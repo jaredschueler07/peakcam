@@ -1,0 +1,35 @@
+{
+  "name": "peakcam",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "import-resorts": "ts-node --esm --project tsconfig.scripts.json scripts/import-resorts.ts",
+    "import-resorts:standalone": "node scripts/import-resorts-standalone.mjs"
+  },
+  "dependencies": {
+    "next": "16.1.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "@supabase/supabase-js": "^2.49.0",
+    "csv-parse": "^5.5.6",
+    "dotenv": "^16.4.5",
+    "fuse.js": "^7.0.0",
+    "leaflet": "^1.9.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5",
+    "@types/leaflet": "^1.9.14"
+  }
+}

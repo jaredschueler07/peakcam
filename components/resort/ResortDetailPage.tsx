@@ -1,0 +1,320 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { Header } from "@/components/layout/Header";
+import { ConditionBadge } from "@/components/ui/Badge";
+import type { ResortWithData, WeatherPeriod, Cam } from "@/lib/types";
+
+interface Props {
+  resort: ResortWithData;
+  weather: WeatherPeriod[] | null;
+}
+
+// ─── Cam player ──────────────────────────────────────────────────────────────
+
+function CamPlayer({ cam }: { cam: Cam }) {
+  const [loaded, setLoaded] = useState(false);
+
+  // Link-out cams — no embed available
+  if (cam.embed_type === "link") {
+    return (
+      <a
+        href={cam.embed_url ?? "#"}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group flex flex-col items-center justify-center gap-3 bg-surface2 rounded-xl
+                   border border-border hover:border-border-hi aspect-video
+                   transition-all duration-220 hover:shadow-glow"
+      >
+        <div className="w-12 h-12 rounded-full bg-bg border border-border flex items-center justify-center
+                        group-hover:border-cyan group-hover:text-cyan text-text-muted transition-all duration-220">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+        </div>
+        <div className="text-center px-4">
+          <p className="text-text-subtle text-sm font-medium group-hover:text-cyan transition-colors">
+            {cam.name}
+          </p>
+          <p className="text-text-muted text-xs mt-0.5">Opens on resort website</p>
+        </div>
+      </a>
+    );
+  }
+
+  // YouTube + iframe — click-to-play
+  const embedSrc =
+    cam.embed_type === "youtube" && cam.youtube_id
+      ? `https://www.youtube.com/embed/${cam.youtube_id}?autoplay=1&mute=1`
+      : cam.embed_url ?? "";
+
+  return (
+    <div className="relative aspect-video bg-surface2 rounded-xl overflow-hidden border border-border">
+      {/* Placeholder until user clicks */}
+      {!loaded && (
+        <button
+          onClick={() => setLoaded(true)}
+          className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-3
+                     hover:bg-white/5 transition-colors group"
+        >
+          <div className="w-14 h-14 rounded-full bg-cyan/10 border border-cyan/30 flex items-center justify-center
+                          group-hover:bg-cyan/20 group-hover:border-cyan transition-all duration-220">
+            <svg className="w-6 h-6 text-cyan ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </div>
+          <div className="text-center px-4">
+            <p className="text-text-subtle text-sm font-medium">{cam.name}</p>
+            {cam.elevation && (
+              <p className="text-text-muted text-xs mt-0.5">
+                {Number(cam.elevation).toLocaleString()}′ elevation
+              </p>
+            )}
+            <p className="text-text-muted text-xs mt-1 flex items-center justify-center gap-1">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-[livePulse_2s_ease-in-out_infinite]" />
+              Click to load live cam
+            </p>
+          </div>
+        </button>
+      )}
+
+      {/* Actual embed */}
+      {loaded && (
+        <iframe
+          src={embedSrc}
+          title={cam.name}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          className="absolute inset-0 w-full h-full border-0"
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Weather strip ───────────────────────────────────────────────────────────
+
+function WeatherStrip({ weather }: { weather: WeatherPeriod[] }) {
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-1">
+      {weather.map((day, i) => (
+        <div
+          key={i}
+          className={`shrink-0 flex flex-col items-center gap-1.5 rounded-xl px-4 py-3 border min-w-[72px]
+            ${i === 0 ? "bg-surface2 border-border-hi" : "bg-surface border-border"}`}
+        >
+          <span className="text-text-muted text-[11px] font-medium">{day.dow}</span>
+          <span className="text-xl">{day.icon}</span>
+          <div className="text-center">
+            <span className="text-text-base text-sm font-semibold">{day.high}°</span>
+            {day.low != null && (
+              <span className="text-text-muted text-xs"> / {day.low}°</span>
+            )}
+          </div>
+          {day.snowInches > 0 && (
+            <span className="text-powder text-[11px] font-medium">
+              ⛄ {day.snowInches}″
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Conditions strip ────────────────────────────────────────────────────────
+
+function ConditionsStrip({ resort }: { resort: ResortWithData }) {
+  const snow = resort.snow_report;
+  if (!snow) return null;
+
+  const stats = [
+    { label: "Base Depth", value: snow.base_depth != null ? `${snow.base_depth}″` : "—", color: "text-powder" },
+    { label: "24h New Snow", value: snow.new_snow_24h != null ? `${snow.new_snow_24h}″` : "—", color: "text-cyan" },
+    { label: "48h New Snow", value: snow.new_snow_48h != null ? `${snow.new_snow_48h}″` : "—", color: "text-cyan-dim" },
+    {
+      label: "Trails Open",
+      value: snow.trails_open != null ? `${snow.trails_open}${snow.trails_total ? `/${snow.trails_total}` : ""}` : "—",
+      color: "text-text-base",
+    },
+    {
+      label: "Lifts Open",
+      value: snow.lifts_open != null ? `${snow.lifts_open}${snow.lifts_total ? `/${snow.lifts_total}` : ""}` : "—",
+      color: "text-text-base",
+    },
+  ];
+
+  return (
+    <div className="flex flex-wrap gap-3">
+      {stats.map((s) => (
+        <div key={s.label} className="bg-surface border border-border rounded-xl px-4 py-3 min-w-[100px]">
+          <div className={`text-2xl font-bold ${s.color} leading-none`}>{s.value}</div>
+          <div className="text-text-muted text-xs mt-1">{s.label}</div>
+        </div>
+      ))}
+      {snow.conditions && (
+        <div className="bg-surface border border-border rounded-xl px-4 py-3">
+          <div className="text-text-base text-sm font-semibold">{snow.conditions}</div>
+          <div className="text-text-muted text-xs mt-1">Conditions</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
+export function ResortDetailPage({ resort, weather }: Props) {
+  const activeCams = resort.cams.filter((c) => c.is_active);
+  const snow = resort.snow_report;
+
+  return (
+    <div className="min-h-screen bg-bg">
+      <Header showSearch={false} />
+
+      {/* ── Hero ──────────────────────────────────────────────── */}
+      <div className="bg-gradient-to-b from-surface2 to-bg border-b border-border px-4 py-6 md:px-8 md:py-8">
+        <div className="max-w-5xl mx-auto">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-text-muted hover:text-cyan text-sm transition-colors mb-4"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            All Resorts
+          </Link>
+
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-extrabold text-text-base tracking-tight leading-tight">
+                {resort.name}
+              </h1>
+              <p className="text-text-muted text-sm mt-1.5">
+                {resort.region} · {resort.state}
+              </p>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              {resort.cond_rating && (
+                <ConditionBadge
+                  rating={resort.cond_rating}
+                  label={resort.cond_rating.charAt(0).toUpperCase() + resort.cond_rating.slice(1)}
+                />
+              )}
+              {resort.website_url && (
+                <a
+                  href={resort.website_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-text-muted hover:text-cyan text-sm border border-border hover:border-border-hi
+                             rounded-lg px-3 py-1.5 transition-all duration-150"
+                >
+                  Resort site ↗
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Content ───────────────────────────────────────────── */}
+      <div className="max-w-5xl mx-auto px-4 py-8 md:px-8 space-y-10">
+
+        {/* Snow conditions */}
+        {snow ? (
+          <section>
+            <h2 className="text-lg font-bold text-text-base mb-4">Snow Report</h2>
+            <ConditionsStrip resort={resort} />
+            <p className="text-text-muted text-xs mt-2">
+              Updated {new Date(snow.updated_at).toLocaleDateString("en-US", {
+                month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+              })} · Source: {snow.source}
+            </p>
+          </section>
+        ) : (
+          <section>
+            <h2 className="text-lg font-bold text-text-base mb-3">Snow Report</h2>
+            <div className="bg-surface border border-border rounded-xl p-6 text-center text-text-muted text-sm">
+              No snow data available yet. Check back after the first SNOTEL sync.
+            </div>
+          </section>
+        )}
+
+        {/* Weather forecast */}
+        {weather && weather.length > 0 && (
+          <section>
+            <h2 className="text-lg font-bold text-text-base mb-4">5-Day Forecast</h2>
+            <WeatherStrip weather={weather} />
+            <p className="text-text-muted text-xs mt-2">Via National Weather Service · Updated hourly</p>
+          </section>
+        )}
+
+        {/* Live cams */}
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-text-base">
+              Live Cams
+              <span className="ml-2 text-text-muted text-sm font-normal">
+                {activeCams.length} available
+              </span>
+            </h2>
+            {resort.cam_page_url && (
+              <a
+                href={resort.cam_page_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-text-muted hover:text-cyan text-xs transition-colors"
+              >
+                View all on resort site ↗
+              </a>
+            )}
+          </div>
+
+          {activeCams.length === 0 ? (
+            <div className="bg-surface border border-border rounded-xl p-6 text-center text-text-muted text-sm">
+              No cams indexed yet for this resort.{" "}
+              {resort.cam_page_url && (
+                <a href={resort.cam_page_url} target="_blank" rel="noopener noreferrer"
+                  className="text-cyan hover:underline">
+                  View on resort website ↗
+                </a>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {activeCams.map((cam) => (
+                <div key={cam.id}>
+                  <CamPlayer cam={cam} />
+                  <p className="text-text-muted text-xs mt-1.5 px-1">
+                    {cam.name}
+                    {cam.elevation && (
+                      <span className="ml-1.5 text-text-muted/60">
+                        · {Number(cam.elevation).toLocaleString()}′
+                      </span>
+                    )}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Footer nav */}
+        <div className="border-t border-border pt-6">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-text-muted hover:text-cyan text-sm transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to all resorts
+          </Link>
+        </div>
+
+      </div>
+    </div>
+  );
+}

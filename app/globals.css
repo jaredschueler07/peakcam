@@ -1,0 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+/* ── Root variables ── */
+:root {
+  --bg:          #070B11;
+  --surface:     #0C1220;
+  --surface2:    #111928;
+  --surface3:    #172035;
+  --border:      #1E2D47;
+  --border-hi:   #2A3F5F;
+  --cyan:        #22D3EE;
+  --cyan-dim:    #0A2A35;
+  --cyan-mid:    #0E3D4D;
+  --snow:        #BAE6FD;
+  --text-base:   #F1F5F9;
+  --text-subtle: #94A3B8;
+  --text-muted:  #64748B;
+  --success:     #34D399;
+}
+
+/* ── Base ── */
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text-base);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* ── Scrollbars ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-hi); }
+
+/* ── Animations ── */
+@keyframes fadeIn    { from { opacity: 0 }                           to { opacity: 1 } }
+@keyframes slideUp   { from { transform: translateY(12px); opacity: 0 } to { transform: none; opacity: 1 } }
+@keyframes livePulse { 0%,100% { opacity:1; transform:scale(1) }   50% { opacity:.4; transform:scale(.75) } }
+@keyframes blink     { 0%,100% { opacity:1 }                        50% { opacity:.25 } }
+
+.animate-fadeIn    { animation: fadeIn    200ms ease; }
+.animate-slideUp   { animation: slideUp   220ms ease; }
+.animate-livePulse { animation: livePulse 2s   infinite; }
+.animate-blink     { animation: blink     1.5s ease infinite; }
+
+/* ── Leaflet dark map overrides ── */
+.leaflet-container               { background: #060A12 !important; font-family: 'Inter', sans-serif !important; }
+.leaflet-popup-content-wrapper   { background: var(--surface2) !important; border: 1px solid var(--border-hi) !important; border-radius: 10px !important; box-shadow: 0 8px 30px rgba(0,0,0,.6) !important; color: var(--text-base) !important; }
+.leaflet-popup-content           { color: var(--text-base) !important; margin: 12px 15px !important; font-family: 'Inter', sans-serif !important; }
+.leaflet-popup-tip               { background: var(--surface2) !important; }
+.leaflet-popup-close-button      { color: var(--text-muted) !important; font-size: 18px !important; }
+.leaflet-control-zoom            { border: 1px solid var(--border) !important; border-radius: 8px !important; overflow: hidden; }
+.leaflet-control-zoom a          { background: var(--surface2) !important; color: var(--text-base) !important; border-color: var(--border) !important; }
+.leaflet-control-zoom a:hover    { background: var(--surface3) !important; }
