@@ -129,7 +129,7 @@ function ResortCard({ resort }: { resort: ResortWithData }) {
 
 function PowderAlert({ resorts }: { resorts: ResortWithData[] }) {
   const alerts = resorts
-    .filter((r) => (r.snow_report?.new_snow_24h ?? 0) >= 6)
+    .filter((r) => (r.snow_report?.new_snow_24h ?? 0) >= 8)
     .sort((a, b) => (b.snow_report?.new_snow_24h ?? 0) - (a.snow_report?.new_snow_24h ?? 0))
     .slice(0, 4);
 
@@ -158,6 +158,8 @@ export function BrowsePage({ resorts }: Props) {
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState<StateFilter>("All");
   const [condFilter, setCondFilter] = useState<ConditionFilter>("all");
+  const [hasLiveCams, setHasLiveCams] = useState(false);
+  const [freshSnow, setFreshSnow] = useState(false);
   const [sort, setSort] = useState<SortOption>("name");
   const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(true);
@@ -177,6 +179,8 @@ export function BrowsePage({ resorts }: Props) {
 
     if (stateFilter !== "All") list = list.filter((r) => r.state === stateFilter);
     if (condFilter !== "all") list = list.filter((r) => r.cond_rating === condFilter);
+    if (hasLiveCams) list = list.filter((r) => r.cams.some((c) => c.is_active));
+    if (freshSnow) list = list.filter((r) => (r.snow_report?.new_snow_24h ?? 0) >= 8);
 
     if (sort === "name") {
       list = [...list].sort((a, b) => a.name.localeCompare(b.name));
@@ -192,7 +196,7 @@ export function BrowsePage({ resorts }: Props) {
     }
 
     return list;
-  }, [resorts, fuse, search, stateFilter, condFilter, sort]);
+  }, [resorts, fuse, search, stateFilter, condFilter, hasLiveCams, freshSnow, sort]);
 
   const handleClearSearch = useCallback(() => setSearch(""), []);
 
@@ -274,6 +278,23 @@ export function BrowsePage({ resorts }: Props) {
               ))}
             </div>
           </div>
+
+          {/* Feature + condition filters */}
+          <div className="flex items-center gap-2 flex-wrap mt-3">
+            <Chip label="Has Live Cams" active={hasLiveCams} onClick={() => setHasLiveCams((v) => !v)} />
+            <Chip label="Fresh Snow 8″+" active={freshSnow} onClick={() => setFreshSnow((v) => !v)} />
+
+            <span className="w-px h-5 bg-border mx-1 hidden sm:block" />
+
+            {(["all", "great", "good", "fair", "poor"] as ConditionFilter[]).map((c) => (
+              <Chip
+                key={c}
+                label={c === "all" ? "Any Condition" : c.charAt(0).toUpperCase() + c.slice(1)}
+                active={condFilter === c}
+                onClick={() => setCondFilter(condFilter === c ? "all" : c)}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
@@ -290,7 +311,7 @@ export function BrowsePage({ resorts }: Props) {
                 <p className="text-lg font-medium text-text-subtle">No resorts found</p>
                 <p className="text-sm mt-1">Try a different search or clear your filters.</p>
                 <button
-                  onClick={() => { setSearch(""); setStateFilter("All"); setCondFilter("all"); }}
+                  onClick={() => { setSearch(""); setStateFilter("All"); setCondFilter("all"); setHasLiveCams(false); setFreshSnow(false); }}
                   className="mt-4 text-cyan text-sm hover:underline">
                   Clear all filters
                 </button>
