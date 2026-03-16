@@ -89,7 +89,8 @@ function splitCsvLine(line) {
 // ─── Supabase REST helper ─────────────────────────────────────────────────────
 
 async function supabaseUpsert(table, records, onConflict) {
-  const url = `${SUPABASE_URL}/rest/v1/${table}`;
+  // ?on_conflict= is required by Supabase REST API for upsert to work
+  const url = `${SUPABASE_URL}/rest/v1/${table}?on_conflict=${onConflict}`;
   const res = await fetch(url, {
     method: "POST",
     headers: {

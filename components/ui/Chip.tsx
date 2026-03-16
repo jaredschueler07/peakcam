@@ -17,7 +17,7 @@ export function Chip({ label, active = false, onClick, icon }: ChipProps) {
         text-xs font-semibold border cursor-pointer select-none
         transition-all duration-[220ms] whitespace-nowrap
         ${active
-          ? "border-cyan-400/30 bg-cyan-dim text-cyan shadow-cyan-glow"
+          ? "border-cyan/30 bg-cyan-dim text-cyan"
           : "border-border bg-surface2 text-text-muted hover:border-border-hi hover:text-text-subtle"}
       `}
     >

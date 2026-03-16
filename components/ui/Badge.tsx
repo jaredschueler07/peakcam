@@ -3,17 +3,17 @@ import { type ConditionRating } from "@/lib/types";
 
 // ── Condition badge ───────────────────────────────────────────
 const conditionStyles: Record<ConditionRating, string> = {
-  great: "bg-cyan-dim border border-cyan-400/20 text-cyan-400",
-  good:  "bg-blue-950/40 border border-blue-400/20 text-blue-400",
-  fair:  "bg-yellow-950/40 border border-yellow-400/20 text-yellow-400",
-  poor:  "bg-red-950/40 border border-red-400/20 text-red-400",
+  great: "bg-cyan-dim border border-cyan/20 text-cyan",
+  good:  "bg-[#142a18] border border-good/20 text-good",
+  fair:  "bg-[#2a2210] border border-fair/20 text-fair",
+  poor:  "bg-[#2a1414] border border-poor/20 text-poor",
 };
 
 const conditionDot: Record<ConditionRating, string> = {
-  great: "bg-cyan-400",
-  good:  "bg-blue-400",
-  fair:  "bg-yellow-400",
-  poor:  "bg-red-400",
+  great: "bg-cyan",
+  good:  "bg-good",
+  fair:  "bg-fair",
+  poor:  "bg-poor",
 };
 
 interface ConditionBadgeProps {

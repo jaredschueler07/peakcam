@@ -56,14 +56,14 @@ function ResortCard({ resort }: { resort: ResortWithData }) {
     <Link
       href={`/resorts/${resort.slug}`}
       className="group block bg-surface border border-border rounded-xl overflow-hidden
-                 hover:border-border-hi hover:shadow-glow transition-all duration-220
+                 hover:border-border-hi hover:shadow-card-hover transition-all duration-220
                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan"
     >
       {/* Snow depth bar */}
       <div className="h-1 w-full bg-surface2">
         {baseDepth != null && (
           <div
-            className="h-full bg-gradient-to-r from-cyan to-powder transition-all duration-300"
+            className="h-full bg-cyan transition-all duration-300"
             style={{ width: `${Math.min((baseDepth / 120) * 100, 100)}%` }}
           />
         )}
@@ -209,7 +209,7 @@ export function BrowsePage({ resorts }: Props) {
         <div className="max-w-screen-2xl mx-auto">
           <div className="flex items-end justify-between mb-4">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-text-base tracking-tight">
+              <h1 className="text-2xl md:text-3xl font-heading font-bold text-text-base uppercase tracking-wider">
                 Browse Resorts
               </h1>
               <p className="text-text-muted text-sm mt-0.5">
@@ -243,7 +243,7 @@ export function BrowsePage({ resorts }: Props) {
               placeholder="Search by resort, region, or state…"
               className="w-full bg-surface border border-border rounded-xl pl-9 pr-9 py-2.5 text-sm
                          text-text-base placeholder:text-text-muted
-                         focus:outline-none focus:border-cyan focus:ring-1 focus:ring-cyan/30
+                         focus:outline-none focus:border-cyan
                          transition-colors duration-150"
             />
             {search && (

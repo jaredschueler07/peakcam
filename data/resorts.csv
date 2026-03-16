@@ -4,71 +4,71 @@ Breckenridge,breckenridge,CO,Summit County,39.4817,-106.0670,https://www.brecken
 Keystone Resort,keystone,CO,Summit County,39.6042,-105.9478,https://www.keystoneresort.com,https://www.keystoneresort.com/the-mountain/mountain-conditions/mountain-cams.aspx,1187,true
 Beaver Creek Resort,beaver-creek,CO,Eagle County,39.6042,-106.5178,https://www.beavercreek.com,https://www.beavercreek.com/the-mountain/mountain-conditions/mountain-cams.aspx,622,true
 Crested Butte Mountain Resort,crested-butte,CO,Elk Mountains,38.8989,-106.9614,https://www.skicb.com,https://www.skicb.com/the-mountain/mountain-conditions/mountain-cams.aspx,542,true
-Telluride Ski Resort,telluride,CO,San Juan Mountains,37.9375,-107.8123,https://www.tellurideskiresort.com,https://www.tellurideskiresort.com/mountain/webcams/,592,true
-Aspen Snowmass,aspen-snowmass,CO,Elk Mountains,39.2083,-106.9498,https://www.aspensnowmass.com,https://www.aspensnowmass.com/our-mountains/mountain-cams,551,true
-Arapahoe Basin,arapahoe-basin,CO,Summit County,39.6428,-105.8714,https://www.arapahoebasin.com,https://www.arapahoebasin.com/the-mountain/webcams/,1187,true
-Loveland Ski Area,loveland,CO,Clear Creek County,39.6800,-105.8978,https://skiloveland.com,https://skiloveland.com/the-mountain/webcams/,1187,true
-Copper Mountain,copper-mountain,CO,Summit County,39.5022,-106.1497,https://www.coppercolorado.com,https://www.coppercolorado.com/the-mountain/conditions/cams,1187,true
-Wolf Creek Ski Area,wolf-creek,CO,San Juan Mountains,37.4756,-106.7953,https://wolfcreekski.com,https://wolfcreekski.com/conditions/webcams/,,true
-Monarch Mountain,monarch-mountain,CO,Sawatch Range,38.5203,-106.3306,https://skimonarch.com,https://skimonarch.com/the-mountain/webcams/,,true
-Powderhorn Mountain Resort,powderhorn,CO,Grand Mesa,39.0697,-108.0267,https://powderhorn.com,https://powderhorn.com/mountain-conditions/webcams/,,true
-Ski Cooper,ski-cooper,CO,Lake County,39.3628,-106.3567,https://skicooper.com,https://skicooper.com/mountain-report/webcams/,,true
+Telluride Ski Resort,telluride,CO,San Juan Mountains,37.9375,-107.8123,https://www.tellurideskiresort.com,https://www.tellurideskiresort.com/webcams/,592,true
+Aspen Snowmass,aspen-snowmass,CO,Elk Mountains,39.2083,-106.9498,https://www.aspensnowmass.com,https://www.aspensnowmass.com/four-mountains/mountain-cams,551,true
+Arapahoe Basin,arapahoe-basin,CO,Summit County,39.6428,-105.8714,https://www.arapahoebasin.com,https://www.arapahoebasin.com/mountain-cams/,1187,true
+Loveland Ski Area,loveland,CO,Clear Creek County,39.6800,-105.8978,https://skiloveland.com,https://skiloveland.com/webcams/,1187,true
+Copper Mountain,copper-mountain,CO,Summit County,39.5022,-106.1497,https://www.coppercolorado.com,https://www.coppercolorado.com/the-mountain/webcams/,1187,true
+Wolf Creek Ski Area,wolf-creek,CO,San Juan Mountains,37.4756,-106.7953,https://wolfcreekski.com,https://wolfcreekski.com/webcams/,,true
+Monarch Mountain,monarch-mountain,CO,Sawatch Range,38.5203,-106.3306,https://skimonarch.com,https://skimonarch.com/conditions/cams/,,true
+Powderhorn Mountain Resort,powderhorn,CO,Grand Mesa,39.0697,-108.0267,https://powderhorn.com,https://powderhorn.com/explore/conditions/webcams.html,,true
+Ski Cooper,ski-cooper,CO,Lake County,39.3628,-106.3567,https://skicooper.com,https://www.skicooper.com/weather-webcams/,,true
 Park City Mountain,park-city,UT,Wasatch Range,40.6461,-111.5080,https://www.parkcitymountain.com,https://www.parkcitymountain.com/the-mountain/mountain-conditions/mountain-cams.aspx,768,true
-Snowbird,snowbird,UT,Little Cottonwood Canyon,40.5830,-111.6553,https://www.snowbird.com,https://www.snowbird.com/mountain-report/webcams/,1125,true
-Alta Ski Area,alta,UT,Little Cottonwood Canyon,40.5883,-111.6378,https://www.alta.com,https://www.alta.com/conditions/webcams,1125,true
-Solitude Mountain Resort,solitude,UT,Big Cottonwood Canyon,40.6197,-111.5917,https://www.solitudemountain.com,https://www.solitudemountain.com/mountain/webcams/,1106,true
-Brighton Resort,brighton,UT,Big Cottonwood Canyon,40.5981,-111.5839,https://www.brightonresort.com,https://www.brightonresort.com/mountain/webcams/,1106,true
-Deer Valley Resort,deer-valley,UT,Wasatch Range,40.6375,-111.4781,https://www.deervalley.com,https://www.deervalley.com/the-mountain/mountain-report/webcams,768,true
-Mammoth Mountain,mammoth,CA,Eastern Sierra,37.6308,-119.0326,https://www.mammothmountain.com,https://www.mammothmountain.com/on-the-mountain/mountain-report/webcams,1132,true
-Palisades Tahoe,palisades-tahoe,CA,Lake Tahoe,39.1969,-120.2358,https://www.palisadestahoe.com,https://www.palisadestahoe.com/the-mountain/conditions/webcams,778,true
-Sugar Bowl Resort,sugar-bowl,CA,Lake Tahoe,39.2939,-120.3497,https://www.sugarbowl.com,https://www.sugarbowl.com/mountain/webcams,778,true
+Snowbird,snowbird,UT,Little Cottonwood Canyon,40.5830,-111.6553,https://www.snowbird.com,https://www.snowbird.com/the-mountain/webcams/view-all-webcams/,1125,true
+Alta Ski Area,alta,UT,Little Cottonwood Canyon,40.5883,-111.6378,https://www.alta.com,https://www.alta.com/weather,1125,true
+Solitude Mountain Resort,solitude,UT,Big Cottonwood Canyon,40.6197,-111.5917,https://www.solitudemountain.com,https://www.solitudemountain.com/mountain-and-village/webcams,1106,true
+Brighton Resort,brighton,UT,Big Cottonwood Canyon,40.5981,-111.5839,https://www.brightonresort.com,https://www.brightonresort.com/conditions,1106,true
+Deer Valley Resort,deer-valley,UT,Wasatch Range,40.6375,-111.4781,https://www.deervalley.com,https://www.deervalley.com/explore-the-mountain/webcams,768,true
+Mammoth Mountain,mammoth,CA,Eastern Sierra,37.6308,-119.0326,https://www.mammothmountain.com,https://www.mammothmountain.com/on-the-mountain/mammoth-webcam,1132,true
+Palisades Tahoe,palisades-tahoe,CA,Lake Tahoe,39.1969,-120.2358,https://www.palisadestahoe.com,https://www.palisadestahoe.com/mountain-information/webcams,778,true
+Sugar Bowl Resort,sugar-bowl,CA,Lake Tahoe,39.2939,-120.3497,https://www.sugarbowl.com,https://www.sugarbowl.com/webcams,778,true
 Northstar California,northstar,CA,Lake Tahoe,39.2744,-120.1208,https://www.northstarcalifornia.com,https://www.northstarcalifornia.com/the-mountain/mountain-conditions/mountain-cams.aspx,778,true
 Heavenly Mountain Resort,heavenly,CA,Lake Tahoe,38.9353,-119.9400,https://www.skiheavenly.com,https://www.skiheavenly.com/the-mountain/mountain-conditions/mountain-cams.aspx,778,true
 Kirkwood Mountain Resort,kirkwood,CA,Lake Tahoe,38.6850,-120.0656,https://www.kirkwood.com,https://www.kirkwood.com/the-mountain/mountain-conditions/mountain-cams.aspx,778,true
-Homewood Mountain Resort,homewood,CA,Lake Tahoe,39.0836,-120.1647,https://skihomewood.com,https://skihomewood.com/mountain/webcams/,,true
-Sierra-at-Tahoe,sierra-at-tahoe,CA,Lake Tahoe,38.7969,-120.0808,https://www.sierratahoeski.com,https://www.sierratahoeski.com/mountain/webcams,,true
-Mt. Rose Ski Tahoe,mt-rose,NV,Lake Tahoe,39.3156,-119.8814,https://www.mtrose.com,https://www.mtrose.com/mountain/webcams,,true
-Diamond Peak Ski Resort,diamond-peak,NV,Lake Tahoe,39.2536,-119.9467,https://www.diamondpeak.com,https://www.diamondpeak.com/mountain/webcams,,true
-Mt. Shasta Ski Park,mt-shasta,CA,Northern California,41.3597,-122.1781,https://skipark.com,https://skipark.com/conditions/webcams,,true
-Bear Mountain,bear-mountain,CA,Southern California,34.2236,-116.8556,https://bearmountain.com,https://bearmountain.com/mountain/webcams,,true
-Snow Summit,snow-summit,CA,Southern California,34.2414,-116.8903,https://snowsummit.com,https://snowsummit.com/mountain/webcams,,true
-Mountain High Resort,mountain-high,CA,Southern California,34.3792,-117.6450,https://mthigh.com,https://mthigh.com/mountain/webcams,,true
-Dodge Ridge Mountain Resort,dodge-ridge,CA,Central Sierra,38.1683,-119.9517,https://dodgeridge.com,https://dodgeridge.com/conditions/webcams,,true
-Jackson Hole Mountain Resort,jackson-hole,WY,Teton Range,43.5875,-110.8281,https://www.jacksonhole.com,https://www.jacksonhole.com/mountain/webcams.html,1002,true
-Big Sky Resort,big-sky,MT,Gallatin Range,45.2858,-111.4012,https://bigskyresort.com,https://bigskyresort.com/mountain/webcams,1009,true
-Sun Valley Resort,sun-valley,ID,Wood River Valley,43.6877,-114.3510,https://www.sunvalley.com,https://www.sunvalley.com/mountain-stats/webcams,,true
-Tamarack Resort,tamarack,ID,West-Central Idaho,44.6900,-115.7042,https://tamarackidaho.com,https://tamarackidaho.com/mountain/webcams,,true
-Schweitzer Mountain Resort,schweitzer,ID,Selkirk Mountains,48.3683,-116.6203,https://www.schweitzer.com,https://www.schweitzer.com/mountain/webcams,,true
-Bogus Basin Mountain Recreation Area,bogus-basin,ID,Boise Mountains,43.7636,-116.1011,https://bogusbasin.org,https://bogusbasin.org/mountain/webcams,,true
-Mt. Bachelor Ski Resort,mt-bachelor,OR,Cascade Range,43.9786,-121.6878,https://www.mtbachelor.com,https://www.mtbachelor.com/mountain/webcams,995,true
-Mt. Hood Meadows,mt-hood-meadows,OR,Mt. Hood,45.3281,-121.6692,https://www.skihood.com,https://www.skihood.com/explore/mountain/webcams,,true
-Timberline Lodge Ski Area,timberline,OR,Mt. Hood,45.3311,-121.7097,https://www.timberlinelodge.com,https://www.timberlinelodge.com/mountain/conditions/webcams,,true
+Homewood Mountain Resort,homewood,CA,Lake Tahoe,39.0836,-120.1647,https://skihomewood.com,https://skihomewood.com/webcams/,,true
+Sierra-at-Tahoe,sierra-at-tahoe,CA,Lake Tahoe,38.7969,-120.0808,https://www.sierraattahoe.com,https://www.sierraattahoe.com/live-cams/,,true
+Mt. Rose Ski Tahoe,mt-rose,NV,Lake Tahoe,39.3156,-119.8814,https://www.mtrose.com,https://skirose.com/the-mountain-web-cams/,,true
+Diamond Peak Ski Resort,diamond-peak,NV,Lake Tahoe,39.2536,-119.9467,https://www.diamondpeak.com,https://www.diamondpeak.com/the-mountain/web-cams/,,true
+Mt. Shasta Ski Park,mt-shasta,CA,Northern California,41.3597,-122.1781,https://skipark.com,https://www.skipark.com/winter/mountain-cams,,true
+Bear Mountain,bear-mountain,CA,Southern California,34.2236,-116.8556,https://www.bigbearmountainresort.com,https://www.bigbearmountainresort.com/webcams/bear-mountain,,true
+Snow Summit,snow-summit,CA,Southern California,34.2414,-116.8903,https://www.bigbearmountainresort.com,https://www.bigbearmountainresort.com/webcams/snow-summit,,true
+Mountain High Resort,mountain-high,CA,Southern California,34.3792,-117.6450,https://mthigh.com,https://www.mthigh.com/site/mountain/mountain-info/livecams/index.html,,true
+Dodge Ridge Mountain Resort,dodge-ridge,CA,Central Sierra,38.1683,-119.9517,https://dodgeridge.com,https://dodgeridge.com/webcams/,,true
+Jackson Hole Mountain Resort,jackson-hole,WY,Teton Range,43.5875,-110.8281,https://www.jacksonhole.com,https://www.jacksonhole.com/live-mountain-cams,1002,true
+Big Sky Resort,big-sky,MT,Gallatin Range,45.2858,-111.4012,https://bigskyresort.com,https://www.bigskyresort.com/current-conditions/webcams,1009,true
+Sun Valley Resort,sun-valley,ID,Wood River Valley,43.6877,-114.3510,https://www.sunvalley.com,https://www.sunvalley.com/the-mountain/web-cams/,,true
+Tamarack Resort,tamarack,ID,West-Central Idaho,44.6900,-115.7042,https://tamarackidaho.com,https://tamarackidaho.com/about/webcams,,true
+Schweitzer Mountain Resort,schweitzer,ID,Selkirk Mountains,48.3683,-116.6203,https://www.schweitzer.com,https://www.schweitzer.com/mountain-info/webcam,,true
+Bogus Basin Mountain Recreation Area,bogus-basin,ID,Boise Mountains,43.7636,-116.1011,https://bogusbasin.org,https://bogusbasin.org/your-mountain/conditions-webcams/,,true
+Mt. Bachelor Ski Resort,mt-bachelor,OR,Cascade Range,43.9786,-121.6878,https://www.mtbachelor.com,https://www.mtbachelor.com/the-mountain/webcams/,995,true
+Mt. Hood Meadows,mt-hood-meadows,OR,Mt. Hood,45.3281,-121.6692,https://www.skihood.com,https://www.skihood.com/mountain-report/mountain-cams,,true
+Timberline Lodge Ski Area,timberline,OR,Mt. Hood,45.3311,-121.7097,https://www.timberlinelodge.com,https://timberlinelodge.com/webcams/,,true
 Stevens Pass Mountain Resort,stevens-pass,WA,Cascade Range,47.7453,-121.0858,https://www.stevenspass.com,https://www.stevenspass.com/the-mountain/mountain-conditions/mountain-cams.aspx,920,true
-Crystal Mountain Resort,crystal-mountain,WA,Cascade Range,46.9353,-121.4739,https://www.crystalmountainresort.com,https://www.crystalmountainresort.com/the-mountain/mountain-conditions/mountain-cams.aspx,1122,true
-The Summit at Snoqualmie,snoqualmie,WA,Cascade Range,47.4072,-121.4125,https://www.summitatsnoqualmie.com,https://www.summitatsnoqualmie.com/mountain/webcams,,true
+Crystal Mountain Resort,crystal-mountain,WA,Cascade Range,46.9353,-121.4739,https://www.crystalmountainresort.com,https://www.crystalmountainresort.com/the-mountain/mountain-report-and-webcams/webcams,1122,true
+The Summit at Snoqualmie,snoqualmie,WA,Cascade Range,47.4072,-121.4125,https://www.summitatsnoqualmie.com,https://www.summitatsnoqualmie.com/webcams,,true
 Whistler Blackcomb,whistler-blackcomb,BC,Coast Mountains,50.1158,-122.9542,https://www.whistlerblackcomb.com,https://www.whistlerblackcomb.com/the-mountain/mountain-conditions/mountain-cams.aspx,1153,true
-Steamboat Ski Resort,steamboat,CO,Park Range,40.4572,-106.8031,https://www.steamboat.com,https://www.steamboat.com/mountain-life/webcams,1019,true
-Winter Park Resort,winter-park,CO,Front Range,39.8867,-105.7628,https://www.winterparkresort.com,https://www.winterparkresort.com/the-mountain/webcams,1061,true
-Snowshoe Mountain Resort,snowshoe,WV,Appalachians,38.4028,-79.9958,https://www.snowshoemtn.com,https://www.snowshoemtn.com/mountain/webcams,,true
-Stratton Mountain Resort,stratton,VT,Green Mountains,43.1114,-72.9072,https://www.stratton.com,https://www.stratton.com/mountain/webcams,,true
+Steamboat Ski Resort,steamboat,CO,Park Range,40.4572,-106.8031,https://www.steamboat.com,https://www.steamboat.com/the-mountain/live-cams,1019,true
+Winter Park Resort,winter-park,CO,Front Range,39.8867,-105.7628,https://www.winterparkresort.com,https://www.winterparkresort.com/the-mountain/mountain-cams,1061,true
+Snowshoe Mountain Resort,snowshoe,WV,Appalachians,38.4028,-79.9958,https://www.snowshoemtn.com,https://www.snowshoemtn.com/media-room/web-cams,,true
+Stratton Mountain Resort,stratton,VT,Green Mountains,43.1114,-72.9072,https://www.stratton.com,https://www.stratton.com/the-mountain/webcams,,true
 Stowe Mountain Resort,stowe,VT,Green Mountains,44.5303,-72.7814,https://www.stowe.com,https://www.stowe.com/the-mountain/mountain-conditions/mountain-cams.aspx,936,true
-Killington Resort,killington,VT,Green Mountains,43.6045,-72.8201,https://www.killington.com,https://www.killington.com/mountain/webcams,,true
+Killington Resort,killington,VT,Green Mountains,43.6045,-72.8201,https://www.killington.com,https://www.killington.com/the-mountain/conditions-weather/webcam/,,true
 Sugarbush Resort,sugarbush,VT,Green Mountains,44.1394,-72.9092,https://www.sugarbush.com,https://www.sugarbush.com/mountain/webcams,,true
-Mad River Glen,mad-river-glen,VT,Green Mountains,44.1928,-72.9367,https://madriverglen.com,https://madriverglen.com/mountain/webcams,,true
-Jay Peak Resort,jay-peak,VT,Northern Vermont,44.9247,-72.5264,https://www.jaypeakresort.com,https://www.jaypeakresort.com/mountain/webcams,,true
-Burke Mountain,burke-mountain,VT,Northeast Kingdom,44.5850,-71.9028,https://www.skiburke.com,https://www.skiburke.com/mountain/webcams,,true
-Bolton Valley Resort,bolton-valley,VT,Green Mountains,44.4231,-72.8742,https://boltonvalley.com,https://boltonvalley.com/mountain/webcams,,true
-Okemo Mountain Resort,okemo,VT,Green Mountains,43.4042,-72.7231,https://www.okemo.com,https://www.okemo.com/mountain/webcams,,true
-Sunday River,sunday-river,ME,Western Maine,44.4706,-70.8556,https://www.sundayriver.com,https://www.sundayriver.com/mountain/webcams,,true
-Sugarloaf,sugarloaf,ME,Western Maine,45.0317,-70.3125,https://www.sugarloaf.com,https://www.sugarloaf.com/mountain/webcams,,true
-Loon Mountain Resort,loon,NH,White Mountains,44.0353,-71.6167,https://www.loonmtn.com,https://www.loonmtn.com/mountain/webcams,,true
-Cannon Mountain,cannon,NH,White Mountains,44.1558,-71.6997,https://www.cannonmt.com,https://www.cannonmt.com/mountain/webcams,,true
-Bretton Woods Mountain Resort,bretton-woods,NH,White Mountains,44.2611,-71.4439,https://www.brettonwoods.com,https://www.brettonwoods.com/mountain/webcams,,true
-Waterville Valley Resort,waterville-valley,NH,White Mountains,43.9739,-71.5119,https://www.waterville.com,https://www.waterville.com/mountain/webcams,,true
-Ski Santa Fe,ski-santa-fe,NM,Sangre de Cristo,35.7906,-105.8214,https://skisantafe.com,https://skisantafe.com/mountain/webcams,,true
-Taos Ski Valley,taos,NM,Sangre de Cristo,36.5950,-105.4481,https://www.skitaos.com,https://www.skitaos.com/the-mountain/webcams,,true
-Mission Ridge Ski & Board Resort,mission-ridge,WA,Eastern Cascades,47.2908,-120.3997,https://www.missionridge.com,https://www.missionridge.com/mountain/webcams,,true
-Donner Ski Ranch,donner-ski-ranch,CA,Lake Tahoe,39.3139,-120.3353,https://www.donnerskiranch.com,https://www.donnerskiranch.com/mountain/webcams,,true
-Boreal Mountain Resort,boreal,CA,Lake Tahoe,39.3597,-120.3553,https://www.borealski.com,https://www.borealski.com/mountain/webcams,,true
-Bear Valley Mountain Resort,bear-valley,CA,Central Sierra,38.4706,-120.0478,https://bearvalley.com,https://bearvalley.com/mountain/webcams,,true
-Ski Bowl at Mt. Hood,ski-bowl,OR,Mt. Hood,45.2964,-121.7281,https://www.skibowl.com,https://www.skibowl.com/mountain/webcams,,true
+Mad River Glen,mad-river-glen,VT,Green Mountains,44.1928,-72.9367,https://madriverglen.com,https://www.madriverglen.com/live-web-cam/,,true
+Jay Peak Resort,jay-peak,VT,Northern Vermont,44.9247,-72.5264,https://www.jaypeakresort.com,https://www.jaypeakresort.com,,true
+Burke Mountain,burke-mountain,VT,Northeast Kingdom,44.5850,-71.9028,https://www.skiburke.com,https://skiburke.com/the-mountain/webcams,,true
+Bolton Valley Resort,bolton-valley,VT,Green Mountains,44.4231,-72.8742,https://boltonvalley.com,https://www.boltonvalley.com/the-resort/live-webcams/,,true
+Okemo Mountain Resort,okemo,VT,Green Mountains,43.4042,-72.7231,https://www.okemo.com,https://www.okemo.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+Sunday River,sunday-river,ME,Western Maine,44.4706,-70.8556,https://www.sundayriver.com,https://www.sundayriver.com,,true
+Sugarloaf,sugarloaf,ME,Western Maine,45.0317,-70.3125,https://www.sugarloaf.com,https://www.sugarloaf.com/mountain-report,,true
+Loon Mountain Resort,loon,NH,White Mountains,44.0353,-71.6167,https://www.loonmtn.com,https://www.loonmtn.com,,true
+Cannon Mountain,cannon,NH,White Mountains,44.1558,-71.6997,https://www.cannonmt.com,https://www.cannonmt.com/webcam,,true
+Bretton Woods Mountain Resort,bretton-woods,NH,White Mountains,44.2611,-71.4439,https://www.brettonwoods.com,https://www.brettonwoods.com/live-cam-forecast/,,true
+Waterville Valley Resort,waterville-valley,NH,White Mountains,43.9739,-71.5119,https://www.waterville.com,https://www.waterville.com/cams,,true
+Ski Santa Fe,ski-santa-fe,NM,Sangre de Cristo,35.7906,-105.8214,https://skisantafe.com,https://skisantafe.com/webcams/,,true
+Taos Ski Valley,taos,NM,Sangre de Cristo,36.5950,-105.4481,https://www.skitaos.com,https://www.skitaos.com/webcams,,true
+Mission Ridge Ski & Board Resort,mission-ridge,WA,Eastern Cascades,47.2908,-120.3997,https://www.missionridge.com,https://www.missionridge.com/mountain-report/,,true
+Donner Ski Ranch,donner-ski-ranch,CA,Lake Tahoe,39.3139,-120.3353,https://www.donnerskiranch.com,https://webcams.donnerskiranch.com/,,true
+Boreal Mountain Resort,boreal,CA,Lake Tahoe,39.3597,-120.3553,https://www.rideboreal.com,https://www.rideboreal.com/explore/webcams/,,true
+Bear Valley Mountain Resort,bear-valley,CA,Central Sierra,38.4706,-120.0478,https://bearvalley.com,https://www.bearvalley.com/webcam,,true
+Ski Bowl at Mt. Hood,ski-bowl,OR,Mt. Hood,45.2964,-121.7281,https://www.skibowl.com,https://www.skibowl.com/jet-popup/video-cam-menu/,,true

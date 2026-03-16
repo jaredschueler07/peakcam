@@ -35,16 +35,9 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
       bg-bg/88 backdrop-blur-md border-b border-border">
 
       {/* Logo */}
-      <Link href="/" className="flex items-center gap-2.5 flex-shrink-0 group">
-        <div className="w-[30px] h-[30px] rounded-lg flex items-center justify-center
-          text-[15px] flex-shrink-0
-          bg-gradient-to-br from-blue-500 to-cyan-400
-          shadow-[0_0_12px_rgba(34,211,238,0.35)]
-          transition-opacity duration-150 group-hover:opacity-85">
-          ⛰
-        </div>
-        <span className="text-[17px] font-extrabold tracking-[-0.6px] text-text-base">
-          Peak<span className="text-cyan">Cam</span>
+      <Link href="/" className="flex items-center flex-shrink-0 group">
+        <span className="font-heading font-bold tracking-wider text-lg text-text-base group-hover:opacity-85 transition-opacity duration-150">
+          PEAK<span className="text-cyan">CAM</span>
         </span>
       </Link>
 
@@ -64,7 +57,7 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
               pl-9 pr-8 py-[9px] text-[13.5px] font-['Inter'] text-text-base
               placeholder:text-text-muted outline-none
               transition-all duration-[220ms]
-              focus:border-cyan focus:bg-surface3 focus:shadow-[0_0_0_3px_rgba(34,211,238,0.1)]"
+              focus:border-cyan focus:bg-surface3"
           />
           {query && (
             <button
@@ -89,7 +82,7 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
               px-3 py-1.5 rounded text-[13px] font-medium whitespace-nowrap
               transition-all duration-150
               ${pathname === link.href
-                ? "text-text-base bg-surface3"
+                ? "text-cyan"
                 : "text-text-muted hover:text-text-subtle hover:bg-surface2"}
             `}
           >

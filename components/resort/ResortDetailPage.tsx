@@ -25,7 +25,7 @@ function CamPlayer({ cam }: { cam: Cam }) {
         rel="noopener noreferrer"
         className="group flex flex-col items-center justify-center gap-3 bg-surface2 rounded-xl
                    border border-border hover:border-border-hi aspect-video
-                   transition-all duration-220 hover:shadow-glow"
+                   transition-all duration-220 hover:shadow-card-hover"
       >
         <div className="w-12 h-12 rounded-full bg-bg border border-border flex items-center justify-center
                         group-hover:border-cyan group-hover:text-cyan text-text-muted transition-all duration-220">
@@ -133,7 +133,7 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
   const stats = [
     { label: "Base Depth", value: snow.base_depth != null ? `${snow.base_depth}″` : "—", color: "text-powder" },
     { label: "24h New Snow", value: snow.new_snow_24h != null ? `${snow.new_snow_24h}″` : "—", color: "text-cyan" },
-    { label: "48h New Snow", value: snow.new_snow_48h != null ? `${snow.new_snow_48h}″` : "—", color: "text-cyan-dim" },
+    { label: "48h New Snow", value: snow.new_snow_48h != null ? `${snow.new_snow_48h}″` : "—", color: "text-text-subtle" },
     {
       label: "Trails Open",
       value: snow.trails_open != null ? `${snow.trails_open}${snow.trails_total ? `/${snow.trails_total}` : ""}` : "—",
@@ -189,7 +189,7 @@ export function ResortDetailPage({ resort, weather }: Props) {
 
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl md:text-4xl font-extrabold text-text-base tracking-tight leading-tight">
+              <h1 className="text-3xl md:text-4xl font-heading font-bold text-text-base uppercase tracking-wider leading-tight">
                 {resort.name}
               </h1>
               <p className="text-text-muted text-sm mt-1.5">
@@ -225,7 +225,7 @@ export function ResortDetailPage({ resort, weather }: Props) {
         {/* Snow conditions */}
         {snow ? (
           <section>
-            <h2 className="text-lg font-bold text-text-base mb-4">Snow Report</h2>
+            <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base mb-4">Snow Report</h2>
             <ConditionsStrip resort={resort} />
             <p className="text-text-muted text-xs mt-2">
               Updated {new Date(snow.updated_at).toLocaleDateString("en-US", {
@@ -235,7 +235,7 @@ export function ResortDetailPage({ resort, weather }: Props) {
           </section>
         ) : (
           <section>
-            <h2 className="text-lg font-bold text-text-base mb-3">Snow Report</h2>
+            <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base mb-3">Snow Report</h2>
             <div className="bg-surface border border-border rounded-xl p-6 text-center text-text-muted text-sm">
               No snow data available yet. Check back after the first SNOTEL sync.
             </div>
@@ -245,7 +245,7 @@ export function ResortDetailPage({ resort, weather }: Props) {
         {/* Weather forecast */}
         {weather && weather.length > 0 && (
           <section>
-            <h2 className="text-lg font-bold text-text-base mb-4">5-Day Forecast</h2>
+            <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base mb-4">5-Day Forecast</h2>
             <WeatherStrip weather={weather} />
             <p className="text-text-muted text-xs mt-2">Via National Weather Service · Updated hourly</p>
           </section>
@@ -254,7 +254,7 @@ export function ResortDetailPage({ resort, weather }: Props) {
         {/* Live cams */}
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-text-base">
+            <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">
               Live Cams
               <span className="ml-2 text-text-muted text-sm font-normal">
                 {activeCams.length} available

@@ -9,52 +9,52 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+        heading: ["Barlow Condensed", "sans-serif"],
+        sans: ["DM Sans", "Inter", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
       },
       colors: {
-        // ── Base palette ──
-        bg:        "#070B11",
-        surface:   "#0C1220",
-        surface2:  "#111928",
-        surface3:  "#172035",
-        border:    "#1E2D47",
-        "border-hi": "#2A3F5F",
+        // ── Base palette (warm charcoal) ──
+        bg:          "#0c0c0e",
+        surface:     "#161618",
+        surface2:    "#1e1e20",
+        surface3:    "#282828",
+        border:      "#2a2826",
+        "border-hi": "#3d3a36",
 
-        // ── Brand accent: mountain sky ──
+        // ── Brand accent: burnt amber ──
         cyan: {
-          DEFAULT: "#22D3EE",
-          dim:     "#0A2A35",
-          mid:     "#0E3D4D",
+          DEFAULT: "#e08a3a",
+          dim:     "#2a1f14",
+          mid:     "#3d2a18",
         },
 
         // ── Conditions palette ──
-        powder:  "#22D3EE", // epic/great
-        good:    "#60A5FA",
-        fair:    "#FBBF24",
-        poor:    "#F87171",
+        powder:  "#f5c542",
+        good:    "#4ade80",
+        fair:    "#fbbf24",
+        poor:    "#f87171",
 
         // ── Snow data ──
         snow: {
-          DEFAULT: "#BAE6FD",
-          dim:     "#0C2034",
+          DEFAULT: "#f5c542",
+          dim:     "#2a2210",
         },
 
         // ── Semantic ──
         success: "#34D399",
         warning: "#FBBF24",
         danger:  "#F87171",
-        purple:  "#A78BFA",
 
         // ── Text hierarchy ──
-        "text-base":   "#F1F5F9",
-        "text-subtle": "#94A3B8",
-        "text-muted":  "#64748B",
+        "text-base":   "#e8e6e3",
+        "text-subtle": "#a8a4a0",
+        "text-muted":  "#7a7775",
       },
       borderRadius: {
-        sm:  "6px",
+        sm:      "6px",
         DEFAULT: "10px",
-        lg:  "14px",
-        xl:  "18px",
+        lg:      "14px",
+        xl:      "18px",
       },
       transitionDuration: {
         fast: "150ms",
@@ -62,12 +62,11 @@ const config: Config = {
         slow: "300ms",
       },
       boxShadow: {
-        "cyan-glow":  "0 0 20px rgba(34,211,238,0.15)",
-        "card-hover": "0 8px 30px rgba(34,211,238,0.12), 0 2px 8px rgba(0,0,0,0.4)",
+        "card-hover": "0 4px 20px rgba(0,0,0,0.5)",
+        "card-lift":  "0 8px 30px rgba(0,0,0,0.6)",
       },
       backgroundImage: {
-        "hero-gradient": "linear-gradient(180deg, #111928 0%, #070B11 100%)",
-        "cyan-gradient":  "linear-gradient(90deg, transparent, #22D3EE, #60A5FA, transparent)",
+        "hero-gradient": "linear-gradient(180deg, #1e1e20 0%, #0c0c0e 100%)",
       },
     },
   },

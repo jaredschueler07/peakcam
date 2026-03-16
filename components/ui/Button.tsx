@@ -10,8 +10,8 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants: Record<Variant, string> = {
-  primary: `bg-cyan-dim border border-cyan-400/30 text-cyan
-             hover:bg-cyan-mid hover:shadow-cyan-glow
+  primary: `bg-cyan-dim border border-cyan/30 text-cyan
+             hover:bg-cyan-mid
              active:scale-[0.98]`,
   ghost:   `bg-transparent text-text-muted
              hover:text-text-subtle hover:bg-surface2

@@ -19,12 +19,12 @@ interface Props {
 // ─── Colour helper ───────────────────────────────────────────────────────────
 function markerColor(resort: ResortWithData): string {
   const snow = resort.snow_report;
-  if (!snow) return "#64748B"; // slate — no data
+  if (!snow) return "#7a7775"; // warm muted — no data
   const depth = snow.base_depth ?? 0;
-  if (depth >= 60) return "#22D3EE"; // cyan — great
-  if (depth >= 30) return "#BAE6FD"; // powder blue — good
-  if (depth >= 10) return "#7DD3FC"; // sky — fair
-  return "#94A3B8"; // muted slate — thin
+  if (depth >= 60) return "#e08a3a"; // amber — great
+  if (depth >= 30) return "#f5c542"; // gold — good
+  if (depth >= 10) return "#c9a84c"; // warm gold — fair
+  return "#a8a4a0"; // muted warm — thin
 }
 
 export default function ResortMap({ resorts, hoveredSlug, onResortHover }: Props) {
@@ -114,10 +114,10 @@ export default function ResortMap({ resorts, hoveredSlug, onResortHover }: Props
         const marker = L.marker([resort.lat, resort.lng], { icon })
           .addTo(map)
           .bindTooltip(
-            `<strong style="color:#22D3EE">${resort.name}</strong><br/>
-             <span style="color:#94A3B8;font-size:11px">${resort.region}</span>
+            `<strong style="color:#e08a3a">${resort.name}</strong><br/>
+             <span style="color:#a8a4a0;font-size:11px">${resort.region}</span>
              ${resort.snow_report?.base_depth != null
-               ? `<br/><span style="color:#BAE6FD;font-size:12px">⛄ ${resort.snow_report.base_depth}″ base</span>`
+               ? `<br/><span style="color:#f5c542;font-size:12px">⛄ ${resort.snow_report.base_depth}″ base</span>`
                : ""}`,
             {
               direction: "top",
@@ -139,7 +139,7 @@ export default function ResortMap({ resorts, hoveredSlug, onResortHover }: Props
     <div
       ref={containerRef}
       className="w-full h-full"
-      style={{ background: "#070B11" }}
+      style={{ background: "#0c0c0e" }}
     />
   );
 }
