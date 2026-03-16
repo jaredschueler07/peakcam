@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import Fuse from "fuse.js";
 import { Header } from "@/components/layout/Header";
 import type { ResortWithData } from "@/lib/types";
 import { ConditionBadge, StateBadge } from "@/components/ui/Badge";
@@ -32,6 +33,16 @@ type SortOption = "name" | "snow" | "conditions";
 
 const CONDITION_ORDER: Record<string, number> = {
   great: 0, good: 1, fair: 2, poor: 3,
+};
+
+const FUSE_OPTIONS: import("fuse.js").IFuseOptions<ResortWithData> = {
+  keys: [
+    { name: "name", weight: 0.5 },
+    { name: "region", weight: 0.3 },
+    { name: "state", weight: 0.2 },
+  ],
+  threshold: 0.35,
+  ignoreLocation: true,
 };
 
 // ─── Resort card ─────────────────────────────────────────────────────────────
@@ -155,17 +166,13 @@ export function BrowsePage({ resorts }: Props) {
     return [...new Set(resorts.map((r) => r.state))].sort();
   }, [resorts]);
 
+  const fuse = useMemo(() => new Fuse(resorts, FUSE_OPTIONS), [resorts]);
+
   const filtered = useMemo(() => {
     let list = resorts;
 
     if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (r) =>
-          r.name.toLowerCase().includes(q) ||
-          r.region.toLowerCase().includes(q) ||
-          r.state.toLowerCase().includes(q)
-      );
+      list = fuse.search(search.trim()).map((result) => result.item);
     }
 
     if (stateFilter !== "All") list = list.filter((r) => r.state === stateFilter);
@@ -185,7 +192,7 @@ export function BrowsePage({ resorts }: Props) {
     }
 
     return list;
-  }, [resorts, search, stateFilter, condFilter, sort]);
+  }, [resorts, fuse, search, stateFilter, condFilter, sort]);
 
   const handleClearSearch = useCallback(() => setSearch(""), []);
 
