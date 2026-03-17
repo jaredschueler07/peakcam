@@ -44,3 +44,6 @@ next-env.d.ts
 # temp scripts and logs
 import-error.log
 .ts-node-out/
+
+# extracted agent plugins (built from .plugin zips)
+agents/plugins/

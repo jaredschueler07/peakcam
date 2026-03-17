@@ -1,0 +1,37 @@
+display_information:
+  name: PeakCam Sales
+  description: Sales agent — account research, outreach, pipeline, forecasting
+  background_color: "#2eb67d"
+  long_description: >-
+    PeakCam's AI sales teammate. Handles account research, call prep,
+    outreach drafting, pipeline reviews, competitive intel, and daily
+    sales briefings. Posts updates to #peakcam-sales.
+
+features:
+  bot_user:
+    display_name: PeakCam Sales
+    always_online: true
+
+oauth_config:
+  scopes:
+    bot:
+      - channels:history
+      - channels:read
+      - channels:join
+      - chat:write
+      - chat:write.customize
+      - groups:history
+      - groups:read
+      - im:history
+      - im:read
+      - im:write
+      - users:read
+      - users:read.email
+      - files:write
+      - reactions:read
+      - reactions:write
+
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

@@ -34,34 +34,37 @@ export async function getAllResorts(): Promise<ResortWithData[]> {
 
   const resortIds = resorts.map((r) => r.id);
 
-  // Fetch latest snow report per resort
-  const { data: snowReports, error: snowError } = await supabase
-    .from("snow_reports")
-    .select("*")
-    .in("resort_id", resortIds)
-    .order("updated_at", { ascending: false });
+  // Fetch snow reports and cams in parallel
+  const [snowResult, camResult] = await Promise.all([
+    // Use the latest_snow_reports view — DB-side DISTINCT ON (resort_id)
+    supabase
+      .from("latest_snow_reports")
+      .select("*")
+      .in("resort_id", resortIds),
+    // Active cams only
+    supabase
+      .from("cams")
+      .select("*")
+      .in("resort_id", resortIds)
+      .eq("is_active", true),
+  ]);
 
-  if (snowError) throw snowError;
+  if (snowResult.error) throw snowResult.error;
+  if (camResult.error) throw camResult.error;
 
-  // Fetch cam counts (active only)
-  const { data: cams, error: camError } = await supabase
-    .from("cams")
-    .select("*")
-    .in("resort_id", resortIds)
-    .eq("is_active", true);
-
-  if (camError) throw camError;
-
-  // Join — latest snow report per resort
+  // Index snow reports by resort (view already returns one per resort)
   const snowByResort = new Map<string, SnowReport>();
-  for (const s of snowReports ?? []) {
-    if (!snowByResort.has(s.resort_id)) snowByResort.set(s.resort_id, s);
+  for (const s of snowResult.data ?? []) {
+    snowByResort.set(s.resort_id, s);
   }
 
+  // Group cams by resort using push() to avoid O(n²) spread
   const camsByResort = new Map<string, Cam[]>();
-  for (const c of cams ?? []) {
-    const existing = camsByResort.get(c.resort_id) ?? [];
-    camsByResort.set(c.resort_id, [...existing, c]);
+  for (const c of camResult.data ?? []) {
+    if (!camsByResort.has(c.resort_id)) {
+      camsByResort.set(c.resort_id, []);
+    }
+    camsByResort.get(c.resort_id)!.push(c);
   }
 
   return resorts.map((r) => ({
@@ -82,23 +85,24 @@ export async function getResortBySlug(slug: string): Promise<ResortWithData | nu
 
   if (resortError || !resort) return null;
 
-  const { data: snowReports } = await supabase
-    .from("snow_reports")
-    .select("*")
-    .eq("resort_id", resort.id)
-    .order("updated_at", { ascending: false })
-    .limit(1);
-
-  const { data: cams } = await supabase
-    .from("cams")
-    .select("*")
-    .eq("resort_id", resort.id)
-    .order("name");
+  const [snowResult, camResult] = await Promise.all([
+    supabase
+      .from("latest_snow_reports")
+      .select("*")
+      .eq("resort_id", resort.id)
+      .maybeSingle(),
+    supabase
+      .from("cams")
+      .select("*")
+      .eq("resort_id", resort.id)
+      .eq("is_active", true)
+      .order("name"),
+  ]);
 
   return {
     ...resort,
-    snow_report: snowReports?.[0] ?? null,
-    cams: cams ?? [],
+    snow_report: snowResult.data ?? null,
+    cams: camResult.data ?? [],
   };
 }
 

@@ -1,0 +1,110 @@
+{
+  "agents": {
+    "sales": {
+      "name": "PeakCam Sales",
+      "emoji": ":moneybag:",
+      "color": "#2eb67d",
+      "channel": "C0ALT9Q4NQM",
+      "channel_name": "#peakcam-sales",
+      "skills": [
+        "account-research", "call-prep", "call-summary",
+        "competitive-intelligence", "create-an-asset", "daily-briefing",
+        "draft-outreach", "forecast", "pipeline-review"
+      ],
+      "token_env": "SLACK_BOT_TOKEN_SALES"
+    },
+    "engineering": {
+      "name": "PeakCam Engineering",
+      "emoji": ":gear:",
+      "color": "#4a154b",
+      "channel": "C0ALF8QJ2TZ",
+      "channel_name": "#peakcam-engineering",
+      "skills": [
+        "architecture", "code-review", "debug", "deploy-checklist",
+        "documentation", "incident-response", "standup",
+        "system-design", "tech-debt", "testing-strategy"
+      ],
+      "token_env": "SLACK_BOT_TOKEN_ENGINEERING"
+    },
+    "product": {
+      "name": "PeakCam Product",
+      "emoji": ":rocket:",
+      "color": "#e01e5a",
+      "channel": "C0AM9KDR3J5",
+      "channel_name": "#peakcam-product",
+      "skills": [
+        "competitive-brief", "metrics-review", "roadmap-update",
+        "sprint-planning", "stakeholder-update",
+        "synthesize-research", "write-spec"
+      ],
+      "token_env": "SLACK_BOT_TOKEN_PRODUCT"
+    },
+    "marketing": {
+      "name": "PeakCam Marketing",
+      "emoji": ":art:",
+      "color": "#ecb22e",
+      "channel": "C0AM09VK6E8",
+      "channel_name": "#peakcam-marketing",
+      "skills": [
+        "brand-review", "campaign-plan", "competitive-brief",
+        "content-creation", "draft-content", "email-sequence",
+        "performance-report", "seo-audit"
+      ],
+      "token_env": "SLACK_BOT_TOKEN_MARKETING"
+    },
+    "operations": {
+      "name": "PeakCam Operations",
+      "emoji": ":clipboard:",
+      "color": "#36c5f0",
+      "channel": "C0ALQAPA95Z",
+      "channel_name": "#peakcam-operations",
+      "skills": [
+        "capacity-plan", "change-request", "compliance-tracking",
+        "process-doc", "process-optimization", "risk-assessment",
+        "runbook", "status-report", "vendor-review"
+      ],
+      "token_env": "SLACK_BOT_TOKEN_OPERATIONS"
+    },
+    "finance": {
+      "name": "PeakCam Finance",
+      "emoji": ":chart_with_upwards_trend:",
+      "color": "#1264a3",
+      "channel": "C0AM9KHJTDF",
+      "channel_name": "#peakcam-finance",
+      "skills": [
+        "audit-support", "close-management", "financial-statements",
+        "journal-entry", "journal-entry-prep", "reconciliation",
+        "sox-testing", "variance-analysis"
+      ],
+      "token_env": "SLACK_BOT_TOKEN_FINANCE"
+    },
+    "data": {
+      "name": "PeakCam Data",
+      "emoji": ":bar_chart:",
+      "color": "#611f69",
+      "channel": "C0AM9K98UUR",
+      "channel_name": "#peakcam-data",
+      "skills": [
+        "analyze", "build-dashboard", "create-viz",
+        "data-context-extractor", "data-visualization", "explore-data",
+        "sql-queries", "statistical-analysis", "validate-data", "write-query"
+      ],
+      "token_env": "SLACK_BOT_TOKEN_DATA"
+    },
+    "productivity": {
+      "name": "PeakCam Productivity",
+      "emoji": ":calendar:",
+      "color": "#2eb67d",
+      "channel": "C0ALULH4YJ2",
+      "channel_name": "#peakcam-productivity",
+      "skills": [
+        "memory-management", "start", "task-management", "update"
+      ],
+      "token_env": "SLACK_BOT_TOKEN_PRODUCTIVITY"
+    }
+  },
+  "broadcast_channel": {
+    "id": "C0ALWABRTCJ",
+    "name": "#all-peakcam"
+  }
+}

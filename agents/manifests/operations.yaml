@@ -1,0 +1,37 @@
+display_information:
+  name: PeakCam Operations
+  description: Operations agent — processes, runbooks, compliance, risk, capacity
+  background_color: "#36c5f0"
+  long_description: >-
+    PeakCam's AI operations teammate. Handles process documentation,
+    runbooks, risk assessments, capacity planning, compliance tracking,
+    change requests, vendor reviews, and status reports. Posts to #peakcam-operations.
+
+features:
+  bot_user:
+    display_name: PeakCam Operations
+    always_online: true
+
+oauth_config:
+  scopes:
+    bot:
+      - channels:history
+      - channels:read
+      - channels:join
+      - chat:write
+      - chat:write.customize
+      - groups:history
+      - groups:read
+      - im:history
+      - im:read
+      - im:write
+      - users:read
+      - users:read.email
+      - files:write
+      - reactions:read
+      - reactions:write
+
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

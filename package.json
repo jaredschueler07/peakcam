@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "import-resorts": "ts-node --esm --project tsconfig.scripts.json scripts/import-resorts.ts",
-    "import-resorts:standalone": "node scripts/import-resorts-standalone.mjs"
+    "import-resorts:standalone": "node scripts/import-resorts-standalone.mjs",
+    "agents": "node agents/loop.mjs",
+    "agents:dry-run": "node agents/loop.mjs --dry-run",
+    "agents:extract-plugins": "for f in plugins/*.plugin; do name=$(basename \"$f\" .plugin); mkdir -p \"agents/plugins/$name\" && unzip -o \"$f\" -d \"agents/plugins/$name\"; done"
   },
   "dependencies": {
     "next": "16.1.6",
