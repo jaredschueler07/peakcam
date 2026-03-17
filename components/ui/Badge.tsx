@@ -4,9 +4,9 @@ import { type ConditionRating } from "@/lib/types";
 // ── Condition badge ───────────────────────────────────────────
 const conditionStyles: Record<ConditionRating, string> = {
   great: "bg-cyan-dim border border-cyan/20 text-cyan",
-  good:  "bg-[#142a18] border border-good/20 text-good",
-  fair:  "bg-[#2a2210] border border-fair/20 text-fair",
-  poor:  "bg-[#2a1414] border border-poor/20 text-poor",
+  good:  "bg-[#0f2918] border border-good/20 text-good",
+  fair:  "bg-[#2a1f0a] border border-fair/20 text-fair",
+  poor:  "bg-[#2a1018] border border-poor/20 text-poor",
 };
 
 const conditionDot: Record<ConditionRating, string> = {

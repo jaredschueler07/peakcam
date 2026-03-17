@@ -1,30 +1,32 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "leaflet/dist/leaflet.css";
+@import "tailwindcss";
 
-/* ── Root variables ── */
+/* ── Root variables (Alpine Bold) ── */
 :root {
-  --bg:          #0c0c0e;
-  --surface:     #161618;
-  --surface2:    #1e1e20;
-  --surface3:    #282828;
-  --border:      #2a2826;
-  --border-hi:   #3d3a36;
-  --cyan:        #e08a3a;
-  --cyan-dim:    #2a1f14;
-  --cyan-mid:    #3d2a18;
-  --snow:        #f5c542;
-  --text-base:   #e8e6e3;
-  --text-subtle: #a8a4a0;
-  --text-muted:  #7a7775;
+  --bg:          #0f172a;
+  --surface:     #1e293b;
+  --surface2:    #1e3a5f;
+  --surface3:    #334155;
+  --border:      #2d3f58;
+  --border-hi:   #475569;
+  --cyan:        #3b82f6;
+  --cyan-dim:    #172554;
+  --cyan-mid:    #1e3a5f;
+  --snow:        #38bdf8;
+  --text-base:   #f8fafc;
+  --text-subtle: #94a3b8;
+  --text-muted:  #64748b;
   --success:     #34D399;
+  --summit:      #f97316;
+  --forest:      #22c55e;
 }
 
 /* ── Base ── */
 *, *::before, *::after { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body {
-  font-family: 'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--bg);
   color: var(--text-base);
   -webkit-font-smoothing: antialiased;
@@ -48,12 +50,14 @@ body {
 .animate-livePulse { animation: livePulse 2s   infinite; }
 .animate-blink     { animation: blink     1.5s ease infinite; }
 
-/* ── Leaflet dark map overrides ── */
-.leaflet-container               { background: #0c0c0e !important; }
-.leaflet-popup-content-wrapper   { background: #1e1e20 !important; border: 1px solid #3d3a36 !important; border-radius: 10px !important; box-shadow: 0 8px 30px rgba(0,0,0,.6) !important; color: #e8e6e3 !important; }
-.leaflet-popup-content           { color: #e8e6e3 !important; margin: 12px 15px !important; }
-.leaflet-popup-tip               { background: #1e1e20 !important; }
-.leaflet-popup-close-button      { color: #7a7775 !important; font-size: 18px !important; }
-.leaflet-control-zoom            { border: 1px solid #2a2826 !important; border-radius: 8px !important; overflow: hidden; }
-.leaflet-control-zoom a          { background: #1e1e20 !important; color: #e8e6e3 !important; border-color: #2a2826 !important; }
-.leaflet-control-zoom a:hover    { background: #282828 !important; }
+/* ── Leaflet dark map overrides (alpine slate) ── */
+.leaflet-container               { background: #0f172a !important; }
+.leaflet-popup-content-wrapper   { background: #1e293b !important; border: 1px solid #475569 !important; border-radius: 10px !important; box-shadow: 0 8px 30px rgba(0,0,0,.5) !important; color: #f8fafc !important; }
+.leaflet-popup-content           { color: #f8fafc !important; margin: 12px 15px !important; }
+.leaflet-popup-tip               { background: #1e293b !important; }
+.leaflet-popup-close-button      { color: #64748b !important; font-size: 18px !important; }
+.leaflet-control-zoom            { border: 1px solid #2d3f58 !important; border-radius: 8px !important; overflow: hidden; }
+.leaflet-control-zoom a          { background: #1e293b !important; color: #f8fafc !important; border-color: #2d3f58 !important; }
+.leaflet-control-zoom a:hover    { background: #334155 !important; }
+.peakcam-tooltip                 { background: #1e1e20 !important; border: 1px solid #3d3a36 !important; border-radius: 8px !important; color: #e8e6e3 !important; box-shadow: 0 4px 20px rgba(0,0,0,0.5) !important; padding: 8px 12px !important; }
+.peakcam-tooltip .leaflet-tooltip-arrow { display: none; }

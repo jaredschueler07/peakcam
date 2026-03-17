@@ -11,7 +11,8 @@
     "import-resorts:standalone": "node scripts/import-resorts-standalone.mjs",
     "agents": "node agents/loop.mjs",
     "agents:dry-run": "node agents/loop.mjs --dry-run",
-    "agents:extract-plugins": "for f in plugins/*.plugin; do name=$(basename \"$f\" .plugin); mkdir -p \"agents/plugins/$name\" && unzip -o \"$f\" -d \"agents/plugins/$name\"; done"
+    "agents:extract-plugins": "for f in plugins/*.plugin; do name=$(basename \"$f\" .plugin); mkdir -p \"agents/plugins/$name\" && unzip -o \"$f\" -d \"agents/plugins/$name\"; done",
+    "snotel-sync": "node scripts/snotel-sync.mjs"
   },
   "dependencies": {
     "next": "16.1.6",
