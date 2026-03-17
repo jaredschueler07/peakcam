@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getResortBySlug, getAllResortSlugs } from "@/lib/supabase";
+import { getResortBySlug, getAllResortSlugs, getLiveConditions } from "@/lib/supabase";
 import { getWeatherForecast } from "@/lib/weather";
 import { ResortDetailPage } from "@/components/resort/ResortDetailPage";
 
@@ -55,8 +55,11 @@ export default async function ResortPage({
   // return notFound() narrows type — TypeScript knows resort is non-null below
   if (!resort) return notFound();
 
-  // Fetch weather server-side — cached for 1 hour per Next.js fetch cache
-  const weather = await getWeatherForecast(resort.lat, resort.lng);
+  // Fetch weather and live conditions server-side
+  const [weather, liveConditions] = await Promise.all([
+    getWeatherForecast(resort.lat, resort.lng),
+    getLiveConditions(resort.id),
+  ]);
 
-  return <ResortDetailPage resort={resort} weather={weather} />;
+  return <ResortDetailPage resort={resort} weather={weather} liveConditions={liveConditions} />;
 }

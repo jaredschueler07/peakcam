@@ -50,6 +50,9 @@ const POLL_INTERVAL = parseInt(process.env.PEAKCAM_POLL_INTERVAL || '5000', 10);
 const CLAUDE_MODEL = process.env.PEAKCAM_CLAUDE_MODEL || 'claude-sonnet-4-20250514';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
 if (!ANTHROPIC_API_KEY) {
   console.error('Missing ANTHROPIC_API_KEY in .env.local');
   process.exit(1);
@@ -79,6 +82,119 @@ function log(level, agent, msg) {
   const ts = new Date().toLocaleTimeString('en-US', { hour12: false });
   const prefix = agent ? `[${ts}] [${agent}]` : `[${ts}]`;
   console[level === 'error' ? 'error' : 'log'](`${prefix} ${msg}`);
+}
+
+// ─────────────────────────────────────────────────────────────
+// B2. Supabase Helper (for shared memory)
+// ─────────────────────────────────────────────────────────────
+
+async function supabaseRPC(method, path, body = null) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return null;
+  const opts = {
+    method,
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': method === 'POST' ? 'return=minimal' : '',
+    },
+  };
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, opts);
+    if (!resp.ok) {
+      log('debug', null, `Supabase ${method} ${path}: ${resp.status}`);
+      return null;
+    }
+    if (method === 'GET') return resp.json();
+    return true;
+  } catch (err) {
+    log('debug', null, `Supabase error: ${err.message}`);
+    return null;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// B3. Shared Memory
+// ─────────────────────────────────────────────────────────────
+
+async function recallMemories(messageText, agentKey) {
+  if (!SUPABASE_URL) return '';
+
+  // Extract likely entities from the message (simple keyword approach)
+  const keywords = messageText.toLowerCase()
+    .replace(/<@[A-Z0-9]+>/g, '')
+    .split(/\s+/)
+    .filter(w => w.length > 3)
+    .slice(0, 10);
+
+  if (keywords.length === 0) return '';
+
+  // Build OR filter for entity matching
+  const orFilter = keywords.map(k => `entity.ilike.*${k}*`).join(',');
+  const memories = await supabaseRPC('GET',
+    `agent_memory?or=(${orFilter})&order=created_at.desc&limit=10` +
+    `&expires_at=is.null,expires_at=gt.${new Date().toISOString()}`
+  );
+
+  if (!memories || memories.length === 0) return '';
+
+  return '\n## Team Memory (shared knowledge from other agents)\n' +
+    memories.map(m =>
+      `- [${m.source_agent}] ${m.entity}: ${m.fact}`
+    ).join('\n') + '\n';
+}
+
+async function storeMemory(agentKey, entity, fact, threadTs = null) {
+  if (!SUPABASE_URL) return;
+  await supabaseRPC('POST', 'agent_memory', {
+    entity,
+    fact,
+    source_agent: agentKey,
+    source_thread: threadTs,
+  });
+  log('debug', agentKey, `Stored memory: ${entity} → ${fact.slice(0, 60)}...`);
+}
+
+function extractMemories(agentKey, responseText, threadTs) {
+  // Look for structured memory markers in Claude's response
+  const memoryPattern = /\[MEMORY:([^\]]+)\]\s*(.*?)(?=\[MEMORY:|\n\n|$)/gs;
+  let match;
+  const memories = [];
+  while ((match = memoryPattern.exec(responseText)) !== null) {
+    memories.push({ entity: match[1].trim().toLowerCase(), fact: match[2].trim() });
+  }
+  // Store them asynchronously
+  for (const { entity, fact } of memories) {
+    storeMemory(agentKey, entity, fact, threadTs).catch(() => {});
+  }
+  return memories.length;
+}
+
+// ─────────────────────────────────────────────────────────────
+// B4. Conversation Persistence
+// ─────────────────────────────────────────────────────────────
+
+async function storeConversation(agentKey, channel, threadTs, userId, summary, outcome, entities) {
+  if (!SUPABASE_URL) return;
+  await supabaseRPC('POST', 'agent_conversations', {
+    agent_key: agentKey,
+    channel,
+    thread_ts: threadTs,
+    user_id: userId,
+    summary,
+    outcome,
+    entities,
+  });
+  log('debug', agentKey, `Stored conversation summary for thread ${threadTs}`);
+}
+
+async function getRecentConversations(agentKey, limit = 5) {
+  if (!SUPABASE_URL) return [];
+  const convos = await supabaseRPC('GET',
+    `agent_conversations?agent_key=eq.${agentKey}&order=created_at.desc&limit=${limit}`
+  );
+  return convos || [];
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -251,7 +367,7 @@ function scoreSkillRelevance(skill, messageText) {
   return score;
 }
 
-function buildSystemPrompt(agentKey, messageText) {
+async function buildSystemPrompt(agentKey, messageText) {
   const agent = config.agents[agentKey];
   const { readme, skills } = loadAgentSkills(agentKey);
 
@@ -294,8 +410,29 @@ ${otherAgents}
 ## Cross-Agent Handoff
 If you determine another agent should handle part of a request, include exactly this pattern in your response:
 [HANDOFF:agent_key] where agent_key is one of: ${Object.keys(config.agents).join(', ')}
-followed by a brief message for that agent. The system will automatically route it.
+followed by a brief message for that agent. Include what you've already determined and what specific question/action the target agent should address.
+
+## Storing Team Knowledge
+When you learn something that other agents should know (decisions made, facts discovered, context about the project), include this pattern:
+[MEMORY:entity_name] The fact or decision to remember.
+Entity names should be lowercase with colons, like: decision:hosting, feature:snotel, resort:vail, metric:launch-target
+The system will store these in shared memory accessible to all agents.
 `;
+
+  // Inject shared memories relevant to this message
+  const sharedMemories = await recallMemories(messageText, agentKey);
+  if (sharedMemories) {
+    prompt += sharedMemories;
+  }
+
+  // Inject recent conversation context
+  const recentConvos = await getRecentConversations(agentKey, 3);
+  if (recentConvos.length > 0) {
+    prompt += '\n## Your Recent Conversations\n';
+    for (const c of recentConvos) {
+      prompt += `- ${c.summary}${c.outcome ? ` → Outcome: ${c.outcome}` : ''}\n`;
+    }
+  }
 
   // Append selected skills in full
   if (selectedSkills.length > 0) {
@@ -416,7 +553,7 @@ function detectHandoff(responseText) {
   return handoffs;
 }
 
-async function executeHandoff(sourceAgent, targetKey, message, originalUserText) {
+async function executeHandoff(sourceAgent, targetKey, message, originalUserText, conversationContext = '') {
   const target = config.agents[targetKey];
   const source = config.agents[sourceAgent];
   const targetToken = process.env[target.token_env];
@@ -425,7 +562,13 @@ async function executeHandoff(sourceAgent, targetKey, message, originalUserText)
     return;
   }
 
-  const handoffText = `*Handoff from ${source.name}:*\n${message}\n\n*Original request:*\n> ${originalUserText}`;
+  // Enriched handoff with context
+  let handoffText = `*Handoff from ${source.name}:*\n\n`;
+  if (conversationContext) {
+    handoffText += `*Context from our discussion:*\n${conversationContext}\n\n`;
+  }
+  handoffText += `*What I need from you:*\n${message}\n\n`;
+  handoffText += `*Original request:*\n> ${originalUserText}`;
 
   if (DRY_RUN) {
     log('info', sourceAgent, `[DRY RUN] Would handoff to ${targetKey}: ${handoffText.slice(0, 100)}...`);
@@ -476,24 +619,48 @@ async function processMessage(agentKey, msg, botUserId, token) {
       return;
     }
 
-    // Build system prompt with skill matching based on latest user message
+    // Build system prompt with skill matching, shared memory, and recent context
     const latestUserText = claudeMessages[claudeMessages.length - 1].content;
-    const systemPrompt = buildSystemPrompt(agentKey, latestUserText);
+    const systemPrompt = await buildSystemPrompt(agentKey, latestUserText);
 
     // Call Claude
     const response = await callClaude(systemPrompt, claudeMessages);
 
-    // Strip handoff markers from the visible response
-    const cleanResponse = response.replace(/\[HANDOFF:\w+\]\s*/g, '').trim();
+    // Extract and store memories from the response
+    const memCount = extractMemories(agentKey, response, threadTs);
+    if (memCount > 0) log('info', agentKey, `Stored ${memCount} memories`);
+
+    // Strip memory and handoff markers from the visible response
+    const cleanResponse = response
+      .replace(/\[MEMORY:[^\]]+\]\s*[^\n]*/g, '')
+      .replace(/\[HANDOFF:\w+\]\s*/g, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
 
     // Post reply
     await postReply(token, channel, threadTs, cleanResponse);
     log('info', agentKey, `Replied in thread ${threadTs}`);
 
-    // Check for handoffs
+    // Store conversation summary (ask Claude to summarize on substantial threads)
+    if (claudeMessages.length >= 3) {
+      const summaryPrompt = 'Summarize this conversation in one sentence. What was discussed and what was decided?';
+      const summaryMessages = [
+        ...claudeMessages.slice(-6),
+        { role: 'user', content: summaryPrompt }
+      ];
+      try {
+        const summary = await callClaude('You are a conversation summarizer. Respond with only the summary, nothing else.', summaryMessages);
+        await storeConversation(agentKey, channel, threadTs, msg.user, summary, null, []);
+      } catch { /* non-critical */ }
+    }
+
+    // Check for handoffs — pass conversation context for enriched routing
     const handoffs = detectHandoff(response);
+    const conversationContext = claudeMessages.length > 1
+      ? `Thread with ${claudeMessages.length} messages. Latest exchange about: ${latestUserText.slice(0, 200)}`
+      : '';
     for (const { targetKey, message } of handoffs) {
-      await executeHandoff(agentKey, targetKey, message, latestUserText);
+      await executeHandoff(agentKey, targetKey, message, latestUserText, conversationContext);
     }
   } catch (err) {
     log('error', agentKey, `Error processing message: ${err.message}`);

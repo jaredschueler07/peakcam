@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import type { Resort, Cam, SnowReport, ResortWithData } from "./types";
+import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel } from "./types";
 
 // ─────────────────────────────────────────────────────────────
 // Client
@@ -105,6 +105,64 @@ export async function getResortBySlug(slug: string): Promise<ResortWithData | nu
     cams: camResult.data ?? [],
   };
 }
+
+// ─────────────────────────────────────────────────────────────
+// User-Verified Conditions
+// ─────────────────────────────────────────────────────────────
+
+/** Fetch live crowd-sourced conditions for a resort (last 12 hours). */
+export async function getLiveConditions(resortId: string): Promise<LiveConditions | null> {
+  const { data, error } = await supabase
+    .from("resort_conditions_live")
+    .select("*")
+    .eq("resort_id", resortId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("[PeakCam] Could not fetch live conditions:", error.message);
+    return null;
+  }
+  return data;
+}
+
+/** Submit a condition vote (anonymous, session-based). */
+export async function submitConditionVote(
+  resortId: string,
+  sessionId: string,
+  snowQuality: SnowQuality | null,
+  comfort: ComfortLevel | null,
+  comment?: string
+): Promise<{ ok: boolean; error?: string }> {
+  // Rate limit: max 1 vote per resort per session per hour
+  const { data: recent } = await supabase
+    .from("condition_votes")
+    .select("id")
+    .eq("resort_id", resortId)
+    .eq("session_id", sessionId)
+    .gte("created_at", new Date(Date.now() - 3600_000).toISOString())
+    .limit(1);
+
+  if (recent && recent.length > 0) {
+    return { ok: false, error: "You've already reported conditions here recently. Try again in an hour." };
+  }
+
+  const { error } = await supabase
+    .from("condition_votes")
+    .insert({
+      resort_id: resortId,
+      session_id: sessionId,
+      snow_quality: snowQuality,
+      comfort,
+      comment: comment?.slice(0, 280) ?? null,
+    });
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Static Params
+// ─────────────────────────────────────────────────────────────
 
 /** Fetch all resort slugs — used for generateStaticParams. */
 export async function getAllResortSlugs(): Promise<string[]> {

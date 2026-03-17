@@ -125,6 +125,88 @@ function ResortCard({ resort }: { resort: ResortWithData }) {
   );
 }
 
+// ─── Featured row (top conditions) ───────────────────────────────────────────
+
+function FeaturedRow({ resorts }: { resorts: ResortWithData[] }) {
+  const featured = useMemo(() => {
+    return resorts
+      .filter((r) => r.snow_report && r.cond_rating)
+      .sort((a, b) => {
+        // Sort by condition rating first, then by fresh snow
+        const condDiff = (CONDITION_ORDER[a.cond_rating] ?? 99) - (CONDITION_ORDER[b.cond_rating] ?? 99);
+        if (condDiff !== 0) return condDiff;
+        return (b.snow_report?.new_snow_24h ?? 0) - (a.snow_report?.new_snow_24h ?? 0);
+      })
+      .slice(0, 3);
+  }, [resorts]);
+
+  if (featured.length === 0) return null;
+
+  return (
+    <div className="mb-6">
+      <h2 className="font-heading text-sm uppercase tracking-widest text-text-muted mb-3">
+        Top Conditions
+      </h2>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {featured.map((resort) => {
+          const snow = resort.snow_report;
+          return (
+            <Link
+              key={resort.id}
+              href={`/resorts/${resort.slug}`}
+              className="group relative bg-surface border border-border rounded-xl overflow-hidden
+                         hover:border-border-hi hover:shadow-card-hover transition-all duration-220
+                         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan"
+            >
+              {/* Accent top bar */}
+              <div className="h-1.5 w-full bg-cyan" />
+
+              <div className="p-4">
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div>
+                    <h3 className="text-text-base font-semibold text-base leading-tight group-hover:text-cyan transition-colors duration-150">
+                      {resort.name}
+                    </h3>
+                    <p className="text-text-muted text-xs mt-0.5">{resort.region}</p>
+                  </div>
+                  <ConditionBadge
+                    rating={resort.cond_rating}
+                    label={resort.cond_rating.charAt(0).toUpperCase() + resort.cond_rating.slice(1)}
+                  />
+                </div>
+
+                {snow && (
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="bg-surface2 rounded-lg p-2 text-center">
+                      <div className="text-powder font-bold text-lg leading-none">{snow.base_depth ?? "—"}</div>
+                      <div className="text-text-muted text-[10px] mt-0.5">base″</div>
+                    </div>
+                    <div className="bg-surface2 rounded-lg p-2 text-center">
+                      <div className="text-cyan font-bold text-lg leading-none">{snow.new_snow_24h ?? "—"}</div>
+                      <div className="text-text-muted text-[10px] mt-0.5">24h″</div>
+                    </div>
+                    <div className="bg-surface2 rounded-lg p-2 text-center">
+                      <div className="text-text-subtle font-bold text-lg leading-none">{snow.new_snow_48h ?? "—"}</div>
+                      <div className="text-text-muted text-[10px] mt-0.5">48h″</div>
+                    </div>
+                    <div className="bg-surface2 rounded-lg p-2 text-center">
+                      <div className="text-text-base font-bold text-lg leading-none">
+                        {snow.trails_open != null && snow.trails_total != null
+                          ? `${snow.trails_open}/${snow.trails_total}` : "—"}
+                      </div>
+                      <div className="text-text-muted text-[10px] mt-0.5">runs</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Powder Alert banner ──────────────────────────────────────────────────────
 
 function PowderAlert({ resorts }: { resorts: ResortWithData[] }) {
@@ -300,6 +382,7 @@ export function BrowsePage({ resorts }: Props) {
 
       {/* ── Body ─────────────────────────────────────────────── */}
       <div className="max-w-screen-2xl mx-auto px-4 py-6 md:px-8">
+        <FeaturedRow resorts={resorts} />
         <PowderAlert resorts={resorts} />
 
         <div className={`grid gap-6 ${showMap ? "lg:grid-cols-[1fr_380px]" : ""}`}>

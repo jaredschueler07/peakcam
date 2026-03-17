@@ -54,6 +54,31 @@ export interface SnowReport {
   updated_at: string;
 }
 
+// ── User-Verified Conditions ─────────────────────────────────
+export type SnowQuality = "powder" | "packed" | "crud" | "ice" | "spring";
+export type ComfortLevel = "warm" | "perfect" | "cold" | "freezing";
+
+export interface ConditionVote {
+  id: string;
+  resort_id: string;
+  session_id: string;
+  snow_quality: SnowQuality | null;
+  comfort: ComfortLevel | null;
+  comment: string | null;
+  created_at: string;
+}
+
+export interface LiveConditions {
+  resort_id: string;
+  top_snow_quality: SnowQuality | null;
+  snow_quality_votes: number;
+  snow_quality_score: number;
+  top_comfort: ComfortLevel | null;
+  comfort_votes: number;
+  comfort_score: number;
+  total_votes_12h: number;
+}
+
 // ── Joined / view types ──────────────────────────────────────
 export interface ResortWithData extends Resort {
   snow_report: SnowReport | null;

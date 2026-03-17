@@ -4,11 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { ConditionBadge } from "@/components/ui/Badge";
-import type { ResortWithData, WeatherPeriod, Cam } from "@/lib/types";
+import type { ResortWithData, WeatherPeriod, LiveConditions, Cam } from "@/lib/types";
+import { ConditionVoter } from "@/components/resort/ConditionVoter";
 
 interface Props {
   resort: ResortWithData;
   weather: WeatherPeriod[] | null;
+  liveConditions?: LiveConditions | null;
 }
 
 // ─── Cam player ──────────────────────────────────────────────────────────────
@@ -166,7 +168,7 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-export function ResortDetailPage({ resort, weather }: Props) {
+export function ResortDetailPage({ resort, weather, liveConditions }: Props) {
   const activeCams = resort.cams.filter((c) => c.is_active);
   const snow = resort.snow_report;
 
@@ -250,6 +252,9 @@ export function ResortDetailPage({ resort, weather }: Props) {
             <p className="text-text-muted text-xs mt-2">Via National Weather Service · Updated hourly</p>
           </section>
         )}
+
+        {/* User-verified conditions */}
+        <ConditionVoter resortId={resort.id} liveConditions={liveConditions ?? null} />
 
         {/* Live cams */}
         <section>
