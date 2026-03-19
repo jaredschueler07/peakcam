@@ -68,6 +68,7 @@ const PLUGIN_DIR_MAP = {
   finance: 'finance',
   data: 'data',
   productivity: 'productivity',
+  coo: null, // orchestrator — no plugin directory
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -251,8 +252,16 @@ async function getNewMessages(token, channel, oldest) {
   });
   if (!data.ok) return [];
   // Filter out bot messages and subtypes (joins, topic changes, etc.)
+  // BUT allow COO bot messages through (directives from the orchestrator)
+  const COO_BOT_TOKEN = process.env.SLACK_BOT_TOKEN_COO;
   return (data.messages || [])
-    .filter(m => !m.bot_id && !m.subtype)
+    .filter(m => {
+      if (m.subtype) return false;
+      if (!m.bot_id) return true; // human messages always pass
+      // Allow COO directive messages through
+      if (m.text?.includes('COO Directive')) return true;
+      return false;
+    })
     .reverse(); // chronological order
 }
 
@@ -314,6 +323,10 @@ function loadAgentSkills(agentKey) {
   if (skillCache[agentKey]) return skillCache[agentKey];
 
   const pluginDir = PLUGIN_DIR_MAP[agentKey];
+  if (!pluginDir) {
+    skillCache[agentKey] = { readme: '', skills: [] };
+    return skillCache[agentKey];
+  }
   const pluginPath = resolve(__dirname, 'plugins', pluginDir);
 
   // Load README
@@ -742,6 +755,7 @@ async function main() {
       const agent = config.agents[agentKey];
 
       try {
+        if (!agent.channel) continue; // skip agents without a dedicated channel (e.g. COO)
         const messages = await getNewMessages(state.token, agent.channel, state.lastSeen);
 
         for (const msg of messages) {
@@ -752,9 +766,10 @@ async function main() {
 
           // Only respond if bot is mentioned or it's a reply in a thread the bot is in
           const mentionsBot = msg.text?.includes(`<@${state.botUserId}>`);
+          const isCOODirective = msg.text?.includes('COO Directive');
           const isThreadReply = !!msg.thread_ts;
 
-          if (mentionsBot) {
+          if (mentionsBot || isCOODirective) {
             await processMessage(agentKey, msg, state.botUserId, state.token);
           } else if (isThreadReply) {
             // Check if bot has already replied in this thread

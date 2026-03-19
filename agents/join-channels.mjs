@@ -56,6 +56,9 @@ const allChannels = [
   { id: config.broadcast_channel.id, name: config.broadcast_channel.name },
 ];
 
+// Also include COO if it has a non-null channel set — but COO should join everything regardless
+const cooToken = process.env.SLACK_BOT_TOKEN_COO;
+
 console.log('\n  PeakCam Agent Team — Joining ALL Channels\n');
 console.log(`  Channels: ${allChannels.map(c => c.name).join(', ')}\n`);
 
@@ -70,6 +73,16 @@ for (const [key, agent] of Object.entries(config.agents)) {
   console.log(`  ${agent.name}:`);
   for (const ch of allChannels) {
     const result = await joinChannel(token, ch.id, `${agent.name} -> ${ch.name}`);
+    if (result.error === 'missing_scope') needsScope = true;
+  }
+  console.log('');
+}
+
+// Join COO to all channels
+if (cooToken) {
+  console.log(`  PeakCam COO:`);
+  for (const ch of allChannels) {
+    const result = await joinChannel(cooToken, ch.id, `PeakCam COO -> ${ch.name}`);
     if (result.error === 'missing_scope') needsScope = true;
   }
   console.log('');

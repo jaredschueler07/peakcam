@@ -101,6 +101,16 @@
         "memory-management", "start", "task-management", "update"
       ],
       "token_env": "SLACK_BOT_TOKEN_PRODUCTIVITY"
+    },
+    "coo": {
+      "name": "PeakCam COO",
+      "emoji": ":tophat:",
+      "color": "#1a1a2e",
+      "channel": null,
+      "channel_name": "#all-peakcam",
+      "skills": [],
+      "token_env": "SLACK_BOT_TOKEN_COO",
+      "role": "orchestrator"
     }
   },
   "broadcast_channel": {

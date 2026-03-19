@@ -1,0 +1,37 @@
+display_information:
+  name: PeakCam COO
+  description: Chief Operating Officer — orchestrates all agents, coordinates work, manages priorities
+  background_color: "#1a1a2e"
+  long_description: >-
+    PeakCam's AI Chief Operating Officer. Oversees all department agents,
+    coordinates cross-team initiatives, manages priorities, monitors agent
+    quality, and reports to leadership. The glue that keeps the team aligned.
+
+features:
+  bot_user:
+    display_name: PeakCam COO
+    always_online: true
+
+oauth_config:
+  scopes:
+    bot:
+      - channels:history
+      - channels:read
+      - channels:join
+      - chat:write
+      - chat:write.customize
+      - groups:history
+      - groups:read
+      - im:history
+      - im:read
+      - im:write
+      - users:read
+      - users:read.email
+      - files:write
+      - reactions:read
+      - reactions:write
+
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false
