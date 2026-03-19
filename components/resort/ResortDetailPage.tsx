@@ -100,7 +100,7 @@ function CamPlayer({ cam }: { cam: Cam }) {
 
 function WeatherStrip({ weather }: { weather: WeatherPeriod[] }) {
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1">
+    <div className="flex gap-2 overflow-x-auto pb-1" style={{ WebkitOverflowScrolling: "touch" }}>
       {weather.map((day, i) => (
         <div
           key={i}

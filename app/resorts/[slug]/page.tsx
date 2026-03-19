@@ -61,5 +61,34 @@ export default async function ResortPage({
     getLiveConditions(resort.id),
   ]);
 
-  return <ResortDetailPage resort={resort} weather={weather} liveConditions={liveConditions} />;
+  const snow = resort.snow_report;
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SkiResort",
+    name: resort.name,
+    description: snow
+      ? `${resort.name} — ${snow.base_depth}" base depth, ${snow.conditions ?? "current conditions"}. ${resort.cams.length} live cams available.`
+      : `Live webcams and snow conditions at ${resort.name}, ${resort.state}.`,
+    address: {
+      "@type": "PostalAddress",
+      addressRegion: resort.state,
+      addressCountry: "US",
+    },
+    geo: {
+      "@type": "GeoCoordinates",
+      latitude: resort.lat,
+      longitude: resort.lng,
+    },
+    ...(resort.website_url ? { url: resort.website_url } : {}),
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <ResortDetailPage resort={resort} weather={weather} liveConditions={liveConditions} />
+    </>
+  );
 }

@@ -9,6 +9,20 @@ export const metadata = {
   description: "Compare live snow conditions across 70+ North American ski resorts. Base depth, fresh snow, trail counts, and lift status at a glance.",
 };
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  name: "Snow Report — PeakCam",
+  description:
+    "Compare live snow conditions across 70+ North American ski resorts. Base depth, fresh snow, trail counts, and lift status at a glance.",
+  url: "https://peakcam.co/snow-report",
+  isPartOf: {
+    "@type": "WebSite",
+    name: "PeakCam",
+    url: "https://peakcam.co",
+  },
+};
+
 export default async function SnowReport() {
   let resorts: ResortWithData[] = [];
 
@@ -18,5 +32,13 @@ export default async function SnowReport() {
     console.warn("[PeakCam] Could not fetch resorts for snow report.");
   }
 
-  return <SnowReportPage resorts={resorts} />;
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <SnowReportPage resorts={resorts} />
+    </>
+  );
 }

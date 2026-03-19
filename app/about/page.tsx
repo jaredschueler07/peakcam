@@ -17,51 +17,71 @@ export default function About() {
         </h1>
 
         <div className="space-y-6 text-text-subtle text-base leading-relaxed">
-          <p>
-            PeakCam is a free, real-time mountain webcam and snow condition aggregator
-            for North American ski resorts. We pull together live webcams, snow reports,
-            weather forecasts, and trail status from 70+ resorts into one fast, clean dashboard.
+          <p className="text-lg text-text-base font-medium">
+            Every mountain. Every cam. One glance.
           </p>
 
           <p>
-            No account required. No ads. No subscription wall. Just the information you need
-            to decide where to ski this weekend.
+            PeakCam is the fastest way to check real-time conditions across
+            70+ ski resorts in Colorado, Utah, and beyond. Live webcams, snow
+            totals, weather forecasts, and trail counts — all on one page, all
+            free, no account required.
+          </p>
+
+          <p>
+            We built this for the Thursday-night session: you and your crew
+            huddled around a phone, trying to figure out which mountain got
+            the goods. No more tab-juggling between resort sites, weather
+            apps, and cam aggregators that haven&apos;t been updated since 2014.
           </p>
 
           <h2 className="text-xl font-heading font-semibold text-text-base uppercase tracking-wider pt-4">
-            Why We Built This
+            Why PeakCam Exists
           </h2>
 
           <p>
-            Every skier knows the drill: check the resort webcam on one site, pull up the
-            snow report on another, cross-reference the weather forecast on a third, then
-            repeat for every mountain you&apos;re considering. It&apos;s 2026 and there&apos;s still
-            no single place to compare real-time conditions across resorts.
+            Other tools make you choose. Pay a premium for forecast models
+            you don&apos;t need, or wade through ad-heavy legacy sites that load
+            like it&apos;s dial-up. We wanted something different: a clean,
+            data-forward dashboard that respects your time and your data plan.
           </p>
 
           <p>
-            PeakCam fixes that. One page, every mountain, every cam — at a glance.
+            PeakCam is opinionated about simplicity. We show you what matters
+            — base depth, fresh snow, a live cam, and a five-day outlook —
+            and get out of the way. If a resort is firing, you&apos;ll know in
+            two seconds, not two minutes.
           </p>
 
           <h2 className="text-xl font-heading font-semibold text-text-base uppercase tracking-wider pt-4">
-            What We Show You
+            What You Get
           </h2>
 
           <ul className="list-disc list-inside space-y-2 text-text-subtle">
-            <li><span className="text-text-base font-medium">Live webcams</span> — click-to-play streams from summit, base, and village cams</li>
-            <li><span className="text-text-base font-medium">Snow conditions</span> — base depth, 24/48hr snowfall, trail and lift counts</li>
-            <li><span className="text-text-base font-medium">Weather forecasts</span> — 5-day outlook from the National Weather Service</li>
-            <li><span className="text-text-base font-medium">Condition ratings</span> — at-a-glance quality scores so you pick the best mountain</li>
+            <li><span className="text-text-base font-medium">Live webcams</span> — summit, base, and village cams from every major resort, click-to-play so your bandwidth stays yours</li>
+            <li><span className="text-text-base font-medium">Snow conditions</span> — base depth, 24h and 48h snowfall pulled from SNOTEL stations and resort reports</li>
+            <li><span className="text-text-base font-medium">Weather forecasts</span> — five-day outlooks straight from the National Weather Service, no paywall</li>
+            <li><span className="text-text-base font-medium">Condition ratings</span> — at-a-glance scores so you can compare mountains without opening six tabs</li>
+            <li><span className="text-text-base font-medium">Powder alerts</span> — when a storm dumps, we surface the resorts with the most fresh snow front and center</li>
           </ul>
 
           <h2 className="text-xl font-heading font-semibold text-text-base uppercase tracking-wider pt-4">
-            Data Sources
+            Our Data
           </h2>
 
           <p>
-            Snow data comes from SNOTEL stations (USDA/NRCS), resort reports, and manual
-            verification. Weather forecasts are sourced from the National Weather Service API.
-            Webcam feeds are aggregated from resort-operated cameras and public streams.
+            Snow data comes from USDA SNOTEL stations — the same federal
+            sensor network used by avalanche centers and water managers.
+            We cross-reference with resort-reported numbers and flag
+            discrepancies. Weather forecasts are sourced from the National
+            Weather Service API, the gold standard for mountain weather.
+            Webcam feeds are aggregated from resort-operated cameras and
+            verified public streams.
+          </p>
+
+          <p>
+            No proprietary models, no black-box algorithms. Just real data
+            from real sensors, presented clearly.
           </p>
 
           <div className="pt-8 border-t border-border">

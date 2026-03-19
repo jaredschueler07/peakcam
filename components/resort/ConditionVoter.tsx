@@ -157,8 +157,8 @@ export function ConditionVoter({ resortId, liveConditions }: Props) {
                   key={opt.value}
                   onClick={() => setSnow(snow === opt.value ? null : opt.value)}
                   className={`
-                    inline-flex items-center gap-1.5 rounded-full px-3 py-1
-                    text-xs font-semibold border cursor-pointer select-none
+                    inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 min-h-[44px]
+                    text-sm font-semibold border cursor-pointer select-none
                     transition-all duration-[220ms] whitespace-nowrap
                     ${snow === opt.value
                       ? "border-cyan/30 bg-cyan-dim text-cyan"
@@ -181,8 +181,8 @@ export function ConditionVoter({ resortId, liveConditions }: Props) {
                   key={opt.value}
                   onClick={() => setComfort(comfort === opt.value ? null : opt.value)}
                   className={`
-                    inline-flex items-center gap-1.5 rounded-full px-3 py-1
-                    text-xs font-semibold border cursor-pointer select-none
+                    inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 min-h-[44px]
+                    text-sm font-semibold border cursor-pointer select-none
                     transition-all duration-[220ms] whitespace-nowrap
                     ${comfort === opt.value
                       ? "border-cyan/30 bg-cyan-dim text-cyan"
@@ -206,7 +206,7 @@ export function ConditionVoter({ resortId, liveConditions }: Props) {
             onClick={handleSubmit}
             disabled={!hasSelection || submitting}
             className={`
-              w-full rounded-lg px-4 py-2.5 text-sm font-semibold
+              w-full rounded-lg px-4 py-3 min-h-[44px] text-sm font-semibold
               border transition-all duration-[220ms]
               ${hasSelection && !submitting
                 ? "bg-cyan-dim border-cyan/30 text-cyan hover:bg-cyan/20 cursor-pointer"
