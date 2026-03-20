@@ -4,22 +4,22 @@ import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import Fuse from "fuse.js";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { Header } from "@/components/layout/Header";
+import { SummitResortCard } from "@/components/browse/SummitResortCard";
 import type { ResortWithData } from "@/lib/types";
-import { ConditionBadge, StateBadge } from "@/components/ui/Badge";
-import { Chip } from "@/components/ui/Chip";
 
 // Leaflet map — dynamic import, no SSR
 const ResortMap = dynamic(() => import("@/components/browse/ResortMap"), {
   ssr: false,
   loading: () => (
     <div className="h-full w-full bg-surface animate-pulse rounded-xl flex items-center justify-center">
-      <span className="text-text-muted text-sm">Loading map…</span>
+      <span className="text-text-muted text-sm">Loading map...</span>
     </div>
   ),
 });
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────────────────────────
 
 interface Props {
   resorts: ResortWithData[];
@@ -29,7 +29,7 @@ type StateFilter = string;
 type ConditionFilter = "all" | "great" | "good" | "fair" | "poor";
 type SortOption = "name" | "snow" | "conditions";
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// ── Constants ────────────────────────────────────────────────────────────────
 
 const CONDITION_ORDER: Record<string, number> = {
   great: 0, good: 1, fair: 2, poor: 3,
@@ -45,156 +45,110 @@ const FUSE_OPTIONS: import("fuse.js").IFuseOptions<ResortWithData> = {
   ignoreLocation: true,
 };
 
-// ─── Resort card ─────────────────────────────────────────────────────────────
+// ── Filter chip ──────────────────────────────────────────────────────────────
 
-function ResortCard({ resort }: { resort: ResortWithData }) {
-  const snow = resort.snow_report;
-  const camCount = resort.cams.filter((c) => c.is_active).length;
-  const baseDepth = snow?.base_depth ?? null;
-
+function FilterChip({
+  label,
+  active,
+  onClick,
+  icon,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  icon?: React.ReactNode;
+}) {
   return (
-    <Link
-      href={`/resorts/${resort.slug}`}
-      className="group block bg-surface border border-border rounded-xl overflow-hidden
-                 hover:border-border-hi hover:shadow-card-hover transition-all duration-220
-                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan"
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium border cursor-pointer select-none transition-colors duration-200 whitespace-nowrap ${
+        active
+          ? "bg-cyan/20 border-cyan/50 text-cyan hover:bg-cyan/30"
+          : "bg-text-base/10 border-text-base/20 text-text-subtle hover:bg-text-base/20"
+      }`}
     >
-      {/* Snow depth bar */}
-      <div className="h-1 w-full bg-surface2">
-        {baseDepth != null && (
-          <div
-            className="h-full bg-cyan transition-all duration-300"
-            style={{ width: `${Math.min((baseDepth / 120) * 100, 100)}%` }}
-          />
-        )}
-      </div>
-
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <h2 className="text-text-base font-semibold text-[15px] leading-tight group-hover:text-cyan transition-colors duration-150">
-            {resort.name}
-          </h2>
-          <StateBadge>{resort.state}</StateBadge>
-        </div>
-
-        <p className="text-text-muted text-xs mb-3">{resort.region}</p>
-
-        {snow ? (
-          <div className="grid grid-cols-3 gap-2 mb-3">
-            <div className="bg-surface2 rounded-lg p-2 text-center">
-              <div className="text-powder font-bold text-lg leading-none">{snow.base_depth ?? "—"}</div>
-              <div className="text-text-muted text-[10px] mt-0.5">base″</div>
-            </div>
-            <div className="bg-surface2 rounded-lg p-2 text-center">
-              <div className="text-cyan font-bold text-lg leading-none">{snow.new_snow_24h ?? "—"}</div>
-              <div className="text-text-muted text-[10px] mt-0.5">24h″</div>
-            </div>
-            <div className="bg-surface2 rounded-lg p-2 text-center">
-              <div className="text-text-base font-bold text-lg leading-none">
-                {snow.trails_open != null && snow.trails_total != null
-                  ? `${snow.trails_open}/${snow.trails_total}` : "—"}
-              </div>
-              <div className="text-text-muted text-[10px] mt-0.5">runs</div>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-surface2 rounded-lg p-2 mb-3 text-center text-text-muted text-xs">
-            No snow data yet
-          </div>
-        )}
-
-        <div className="flex items-center justify-between">
-          {resort.cond_rating ? (
-            <ConditionBadge
-              rating={resort.cond_rating}
-              label={resort.cond_rating.charAt(0).toUpperCase() + resort.cond_rating.slice(1)}
-            />
-          ) : (
-            <span className="text-text-muted text-xs">—</span>
-          )}
-          <span className="text-text-muted text-xs flex items-center gap-1">
-            <svg className="w-3.5 h-3.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M15 10l4.553-2.069A1 1 0 0121 8.82V18a1 1 0 01-1.447.894L15 17M3 8h12v10H3a1 1 0 01-1-1V9a1 1 0 011-1z" />
-            </svg>
-            {camCount} cam{camCount !== 1 ? "s" : ""}
-          </span>
-        </div>
-      </div>
-    </Link>
+      {icon}
+      {label}
+    </button>
   );
 }
 
-// ─── Featured row (top conditions) ───────────────────────────────────────────
+// ── TODAY'S TOP CONDITIONS — editorial strip ─────────────────────────────────
 
 function FeaturedRow({ resorts }: { resorts: ResortWithData[] }) {
   const featured = useMemo(() => {
     return resorts
       .filter((r) => r.snow_report && r.cond_rating)
       .sort((a, b) => {
-        // Sort by condition rating first, then by fresh snow
         const condDiff = (CONDITION_ORDER[a.cond_rating] ?? 99) - (CONDITION_ORDER[b.cond_rating] ?? 99);
         if (condDiff !== 0) return condDiff;
         return (b.snow_report?.new_snow_24h ?? 0) - (a.snow_report?.new_snow_24h ?? 0);
       })
-      .slice(0, 3);
+      .slice(0, 4);
   }, [resorts]);
 
   if (featured.length === 0) return null;
 
   return (
-    <div className="mb-6">
-      <h2 className="font-heading text-sm uppercase tracking-widest text-text-muted mb-3">
-        Top Conditions
+    <div className="mb-10">
+      <h2 className="font-display text-4xl md:text-5xl text-text-base mb-6 tracking-wide">
+        TODAY&apos;S TOP CONDITIONS
       </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
         {featured.map((resort) => {
           const snow = resort.snow_report;
+          const condColor =
+            resort.cond_rating === "great" ? "#2ECC8F"
+            : resort.cond_rating === "good" ? "#60C8FF"
+            : resort.cond_rating === "fair" ? "#8AA3BE"
+            : "#f87171";
           return (
             <Link
               key={resort.id}
               href={`/resorts/${resort.slug}`}
-              className="group relative bg-surface border border-border rounded-xl overflow-hidden
-                         hover:border-border-hi hover:shadow-card-hover transition-all duration-220
+              className="group relative flex-shrink-0 w-72 bg-surface border border-border rounded-lg overflow-hidden
+                         hover:border-cyan/50 hover:shadow-glow-ice transition-all duration-300
                          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan"
             >
-              {/* Accent top bar */}
-              <div className="h-1.5 w-full bg-cyan" />
+              {/* Alpenglow accent bar */}
+              <div className="h-1 w-full bg-gradient-to-r from-alpenglow via-cyan to-alpenglow" />
 
-              <div className="p-4">
-                <div className="flex items-start justify-between gap-2 mb-3">
+              <div className="p-5">
+                <div className="flex items-start justify-between gap-2 mb-4">
                   <div>
-                    <h3 className="text-text-base font-semibold text-base leading-tight group-hover:text-cyan transition-colors duration-150">
+                    <h3 className="text-text-base font-semibold text-lg leading-tight group-hover:text-cyan transition-colors duration-150">
                       {resort.name}
                     </h3>
-                    <p className="text-text-muted text-xs mt-0.5">{resort.region}</p>
+                    <p className="text-text-muted text-xs mt-1">{resort.region}, {resort.state}</p>
                   </div>
-                  <ConditionBadge
-                    rating={resort.cond_rating}
-                    label={resort.cond_rating.charAt(0).toUpperCase() + resort.cond_rating.slice(1)}
-                  />
+                  <div
+                    className="px-2.5 py-1 rounded text-xs font-semibold shrink-0"
+                    style={{
+                      backgroundColor: `${condColor}20`,
+                      color: condColor,
+                      border: `1px solid ${condColor}40`,
+                    }}
+                  >
+                    {resort.cond_rating.toUpperCase()}
+                  </div>
                 </div>
 
                 {snow && (
-                  <div className="grid grid-cols-4 gap-2">
-                    <div className="bg-surface2 rounded-lg p-2 text-center">
-                      <div className="text-powder font-bold text-lg leading-none">{snow.base_depth ?? "—"}</div>
-                      <div className="text-text-muted text-[10px] mt-0.5">base″</div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-bg/50 rounded-lg p-2 text-center">
+                      <div className="text-powder font-mono font-bold text-xl leading-none">{snow.base_depth ?? "\u2014"}</div>
+                      <div className="text-text-muted text-[10px] mt-1">base&quot;</div>
                     </div>
-                    <div className="bg-surface2 rounded-lg p-2 text-center">
-                      <div className="text-cyan font-bold text-lg leading-none">{snow.new_snow_24h ?? "—"}</div>
-                      <div className="text-text-muted text-[10px] mt-0.5">24h″</div>
+                    <div className="bg-bg/50 rounded-lg p-2 text-center">
+                      <div className="text-cyan font-mono font-bold text-xl leading-none">{snow.new_snow_24h ?? "\u2014"}</div>
+                      <div className="text-text-muted text-[10px] mt-1">24h&quot;</div>
                     </div>
-                    <div className="bg-surface2 rounded-lg p-2 text-center">
-                      <div className="text-text-subtle font-bold text-lg leading-none">{snow.new_snow_48h ?? "—"}</div>
-                      <div className="text-text-muted text-[10px] mt-0.5">48h″</div>
-                    </div>
-                    <div className="bg-surface2 rounded-lg p-2 text-center">
-                      <div className="text-text-base font-bold text-lg leading-none">
+                    <div className="bg-bg/50 rounded-lg p-2 text-center">
+                      <div className="text-text-base font-mono font-bold text-xl leading-none">
                         {snow.trails_open != null && snow.trails_total != null
-                          ? `${snow.trails_open}/${snow.trails_total}` : "—"}
+                          ? `${snow.trails_open}/${snow.trails_total}` : "\u2014"}
                       </div>
-                      <div className="text-text-muted text-[10px] mt-0.5">runs</div>
+                      <div className="text-text-muted text-[10px] mt-1">runs</div>
                     </div>
                   </div>
                 )}
@@ -207,7 +161,7 @@ function FeaturedRow({ resorts }: { resorts: ResortWithData[] }) {
   );
 }
 
-// ─── Powder Alert banner ──────────────────────────────────────────────────────
+// ── Powder Alert banner ──────────────────────────────────────────────────────
 
 function PowderAlert({ resorts }: { resorts: ResortWithData[] }) {
   const alerts = resorts
@@ -218,15 +172,22 @@ function PowderAlert({ resorts }: { resorts: ResortWithData[] }) {
   if (alerts.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 bg-cyan/10 border border-cyan/30 rounded-xl mb-6">
-      <span className="text-lg shrink-0">🌨️</span>
+    <div className="flex items-center gap-3 px-5 py-3 bg-alpenglow/10 border border-alpenglow/30 rounded-lg mb-8">
+      {/* Pulsing dot */}
+      <span className="relative flex h-3 w-3 shrink-0">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-alpenglow opacity-75" />
+        <span className="relative inline-flex rounded-full h-3 w-3 bg-alpenglow" />
+      </span>
       <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-cyan font-semibold text-sm">Powder Alert</span>
+        <span className="text-alpenglow font-semibold text-sm">Powder Alert</span>
         {alerts.map((r) => (
-          <Link key={r.slug} href={`/resorts/${r.slug}`}
-            className="text-text-subtle text-sm hover:text-cyan transition-colors">
+          <Link
+            key={r.slug}
+            href={`/resorts/${r.slug}`}
+            className="text-text-subtle text-sm hover:text-cyan transition-colors"
+          >
             {r.name}{" "}
-            <span className="text-powder font-medium">+{r.snow_report!.new_snow_24h}″</span>
+            <span className="text-powder font-medium">+{r.snow_report!.new_snow_24h}&quot;</span>
           </Link>
         ))}
       </div>
@@ -234,7 +195,7 @@ function PowderAlert({ resorts }: { resorts: ResortWithData[] }) {
   );
 }
 
-// ─── Main BrowsePage ─────────────────────────────────────────────────────────
+// ── Main BrowsePage ──────────────────────────────────────────────────────────
 
 export function BrowsePage({ resorts }: Props) {
   const [search, setSearch] = useState("");
@@ -286,22 +247,38 @@ export function BrowsePage({ resorts }: Props) {
     <div className="min-h-screen bg-bg">
       <Header />
 
-      {/* ── Page header ──────────────────────────────────────── */}
-      <div className="border-b border-border px-4 py-5 md:px-8">
-        <div className="max-w-screen-2xl mx-auto">
-          <div className="flex items-end justify-between mb-4">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-heading font-bold text-text-base uppercase tracking-wider">
-                Browse Resorts
-              </h1>
-              <p className="text-text-muted text-sm mt-0.5">
-                {filtered.length} of {resorts.length} resorts
-              </p>
+      {/* ── Frosted glass search + filter bar ─────────────────── */}
+      <div className="sticky top-0 z-30 border-b border-border backdrop-blur-md bg-surface/85">
+        <div className="max-w-screen-2xl mx-auto px-4 py-5 md:px-8">
+          {/* Top row: search + map toggle */}
+          <div className="flex items-center gap-4 mb-4">
+            <div className="flex-1 relative">
+              <Search
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-text-subtle pointer-events-none"
+                size={20}
+              />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search resorts..."
+                className="w-full pl-12 pr-9 py-3 bg-bg/50 border border-border focus:border-cyan/50 rounded-lg text-text-base placeholder:text-text-muted outline-none transition-colors"
+              />
+              {search && (
+                <button
+                  onClick={handleClearSearch}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-base transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
             </div>
             <button
               onClick={() => setShowMap((v) => !v)}
               className="hidden md:flex items-center gap-2 text-text-muted hover:text-text-base text-sm
-                         border border-border rounded-lg px-3 py-1.5 transition-colors duration-150"
+                         border border-border rounded-lg px-3 py-2.5 transition-colors duration-150"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -311,101 +288,97 @@ export function BrowsePage({ resorts }: Props) {
             </button>
           </div>
 
-          {/* Search */}
-          <div className="relative mb-4">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none"
-              fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M21 21l-4.35-4.35M17 11A6 6 0 105 11a6 6 0 0012 0z" />
-            </svg>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by resort, region, or state…"
-              className="w-full bg-surface border border-border rounded-xl pl-9 pr-9 py-2.5 text-sm
-                         text-text-base placeholder:text-text-muted
-                         focus:outline-none focus:border-cyan
-                         transition-colors duration-150"
-            />
-            {search && (
-              <button onClick={handleClearSearch}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-base transition-colors">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
-
-          {/* State chips + sort */}
+          {/* Filter chips row */}
           <div className="flex items-center gap-2 flex-wrap">
-            <Chip label="All" active={stateFilter === "All"} onClick={() => setStateFilter("All")} />
+            {/* State chips */}
+            <FilterChip label="All" active={stateFilter === "All"} onClick={() => setStateFilter("All")} />
             {availableStates.map((s) => (
-              <Chip key={s} label={s} active={stateFilter === s}
-                onClick={() => setStateFilter(stateFilter === s ? "All" : s)} />
+              <FilterChip
+                key={s}
+                label={s}
+                active={stateFilter === s}
+                onClick={() => setStateFilter(stateFilter === s ? "All" : s)}
+              />
             ))}
-
-            <div className="ml-auto flex items-center gap-1.5">
-              <span className="text-text-muted text-xs hidden sm:block">Sort:</span>
-              {(["name", "snow", "conditions"] as SortOption[]).map((opt) => (
-                <button key={opt} onClick={() => setSort(opt)}
-                  className={`text-xs px-2.5 py-1 rounded-lg border transition-colors duration-150 ${
-                    sort === opt
-                      ? "bg-cyan/10 border-cyan/40 text-cyan"
-                      : "border-border text-text-muted hover:text-text-base"
-                  }`}>
-                  {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Feature + condition filters */}
-          <div className="flex items-center gap-2 flex-wrap mt-3">
-            <Chip label="Has Live Cams" active={hasLiveCams} onClick={() => setHasLiveCams((v) => !v)} />
-            <Chip label="Fresh Snow 8″+" active={freshSnow} onClick={() => setFreshSnow((v) => !v)} />
 
             <span className="w-px h-5 bg-border mx-1 hidden sm:block" />
 
+            {/* Feature filters */}
+            <FilterChip label="Fresh Snow" active={freshSnow} onClick={() => setFreshSnow((v) => !v)} />
+            <FilterChip label="Live Cams" active={hasLiveCams} onClick={() => setHasLiveCams((v) => !v)} />
+
+            <span className="w-px h-5 bg-border mx-1 hidden sm:block" />
+
+            {/* Condition filters */}
             {(["all", "great", "good", "fair", "poor"] as ConditionFilter[]).map((c) => (
-              <Chip
+              <FilterChip
                 key={c}
                 label={c === "all" ? "Any Condition" : c.charAt(0).toUpperCase() + c.slice(1)}
                 active={condFilter === c}
                 onClick={() => setCondFilter(condFilter === c ? "all" : c)}
               />
             ))}
+
+            {/* Sort */}
+            <div className="ml-auto flex items-center gap-1.5">
+              <SlidersHorizontal size={14} className="text-text-muted" />
+              <span className="text-text-muted text-xs hidden sm:block">Sort:</span>
+              {(["name", "snow", "conditions"] as SortOption[]).map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => setSort(opt)}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors duration-200 ${
+                    sort === opt
+                      ? "bg-cyan/20 border-cyan/50 text-cyan"
+                      : "border-border text-text-muted hover:text-text-base"
+                  }`}
+                >
+                  {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ── Body ─────────────────────────────────────────────── */}
-      <div className="max-w-screen-2xl mx-auto px-4 py-6 md:px-8">
+      {/* ── Body ──────────────────────────────────────────────── */}
+      <div className="max-w-screen-2xl mx-auto px-4 py-8 md:px-8">
         <FeaturedRow resorts={resorts} />
         <PowderAlert resorts={resorts} />
+
+        {/* Section header */}
+        <div className="mb-8">
+          <h2 className="font-display text-5xl md:text-6xl text-text-base mb-2">
+            TODAY&apos;S CONDITIONS
+          </h2>
+          <p className="text-text-subtle text-lg">
+            Real-time snow reports from {filtered.length} of {resorts.length} resorts
+          </p>
+        </div>
 
         <div className={`grid gap-6 ${showMap ? "lg:grid-cols-[1fr_380px]" : ""}`}>
           {/* Resort grid */}
           <div>
             {filtered.length === 0 ? (
               <div className="text-center py-20 text-text-muted">
-                <div className="text-4xl mb-3">⛷️</div>
                 <p className="text-lg font-medium text-text-subtle">No resorts found</p>
                 <p className="text-sm mt-1">Try a different search or clear your filters.</p>
                 <button
                   onClick={() => { setSearch(""); setStateFilter("All"); setCondFilter("all"); setHasLiveCams(false); setFreshSnow(false); }}
-                  className="mt-4 text-cyan text-sm hover:underline">
+                  className="mt-4 text-cyan text-sm hover:underline"
+                >
                   Clear all filters
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {filtered.map((resort) => (
-                  <div key={resort.id}
+                  <div
+                    key={resort.id}
                     onMouseEnter={() => setHoveredSlug(resort.slug)}
-                    onMouseLeave={() => setHoveredSlug(null)}>
-                    <ResortCard resort={resort} />
+                    onMouseLeave={() => setHoveredSlug(null)}
+                  >
+                    <SummitResortCard resort={resort} />
                   </div>
                 ))}
               </div>
