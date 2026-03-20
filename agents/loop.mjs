@@ -202,24 +202,48 @@ async function getRecentConversations(agentKey, limit = 5) {
 // C. Slack API Helpers
 // ─────────────────────────────────────────────────────────────
 
-async function slackAPI(token, method, params = {}) {
+const FETCH_TIMEOUT_MS = 10_000; // 10s timeout on all fetch calls
+
+async function fetchWithTimeout(url, options = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function slackAPI(token, method, params = {}, attempt = 0) {
   const isGet = ['conversations.history', 'conversations.replies'].includes(method);
 
   let resp;
-  if (isGet) {
-    const qs = new URLSearchParams(params).toString();
-    resp = await fetch(`https://slack.com/api/${method}?${qs}`, {
-      headers: { 'Authorization': `Bearer ${token}` },
-    });
-  } else {
-    resp = await fetch(`https://slack.com/api/${method}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(params),
-    });
+  try {
+    if (isGet) {
+      const qs = new URLSearchParams(params).toString();
+      resp = await fetchWithTimeout(`https://slack.com/api/${method}?${qs}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+    } else {
+      resp = await fetchWithTimeout(`https://slack.com/api/${method}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params),
+      });
+    }
+  } catch (err) {
+    // Network-level failure (DNS, TCP, timeout) — retry with backoff up to 3 times
+    const cause = err.cause?.message || err.message;
+    if (attempt < 3) {
+      const delay = Math.min(1000 * 2 ** attempt, 8000); // 1s, 2s, 4s
+      log('warn', null, `Slack fetch error (${cause}), retry ${attempt + 1}/3 in ${delay}ms`);
+      await sleep(delay);
+      return slackAPI(token, method, params, attempt + 1);
+    }
+    throw err; // Exhausted retries — let caller handle
   }
 
   // Handle rate limiting
@@ -227,7 +251,20 @@ async function slackAPI(token, method, params = {}) {
     const retryAfter = parseInt(resp.headers.get('Retry-After') || '5', 10);
     log('warn', null, `Slack rate limited, waiting ${retryAfter}s`);
     await sleep(retryAfter * 1000);
-    return slackAPI(token, method, params);
+    return slackAPI(token, method, params, attempt);
+  }
+
+  // Handle non-JSON responses (e.g. Slack error pages)
+  const contentType = resp.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    const body = await resp.text();
+    log('warn', null, `Slack API ${method}: unexpected content-type ${contentType}, status ${resp.status}, body: ${body.slice(0, 100)}`);
+    if (attempt < 3) {
+      const delay = Math.min(1000 * 2 ** attempt, 8000);
+      await sleep(delay);
+      return slackAPI(token, method, params, attempt + 1);
+    }
+    throw new Error(`Slack API returned non-JSON (${resp.status})`);
   }
 
   const data = await resp.json();
@@ -781,7 +818,8 @@ async function main() {
           }
         }
       } catch (err) {
-        log('error', agentKey, `Poll error: ${err.message}`);
+        const cause = err.cause?.message ? ` (${err.cause.message})` : '';
+        log('error', agentKey, `Poll error: ${err.message}${cause}`);
       }
 
       await sleep(250); // Stagger between agents
