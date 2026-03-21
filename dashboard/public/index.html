@@ -1,0 +1,2756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PeakCam Ops</title>
+  <style>
+    /* ── Reset & Base ──────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #080d18;
+      --surface:  #0f1624;
+      --surface2: #162030;
+      --surface3: #1d2a40;
+      --border:   #1e3050;
+      --text:     #e2e8f0;
+      --subtle:   #8fa3bc;
+      --muted:    #4a6080;
+      --accent:   #60C8FF;
+      --error:    #FF7B5E;
+      --warn:     #fbbf24;
+      --success:  #34d399;
+
+      --agent-engineering:  #a78bfa;
+      --agent-product:      #f472b6;
+      --agent-marketing:    #fbbf24;
+      --agent-operations:   #60C8FF;
+      --agent-finance:      #60a5fa;
+      --agent-data:         #c084fc;
+      --agent-productivity: #34d399;
+      --agent-sales:        #4ade80;
+      --agent-coo:          #fb923c;
+    }
+
+    html { font-size: 14px; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ── Layout ────────────────────────────────────────────────────────── */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(8,13,24,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--accent);
+      letter-spacing: -0.02em;
+    }
+
+    .header-logo svg { width: 20px; height: 20px; }
+
+    .header-title {
+      font-size: 0.85rem;
+      color: var(--subtle);
+      font-weight: 400;
+    }
+
+    .header-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .loop-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .loop-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+    }
+
+    .loop-dot.running {
+      background: var(--success);
+      box-shadow: 0 0 6px var(--success);
+      animation: pulse 2s infinite;
+    }
+
+    .loop-dot.stopped { background: var(--error); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .conn-status {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .conn-status.live { color: var(--success); }
+    .conn-status.error { color: var(--error); }
+
+    .main {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 20px;
+      display: grid;
+      gap: 20px;
+    }
+
+    /* ── Section headers ───────────────────────────────────────────────── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--subtle);
+    }
+
+    .section-badge {
+      font-size: 0.7rem;
+      padding: 1px 7px;
+      border-radius: 20px;
+      background: var(--surface3);
+      color: var(--subtle);
+    }
+
+    /* ── Cards ─────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+
+    /* ── System Health Row ─────────────────────────────────────────────── */
+    .health-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+    }
+
+    .health-metric {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+
+    .health-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+    }
+
+    .health-value {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .health-value.ok    { color: var(--success); }
+    .health-value.warn  { color: var(--warn); }
+    .health-value.error { color: var(--error); }
+
+    .health-sub {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* ── Agent Cards ───────────────────────────────────────────────────── */
+    .agents-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 10px;
+    }
+
+    .agent-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      border-top: 2px solid transparent;
+      transition: border-color 0.2s;
+    }
+
+    .agent-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .agent-name {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .agent-status-pill {
+      font-size: 0.65rem;
+      padding: 2px 7px;
+      border-radius: 20px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .status-active  { background: rgba(52,211,153,0.15); color: var(--success); }
+    .status-idle    { background: rgba(96,200,255,0.1);  color: var(--subtle); }
+    .status-error   { background: rgba(255,123,94,0.15); color: var(--error); }
+    .status-offline { background: rgba(74,96,128,0.2);   color: var(--muted); }
+    .status-unknown { background: rgba(74,96,128,0.2);   color: var(--muted); }
+
+    .agent-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 8px;
+    }
+
+    .agent-stat {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .agent-stat-val {
+      font-size: 1rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+    }
+
+    .agent-stat-label {
+      font-size: 0.65rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .agent-last-active {
+      margin-top: 8px;
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+
+    /* ── Two-column layout ─────────────────────────────────────────────── */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 20px;
+      align-items: start;
+    }
+
+    @media (max-width: 900px) {
+      .two-col { grid-template-columns: 1fr; }
+    }
+
+    /* ── Activity Feed ─────────────────────────────────────────────────── */
+    .feed-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      height: 520px;
+    }
+
+    .feed-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .feed-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .feed-filter {
+      font-size: 0.72rem;
+      padding: 3px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--subtle);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .feed-filter:hover { background: var(--surface3); color: var(--text); }
+    .feed-filter.active { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+
+    .autoscroll-btn {
+      font-size: 0.72rem;
+      padding: 3px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--subtle);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .autoscroll-btn.active { border-color: var(--accent); color: var(--accent); }
+
+    .feed-entries {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+      scroll-behavior: smooth;
+    }
+
+    .feed-entries::-webkit-scrollbar { width: 4px; }
+    .feed-entries::-webkit-scrollbar-track { background: transparent; }
+    .feed-entries::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .feed-entry {
+      display: flex;
+      gap: 8px;
+      padding: 5px 14px;
+      line-height: 1.4;
+      font-size: 0.78rem;
+      border-left: 2px solid transparent;
+      transition: background 0.1s;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .feed-entry:hover { background: var(--surface2); }
+
+    .feed-entry.new {
+      animation: highlightIn 0.5s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    @keyframes highlightIn {
+      0%   { background: rgba(96,200,255,0.1); }
+      100% { background: transparent; }
+    }
+
+    .entry-time {
+      color: var(--muted);
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.72rem;
+      flex-shrink: 0;
+      padding-top: 1px;
+      min-width: 68px;
+    }
+
+    .entry-rel-time {
+      color: var(--muted);
+      font-size: 0.68rem;
+      flex-shrink: 0;
+      padding-top: 2px;
+      min-width: 62px;
+      opacity: 0.7;
+      font-style: italic;
+    }
+
+    .entry-agent {
+      font-weight: 600;
+      font-size: 0.72rem;
+      min-width: 88px;
+      flex-shrink: 0;
+      padding-top: 1px;
+    }
+
+    .entry-msg {
+      color: var(--text);
+      word-break: break-word;
+      min-width: 0;
+    }
+
+    .entry-msg .processing-preview {
+      color: var(--subtle);
+      font-style: italic;
+    }
+
+    /* Type-based styling */
+    .feed-entry[data-type="error"]      { border-left-color: var(--error); }
+    .feed-entry[data-type="error"] .entry-msg { color: var(--error); }
+    .feed-entry[data-type="handoff"]    { border-left-color: var(--warn); }
+    .feed-entry[data-type="handoff"] .entry-msg { color: var(--warn); }
+    .feed-entry[data-type="reply"]      { border-left-color: var(--success); }
+    .feed-entry[data-type="system"]     { opacity: 0.5; }
+
+    /* ── Channel Summary ───────────────────────────────────────────────── */
+    .channels-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      height: 520px;
+    }
+
+    .channels-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .channels-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+
+    .channels-list::-webkit-scrollbar { width: 4px; }
+    .channels-list::-webkit-scrollbar-track { background: transparent; }
+    .channels-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .channel-item {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .channel-item:last-child { border-bottom: none; }
+
+    .channel-name {
+      font-size: 0.78rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .channel-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .channel-msg {
+      font-size: 0.72rem;
+      color: var(--subtle);
+      padding: 2px 0;
+      display: flex;
+      gap: 6px;
+    }
+
+    .channel-msg-time { color: var(--muted); flex-shrink: 0; }
+    .channel-msg-type {
+      flex-shrink: 0;
+      font-size: 0.65rem;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: var(--surface3);
+      color: var(--muted);
+    }
+
+    .channel-msg-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .channel-empty { font-size: 0.72rem; color: var(--muted); font-style: italic; }
+
+    /* ── Sprint Tracker ────────────────────────────────────────────────── */
+    .sprint-header-row {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .sprint-goal {
+      font-size: 0.78rem;
+      color: var(--subtle);
+    }
+
+    .sprint-progress {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .progress-bar-wrap {
+      width: 120px;
+      height: 6px;
+      background: var(--surface3);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--success));
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+
+    .progress-pct {
+      font-size: 0.72rem;
+      color: var(--subtle);
+      font-variant-numeric: tabular-nums;
+      min-width: 30px;
+    }
+
+    .sprint-items {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 8px;
+    }
+
+    .sprint-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      transition: border-color 0.2s;
+    }
+
+    .sprint-item:hover { border-color: var(--surface3); }
+    .sprint-item.done { opacity: 0.5; }
+
+    .sprint-item-check {
+      width: 18px; height: 18px;
+      border: 2px solid var(--border);
+      border-radius: 4px;
+      flex-shrink: 0;
+      margin-top: 1px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      background: transparent;
+    }
+
+    .sprint-item-check:hover { border-color: var(--accent); }
+    .sprint-item.done .sprint-item-check { background: var(--success); border-color: var(--success); }
+    .sprint-item.in-progress .sprint-item-check { background: rgba(96,200,255,0.2); border-color: var(--accent); }
+
+    .sprint-item-check svg { display: none; }
+    .sprint-item.done .sprint-item-check svg { display: block; }
+
+    .sprint-item-body { flex: 1; min-width: 0; }
+
+    .sprint-item-title {
+      font-size: 0.8rem;
+      line-height: 1.3;
+      margin-bottom: 4px;
+    }
+
+    .sprint-item.done .sprint-item-title { text-decoration: line-through; color: var(--muted); }
+
+    .sprint-item-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .sprint-priority {
+      font-size: 0.65rem;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-weight: 600;
+    }
+
+    .p0 { background: rgba(255,123,94,0.15); color: var(--error); }
+    .p1 { background: rgba(251,191,36,0.15); color: var(--warn); }
+    .p2 { background: rgba(96,200,255,0.1);  color: var(--accent); }
+    .p3 { background: rgba(74,96,128,0.2);   color: var(--muted); }
+
+    .sprint-owner {
+      font-size: 0.65rem;
+      color: var(--muted);
+      text-transform: capitalize;
+    }
+
+    .sprint-status-select {
+      margin-left: auto;
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--subtle);
+      cursor: pointer;
+      appearance: none;
+    }
+
+    /* ── Responsive tweaks ─────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .main { padding: 12px; gap: 14px; }
+      .header { padding: 0 12px; }
+      .health-grid { grid-template-columns: repeat(2, 1fr); }
+      .agents-grid { grid-template-columns: repeat(2, 1fr); }
+      .sprint-items { grid-template-columns: 1fr; }
+      .feed-entry { padding: 4px 10px; }
+      .entry-agent { min-width: 70px; }
+    }
+
+    /* ── Utility ───────────────────────────────────────────────────────── */
+    .dimmed { opacity: 0.4; }
+    .hidden { display: none !important; }
+    .mono { font-family: 'SF Mono', 'Fira Code', monospace; }
+
+    /* ── COO Command Bar (fixed bottom) ────────────────────────────────── */
+    .cmd-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 200;
+      background: rgba(8,13,24,0.88);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border-top: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .cmd-bar-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--agent-coo);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .cmd-channel-select {
+      font-size: 0.78rem;
+      padding: 7px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      flex-shrink: 0;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .cmd-channel-select:focus { border-color: var(--agent-coo); }
+
+    .cmd-input {
+      flex: 1;
+      font-size: 0.88rem;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s;
+      min-width: 0;
+      font-family: inherit;
+    }
+
+    .cmd-input::placeholder { color: var(--muted); }
+    .cmd-input:focus { border-color: var(--agent-coo); box-shadow: 0 0 0 2px rgba(251,146,60,0.12); }
+
+    .cmd-send-btn {
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 8px 18px;
+      border-radius: 8px;
+      border: none;
+      background: var(--agent-coo);
+      color: #000;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: opacity 0.15s, transform 0.1s;
+      white-space: nowrap;
+    }
+
+    .cmd-send-btn:hover { opacity: 0.88; }
+    .cmd-send-btn:active { transform: scale(0.97); }
+    .cmd-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .cmd-feedback {
+      font-size: 0.72rem;
+      flex-shrink: 0;
+      min-width: 120px;
+      text-align: right;
+      color: var(--muted);
+      transition: color 0.2s;
+    }
+
+    .cmd-feedback.ok { color: var(--success); }
+    .cmd-feedback.err { color: var(--error); }
+
+    /* ── Code Task Button (header) ─────────────────────────────────────── */
+    .code-task-btn {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--accent);
+      background: rgba(96,200,255,0.08);
+      color: var(--accent);
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+
+    .code-task-btn:hover { background: rgba(96,200,255,0.15); }
+
+    /* ── Modal ─────────────────────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 400;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      width: 100%;
+      max-width: 600px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .modal-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .modal-close {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--subtle);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem;
+      line-height: 1;
+      transition: background 0.15s;
+    }
+
+    .modal-close:hover { background: var(--surface3); color: var(--text); }
+
+    .modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .modal-body::-webkit-scrollbar { width: 4px; }
+    .modal-body::-webkit-scrollbar-track { background: transparent; }
+    .modal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .field-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--subtle);
+      margin-bottom: 6px;
+    }
+
+    .field-input, .field-textarea {
+      width: 100%;
+      font-size: 0.85rem;
+      padding: 9px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+
+    .field-textarea {
+      resize: vertical;
+      min-height: 90px;
+      line-height: 1.5;
+    }
+
+    .field-input:focus, .field-textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(96,200,255,0.1);
+    }
+
+    .modal-submit-btn {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      background: var(--accent);
+      color: #000;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .modal-submit-btn:hover { opacity: 0.88; }
+    .modal-submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Sessions List ─────────────────────────────────────────────────── */
+    .sessions-section {
+      margin-top: 8px;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+    }
+
+    .sessions-title {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--subtle);
+      margin-bottom: 10px;
+    }
+
+    .session-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+
+    .session-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .session-pid {
+      font-size: 0.7rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .session-status {
+      font-size: 0.65rem;
+      padding: 2px 7px;
+      border-radius: 20px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .session-status.running { background: rgba(52,211,153,0.15); color: var(--success); }
+    .session-status.done    { background: rgba(74,96,128,0.2);   color: var(--muted); }
+    .session-status.failed  { background: rgba(255,123,94,0.15); color: var(--error); }
+
+    .session-prompt {
+      font-size: 0.75rem;
+      color: var(--subtle);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .session-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .session-btn {
+      font-size: 0.68rem;
+      padding: 3px 8px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--surface3);
+      color: var(--subtle);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .session-btn:hover { color: var(--text); border-color: var(--accent); }
+    .session-btn.kill { border-color: rgba(255,123,94,0.3); }
+    .session-btn.kill:hover { color: var(--error); border-color: var(--error); }
+
+    .session-output {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.7rem;
+      color: var(--subtle);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      max-height: 160px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin-top: 8px;
+    }
+
+    .session-output::-webkit-scrollbar { width: 3px; }
+    .session-output::-webkit-scrollbar-thumb { background: var(--border); }
+
+    /* ── Body padding for fixed bar ────────────────────────────────────── */
+    body { padding-bottom: 60px; }
+
+    /* ── Sessions Panel ────────────────────────────────────────────────── */
+    .sessions-panel {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+      gap: 12px;
+    }
+
+    .sessions-empty {
+      font-size: 0.78rem;
+      color: var(--muted);
+      padding: 16px 0;
+    }
+
+    .session-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      border-left: 3px solid var(--border);
+    }
+
+    .session-card:hover { background: var(--surface2); border-color: var(--accent); }
+    .session-card.status-running { border-left-color: var(--success); }
+    .session-card.status-done    { border-left-color: var(--muted); }
+    .session-card.status-failed  { border-left-color: var(--error); }
+    .session-card.status-external { border-left-color: var(--warn); }
+
+    .session-card-top {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .session-card-prompt {
+      font-size: 0.8rem;
+      color: var(--text);
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .session-card-preview {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.68rem;
+      color: var(--subtle);
+      background: var(--bg);
+      border-radius: 5px;
+      padding: 5px 8px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .session-card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .session-cwd {
+      font-size: 0.68rem;
+      color: var(--muted);
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .session-uptime {
+      font-size: 0.68rem;
+      color: var(--muted);
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .session-status-pill {
+      font-size: 0.65rem;
+      padding: 2px 7px;
+      border-radius: 20px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      flex-shrink: 0;
+    }
+
+    .session-status-pill.running  { background: rgba(52,211,153,0.15); color: var(--success); }
+    .session-status-pill.done     { background: rgba(74,96,128,0.2);   color: var(--muted); }
+    .session-status-pill.failed   { background: rgba(255,123,94,0.15); color: var(--error); }
+    .session-status-pill.external { background: rgba(251,191,36,0.15); color: var(--warn); }
+
+    .session-readonly-badge {
+      font-size: 0.6rem;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: rgba(251,191,36,0.1);
+      color: var(--warn);
+      border: 1px solid rgba(251,191,36,0.2);
+    }
+
+    .discover-btn {
+      font-size: 0.72rem;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--subtle);
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .discover-btn:hover { border-color: var(--warn); color: var(--warn); }
+
+    /* ── Session Detail Overlay ─────────────────────────────────────────── */
+    .session-detail-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.72);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 500;
+      display: flex;
+      align-items: stretch;
+      justify-content: flex-end;
+    }
+
+    .session-detail-panel {
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      width: 100%;
+      max-width: 800px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    @media (max-width: 600px) {
+      .session-detail-panel { max-width: 100%; }
+    }
+
+    .session-detail-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      gap: 10px;
+    }
+
+    .detail-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .detail-header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .detail-pid {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.75rem;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .detail-uptime {
+      font-size: 0.7rem;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .detail-prompt {
+      padding: 8px 16px;
+      font-size: 0.8rem;
+      color: var(--subtle);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .detail-meta {
+      padding: 4px 16px 6px;
+      font-size: 0.68rem;
+      color: var(--muted);
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    /* ── Output Terminal ────────────────────────────────────────────────── */
+    .session-output-terminal {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 14px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.72rem;
+      line-height: 1.55;
+      background: var(--bg);
+    }
+
+    .session-output-terminal::-webkit-scrollbar { width: 5px; }
+    .session-output-terminal::-webkit-scrollbar-track { background: transparent; }
+    .session-output-terminal::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .output-line {
+      color: var(--subtle);
+      word-break: break-all;
+      padding: 1px 0;
+      white-space: pre-wrap;
+    }
+
+    .output-line.stderr     { color: var(--error); }
+    .output-line.exit       { color: var(--warn); opacity: 0.8; }
+    .output-line.tool       { color: var(--accent); }
+    .output-line.input-echo { color: var(--success); font-style: italic; }
+
+    .terminal-empty {
+      color: var(--muted);
+      font-style: italic;
+      font-size: 0.72rem;
+      padding: 10px 0;
+    }
+
+    /* ── Session Stdin Bar ──────────────────────────────────────────────── */
+    .session-stdin-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+
+    .stdin-prompt-char {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.85rem;
+      color: var(--success);
+      flex-shrink: 0;
+    }
+
+    .stdin-input {
+      flex: 1;
+      font-size: 0.82rem;
+      padding: 7px 12px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      outline: none;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      transition: border-color 0.15s;
+      min-width: 0;
+    }
+
+    .stdin-input::placeholder { color: var(--muted); }
+    .stdin-input:focus { border-color: var(--success); box-shadow: 0 0 0 2px rgba(52,211,153,0.1); }
+
+    .stdin-send-btn {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 7px 16px;
+      border-radius: 7px;
+      border: none;
+      background: var(--success);
+      color: #000;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: opacity 0.15s;
+    }
+
+    .stdin-send-btn:hover { opacity: 0.85; }
+    .stdin-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .stdin-feedback {
+      font-size: 0.7rem;
+      min-width: 50px;
+      text-align: right;
+      flex-shrink: 0;
+      transition: color 0.2s;
+    }
+
+    .stdin-readonly-notice {
+      padding: 10px 16px;
+      font-size: 0.72rem;
+      color: var(--warn);
+      border-top: 1px solid var(--border);
+      background: rgba(251,191,36,0.06);
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 600px) {
+      .sessions-panel { grid-template-columns: 1fr; }
+    }
+
+    /* ── Dispatch Sessions ───────────────────────────────────────────────── */
+    .dispatch-section {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    .dispatch-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .dispatch-title {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--subtle);
+    }
+
+    .dispatch-badge {
+      font-size: 0.7rem;
+      padding: 1px 7px;
+      border-radius: 20px;
+      background: rgba(167,139,250,0.15);
+      color: #a78bfa;
+    }
+
+    .dispatch-panel {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 10px;
+    }
+
+    .dispatch-empty {
+      font-size: 0.78rem;
+      color: var(--muted);
+      padding: 12px 0;
+    }
+
+    .dispatch-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid #a78bfa;
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .dispatch-card-top {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      flex-wrap: wrap;
+    }
+
+    .dispatch-session-id {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.68rem;
+      color: #a78bfa;
+      font-weight: 600;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .dispatch-status {
+      font-size: 0.65rem;
+      padding: 2px 7px;
+      border-radius: 20px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      flex-shrink: 0;
+    }
+
+    .dispatch-status.running { background: rgba(52,211,153,0.15); color: var(--success); }
+    .dispatch-status.idle    { background: rgba(74,96,128,0.2);   color: var(--muted); }
+    .dispatch-status.unknown { background: rgba(251,191,36,0.1);  color: var(--warn); }
+
+    .dispatch-name {
+      font-size: 0.8rem;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .dispatch-meta {
+      font-size: 0.68rem;
+      color: var(--muted);
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .dispatch-msg-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .dispatch-msg-input {
+      flex: 1;
+      font-size: 0.78rem;
+      padding: 6px 10px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      outline: none;
+      font-family: inherit;
+      min-width: 0;
+      transition: border-color 0.15s;
+    }
+
+    .dispatch-msg-input::placeholder { color: var(--muted); }
+    .dispatch-msg-input:focus { border-color: #a78bfa; box-shadow: 0 0 0 2px rgba(167,139,250,0.1); }
+
+    .dispatch-send-btn {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 7px;
+      border: none;
+      background: #a78bfa;
+      color: #000;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: opacity 0.15s;
+      white-space: nowrap;
+    }
+
+    .dispatch-send-btn:hover { opacity: 0.85; }
+    .dispatch-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .dispatch-feedback {
+      font-size: 0.7rem;
+      color: var(--muted);
+      min-height: 16px;
+      transition: color 0.2s;
+    }
+
+    .dispatch-response {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.68rem;
+      color: var(--subtle);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      max-height: 120px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      display: none;
+    }
+
+    .dispatch-response::-webkit-scrollbar { width: 3px; }
+    .dispatch-response::-webkit-scrollbar-thumb { background: var(--border); }
+
+    /* Register modal */
+    .register-btn {
+      font-size: 0.72rem;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(167,139,250,0.3);
+      background: rgba(167,139,250,0.08);
+      color: #a78bfa;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+      margin-left: auto;
+    }
+
+    .register-btn:hover { background: rgba(167,139,250,0.15); border-color: #a78bfa; }
+
+    .dispatch-unregister-btn {
+      font-size: 0.62rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,123,94,0.25);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+
+    .dispatch-unregister-btn:hover { color: var(--error); border-color: var(--error); }
+
+    @media (max-width: 600px) {
+      .dispatch-panel { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────── -->
+<header class="header">
+  <div class="header-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M3 17l4-8 4 4 4-7 4 11" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    PeakCam
+  </div>
+  <span class="header-title">Ops Dashboard</span>
+  <div class="header-right">
+    <button class="code-task-btn" id="newCodeTaskBtn">⌨ New Code Task</button>
+    <div class="loop-status" id="loopStatus">
+      <span class="loop-dot" id="loopDot"></span>
+      <span id="loopStatusText">Checking...</span>
+    </div>
+    <span class="conn-status" id="connStatus">connecting</span>
+  </div>
+</header>
+
+<!-- ── Claude Code Task Modal ─────────────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="codeModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">⌨ New Code Task</span>
+      <button class="modal-close" id="codeModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div>
+        <div class="field-label">Task Prompt</div>
+        <textarea class="field-textarea" id="codePrompt" placeholder="Describe what you want Claude to do…"></textarea>
+      </div>
+      <div>
+        <div class="field-label">Working Directory</div>
+        <input class="field-input" id="codeCwd" type="text" value="/Users/maestro_admin/peakcam/peakcam">
+      </div>
+      <button class="modal-submit-btn" id="codeSubmitBtn">Launch Session</button>
+      <div style="font-size:0.72rem;color:var(--muted);text-align:center;margin-top:4px;">
+        Session will appear in the Claude Sessions panel below.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main ────────────────────────────────────────────────────────────── -->
+<div class="main">
+
+  <!-- System Health -->
+  <section>
+    <div class="section-header">
+      <span class="section-title">System Health</span>
+      <span class="section-badge" id="healthTs">—</span>
+    </div>
+    <div class="health-grid">
+      <div class="health-metric">
+        <div class="health-label">Loop Process</div>
+        <div class="health-value" id="hLoopProc">—</div>
+        <div class="health-sub" id="hLoopPid">—</div>
+      </div>
+      <div class="health-metric">
+        <div class="health-label">Uptime</div>
+        <div class="health-value" id="hUptime">—</div>
+        <div class="health-sub">process elapsed</div>
+      </div>
+      <div class="health-metric">
+        <div class="health-label">Last Poll</div>
+        <div class="health-value mono" id="hLastPoll">—</div>
+        <div class="health-sub">from loop.log</div>
+      </div>
+      <div class="health-metric">
+        <div class="health-label">Error Rate</div>
+        <div class="health-value" id="hErrorRate">—</div>
+        <div class="health-sub">this session</div>
+      </div>
+      <div class="health-metric">
+        <div class="health-label">Log Size</div>
+        <div class="health-value" id="hLogSize">—</div>
+        <div class="health-sub">loop.log</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Claude Sessions -->
+  <section id="claudeSessionsSection">
+    <div class="section-header">
+      <span class="section-title">Claude Sessions</span>
+      <span class="section-badge" id="sessionCountBadge">0 running</span>
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+        <button class="discover-btn" id="discoverBtn" title="Scan for running claude processes">Discover</button>
+      </div>
+    </div>
+    <div class="sessions-panel" id="sessionsPanel">
+      <div class="sessions-empty">No sessions. Use "New Code Task" to start one.</div>
+    </div>
+  </section>
+
+  <!-- Dispatch Sessions subsection (injected inside Claude Sessions card area) -->
+  <section id="dispatchSessionsSection">
+    <div class="dispatch-section">
+      <div class="dispatch-header">
+        <span class="dispatch-title">Dispatch Sessions</span>
+        <span class="dispatch-badge" id="dispatchCountBadge">0</span>
+        <button class="discover-btn" id="dispatchRefreshBtn" style="border-color:rgba(167,139,250,0.3);color:#a78bfa;" title="Refresh dispatch sessions">Refresh</button>
+        <button class="register-btn" id="openRegisterBtn">+ Register</button>
+      </div>
+      <div class="dispatch-panel" id="dispatchPanel">
+        <div class="dispatch-empty">Loading…</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Agent Status -->
+  <section>
+    <div class="section-header">
+      <span class="section-title">Agents</span>
+      <span class="section-badge" id="agentActiveCount">0 active</span>
+    </div>
+    <div class="agents-grid" id="agentsGrid">
+      <!-- populated by JS -->
+    </div>
+  </section>
+
+  <!-- Activity Feed + Channels -->
+  <div class="two-col">
+
+    <!-- Feed -->
+    <div>
+      <div class="section-header" style="margin-bottom:8px;">
+        <span class="section-title">Activity Feed</span>
+        <span class="section-badge" id="feedCount">0 entries</span>
+        <div class="feed-controls" style="margin-left:auto;">
+          <button class="feed-filter active" data-filter="all">All</button>
+          <button class="feed-filter" data-filter="processing">Messages</button>
+          <button class="feed-filter" data-filter="reply">Replies</button>
+          <button class="feed-filter" data-filter="handoff">Handoffs</button>
+          <button class="feed-filter" data-filter="error">Errors</button>
+          <button class="autoscroll-btn active" id="autoScrollBtn">↓ Auto</button>
+        </div>
+      </div>
+      <div class="feed-wrap">
+        <div class="feed-entries" id="feedEntries"></div>
+      </div>
+    </div>
+
+    <!-- Channels -->
+    <div>
+      <div class="section-header" style="margin-bottom:8px;">
+        <span class="section-title">Channels</span>
+      </div>
+      <div class="channels-wrap">
+        <div class="channels-list" id="channelsList"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Sprint Tracker -->
+  <section>
+    <div class="sprint-header-row">
+      <div class="section-title" id="sprintTitle">Sprint 2</div>
+      <div class="sprint-goal" id="sprintGoal"></div>
+      <div class="sprint-progress">
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" id="sprintBar" style="width:0%"></div></div>
+        <span class="progress-pct" id="sprintPct">0%</span>
+      </div>
+    </div>
+    <div class="sprint-items" id="sprintItems">
+      <div style="color:var(--muted);font-size:0.8rem;">Loading...</div>
+    </div>
+  </section>
+
+</div><!-- /main -->
+
+<!-- ── Register Session Modal ────────────────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="registerModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" style="color:#a78bfa">⎋ Register Session</span>
+      <button class="modal-close" id="registerModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div>
+        <div class="field-label">Session ID (UUID)</div>
+        <input class="field-input" id="registerSessionId" type="text" placeholder="e.g. 766aea48-fce2-4764-813d-0f9661042aa1">
+      </div>
+      <div>
+        <div class="field-label">Display Name (optional)</div>
+        <input class="field-input" id="registerName" type="text" placeholder="e.g. Dispatch — Engineering">
+      </div>
+      <div>
+        <div class="field-label">Working Directory (optional)</div>
+        <input class="field-input" id="registerCwd" type="text" placeholder="/Users/maestro_admin/peakcam/peakcam">
+      </div>
+      <button class="modal-submit-btn" id="registerSubmitBtn" style="background:#a78bfa">Register Session</button>
+      <div style="font-size:0.72rem;color:var(--muted);text-align:center;margin-top:4px;">
+        Find the session ID via <code style="font-size:0.7rem;color:var(--subtle)">ls ~/.claude/sessions/</code> or from Dispatch output.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Session Detail Overlay ───────────────────────────────────────────────── -->
+<div class="session-detail-overlay hidden" id="sessionDetailOverlay">
+  <div class="session-detail-panel">
+    <div class="session-detail-header">
+      <div class="detail-header-left">
+        <span class="detail-pid" id="detailPid">PID 0</span>
+        <span class="session-status-pill running" id="detailStatus">running</span>
+        <span class="detail-uptime" id="detailUptime"></span>
+      </div>
+      <div class="detail-header-right">
+        <button class="session-btn kill hidden" id="detailKillBtn">Kill</button>
+        <button class="modal-close" id="detailCloseBtn">✕</button>
+      </div>
+    </div>
+    <div class="detail-prompt" id="detailPrompt"></div>
+    <div class="detail-meta" id="detailMeta"></div>
+    <div class="session-output-terminal" id="detailTerminal">
+      <div class="terminal-empty">Connecting…</div>
+    </div>
+    <div class="session-stdin-bar" id="stdinBar">
+      <span class="stdin-prompt-char">→</span>
+      <input class="stdin-input" id="stdinInput" type="text"
+        placeholder="Send input to this Claude session… (Enter to send)"
+        autocomplete="off">
+      <button class="stdin-send-btn" id="stdinSendBtn">Send</button>
+      <span class="stdin-feedback" id="stdinFeedback"></span>
+    </div>
+    <div class="stdin-readonly-notice hidden" id="stdinReadonlyNotice">
+      Read-only — this process was not started by the dashboard
+    </div>
+  </div>
+</div>
+
+<!-- ── COO Command Bar ────────────────────────────────────────────────────── -->
+<div class="cmd-bar">
+  <span class="cmd-bar-label">📋 COO</span>
+  <select class="cmd-channel-select" id="cmdChannel">
+    <option value="C0ALWABRTCJ">#all-peakcam</option>
+    <option value="C0ALF8QJ2TZ">#peakcam-engineering</option>
+    <option value="C0AM9KDR3J5">#peakcam-product</option>
+    <option value="C0AM09VK6E8">#peakcam-marketing</option>
+    <option value="C0ALT9Q4NQM">#peakcam-sales</option>
+    <option value="C0AM9K98UUR">#peakcam-data</option>
+    <option value="C0ALQAPA95Z">#peakcam-operations</option>
+    <option value="C0AM9KHJTDF">#peakcam-finance</option>
+    <option value="C0ALULH4YJ2">#peakcam-productivity</option>
+  </select>
+  <input class="cmd-input" id="cmdInput" type="text" placeholder="Type a directive and press Enter…" autocomplete="off">
+  <button class="cmd-send-btn" id="cmdSendBtn">Send</button>
+  <span class="cmd-feedback" id="cmdFeedback"></span>
+</div>
+
+<script>
+// ── Agent config (filled from /api/config) ─────────────────────────────────
+let AGENT_COLORS = {};
+let AGENTS_CONFIG = {};
+
+// ── State ─────────────────────────────────────────────────────────────────
+let allEntries = [];
+let activeFilter = 'all';
+let autoScroll = true;
+let feedCount = 0;
+
+// ── Color helpers ──────────────────────────────────────────────────────────
+function agentColor(name) {
+  return AGENT_COLORS[name] || '#8fa3bc';
+}
+
+function agentLabel(name) {
+  if (!name) return '';
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+// ── Feed ───────────────────────────────────────────────────────────────────
+const feedEl = document.getElementById('feedEntries');
+const feedCountEl = document.getElementById('feedCount');
+let feedCountBadge = 0;
+
+function formatLogTime(timeStr) {
+  if (!timeStr) return { display: '', relative: '' };
+  const [h, m] = timeStr.split(':').map(Number);
+  const hours12 = h % 12 || 12;
+  const ampm = h < 12 ? 'AM' : 'PM';
+  const display = `${hours12}:${String(m).padStart(2, '0')} ${ampm}`;
+
+  const now = new Date();
+  const s = parseInt(timeStr.split(':')[2]) || 0;
+  const logDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, s);
+  let diffMs = now - logDate;
+  if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000; // before midnight rollover
+  const diffMin = Math.floor(diffMs / 60000);
+  let relative;
+  if (diffMin < 1) relative = 'just now';
+  else if (diffMin < 60) relative = `${diffMin}m ago`;
+  else if (diffMin < 1440) relative = `${Math.floor(diffMin / 60)}h ago`;
+  else relative = display;
+
+  return { display, relative };
+}
+
+function renderEntry(entry, isNew = false) {
+  const color = agentColor(entry.agent);
+
+  // Format message
+  let msgHtml = escHtml(entry.message);
+
+  // For processing messages, show a truncated preview
+  if (entry.type === 'processing') {
+    const preview = entry.message.replace(/^Processing message from <@[^>]+>: "?/, '').slice(0, 120);
+    const base = 'Processing';
+    msgHtml = `<span>${base}</span> <span class="processing-preview">${escHtml(preview)}${preview.length >= 120 ? '…' : ''}</span>`;
+  }
+
+  const div = document.createElement('div');
+  div.className = `feed-entry${isNew ? ' new' : ''}`;
+  div.dataset.type = entry.type;
+  div.dataset.agent = entry.agent || '';
+  if (shouldHide(entry)) div.classList.add('hidden');
+
+  const { display: timeDisplay, relative: timeRelative } = formatLogTime(entry.time);
+  div.innerHTML = `
+    <span class="entry-time mono" title="${escHtml(entry.time || '')}">${escHtml(timeDisplay)}</span>
+    <span class="entry-rel-time">${escHtml(timeRelative)}</span>
+    <span class="entry-agent" style="color:${color}">${agentLabel(entry.agent)}</span>
+    <span class="entry-msg">${msgHtml}</span>
+  `;
+
+  return div;
+}
+
+function shouldHide(entry) {
+  if (activeFilter === 'all') return false;
+  return entry.type !== activeFilter;
+}
+
+function applyFilter() {
+  const entries = feedEl.querySelectorAll('.feed-entry');
+  entries.forEach(el => {
+    if (activeFilter === 'all' || el.dataset.type === activeFilter) {
+      el.classList.remove('hidden');
+    } else {
+      el.classList.add('hidden');
+    }
+  });
+}
+
+function addEntriesToFeed(entries, isNew = false) {
+  const frag = document.createDocumentFragment();
+  entries.forEach(e => frag.appendChild(renderEntry(e, isNew)));
+  feedEl.appendChild(frag);
+  feedCountBadge += entries.length;
+  feedCountEl.textContent = `${feedCountBadge} entries`;
+  // trim old entries
+  while (feedEl.children.length > 500) feedEl.removeChild(feedEl.firstChild);
+  if (autoScroll) feedEl.scrollTop = feedEl.scrollHeight;
+}
+
+// ── Agent Cards ────────────────────────────────────────────────────────────
+const agentsGrid = document.getElementById('agentsGrid');
+const agentOrder = ['engineering','product','marketing','operations','finance','data','productivity','sales','coo'];
+
+function renderAgentsGrid(agentStats) {
+  agentsGrid.innerHTML = '';
+  let activeCount = 0;
+
+  agentOrder.forEach(key => {
+    const stats = agentStats[key] || { messageCount: 0, replyCount: 0, errorCount: 0, handoffCount: 0, lastActive: null, status: 'offline' };
+    const color = agentColor(key);
+    const status = stats.status || 'offline';
+    if (status === 'active') activeCount++;
+
+    const card = document.createElement('div');
+    card.className = 'agent-card';
+    card.style.borderTopColor = color;
+
+    const statusClass = `status-${status}`;
+    const statusLabel = status;
+
+    card.innerHTML = `
+      <div class="agent-card-header">
+        <span class="agent-name" style="color:${color}">${agentLabel(key)}</span>
+        <span class="agent-status-pill ${statusClass}">${statusLabel}</span>
+      </div>
+      <div class="agent-stats">
+        <div class="agent-stat">
+          <span class="agent-stat-val">${stats.messageCount}</span>
+          <span class="agent-stat-label">Msgs</span>
+        </div>
+        <div class="agent-stat">
+          <span class="agent-stat-val">${stats.replyCount}</span>
+          <span class="agent-stat-label">Replied</span>
+        </div>
+        <div class="agent-stat">
+          <span class="agent-stat-val">${stats.handoffCount}</span>
+          <span class="agent-stat-label">Handoffs</span>
+        </div>
+        <div class="agent-stat">
+          <span class="agent-stat-val" style="${stats.errorCount > 0 ? 'color:var(--error)' : ''}">${stats.errorCount}</span>
+          <span class="agent-stat-label">Errors</span>
+        </div>
+      </div>
+      <div class="agent-last-active">${stats.lastActive ? `Last: ${stats.lastActive}` : 'No activity'}</div>
+    `;
+
+    agentsGrid.appendChild(card);
+  });
+
+  document.getElementById('agentActiveCount').textContent = `${activeCount} active`;
+}
+
+// ── Channels ───────────────────────────────────────────────────────────────
+const channelsList = document.getElementById('channelsList');
+
+function renderChannels(channels) {
+  channelsList.innerHTML = '';
+
+  const channelOrder = [
+    '#peakcam-engineering', '#peakcam-product', '#peakcam-marketing',
+    '#peakcam-operations', '#peakcam-finance', '#peakcam-data',
+    '#peakcam-productivity', '#peakcam-sales', '#all-peakcam'
+  ];
+
+  // merge channels from data with expected order
+  const agentForChannel = {
+    '#peakcam-engineering':  'engineering',
+    '#peakcam-product':      'product',
+    '#peakcam-marketing':    'marketing',
+    '#peakcam-operations':   'operations',
+    '#peakcam-finance':      'finance',
+    '#peakcam-data':         'data',
+    '#peakcam-productivity': 'productivity',
+    '#peakcam-sales':        'sales',
+    '#all-peakcam':          'coo',
+  };
+
+  channelOrder.forEach(ch => {
+    const agentKey = agentForChannel[ch];
+    const color = agentColor(agentKey);
+    const data = channels[ch] || { messages: [] };
+
+    const item = document.createElement('div');
+    item.className = 'channel-item';
+    item.innerHTML = `
+      <div class="channel-name">
+        <span class="channel-dot" style="background:${color}"></span>
+        ${escHtml(ch)}
+      </div>
+      ${data.messages.length ? data.messages.map(m => `
+        <div class="channel-msg">
+          <span class="channel-msg-time">${escHtml(m.time)}</span>
+          <span class="channel-msg-type">${escHtml(m.type)}</span>
+          <span class="channel-msg-text">${escHtml(formatMsgText(m.text))}</span>
+        </div>
+      `).join('') : '<div class="channel-empty">No activity this session</div>'}
+    `;
+    channelsList.appendChild(item);
+  });
+}
+
+function formatMsgText(text) {
+  return text
+    .replace(/^Processing message from <@[^>]+>: /, '')
+    .replace(/^Replied in thread \S+/, 'Replied in thread')
+    .replace(/^Handed off to (\w+) in /, 'Handoff → ')
+    .slice(0, 80);
+}
+
+// ── Health ─────────────────────────────────────────────────────────────────
+function updateHealth(health, errorRate, lastPollTime) {
+  const running = health.loopRunning;
+
+  const dot = document.getElementById('loopDot');
+  const statusTxt = document.getElementById('loopStatusText');
+  dot.className = `loop-dot ${running ? 'running' : 'stopped'}`;
+  statusTxt.textContent = running ? 'Loop running' : 'Loop stopped';
+
+  document.getElementById('hLoopProc').textContent = running ? 'Running' : 'Stopped';
+  document.getElementById('hLoopProc').className = `health-value ${running ? 'ok' : 'error'}`;
+  document.getElementById('hLoopPid').textContent = health.pid ? `PID ${health.pid}` : 'not found';
+  document.getElementById('hUptime').textContent = health.loopUptime || '—';
+  document.getElementById('hLastPoll').textContent = lastPollTime || health.lastPollTime || '—';
+
+  const errRateNum = errorRate || 0;
+  const errEl = document.getElementById('hErrorRate');
+  errEl.textContent = `${errRateNum}%`;
+  errEl.className = `health-value ${errRateNum === 0 ? 'ok' : errRateNum < 5 ? 'warn' : 'error'}`;
+
+  document.getElementById('hLogSize').textContent = health.logSizeHuman || '—';
+
+  if (health.localTimeStr) {
+    document.getElementById('healthTs').textContent = `updated ${health.localTimeStr}`;
+  }
+}
+
+// ── Sprint ─────────────────────────────────────────────────────────────────
+function renderSprint(data) {
+  const items = data.items || [];
+  const done = items.filter(i => i.status === 'done').length;
+  const pct = items.length ? Math.round((done / items.length) * 100) : 0;
+
+  document.getElementById('sprintTitle').textContent = data.title || `Sprint ${data.sprint}`;
+  document.getElementById('sprintGoal').textContent = data.goal || '';
+  document.getElementById('sprintBar').style.width = `${pct}%`;
+  document.getElementById('sprintPct').textContent = `${pct}%`;
+
+  const container = document.getElementById('sprintItems');
+  container.innerHTML = '';
+
+  items.forEach(item => {
+    const div = document.createElement('div');
+    div.className = `sprint-item ${item.status}`;
+    div.dataset.id = item.id;
+
+    div.innerHTML = `
+      <div class="sprint-item-check" title="Toggle status">
+        <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+          <path d="M1 4l3 3 5-6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="sprint-item-body">
+        <div class="sprint-item-title">${escHtml(item.title)}</div>
+        <div class="sprint-item-meta">
+          <span class="sprint-priority ${item.priority.toLowerCase()}">${item.priority}</span>
+          <span class="sprint-owner" style="color:${agentColor(item.owner)}">${item.owner}</span>
+          <select class="sprint-status-select" data-id="${item.id}">
+            <option value="todo"        ${item.status === 'todo'        ? 'selected' : ''}>Todo</option>
+            <option value="in-progress" ${item.status === 'in-progress' ? 'selected' : ''}>In Progress</option>
+            <option value="done"        ${item.status === 'done'        ? 'selected' : ''}>Done</option>
+          </select>
+        </div>
+      </div>
+    `;
+
+    // Checkbox click → cycle todo → in-progress → done
+    div.querySelector('.sprint-item-check').addEventListener('click', () => {
+      const next = { todo: 'in-progress', 'in-progress': 'done', done: 'todo' };
+      updateSprintItem(item.id, next[item.status]);
+    });
+
+    // Select change
+    div.querySelector('.sprint-status-select').addEventListener('change', e => {
+      updateSprintItem(item.id, e.target.value);
+    });
+
+    container.appendChild(div);
+  });
+}
+
+function updateSprintItem(id, status) {
+  fetch(`/api/sprint/item/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  })
+  .then(r => r.json())
+  .then(() => loadSprint())
+  .catch(console.error);
+}
+
+function loadSprint() {
+  fetch('/api/sprint').then(r => r.json()).then(renderSprint).catch(console.error);
+}
+
+// ── SSE Connection ─────────────────────────────────────────────────────────
+let evtSource = null;
+let reconnectTimer = null;
+
+function connect() {
+  if (evtSource) evtSource.close();
+
+  const connEl = document.getElementById('connStatus');
+  connEl.textContent = 'connecting…';
+  connEl.className = 'conn-status';
+
+  evtSource = new EventSource('/api/events');
+
+  evtSource.onopen = () => {
+    connEl.textContent = 'live';
+    connEl.className = 'conn-status live';
+    clearTimeout(reconnectTimer);
+  };
+
+  evtSource.onmessage = (e) => {
+    let msg;
+    try { msg = JSON.parse(e.data); } catch (_) { return; }
+
+    if (msg.type === 'init') {
+      if (msg.agentColors) AGENT_COLORS = msg.agentColors;
+
+      // Load config
+      fetch('/api/config').then(r => r.json()).then(cfg => {
+        AGENTS_CONFIG = cfg.agents;
+        if (cfg.colors) AGENT_COLORS = cfg.colors;
+        renderAgentsGrid(msg.agents || {});
+        renderChannels(msg.channels || {});
+      }).catch(() => {
+        renderAgentsGrid(msg.agents || {});
+        renderChannels(msg.channels || {});
+      });
+
+      feedEl.innerHTML = '';
+      feedCountBadge = 0;
+      addEntriesToFeed(msg.lines || []);
+      updateHealth(msg.health || {}, msg.errorRate, msg.lastPollTime);
+    }
+
+    if (msg.type === 'update') {
+      if (msg.newLines && msg.newLines.length) addEntriesToFeed(msg.newLines, true);
+      if (msg.agents) renderAgentsGrid(msg.agents);
+      if (msg.channels) renderChannels(msg.channels);
+      updateHealth(msg.health || {}, msg.errorRate, msg.lastPollTime);
+    }
+
+    if (msg.type === 'health') {
+      updateHealth(msg.health || {}, null, null);
+    }
+  };
+
+  evtSource.onerror = () => {
+    connEl.textContent = 'reconnecting…';
+    connEl.className = 'conn-status error';
+    evtSource.close();
+    reconnectTimer = setTimeout(connect, 3000);
+  };
+}
+
+// ── Filter controls ────────────────────────────────────────────────────────
+document.querySelectorAll('.feed-filter').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.feed-filter').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilter = btn.dataset.filter;
+    applyFilter();
+  });
+});
+
+const autoScrollBtn = document.getElementById('autoScrollBtn');
+autoScrollBtn.addEventListener('click', () => {
+  autoScroll = !autoScroll;
+  autoScrollBtn.classList.toggle('active', autoScroll);
+  if (autoScroll) feedEl.scrollTop = feedEl.scrollHeight;
+});
+
+feedEl.addEventListener('scroll', () => {
+  const atBottom = feedEl.scrollTop + feedEl.clientHeight >= feedEl.scrollHeight - 20;
+  if (!atBottom && autoScroll) {
+    autoScroll = false;
+    autoScrollBtn.classList.remove('active');
+  }
+});
+
+// ── Escape HTML ────────────────────────────────────────────────────────────
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ── COO Command Bar ────────────────────────────────────────────────────────
+const cmdInput   = document.getElementById('cmdInput');
+const cmdSendBtn = document.getElementById('cmdSendBtn');
+const cmdFeedback = document.getElementById('cmdFeedback');
+const cmdChannel = document.getElementById('cmdChannel');
+
+let cmdFeedbackTimer = null;
+
+function setFeedback(msg, type) {
+  cmdFeedback.textContent = msg;
+  cmdFeedback.className = `cmd-feedback ${type}`;
+  clearTimeout(cmdFeedbackTimer);
+  cmdFeedbackTimer = setTimeout(() => {
+    cmdFeedback.textContent = '';
+    cmdFeedback.className = 'cmd-feedback';
+  }, 4000);
+}
+
+async function sendDirective() {
+  const msg = cmdInput.value.trim();
+  if (!msg) return;
+  const channel = cmdChannel.value;
+
+  cmdSendBtn.disabled = true;
+  setFeedback('Sending…', '');
+
+  try {
+    const r = await fetch('/api/slack/post', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel, message: msg }),
+    });
+    const data = await r.json();
+    if (data.ok) {
+      setFeedback('Sent ✓', 'ok');
+      cmdInput.value = '';
+    } else {
+      setFeedback(`Error: ${data.error}`, 'err');
+    }
+  } catch (e) {
+    setFeedback(`Network error`, 'err');
+  } finally {
+    cmdSendBtn.disabled = false;
+    cmdInput.focus();
+  }
+}
+
+cmdSendBtn.addEventListener('click', sendDirective);
+cmdInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendDirective(); }
+});
+
+// ── Claude Code Modal ──────────────────────────────────────────────────────
+const codeModal      = document.getElementById('codeModal');
+const newCodeTaskBtn = document.getElementById('newCodeTaskBtn');
+const codeModalClose = document.getElementById('codeModalClose');
+const codePrompt     = document.getElementById('codePrompt');
+const codeCwd        = document.getElementById('codeCwd');
+const codeSubmitBtn  = document.getElementById('codeSubmitBtn');
+
+function openCodeModal() {
+  codeModal.classList.remove('hidden');
+  codePrompt.focus();
+}
+
+function closeCodeModal() {
+  codeModal.classList.add('hidden');
+}
+
+newCodeTaskBtn.addEventListener('click', openCodeModal);
+codeModalClose.addEventListener('click', closeCodeModal);
+codeModal.addEventListener('click', e => { if (e.target === codeModal) closeCodeModal(); });
+
+codeSubmitBtn.addEventListener('click', async () => {
+  const prompt = codePrompt.value.trim();
+  const cwd = codeCwd.value.trim() || '/Users/maestro_admin/peakcam/peakcam';
+  if (!prompt) return;
+
+  codeSubmitBtn.disabled = true;
+  codeSubmitBtn.textContent = 'Launching…';
+
+  try {
+    const r = await fetch('/api/claude/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, cwd }),
+    });
+    const data = await r.json();
+    if (data.ok) {
+      codePrompt.value = '';
+      closeCodeModal();
+      // Immediately refresh the sessions panel
+      loadSessionsPanel();
+    } else {
+      alert(`Failed to start session: ${data.error}`);
+    }
+  } catch (e) {
+    alert(`Error: ${e.message}`);
+  } finally {
+    codeSubmitBtn.disabled = false;
+    codeSubmitBtn.textContent = 'Launch Session';
+  }
+});
+
+// ── Sessions Panel ─────────────────────────────────────────────────────────
+let dashboardSessions = [];  // sessions started by this dashboard
+let externalSessions  = [];  // discovered external processes
+let sessionsRefreshInterval = null;
+let activeDetailPid   = null;
+let detailSSE         = null;
+let detailUptimeTimer = null;
+let detailAutoScroll  = true;
+
+function startSessionsPolling() {
+  loadSessionsPanel();
+  if (!sessionsRefreshInterval) {
+    sessionsRefreshInterval = setInterval(loadSessionsPanel, 5000);
+  }
+}
+
+async function loadSessionsPanel() {
+  try {
+    const r = await fetch('/api/claude/sessions');
+    dashboardSessions = await r.json();
+    renderSessionCards();
+    // If a detail is open, update its status pill
+    if (activeDetailPid !== null) {
+      const s = dashboardSessions.find(s => s.pid === activeDetailPid);
+      if (s) updateDetailHeader(s);
+    }
+  } catch (_) {}
+}
+
+async function discoverSessions() {
+  try {
+    const btn = document.getElementById('discoverBtn');
+    btn.textContent = 'Scanning…';
+    const r = await fetch('/api/claude/discover');
+    externalSessions = await r.json();
+    renderSessionCards();
+    btn.textContent = 'Discover';
+  } catch (_) {
+    document.getElementById('discoverBtn').textContent = 'Discover';
+  }
+}
+
+function formatUptime(startTimeMs) {
+  const secs = Math.floor((Date.now() - startTimeMs) / 1000);
+  if (secs < 60) return `${secs}s`;
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ${secs % 60}s`;
+  return `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`;
+}
+
+function sessionStatusLabel(s) {
+  if (s.external) return 'external';
+  if (s.exitCode === null) return 'running';
+  if (s.exitCode === 0) return 'done';
+  return 'failed';
+}
+
+function renderSessionCards() {
+  const allSessions = [...dashboardSessions, ...externalSessions];
+  const panel = document.getElementById('sessionsPanel');
+  const badge = document.getElementById('sessionCountBadge');
+
+  const running = allSessions.filter(s => s.exitCode === null || s.external).length;
+  badge.textContent = `${running} running`;
+
+  if (!allSessions.length) {
+    panel.innerHTML = '<div class="sessions-empty">No sessions. Use "New Code Task" to start one.</div>';
+    return;
+  }
+
+  // Re-render all cards; preserve scroll position
+  panel.innerHTML = '';
+  for (const s of allSessions) {
+    panel.appendChild(createSessionCard(s));
+  }
+}
+
+function createSessionCard(s) {
+  const status = sessionStatusLabel(s);
+  const promptText = s.prompt || s.cmd || `External PID ${s.pid}`;
+  const lastLine   = s.lastLine || s.cmd || '';
+  const cwdShort   = (s.cwd || '').replace('/Users/maestro_admin/peakcam/peakcam', '~/peakcam').replace('/Users/maestro_admin', '~') || '—';
+  const uptime     = s.startTime ? formatUptime(new Date(s.startTime).getTime()) : '—';
+
+  const card = document.createElement('div');
+  card.className = `session-card status-${status}`;
+  card.dataset.pid = s.pid;
+
+  card.innerHTML = `
+    <div class="session-card-top">
+      <span class="detail-pid">PID ${s.pid}</span>
+      <span class="session-status-pill ${status}">${status}</span>
+      ${s.external ? '<span class="session-readonly-badge">read-only</span>' : ''}
+    </div>
+    <div class="session-card-prompt">${escHtml(promptText.slice(0, 160))}</div>
+    ${lastLine ? `<div class="session-card-preview" id="card-preview-${s.pid}">${escHtml(lastLine.slice(0, 140))}</div>` : ''}
+    <div class="session-card-footer">
+      <span class="session-cwd">${escHtml(cwdShort)}</span>
+      <span class="session-uptime">${uptime}</span>
+    </div>
+  `;
+
+  card.addEventListener('click', () => openSessionDetail(s));
+  return card;
+}
+
+// ── Session Detail ─────────────────────────────────────────────────────────
+function openSessionDetail(s) {
+  activeDetailPid  = s.pid;
+  detailAutoScroll = true;
+
+  const overlay = document.getElementById('sessionDetailOverlay');
+  const terminal = document.getElementById('detailTerminal');
+
+  // Populate header
+  updateDetailHeader(s);
+
+  // Show/hide stdin based on whether interactive
+  const stdinBar      = document.getElementById('stdinBar');
+  const readonlyNote  = document.getElementById('stdinReadonlyNotice');
+  if (s.external || s.exitCode !== null) {
+    stdinBar.classList.add('hidden');
+    if (s.external) readonlyNote.classList.remove('hidden');
+    else readonlyNote.classList.add('hidden');
+  } else {
+    stdinBar.classList.remove('hidden');
+    readonlyNote.classList.add('hidden');
+  }
+
+  // Clear terminal
+  terminal.innerHTML = '<div class="terminal-empty">Connecting…</div>';
+
+  overlay.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+
+  // Start SSE stream if trackable
+  if (!s.external) {
+    connectDetailSSE(s.pid);
+  } else {
+    terminal.innerHTML = '<div class="terminal-empty">External process — output not captured by dashboard</div>';
+  }
+
+  // Start uptime ticker
+  if (s.startTime) {
+    const startMs = new Date(s.startTime).getTime();
+    document.getElementById('detailUptime').textContent = formatUptime(startMs);
+    detailUptimeTimer = setInterval(() => {
+      document.getElementById('detailUptime').textContent = formatUptime(startMs);
+    }, 5000);
+  }
+
+  // Focus stdin
+  if (!s.external && s.exitCode === null) {
+    setTimeout(() => document.getElementById('stdinInput').focus(), 100);
+  }
+}
+
+function updateDetailHeader(s) {
+  const status = sessionStatusLabel(s);
+  document.getElementById('detailPid').textContent = `PID ${s.pid}`;
+  document.getElementById('detailPrompt').textContent = s.prompt || s.cmd || `External PID ${s.pid}`;
+  document.getElementById('detailMeta').textContent = `cwd: ${s.cwd || '(unknown)'}`;
+
+  const statusEl = document.getElementById('detailStatus');
+  statusEl.textContent = status;
+  statusEl.className = `session-status-pill ${status}`;
+
+  const killBtn = document.getElementById('detailKillBtn');
+  if (s.exitCode === null && !s.external) killBtn.classList.remove('hidden');
+  else killBtn.classList.add('hidden');
+
+  // If session just finished while detail is open, hide stdin
+  if (s.exitCode !== null) {
+    document.getElementById('stdinBar').classList.add('hidden');
+  }
+}
+
+function closeSessionDetail() {
+  activeDetailPid = null;
+  document.getElementById('sessionDetailOverlay').classList.add('hidden');
+  document.body.style.overflow = '';
+
+  if (detailSSE) { detailSSE.close(); detailSSE = null; }
+  clearInterval(detailUptimeTimer);
+  detailUptimeTimer = null;
+}
+
+function connectDetailSSE(pid) {
+  if (detailSSE) { detailSSE.close(); detailSSE = null; }
+
+  detailSSE = new EventSource(`/api/claude/session/${pid}/stream`);
+
+  detailSSE.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      const terminal = document.getElementById('detailTerminal');
+
+      if (msg.type === 'history') {
+        terminal.innerHTML = '';
+        if (!msg.lines.length) {
+          terminal.innerHTML = '<div class="terminal-empty">No output yet…</div>';
+        } else {
+          const frag = document.createDocumentFragment();
+          for (const line of msg.lines) {
+            frag.appendChild(makeOutputLine(line));
+          }
+          terminal.appendChild(frag);
+          terminal.scrollTop = terminal.scrollHeight;
+        }
+
+      } else if (msg.line !== undefined) {
+        // Remove "no output" placeholder
+        const empty = terminal.querySelector('.terminal-empty');
+        if (empty) terminal.removeChild(empty);
+
+        terminal.appendChild(makeOutputLine(msg.line));
+
+        // Trim to 1500 lines
+        while (terminal.children.length > 1500) terminal.removeChild(terminal.firstChild);
+
+        if (detailAutoScroll) terminal.scrollTop = terminal.scrollHeight;
+
+        // Update card preview
+        const preview = document.getElementById(`card-preview-${pid}`);
+        if (preview) preview.textContent = msg.line.slice(0, 140);
+
+      } else if (msg.type === 'exit') {
+        terminal.appendChild(makeOutputLine(`[process exited with code ${msg.exitCode}]`));
+        if (detailAutoScroll) terminal.scrollTop = terminal.scrollHeight;
+        // Update status in detail header
+        const s = dashboardSessions.find(s => s.pid === pid) || {};
+        s.exitCode = msg.exitCode;
+        updateDetailHeader(s);
+      }
+    } catch (_) {}
+  };
+
+  detailSSE.onerror = () => {
+    // Connection dropped — process likely exited
+  };
+}
+
+function makeOutputLine(line) {
+  const div = document.createElement('div');
+  div.className = `output-line ${classifyOutputLine(line)}`;
+  div.textContent = line;
+  return div;
+}
+
+function classifyOutputLine(line) {
+  const t = line.trimStart();
+  if (line.startsWith('[stderr]') || line.startsWith('[spawn error]')) return 'stderr';
+  if (line.startsWith('[process exited')) return 'exit';
+  if (line.startsWith('[stdin]')) return 'input-echo';
+  // Tool call lines (Claude Code output format)
+  if (/^(Bash|Read|Write|Edit|Glob|Grep|Agent|TodoWrite|WebFetch|WebSearch|Skill|ToolSearch|SendMessage)\(/.test(t)) return 'tool';
+  if (/^\⚙|^Tool:|^Running /.test(t)) return 'tool';
+  return 'output';
+}
+
+// ── Stdin send ─────────────────────────────────────────────────────────────
+async function sendStdinInput() {
+  const input    = document.getElementById('stdinInput');
+  const feedback = document.getElementById('stdinFeedback');
+  const text     = input.value.trim();
+  if (!text || activeDetailPid === null) return;
+
+  input.value = '';
+  document.getElementById('stdinSendBtn').disabled = true;
+
+  try {
+    const r = await fetch(`/api/claude/session/${activeDetailPid}/input`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    const data = await r.json();
+    if (data.ok) {
+      // Echo to terminal
+      const terminal = document.getElementById('detailTerminal');
+      terminal.appendChild(makeOutputLine(`[stdin] ${text}`));
+      if (detailAutoScroll) terminal.scrollTop = terminal.scrollHeight;
+      feedback.textContent = 'Sent ✓';
+      feedback.style.color = 'var(--success)';
+    } else {
+      feedback.textContent = data.error || 'Error';
+      feedback.style.color = 'var(--error)';
+    }
+  } catch (_) {
+    feedback.textContent = 'Error';
+    feedback.style.color = 'var(--error)';
+  } finally {
+    document.getElementById('stdinSendBtn').disabled = false;
+    setTimeout(() => { feedback.textContent = ''; }, 2500);
+    input.focus();
+  }
+}
+
+// ── Detail overlay events ──────────────────────────────────────────────────
+document.getElementById('detailCloseBtn').addEventListener('click', closeSessionDetail);
+document.getElementById('sessionDetailOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('sessionDetailOverlay')) closeSessionDetail();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && activeDetailPid !== null) closeSessionDetail();
+});
+
+document.getElementById('stdinSendBtn').addEventListener('click', sendStdinInput);
+document.getElementById('stdinInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendStdinInput(); }
+});
+
+// Auto-scroll toggle: if user scrolls up in terminal, disable auto-scroll
+document.getElementById('detailTerminal').addEventListener('scroll', () => {
+  const el = document.getElementById('detailTerminal');
+  const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 30;
+  detailAutoScroll = atBottom;
+});
+
+document.getElementById('detailKillBtn').addEventListener('click', async () => {
+  if (!activeDetailPid) return;
+  if (!confirm(`Kill Claude session PID ${activeDetailPid}?`)) return;
+  try {
+    await fetch(`/api/claude/session/${activeDetailPid}`, { method: 'DELETE' });
+    closeSessionDetail();
+    loadSessionsPanel();
+  } catch (e) {
+    alert(`Error: ${e.message}`);
+  }
+});
+
+document.getElementById('discoverBtn').addEventListener('click', discoverSessions);
+
+// ── Dispatch Sessions ──────────────────────────────────────────────────────
+let dispatchSessions = [];
+let dispatchRefreshInterval = null;
+
+async function loadDispatchSessions() {
+  try {
+    const r = await fetch('/api/dispatch/sessions');
+    dispatchSessions = await r.json();
+    renderDispatchPanel();
+  } catch (_) {}
+}
+
+function startDispatchPolling() {
+  loadDispatchSessions();
+  if (!dispatchRefreshInterval) {
+    dispatchRefreshInterval = setInterval(loadDispatchSessions, 10000);
+  }
+}
+
+function renderDispatchPanel() {
+  const panel = document.getElementById('dispatchPanel');
+  const badge = document.getElementById('dispatchCountBadge');
+  badge.textContent = `${dispatchSessions.length}`;
+
+  if (!dispatchSessions.length) {
+    panel.innerHTML = '<div class="dispatch-empty">No dispatch sessions found. Auto-discovers from ~/.claude/sessions/ or register a session ID manually.</div>';
+    return;
+  }
+
+  panel.innerHTML = '';
+  for (const s of dispatchSessions) {
+    panel.appendChild(createDispatchCard(s));
+  }
+}
+
+function createDispatchCard(s) {
+  const card = document.createElement('div');
+  card.className = 'dispatch-card';
+  card.dataset.sessionId = s.sessionId;
+
+  const displayId = s.sessionId.slice(0, 8) + '…' + s.sessionId.slice(-4);
+  const title = s.name || `Session ${displayId}`;
+  const cwdShort = (s.cwd || '').replace('/Users/maestro_admin/peakcam/peakcam', '~/peakcam').replace('/Users/maestro_admin', '~') || '—';
+  const started = s.startedAt ? new Date(s.startedAt).toLocaleString() : '—';
+  const isRegistered = s.source === 'registered';
+
+  card.innerHTML = `
+    <div class="dispatch-card-top">
+      <span class="dispatch-session-id" title="${escHtml(s.sessionId)}">${escHtml(displayId)}</span>
+      <span class="dispatch-status ${s.status}">${s.status}</span>
+      ${s.pid ? `<span style="font-size:0.65rem;color:var(--muted)">PID ${s.pid}</span>` : ''}
+      ${isRegistered ? `<button class="dispatch-unregister-btn" data-id="${escHtml(s.sessionId)}">✕</button>` : ''}
+    </div>
+    ${s.name ? `<div class="dispatch-name">${escHtml(s.name)}</div>` : ''}
+    <div class="dispatch-meta">${escHtml(cwdShort)} · ${escHtml(started)}</div>
+    <div class="dispatch-msg-row">
+      <input class="dispatch-msg-input" type="text" placeholder="Send a message to this session…" autocomplete="off">
+      <button class="dispatch-send-btn">Send</button>
+    </div>
+    <div class="dispatch-feedback"></div>
+    <div class="dispatch-response"></div>
+  `;
+
+  const input = card.querySelector('.dispatch-msg-input');
+  const btn   = card.querySelector('.dispatch-send-btn');
+  const fb    = card.querySelector('.dispatch-feedback');
+  const resp  = card.querySelector('.dispatch-response');
+
+  async function sendDispatchMessage() {
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    btn.disabled = true;
+    fb.textContent = 'Sending…';
+    fb.style.color = 'var(--muted)';
+    resp.style.display = 'none';
+
+    try {
+      const r = await fetch('/api/dispatch/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: s.sessionId, message: msg }),
+      });
+      const data = await r.json();
+      if (data.ok) {
+        input.value = '';
+        fb.textContent = 'Sent ✓';
+        fb.style.color = 'var(--success)';
+        if (data.output) {
+          resp.textContent = data.output.trim();
+          resp.style.display = 'block';
+          resp.scrollTop = resp.scrollHeight;
+        }
+      } else {
+        fb.textContent = data.error || `Exit ${data.exitCode}`;
+        fb.style.color = 'var(--error)';
+        if (data.output) {
+          resp.textContent = data.output.trim();
+          resp.style.display = 'block';
+        }
+      }
+    } catch (e) {
+      fb.textContent = 'Network error';
+      fb.style.color = 'var(--error)';
+    } finally {
+      btn.disabled = false;
+      setTimeout(() => { if (fb.textContent.includes('✓')) fb.textContent = ''; }, 4000);
+    }
+  }
+
+  btn.addEventListener('click', sendDispatchMessage);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendDispatchMessage(); } });
+
+  const unregBtn = card.querySelector('.dispatch-unregister-btn');
+  if (unregBtn) {
+    unregBtn.addEventListener('click', async () => {
+      await fetch(`/api/dispatch/session/${encodeURIComponent(s.sessionId)}`, { method: 'DELETE' });
+      loadDispatchSessions();
+    });
+  }
+
+  return card;
+}
+
+// Dispatch refresh button
+document.getElementById('dispatchRefreshBtn').addEventListener('click', loadDispatchSessions);
+
+// ── Register Session Modal ──────────────────────────────────────────────────
+const registerModal    = document.getElementById('registerModal');
+const registerModalClose = document.getElementById('registerModalClose');
+const registerSubmitBtn  = document.getElementById('registerSubmitBtn');
+
+document.getElementById('openRegisterBtn').addEventListener('click', () => {
+  registerModal.classList.remove('hidden');
+  document.getElementById('registerSessionId').focus();
+});
+
+registerModalClose.addEventListener('click', () => registerModal.classList.add('hidden'));
+registerModal.addEventListener('click', e => { if (e.target === registerModal) registerModal.classList.add('hidden'); });
+
+registerSubmitBtn.addEventListener('click', async () => {
+  const sessionId = document.getElementById('registerSessionId').value.trim();
+  const name      = document.getElementById('registerName').value.trim();
+  const cwd       = document.getElementById('registerCwd').value.trim();
+  if (!sessionId) return;
+
+  registerSubmitBtn.disabled = true;
+  registerSubmitBtn.textContent = 'Registering…';
+
+  try {
+    await fetch('/api/dispatch/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, name: name || null, cwd: cwd || null }),
+    });
+    document.getElementById('registerSessionId').value = '';
+    document.getElementById('registerName').value = '';
+    document.getElementById('registerCwd').value = '';
+    registerModal.classList.add('hidden');
+    loadDispatchSessions();
+  } catch (e) {
+    alert(`Error: ${e.message}`);
+  } finally {
+    registerSubmitBtn.disabled = false;
+    registerSubmitBtn.textContent = 'Register Session';
+  }
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────
+connect();
+loadSprint();
+startSessionsPolling();
+startDispatchPolling();
+</script>
+</body>
+</html>

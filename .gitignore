@@ -44,6 +44,12 @@ next-env.d.ts
 # temp scripts and logs
 import-error.log
 .ts-node-out/
+.test_write
+agents/loop.log
+scripts/snotel-sync.log
 
 # extracted agent plugins (built from .plugin zips)
 agents/plugins/
+
+# dashboard dependencies
+dashboard/node_modules/
