@@ -53,3 +53,8 @@ agents/plugins/
 
 # dashboard dependencies
 dashboard/node_modules/
+
+node_modules/
+agents/loop.log
+scripts/*.log
+.test_write
