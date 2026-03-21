@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel } from "./types";
+import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition } from "./types";
 
 // ─────────────────────────────────────────────────────────────
 // Client
@@ -158,6 +158,28 @@ export async function submitConditionVote(
 
   if (error) return { ok: false, error: error.message };
   return { ok: true };
+}
+
+// ─────────────────────────────────────────────────────────────
+// User Conditions Reports
+// ─────────────────────────────────────────────────────────────
+
+/** Fetch recent user-submitted conditions reports for a resort (last 48 hours, unflagged). */
+export async function getUserConditions(resortId: string, limit = 10): Promise<UserCondition[]> {
+  const { data, error } = await supabase
+    .from("user_conditions")
+    .select("*")
+    .eq("resort_id", resortId)
+    .eq("is_flagged", false)
+    .gte("submitted_at", new Date(Date.now() - 48 * 3600_000).toISOString())
+    .order("submitted_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.warn("[PeakCam] Could not fetch user conditions:", error.message);
+    return [];
+  }
+  return data ?? [];
 }
 
 // ─────────────────────────────────────────────────────────────

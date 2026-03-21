@@ -1,21 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { ConditionBadge } from "@/components/ui/Badge";
-import type { ResortWithData, WeatherPeriod, LiveConditions, Cam } from "@/lib/types";
+import type { ResortWithData, WeatherPeriod, LiveConditions, Cam, UserCondition } from "@/lib/types";
 import { ConditionVoter } from "@/components/resort/ConditionVoter";
+import { UserConditionsForm } from "@/components/resort/UserConditionsForm";
+import { UserConditionsList } from "@/components/resort/UserConditionsList";
+import { trackResortView, trackCamClick } from "@/lib/posthog";
 
 interface Props {
   resort: ResortWithData;
   weather: WeatherPeriod[] | null;
   liveConditions?: LiveConditions | null;
+  userConditions?: UserCondition[];
 }
 
 // ─── Cam player ──────────────────────────────────────────────────────────────
 
-function CamPlayer({ cam }: { cam: Cam }) {
+function CamPlayer({ cam, resortSlug }: { cam: Cam; resortSlug: string }) {
   const [loaded, setLoaded] = useState(false);
 
   // Link-out cams — no embed available
@@ -25,6 +29,7 @@ function CamPlayer({ cam }: { cam: Cam }) {
         href={cam.embed_url ?? "#"}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={() => trackCamClick(resortSlug, cam.name, cam.embed_type)}
         className="group flex flex-col items-center justify-center gap-3 bg-surface2 rounded-xl
                    border border-border hover:border-border-hi aspect-video
                    transition-all duration-220 hover:shadow-card-hover"
@@ -57,7 +62,7 @@ function CamPlayer({ cam }: { cam: Cam }) {
       {/* Placeholder until user clicks */}
       {!loaded && (
         <button
-          onClick={() => setLoaded(true)}
+          onClick={() => { setLoaded(true); trackCamClick(resortSlug, cam.name, cam.embed_type); }}
           className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-3
                      hover:bg-white/5 transition-colors group"
         >
@@ -168,9 +173,13 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-export function ResortDetailPage({ resort, weather, liveConditions }: Props) {
+export function ResortDetailPage({ resort, weather, liveConditions, userConditions = [] }: Props) {
   const activeCams = resort.cams.filter((c) => c.is_active);
   const snow = resort.snow_report;
+
+  useEffect(() => {
+    trackResortView(resort.name, resort.slug);
+  }, [resort.name, resort.slug]);
 
   return (
     <div className="min-h-screen bg-bg">
@@ -253,8 +262,19 @@ export function ResortDetailPage({ resort, weather, liveConditions }: Props) {
           </section>
         )}
 
-        {/* User-verified conditions */}
-        <ConditionVoter resortId={resort.id} liveConditions={liveConditions ?? null} />
+        {/* User-verified conditions (quick vote) */}
+        <ConditionVoter resortId={resort.id} resortSlug={resort.slug} liveConditions={liveConditions ?? null} />
+
+        {/* User conditions reports — submit + list */}
+        <section>
+          <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base mb-4">
+            Conditions Reports
+          </h2>
+          <div className="space-y-4">
+            <UserConditionsForm resortId={resort.id} resortSlug={resort.slug} />
+            <UserConditionsList conditions={userConditions} />
+          </div>
+        </section>
 
         {/* Live cams */}
         <section>
@@ -291,7 +311,7 @@ export function ResortDetailPage({ resort, weather, liveConditions }: Props) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {activeCams.map((cam) => (
                 <div key={cam.id}>
-                  <CamPlayer cam={cam} />
+                  <CamPlayer cam={cam} resortSlug={resort.slug} />
                   <p className="text-text-muted text-xs mt-1.5 px-1">
                     {cam.name}
                     {cam.elevation && (

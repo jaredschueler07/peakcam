@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import Fuse from "fuse.js";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { SummitResortCard } from "@/components/browse/SummitResortCard";
+import { PowderAlertSignup } from "@/components/alerts/PowderAlertSignup";
 import type { ResortWithData } from "@/lib/types";
+import { trackSearch, trackFilter } from "@/lib/posthog";
 
 // Leaflet map — dynamic import, no SSR
 const ResortMap = dynamic(() => import("@/components/browse/ResortMap"), {
@@ -243,6 +245,38 @@ export function BrowsePage({ resorts }: Props) {
 
   const handleClearSearch = useCallback(() => setSearch(""), []);
 
+  // Debounced search tracking
+  const searchTrackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!search.trim()) return;
+    if (searchTrackTimer.current) clearTimeout(searchTrackTimer.current);
+    searchTrackTimer.current = setTimeout(() => {
+      trackSearch(search.trim(), filtered.length);
+    }, 1000);
+    return () => {
+      if (searchTrackTimer.current) clearTimeout(searchTrackTimer.current);
+    };
+  }, [search, filtered.length]);
+
+  // Filter tracking
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    if (stateFilter !== "All") trackFilter("state", stateFilter);
+  }, [stateFilter]);
+
+  useEffect(() => {
+    if (condFilter !== "all") trackFilter("condition", condFilter);
+  }, [condFilter]);
+
+  useEffect(() => {
+    if (freshSnow) trackFilter("fresh_snow", "true");
+  }, [freshSnow]);
+
+  useEffect(() => {
+    if (hasLiveCams) trackFilter("live_cams", "true");
+  }, [hasLiveCams]);
+
   return (
     <div className="min-h-screen bg-bg">
       <Header />
@@ -347,13 +381,16 @@ export function BrowsePage({ resorts }: Props) {
         <PowderAlert resorts={resorts} />
 
         {/* Section header */}
-        <div className="mb-8">
-          <h2 className="font-display text-5xl md:text-6xl text-text-base mb-2">
-            TODAY&apos;S CONDITIONS
-          </h2>
-          <p className="text-text-subtle text-lg">
-            Real-time snow reports from {filtered.length} of {resorts.length} resorts
-          </p>
+        <div className="flex items-end justify-between gap-4 mb-8 flex-wrap">
+          <div>
+            <h2 className="font-display text-5xl md:text-6xl text-text-base mb-2">
+              TODAY&apos;S CONDITIONS
+            </h2>
+            <p className="text-text-subtle text-lg">
+              Real-time snow reports from {filtered.length} of {resorts.length} resorts
+            </p>
+          </div>
+          <PowderAlertSignup resorts={resorts} />
         </div>
 
         <div className={`grid gap-6 ${showMap ? "lg:grid-cols-[1fr_380px]" : ""}`}>

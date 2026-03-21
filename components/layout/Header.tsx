@@ -1,7 +1,10 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { AuthModal } from "@/components/auth/AuthModal";
+import type { User } from "@supabase/supabase-js";
 
 interface HeaderProps {
   onSearch?: (query: string) => void;
@@ -10,6 +13,7 @@ interface HeaderProps {
 
 const navLinks = [
   { label: "Resorts",     href: "/" },
+  { label: "Compare",     href: "/compare" },
   { label: "Snow Report", href: "/snow-report" },
   { label: "About",       href: "/about" },
 ];
@@ -18,6 +22,22 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
   const pathname = usePathname();
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
+  useEffect(() => {
+    const supabase = createSupabaseBrowserClient();
+    supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  async function handleSignOut() {
+    const supabase = createSupabaseBrowserClient();
+    await supabase.auth.signOut();
+  }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setQuery(e.target.value);
@@ -31,6 +51,8 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
   }
 
   return (
+    <>
+      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
     <header className="sticky top-0 z-50 h-[60px] flex items-center gap-5 px-7
       bg-bg/88 backdrop-blur-md border-b border-border">
 
@@ -89,7 +111,28 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
             {link.label}
           </Link>
         ))}
+
+        {/* Auth */}
+        {user ? (
+          <button
+            onClick={handleSignOut}
+            className="ml-1 px-3 py-1.5 rounded text-[13px] font-medium whitespace-nowrap
+              text-text-muted hover:text-text-subtle hover:bg-surface2 transition-all duration-150"
+            title={user.email ?? "Signed in"}
+          >
+            Sign out
+          </button>
+        ) : (
+          <button
+            onClick={() => setShowAuthModal(true)}
+            className="ml-1 px-3 py-1.5 rounded text-[13px] font-semibold whitespace-nowrap
+              text-cyan border border-cyan/30 hover:bg-cyan-dim transition-all duration-150"
+          >
+            Sign in
+          </button>
+        )}
       </nav>
     </header>
+    </>
   );
 }

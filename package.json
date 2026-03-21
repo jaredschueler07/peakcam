@@ -14,6 +14,7 @@
     "agents:extract-plugins": "for f in plugins/*.plugin; do name=$(basename \"$f\" .plugin); mkdir -p \"agents/plugins/$name\" && unzip -o \"$f\" -d \"agents/plugins/$name\"; done",
     "snotel-sync": "node scripts/snotel-sync.mjs",
     "cam-health": "node scripts/cam-health-check.mjs",
+    "powder-alerts": "node scripts/powder-alert-check.mjs",
     "generate-images": "node scripts/generate-images.mjs",
     "generate-images:one": "node scripts/generate-images.mjs --name"
   },

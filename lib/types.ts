@@ -85,6 +85,25 @@ export interface ResortWithData extends Resort {
   cams: Cam[];
 }
 
+// ── User Conditions Reports ───────────────────────────────────
+export type UserSnowQuality = "powder" | "packed" | "icy" | "slush";
+export type UserVisibility = "clear" | "foggy" | "whiteout";
+export type UserWind = "calm" | "breezy" | "gusty" | "high";
+export type UserTrailConditions = "groomed" | "ungroomed" | "moguls" | "variable";
+
+export interface UserCondition {
+  id: string;
+  resort_id: string;
+  user_id: string;
+  snow_quality: UserSnowQuality;
+  visibility: UserVisibility;
+  wind: UserWind;
+  trail_conditions: UserTrailConditions;
+  notes: string | null;
+  is_flagged: boolean;
+  submitted_at: string;
+}
+
 // ── NWS Weather ──────────────────────────────────────────────
 export interface WeatherPeriod {
   dow: string;             // "Today", "Mon", "Tue" …
