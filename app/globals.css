@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "maplibre-gl/dist/maplibre-gl.css";
 @import "tailwindcss";
+@config "../tailwind.config.ts";
 
 /* ── Root variables (Summit Light) ── */
 :root {
