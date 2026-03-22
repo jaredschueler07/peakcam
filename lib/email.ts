@@ -7,8 +7,8 @@ function getResend() {
   return new Resend(key);
 }
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://peakcam.app";
-const FROM = "PeakCam Alerts <alerts@peakcam.app>";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://peakcam.io";
+const FROM = "PeakCam Alerts <alerts@peakcam.io>";
 
 // ─── Welcome email ────────────────────────────────────────────────────────────
 

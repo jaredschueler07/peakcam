@@ -23,7 +23,7 @@ export const metadata = {
   openGraph: {
     title: "Ski Resort Snow Report — Live Base Depth & Conditions | PeakCam",
     description: "Compare live snow conditions, base depths, and powder alerts for 70+ North American ski resorts.",
-    url: "https://peakcam.co/snow-report",
+    url: "https://peakcam.io/snow-report",
     type: "website" as const,
   },
   twitter: {
@@ -39,11 +39,11 @@ const jsonLd = {
   name: "Snow Report — PeakCam",
   description:
     "Compare live snow conditions across 70+ North American ski resorts. Base depth, fresh snow, trail counts, and lift status at a glance.",
-  url: "https://peakcam.co/snow-report",
+  url: "https://peakcam.io/snow-report",
   isPartOf: {
     "@type": "WebSite",
     name: "PeakCam",
-    url: "https://peakcam.co",
+    url: "https://peakcam.io",
   },
 };
 

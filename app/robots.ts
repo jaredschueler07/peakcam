@@ -8,6 +8,6 @@ export default function robots(): MetadataRoute.Robots {
         allow: "/",
       },
     ],
-    sitemap: "https://peakcam.co/sitemap.xml",
+    sitemap: "https://peakcam.io/sitemap.xml",
   };
 }

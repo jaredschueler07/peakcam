@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { PostHogProvider } from "@/lib/posthog";
 
-const BASE_URL = "https://peakcam.co";
+const BASE_URL = "https://peakcam.io";
 
 export const metadata: Metadata = {
   title: {

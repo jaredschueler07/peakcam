@@ -4,7 +4,7 @@ import { getResortBySlug, getAllResortSlugs, getLiveConditions, getUserCondition
 import { getWeatherForecast } from "@/lib/weather";
 import { ResortDetailPage } from "@/components/resort/ResortDetailPage";
 
-const BASE_URL = "https://peakcam.co";
+const BASE_URL = "https://peakcam.io";
 
 export const revalidate = 3600;
 

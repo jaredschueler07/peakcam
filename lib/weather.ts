@@ -6,7 +6,7 @@ import type { WeatherPeriod } from "./types";
 // All fetches MUST be server-side. NWS rate-limits aggressively.
 // ─────────────────────────────────────────────────────────────
 
-const NWS_USER_AGENT = "PeakCam/1.0 (contact@peakcam.app)"; // NWS requires a UA string
+const NWS_USER_AGENT = "PeakCam/1.0 (contact@peakcam.io)"; // NWS requires a UA string
 
 /** Snow-related keywords in NWS short forecast strings. */
 const SNOW_KEYWORDS = [
