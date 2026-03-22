@@ -122,6 +122,70 @@
     .conn-status.live { color: var(--success); }
     .conn-status.error { color: var(--error); }
 
+    /* ── Site Links Bar ─────────────────────────────────────────────────── */
+    .site-links-bar {
+      background: rgba(15,22,36,0.85);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .site-link-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-weight: 600;
+    }
+
+    .site-link-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      text-decoration: none;
+      border: 1px solid transparent;
+      transition: opacity 0.15s, border-color 0.15s;
+    }
+
+    .site-link-badge:hover { opacity: 0.85; }
+
+    .site-link-badge.live {
+      background: rgba(96,200,255,0.1);
+      border-color: rgba(96,200,255,0.35);
+      color: var(--accent);
+    }
+
+    .site-link-badge.dev {
+      background: rgba(52,211,153,0.08);
+      border-color: rgba(52,211,153,0.3);
+      color: var(--success);
+    }
+
+    .site-link-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .site-link-badge.live .site-link-dot { background: var(--accent); }
+    .site-link-badge.dev  .site-link-dot { background: var(--success); }
+
+    .site-links-sep {
+      width: 1px;
+      height: 16px;
+      background: var(--border);
+      margin: 0 4px;
+    }
+
     .main {
       max-width: 1600px;
       margin: 0 auto;
@@ -1498,6 +1562,20 @@
     <span class="conn-status" id="connStatus">connecting</span>
   </div>
 </header>
+
+<!-- ── Site Links Bar ──────────────────────────────────────────────────── -->
+<div class="site-links-bar">
+  <span class="site-link-label">Open</span>
+  <a class="site-link-badge live" href="https://peakcam.vercel.app" target="_blank" rel="noopener">
+    <span class="site-link-dot"></span>
+    peakcam.vercel.app
+  </a>
+  <div class="site-links-sep"></div>
+  <a class="site-link-badge dev" href="http://localhost:3000" target="_blank" rel="noopener">
+    <span class="site-link-dot"></span>
+    localhost:3000 (dev)
+  </a>
+</div>
 
 <!-- ── Claude Code Task Modal ─────────────────────────────────────────────── -->
 <div class="modal-overlay hidden" id="codeModal">
