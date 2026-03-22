@@ -3,7 +3,7 @@ import "./globals.css";
 import { PostHogProvider } from "@/lib/posthog";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
-const BASE_URL = "https://peakcam.co";
+const BASE_URL = "https://peakcam.io";
 
 export const metadata: Metadata = {
   title: {

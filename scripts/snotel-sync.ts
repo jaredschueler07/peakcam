@@ -69,7 +69,7 @@ const supaHeaders = {
 };
 
 const SNOTEL_BASE = "https://wcc.sc.egov.usda.gov/awdbRestApi/services/v1";
-const NWS_USER_AGENT = "PeakCam/1.0 (contact@peakcam.app)";
+const NWS_USER_AGENT = "PeakCam/1.0 (contact@peakcam.io)";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 

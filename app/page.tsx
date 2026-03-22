@@ -31,7 +31,7 @@ export const metadata = {
     title: "PeakCam — Live Ski Resort Webcams, Snow Reports & Conditions",
     description:
       "Browse live webcams, real-time snow reports, and powder alerts for 75+ ski resorts across North America.",
-    url: "https://peakcam.co",
+    url: "https://peakcam.io",
     type: "website" as const,
   },
   twitter: {

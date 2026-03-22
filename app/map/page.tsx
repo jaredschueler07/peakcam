@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     title: "Interactive Ski Resort Map — PeakCam",
     description:
       "Explore ski resorts on an interactive map with live snow data and weather radar.",
-    url: "https://peakcam.co/map",
+    url: "https://peakcam.io/map",
     type: "website",
   },
 };

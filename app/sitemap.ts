@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { getAllResortSlugs } from "@/lib/supabase";
 
-const BASE_URL = "https://peakcam.co";
+const BASE_URL = "https://peakcam.io";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let resortSlugs: string[] = [];
