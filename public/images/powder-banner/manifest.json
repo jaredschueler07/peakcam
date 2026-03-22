@@ -1,0 +1,52 @@
+{
+  "key": "powder-banner",
+  "aspect_ratio": "2:1",
+  "versions": [
+    {
+      "version": "v0",
+      "filename": "v0.jpg",
+      "timestamp": "2026-03-21T11:00:00Z",
+      "model": "grok-imagine-image",
+      "prompt": "Ultrawide cinematic photograph of fresh snow falling through tall pine trees in a mountain forest. Soft golden light filtering through the branches, catching individual snowflakes. The forest floor is blanketed in untouched powder. Warm light mixed with cool shadow — not harsh, not cold. The feeling is quiet, peaceful, alive. Like walking through the woods on a powder morning before anyone else is up. Slight film grain, natural color. No people, no trails — just snow, trees, and golden light filtering through. West coast mountain forest vibes.",
+      "analysis": "Beautiful forest scene with golden light through pines. Snow on the ground reads well. The quiet, peaceful mood lands. Good ultrawide composition. Feels like a real Pacific Northwest forest morning.",
+      "iterate_notes": "Could catch more individual snowflakes in the light. The golden light could be slightly warmer/more amber."
+    },
+    {
+      "version": "v1",
+      "filename": "v1.jpg",
+      "timestamp": "2026-03-21T00:00:00Z",
+      "model": "grok-imagine-image",
+      "prompt": "Heavy snowfall with amber sunbeams cutting through forest, glowing snowflakes catching light.",
+      "analysis": "More visible snowflakes and warmer amber light beams. The falling snow is more prominent and catches the golden light better.",
+      "iterate_notes": "Try a single dramatic light shaft instead of diffuse beams. Push the cathedral forest feeling — taller, darker trees."
+    },
+    {
+      "version": "v2",
+      "filename": "v2.jpg",
+      "timestamp": "2026-03-21T00:00:00Z",
+      "model": "grok-imagine-image",
+      "prompt": "Single dramatic light shaft through dark cathedral forest, heavy snowfall, tall pines.",
+      "analysis": "Incredible light shaft cutting through the dark cathedral forest. The single beam creates a dramatic focal point. Deep forest vibes.",
+      "iterate_notes": "Try looking up through snow-covered canopy with snowflakes falling toward camera for a more playful, immersive perspective."
+    },
+    {
+      "version": "v3",
+      "filename": "v3.jpg",
+      "timestamp": "2026-03-21T00:00:00Z",
+      "model": "grok-imagine-image",
+      "prompt": "Looking up through snow-covered canopy, snowflakes falling toward camera, golden light above.",
+      "analysis": "Cool upward perspective with snowflakes falling toward the viewer. Playful and immersive, different energy from the others.",
+      "iterate_notes": "Try a forest trail disappearing into golden morning mist with falling snow — more inviting, pull-you-in composition."
+    },
+    {
+      "version": "v4",
+      "filename": "v4.jpg",
+      "timestamp": "2026-03-21T00:00:00Z",
+      "model": "grok-imagine-image",
+      "prompt": "Snow-covered forest trail disappearing into golden morning mist, snowflakes falling, inviting path.",
+      "analysis": "Beautiful inviting trail with falling snowflakes disappearing into golden mist. The path draws you in — makes you want to walk into the frame.",
+      "iterate_notes": "Could try adding subtle animal tracks on the trail for storytelling. Or experiment with denser snowfall for more drama."
+    }
+  ],
+  "current": "v2"
+}

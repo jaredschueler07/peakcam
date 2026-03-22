@@ -1,0 +1,52 @@
+{
+  "key": "card-texture-co",
+  "aspect_ratio": "2:3",
+  "versions": [
+    {
+      "version": "v0",
+      "filename": "v0.jpg",
+      "timestamp": "2026-03-21T11:00:00Z",
+      "model": "grok-imagine-image",
+      "prompt": "Very dark abstract texture for a card background. Subtle weathered wood grain pattern blended with topographic contour lines. Dark warm tones — deep brown-black (#1A1510) fading to near-black (#0D0B08). A hint of amber warmth in the midtones. Must be very dark (90%+ dark) so white text is readable on top. Feels like a worn trail map or a lodge wall. Organic, rustic, not digital or geometric.",
+      "analysis": "Excellent dark texture with visible wood grain and topo line pattern. Amber warmth comes through in the midtones. Dark enough for text overlay. The worn trail map feel is strong — rustic and organic.",
+      "iterate_notes": "The topo lines could be slightly more subtle. Overall very usable as-is."
+    },
+    {
+      "version": "v1",
+      "filename": "v1.jpg",
+      "timestamp": "2026-03-21T00:00:00Z",
+      "model": "grok-imagine-image",
+      "prompt": "Waxed canvas/oilskin texture with faint topo lines, dark warm tones.",
+      "analysis": "Great waxed canvas look with natural creases and folds. The topo lines are more subtle than v0. Feels like a well-worn Filson bag.",
+      "iterate_notes": "Try dark leather with embossed topo map lines for a more premium feel."
+    },
+    {
+      "version": "v2",
+      "filename": "v2.jpg",
+      "timestamp": "2026-03-21T00:00:00Z",
+      "model": "grok-imagine-image",
+      "prompt": "Dark leather with embossed topo map lines, premium texture, deep brown-black.",
+      "analysis": "Very premium embossed leather look. The topo lines feel pressed into the surface. Rich and tactile.",
+      "iterate_notes": "Try shou sugi ban (burnt cedar) texture — charred wood could be very Colorado mining country."
+    },
+    {
+      "version": "v3",
+      "filename": "v3.jpg",
+      "timestamp": "2026-03-21T00:00:00Z",
+      "model": "grok-imagine-image",
+      "prompt": "Shou sugi ban (burnt cedar) texture, charred wood surface with warm amber peeking through cracks.",
+      "analysis": "Amazing charred surface texture with warm amber peeking through the burned wood. Visually striking and uniquely Colorado mining country.",
+      "iterate_notes": "Try reclaimed barn wood planks with nail holes — rustic cabin feel with more visible wood character."
+    },
+    {
+      "version": "v4",
+      "filename": "v4.jpg",
+      "timestamp": "2026-03-21T00:00:00Z",
+      "model": "grok-imagine-image",
+      "prompt": "Reclaimed barn wood planks with nail holes, dark weathered surface, mining cabin feel.",
+      "analysis": "Perfect mining cabin feel. Warm and rustic with visible nail holes and weathered plank joints. Distinctly Colorado heritage.",
+      "iterate_notes": "Could try blending the barn wood with faint topo lines from v0 for the best of both worlds. Or add a subtle snow dusting."
+    }
+  ],
+  "current": "v3"
+}

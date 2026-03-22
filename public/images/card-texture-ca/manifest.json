@@ -1,0 +1,52 @@
+{
+  "key": "card-texture-ca",
+  "aspect_ratio": "2:3",
+  "versions": [
+    {
+      "version": "v0",
+      "filename": "v0.jpg",
+      "timestamp": "2026-03-21T11:00:00Z",
+      "model": "grok-imagine-image",
+      "prompt": "Very dark abstract texture for a card background. Subtle granite and pine bark texture blended together. Dark earthy tones — deep grey-brown (#15130F) fading to near-black (#0A0908). A barely visible hint of forest green in the shadows. Must be very dark (90%+ dark) so white text is readable on top. Feels like Sierra Nevada granite and old-growth forest. Organic, natural, weathered — not digital or clean.",
+      "analysis": "Dark bark/granite texture is convincingly Sierra Nevada. Very dark and uniform — excellent for text overlay. The organic, weathered feel is strong. Distinct from CO and UT textures.",
+      "iterate_notes": "Could use a hint more of the forest green in the shadows as specified. Currently reads very monochrome."
+    },
+    {
+      "version": "v1",
+      "filename": "v1.jpg",
+      "timestamp": "2026-03-21T00:00:00Z",
+      "model": "grok-imagine-image",
+      "prompt": "Sierra granite with dark green lichen patches, grey-brown stone texture.",
+      "analysis": "Dark granite with green lichen patches. Very Sierra Nevada — the lichen adds the forest green that v0 was missing.",
+      "iterate_notes": "Try old-growth redwood bark with deep furrows for a more distinctly California texture."
+    },
+    {
+      "version": "v2",
+      "filename": "v2.jpg",
+      "timestamp": "2026-03-21T00:00:00Z",
+      "model": "grok-imagine-image",
+      "prompt": "Old-growth redwood bark with deep furrows, dark red-brown texture, massive tree surface.",
+      "analysis": "Beautiful red-brown bark texture with deep vertical furrows. Distinctly California — you can feel the scale of the tree.",
+      "iterate_notes": "Try forest floor pine needles and pine cones — Tahoe forest floor for an organic ground-level texture."
+    },
+    {
+      "version": "v3",
+      "filename": "v3.jpg",
+      "timestamp": "2026-03-21T00:00:00Z",
+      "model": "grok-imagine-image",
+      "prompt": "Forest floor pine needles and pine cones, dark organic texture, Tahoe forest floor.",
+      "analysis": "Very organic Tahoe forest floor. Pine needles create a natural pattern with warm brown tones. Pine cones add visual interest.",
+      "iterate_notes": "Try wet dark granite with water film — river stone look with subtle mica sparkle."
+    },
+    {
+      "version": "v4",
+      "filename": "v4.jpg",
+      "timestamp": "2026-03-21T00:00:00Z",
+      "model": "grok-imagine-image",
+      "prompt": "Wet dark granite with water film, smooth river stone surface, subtle mica sparkle.",
+      "analysis": "Smooth river stone with mica sparkle and a thin water film. Dark and reflective — very refined Sierra feel.",
+      "iterate_notes": "Could combine the wet granite with subtle lichen from v1 for added character. Or try a frost-on-granite variant for winter feel."
+    }
+  ],
+  "current": "v2"
+}

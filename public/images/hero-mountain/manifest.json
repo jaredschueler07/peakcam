@@ -1,0 +1,52 @@
+{
+  "key": "hero-mountain",
+  "aspect_ratio": "16:9",
+  "versions": [
+    {
+      "version": "v0",
+      "filename": "v0.jpg",
+      "timestamp": "2026-03-21T11:00:00Z",
+      "model": "grok-imagine-image",
+      "prompt": "Landscape photography, golden hour. A wide view of snow-dusted peaks at sunset with warm amber and burnt-orange light flooding the scene. Scattered evergreen trees in the foreground, a thin layer of mist in the valley. The light is soft and golden, hitting the snow with warmth, not coldness. No people, no buildings, no ski lifts — but it feels like a place someone calls home, not a postcard. Slightly faded film tones, natural grain. Color palette: warm amber (#D4915E), deep forest shadow (#1A2A1F), snow catching golden light (#F5E6D0). The mood is the end of a long day outside, looking back at the mountains from the trailhead. Shot on 35mm film, editorial quality like a Patagonia catalog or The Surfer's Journal.",
+      "analysis": "Strong golden hour warmth with snow-dusted peaks and evergreens. Amber light hits the snow convincingly. Film-like quality achieved. Feels like a real place, not a stock photo. Good Patagonia catalog energy.",
+      "iterate_notes": "Could use slightly more mist in the valley. The foreground trees could be more prominent for depth."
+    },
+    {
+      "version": "v1",
+      "filename": "v1.jpg",
+      "timestamp": "2026-03-21T00:00:00Z",
+      "model": "grok-imagine-image",
+      "prompt": "Added prominent foreground trees and thick valley mist to v0 base prompt.",
+      "analysis": "Much better depth with big foreground trees and golden mist filling the valley. The layering creates a stronger sense of place.",
+      "iterate_notes": "Try deeper color saturation — push the amber/golden tones further toward Kodachrome warmth."
+    },
+    {
+      "version": "v2",
+      "filename": "v2.jpg",
+      "timestamp": "2026-03-21T00:00:00Z",
+      "model": "grok-imagine-image",
+      "prompt": "Deep amber Kodachrome sunset with saturated warm tones, building on v1 composition.",
+      "analysis": "Gorgeous amber sunset with golden mist. Great silhouetted trees against the warm sky. Kodachrome saturation adds richness.",
+      "iterate_notes": "Explore warm-to-cool color contrast — last light hitting peaks with cooler shadows. Try off-center composition."
+    },
+    {
+      "version": "v3",
+      "filename": "v3.jpg",
+      "timestamp": "2026-03-21T00:00:00Z",
+      "model": "grok-imagine-image",
+      "prompt": "Last light with warm-to-cool contrast, off-center composition with dramatic peaks.",
+      "analysis": "Dramatic Fitz Roy-like peaks with great warm/cool contrast. The off-center composition creates visual tension and energy.",
+      "iterate_notes": "Try an intimate, closer view — morning instead of sunset, looking through pine trees at a single peak. Backyard mountain feel."
+    },
+    {
+      "version": "v4",
+      "filename": "v4.jpg",
+      "timestamp": "2026-03-21T00:00:00Z",
+      "model": "grok-imagine-image",
+      "prompt": "Intimate morning view through pine trees at a single peak, mist in valley, pine needles on ground.",
+      "analysis": "Nailed the intimate 'backyard mountain' feel. Morning mist drifting through, pine needles scattered on the ground. Feels personal, not epic — like your favorite local peak.",
+      "iterate_notes": "Could experiment with different times of day — early blue hour or mid-morning side light. Consider adding a subtle trail or path element."
+    }
+  ],
+  "current": "v2"
+}
