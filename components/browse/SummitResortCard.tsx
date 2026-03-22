@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
-import { Camera } from "lucide-react";
+import { Camera, ArrowLeftRight } from "lucide-react";
 import type { ResortWithData, ConditionRating } from "@/lib/types";
+import { trackResortCardClick } from "@/lib/posthog";
 
 // ── Animated count-up number ─────────────────────────────────────────────────
 
@@ -82,31 +83,36 @@ export function SummitResortCard({ resort }: Props) {
       whileHover={{ y: -8 }}
       transition={{ duration: 0.2 }}
     >
-      <Link href={`/resorts/${resort.slug}`} className="block">
-        <div
-          className="noise-overlay relative p-6 h-full border border-border hover:border-cyan/50 hover:shadow-glow-ice transition-all duration-300"
-          style={{ background: gradient }}
+      <div
+        className="noise-overlay relative h-full border border-border hover:border-cyan/50 hover:shadow-glow-ice transition-all duration-300"
+        style={{ background: gradient }}
+      >
+        {/* Alpenglow top border on hover */}
+        <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-alpenglow to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+        {/* Fresh snow shimmer overlay */}
+        {isFresh && (
+          <>
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-br from-transparent via-white/5 to-transparent pointer-events-none"
+              animate={{ backgroundPosition: ["0% 0%", "100% 100%"] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+              style={{ backgroundSize: "200% 200%" }}
+            />
+            <div className="absolute top-4 right-4 z-10 px-3 py-1 bg-cyan/20 backdrop-blur-sm border border-cyan/50 rounded-full">
+              <span className="text-cyan text-xs font-semibold flex items-center gap-1">
+                &#10052; FRESH
+              </span>
+            </div>
+          </>
+        )}
+
+        {/* Main card link */}
+        <Link
+          href={`/resorts/${resort.slug}`}
+          className="block p-6"
+          onClick={() => trackResortCardClick(resort.name, resort.slug)}
         >
-          {/* Alpenglow top border on hover */}
-          <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-alpenglow to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-          {/* Fresh snow shimmer overlay */}
-          {isFresh && (
-            <>
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-br from-transparent via-white/5 to-transparent pointer-events-none"
-                animate={{ backgroundPosition: ["0% 0%", "100% 100%"] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                style={{ backgroundSize: "200% 200%" }}
-              />
-              <div className="absolute top-4 right-4 z-10 px-3 py-1 bg-cyan/20 backdrop-blur-sm border border-cyan/50 rounded-full">
-                <span className="text-cyan text-xs font-semibold flex items-center gap-1">
-                  &#10052; FRESH
-                </span>
-              </div>
-            </>
-          )}
-
           <div className="relative space-y-6">
             {/* Giant base depth number */}
             <div className="text-center py-8">
@@ -180,8 +186,19 @@ export function SummitResortCard({ resort }: Props) {
               </div>
             </div>
           </div>
+        </Link>
+
+        {/* Compare button — separate link outside the main card link */}
+        <div className="px-6 pb-5 pt-1">
+          <Link
+            href={`/compare?resorts=${resort.slug}`}
+            className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg border border-border/60 text-text-muted hover:text-cyan hover:border-cyan/40 hover:bg-cyan/5 transition-all duration-200 text-xs font-medium"
+          >
+            <ArrowLeftRight size={12} />
+            Compare
+          </Link>
         </div>
-      </Link>
+      </div>
     </motion.div>
   );
 }
