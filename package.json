@@ -12,7 +12,8 @@
     "agents": "node agents/loop.mjs",
     "agents:dry-run": "node agents/loop.mjs --dry-run",
     "agents:extract-plugins": "for f in plugins/*.plugin; do name=$(basename \"$f\" .plugin); mkdir -p \"agents/plugins/$name\" && unzip -o \"$f\" -d \"agents/plugins/$name\"; done",
-    "snotel-sync": "node scripts/snotel-sync.mjs",
+    "snotel-sync": "tsx scripts/snotel-sync.ts",
+    "seed-normals": "tsx scripts/seed-snotel-normals.ts",
     "cam-health": "node scripts/cam-health-check.mjs",
     "powder-alerts": "node scripts/powder-alert-check.mjs",
     "generate-images": "node scripts/generate-images.mjs",
@@ -45,6 +46,7 @@
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }
