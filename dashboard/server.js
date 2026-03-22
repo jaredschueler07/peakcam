@@ -390,6 +390,8 @@ app.post('/api/claude/start', (req, res) => {
     session.output.push(line);
     session.lastOutputTime = Date.now();
     if (session.output.length > 500) session.output = session.output.slice(-500);
+    // Check for permission prompts in output stream
+    detectPermission(child.pid, null, line);
     // Push to any SSE clients watching this session
     const clients = sessionSSEClients.get(child.pid);
     if (clients && clients.size > 0) {
@@ -699,6 +701,272 @@ app.get('/api/claude/discover', (req, res) => {
   } catch (_) {
     res.json([]);
   }
+});
+
+// ── Permission Approval System ────────────────────────────────────────────────
+//
+// Surfaces Claude Code permission prompts in the dashboard UI so they can be
+// approved or denied remotely (e.g. from a phone browser).
+//
+// Detection:   Scans captured stdout/stderr of dashboard-managed sessions for
+//              permission prompt patterns. External sessions (started outside
+//              the dashboard) cannot have their output intercepted on macOS
+//              without a TTY wrapper, but their PID is known so approval can
+//              still be attempted via the TTY write method below.
+//
+// Approval:    Method 1 — write 'y\n' / 'n\n' to the child process stdin
+//              (works for sessions started by this dashboard without -p flag).
+//              Method 2 — write to the process's controlling TTY device
+//              (works on macOS when dashboard and Claude share the same user;
+//              the TTY path is resolved via `ps -p PID -o tty=`).
+//
+// Limitations: External sessions write permission prompts to their terminal
+//              (TTY), which we cannot read from another process on macOS
+//              without DTrace/dtrace (requires SIP off) or a wrapper script.
+//              Workaround: run Claude inside tmux and set up logging, or start
+//              sessions via the dashboard "interactive" mode (no -p flag).
+
+const permissionQueue = new Map(); // id → permission object
+let permIdCounter = 0;
+
+function genPermId() {
+  return `perm_${Date.now()}_${++permIdCounter}`;
+}
+
+// Patterns that strongly indicate a permission prompt line
+const PERM_TRIGGER_RE = [
+  { re: /allow claude to (?:use|run|execute|call)\s+([^\?]+)\?/i, cap: 1 },
+  { re: /allow tool:\s*(.+)/i, cap: 1 },
+  { re: /do you want to (?:allow|proceed)/i, cap: null },
+  { re: /\(y\/n(?:\/always)?(?:\/never)?\)/i, cap: null },
+  { re: /approve this action/i, cap: null },
+  { re: /press enter to allow/i, cap: null },
+];
+
+// Patterns to extract tool/command from recent context
+const TOOL_EXTRACT_RE = [
+  /tool:\s*(\w+)/i,
+  /(?:use|run|execute|call)\s+([A-Z][a-zA-Z]+)/,
+  /allow claude to (?:use|run)\s+(\w+)/i,
+];
+const CMD_EXTRACT_RE = [
+  /(?:bash|command|cmd):\s*(.+)/i,
+  /running:\s*(.+)/i,
+  /execute:\s*(.+)/i,
+];
+
+// Per-session rolling line buffers (for multi-line context)
+const permLineBufs  = new Map(); // pid → string[]
+const permLastHit   = new Map(); // pid → timestamp (debounce)
+
+function detectPermission(pid, sessionId, rawLine) {
+  // Strip ANSI escape codes
+  const line = rawLine.replace(/\x1b\[[0-9;]*[mGKHFJA-Z]/g, '')
+                      .replace(/\x1b[()][A-Z0-9]/g, '')
+                      .trim();
+  if (!line) return;
+
+  if (!permLineBufs.has(pid)) permLineBufs.set(pid, []);
+  const buf = permLineBufs.get(pid);
+  buf.push(line);
+  if (buf.length > 30) buf.splice(0, buf.length - 30);
+
+  // Check if this line matches any permission trigger
+  let triggered = false;
+  let toolName   = null;
+
+  for (const { re, cap } of PERM_TRIGGER_RE) {
+    const m = line.match(re);
+    if (m) {
+      triggered = true;
+      if (cap && m[cap]) toolName = m[cap].trim().replace(/\?$/, '');
+      break;
+    }
+  }
+  if (!triggered) return;
+
+  // Debounce: skip if triggered recently for this session
+  const lastHit = permLastHit.get(pid) || 0;
+  if (Date.now() - lastHit < 8000) return;
+
+  // Skip if session already has a pending permission
+  for (const p of permissionQueue.values()) {
+    if (p.pid === pid && p.status === 'pending') return;
+  }
+
+  permLastHit.set(pid, Date.now());
+
+  // Extract tool name and command from recent buffer context
+  const context = buf.slice(-15).join('\n');
+  if (!toolName) {
+    for (const re of TOOL_EXTRACT_RE) {
+      const m = context.match(re);
+      if (m) { toolName = m[1]; break; }
+    }
+  }
+  let command = null;
+  for (const re of CMD_EXTRACT_RE) {
+    const m = context.match(re);
+    if (m) { command = m[1].trim().slice(0, 300); break; }
+  }
+
+  const id = genPermId();
+  const perm = {
+    id,
+    pid,
+    sessionId: sessionId || null,
+    toolName:   (toolName || 'Unknown Tool').slice(0, 80),
+    command:    command,
+    promptText: context.slice(-400),
+    timestamp:  Date.now(),
+    status:     'pending',
+    resolvedAt: null,
+    method:     null,
+  };
+
+  permissionQueue.set(id, perm);
+  console.log(`[permissions] Queued: ${id}  tool=${perm.toolName}  pid=${pid}`);
+
+  // Auto-expire after 10 minutes if not resolved
+  setTimeout(() => {
+    const p = permissionQueue.get(id);
+    if (p && p.status === 'pending') p.status = 'expired';
+  }, 10 * 60 * 1000);
+}
+
+async function resolvePermission(permId, approved) {
+  const perm = permissionQueue.get(permId);
+  if (!perm)                      return { ok: false, error: 'Permission not found' };
+  if (perm.status !== 'pending')  return { ok: false, error: `Already ${perm.status}` };
+
+  perm.status    = approved ? 'approved' : 'denied';
+  perm.resolvedAt = Date.now();
+
+  const response = approved ? 'y\n' : 'n\n';
+
+  // ── Method 1: stdin of a dashboard-managed child process ─────────────────
+  const child = children.get(perm.pid);
+  if (child && child.stdin && !child.stdin.destroyed) {
+    try {
+      child.stdin.write(response);
+      perm.method = 'stdin';
+      console.log(`[permissions] Resolved ${permId} via stdin`);
+      return { ok: true, method: 'stdin' };
+    } catch (e) {
+      console.warn('[permissions] stdin write failed:', e.message);
+    }
+  }
+
+  // ── Method 2: macOS — write to the process's controlling TTY ─────────────
+  // On macOS, `ps -p PID -o tty=` returns the TTY name (e.g. "s001").
+  // The TTY device is /dev/ttys001 and is writable by the owning user.
+  // This sends the keypress as if the user typed it in the terminal.
+  try {
+    const alive = (() => { try { process.kill(perm.pid, 0); return true; } catch (_) { return false; } })();
+    if (!alive) {
+      return { ok: false, error: 'Process is no longer running' };
+    }
+
+    const ttyRaw = execSync(
+      `ps -p ${perm.pid} -o tty=`,
+      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
+    ).trim();
+
+    if (ttyRaw && ttyRaw !== '?' && ttyRaw !== '??') {
+      // macOS TTY names look like "s001"; device path is /dev/ttys001
+      const ttyPath = ttyRaw.startsWith('/')     ? ttyRaw
+                    : ttyRaw.startsWith('ttys')  ? `/dev/${ttyRaw}`
+                    : `/dev/tty${ttyRaw}`;
+      try {
+        fs.writeFileSync(ttyPath, response);
+        perm.method = `tty:${ttyPath}`;
+        console.log(`[permissions] Resolved ${permId} via ${ttyPath}`);
+        return { ok: true, method: `tty:${ttyPath}` };
+      } catch (e) {
+        console.warn(`[permissions] TTY write to ${ttyPath} failed:`, e.message);
+        return {
+          ok: false,
+          error: `TTY write failed: ${e.message}`,
+          suggestion: 'Ensure the dashboard runs as the same user as Claude and has tty group access.',
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('[permissions] TTY lookup failed:', e.message);
+  }
+
+  return {
+    ok: false,
+    error: 'Could not reach process stdin or TTY. See server logs.',
+    suggestion: 'For external sessions, start Claude via tmux + script logging, or use "New Code Task" from the dashboard (interactive mode).',
+  };
+}
+
+// Watch ~/.claude/sessions/ for new external sessions
+function watchExternalSessions() {
+  try {
+    fs.watch(CLAUDE_SESSIONS_DIR, { persistent: false }, (event, filename) => {
+      if (filename && filename.endsWith('.json')) {
+        console.log(`[permissions] External session change detected: ${filename}`);
+        // We can't intercept TTY output of external sessions on macOS, but
+        // the user can manually trigger approval via /api/permissions (inject
+        // a pending perm) or the TTY write will be attempted on approve.
+      }
+    });
+  } catch (_) {} // directory may not exist
+}
+
+watchExternalSessions();
+
+// GET  /api/permissions          → list recent permission requests
+// POST /api/permissions/:id/approve
+// POST /api/permissions/:id/deny
+// POST /api/permissions/inject   → manually inject a pending request (for external sessions)
+
+app.get('/api/permissions', (req, res) => {
+  const cutoff = Date.now() - 30 * 60 * 1000; // keep last 30 min
+  const list = Array.from(permissionQueue.values())
+    .filter(p => p.status === 'pending' || p.timestamp > cutoff)
+    .sort((a, b) => {
+      if (a.status === 'pending' && b.status !== 'pending') return -1;
+      if (b.status === 'pending' && a.status !== 'pending') return  1;
+      return b.timestamp - a.timestamp;
+    })
+    .slice(0, 30);
+  res.json(list);
+});
+
+app.post('/api/permissions/:id/approve', async (req, res) => {
+  res.json(await resolvePermission(req.params.id, true));
+});
+
+app.post('/api/permissions/:id/deny', async (req, res) => {
+  res.json(await resolvePermission(req.params.id, false));
+});
+
+// Inject a manual permission request (use when an external session has a prompt
+// waiting but the dashboard can't detect it automatically)
+app.post('/api/permissions/inject', (req, res) => {
+  const { pid, sessionId, toolName, command } = req.body;
+  if (!pid) return res.status(400).json({ error: 'pid required' });
+
+  const id = genPermId();
+  const perm = {
+    id,
+    pid:        parseInt(pid),
+    sessionId:  sessionId || null,
+    toolName:   (toolName || 'Manual Request').slice(0, 80),
+    command:    command || null,
+    promptText: command || 'Manually injected permission request',
+    timestamp:  Date.now(),
+    status:     'pending',
+    resolvedAt: null,
+    method:     null,
+  };
+  permissionQueue.set(id, perm);
+  setTimeout(() => { const p = permissionQueue.get(id); if (p && p.status === 'pending') p.status = 'expired'; }, 10 * 60 * 1000);
+  console.log(`[permissions] Manual inject: ${id}  pid=${pid}  tool=${toolName}`);
+  res.json({ ok: true, id });
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────

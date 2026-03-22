@@ -1540,6 +1540,248 @@
     @media (max-width: 600px) {
       .dispatch-panel { grid-template-columns: 1fr; }
     }
+
+    /* ── Permissions Panel ──────────────────────────────────────────────── */
+    .perms-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+
+    .perms-section.has-pending {
+      border-color: rgba(251,191,36,0.55);
+      box-shadow: 0 0 24px rgba(251,191,36,0.1);
+      animation: permGlow 2.2s ease-in-out infinite;
+    }
+
+    @keyframes permGlow {
+      0%, 100% { box-shadow: 0 0 16px rgba(251,191,36,0.08); }
+      50%       { box-shadow: 0 0 32px rgba(251,191,36,0.22); }
+    }
+
+    .perms-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .perms-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--subtle);
+    }
+
+    .perms-count-badge {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-weight: 600;
+      background: var(--surface3);
+      color: var(--subtle);
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .perms-count-badge.has-pending {
+      background: rgba(251,191,36,0.18);
+      color: var(--warn);
+    }
+
+    .perms-refresh-hint {
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-left: auto;
+    }
+
+    .perms-inject-btn {
+      font-size: 0.7rem;
+      padding: 3px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(96,200,255,0.25);
+      background: rgba(96,200,255,0.06);
+      color: var(--accent);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+
+    .perms-inject-btn:hover { background: rgba(96,200,255,0.14); border-color: var(--accent); }
+
+    .perms-list {
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .perms-empty {
+      padding: 18px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .perm-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: opacity 0.4s;
+    }
+
+    .perm-card.pending  { border-color: rgba(251,191,36,0.4); }
+    .perm-card.approved { opacity: 0.65; border-color: rgba(52,211,153,0.25); }
+    .perm-card.denied   { opacity: 0.55; border-color: rgba(255,123,94,0.25); }
+    .perm-card.expired  { opacity: 0.35; }
+
+    .perm-card-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .perm-icon {
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    .perm-tool-name {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--warn);
+    }
+
+    .perm-status-pill {
+      font-size: 0.65rem;
+      padding: 2px 7px;
+      border-radius: 20px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      flex-shrink: 0;
+    }
+
+    .perm-status-pill.pending  { background: rgba(251,191,36,0.15); color: var(--warn); }
+    .perm-status-pill.approved { background: rgba(52,211,153,0.15);  color: var(--success); }
+    .perm-status-pill.denied   { background: rgba(255,123,94,0.15);  color: var(--error); }
+    .perm-status-pill.expired  { background: rgba(74,96,128,0.2);    color: var(--muted); }
+
+    .perm-pid-label {
+      font-size: 0.68rem;
+      color: var(--muted);
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      margin-left: auto;
+    }
+
+    .perm-command-box {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.72rem;
+      color: var(--subtle);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 7px 9px;
+      max-height: 90px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      line-height: 1.4;
+    }
+
+    .perm-command-box::-webkit-scrollbar { width: 3px; }
+    .perm-command-box::-webkit-scrollbar-thumb { background: var(--border); }
+
+    .perm-meta-row {
+      font-size: 0.68rem;
+      color: var(--muted);
+    }
+
+    .perm-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .perm-allow-btn {
+      flex: 1;
+      padding: 8px 0;
+      border-radius: 7px;
+      border: none;
+      background: var(--success);
+      color: #000;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+
+    .perm-allow-btn:hover  { opacity: 0.88; }
+    .perm-allow-btn:active { transform: scale(0.97); }
+    .perm-allow-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .perm-deny-btn {
+      flex: 1;
+      padding: 8px 0;
+      border-radius: 7px;
+      border: none;
+      background: var(--error);
+      color: #fff;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+
+    .perm-deny-btn:hover  { opacity: 0.88; }
+    .perm-deny-btn:active { transform: scale(0.97); }
+    .perm-deny-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .perm-result-msg {
+      font-size: 0.72rem;
+      min-height: 14px;
+    }
+
+    .perm-result-msg.ok  { color: var(--success); }
+    .perm-result-msg.err { color: var(--error); }
+
+    /* Header badge — pulses when permissions are pending */
+    .perm-header-badge {
+      display: none;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 11px;
+      border-radius: 20px;
+      border: 1px solid rgba(251,191,36,0.5);
+      background: rgba(251,191,36,0.1);
+      color: var(--warn);
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      animation: pulse 1.4s infinite;
+      user-select: none;
+    }
+
+    .perm-header-badge.visible { display: flex; }
+
+    /* Inject modal */
+    .inject-modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      z-index: 300;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .inject-modal-overlay.hidden { display: none; }
   </style>
 </head>
 <body>
@@ -1554,6 +1796,10 @@
   </div>
   <span class="header-title">Ops Dashboard</span>
   <div class="header-right">
+    <div class="perm-header-badge" id="permHeaderBadge"
+         onclick="document.getElementById('permissionsSection').scrollIntoView({behavior:'smooth'})">
+      ⚡ <span id="permHeaderCount">0</span> pending
+    </div>
     <button class="code-task-btn" id="newCodeTaskBtn">⌨ New Code Task</button>
     <div class="loop-status" id="loopStatus">
       <span class="loop-dot" id="loopDot"></span>
@@ -1638,6 +1884,53 @@
       </div>
     </div>
   </section>
+
+  <!-- Permissions Panel -->
+  <section id="permissionsSection" class="perms-section">
+    <div class="perms-header">
+      <span class="perms-title">Permissions</span>
+      <span class="perms-count-badge" id="permsCountBadge">0 pending</span>
+      <button class="perms-inject-btn" id="permsInjectBtn" title="Manually inject a permission request for an external Claude session">+ Manual Request</button>
+      <span class="perms-refresh-hint" id="permsRefreshHint"></span>
+    </div>
+    <div id="permsList" class="perms-list">
+      <div class="perms-empty">No pending permission requests. Auto-detected from session output.</div>
+    </div>
+  </section>
+
+  <!-- Manual Permission Inject Modal -->
+  <div class="inject-modal-overlay hidden" id="injectModal">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title" style="color:var(--warn)">⚡ Manual Permission Request</span>
+        <button class="modal-close" id="injectModalClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:0.78rem;color:var(--subtle);margin-bottom:12px;">
+          Use this when an external Claude session has a permission prompt waiting but the dashboard can't auto-detect it.
+          Approval will be sent to the process's TTY.
+        </div>
+        <div>
+          <div class="field-label">Process PID</div>
+          <input class="field-input" id="injectPid" type="number" placeholder="e.g. 45949">
+        </div>
+        <div>
+          <div class="field-label">Tool / Command Name</div>
+          <input class="field-input" id="injectTool" type="text" placeholder="e.g. Bash, Read, Edit…">
+        </div>
+        <div>
+          <div class="field-label">Command details (optional)</div>
+          <input class="field-input" id="injectCmd" type="text" placeholder="e.g. npm run build">
+        </div>
+        <button class="modal-submit-btn" id="injectSubmitBtn" style="background:var(--warn);color:#000;">
+          Create Request
+        </button>
+        <div style="font-size:0.72rem;color:var(--muted);text-align:center;margin-top:4px;">
+          Find the PID via <code style="font-size:0.7rem;color:var(--subtle)">ls ~/.claude/sessions/</code> or the Dispatch panel above.
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Claude Sessions -->
   <section id="claudeSessionsSection">
@@ -2827,11 +3120,240 @@ registerSubmitBtn.addEventListener('click', async () => {
   }
 });
 
+// ── Permissions Panel ──────────────────────────────────────────────────────
+
+let permPrevPendingCount = 0;
+let permAudioCtx = null;
+
+function getPermAudioCtx() {
+  if (!permAudioCtx) {
+    try { permAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) {}
+  }
+  return permAudioCtx;
+}
+
+function playPermAlert() {
+  try {
+    const ctx = getPermAudioCtx();
+    if (!ctx) return;
+    // Two-tone alert: high then mid
+    [880, 660].forEach((freq, i) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.18;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.28, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+      osc.start(t);
+      osc.stop(t + 0.25);
+    });
+  } catch (_) {}
+}
+
+function permTimeAgo(ts) {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60)   return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  return `${Math.floor(s / 3600)}h ago`;
+}
+
+async function loadPermissions() {
+  try {
+    const r    = await fetch('/api/permissions');
+    const list = await r.json();
+    renderPermissions(list);
+
+    const pending = list.filter(p => p.status === 'pending').length;
+    // Header badge
+    const badge   = document.getElementById('permHeaderBadge');
+    const countEl = document.getElementById('permHeaderCount');
+    if (badge && countEl) {
+      countEl.textContent = pending;
+      badge.classList.toggle('visible', pending > 0);
+    }
+    // Audio alert on new pending requests
+    if (pending > permPrevPendingCount) playPermAlert();
+    permPrevPendingCount = pending;
+
+    document.getElementById('permsRefreshHint').textContent =
+      `refreshed ${new Date().toLocaleTimeString()}`;
+  } catch (_) {}
+}
+
+function renderPermissions(list) {
+  const container = document.getElementById('permsList');
+  const section   = document.getElementById('permissionsSection');
+  const badge     = document.getElementById('permsCountBadge');
+
+  const pending = list.filter(p => p.status === 'pending');
+  const resolved = list.filter(p => p.status !== 'pending').slice(0, 5);
+  const toShow = [...pending, ...resolved];
+
+  badge.textContent = `${pending.length} pending`;
+  badge.classList.toggle('has-pending', pending.length > 0);
+  section.classList.toggle('has-pending', pending.length > 0);
+
+  if (!toShow.length) {
+    container.innerHTML = '<div class="perms-empty">No pending permission requests. Auto-detected from session output.</div>';
+    return;
+  }
+
+  container.innerHTML = '';
+  for (const perm of toShow) {
+    container.appendChild(buildPermCard(perm));
+  }
+}
+
+function buildPermCard(perm) {
+  const card = document.createElement('div');
+  card.className = `perm-card ${perm.status}`;
+
+  const displayText = perm.command || perm.promptText || '';
+  const cmdHtml = displayText
+    ? `<div class="perm-command-box">${escHtml(displayText.slice(0, 300))}</div>`
+    : '';
+
+  const sessionHint = perm.sessionId
+    ? ` · session <code style="font-size:0.65rem">${perm.sessionId.slice(0,8)}</code>`
+    : '';
+
+  const isPending = perm.status === 'pending';
+
+  card.innerHTML = `
+    <div class="perm-card-top">
+      <span class="perm-icon">🔐</span>
+      <span class="perm-tool-name">${escHtml(perm.toolName)}</span>
+      <span class="perm-status-pill ${perm.status}">${perm.status}</span>
+      <span class="perm-pid-label">PID ${perm.pid}</span>
+    </div>
+    ${cmdHtml}
+    <div class="perm-meta-row">${permTimeAgo(perm.timestamp)}${sessionHint}</div>
+    ${isPending ? `
+      <div class="perm-actions">
+        <button class="perm-allow-btn" data-id="${perm.id}" data-approve="true">✓ Allow</button>
+        <button class="perm-deny-btn"  data-id="${perm.id}" data-approve="false">✗ Deny</button>
+      </div>
+      <div class="perm-result-msg" id="permMsg_${perm.id}"></div>
+    ` : `
+      <div class="perm-result-msg ${perm.status === 'approved' ? 'ok' : 'err'}">
+        ${perm.status === 'approved' ? '✓ Approved' : perm.status === 'denied' ? '✗ Denied' : '⏱ Expired'}
+        ${perm.method ? `· via ${escHtml(perm.method)}` : ''}
+        ${perm.resolvedAt ? `· ${permTimeAgo(perm.resolvedAt)}` : ''}
+      </div>
+    `}
+  `;
+
+  // Wire up buttons
+  if (isPending) {
+    card.querySelector('.perm-allow-btn').addEventListener('click', e => handlePermBtn(e, true));
+    card.querySelector('.perm-deny-btn').addEventListener('click',  e => handlePermBtn(e, false));
+  }
+
+  return card;
+}
+
+async function handlePermBtn(e, approve) {
+  const btn  = e.currentTarget;
+  const id   = btn.dataset.id;
+  const card = btn.closest('.perm-card');
+  const msgEl = document.getElementById(`permMsg_${id}`);
+  const btns  = card.querySelectorAll('button');
+
+  btns.forEach(b => b.disabled = true);
+  if (msgEl) { msgEl.textContent = 'Sending…'; msgEl.className = 'perm-result-msg'; }
+
+  try {
+    const action = approve ? 'approve' : 'deny';
+    const r    = await fetch(`/api/permissions/${id}/${action}`, { method: 'POST' });
+    const data = await r.json();
+
+    if (data.ok) {
+      if (msgEl) {
+        msgEl.textContent = `${approve ? '✓ Approved' : '✗ Denied'} · via ${data.method}`;
+        msgEl.className = 'perm-result-msg ok';
+      }
+      // Update card appearance immediately
+      card.className = `perm-card ${approve ? 'approved' : 'denied'}`;
+      card.querySelector('.perm-status-pill').textContent = approve ? 'approved' : 'denied';
+      card.querySelector('.perm-status-pill').className = `perm-status-pill ${approve ? 'approved' : 'denied'}`;
+      card.querySelector('.perm-actions')?.remove();
+    } else {
+      if (msgEl) {
+        const hint = data.suggestion ? `\n${data.suggestion}` : '';
+        msgEl.textContent = `Error: ${data.error}${hint}`;
+        msgEl.className = 'perm-result-msg err';
+      }
+      btns.forEach(b => b.disabled = false);
+    }
+  } catch (err) {
+    if (msgEl) { msgEl.textContent = 'Network error'; msgEl.className = 'perm-result-msg err'; }
+    btns.forEach(b => b.disabled = false);
+  }
+
+  // Refresh after a brief delay
+  setTimeout(loadPermissions, 1200);
+}
+
+// Start polling permissions every 5 seconds (time-sensitive)
+setInterval(loadPermissions, 5000);
+
+// ── Manual Inject Modal ─────────────────────────────────────────────────────
+
+const injectModal     = document.getElementById('injectModal');
+const injectModalClose = document.getElementById('injectModalClose');
+const injectSubmitBtn  = document.getElementById('injectSubmitBtn');
+
+document.getElementById('permsInjectBtn').addEventListener('click', () => {
+  injectModal.classList.remove('hidden');
+  document.getElementById('injectPid').focus();
+});
+
+injectModalClose.addEventListener('click', () => injectModal.classList.add('hidden'));
+injectModal.addEventListener('click', e => { if (e.target === injectModal) injectModal.classList.add('hidden'); });
+
+injectSubmitBtn.addEventListener('click', async () => {
+  const pid     = parseInt(document.getElementById('injectPid').value.trim());
+  const toolName = document.getElementById('injectTool').value.trim() || 'Unknown Tool';
+  const cmd     = document.getElementById('injectCmd').value.trim();
+  if (!pid) return;
+
+  injectSubmitBtn.disabled = true;
+  injectSubmitBtn.textContent = 'Creating…';
+
+  try {
+    const r = await fetch('/api/permissions/inject', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pid, toolName, command: cmd || null }),
+    });
+    const data = await r.json();
+    if (data.ok) {
+      document.getElementById('injectPid').value = '';
+      document.getElementById('injectTool').value = '';
+      document.getElementById('injectCmd').value = '';
+      injectModal.classList.add('hidden');
+      await loadPermissions();
+    } else {
+      alert(`Error: ${data.error}`);
+    }
+  } catch (e) {
+    alert(`Error: ${e.message}`);
+  } finally {
+    injectSubmitBtn.disabled = false;
+    injectSubmitBtn.textContent = 'Create Request';
+  }
+});
+
 // ── Init ───────────────────────────────────────────────────────────────────
 connect();
 loadSprint();
 startSessionsPolling();
 startDispatchPolling();
+loadPermissions();
 </script>
 </body>
 </html>
