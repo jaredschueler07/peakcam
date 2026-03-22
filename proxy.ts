@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// Supabase Auth Middleware
+// Supabase Auth Proxy (Next.js 16 convention)
 // Refreshes the user's session on every request so Server
 // Components always have a valid session from cookies.
 // ─────────────────────────────────────────────────────────────
@@ -7,7 +7,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
