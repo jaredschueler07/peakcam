@@ -50,8 +50,8 @@ purgatory,Snow Stake,10822,image,https://assets.mcp.ski/purgatory/SnowStake.jpg,
 eldora,Snow Stake,10800,image,https://b14.hdrelay.com/camera/b7ceb08f-5cbb-42f1-9a9f-920f2ac5c4dc/snapshot,,true
 eldora,Alpenglow,10800,image,https://b14.hdrelay.com/camera/0e9787f3-7961-4ae4-bd59-8cbbcd79ed31/snapshot,,true
 eldora,Lower Mountain,9200,image,https://img.hdrelay.com/frames/eldora-lower-mountain/default/last.jpg,,true
-sunlight-mountain,Snow Stake,9895,iframe,https://g1.ipcamlive.com/player/player.php?alias=sunlightsnowstake,,true
-sunlight-mountain,Leonards Lookout,9895,iframe,https://g1.ipcamlive.com/player/player.php?alias=sopris&autoplay=1&mute=1,,true
+sunlight,Snow Stake,9895,iframe,https://g1.ipcamlive.com/player/player.php?alias=sunlightsnowstake,,true
+sunlight,Leonards Lookout,9895,iframe,https://g1.ipcamlive.com/player/player.php?alias=sopris&autoplay=1&mute=1,,true
 granby-ranch,Base,8202,link,https://camstreamer.com/live/stream/1865,,true
 monarch-mountain,Webcams,11952,link,https://skimonarch.com/conditions/cams/,,true
 park-city,Lookout Cabin,9200,iframe,https://player.brownrice.com/embed/parkcitylookoutcabin,,true
@@ -231,7 +231,7 @@ pico,Base,3967,image,https://b14.hdrelay.com/camera/84943abb-01cd-4907-8cc2-a9a7
 pico,Summit,3967,image,https://b14.hdrelay.com/camera/2a8b98fa-994e-4e36-9c61-d62e00a500b0/snapshot,,true
 smugglers-notch,Morse,3640,youtube,https://www.youtube.com/embed/7i94UfG1Om0,7i94UfG1Om0,true
 smugglers-notch,Madonna,3640,youtube,https://www.youtube.com/embed/n7kDiEJvdkc,n7kDiEJvdkc,true
-burke,Webcams,3267,link,https://skiburke.com/the-mountain/webcams,,true
+burke-mountain,Webcams,3267,link,https://skiburke.com/the-mountain/webcams,,true
 bolton-valley,Vista Peak,3150,youtube,https://www.youtube.com/embed/xWdZHDUHjv8,xWdZHDUHjv8,true
 bolton-valley,Base,3150,youtube,https://www.youtube.com/embed/VX9ANOUYO1k,VX9ANOUYO1k,true
 loon,Octagon,3050,youtube,https://www.youtube.com/embed/5NUYOuzzZwc,5NUYOuzzZwc,true
@@ -258,9 +258,9 @@ sugarloaf,Beach,4237,youtube,https://www.youtube.com/embed/K77ahIkmPGw,K77ahIkmP
 sugarloaf,Bullwinkle,4237,youtube,https://www.youtube.com/embed/IdibWuNtW1c,IdibWuNtW1c,true
 whiteface,Legacy Lodge,4867,image,https://img.hdrelay.com/frames/56ce853a-23fc-48cc-af9b-13907ef75b9a/panorama/last.jpg,,true
 whiteface,Bear Den,4867,image,https://img.hdrelay.com/frames/6467e4a44bca054a8e3c2f0b/panorama/last.jpg,,true
-gore-mountain,Base,3600,image,https://img.hdrelay.com/frames/29684ca1-7164-47c4-a217-d3d19c8b21e9/panorama/last.jpg,,true
-gore-mountain,Summit,3600,image,https://img.hdrelay.com/frames/3609323d-2651-4778-8589-b5991afc6ee4/default/last.jpg,,true
-gore-mountain,Bear Mountain,3600,image,https://b14.hdrelay.com/camera/ae2aab18-54cc-4ea3-979c-0edb66075a86/snapshot,,true
+gore,Base,3600,image,https://img.hdrelay.com/frames/29684ca1-7164-47c4-a217-d3d19c8b21e9/panorama/last.jpg,,true
+gore,Summit,3600,image,https://img.hdrelay.com/frames/3609323d-2651-4778-8589-b5991afc6ee4/default/last.jpg,,true
+gore,Bear Mountain,3600,image,https://b14.hdrelay.com/camera/ae2aab18-54cc-4ea3-979c-0edb66075a86/snapshot,,true
 hunter,Base,3200,iframe,https://player.brownrice.com/embed/hunter1,,true
 hunter,Mid Mountain,3200,iframe,https://player.brownrice.com/embed/huntermidstation,,true
 hunter,Summit,3200,iframe,https://player.brownrice.com/embed/huntersummit,,true

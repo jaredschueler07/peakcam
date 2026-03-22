@@ -17,6 +17,30 @@ interface Props {
   userConditions?: UserCondition[];
 }
 
+// ─── Auto-refreshing image cam ───────────────────────────────────────────────
+
+function ImageCam({ url, name }: { url: string; name: string }) {
+  const [src, setSrc] = useState(url);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const sep = url.includes("?") ? "&" : "?";
+      setSrc(`${url}${sep}_t=${Date.now()}`);
+    }, 30_000); // refresh every 30 seconds
+    return () => clearInterval(interval);
+  }, [url]);
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={name}
+      className="absolute inset-0 w-full h-full object-cover"
+      loading="lazy"
+    />
+  );
+}
+
 // ─── Cam player ──────────────────────────────────────────────────────────────
 
 function CamPlayer({ cam, resortSlug }: { cam: Cam; resortSlug: string }) {
@@ -48,6 +72,40 @@ function CamPlayer({ cam, resortSlug }: { cam: Cam; resortSlug: string }) {
           <p className="text-text-muted text-xs mt-0.5">Opens on resort website</p>
         </div>
       </a>
+    );
+  }
+
+  // Image cams — auto-refreshing snapshot
+  if (cam.embed_type === "image") {
+    return (
+      <div className="relative aspect-video bg-surface2 rounded-xl overflow-hidden border border-border">
+        {!loaded ? (
+          <button
+            onClick={() => { setLoaded(true); trackCamClick(resortSlug, cam.name, cam.embed_type); }}
+            className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-3
+                       hover:bg-white/5 transition-colors group"
+          >
+            <div className="w-14 h-14 rounded-full bg-cyan/10 border border-cyan/30 flex items-center justify-center
+                            group-hover:bg-cyan/20 group-hover:border-cyan transition-all duration-220">
+              <svg className="w-6 h-6 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.91M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+              </svg>
+            </div>
+            <div className="text-center px-4">
+              <p className="text-text-subtle text-sm font-medium">{cam.name}</p>
+              {cam.elevation && (
+                <p className="text-text-muted text-xs mt-0.5">
+                  {Number(cam.elevation).toLocaleString()}′ elevation
+                </p>
+              )}
+              <p className="text-text-muted text-xs mt-1">Click to load snapshot</p>
+            </div>
+          </button>
+        ) : (
+          <ImageCam url={cam.embed_url ?? ""} name={cam.name} />
+        )}
+      </div>
     );
   }
 

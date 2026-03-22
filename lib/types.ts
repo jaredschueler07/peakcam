@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 
 export type ConditionRating = "great" | "good" | "fair" | "poor";
-export type EmbedType = "youtube" | "iframe" | "link";
+export type EmbedType = "youtube" | "iframe" | "image" | "link";
 export type SnowReportSource = "snotel" | "manual" | "resort";
 
 // ── Resorts ──────────────────────────────────────────────────
