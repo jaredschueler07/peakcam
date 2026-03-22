@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { SnowQuality, ComfortLevel, LiveConditions } from "@/lib/types";
+import { trackConditionVote } from "@/lib/posthog";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface Props {
   resortId: string;
+  resortSlug: string;
   liveConditions: LiveConditions | null;
 }
 
@@ -55,7 +57,7 @@ function freshnessColor(votes: number): string {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function ConditionVoter({ resortId, liveConditions }: Props) {
+export function ConditionVoter({ resortId, resortSlug, liveConditions }: Props) {
   const [snow, setSnow] = useState<SnowQuality | null>(null);
   const [comfort, setComfort] = useState<ComfortLevel | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -97,12 +99,13 @@ export function ConditionVoter({ resortId, liveConditions }: Props) {
       }
 
       setSubmitted(true);
+      trackConditionVote(resortSlug, snow, comfort);
     } catch {
       setError("Network error. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
-  }, [snow, comfort, sessionId, resortId]);
+  }, [snow, comfort, sessionId, resortId, resortSlug]);
 
   const hasSelection = snow !== null || comfort !== null;
 

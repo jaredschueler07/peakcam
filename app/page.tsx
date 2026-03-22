@@ -13,6 +13,32 @@ export const metadata = {
   description:
     "Browse live webcams, real-time snow reports, base depths, and trail conditions for 75+ ski resorts across North America. " +
     "Compare powder days, check lift status, and plan your next ski trip with PeakCam.",
+  keywords: [
+    "live ski resort webcams",
+    "ski resort snow report",
+    "powder day alerts",
+    "ski resort conditions",
+    "live mountain webcam",
+    "base depth report",
+    "trail conditions skiing",
+    "lift status ski resort",
+    "ski resort weather forecast",
+    "North America ski resorts",
+    "ski cam live stream",
+    "best powder days",
+  ],
+  openGraph: {
+    title: "PeakCam — Live Ski Resort Webcams, Snow Reports & Conditions",
+    description:
+      "Browse live webcams, real-time snow reports, and powder alerts for 75+ ski resorts across North America.",
+    url: "https://peakcam.co",
+    type: "website" as const,
+  },
+  twitter: {
+    card: "summary_large_image" as const,
+    title: "PeakCam — Live Ski Webcams & Snow Reports",
+    description: "Real-time powder alerts, base depths, and live cams for 75+ North American ski resorts.",
+  },
 };
 
 export default async function Home() {
