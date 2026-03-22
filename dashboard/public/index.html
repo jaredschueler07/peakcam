@@ -1659,6 +1659,7 @@
       <div class="dispatch-header">
         <span class="dispatch-title">Dispatch Sessions</span>
         <span class="dispatch-badge" id="dispatchCountBadge">0</span>
+        <span id="dispatchLastRefresh" style="font-size:0.68rem;color:var(--muted);margin-right:4px;"></span>
         <button class="discover-btn" id="dispatchRefreshBtn" style="border-color:rgba(167,139,250,0.3);color:#a78bfa;" title="Refresh dispatch sessions">Refresh</button>
         <button class="register-btn" id="openRegisterBtn">+ Register</button>
       </div>
@@ -2665,13 +2666,15 @@ async function loadDispatchSessions() {
     const r = await fetch('/api/dispatch/sessions');
     dispatchSessions = await r.json();
     renderDispatchPanel();
+    const el = document.getElementById('dispatchLastRefresh');
+    if (el) el.textContent = 'refreshed ' + new Date().toLocaleTimeString();
   } catch (_) {}
 }
 
 function startDispatchPolling() {
   loadDispatchSessions();
   if (!dispatchRefreshInterval) {
-    dispatchRefreshInterval = setInterval(loadDispatchSessions, 10000);
+    dispatchRefreshInterval = setInterval(loadDispatchSessions, 30000);
   }
 }
 

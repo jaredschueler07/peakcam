@@ -518,20 +518,43 @@ app.post('/api/claude/session/:pid/input', (req, res) => {
 
 // ── Dispatch Session Management ───────────────────────────────────────────
 
-const DISPATCH_SESSIONS_JSON = path.join(__dirname, 'sessions.json');
-const CLAUDE_SESSIONS_DIR    = path.join(os.homedir(), '.claude', 'sessions');
+const DISPATCH_SESSIONS_JSON  = path.join(__dirname, 'sessions.json');
+const CLAUDE_SESSIONS_DIR     = path.join(os.homedir(), '.claude', 'sessions');
+const LOCAL_AGENT_SESSIONS_DIR = path.join(os.homedir(), 'Library', 'Application Support', 'Claude', 'local-agent-mode-sessions');
 
 function readClaudeSessionFiles() {
   const result = [];
+  const seen = new Set();
+
+  // Read from ~/.claude/sessions/
   try {
     const files = fs.readdirSync(CLAUDE_SESSIONS_DIR).filter(f => f.endsWith('.json'));
     for (const file of files) {
       try {
         const data = JSON.parse(fs.readFileSync(path.join(CLAUDE_SESSIONS_DIR, file), 'utf8'));
-        if (data.sessionId) result.push(data);
+        if (data.sessionId && !seen.has(data.sessionId)) {
+          seen.add(data.sessionId);
+          result.push({ ...data, _source: 'claude-sessions' });
+        }
       } catch (_) {}
     }
   } catch (_) {}
+
+  // Read from ~/Library/Application Support/Claude/local-agent-mode-sessions/
+  try {
+    const files = fs.readdirSync(LOCAL_AGENT_SESSIONS_DIR).filter(f => f.endsWith('.json'));
+    for (const file of files) {
+      try {
+        const data = JSON.parse(fs.readFileSync(path.join(LOCAL_AGENT_SESSIONS_DIR, file), 'utf8'));
+        const sid = data.sessionId || data.id || data.session_id;
+        if (sid && !seen.has(sid)) {
+          seen.add(sid);
+          result.push({ sessionId: sid, pid: data.pid || null, cwd: data.cwd || null, startedAt: data.startedAt || data.created_at || null, _source: 'local-agent' });
+        }
+      } catch (_) {}
+    }
+  } catch (_) {}
+
   return result;
 }
 
