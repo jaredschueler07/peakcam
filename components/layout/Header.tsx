@@ -13,6 +13,7 @@ interface HeaderProps {
 
 const navLinks = [
   { label: "Resorts",     href: "/" },
+  { label: "Map",         href: "/map" },
   { label: "Compare",     href: "/compare" },
   { label: "Snow Report", href: "/snow-report" },
   { label: "About",       href: "/about" },

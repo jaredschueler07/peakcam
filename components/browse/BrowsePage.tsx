@@ -11,8 +11,8 @@ import { PowderAlertSignup } from "@/components/alerts/PowderAlertSignup";
 import type { ResortWithData } from "@/lib/types";
 import { trackSearch, trackFilter } from "@/lib/posthog";
 
-// Leaflet map — dynamic import, no SSR
-const ResortMap = dynamic(() => import("@/components/browse/ResortMap"), {
+// MapLibre map — dynamic import, no SSR (requires window)
+const MapView = dynamic(() => import("@/components/map/MapView"), {
   ssr: false,
   loading: () => (
     <div className="h-full w-full bg-surface animate-pulse rounded-xl flex items-center justify-center">
@@ -425,10 +425,12 @@ export function BrowsePage({ resorts }: Props) {
           {/* Map sidebar */}
           {showMap && (
             <div className="hidden lg:block sticky top-20 h-[calc(100vh-6rem)] rounded-xl overflow-hidden border border-border">
-              <ResortMap
+              <MapView
                 resorts={filtered}
                 hoveredSlug={hoveredSlug}
                 onResortHover={setHoveredSlug}
+                onResortClick={(slug) => { window.location.href = `/resorts/${slug}`; }}
+                variant="sidebar"
               />
             </div>
           )}
