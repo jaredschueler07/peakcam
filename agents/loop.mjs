@@ -289,14 +289,15 @@ async function getNewMessages(token, channel, oldest) {
   });
   if (!data.ok) return [];
   // Filter out bot messages and subtypes (joins, topic changes, etc.)
-  // BUT allow COO bot messages through (directives from the orchestrator)
-  const COO_BOT_TOKEN = process.env.SLACK_BOT_TOKEN_COO;
+  // BUT allow COO directives and cross-agent handoffs through
   return (data.messages || [])
     .filter(m => {
       if (m.subtype) return false;
       if (!m.bot_id) return true; // human messages always pass
       // Allow COO directive messages through
       if (m.text?.includes('COO Directive')) return true;
+      // Allow cross-agent handoff messages through
+      if (m.text?.includes('Handoff from')) return true;
       return false;
     })
     .reverse(); // chronological order
@@ -750,7 +751,7 @@ async function main() {
         token,
         botUserId: userId,
         botId,
-        lastSeen: (Date.now() / 1000).toFixed(6), // Start from now
+        lastSeen: ((Date.now() - 30 * 60 * 1000) / 1000).toFixed(6), // Start from 30min ago
       };
       log('info', key, `Online as <@${userId}> in ${agent.channel_name}`);
 
@@ -801,12 +802,13 @@ async function main() {
             state.lastSeen = msg.ts;
           }
 
-          // Only respond if bot is mentioned or it's a reply in a thread the bot is in
+          // Only respond if bot is mentioned, COO directive, handoff, or thread reply bot is in
           const mentionsBot = msg.text?.includes(`<@${state.botUserId}>`);
           const isCOODirective = msg.text?.includes('COO Directive');
+          const isHandoff = msg.text?.includes('Handoff from');
           const isThreadReply = !!msg.thread_ts;
 
-          if (mentionsBot || isCOODirective) {
+          if (mentionsBot || isCOODirective || isHandoff) {
             await processMessage(agentKey, msg, state.botUserId, state.token);
           } else if (isThreadReply) {
             // Check if bot has already replied in this thread
