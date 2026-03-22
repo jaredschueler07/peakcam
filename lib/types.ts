@@ -52,6 +52,38 @@ export interface SnowReport {
   conditions: string | null;       // human-readable e.g. "Powder Day"
   source: SnowReportSource;
   updated_at: string;
+  swe_in: number | null;
+  pct_of_normal: number | null;
+  trend_7d: SnowTrend | null;
+  outlook: SnowOutlook | null;
+  auto_cond_rating: ConditionRating | null;
+}
+
+// ── Snowpack & Conditions Engine Types ───────────────────────
+export type QCFlag = "valid" | "suspect" | "missing" | "corrected";
+export type SnowTrend = "rising" | "falling" | "stable";
+export type SnowOutlook = "more_snow" | "stable" | "warming" | "melt_risk";
+
+export interface SnowpackDaily {
+  resort_id: string;
+  station_id: string;
+  date: string;
+  snow_depth_in: number | null;
+  swe_in: number | null;
+  precip_accum_in: number | null;
+  temp_obs_f: number | null;
+  temp_max_f: number | null;
+  temp_min_f: number | null;
+  qc_flag: QCFlag;
+}
+
+export interface SnotelNormal {
+  station_id: string;
+  day_of_water_year: number;
+  median_swe_in: number | null;
+  median_depth_in: number | null;
+  pctile_10_swe_in: number | null;
+  pctile_90_swe_in: number | null;
 }
 
 // ── User-Verified Conditions ─────────────────────────────────

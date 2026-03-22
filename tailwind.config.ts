@@ -92,11 +92,16 @@ const config: Config = {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.3" },
         },
+        "slide-up": {
+          "0%": { transform: "translateY(100%)" },
+          "100%": { transform: "translateY(0)" },
+        },
       },
       animation: {
         "shimmer": "shimmer 3s linear infinite",
         "ticker": "ticker 20s linear infinite",
         "pulse-live": "pulse-live 2s ease-in-out infinite",
+        "slide-up": "slide-up 300ms ease-out",
       },
     },
   },
