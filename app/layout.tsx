@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { PostHogProvider } from "@/lib/posthog";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const BASE_URL = "https://peakcam.co";
 
@@ -78,6 +79,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteLd) }}
         />
         <PostHogProvider>{children}</PostHogProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
