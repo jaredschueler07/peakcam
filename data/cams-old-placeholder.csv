@@ -1,0 +1,125 @@
+resort_slug,name,elevation,embed_type,embed_url,youtube_id,is_active
+vail,Eagle Bahn Gondola Summit,11570,youtube,https://www.youtube.com/embed/live_stream?channel=UCxyz_vail_placeholder,UCxyz_vail_placeholder,true
+vail,Mid-Vail Overlook,10350,link,https://www.vail.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+vail,Golden Peak Base,8120,link,https://www.vail.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+breckenridge,Peak 8 Summit,12998,youtube,https://www.youtube.com/embed/live_stream?channel=UCxyz_breck_placeholder,UCxyz_breck_placeholder,true
+breckenridge,Snowflake Lift Base,9600,link,https://www.breckenridge.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+breckenridge,Peak 7 Bowl,12665,link,https://www.breckenridge.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+keystone,Mountain House Base,9280,link,https://www.keystoneresort.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+keystone,Dercum Mountain Summit,11640,link,https://www.keystoneresort.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+beaver-creek,Village Overlook,8100,link,https://www.beavercreek.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+beaver-creek,Beaver Creek Summit,11440,link,https://www.beavercreek.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+crested-butte,Gothic Road Base,9375,link,https://www.skicb.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+crested-butte,Ski Area Summit,12162,link,https://www.skicb.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+telluride,Telluride Village,8725,iframe,https://www.tellurideskiresort.com/webcam/village,,true
+telluride,Mountain Village,9540,iframe,https://www.tellurideskiresort.com/webcam/mountain-village,,true
+telluride,Gold Hill Summit,13150,link,https://www.tellurideskiresort.com/mountain/webcams/,,true
+aspen-snowmass,Snowmass Base Village,8104,iframe,https://www.aspensnowmass.com/webcam/base-village,,true
+aspen-snowmass,Elk Camp Mid-Mountain,10005,link,https://www.aspensnowmass.com/our-mountains/mountain-cams,,true
+aspen-snowmass,Aspen Mountain Top of Bell,11212,link,https://www.aspensnowmass.com/our-mountains/mountain-cams,,true
+arapahoe-basin,Black Mountain Lodge,12440,link,https://www.arapahoebasin.com/the-mountain/webcams/,,true
+arapahoe-basin,Base Area,10780,link,https://www.arapahoebasin.com/the-mountain/webcams/,,true
+loveland,Chair 1 Summit,12700,link,https://skiloveland.com/the-mountain/webcams/,,true
+loveland,Base Area Lodge,10800,link,https://skiloveland.com/the-mountain/webcams/,,true
+copper-mountain,Center Village,9712,link,https://www.coppercolorado.com/the-mountain/conditions/cams,,true
+copper-mountain,Summit Ski Area,12313,link,https://www.coppercolorado.com/the-mountain/conditions/cams,,true
+wolf-creek,Lookout Peak,11904,link,https://wolfcreekski.com/conditions/webcams/,,true
+wolf-creek,Base Area,10300,link,https://wolfcreekski.com/conditions/webcams/,,true
+steamboat,Christie Peak Summit,10568,youtube,https://www.youtube.com/embed/live_stream?channel=UCxyz_steamboat_placeholder,UCxyz_steamboat_placeholder,true
+steamboat,Gondola Base,6900,link,https://www.steamboat.com/mountain-life/webcams,,true
+steamboat,Storm Peak,10384,link,https://www.steamboat.com/mountain-life/webcams,,true
+winter-park,Winter Park Base,9000,link,https://www.winterparkresort.com/the-mountain/webcams,,true
+winter-park,Mary Jane Summit,12060,link,https://www.winterparkresort.com/the-mountain/webcams,,true
+park-city,Town Lift Base,6900,link,https://www.parkcitymountain.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+park-city,Tombstone Summit,10026,link,https://www.parkcitymountain.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+park-city,Canyons Village,6800,link,https://www.parkcitymountain.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+snowbird,Tram Summit,11000,iframe,https://www.snowbird.com/webcam/tram,,true
+snowbird,Hidden Peak,11000,link,https://www.snowbird.com/mountain-report/webcams/,,true
+snowbird,Snowbird Center Base,7760,link,https://www.snowbird.com/mountain-report/webcams/,,true
+alta,Albion Base,8530,iframe,https://www.alta.com/webcam/albion-base,,true
+alta,Collins Gulch,9500,link,https://www.alta.com/conditions/webcams,,true
+solitude,Village Base,7988,link,https://www.solitudemountain.com/mountain/webcams/,,true
+solitude,Summit,10035,link,https://www.solitudemountain.com/mountain/webcams/,,true
+brighton,Brighton Center Base,8755,link,https://www.brightonresort.com/mountain/webcams/,,true
+brighton,Mount Millicent Summit,10479,link,https://www.brightonresort.com/mountain/webcams/,,true
+deer-valley,Snow Park Lodge Base,7200,link,https://www.deervalley.com/the-mountain/mountain-report/webcams,,true
+deer-valley,Silver Lake Lodge,8100,link,https://www.deervalley.com/the-mountain/mountain-report/webcams,,true
+mammoth,Canyon Lodge Base,7953,youtube,https://www.youtube.com/embed/live_stream?channel=UCxyz_mammoth_placeholder,UCxyz_mammoth_placeholder,true
+mammoth,Main Lodge,9000,link,https://www.mammothmountain.com/on-the-mountain/mountain-report/webcams,,true
+mammoth,Top of Mountain,11053,link,https://www.mammothmountain.com/on-the-mountain/mountain-report/webcams,,true
+palisades-tahoe,Olympic Valley Base,6200,link,https://www.palisadestahoe.com/the-mountain/conditions/webcams,,true
+palisades-tahoe,High Camp,8200,link,https://www.palisadestahoe.com/the-mountain/conditions/webcams,,true
+palisades-tahoe,Alpine Meadows Base,7000,link,https://www.palisadestahoe.com/the-mountain/conditions/webcams,,true
+northstar,Village Base,6330,link,https://www.northstarcalifornia.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+northstar,Lookout Mountain Summit,8610,link,https://www.northstarcalifornia.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+heavenly,Stagecoach Express Mid,9123,link,https://www.skiheavenly.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+heavenly,Gondola Summit,9156,link,https://www.skiheavenly.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+kirkwood,Timber Creek Chair 6,9800,link,https://www.kirkwood.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+kirkwood,Cornice Chair Summit,9800,link,https://www.kirkwood.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+sugar-bowl,Mt. Lincoln Summit,8383,link,https://www.sugarbowl.com/mountain/webcams,,true
+sugar-bowl,Village Base,6883,link,https://www.sugarbowl.com/mountain/webcams,,true
+mt-rose,Southwest Face Summit,9700,link,https://www.mtrose.com/mountain/webcams,,true
+mt-rose,Base Lodge,7900,link,https://www.mtrose.com/mountain/webcams,,true
+jackson-hole,Aerial Tram Summit,10450,youtube,https://www.youtube.com/embed/live_stream?channel=UCxyz_jh_placeholder,UCxyz_jh_placeholder,true
+jackson-hole,Bridger Gondola,9095,link,https://www.jacksonhole.com/mountain/webcams.html,,true
+jackson-hole,Village Base,6311,link,https://www.jacksonhole.com/mountain/webcams.html,,true
+big-sky,Mountain Village,7500,youtube,https://www.youtube.com/embed/live_stream?channel=UCxyz_bigsky_placeholder,UCxyz_bigsky_placeholder,true
+big-sky,Lone Peak Tram Summit,11166,link,https://bigskyresort.com/mountain/webcams,,true
+big-sky,Swift Current Base,7500,link,https://bigskyresort.com/mountain/webcams,,true
+sun-valley,Seattle Ridge,9150,link,https://www.sunvalley.com/mountain-stats/webcams,,true
+sun-valley,Bald Mountain Summit,9150,link,https://www.sunvalley.com/mountain-stats/webcams,,true
+mt-bachelor,Summit Lift,9065,youtube,https://www.youtube.com/embed/live_stream?channel=UCxyz_bachelor_placeholder,UCxyz_bachelor_placeholder,true
+mt-bachelor,West Village Base,5763,link,https://www.mtbachelor.com/mountain/webcams,,true
+mt-bachelor,Pine Marten Lodge,7775,link,https://www.mtbachelor.com/mountain/webcams,,true
+stevens-pass,Skyline Express Summit,5845,link,https://www.stevenspass.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+stevens-pass,Base Lodge,4061,link,https://www.stevenspass.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+crystal-mountain,Summit,7012,link,https://www.crystalmountainresort.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+crystal-mountain,Gold Hills Base,4400,link,https://www.crystalmountainresort.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+whistler-blackcomb,Whistler Village,2182,youtube,https://www.youtube.com/embed/live_stream?channel=UCxyz_whistler_placeholder,UCxyz_whistler_placeholder,true
+whistler-blackcomb,Whistler Mountain Summit,7160,link,https://www.whistlerblackcomb.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+whistler-blackcomb,Blackcomb Mountain Summit,7494,link,https://www.whistlerblackcomb.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+whistler-blackcomb,Blackcomb Base,2214,link,https://www.whistlerblackcomb.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+stowe,Spruce Peak Village,1559,iframe,https://www.stowe.com/webcam/spruce-peak,,true
+stowe,Mt. Mansfield Summit,4393,link,https://www.stowe.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+stowe,Gondola Base,1559,link,https://www.stowe.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+killington,K-1 Summit,4241,link,https://www.killington.com/mountain/webcams,,true
+killington,Snowshed Base,1165,link,https://www.killington.com/mountain/webcams,,true
+killington,Ramshead Area,3711,link,https://www.killington.com/mountain/webcams,,true
+stratton,Summit,3875,link,https://www.stratton.com/mountain/webcams,,true
+stratton,Village Base,1872,link,https://www.stratton.com/mountain/webcams,,true
+sugarbush,Lincoln Peak Summit,4135,link,https://www.sugarbush.com/mountain/webcams,,true
+sugarbush,Gate House Base,1483,link,https://www.sugarbush.com/mountain/webcams,,true
+jay-peak,Tram Summit,3968,link,https://www.jaypeakresort.com/mountain/webcams,,true
+jay-peak,Aerial Tramway Base,1815,link,https://www.jaypeakresort.com/mountain/webcams,,true
+sunday-river,Summit,3140,link,https://www.sundayriver.com/mountain/webcams,,true
+sunday-river,North Peak,2735,link,https://www.sundayriver.com/mountain/webcams,,true
+sugarloaf,Summit,4237,link,https://www.sugarloaf.com/mountain/webcams,,true
+sugarloaf,Base Lodge,1417,link,https://www.sugarloaf.com/mountain/webcams,,true
+loon,Gondola Summit,3050,link,https://www.loonmtn.com/mountain/webcams,,true
+loon,Base,1030,link,https://www.loonmtn.com/mountain/webcams,,true
+cannon,Summit,4080,link,https://www.cannonmt.com/mountain/webcams,,true
+cannon,Base Area,1923,link,https://www.cannonmt.com/mountain/webcams,,true
+bretton-woods,Mt. Rosebrook Summit,3100,link,https://www.brettonwoods.com/mountain/webcams,,true
+bretton-woods,Base Lodge,1700,link,https://www.brettonwoods.com/mountain/webcams,,true
+taos,Kachina Peak,12481,link,https://www.skitaos.com/the-mountain/webcams,,true
+taos,Base Terminal,9207,link,https://www.skitaos.com/the-mountain/webcams,,true
+taos,West Basin Ridge,11800,link,https://www.skitaos.com/the-mountain/webcams,,true
+ski-santa-fe,Tesuque Peak Summit,12075,link,https://skisantafe.com/mountain/webcams,,true
+ski-santa-fe,Base Lodge,10350,link,https://skisantafe.com/mountain/webcams,,true
+snowshoe,Top of Cupp Run,4848,link,https://www.snowshoemtn.com/mountain/webcams,,true
+snowshoe,Village Base,4848,link,https://www.snowshoemtn.com/mountain/webcams,,true
+bear-mountain,Summit,8805,link,https://bearmountain.com/mountain/webcams,,true
+bear-mountain,Bear Mountain Village,7140,link,https://bearmountain.com/mountain/webcams,,true
+snow-summit,Summit,8200,link,https://snowsummit.com/mountain/webcams,,true
+schweitzer,Summit,6395,link,https://www.schweitzer.com/mountain/webcams,,true
+schweitzer,Village Base,4709,link,https://www.schweitzer.com/mountain/webcams,,true
+bogus-basin,Shafer Butte Summit,7590,link,https://bogusbasin.org/mountain/webcams,,true
+bogus-basin,Lodges Base,6100,link,https://bogusbasin.org/mountain/webcams,,true
+mt-hood-meadows,South Lodge Base,5250,link,https://www.skihood.com/explore/mountain/webcams,,true
+mt-hood-meadows,Mt. Hood Summit Area,11239,link,https://www.skihood.com/explore/mountain/webcams,,true
+timberline,Timberline Lodge,5960,link,https://www.timberlinelodge.com/mountain/conditions/webcams,,true
+timberline,Palmer Snowfield,8540,link,https://www.timberlinelodge.com/mountain/conditions/webcams,,true
+snoqualmie,Summit West Base,3000,link,https://www.summitatsnoqualmie.com/mountain/webcams,,true
+snoqualmie,Summit Central,3400,link,https://www.summitatsnoqualmie.com/mountain/webcams,,true
+mission-ridge,Summit,6820,link,https://www.missionridge.com/mountain/webcams,,true
+mission-ridge,Base Lodge,4570,link,https://www.missionridge.com/mountain/webcams,,true

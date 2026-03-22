@@ -1,125 +1,302 @@
 resort_slug,name,elevation,embed_type,embed_url,youtube_id,is_active
-vail,Eagle Bahn Gondola Summit,11570,youtube,https://www.youtube.com/embed/live_stream?channel=UCxyz_vail_placeholder,UCxyz_vail_placeholder,true
-vail,Mid-Vail Overlook,10350,link,https://www.vail.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-vail,Golden Peak Base,8120,link,https://www.vail.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-breckenridge,Peak 8 Summit,12998,youtube,https://www.youtube.com/embed/live_stream?channel=UCxyz_breck_placeholder,UCxyz_breck_placeholder,true
-breckenridge,Snowflake Lift Base,9600,link,https://www.breckenridge.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-breckenridge,Peak 7 Bowl,12665,link,https://www.breckenridge.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-keystone,Mountain House Base,9280,link,https://www.keystoneresort.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-keystone,Dercum Mountain Summit,11640,link,https://www.keystoneresort.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-beaver-creek,Village Overlook,8100,link,https://www.beavercreek.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-beaver-creek,Beaver Creek Summit,11440,link,https://www.beavercreek.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-crested-butte,Gothic Road Base,9375,link,https://www.skicb.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-crested-butte,Ski Area Summit,12162,link,https://www.skicb.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-telluride,Telluride Village,8725,iframe,https://www.tellurideskiresort.com/webcam/village,,true
-telluride,Mountain Village,9540,iframe,https://www.tellurideskiresort.com/webcam/mountain-village,,true
-telluride,Gold Hill Summit,13150,link,https://www.tellurideskiresort.com/mountain/webcams/,,true
-aspen-snowmass,Snowmass Base Village,8104,iframe,https://www.aspensnowmass.com/webcam/base-village,,true
-aspen-snowmass,Elk Camp Mid-Mountain,10005,link,https://www.aspensnowmass.com/our-mountains/mountain-cams,,true
-aspen-snowmass,Aspen Mountain Top of Bell,11212,link,https://www.aspensnowmass.com/our-mountains/mountain-cams,,true
-arapahoe-basin,Black Mountain Lodge,12440,link,https://www.arapahoebasin.com/the-mountain/webcams/,,true
-arapahoe-basin,Base Area,10780,link,https://www.arapahoebasin.com/the-mountain/webcams/,,true
-loveland,Chair 1 Summit,12700,link,https://skiloveland.com/the-mountain/webcams/,,true
-loveland,Base Area Lodge,10800,link,https://skiloveland.com/the-mountain/webcams/,,true
-copper-mountain,Center Village,9712,link,https://www.coppercolorado.com/the-mountain/conditions/cams,,true
-copper-mountain,Summit Ski Area,12313,link,https://www.coppercolorado.com/the-mountain/conditions/cams,,true
-wolf-creek,Lookout Peak,11904,link,https://wolfcreekski.com/conditions/webcams/,,true
-wolf-creek,Base Area,10300,link,https://wolfcreekski.com/conditions/webcams/,,true
-steamboat,Christie Peak Summit,10568,youtube,https://www.youtube.com/embed/live_stream?channel=UCxyz_steamboat_placeholder,UCxyz_steamboat_placeholder,true
-steamboat,Gondola Base,6900,link,https://www.steamboat.com/mountain-life/webcams,,true
-steamboat,Storm Peak,10384,link,https://www.steamboat.com/mountain-life/webcams,,true
-winter-park,Winter Park Base,9000,link,https://www.winterparkresort.com/the-mountain/webcams,,true
-winter-park,Mary Jane Summit,12060,link,https://www.winterparkresort.com/the-mountain/webcams,,true
-park-city,Town Lift Base,6900,link,https://www.parkcitymountain.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-park-city,Tombstone Summit,10026,link,https://www.parkcitymountain.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-park-city,Canyons Village,6800,link,https://www.parkcitymountain.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-snowbird,Tram Summit,11000,iframe,https://www.snowbird.com/webcam/tram,,true
-snowbird,Hidden Peak,11000,link,https://www.snowbird.com/mountain-report/webcams/,,true
-snowbird,Snowbird Center Base,7760,link,https://www.snowbird.com/mountain-report/webcams/,,true
-alta,Albion Base,8530,iframe,https://www.alta.com/webcam/albion-base,,true
-alta,Collins Gulch,9500,link,https://www.alta.com/conditions/webcams,,true
-solitude,Village Base,7988,link,https://www.solitudemountain.com/mountain/webcams/,,true
-solitude,Summit,10035,link,https://www.solitudemountain.com/mountain/webcams/,,true
-brighton,Brighton Center Base,8755,link,https://www.brightonresort.com/mountain/webcams/,,true
-brighton,Mount Millicent Summit,10479,link,https://www.brightonresort.com/mountain/webcams/,,true
-deer-valley,Snow Park Lodge Base,7200,link,https://www.deervalley.com/the-mountain/mountain-report/webcams,,true
-deer-valley,Silver Lake Lodge,8100,link,https://www.deervalley.com/the-mountain/mountain-report/webcams,,true
-mammoth,Canyon Lodge Base,7953,youtube,https://www.youtube.com/embed/live_stream?channel=UCxyz_mammoth_placeholder,UCxyz_mammoth_placeholder,true
-mammoth,Main Lodge,9000,link,https://www.mammothmountain.com/on-the-mountain/mountain-report/webcams,,true
-mammoth,Top of Mountain,11053,link,https://www.mammothmountain.com/on-the-mountain/mountain-report/webcams,,true
-palisades-tahoe,Olympic Valley Base,6200,link,https://www.palisadestahoe.com/the-mountain/conditions/webcams,,true
-palisades-tahoe,High Camp,8200,link,https://www.palisadestahoe.com/the-mountain/conditions/webcams,,true
-palisades-tahoe,Alpine Meadows Base,7000,link,https://www.palisadestahoe.com/the-mountain/conditions/webcams,,true
-northstar,Village Base,6330,link,https://www.northstarcalifornia.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-northstar,Lookout Mountain Summit,8610,link,https://www.northstarcalifornia.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-heavenly,Stagecoach Express Mid,9123,link,https://www.skiheavenly.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-heavenly,Gondola Summit,9156,link,https://www.skiheavenly.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-kirkwood,Timber Creek Chair 6,9800,link,https://www.kirkwood.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-kirkwood,Cornice Chair Summit,9800,link,https://www.kirkwood.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-sugar-bowl,Mt. Lincoln Summit,8383,link,https://www.sugarbowl.com/mountain/webcams,,true
-sugar-bowl,Village Base,6883,link,https://www.sugarbowl.com/mountain/webcams,,true
-mt-rose,Southwest Face Summit,9700,link,https://www.mtrose.com/mountain/webcams,,true
-mt-rose,Base Lodge,7900,link,https://www.mtrose.com/mountain/webcams,,true
-jackson-hole,Aerial Tram Summit,10450,youtube,https://www.youtube.com/embed/live_stream?channel=UCxyz_jh_placeholder,UCxyz_jh_placeholder,true
-jackson-hole,Bridger Gondola,9095,link,https://www.jacksonhole.com/mountain/webcams.html,,true
-jackson-hole,Village Base,6311,link,https://www.jacksonhole.com/mountain/webcams.html,,true
-big-sky,Mountain Village,7500,youtube,https://www.youtube.com/embed/live_stream?channel=UCxyz_bigsky_placeholder,UCxyz_bigsky_placeholder,true
-big-sky,Lone Peak Tram Summit,11166,link,https://bigskyresort.com/mountain/webcams,,true
-big-sky,Swift Current Base,7500,link,https://bigskyresort.com/mountain/webcams,,true
-sun-valley,Seattle Ridge,9150,link,https://www.sunvalley.com/mountain-stats/webcams,,true
-sun-valley,Bald Mountain Summit,9150,link,https://www.sunvalley.com/mountain-stats/webcams,,true
-mt-bachelor,Summit Lift,9065,youtube,https://www.youtube.com/embed/live_stream?channel=UCxyz_bachelor_placeholder,UCxyz_bachelor_placeholder,true
-mt-bachelor,West Village Base,5763,link,https://www.mtbachelor.com/mountain/webcams,,true
-mt-bachelor,Pine Marten Lodge,7775,link,https://www.mtbachelor.com/mountain/webcams,,true
-stevens-pass,Skyline Express Summit,5845,link,https://www.stevenspass.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-stevens-pass,Base Lodge,4061,link,https://www.stevenspass.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-crystal-mountain,Summit,7012,link,https://www.crystalmountainresort.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-crystal-mountain,Gold Hills Base,4400,link,https://www.crystalmountainresort.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-whistler-blackcomb,Whistler Village,2182,youtube,https://www.youtube.com/embed/live_stream?channel=UCxyz_whistler_placeholder,UCxyz_whistler_placeholder,true
-whistler-blackcomb,Whistler Mountain Summit,7160,link,https://www.whistlerblackcomb.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-whistler-blackcomb,Blackcomb Mountain Summit,7494,link,https://www.whistlerblackcomb.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-whistler-blackcomb,Blackcomb Base,2214,link,https://www.whistlerblackcomb.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-stowe,Spruce Peak Village,1559,iframe,https://www.stowe.com/webcam/spruce-peak,,true
-stowe,Mt. Mansfield Summit,4393,link,https://www.stowe.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-stowe,Gondola Base,1559,link,https://www.stowe.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
-killington,K-1 Summit,4241,link,https://www.killington.com/mountain/webcams,,true
-killington,Snowshed Base,1165,link,https://www.killington.com/mountain/webcams,,true
-killington,Ramshead Area,3711,link,https://www.killington.com/mountain/webcams,,true
-stratton,Summit,3875,link,https://www.stratton.com/mountain/webcams,,true
-stratton,Village Base,1872,link,https://www.stratton.com/mountain/webcams,,true
-sugarbush,Lincoln Peak Summit,4135,link,https://www.sugarbush.com/mountain/webcams,,true
-sugarbush,Gate House Base,1483,link,https://www.sugarbush.com/mountain/webcams,,true
-jay-peak,Tram Summit,3968,link,https://www.jaypeakresort.com/mountain/webcams,,true
-jay-peak,Aerial Tramway Base,1815,link,https://www.jaypeakresort.com/mountain/webcams,,true
-sunday-river,Summit,3140,link,https://www.sundayriver.com/mountain/webcams,,true
-sunday-river,North Peak,2735,link,https://www.sundayriver.com/mountain/webcams,,true
-sugarloaf,Summit,4237,link,https://www.sugarloaf.com/mountain/webcams,,true
-sugarloaf,Base Lodge,1417,link,https://www.sugarloaf.com/mountain/webcams,,true
-loon,Gondola Summit,3050,link,https://www.loonmtn.com/mountain/webcams,,true
-loon,Base,1030,link,https://www.loonmtn.com/mountain/webcams,,true
-cannon,Summit,4080,link,https://www.cannonmt.com/mountain/webcams,,true
-cannon,Base Area,1923,link,https://www.cannonmt.com/mountain/webcams,,true
-bretton-woods,Mt. Rosebrook Summit,3100,link,https://www.brettonwoods.com/mountain/webcams,,true
-bretton-woods,Base Lodge,1700,link,https://www.brettonwoods.com/mountain/webcams,,true
-taos,Kachina Peak,12481,link,https://www.skitaos.com/the-mountain/webcams,,true
-taos,Base Terminal,9207,link,https://www.skitaos.com/the-mountain/webcams,,true
-taos,West Basin Ridge,11800,link,https://www.skitaos.com/the-mountain/webcams,,true
-ski-santa-fe,Tesuque Peak Summit,12075,link,https://skisantafe.com/mountain/webcams,,true
-ski-santa-fe,Base Lodge,10350,link,https://skisantafe.com/mountain/webcams,,true
-snowshoe,Top of Cupp Run,4848,link,https://www.snowshoemtn.com/mountain/webcams,,true
-snowshoe,Village Base,4848,link,https://www.snowshoemtn.com/mountain/webcams,,true
-bear-mountain,Summit,8805,link,https://bearmountain.com/mountain/webcams,,true
-bear-mountain,Bear Mountain Village,7140,link,https://bearmountain.com/mountain/webcams,,true
-snow-summit,Summit,8200,link,https://snowsummit.com/mountain/webcams,,true
-schweitzer,Summit,6395,link,https://www.schweitzer.com/mountain/webcams,,true
-schweitzer,Village Base,4709,link,https://www.schweitzer.com/mountain/webcams,,true
-bogus-basin,Shafer Butte Summit,7590,link,https://bogusbasin.org/mountain/webcams,,true
-bogus-basin,Lodges Base,6100,link,https://bogusbasin.org/mountain/webcams,,true
-mt-hood-meadows,South Lodge Base,5250,link,https://www.skihood.com/explore/mountain/webcams,,true
-mt-hood-meadows,Mt. Hood Summit Area,11239,link,https://www.skihood.com/explore/mountain/webcams,,true
-timberline,Timberline Lodge,5960,link,https://www.timberlinelodge.com/mountain/conditions/webcams,,true
-timberline,Palmer Snowfield,8540,link,https://www.timberlinelodge.com/mountain/conditions/webcams,,true
-snoqualmie,Summit West Base,3000,link,https://www.summitatsnoqualmie.com/mountain/webcams,,true
-snoqualmie,Summit Central,3400,link,https://www.summitatsnoqualmie.com/mountain/webcams,,true
-mission-ridge,Summit,6820,link,https://www.missionridge.com/mountain/webcams,,true
-mission-ridge,Base Lodge,4570,link,https://www.missionridge.com/mountain/webcams,,true
+vail,Sun Up Bowl,11250,iframe,https://player.brownrice.com/embed/vailch11,,true
+vail,Back Bowl,11250,iframe,https://player.brownrice.com/embed/vailch21,,true
+vail,Gore Range,11250,iframe,https://player.brownrice.com/embed/vailch2,,true
+vail,Snow Stake,10350,iframe,https://timecam.tv/view_cam_embed.aspx?C=FDBEBCIPC5B3,,true
+breckenridge,Peak 7,12998,iframe,https://player.brownrice.com/embed/breckenridge7,,true
+breckenridge,Peak 8 from Peak 9,12998,iframe,https://player.brownrice.com/embed/breckenridge9,,true
+breckenridge,Main Street,9600,youtube,https://www.youtube.com/embed/SH63YaIWyK0,SH63YaIWyK0,true
+breckenridge,Peak 8,12998,youtube,https://www.youtube.com/embed/mHTTPNYltZo,mHTTPNYltZo,true
+keystone,North Peak,11640,iframe,https://player.brownrice.com/embed/keystonenorthpeak,,true
+keystone,Dercum,11640,iframe,https://player.brownrice.com/embed/keystonedercum,,true
+keystone,River Run,9280,iframe,https://player.brownrice.com/embed/keystoneriverrun,,true
+keystone,Snow Stake,11640,image,https://cache.snow.com/Mtncams/KeySnowStake.jpg,,true
+beaver-creek,Spruce Saddle,11440,iframe,https://player.brownrice.com/embed/bcspruce,,true
+beaver-creek,McCoy Park,11440,iframe,https://player.brownrice.com/embed/bcmccoy,,true
+beaver-creek,Village,8100,iframe,https://player.brownrice.com/embed/bcvillage,,true
+beaver-creek,Snow Stake,11440,iframe,https://player.timecam.tv/express/index.html?C=1B67AJEJ8032,,true
+crested-butte,Base,9375,iframe,https://player.brownrice.com/embed/Crestedbuttebase,,true
+crested-butte,Umbrella Bar,10200,iframe,https://player.brownrice.com/embed/Crestedbuttebar,,true
+crested-butte,Paradise,11875,iframe,https://player.brownrice.com/embed/Crestedbuttewarm,,true
+telluride,Revelation Bowl 360,12570,iframe,https://tellurideskiresort.roundshot.com/,,true
+telluride,Village,8725,iframe,https://g1.ipcamlive.com/player/player.php?alias=plazacam&autoplay=1,,true
+telluride,Black Iron,8725,iframe,https://g1.ipcamlive.com/player/player.php?alias=bonvivant&autoplay=1,,true
+telluride,See Forever,12570,iframe,https://g1.ipcamlive.com/player/player.php?alias=jointpoint&autoplay=1,,true
+aspen-snowmass,Aspen Mountain,11212,iframe,https://aspen.roundshot.com/aspen/,,true
+aspen-snowmass,Highlands,11675,iframe,https://aspen.roundshot.com/highlands/,,true
+aspen-snowmass,Snowmass Sam's Knob,12510,iframe,https://aspen.roundshot.com/snowmass-samsknob/,,true
+aspen-snowmass,Snow Stake,8104,iframe,https://g1.ipcamlive.com/player/player.php?alias=5c6d8ba5a8388&skin=white&autoplay=1,,true
+arapahoe-basin,Snow Stake,10780,image,https://b12.hdrelay.com/camera/929449a8-672b-46c4-8191-b1a6d0842a3f/snapshot,,true
+arapahoe-basin,Base,10780,image,https://ftp.purchus.io/wwwroot/abasin/webcam/abasincam1001m.jpg,,true
+arapahoe-basin,Summit,13050,image,https://b14.hdrelay.com/camera/61f47337c621805ca7d0e6fb/snapshot,,true
+steamboat,Christie Peak,9080,youtube,https://www.youtube.com/embed/fI30YzAmCHw,fI30YzAmCHw,true
+steamboat,Thunderhead,9080,youtube,https://www.youtube.com/embed/qjAqCiwCW34,qjAqCiwCW34,true
+steamboat,Champagne Powder,10568,youtube,https://www.youtube.com/embed/8w4tZE2k7AE,8w4tZE2k7AE,true
+winter-park,Snow Stake,10700,youtube,https://www.youtube.com/embed/_wOIgFEMypY,_wOIgFEMypY,true
+winter-park,Lunch Rock,12060,youtube,https://www.youtube.com/embed/HfX4H3MSwXs,HfX4H3MSwXs,true
+winter-park,Village,9000,youtube,https://www.youtube.com/embed/0pL3kjrpJRU,0pL3kjrpJRU,true
+copper-mountain,Union Peak,12313,image,https://img.hdrelay.com/frames/73c252b4-e74a-47fa-b8ea-5a34f0b6469a/default/last.jpg,,true
+copper-mountain,Snow Stake,9712,image,https://b7b.hdrelay.com/cameras/fb469125-f1f3-459f-aeb4-98cb674e395f/GetOneShot?size=800x450,,true
+copper-mountain,Aerie,12313,image,https://img.hdrelay.com/frames/671bcfb507697ecebbaffc13/default/last.jpg,,true
+loveland,Snow Stake,10800,image,https://photosskiloveland.com/Report/15minutes/data.jpg,,true
+loveland,Ptarmigan,12700,image,https://photosskiloveland.com/ptarmigan/image.jpg,,true
+loveland,Basin,10800,image,https://photosskiloveland.com/basin/image.jpg,,true
+wolf-creek,Base,10300,iframe,https://live2.brownrice.com/embed/wolfcreektreasure&em=1,,true
+wolf-creek,Summit,11904,iframe,https://live2.brownrice.com/embed/wolfcreeksummit,,true
+wolf-creek,Lift Line,10300,iframe,https://live2.brownrice.com/embed/wolfcreektresurlift,,true
+purgatory,Village Express,8793,iframe,https://vauth.command.verkada.com/embed/html/1b078368-5a35-4495-84da-c508db9cebb9/,,true
+purgatory,Summit,10822,image,https://assets.mcp.ski/purgatory/camera1.jpg,,true
+purgatory,Snow Stake,10822,image,https://assets.mcp.ski/purgatory/SnowStake.jpg,,true
+eldora,Snow Stake,10800,image,https://b14.hdrelay.com/camera/b7ceb08f-5cbb-42f1-9a9f-920f2ac5c4dc/snapshot,,true
+eldora,Alpenglow,10800,image,https://b14.hdrelay.com/camera/0e9787f3-7961-4ae4-bd59-8cbbcd79ed31/snapshot,,true
+eldora,Lower Mountain,9200,image,https://img.hdrelay.com/frames/eldora-lower-mountain/default/last.jpg,,true
+sunlight-mountain,Snow Stake,9895,iframe,https://g1.ipcamlive.com/player/player.php?alias=sunlightsnowstake,,true
+sunlight-mountain,Leonards Lookout,9895,iframe,https://g1.ipcamlive.com/player/player.php?alias=sopris&autoplay=1&mute=1,,true
+granby-ranch,Base,8202,link,https://camstreamer.com/live/stream/1865,,true
+monarch-mountain,Webcams,11952,link,https://skimonarch.com/conditions/cams/,,true
+park-city,Lookout Cabin,9200,iframe,https://player.brownrice.com/embed/parkcitylookoutcabin,,true
+park-city,High Meadow,8700,iframe,https://player.brownrice.com/embed/parkcityhighmeadow,,true
+park-city,Top OBX,9400,iframe,https://player.brownrice.com/embed/parkcitytopobx,,true
+park-city,Mountain Village,6900,iframe,https://player.brownrice.com/embed/parkcitymtnvillage,,true
+snowbird,Snow Stake,9600,image,https://manage.hdrelay.com/snapshot/8611e276-7ee5-42c0-b8cd-d9e1890e1cd4,,true
+snowbird,Base Area,7760,image,https://b15.hdrelay.com/camera/db2a69c5-66e9-4c48-a713-919eaf191fc1/snapshot,,true
+alta,Albion Basin,10550,image,https://app.prismcam.com/public/helpers/realtime_preview.php?c=65&s=720,,true
+alta,Mt Baldy,11068,image,https://app.prismcam.com/public/helpers/realtime_preview.php?c=88&s=720,,true
+alta,Snow Stake,9600,image,https://altaskiarea.s3-us-west-2.amazonaws.com/mountain-cams/Collins_Snow_Stake.jpg,,true
+alta,High Rustler,10795,image,https://altaskiarea.s3-us-west-2.amazonaws.com/mountain-cams/Highrustler.jpg,,true
+solitude,Webcams,8000,link,https://solitudemountain.com/mountain-and-village/webcams,,true
+brighton,Cam 1,8755,youtube,https://www.youtube.com/embed/XLzKPufaAts,XLzKPufaAts,true
+brighton,Cam 2,9000,youtube,https://www.youtube.com/embed/4a-3iEM7bHk,4a-3iEM7bHk,true
+brighton,Cam 3,9500,youtube,https://www.youtube.com/embed/HD1S-bdI1AA,HD1S-bdI1AA,true
+brighton,Cam 4,10000,youtube,https://www.youtube.com/embed/Zv8HYwaXjBg,Zv8HYwaXjBg,true
+deer-valley,Webcams,7200,link,https://www.deervalley.com/explore-the-mountain/webcams,,true
+snowbasin,Earl's Plaza,6391,image,https://img.hdrelay.com/frames/6192dda05233cdcad76d7dbb/default/last.jpg,,true
+snowbasin,Needles,8800,image,https://b15.hdrelay.com/camera/5af99fc0-02f8-4dc2-8e9a-ba20ad3093c5/snapshot,,true
+powder-mountain,Webcams,8900,link,https://www.powdermountain.com/resort/the-mountain/conditions/webcams,,true
+brian-head,Cam 1,9600,image,https://b10.hdrelay.com/camera/672292ef07697ecebbaffc18/snapshot,,true
+brian-head,Cam 2,10000,image,https://b10.hdrelay.com/camera/b2e81028-f1f0-408c-9f6d-dee347d0b001/snapshot,,true
+sundance,Bearclaw,6100,iframe,https://vauth.command.verkada.com/__v/sundance-mountain-resort/embed/html/78238dd4-916b-42a4-94b5-830413e9b852/,,true
+sundance,Mandan,7500,image,https://img.hdrelay.com/frames/636ec94147fa8645ab27e879/default/last.jpg,,true
+mammoth,Summit,11053,youtube,https://www.youtube.com/embed/awxz_oIlJE0,awxz_oIlJE0,true
+mammoth,McCoy Station,9200,youtube,https://www.youtube.com/embed/lpGHpWtXGsk,lpGHpWtXGsk,true
+mammoth,Main Lodge,8900,youtube,https://www.youtube.com/embed/UpfvBbw6kSY,UpfvBbw6kSY,true
+mammoth,Canyon Lodge,8000,youtube,https://www.youtube.com/embed/9--ZgYEZBhk,9--ZgYEZBhk,true
+palisades-tahoe,Base Area,6200,iframe,https://relay.ozolio.com/pub.api?cmd=embed&oid=EMB_ZIGI00000147,,true
+palisades-tahoe,Scope,7200,iframe,https://relay.ozolio.com/pub.api?cmd=embed&oid=EMB_EIFC0000015B,,true
+palisades-tahoe,Silverado 360,8200,iframe,https://palisadestahoe.roundshot.com/silverado/#/,,true
+sugar-bowl,Webcams,7800,link,https://www.sugarbowl.com/webcams,,true
+northstar,Snow Stake,7800,iframe,https://player.brownrice.com/embed/northstarsnowstake,,true
+northstar,Mid Mountain,7600,iframe,https://player.brownrice.com/embed/northstarmidmountain,,true
+northstar,Summit,8610,iframe,https://player.brownrice.com/embed/northstarspluto,,true
+heavenly,Gondola Mid Station,9100,iframe,https://player.brownrice.com/embed/heavenlymidstation,,true
+heavenly,Snow Stake,9500,iframe,https://player.brownrice.com/embed/heavenlysnowstake,,true
+heavenly,Tram Summit,10067,iframe,https://player.brownrice.com/embed/heavenlytram,,true
+heavenly,Hwy 50,6500,iframe,https://g1.ipcamlive.com/player/player.php?alias=663aa2e1bf523,,true
+kirkwood,Cornice,9800,iframe,https://player.brownrice.com/embed/kirkwoodcornice,,true
+kirkwood,Red Cliffs,8500,iframe,https://player.brownrice.com/embed/kirkwoodredcliffs,,true
+kirkwood,Snow Stake,7800,image,https://cache.snow.com/Mtncams/KWSnowStake.jpg,,true
+homewood,Ellis Lift,7000,iframe,https://player.livespotting.com/lsplayer.html?alias=7njvla68&ch=alta1aac,,true
+homewood,Snow Stake,7880,iframe,https://live4.brownrice.com/embed/homewood5,,true
+homewood,Lake Tahoe View,7000,iframe,https://explore.org/live-cams/player/lake-tahoe-homewood-mountain-resort-cam,,true
+sierra-at-tahoe,Grandview,8000,youtube,https://www.youtube.com/embed/adxDs4z-y34,adxDs4z-y34,true
+sierra-at-tahoe,West Bowl,8600,youtube,https://www.youtube.com/embed/v8ZE0oA6C8o,v8ZE0oA6C8o,true
+sierra-at-tahoe,Plaza,6640,youtube,https://www.youtube.com/embed/Y1klKdloipI,Y1klKdloipI,true
+mt-rose,Summit,9700,iframe,https://live3.brownrice.com/embed/mtrose1,,true
+mt-rose,Main Lodge,8260,iframe,https://live3.brownrice.com/embed/mtrosecam,,true
+mt-rose,Slide Bowl,9000,iframe,https://live3.brownrice.com/embed/mtroseslidebowl,,true
+diamond-peak,Summit,8540,image,https://img.hdrelay.com/frames/544ccabf-7940-470e-86ba-4e06b192c29f/default/last.jpg,,true
+diamond-peak,Mid Mountain,7800,image,https://img.hdrelay.com/frames/0b881044-f574-49ff-b548-e2b617063ae6/default/last.jpg,,true
+diamond-peak,Base Lodge,6840,image,https://img.hdrelay.com/frames/f696eee0-2224-4f36-b215-864ddb36012f/default/last.jpg,,true
+bear-mountain,Summit,8805,youtube,https://www.youtube.com/embed/kydMumfVS5o,kydMumfVS5o,true
+bear-mountain,Midway,8200,youtube,https://www.youtube.com/embed/xnZH7wUCsPU,xnZH7wUCsPU,true
+bear-mountain,Base,7140,youtube,https://www.youtube.com/embed/f_OUEF4csuo,f_OUEF4csuo,true
+snow-summit,Webcams,7000,link,https://www.bigbearmountainresort.com/webcams/snow-summit,,true
+mountain-high,East Summit,8200,youtube,https://www.youtube.com/embed/NoLcR2_9eXk,NoLcR2_9eXk,true
+mountain-high,Yeti Park,7800,youtube,https://www.youtube.com/embed/dC8yeB98l3Y,dC8yeB98l3Y,true
+mountain-high,West Side,6500,youtube,https://www.youtube.com/embed/quXem3ocJJg,quXem3ocJJg,true
+mt-shasta,Base Area,5500,image,https://b10.hdrelay.com/camera/5382836b-436d-4bf6-abd2-0e52c38e25cc/snapshot,,true
+mt-shasta,Douglas,6000,image,https://b10.hdrelay.com/camera/7844ea16-4b4b-4554-859c-136ee9db580e/snapshot,,true
+dodge-ridge,Base Lodge,6600,youtube,https://www.youtube.com/embed/jlzZ5jXXOW4,jlzZ5jXXOW4,true
+dodge-ridge,Summit,8200,youtube,https://www.youtube.com/embed/l1gateQVYr4,l1gateQVYr4,true
+june-mountain,Chalet,7545,youtube,https://www.youtube.com/embed/Ewam1RD-Kgk,Ewam1RD-Kgk,true
+june-mountain,Ski Patrol,8600,youtube,https://www.youtube.com/embed/nFMWlayuWec,nFMWlayuWec,true
+june-mountain,J3,10100,youtube,https://www.youtube.com/embed/tTGH5oY23yU,tTGH5oY23yU,true
+china-peak,Summit,8700,iframe,https://g1.ipcamlive.com/player/player.php?alias=8h08e8bpagfd912,,true
+china-peak,Mid Mountain,7800,iframe,https://g1.ipcamlive.com/player/player.php?alias=6333584f5ea45,,true
+china-peak,Buckhorn,7100,iframe,https://g1.ipcamlive.com/player/player.php?alias=63335f1b76211,,true
+mt-baldy,7800ft Cam,7800,youtube,https://www.youtube.com/embed/gxbO673T0No,gxbO673T0No,true
+snow-valley,Base Lodge,6800,youtube,https://www.youtube.com/embed/RBYyWnu8nhM,RBYyWnu8nhM,true
+snow-valley,Summit,7841,youtube,https://www.youtube.com/embed/1GyTQP4SNDk,1GyTQP4SNDk,true
+tahoe-donner,Webcams,7000,link,https://www.tahoedonner.com/community/webcams/,,true
+donner-ski-ranch,Webcams,7031,link,https://www.donnerskiranch.com,,true
+boreal,Base Area,7200,image,https://b15.hdrelay.com/camera/8893d4ed-8bb5-4fb9-b60e-8e84ce98ab79/snapshot,,true
+boreal,Snow Stake,7700,image,https://b15.hdrelay.com/camera/9430596b-991d-4986-af5b-42e743cc249f/snapshot,,true
+bear-valley,Summit,8500,iframe,https://camstreamer.com/embed/RFmy0SK1VyqlMtIBCgVJyJCWSju2Jd6wruSW8T7X,,true
+stevens-pass,Snow Stake,,iframe,https://player.brownrice.com/embed/stevenspasssnowstake,,true
+stevens-pass,Jupiter,,iframe,https://player.brownrice.com/embed/stevenspassjupiter,,true
+stevens-pass,Courtyard,,iframe,https://player.brownrice.com/embed/stevenspasscourtyard,,true
+crystal-mountain,Summit Roundshot,,iframe,https://crystalmountainresort.roundshot.com/summit/,,true
+crystal-mountain,Snow Stake,,image,https://webcams.opensnow.com/current/2003.jpg,,true
+crystal-mountain,Base,,image,https://webcams.opensnow.com/current/2005.jpg,,true
+snoqualmie,Central,,youtube,https://www.youtube.com/embed/BxM71UffjpU,BxM71UffjpU,true
+snoqualmie,Central Express,,youtube,https://www.youtube.com/embed/q2jMYi5mXv8,q2jMYi5mXv8,true
+snoqualmie,Alpental,,youtube,https://www.youtube.com/embed/tGXlFWKi93I,tGXlFWKi93I,true
+mt-baker,Heather Meadow,,image,https://imgproxy.windy.com/_/full/plain/current/1754508997/original.jpg,,true
+mt-baker,Shuksan,,image,https://imgproxy.windy.com/_/full/plain/current/1754511676/original.jpg,,true
+white-pass,High Camp,,iframe,https://player.brownrice.com/embed/whitepasshighcamp,,true
+white-pass,Snow Stake,,iframe,https://player.brownrice.com/embed/whitepasssnowstake,,true
+white-pass,Base,,iframe,https://player.brownrice.com/embed/whitepasslive,,true
+49-degrees-north,Summit,,image,https://www.ski49n.com/webcams/summit.jpg,,true
+49-degrees-north,Lodge,,image,https://www.ski49n.com/webcams/lodge.jpg,,true
+ski-bluewood,Base,,image,https://cameraftpapi.drivehq.com/api/Camera/LastImageaspx/shareID17403629/bwdbase.jpg,,true
+ski-bluewood,Summit,,image,https://cameraftpapi.drivehq.com/api/Camera/LastImageaspx/shareID17403860/bwdsummit.jpg,,true
+mission-ridge,Sunspot,,youtube,https://www.youtube.com/embed/Wy1f0CzNaAM,Wy1f0CzNaAM,true
+mission-ridge,Mimi,,youtube,https://www.youtube.com/embed/XaT_9QW-zJM,XaT_9QW-zJM,true
+mission-ridge,Midway,,youtube,https://www.youtube.com/embed/e7qxWn1VrM4,e7qxWn1VrM4,true
+mt-bachelor,Snow Stake,,youtube,https://www.youtube.com/embed/jF9f7hsdlJg,jF9f7hsdlJg,true
+mt-bachelor,Cloudchaser,,youtube,https://www.youtube.com/embed/kVkLyuigAwA,kVkLyuigAwA,true
+mt-bachelor,Pine Marten,,youtube,https://www.youtube.com/embed/qjfPiDu9F50,qjfPiDu9F50,true
+mt-hood-meadows,Top of Blue,,iframe,https://api.wetmet.net/widgets/stream/frame.php?uid=c878c340832e23aab90526673b71cc17,,true
+mt-hood-meadows,Blue #2,,iframe,https://api.wetmet.net/widgets/stream/frame.php?uid=1be5f08dfca10d15d5e4ec9627c17c7c,,true
+mt-hood-meadows,Bottom Vista,,iframe,https://api.wetmet.net/widgets/stream/frame.php?uid=eec27f8164fc1105656ea4d46df4cd37,,true
+timberline,Lodge,,image,https://timberlinelodge.com/snowcameras/lodge.jpg,,true
+timberline,Snow Stake,,image,https://timberlinelodge.com/snowcameras/snowstake.jpg,,true
+timberline,Palmer,,image,https://timberlinelodge.com/snowcameras/palmerbottom.jpg,,true
+timberline,Summit,,image,https://timberlinelodge.com/snowcameras/summit.jpg,,true
+ski-bowl,West Base,,iframe,https://video.nest.com/live/SUFOrgWa6m,,true
+ski-bowl,Upper Bowl,,iframe,https://video.nest.com/live/npsFa2hlJU,,true
+ski-bowl,East Base,,iframe,https://video.nest.com/live/V7j7Fc9F0o,,true
+hoodoo,Summit,,image,https://santiampsp.org/wx/weather1.jpg,,true
+hoodoo,Base,,image,https://santiampsp.org/wx/weather16.jpg,,true
+hoodoo,Top of Ed,,image,https://santiampsp.org/wx/weather2.jpg,,true
+willamette-pass,Base,,youtube,https://www.youtube.com/embed/9wA71jnfNx0,9wA71jnfNx0,true
+mt-ashland,Webcams,,link,https://mtashland.com/webcams/,,true
+jackson-hole,Rendezvous,,image,https://backend.roundshot.com/cams/6f7dc91857e22fe329e8bdeef5ee5750/default,,true
+jackson-hole,Summit,,image,https://backend.roundshot.com/cams/12a4b2c24cd515e0a115d4a0f59ef7f8/default,,true
+big-sky,Ramcharger,,iframe,https://camstreamer.com/embed/4caf8cbab6999c9/S-16675,,true
+big-sky,Moonlight,,iframe,https://lonemountainland.roundshot.com/moonlightbasin/,,true
+big-sky,Town,,iframe,https://lonemountainland.roundshot.com/,,true
+sun-valley,Snow Stake,,image,https://b14.hdrelay.com/camera/dfd66293-97e7-4c5d-b1eb-e375f64df469/snapshot,,true
+sun-valley,River Run,,image,https://b14.hdrelay.com/camera/fd6ee8bb-c858-4ffc-949b-12d1e18bda7f/snapshot,,true
+sun-valley,Bowls,,image,https://b14.hdrelay.com/camera/a786b634-06e1-47dc-bef3-36b476a3ceab/snapshot,,true
+tamarack,Summit,,youtube,https://www.youtube.com/embed/V_VTBRzPad8,V_VTBRzPad8,true
+schweitzer,Summit Roundshot,,iframe,https://schweitzer.roundshot.com/,,true
+bogus-basin,Summit PrismCam,,image,https://storage.googleapis.com/prism-cam-00091/1080-watermark.jpg,,true
+bogus-basin,Snow Marker,,link,https://photos.bogusbasin.org/boguscreek.php,,true
+whitefish,Summit Roundshot,,iframe,https://skiwhitefish.roundshot.com/summit/,,true
+bridger-bowl,Ridge East,,image,https://webcam-images.s3-us-west-1.amazonaws.com/RidgeEast.jpg,,true
+bridger-bowl,Bridger Lift,,image,https://webcam-images.s3-us-west-1.amazonaws.com/bridger_lift.jpg,,true
+bridger-bowl,Base,,image,https://webcam-images.s3-us-west-1.amazonaws.com/parking_lot.jpg,,true
+bridger-bowl,Alpine Lift,,image,https://webcam-images.s3-us-west-1.amazonaws.com/alpine_lift.jpg,,true
+red-lodge,Webcam,,link,https://redlodgemountain.com/webcam/,,true
+brundage,Base Snow,,image,https://brundage.com/webcam/snowcam.jpg,,true
+brundage,Top Bird,,iframe,https://camstreamer.com/embed/lp5EwsubCtc7WSvvfEoZ3OBCcnLw3YpUQxhBpdtB,,true
+brundage,Centennial,,iframe,https://camstreamer.com/embed/zsX6U58XfcHSS3TOLj7fCHwA7vVguMBu7HiJOJeO,,true
+lookout-pass,Webcams,,link,https://skilookout.com/webcams/,,true
+snow-king,Mid Mtn,,youtube,https://www.youtube.com/embed/JWflsXXpHRQ,JWflsXXpHRQ,true
+whistler-blackcomb,Roundhouse,,iframe,https://player.brownrice.com/embed/whistlerroundhouse,,true
+whistler-blackcomb,Peak,,iframe,https://player.brownrice.com/embed/whistlerpeak,,true
+whistler-blackcomb,7th Heaven,,iframe,https://player.brownrice.com/embed/whistler7thheaven,,true
+whistler-blackcomb,Village,,iframe,https://player.brownrice.com/embed/whistlervillage,,true
+sun-peaks,Sundance,,image,https://www.sunpeaksresort.com/spr_website_data/webcams/sundance.jpg,,true
+sun-peaks,Mt Tod,,image,https://www.sunpeaksresort.com/spr_website_data/webcams/view%20of%20mt%20todd.jpg,,true
+sun-peaks,Valley,,image,https://www.sunpeaksresort.com/spr_website_data/webcams/Valley.jpg,,true
+big-white,Village,,image,https://www.bigwhite.com/sites/default/files/village_535.jpg,,true
+big-white,Pow,,image,https://www.bigwhite.com/sites/default/files/powpow_535.jpg,,true
+big-white,Snow Ghost,,image,https://www.bigwhite.com/sites/default/files/snowghost_535.jpg,,true
+stowe,Stowe Village 2,3900,iframe,https://player.brownrice.com/embed/stowevillage2,,true
+stowe,Spruce Peak,3900,iframe,https://player.brownrice.com/embed/stowevillage,,true
+killington,Peak 360,4241,iframe,https://killington.roundshot.com/peaklodge,,true
+killington,Superstar,4241,image,https://b9.hdrelay.com/camera/a0de9878-d7b7-4906-9e83-536fde35c8a9/snapshot,,true
+killington,North Ridge,4241,image,https://b9.hdrelay.com/camera/61e3ce02-faaa-4499-a547-6574ef6fa4f6/snapshot,,true
+sugarbush,Gatehouse,4083,youtube,https://www.youtube.com/embed/QrpBL6HNxZA,QrpBL6HNxZA,true
+sugarbush,Super Bravo,4083,youtube,https://www.youtube.com/embed/n5QqJSYEZT8,n5QqJSYEZT8,true
+sugarbush,Castle Rock,4083,youtube,https://www.youtube.com/embed/5g8SM1EqTJY,5g8SM1EqTJY,true
+sugarbush,Snow Stake,4083,iframe,https://camstreamer.com/embed/DhlhgO70iUnmfRQuuejOIZO59FrW09AIcUg1iNYb,,true
+mad-river-glen,Single Chair,3637,youtube,https://www.youtube.com/embed/wVOqgmbvCrY,wVOqgmbvCrY,true
+jay-peak,Summit,3968,image,https://storage.googleapis.com/prism-cam-00058/1080-watermark.jpg,,true
+jay-peak,Tramside,3968,image,https://b10.hdrelay.com/camera/6526fd5a071b19b5189bb07b/snapshot,,true
+jay-peak,Stateside,3968,image,https://b10.hdrelay.com/camera/6526ffaa1c3bd6b512d2585d/snapshot,,true
+stratton,Summit,3875,youtube,https://www.youtube.com/embed/9E00W9R_Cnc,9E00W9R_Cnc,true
+stratton,Mid Mountain,3875,youtube,https://www.youtube.com/embed/AhcH03HwuH0,AhcH03HwuH0,true
+stratton,Snowbowl,3875,youtube,https://www.youtube.com/embed/ildHe_RG1Mk,ildHe_RG1Mk,true
+stratton,Base,3875,youtube,https://www.youtube.com/embed/H-_sGi4Sbtk,H-_sGi4Sbtk,true
+okemo,Summit,3344,iframe,https://player.brownrice.com/embed/okemosummit,,true
+okemo,Snow Stake,3344,iframe,https://player.brownrice.com/embed/okemosnowstake,,true
+okemo,Sugar House,3344,iframe,https://player.brownrice.com/embed/okemosugarhouse,,true
+mount-snow,Snow Stake,3600,iframe,https://player.brownrice.com/embed/mountsnowsnowstake,,true
+mount-snow,Summit,3600,iframe,https://player.brownrice.com/embed/mountsnowsummit,,true
+mount-snow,Carinthia,3600,iframe,https://player.brownrice.com/embed/mountsnowcarinthia,,true
+pico,Base,3967,image,https://b14.hdrelay.com/camera/84943abb-01cd-4907-8cc2-a9a7680d7529/snapshot,,true
+pico,Summit,3967,image,https://b14.hdrelay.com/camera/2a8b98fa-994e-4e36-9c61-d62e00a500b0/snapshot,,true
+smugglers-notch,Morse,3640,youtube,https://www.youtube.com/embed/7i94UfG1Om0,7i94UfG1Om0,true
+smugglers-notch,Madonna,3640,youtube,https://www.youtube.com/embed/n7kDiEJvdkc,n7kDiEJvdkc,true
+burke,Webcams,3267,link,https://skiburke.com/the-mountain/webcams,,true
+bolton-valley,Vista Peak,3150,youtube,https://www.youtube.com/embed/xWdZHDUHjv8,xWdZHDUHjv8,true
+bolton-valley,Base,3150,youtube,https://www.youtube.com/embed/VX9ANOUYO1k,VX9ANOUYO1k,true
+loon,Octagon,3050,youtube,https://www.youtube.com/embed/5NUYOuzzZwc,5NUYOuzzZwc,true
+loon,Peak,3050,youtube,https://www.youtube.com/embed/pkR1I-UkAAk,pkR1I-UkAAk,true
+loon,Kancamagus,3050,youtube,https://www.youtube.com/embed/1ulgeNTlFJc,1ulgeNTlFJc,true
+cannon,Summit,4080,youtube,https://www.youtube.com/embed/MSl7Gy9tZiA,MSl7Gy9tZiA,true
+cannon,Tram,4080,iframe,https://g1.ipcamlive.com/player/player.php?alias=6894a26492e8d,,true
+bretton-woods,Rosebrook,3100,iframe,https://share.earthcam.net/tJ90CoLmq7TzrY396Yd88ClXTsprOSvXV0M0N-qbZe8!.tJ90CoLmq7TzrY396Yd88Lk4ZZSG9up1iSraH3Jc1UI!/bretton_woods/camera/live,,true
+bretton-woods,Base,3100,iframe,https://g1.ipcamlive.com/player/player.php?alias=63c1cffd31643,,true
+waterville-valley,Summit,4004,image,https://b14.hdrelay.com/camera/63d44ef27803e58fc2e6d8cd/snapshot,,true
+waterville-valley,Base,4004,image,https://b14.hdrelay.com/camera/e8f5d990-aca1-4d50-9002-8028bcab466c/snapshot,,true
+wildcat,Snow Stake,4062,iframe,https://player.brownrice.com/embed/wildcat3,,true
+wildcat,Base,4062,iframe,https://player.brownrice.com/embed/wildcat2,,true
+cranmore,Meister,1704,youtube,https://www.youtube.com/embed/1Z98cHpO0Pg,1Z98cHpO0Pg,true
+cranmore,Snow Cam,1704,link,https://yullrstorage.s3.us-east-1.amazonaws.com/cranmore/webcams/cam24/current.mp4,,true
+attitash,Base,2350,iframe,https://player.brownrice.com/embed/attitash3,,true
+attitash,Bear Peak,2350,iframe,https://player.brownrice.com/embed/attitash1,,true
+sunday-river,Peak Lodge,3140,youtube,https://www.youtube.com/embed/J98tW5YX4Z8,J98tW5YX4Z8,true
+sunday-river,Jordan 8,3140,youtube,https://www.youtube.com/embed/AtXgvVaqy88,AtXgvVaqy88,true
+sunday-river,Barker 6,3140,youtube,https://www.youtube.com/embed/2KZpFcnZ7ig,2KZpFcnZ7ig,true
+sugarloaf,Skyline,4237,youtube,https://www.youtube.com/embed/rhLXBwVfszw,rhLXBwVfszw,true
+sugarloaf,Narrow Gauge,4237,youtube,https://www.youtube.com/embed/KijmSwVBDpc,KijmSwVBDpc,true
+sugarloaf,Beach,4237,youtube,https://www.youtube.com/embed/K77ahIkmPGw,K77ahIkmPGw,true
+sugarloaf,Bullwinkle,4237,youtube,https://www.youtube.com/embed/IdibWuNtW1c,IdibWuNtW1c,true
+whiteface,Legacy Lodge,4867,image,https://img.hdrelay.com/frames/56ce853a-23fc-48cc-af9b-13907ef75b9a/panorama/last.jpg,,true
+whiteface,Bear Den,4867,image,https://img.hdrelay.com/frames/6467e4a44bca054a8e3c2f0b/panorama/last.jpg,,true
+gore-mountain,Base,3600,image,https://img.hdrelay.com/frames/29684ca1-7164-47c4-a217-d3d19c8b21e9/panorama/last.jpg,,true
+gore-mountain,Summit,3600,image,https://img.hdrelay.com/frames/3609323d-2651-4778-8589-b5991afc6ee4/default/last.jpg,,true
+gore-mountain,Bear Mountain,3600,image,https://b14.hdrelay.com/camera/ae2aab18-54cc-4ea3-979c-0edb66075a86/snapshot,,true
+hunter,Base,3200,iframe,https://player.brownrice.com/embed/hunter1,,true
+hunter,Mid Mountain,3200,iframe,https://player.brownrice.com/embed/huntermidstation,,true
+hunter,Summit,3200,iframe,https://player.brownrice.com/embed/huntersummit,,true
+windham,Base,3100,iframe,https://player.brownrice.com/embed/windhammountainclub/timelapse/24hr,,true
+belleayre,Overlook,3429,image,https://images-webcams.windy.com/74/1706697774/current/full/1706697774.jpg,,true
+belleayre,Discovery,3429,image,https://images-webcams.windy.com/16/1706697616/current/full/1706697616.jpg,,true
+jiminy-peak,Webcams,2380,link,https://jiminypeak.com/webcams/,,true
+wachusett,Summit,2006,image,https://api.wetmet.net/widgets/stream/frame.php?uid=ae0a41d92d6d4c74d5c696e2d18ae88f,,true
+wachusett,NASTAR,2006,image,https://api.wetmet.net/widgets/stream/frame.php?uid=c5d9979a7622e03eb89b208a83d65810,,true
+seven-springs,Webcams,2994,link,https://7springs.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
+camelback,Webcams,2133,link,https://camelbackresort.com/resort-information/live-cameras,,true
+wintergreen,Classic,3515,image,https://ftp.resortcams.com/wintergreen/skyline.jpg,,true
+wintergreen,Lookout,3515,image,https://ftp.resortcams.com/wintergreen/slopeside.jpg,,true
+wisp,Base,3080,image,https://ftp.resortcams.com/wisp/image.jpg,,true
+wisp,Mountain Park,3080,image,https://ftp.resortcams.com/wisp-resort-mountain-park/image.jpg,,true
+snowshoe,Webcams,4848,link,https://snowshoemtn.com/media-room/web-cams,,trueski-santa-fe,Quad Top,10350,iframe,https://player.brownrice.com/snapshot/quadtop,,true
+ski-santa-fe,Base,10350,iframe,https://player.brownrice.com/snapshot/santafe,,true
+ski-santa-fe,Chair 5,10350,iframe,https://player.brownrice.com/snapshot/santafechair5,,true
+taos,Base,9207,iframe,https://live2.brownrice.com/embed/tsv,,true
+taos,Highline,9207,iframe,https://live2.brownrice.com/embed/tsvridge,,true
+taos,Kachina Basin,9207,iframe,https://live3.brownrice.com/embed/tsvbav,,true
+taos,Poco Snow Stake,9207,iframe,https://tsvweather.brownrice.com/poco-webcam.php,,true
+angel-fire,Summit,10677,iframe,https://live1.brownrice.com/embed/swsummit,,true
+angel-fire,Base,8600,iframe,https://live1.brownrice.com/embed/afbasearea,,true
+angel-fire,Chile Unload,8600,iframe,https://live3.brownrice.com/embed/afchileunload,,true
+red-river,The Face,10350,link,https://redriverskiarea.com/explore/about/webcams/,,true
+red-river,Town,8750,link,https://redriverskiarea.com/explore/about/webcams/,,true
+ski-apache,Base PTZ,9600,iframe,https://player.brownrice.com/embed/apache,,true
+arizona-snowbowl,Gondola,11500,youtube,https://www.youtube.com/embed/Gc3jTJZ-WaE,Gc3jTJZ-WaE,true
+arizona-snowbowl,Grand Canyon Express,11500,youtube,https://www.youtube.com/embed/E_nsa206CPc,E_nsa206CPc,true
+boyne-mountain,Hemlock,1120,youtube,https://www.youtube.com/embed/wgU1Dsro-6U,wgU1Dsro-6U,true
+boyne-mountain,Clock Tower,1120,youtube,https://www.youtube.com/embed/3vuXRsZXFUU,3vuXRsZXFUU,true
+boyne-mountain,Snow Stake,1120,youtube,https://www.youtube.com/embed/dNNJ0xXBkgA,dNNJ0xXBkgA,true
+nubs-nob,Live Cam,1350,link,https://nubsnob.com/cam/,,true
+marquette-mountain,Trail Cam,1544,image,https://it.nmu.edu/campics/mtmesnard.jpg,,true
+granite-peak,Summit,1940,image,https://b10.hdrelay.com/camera/1446cadc-5c06-427a-9b3f-5178b6a96047/snapshot,,true
+granite-peak,Base,1940,image,https://b10.hdrelay.com/camera/839ba6a3-b9e3-4153-a720-222a75898532/snapshot,,true
+lutsen,Roundshot 360,1688,iframe,https://lutsen.roundshot.com/,,true
+spirit-mountain,Live Cam,1052,image,https://tools.hbi.com/wx/wdio/dynamic_weather_spiritmtn.jpg,,true
