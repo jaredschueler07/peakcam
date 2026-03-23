@@ -102,7 +102,7 @@ async function supabaseRPC(method, path, body = null) {
   };
   if (body) opts.body = JSON.stringify(body);
   try {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, opts);
+    const resp = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/${path}`, opts);
     if (!resp.ok) {
       log('debug', null, `Supabase ${method} ${path}: ${resp.status}`);
       return null;
@@ -202,7 +202,8 @@ async function getRecentConversations(agentKey, limit = 5) {
 // C. Slack API Helpers
 // ─────────────────────────────────────────────────────────────
 
-const FETCH_TIMEOUT_MS = 10_000; // 10s timeout on all fetch calls
+const FETCH_TIMEOUT_MS = 10_000;   // 10s timeout on all Slack/Supabase fetch calls
+const CLAUDE_TIMEOUT_MS = 90_000;  // 90s timeout on Claude API calls
 
 async function fetchWithTimeout(url, options = {}) {
   const controller = new AbortController();
@@ -521,15 +522,31 @@ async function callClaude(systemPrompt, messages) {
 
   log('debug', null, `Claude request: ${messages.length} messages, system prompt ${systemPrompt.length} chars`);
 
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
+  // Use AbortController so a hung Claude call never permanently blocks the poll loop.
+  // Without this timeout, a single slow/stuck API call freezes the entire loop forever.
+  const controller = new AbortController();
+  const claudeTimer = setTimeout(() => controller.abort(), CLAUDE_TIMEOUT_MS);
+
+  let resp;
+  try {
+    resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error(`Claude API timed out after ${CLAUDE_TIMEOUT_MS / 1000}s`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(claudeTimer);
+  }
 
   if (resp.status === 429 || resp.status === 529) {
     const retryAfter = parseInt(resp.headers.get('retry-after') || '10', 10);
@@ -646,7 +663,7 @@ async function executeHandoff(sourceAgent, targetKey, message, originalUserText,
 // H. Message Processing
 // ─────────────────────────────────────────────────────────────
 
-async function processMessage(agentKey, msg, botUserId, token) {
+async function processMessage(agentKey, msg, botUserId, token, agentState = null) {
   const agent = config.agents[agentKey];
   const channel = agent.channel;
   const threadTs = msg.thread_ts || msg.ts;
@@ -689,8 +706,20 @@ async function processMessage(agentKey, msg, botUserId, token) {
       .trim();
 
     // Post reply
-    await postReply(token, channel, threadTs, cleanResponse);
+    const replyResult = await postReply(token, channel, threadTs, cleanResponse);
     log('info', agentKey, `Replied in thread ${threadTs}`);
+
+    // Register this thread so the poll loop watches it for follow-up replies.
+    // Slack's conversations.history only returns top-level channel messages; replies
+    // posted inside a thread are invisible unless we poll conversations.replies directly.
+    if (agentState && replyResult?.ok && replyResult.ts) {
+      agentState.activeThreads.set(threadTs, replyResult.ts);
+      log('debug', agentKey, `Watching thread ${threadTs} for follow-ups`);
+    } else if (agentState) {
+      // Even if we couldn't get the reply ts, start watching from current time
+      agentState.activeThreads.set(threadTs,
+        agentState.activeThreads.get(threadTs) || (Date.now() / 1000).toFixed(6));
+    }
 
     // Store conversation summary (ask Claude to summarize on substantial threads)
     if (claudeMessages.length >= 3) {
@@ -752,6 +781,10 @@ async function main() {
         botUserId: userId,
         botId,
         lastSeen: ((Date.now() - 30 * 60 * 1000) / 1000).toFixed(6), // Start from 30min ago
+        // Track threads the bot has replied in so we can poll for follow-ups.
+        // Slack's conversations.history only returns top-level messages — thread replies
+        // are invisible unless we explicitly poll each thread via conversations.replies.
+        activeThreads: new Map(), // threadTs -> lastSeenTs (string)
       };
       log('info', key, `Online as <@${userId}> in ${agent.channel_name}`);
 
@@ -784,8 +817,21 @@ async function main() {
     running = false;
   });
 
+  // Heartbeat: log every 5 minutes so we can confirm the loop is alive.
+  const HEARTBEAT_INTERVAL = 5 * 60 * 1000; // 5min
+  let lastHeartbeat = Date.now();
+
   // Poll loop
+  let pollCycle = 0;
   while (running) {
+    pollCycle++;
+
+    // Heartbeat log — if this stops appearing, the loop is hung
+    if (Date.now() - lastHeartbeat >= HEARTBEAT_INTERVAL) {
+      log('info', null, `Heartbeat: loop alive (cycle ${pollCycle}, ${activeAgents.length} agents)`);
+      lastHeartbeat = Date.now();
+    }
+
     for (const agentKey of activeAgents) {
       if (!running) break;
 
@@ -794,6 +840,8 @@ async function main() {
 
       try {
         if (!agent.channel) continue; // skip agents without a dedicated channel (e.g. COO)
+
+        // ── 1. Poll channel history for new top-level messages ──────────────
         const messages = await getNewMessages(state.token, agent.channel, state.lastSeen);
 
         for (const msg of messages) {
@@ -809,19 +857,63 @@ async function main() {
           const isThreadReply = !!msg.thread_ts;
 
           if (mentionsBot || isCOODirective || isHandoff) {
-            await processMessage(agentKey, msg, state.botUserId, state.token);
+            await processMessage(agentKey, msg, state.botUserId, state.token, state);
           } else if (isThreadReply) {
-            // Check if bot has already replied in this thread
+            // Broadcast thread replies appear in history — check if bot is already in thread
             const thread = await getThreadMessages(state.token, agent.channel, msg.thread_ts);
             const botInThread = thread.some(m => m.user === state.botUserId);
             if (botInThread) {
-              await processMessage(agentKey, msg, state.botUserId, state.token);
+              await processMessage(agentKey, msg, state.botUserId, state.token, state);
             }
           }
+        }
+
+        // ── 2. Poll active threads for follow-up replies ─────────────────────
+        // Slack's conversations.history only returns top-level messages.
+        // Thread replies are INVISIBLE to the history API unless broadcast to the channel.
+        // We track threads where the bot has replied and poll them explicitly.
+        const THREAD_MAX_AGE_MS = 24 * 60 * 60 * 1000; // drop threads older than 24h
+        const now = Date.now();
+
+        for (const [threadTs, threadLastSeen] of state.activeThreads) {
+          // Evict stale threads (> 24h old) to prevent unbounded growth
+          if (now - parseFloat(threadTs) * 1000 > THREAD_MAX_AGE_MS) {
+            state.activeThreads.delete(threadTs);
+            continue;
+          }
+
+          try {
+            const repliesData = await slackAPI(state.token, 'conversations.replies', {
+              channel: agent.channel,
+              ts: threadTs,
+              oldest: threadLastSeen,
+              inclusive: 'false',
+              limit: '20',
+            });
+
+            if (!repliesData.ok) continue;
+
+            for (const reply of repliesData.messages || []) {
+              if (reply.ts === threadTs) continue; // skip parent message
+              if (reply.bot_id) continue;          // skip bot replies
+              if (parseFloat(reply.ts) <= parseFloat(threadLastSeen)) continue;
+
+              // Advance the thread cursor so we don't re-process this reply
+              state.activeThreads.set(threadTs, reply.ts);
+
+              log('info', agentKey, `Thread follow-up in ${threadTs}: "${reply.text?.slice(0, 60)}"`);
+              await processMessage(agentKey, reply, state.botUserId, state.token, state);
+            }
+          } catch (threadErr) {
+            log('warn', agentKey, `Thread poll error (${threadTs}): ${threadErr.message}`);
+          }
+
+          await sleep(150); // stagger thread polls
         }
       } catch (err) {
         const cause = err.cause?.message ? ` (${err.cause.message})` : '';
         log('error', agentKey, `Poll error: ${err.message}${cause}`);
+        // Loop continues — do NOT re-throw; one agent error must not kill the cycle.
       }
 
       await sleep(250); // Stagger between agents
