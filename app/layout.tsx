@@ -39,6 +39,9 @@ export const metadata: Metadata = {
     description: "Browse live cams and snow conditions for 75+ North American ski resorts.",
   },
   robots: { index: true, follow: true },
+  verification: {
+    google: 'WxEYSVb48l8MEVfSy2aRBYcwIxq1hq2djwwO6UcL_Q8',
+  },
 };
 
 const organizationLd = {
