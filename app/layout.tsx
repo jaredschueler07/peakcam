@@ -26,6 +26,7 @@ export const metadata: Metadata = {
     "trail conditions",
   ],
   metadataBase: new URL(BASE_URL),
+  alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     siteName: "PeakCam",
