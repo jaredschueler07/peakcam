@@ -30,6 +30,15 @@ export interface ConditionsInput {
     /** Highest forecast high temperature (°F) in the next 48 hours. */
     maxHighTemp48h: number;
   };
+  nwsGrid?: {
+    skyCoverAvg: number;        // %
+    windGustMax: number;        // mph
+    windChillAvg: number;       // °F
+    snowLevelAvg: number;       // ft
+    resortElevBase: number;     // ft
+    iceAccumulationMax: number; // inches
+    probOfPrecipMax: number;    // %
+  } | null;
 }
 
 // ── Outputs ──────────────────────────────────────────────────
@@ -43,6 +52,8 @@ export interface ConditionsOutput {
   trend7d: SnowTrend;
   outlook: SnowOutlook;
   outlookLabel: string;
+  tags: string[];
+  narrative: string;
 }
 
 // ── Thresholds (tunable) ─────────────────────────────────────
@@ -130,40 +141,86 @@ export function computeConditionRating(
 ): ConditionRating {
   const t = RATING_THRESHOLDS;
 
-  // Great: big dump
-  if (newSnow24h >= t.great.newSnow24h || newSnow48h >= t.great.newSnow48h) {
-    return "great";
-  }
-
-  // Good: moderate new snow OR healthy snowpack
+  if (newSnow24h >= t.great.newSnow24h || newSnow48h >= t.great.newSnow48h) return "great";
   if (newSnow24h >= t.good.newSnow24h) return "good";
-  if (
-    pctOfNormal != null &&
-    pctOfNormal >= t.good.pctOfNormal &&
-    snowDepthIn != null &&
-    snowDepthIn >= t.good.minDepth
-  ) {
-    return "good";
-  }
-
-  // Fair: adequate base, reasonable snowpack
-  if (
-    snowDepthIn != null &&
-    snowDepthIn >= t.fair.minDepth &&
-    (pctOfNormal == null || pctOfNormal >= t.fair.pctOfNormal)
-  ) {
-    return "fair";
-  }
-
-  // Poor: everything else
+  if (pctOfNormal != null && pctOfNormal >= t.good.pctOfNormal && snowDepthIn != null && snowDepthIn >= t.good.minDepth) return "good";
+  if (snowDepthIn != null && snowDepthIn >= t.fair.minDepth && (pctOfNormal == null || pctOfNormal >= t.fair.pctOfNormal)) return "fair";
+  
   return "poor";
+}
+
+// ── Tags & Narrative Synthesis ───────────────────────────────
+
+export function synthesizeGridData(input: ConditionsInput): { tags: string[], narrative: string } {
+  const tags: string[] = [];
+  const narrativeParts: string[] = [];
+
+  const { current, nwsGrid } = input;
+
+  if (current.newSnow24h >= 4) {
+    tags.push("Powder Day");
+    narrativeParts.push(`Fresh powder (${current.newSnow24h}")`);
+  }
+
+  if (nwsGrid) {
+    if (nwsGrid.skyCoverAvg < 30 && nwsGrid.probOfPrecipMax < 20) {
+      tags.push("Bluebird");
+      narrativeParts.push("clear bluebird skies");
+    } else if (nwsGrid.skyCoverAvg > 80) {
+      tags.push("Flat Light");
+      narrativeParts.push("heavy overcast and flat light");
+    }
+
+    if (nwsGrid.windGustMax > 35) {
+      tags.push("Wind Hold Risk");
+      narrativeParts.push(`high winds up to ${Math.round(nwsGrid.windGustMax)}mph posing a lift hold risk`);
+    } else if (nwsGrid.windGustMax > 20) {
+      narrativeParts.push("breezy conditions");
+    }
+
+    if (nwsGrid.windChillAvg < 5) {
+      tags.push("Bundle Up");
+      narrativeParts.push("bitterly cold wind chills");
+    } else if (nwsGrid.windChillAvg > 45 && (current.snowDepthIn ?? 0) > 10) {
+      tags.push("Spring Skiing");
+      narrativeParts.push("warm spring-like temperatures");
+    }
+
+    if (nwsGrid.iceAccumulationMax > 0.05) {
+      tags.push("Icy");
+      narrativeParts.push("potential for icy surface conditions");
+    }
+
+    // Rain vs Snow check based on elevation
+    if (nwsGrid.probOfPrecipMax > 40 && nwsGrid.snowLevelAvg > (nwsGrid.resortElevBase + 500)) {
+      tags.push("Rain at Base");
+      narrativeParts.push(`rain mixed in at the base (snow level around ${Math.round(nwsGrid.snowLevelAvg)}ft)`);
+    }
+  }
+
+  if (tags.length === 0) tags.push("Standard Conditions");
+
+  let narrative = "";
+  if (narrativeParts.length > 0) {
+    // Join the first two or three parts into a flowing sentence
+    if (narrativeParts.length === 1) {
+      narrative = `Expect ${narrativeParts[0]} today.`;
+    } else if (narrativeParts.length === 2) {
+      narrative = `Expect ${narrativeParts[0]} alongside ${narrativeParts[1]}.`;
+    } else {
+      narrative = `Expect ${narrativeParts[0]}, ${narrativeParts[1]}, and ${narrativeParts[2]}.`;
+    }
+    // Capitalize first letter
+    narrative = narrative.charAt(0).toUpperCase() + narrative.slice(1);
+  } else {
+    narrative = "Standard mountain conditions expected today.";
+  }
+
+  return { tags, narrative };
 }
 
 // ── Main Entry Point ─────────────────────────────────────────
 
-/**
- * Compute all conditions from inputs. Pure function — no side effects.
- */
 export function computeConditions(input: ConditionsInput): ConditionsOutput {
   const pctOfNormal = computePctOfNormal(
     input.current.sweIn,
@@ -185,5 +242,7 @@ export function computeConditions(input: ConditionsInput): ConditionsOutput {
     pctOfNormal,
   );
 
-  return { condRating, pctOfNormal, trend7d, outlook, outlookLabel };
+  const { tags, narrative } = synthesizeGridData(input);
+
+  return { condRating, pctOfNormal, trend7d, outlook, outlookLabel, tags, narrative };
 }

@@ -285,17 +285,17 @@ function computeDeltas(days: ParsedDay[]): { newSnow24h: number; newSnow48h: num
 // ─── Step 6: Lookup normals ───────────────────────────────────────────────
 
 interface NormalsRow {
-  median_swe_in: number | null;
-  pctile_10_swe_in: number | null;
-  pctile_90_swe_in: number | null;
+  median_swe: number | null;
+  p10_swe: number | null;
+  p90_swe: number | null;
 }
 
 async function fetchNormals(
-  stationId: string,
+  stationId: string, // now potentially a full triplet like "842:CO:SNTL"
   dowy: number,
 ): Promise<NormalsRow | null> {
   const url =
-    `${SUPABASE_URL}/rest/v1/snotel_normals?station_id=eq.${stationId}&day_of_water_year=eq.${dowy}&select=median_swe_in,pctile_10_swe_in,pctile_90_swe_in&limit=1`;
+    `${SUPABASE_URL}/rest/v1/snotel_normals?station_id=eq.${stationId}&day_of_water_year=eq.${dowy}&select=median_swe,p10_swe,p90_swe&limit=1`;
   const resp = await fetch(url, { headers: supaHeaders });
   if (!resp.ok) return null;
   const rows = await resp.json();
@@ -316,18 +316,19 @@ async function fetchSweHistory(
   return rows.map((r) => r.swe_in).reverse();
 }
 
-// ─── Step 8: Fetch NWS forecast summary ──────────────────────────────────
+// ─── Step 8: Fetch NWS forecast summary & Grid Data ────────────────────────
 
 interface ForecastSummary {
   snowInchesNext48h: number;
   maxHighTemp48h: number;
+  gridData: any | null;
 }
 
 async function fetchNwsForecast(
   lat: number,
   lng: number,
 ): Promise<ForecastSummary> {
-  const defaults: ForecastSummary = { snowInchesNext48h: 0, maxHighTemp48h: 32 };
+  const defaults: ForecastSummary = { snowInchesNext48h: 0, maxHighTemp48h: 32, gridData: null };
   try {
     // Step 1: resolve gridpoint
     const pointsRes = await fetch(
@@ -337,39 +338,60 @@ async function fetchNwsForecast(
     if (!pointsRes.ok) return defaults;
     const pointsData = await pointsRes.json();
     const forecastUrl: string | undefined = pointsData?.properties?.forecast;
+    const gridUrl: string | undefined = pointsData?.properties?.forecastGridData;
+    
     if (!forecastUrl) return defaults;
 
-    // Step 2: fetch forecast
+    // Step 2: fetch forecast (Summary)
     const forecastRes = await fetch(forecastUrl, {
       headers: { "User-Agent": NWS_USER_AGENT },
     });
-    if (!forecastRes.ok) return defaults;
-    const forecastData = await forecastRes.json();
-    const periods: Array<{
-      temperature: number;
-      shortForecast: string;
-      isDaytime: boolean;
-    }> = forecastData?.properties?.periods ?? [];
-
-    // Extract from first 4 periods (~48 hours)
-    const first4 = periods.slice(0, 4);
+    
     let totalSnow = 0;
     let maxHigh = -Infinity;
+    
+    if (forecastRes.ok) {
+      const forecastData = await forecastRes.json();
+      const periods: Array<{
+        temperature: number;
+        shortForecast: string;
+        isDaytime: boolean;
+      }> = forecastData?.properties?.periods ?? [];
 
-    for (const p of first4) {
-      totalSnow += estimateSnow(p.shortForecast);
-      if (p.isDaytime) {
-        maxHigh = Math.max(maxHigh, p.temperature);
+      // Extract from first 4 periods (~48 hours)
+      const first4 = periods.slice(0, 4);
+
+      for (const p of first4) {
+        totalSnow += estimateSnow(p.shortForecast);
+        if (p.isDaytime) {
+          maxHigh = Math.max(maxHigh, p.temperature);
+        }
+      }
+    }
+
+    // Step 3: fetch Grid Data (for tags/narrative)
+    let gridData = null;
+    if (gridUrl) {
+      const gridRes = await fetch(gridUrl, { headers: { "User-Agent": NWS_USER_AGENT }});
+      if (gridRes.ok) {
+        gridData = await gridRes.json();
       }
     }
 
     return {
       snowInchesNext48h: totalSnow,
       maxHighTemp48h: maxHigh === -Infinity ? 32 : maxHigh,
+      gridData: gridData?.properties || null
     };
   } catch {
     return defaults;
   }
+}
+
+// Helper to extract first grid value safely
+function getGridVal(layer: any): number | null {
+  if (!layer || !layer.values || layer.values.length === 0) return null;
+  return layer.values[0].value;
 }
 
 // ─── Step 9: Insert snow_reports (append-only) ───────────────────────────
@@ -380,6 +402,10 @@ async function insertSnowReport(
   deltas: { newSnow24h: number; newSnow48h: number },
   conditions: ReturnType<typeof computeConditions>,
 ): Promise<void> {
+  
+  // Combine tags and narrative into the single conditions string field
+  const conditionsString = `${conditions.tags.join(",")}||${conditions.narrative}`;
+
   const body = {
     resort_id: resortId,
     base_depth: latest.snowDepthIn != null ? Math.round(latest.snowDepthIn) : null,
@@ -390,6 +416,7 @@ async function insertSnowReport(
     trend_7d: conditions.trend7d,
     outlook: conditions.outlook,
     auto_cond_rating: conditions.condRating,
+    conditions: conditionsString,
     source: "snotel",
     updated_at: new Date().toISOString(),
   };
@@ -505,9 +532,9 @@ async function main(): Promise<void> {
           newSnow48h: deltas.newSnow48h,
         },
         normals: {
-          medianSweIn: normals?.median_swe_in ?? null,
-          pctile10SweIn: normals?.pctile_10_swe_in ?? null,
-          pctile90SweIn: normals?.pctile_90_swe_in ?? null,
+          medianSweIn: normals?.median_swe ?? null,
+          pctile10SweIn: normals?.p10_swe ?? null,
+          pctile90SweIn: normals?.p90_swe ?? null,
         },
         history7d: {
           sweValues: sweHistory,
@@ -516,6 +543,15 @@ async function main(): Promise<void> {
           snowInchesNext48h: forecast.snowInchesNext48h,
           maxHighTemp48h: forecast.maxHighTemp48h,
         },
+        nwsGrid: forecast.gridData ? {
+          skyCoverAvg: getGridVal(forecast.gridData.skyCover) ?? 50,
+          windGustMax: (getGridVal(forecast.gridData.windGust) ?? 0) * 0.621371, // km/h to mph
+          windChillAvg: (getGridVal(forecast.gridData.windChill) ?? 0) * 9/5 + 32, // C to F
+          snowLevelAvg: (getGridVal(forecast.gridData.snowLevel) ?? 0) * 3.28084, // m to ft
+          resortElevBase: resort.lat, // Assuming we don't have elevation, we'll estimate or ignore. Wait! Resort table has lat/lng.
+          iceAccumulationMax: (getGridVal(forecast.gridData.iceAccumulation) ?? 0) / 25.4, // mm to inches
+          probOfPrecipMax: getGridVal(forecast.gridData.probabilityOfPrecipitation) ?? 0,
+        } : null
       };
 
       const conditions = computeConditions(conditionsInput);

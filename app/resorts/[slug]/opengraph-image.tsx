@@ -27,7 +27,11 @@ export default async function OgImage({
   const condColor = resort
     ? (COND_COLOR[resort.cond_rating] ?? "#60C8FF")
     : "#60C8FF";
-  const snow = resort?.snow_report;
+  const snow = resort.snow_report;
+
+  const conditionsNarrative = snow?.conditions 
+    ? (snow.conditions.includes("||") ? snow.conditions.split("||")[1] : snow.conditions) 
+    : null;
 
   return new ImageResponse(
     (
@@ -263,7 +267,7 @@ export default async function OgImage({
           )}
 
           {/* Conditions string */}
-          {snow?.conditions && (
+          {conditionsNarrative && (
             <div
               style={{
                 display: "flex",
@@ -281,7 +285,7 @@ export default async function OgImage({
               <div
                 style={{ fontSize: 20, fontWeight: 700, color: "#E8F0F8", lineHeight: 1.2, display: "flex" }}
               >
-                {snow.conditions}
+                {conditionsNarrative}
               </div>
             </div>
           )}

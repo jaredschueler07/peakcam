@@ -124,7 +124,8 @@ async function fetchPeriodOfRecord(
   stationId: string,
   stateCode: string
 ): Promise<{ wteqByDay: Map<number, number[]>; snwdByDay: Map<number, number[]> }> {
-  const triplet = `${stationId}:${stateCode}:SNTL`;
+  // Use the full triplet if it's already one, otherwise append defaults
+  const triplet = stationId.includes(":") ? stationId : `${stationId}:${stateCode}:SNTL`;
   const params = new URLSearchParams({
     stationTriplets: triplet,
     elements: "WTEQ,SNWD",

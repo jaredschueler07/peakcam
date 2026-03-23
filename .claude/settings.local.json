@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /c/Users/jared/live_cam_web/peakcam && npm install 2>&1)",
+      "Bash(cd /c/Users/jared/live_cam_web/peakcam && rm -f node_modules node_modules_fresh && rm -rf node_modules_old node_modules_new)",
+      "Bash(cd /c/Users/jared/live_cam_web/peakcam && npm run dev 2>&1)",
+      "Bash(cd /c/Users/jared/live_cam_web/peakcam && git init && git branch -m main)",
+      "Bash(cd /c/Users/jared/live_cam_web/peakcam && git add .gitignore .npmrc CLAUDE.md README.md app/ components/ data/ eslint.config.mjs lib/ next.config.ts package-lock.json package.json postcss.config.mjs public/ supabase/ tailwind.config.ts tsconfig.json tsconfig.scripts.json scripts/import-resorts.ts scripts/import-resorts-standalone.mjs)",
+      "Bash(cd /c/Users/jared/live_cam_web/peakcam && git commit -m \"$\\(cat <<'EOF'\nInitial commit: PeakCam phases 1-3 scaffold\n\nNext.js 16 + React 19 + Supabase + Tailwind 4 + Leaflet.\nBrowse page with resort cards, search, filters, and map sidebar.\nResort detail page with snow report, weather forecast, and cam embeds.\nCSV data import pipeline for resorts and cams.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(cd /c/Users/jared/live_cam_web/peakcam && npx tsc --noEmit 2>&1 | head -30)",
+      "Bash(cd /c/Users/jared/live_cam_web/peakcam && git add components/browse/BrowsePage.tsx && git commit -m \"$\\(cat <<'EOF'\nReplace naive string search with Fuse.js fuzzy matching\n\nFuse.js was already a dependency but unused. Now powers the browse\npage search with weighted fuzzy matching on name \\(50%\\), region \\(30%\\),\nand state \\(20%\\). Handles typos and partial matches.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(cd /c/Users/jared/live_cam_web/peakcam && git checkout -b feature/roadmap-gaps)",
+      "Bash(cd /c/Users/jared/live_cam_web/peakcam && npx tsc --noEmit 2>&1)",
+      "Bash(cd /c/Users/jared/live_cam_web/peakcam && git add components/browse/BrowsePage.tsx app/resorts/\\\\[slug\\\\]/not-found.tsx && git status)",
+      "Bash(cd /c/Users/jared/live_cam_web/peakcam && git checkout main && git merge feature/roadmap-gaps)",
+      "mcp__plugin_superpowers-chrome_chrome__use_browser",
+      "Bash(rsync -av --exclude='node_modules' --exclude='.next' --exclude='.env*' \"C:/Users/jared/live_cam_web/peakcam/\" \"O:/live_cam_website/\")",
+      "Bash(chmod +x \"C:/Users/jared/live_cam_web/peakcam/.git/hooks/post-commit\")",
+      "Bash(cd \"C:/Users/jared/live_cam_web/peakcam\" && git remote add origin https://github.com/jaredschueler07/peakcam.git)",
+      "Bash(cd \"C:/Users/jared/live_cam_web/peakcam\" && git add tailwind.config.ts app/globals.css components/layout/Header.tsx components/browse/BrowsePage.tsx components/browse/ResortMap.tsx components/resort/ResortDetailPage.tsx components/ui/Badge.tsx components/ui/Chip.tsx components/ui/Button.tsx \"app/resorts/[slug]/not-found.tsx\" docs/superpowers/specs/2026-03-15-alpine-bold-redesign-design.md data/resorts.csv scripts/import-resorts-standalone.mjs)",
+      "Bash(cd \"C:/Users/jared/live_cam_web/peakcam\" && git commit -m \"$\\(cat <<'EOF'\nAlpine Bold UI redesign: warm contrast palette, condensed typography\n\nReplace AI-generated cyan-on-navy dark theme with bold modern sport aesthetic.\nBurnt amber \\(#e08a3a\\) primary accent, gold \\(#f5c542\\) highlights, warm charcoal\nsurfaces. Barlow Condensed headings with DM Sans body text. Remove all glow\neffects and gradients. Update all hardcoded hex values in ResortMap markers\nand tooltips.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(cd \"C:/Users/jared/live_cam_web/peakcam\" && git push -u origin main)",
+      "Bash(cd \"C:/Users/jared/live_cam_web/peakcam\" && curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "Bash(cd \"C:/Users/jared/live_cam_web/peakcam\" && git status -u)",
+      "Bash(cd \"C:/Users/jared/live_cam_web/peakcam\" && git push)"
+    ]
+  }
+}

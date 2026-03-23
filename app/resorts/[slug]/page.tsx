@@ -29,8 +29,12 @@ export async function generateMetadata({
     const resort = await getResortBySlug(slug);
     if (!resort) return {};
     const snow = resort.snow_report;
+    const conditionsNarrative = snow?.conditions 
+      ? (snow.conditions.includes("||") ? snow.conditions.split("||")[1] : snow.conditions) 
+      : "current conditions";
+
     const desc = snow
-      ? `${resort.name} live cams — ${snow.base_depth ?? "?"}″ base, ${snow.conditions ?? "current conditions"}. ${resort.cams.length} webcam${resort.cams.length !== 1 ? "s" : ""} available. Real-time snow report for ${resort.state}.`
+      ? `${resort.name} live cams — ${snow.base_depth ?? "?"}″ base, ${conditionsNarrative}. ${resort.cams.length} webcam${resort.cams.length !== 1 ? "s" : ""} available. Real-time snow report for ${resort.state}.`
       : `Live webcams and real-time snow conditions at ${resort.name}, ${resort.state}. Check base depth, trail status, and powder reports.`;
 
     const pageUrl = `${BASE_URL}/resorts/${slug}`;

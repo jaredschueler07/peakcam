@@ -44,7 +44,7 @@ function ImageCam({ url, name }: { url: string; name: string }) {
 // ─── Cam player ──────────────────────────────────────────────────────────────
 
 function CamPlayer({ cam, resortSlug }: { cam: Cam; resortSlug: string }) {
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(true);
 
   // Link-out cams — no embed available
   if (cam.embed_type === "link") {
@@ -219,12 +219,28 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
           <div className="text-text-muted text-xs mt-1">{s.label}</div>
         </div>
       ))}
-      {snow.conditions && (
-        <div className="bg-surface border border-border rounded-xl px-4 py-3">
-          <div className="text-text-base text-sm font-semibold">{snow.conditions}</div>
-          <div className="text-text-muted text-xs mt-1">Conditions</div>
-        </div>
-      )}
+      {(() => {
+        if (!snow.conditions) return null;
+        const conditionsRaw = snow.conditions;
+        const [tagsStr, narrativeStr] = conditionsRaw.includes("||") ? conditionsRaw.split("||") : ["", conditionsRaw];
+        const tags = tagsStr ? tagsStr.split(",") : [];
+        const narrative = narrativeStr || conditionsRaw;
+
+        return (
+          <div className="bg-surface border border-border rounded-xl px-4 py-3 flex-1 min-w-[200px]">
+            {tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {tags.map((tag) => (
+                  <span key={tag} className="px-2 py-0.5 rounded bg-surface2 border border-border text-text-subtle text-[10px] uppercase tracking-wider font-bold">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="text-text-base text-sm font-medium leading-snug">{narrative}</div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

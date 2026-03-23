@@ -70,7 +70,9 @@ export function resortsToGeoJSON(
           liftsOpen: snow?.lifts_open ?? null,
           liftsTotal: snow?.lifts_total ?? null,
           camCount: resort.cams.length,
-          conditions: snow?.conditions ?? null,
+          conditions: snow?.conditions 
+            ? (snow.conditions.includes("||") ? snow.conditions.split("||")[1] : snow.conditions)
+            : null,
         },
       };
     }),
