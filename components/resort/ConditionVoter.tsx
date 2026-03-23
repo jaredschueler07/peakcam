@@ -1,6 +1,17 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { 
+  CloudSnow, 
+  CheckCircle2, 
+  Activity, 
+  IceCream, 
+  Sun,
+  Flame,
+  Smile,
+  Thermometer,
+  Snowflake
+} from "lucide-react";
 import type { SnowQuality, ComfortLevel, LiveConditions } from "@/lib/types";
 import { trackConditionVote } from "@/lib/posthog";
 
@@ -14,19 +25,19 @@ interface Props {
 
 // ── Option maps ──────────────────────────────────────────────────────────────
 
-const snowOptions: { value: SnowQuality; label: string; icon: string }[] = [
-  { value: "powder", label: "Powder", icon: "🤩" },
-  { value: "packed", label: "Packed", icon: "👍" },
-  { value: "crud",   label: "Crud",   icon: "😬" },
-  { value: "ice",    label: "Ice",    icon: "🧊" },
-  { value: "spring", label: "Spring", icon: "🌞" },
+const snowOptions: { value: SnowQuality; label: string; icon: any }[] = [
+  { value: "powder", label: "Powder", icon: CloudSnow },
+  { value: "packed", label: "Packed", icon: CheckCircle2 },
+  { value: "crud",   label: "Crud",   icon: Activity },
+  { value: "ice",    label: "Ice",    icon: IceCream },
+  { value: "spring", label: "Spring", icon: Sun },
 ];
 
-const comfortOptions: { value: ComfortLevel; label: string; icon: string }[] = [
-  { value: "warm",     label: "Warm",     icon: "☀️" },
-  { value: "perfect",  label: "Perfect",  icon: "😎" },
-  { value: "cold",     label: "Cold",     icon: "🥶" },
-  { value: "freezing", label: "Freezing", icon: "❄️" },
+const comfortOptions: { value: ComfortLevel; label: string; icon: any }[] = [
+  { value: "warm",     label: "Warm",     icon: Flame },
+  { value: "perfect",  label: "Perfect",  icon: Smile },
+  { value: "cold",     label: "Cold",     icon: Thermometer },
+  { value: "freezing", label: "Freezing", icon: Snowflake },
 ];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -124,15 +135,21 @@ export function ConditionVoter({ resortId, resortSlug, liveConditions }: Props) 
             {liveConditions.total_votes_12h} skier{liveConditions.total_votes_12h !== 1 ? "s" : ""} report
             {liveConditions.total_votes_12h === 1 ? "s" : ""}:
             {liveConditions.top_snow_quality && (
-              <span className="text-cyan font-semibold ml-1">
-                {snowOptions.find((o) => o.value === liveConditions.top_snow_quality)?.icon}{" "}
+              <span className="text-cyan font-semibold ml-1 inline-flex items-center gap-1">
+                {(() => {
+                  const Icon = snowOptions.find((o) => o.value === liveConditions.top_snow_quality)?.icon;
+                  return Icon ? <Icon size={14} /> : null;
+                })()}
                 {liveConditions.top_snow_quality.charAt(0).toUpperCase() + liveConditions.top_snow_quality.slice(1)}
               </span>
             )}
             {liveConditions.top_snow_quality && liveConditions.top_comfort && " · "}
             {liveConditions.top_comfort && (
-              <span className="text-powder font-semibold">
-                {comfortOptions.find((o) => o.value === liveConditions.top_comfort)?.icon}{" "}
+              <span className="text-powder font-semibold inline-flex items-center gap-1">
+                {(() => {
+                  const Icon = comfortOptions.find((o) => o.value === liveConditions.top_comfort)?.icon;
+                  return Icon ? <Icon size={14} /> : null;
+                })()}
                 {liveConditions.top_comfort.charAt(0).toUpperCase() + liveConditions.top_comfort.slice(1)}
               </span>
             )}
@@ -155,23 +172,26 @@ export function ConditionVoter({ resortId, resortSlug, liveConditions }: Props) 
           <div className="mb-3">
             <p className="text-text-muted text-xs font-medium mb-2">Snow Quality</p>
             <div className="flex flex-wrap gap-1.5">
-              {snowOptions.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => setSnow(snow === opt.value ? null : opt.value)}
-                  className={`
-                    inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 min-h-[44px]
-                    text-sm font-semibold border cursor-pointer select-none
-                    transition-all duration-[220ms] whitespace-nowrap
-                    ${snow === opt.value
-                      ? "border-cyan/30 bg-cyan-dim text-cyan"
-                      : "border-border bg-surface2 text-text-muted hover:border-border-hi hover:text-text-subtle"}
-                  `}
-                >
-                  <span className="text-sm leading-none">{opt.icon}</span>
-                  {opt.label}
-                </button>
-              ))}
+              {snowOptions.map((opt) => {
+                const Icon = opt.icon;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => setSnow(snow === opt.value ? null : opt.value)}
+                    className={`
+                      inline-flex items-center gap-2 rounded-full px-4 py-2.5 min-h-[44px]
+                      text-sm font-semibold border cursor-pointer select-none
+                      transition-all duration-[220ms] whitespace-nowrap
+                      ${snow === opt.value
+                        ? "border-cyan/30 bg-cyan-dim text-cyan"
+                        : "border-border bg-surface2 text-text-muted hover:border-border-hi hover:text-text-subtle"}
+                    `}
+                  >
+                    <Icon size={16} />
+                    {opt.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -179,23 +199,26 @@ export function ConditionVoter({ resortId, resortSlug, liveConditions }: Props) 
           <div className="mb-4">
             <p className="text-text-muted text-xs font-medium mb-2">Comfort</p>
             <div className="flex flex-wrap gap-1.5">
-              {comfortOptions.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => setComfort(comfort === opt.value ? null : opt.value)}
-                  className={`
-                    inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 min-h-[44px]
-                    text-sm font-semibold border cursor-pointer select-none
-                    transition-all duration-[220ms] whitespace-nowrap
-                    ${comfort === opt.value
-                      ? "border-cyan/30 bg-cyan-dim text-cyan"
-                      : "border-border bg-surface2 text-text-muted hover:border-border-hi hover:text-text-subtle"}
-                  `}
-                >
-                  <span className="text-sm leading-none">{opt.icon}</span>
-                  {opt.label}
-                </button>
-              ))}
+              {comfortOptions.map((opt) => {
+                const Icon = opt.icon;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => setComfort(comfort === opt.value ? null : opt.value)}
+                    className={`
+                      inline-flex items-center gap-2 rounded-full px-4 py-2.5 min-h-[44px]
+                      text-sm font-semibold border cursor-pointer select-none
+                      transition-all duration-[220ms] whitespace-nowrap
+                      ${comfort === opt.value
+                        ? "border-cyan/30 bg-cyan-dim text-cyan"
+                        : "border-border bg-surface2 text-text-muted hover:border-border-hi hover:text-text-subtle"}
+                    `}
+                  >
+                    <Icon size={16} />
+                    {opt.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

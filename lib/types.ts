@@ -20,6 +20,9 @@ export interface Resort {
   cam_page_url: string | null;
   cond_rating: ConditionRating;
   snotel_station_id: string | null;
+  x_url: string | null;
+  facebook_url: string | null;
+  instagram_url: string | null;
   is_active: boolean;
   created_at: string;
 }

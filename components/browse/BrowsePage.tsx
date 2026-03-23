@@ -278,7 +278,7 @@ export function BrowsePage({ resorts }: Props) {
   }, [hasLiveCams]);
 
   return (
-    <div className="min-h-screen bg-bg">
+    <div id="conditions" className="min-h-screen bg-bg">
       <Header />
 
       {/* ── Frosted glass search + filter bar ─────────────────── */}

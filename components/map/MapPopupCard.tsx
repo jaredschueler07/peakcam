@@ -18,11 +18,14 @@ export default function MapPopupCard({
     resort.cond_rating.charAt(0).toUpperCase() + resort.cond_rating.slice(1);
 
   return (
-    <div className="min-w-[240px]">
+    <div 
+      className="min-w-[240px] cursor-pointer group/popup"
+      onClick={() => onViewResort(resort.slug)}
+    >
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-2">
         <div>
-          <h3 className="text-text-base font-semibold text-sm">
+          <h3 className="text-text-base font-semibold text-sm group-hover/popup:text-cyan transition-colors">
             {resort.name}
           </h3>
           <p className="text-text-muted text-xs">
@@ -72,12 +75,9 @@ export default function MapPopupCard({
         <span className="text-text-muted text-xs">
           {resort.cams.length} cam{resort.cams.length !== 1 ? "s" : ""}
         </span>
-        <button
-          onClick={() => onViewResort(resort.slug)}
-          className="text-cyan text-xs font-semibold hover:underline transition-colors duration-220"
-        >
+        <div className="text-cyan text-xs font-semibold hover:underline transition-colors duration-220">
           View Resort &rarr;
-        </button>
+        </div>
       </div>
     </div>
   );

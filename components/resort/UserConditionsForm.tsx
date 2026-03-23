@@ -1,6 +1,23 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { 
+  CloudSnow, 
+  CheckCircle2, 
+  IceCream, 
+  Droplets, 
+  Sun, 
+  CloudFog, 
+  EyeOff, 
+  Wind, 
+  WindArrowDown, 
+  Tornado, 
+  Navigation,
+  Check,
+  Mountain,
+  Zap,
+  Split
+} from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { AuthModal } from "@/components/auth/AuthModal";
 import type { User } from "@supabase/supabase-js";
@@ -8,31 +25,31 @@ import type { UserSnowQuality, UserVisibility, UserWind, UserTrailConditions } f
 
 // ── Option definitions ───────────────────────────────────────
 
-const snowOptions: { value: UserSnowQuality; label: string; icon: string }[] = [
-  { value: "powder",  label: "Powder",  icon: "🤩" },
-  { value: "packed",  label: "Packed",  icon: "👍" },
-  { value: "icy",     label: "Icy",     icon: "🧊" },
-  { value: "slush",   label: "Slush",   icon: "💧" },
+const snowOptions: { value: UserSnowQuality; label: string; icon: any }[] = [
+  { value: "powder",  label: "Powder",  icon: CloudSnow },
+  { value: "packed",  label: "Packed",  icon: CheckCircle2 },
+  { value: "icy",     label: "Icy",     icon: IceCream },
+  { value: "slush",   label: "Slush",   icon: Droplets },
 ];
 
-const visibilityOptions: { value: UserVisibility; label: string; icon: string }[] = [
-  { value: "clear",     label: "Clear",     icon: "☀️" },
-  { value: "foggy",     label: "Foggy",     icon: "🌫️" },
-  { value: "whiteout",  label: "Whiteout",  icon: "🫥" },
+const visibilityOptions: { value: UserVisibility; label: string; icon: any }[] = [
+  { value: "clear",     label: "Clear",     icon: Sun },
+  { value: "foggy",     label: "Foggy",     icon: CloudFog },
+  { value: "whiteout",  label: "Whiteout",  icon: EyeOff },
 ];
 
-const windOptions: { value: UserWind; label: string; icon: string }[] = [
-  { value: "calm",    label: "Calm",    icon: "🍃" },
-  { value: "breezy",  label: "Breezy",  icon: "💨" },
-  { value: "gusty",   label: "Gusty",   icon: "🌬️" },
-  { value: "high",    label: "High",    icon: "⛔" },
+const windOptions: { value: UserWind; label: string; icon: any }[] = [
+  { value: "calm",    label: "Calm",    icon: Navigation },
+  { value: "breezy",  label: "Breezy",  icon: Wind },
+  { value: "gusty",   label: "Gusty",   icon: WindArrowDown },
+  { value: "high",    label: "High",    icon: Tornado },
 ];
 
-const trailOptions: { value: UserTrailConditions; label: string; icon: string }[] = [
-  { value: "groomed",    label: "Groomed",    icon: "✅" },
-  { value: "ungroomed",  label: "Ungroomed",  icon: "🎿" },
-  { value: "moguls",     label: "Moguls",     icon: "⛰️" },
-  { value: "variable",   label: "Variable",   icon: "🔀" },
+const trailOptions: { value: UserTrailConditions; label: string; icon: any }[] = [
+  { value: "groomed",    label: "Groomed",    icon: Check },
+  { value: "ungroomed",  label: "Ungroomed",  icon: Mountain },
+  { value: "moguls",     label: "Moguls",     icon: Zap },
+  { value: "variable",   label: "Variable",   icon: Split },
 ];
 
 // ── Sub-components ───────────────────────────────────────────
@@ -44,7 +61,7 @@ function OptionRow<T extends string>({
   onSelect,
 }: {
   label: string;
-  options: { value: T; label: string; icon: string }[];
+  options: { value: T; label: string; icon: any }[];
   selected: T | null;
   onSelect: (v: T) => void;
 }) {
@@ -52,24 +69,27 @@ function OptionRow<T extends string>({
     <div className="mb-3">
       <p className="text-text-muted text-xs font-medium mb-2">{label}</p>
       <div className="flex flex-wrap gap-1.5">
-        {options.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => onSelect(selected === opt.value ? (null as unknown as T) : opt.value)}
-            className={`
-              inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 min-h-[44px]
-              text-sm font-semibold border cursor-pointer select-none
-              transition-all duration-[220ms] whitespace-nowrap
-              ${selected === opt.value
-                ? "border-cyan/30 bg-cyan-dim text-cyan"
-                : "border-border bg-surface2 text-text-muted hover:border-border-hi hover:text-text-subtle"}
-            `}
-          >
-            <span className="text-sm leading-none">{opt.icon}</span>
-            {opt.label}
-          </button>
-        ))}
+        {options.map((opt) => {
+          const Icon = opt.icon;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onSelect(selected === opt.value ? (null as unknown as T) : opt.value)}
+              className={`
+                inline-flex items-center gap-2 rounded-full px-4 py-2.5 min-h-[44px]
+                text-sm font-semibold border cursor-pointer select-none
+                transition-all duration-[220ms] whitespace-nowrap
+                ${selected === opt.value
+                  ? "border-cyan/30 bg-cyan-dim text-cyan"
+                  : "border-border bg-surface2 text-text-muted hover:border-border-hi hover:text-text-subtle"}
+              `}
+            >
+              <Icon size={16} />
+              {opt.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

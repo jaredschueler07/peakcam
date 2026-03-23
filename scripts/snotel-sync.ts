@@ -140,7 +140,10 @@ async function fetchSnotelData(
   const eightDaysAgo = new Date(now);
   eightDaysAgo.setDate(eightDaysAgo.getDate() - 8);
 
-  const triplet = `${stationId}:${stateCode}:SNTL`;
+  // stationId might now be a full triplet (e.g. "2041:VT:SCAN")
+  // ONLY append if it's a raw ID (no colons)
+  const triplet = stationId.includes(":") ? stationId : `${stationId}:${stateCode}:SNTL`;
+  
   const params = new URLSearchParams({
     stationTriplets: triplet,
     elements: "SNWD,WTEQ,PREC,TOBS,TMAX,TMIN",
@@ -445,8 +448,11 @@ async function main(): Promise<void> {
       );
 
       if (!days || days.length === 0) {
+        const triplet = resort.snotel_station_id.includes(":") 
+          ? resort.snotel_station_id 
+          : `${resort.snotel_station_id}:${resort.state}:SNTL`;
         console.log(
-          `  SKIP ${resort.name} (${resort.snotel_station_id}:${resort.state}:SNTL) — no data`,
+          `  SKIP ${resort.name} (${triplet}) — no data`,
         );
         noData++;
         await sleep(300);

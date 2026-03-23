@@ -156,7 +156,10 @@ async function importResorts() {
       lng:                toNullFloat(r.lng),
       website_url:        blankToNull(r.website_url),
       cam_page_url:       blankToNull(r.cam_page_url),
-      snotel_station_id:  toNullInt(r.snotel_station_id),
+      snotel_station_id:  blankToNull(r.snotel_station_id),
+      x_url:              blankToNull(r.x_url),
+      facebook_url:       blankToNull(r.facebook_url),
+      instagram_url:      blankToNull(r.instagram_url),
       is_active:          toBool(r.is_active),
     }));
 

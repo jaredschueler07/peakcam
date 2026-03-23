@@ -272,17 +272,43 @@ export function ResortDetailPage({ resort, weather, liveConditions, userConditio
                   label={resort.cond_rating.charAt(0).toUpperCase() + resort.cond_rating.slice(1)}
                 />
               )}
-              {resort.website_url && (
-                <a
-                  href={resort.website_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-text-muted hover:text-cyan text-sm border border-border hover:border-border-hi
-                             rounded-lg px-3 py-1.5 transition-all duration-150"
-                >
-                  Resort site ↗
-                </a>
-              )}
+              <div className="flex items-center gap-2">
+                {resort.instagram_url && (
+                  <a href={resort.instagram_url} target="_blank" rel="noopener noreferrer"
+                    className="text-text-muted hover:text-cyan transition-colors" title="Instagram">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+                    </svg>
+                  </a>
+                )}
+                {resort.facebook_url && (
+                  <a href={resort.facebook_url} target="_blank" rel="noopener noreferrer"
+                    className="text-text-muted hover:text-cyan transition-colors" title="Facebook">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    </svg>
+                  </a>
+                )}
+                {resort.x_url && (
+                  <a href={resort.x_url} target="_blank" rel="noopener noreferrer"
+                    className="text-text-muted hover:text-cyan transition-colors" title="X (Twitter)">
+                    <svg className="w-[18px] h-[18px]" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                    </svg>
+                  </a>
+                )}
+                {resort.website_url && (
+                  <a
+                    href={resort.website_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-text-muted hover:text-cyan text-sm border border-border hover:border-border-hi
+                               rounded-lg px-3 py-1.5 transition-all duration-150"
+                  >
+                    Resort site ↗
+                  </a>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -294,7 +320,19 @@ export function ResortDetailPage({ resort, weather, liveConditions, userConditio
         {/* Snow conditions */}
         {snow ? (
           <section>
-            <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base mb-4">Snow Report</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">Snow Report</h2>
+              {resort.snotel_station_id && (
+                <a
+                  href={`https://www.nrcs.usda.gov/wps/portal/wcc/home/snowpackProfile?station=${resort.snotel_station_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-text-muted hover:text-cyan text-xs transition-colors"
+                >
+                  SNOTEL Source ↗
+                </a>
+              )}
+            </div>
             <ConditionsStrip resort={resort} />
             <p className="text-text-muted text-xs mt-2">
               Updated {new Date(snow.updated_at).toLocaleDateString("en-US", {
@@ -312,27 +350,40 @@ export function ResortDetailPage({ resort, weather, liveConditions, userConditio
         )}
 
         {/* Weather forecast */}
-        {weather && weather.length > 0 && (
+        {weather && weather.length > 0 ? (
           <section>
-            <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base mb-4">5-Day Forecast</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">5-Day Forecast</h2>
+              <a
+                href={`https://forecast.weather.gov/MapClick.php?lat=${resort.lat}&lon=${resort.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-text-muted hover:text-cyan text-xs transition-colors"
+              >
+                NWS Forecast ↗
+              </a>
+            </div>
             <WeatherStrip weather={weather} />
             <p className="text-text-muted text-xs mt-2">Via National Weather Service · Updated hourly</p>
           </section>
+        ) : (
+          <section>
+             <div className="flex items-center justify-between mb-4">
+              <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">5-Day Forecast</h2>
+              <a
+                href={`https://forecast.weather.gov/MapClick.php?lat=${resort.lat}&lon=${resort.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-text-muted hover:text-cyan text-xs transition-colors"
+              >
+                NWS Forecast ↗
+              </a>
+            </div>
+            <div className="bg-surface border border-border rounded-xl p-6 text-center text-text-muted text-sm">
+              Weather data temporarily unavailable.
+            </div>
+          </section>
         )}
-
-        {/* User-verified conditions (quick vote) */}
-        <ConditionVoter resortId={resort.id} resortSlug={resort.slug} liveConditions={liveConditions ?? null} />
-
-        {/* User conditions reports — submit + list */}
-        <section>
-          <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base mb-4">
-            Conditions Reports
-          </h2>
-          <div className="space-y-4">
-            <UserConditionsForm resortId={resort.id} resortSlug={resort.slug} />
-            <UserConditionsList conditions={userConditions} />
-          </div>
-        </section>
 
         {/* Live cams */}
         <section>
@@ -382,6 +433,20 @@ export function ResortDetailPage({ resort, weather, liveConditions, userConditio
               ))}
             </div>
           )}
+        </section>
+
+        {/* User-verified conditions (quick vote) */}
+        <ConditionVoter resortId={resort.id} resortSlug={resort.slug} liveConditions={liveConditions ?? null} />
+
+        {/* User conditions reports — submit + list */}
+        <section>
+          <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base mb-4">
+            Conditions Reports
+          </h2>
+          <div className="space-y-4">
+            <UserConditionsForm resortId={resort.id} resortSlug={resort.slug} />
+            <UserConditionsList conditions={userConditions} />
+          </div>
         </section>
 
         {/* Footer nav */}

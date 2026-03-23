@@ -1,34 +1,51 @@
 "use client";
 
+import { 
+  CloudSnow, 
+  CheckCircle2, 
+  IceCream, 
+  Droplets, 
+  Sun, 
+  CloudFog, 
+  EyeOff, 
+  Wind, 
+  WindArrowDown, 
+  Tornado, 
+  Navigation,
+  Check,
+  Mountain,
+  Zap,
+  Split
+} from "lucide-react";
 import type { UserCondition } from "@/lib/types";
 
 // ── Label maps ───────────────────────────────────────────────
 
-const snowLabels: Record<string, { label: string; icon: string; color: string }> = {
-  powder:  { label: "Powder",  icon: "🤩", color: "text-powder" },
-  packed:  { label: "Packed",  icon: "👍", color: "text-cyan" },
-  icy:     { label: "Icy",     icon: "🧊", color: "text-good" },
-  slush:   { label: "Slush",   icon: "💧", color: "text-fair" },
+const snowLabels: Record<string, { label: string; icon: any; color: string }> = {
+  powder:  { label: "Powder",  icon: CloudSnow, color: "text-powder" },
+  packed:  { label: "Packed",  icon: CheckCircle2, color: "text-cyan" },
+  icy:     { label: "Icy",     icon: IceCream, color: "text-good" },
+  slush:   { label: "Slush",   icon: Droplets, color: "text-fair" },
 };
 
-const visibilityLabels: Record<string, { label: string; icon: string }> = {
-  clear:    { label: "Clear",    icon: "☀️" },
-  foggy:    { label: "Foggy",    icon: "🌫️" },
-  whiteout: { label: "Whiteout", icon: "🫥" },
+const visibilityLabels: Record<string, { label: string; icon: any }> = {
+  clear:    { label: "Clear",    icon: Sun },
+  foggy:    { label: "Foggy",    icon: CloudFog },
+  whiteout: { label: "Whiteout", icon: EyeOff },
 };
 
-const windLabels: Record<string, { label: string; icon: string }> = {
-  calm:   { label: "Calm",   icon: "🍃" },
-  breezy: { label: "Breezy", icon: "💨" },
-  gusty:  { label: "Gusty",  icon: "🌬️" },
-  high:   { label: "High",   icon: "⛔" },
+const windLabels: Record<string, { label: string; icon: any }> = {
+  calm:   { label: "Calm",   icon: Navigation },
+  breezy: { label: "Breezy", icon: Wind },
+  gusty:  { label: "Gusty",  icon: WindArrowDown },
+  high:   { label: "High",   icon: Tornado },
 };
 
-const trailLabels: Record<string, { label: string; icon: string }> = {
-  groomed:   { label: "Groomed",    icon: "✅" },
-  ungroomed: { label: "Ungroomed",  icon: "🎿" },
-  moguls:    { label: "Moguls",     icon: "⛰️" },
-  variable:  { label: "Variable",   icon: "🔀" },
+const trailLabels: Record<string, { label: string; icon: any }> = {
+  groomed:   { label: "Groomed",    icon: Check },
+  ungroomed: { label: "Ungroomed",  icon: Mountain },
+  moguls:    { label: "Moguls",     icon: Zap },
+  variable:  { label: "Variable",   icon: Split },
 };
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -66,6 +83,11 @@ export function UserConditionsList({ conditions }: Props) {
         const wind = windLabels[c.wind];
         const trail = trailLabels[c.trail_conditions];
 
+        const SnowIcon = snow?.icon;
+        const VisIcon = vis?.icon;
+        const WindIcon = wind?.icon;
+        const TrailIcon = trail?.icon;
+
         return (
           <div
             key={c.id}
@@ -74,7 +96,7 @@ export function UserConditionsList({ conditions }: Props) {
             {/* Top row: snow quality + time */}
             <div className="flex items-start justify-between gap-3 mb-3">
               <div className="flex items-center gap-2">
-                <span className="text-lg leading-none">{snow?.icon}</span>
+                {SnowIcon && <SnowIcon size={18} className={snow?.color} />}
                 <span className={`text-sm font-semibold ${snow?.color ?? "text-text-base"}`}>
                   {snow?.label}
                 </span>
@@ -84,17 +106,20 @@ export function UserConditionsList({ conditions }: Props) {
 
             {/* Condition pills */}
             <div className="flex flex-wrap gap-1.5 mb-3">
-              <span className="inline-flex items-center gap-1 text-xs bg-surface2 border border-border
+              <span className="inline-flex items-center gap-1.5 text-xs bg-surface2 border border-border
                 rounded-full px-2.5 py-1 text-text-subtle">
-                {vis?.icon} {vis?.label}
+                {VisIcon && <VisIcon size={13} />}
+                {vis?.label}
               </span>
-              <span className="inline-flex items-center gap-1 text-xs bg-surface2 border border-border
+              <span className="inline-flex items-center gap-1.5 text-xs bg-surface2 border border-border
                 rounded-full px-2.5 py-1 text-text-subtle">
-                {wind?.icon} {wind?.label} wind
+                {WindIcon && <WindIcon size={13} />}
+                {wind?.label} wind
               </span>
-              <span className="inline-flex items-center gap-1 text-xs bg-surface2 border border-border
+              <span className="inline-flex items-center gap-1.5 text-xs bg-surface2 border border-border
                 rounded-full px-2.5 py-1 text-text-subtle">
-                {trail?.icon} {trail?.label}
+                {TrailIcon && <TrailIcon size={13} />}
+                {trail?.label}
               </span>
             </div>
 

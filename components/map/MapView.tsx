@@ -165,6 +165,12 @@ export default function MapView({
     (e: MapLayerMouseEvent) => {
       if (e.features && e.features.length > 0) {
         const slug = e.features[0].properties?.slug as string;
+
+        // If a handler is provided (e.g. for navigation), call it
+        if (onResortClick) {
+          onResortClick(slug);
+        }
+
         setSelectedSlug(slug);
 
         // Fly to clicked resort
@@ -178,7 +184,7 @@ export default function MapView({
         setSelectedSlug(null);
       }
     },
-    [],
+    [onResortClick],
   );
 
   const handlePopupClose = useCallback(() => setSelectedSlug(null), []);
