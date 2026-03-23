@@ -109,7 +109,7 @@ export default async function OgImage({
             PEAKCAM
           </div>
           <div style={{ fontSize: 14, color: "#2E4A68", letterSpacing: "0.05em" }}>
-            peakcam.vercel.app
+            peakcam.io
           </div>
         </div>
 
