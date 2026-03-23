@@ -27,7 +27,7 @@ export default async function OgImage({
   const condColor = resort
     ? (COND_COLOR[resort.cond_rating] ?? "#60C8FF")
     : "#60C8FF";
-  const snow = resort.snow_report;
+  const snow = resort?.snow_report;
 
   const conditionsNarrative = snow?.conditions 
     ? (snow.conditions.includes("||") ? snow.conditions.split("||")[1] : snow.conditions) 
