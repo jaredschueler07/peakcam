@@ -3,7 +3,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
-import { AuthModal } from "@/components/auth/AuthModal";
 import type { User } from "@supabase/supabase-js";
 
 interface HeaderProps {
@@ -16,6 +15,7 @@ const navLinks = [
   { label: "Map",         href: "/map" },
   { label: "Compare",     href: "/compare" },
   { label: "Snow Report", href: "/snow-report" },
+  { label: "Favorites",   href: "/favorites" },
   { label: "About",       href: "/about" },
 ];
 
@@ -24,7 +24,6 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [showAuthModal, setShowAuthModal] = useState(false);
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
@@ -52,8 +51,6 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
   }
 
   return (
-    <>
-      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
     <header className="sticky top-0 z-50 h-[60px] flex items-center gap-5 px-7
       bg-bg/88 backdrop-blur-md border-b border-border">
 
@@ -124,16 +121,15 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
             Sign out
           </button>
         ) : (
-          <button
-            onClick={() => setShowAuthModal(true)}
+          <Link
+            href={`/auth?next=${encodeURIComponent(pathname)}`}
             className="ml-1 px-3 py-1.5 rounded text-[13px] font-semibold whitespace-nowrap
               text-cyan border border-cyan/30 hover:bg-cyan-dim transition-all duration-150"
           >
             Sign in
-          </button>
+          </Link>
         )}
       </nav>
     </header>
-    </>
   );
 }
