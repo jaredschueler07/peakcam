@@ -8,8 +8,10 @@ import { Search, SlidersHorizontal } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { SummitResortCard } from "@/components/browse/SummitResortCard";
 import { PowderAlertSignup } from "@/components/alerts/PowderAlertSignup";
+import { AuthModal } from "@/components/auth/AuthModal";
 import type { ResortWithData } from "@/lib/types";
-import { trackSearch, trackFilter } from "@/lib/posthog";
+import { trackSearch, trackFilter, trackFavoriteToggle } from "@/lib/posthog";
+import { useFavorites } from "@/lib/useFavorites";
 
 // MapLibre map — dynamic import, no SSR (requires window)
 const MapView = dynamic(() => import("@/components/map/MapView"), {
@@ -208,6 +210,19 @@ export function BrowsePage({ resorts }: Props) {
   const [sort, setSort] = useState<SortOption>("name");
   const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
+  const { favoriteIds, toggleFavorite } = useFavorites();
+
+  async function handleToggleFavorite(resortId: string) {
+    const wasFav = favoriteIds.has(resortId);
+    const { needsAuth } = await toggleFavorite(resortId);
+    if (needsAuth) {
+      setShowAuthModal(true);
+    } else {
+      trackFavoriteToggle(resortId, wasFav ? "remove" : "add");
+    }
+  }
 
   const availableStates = useMemo(() => {
     return [...new Set(resorts.map((r) => r.state))].sort();
@@ -279,6 +294,9 @@ export function BrowsePage({ resorts }: Props) {
 
   return (
     <div id="conditions" className="min-h-screen bg-bg">
+      {showAuthModal && (
+        <AuthModal onClose={() => setShowAuthModal(false)} />
+      )}
       <Header />
 
       {/* ── Frosted glass search + filter bar ─────────────────── */}
@@ -415,7 +433,11 @@ export function BrowsePage({ resorts }: Props) {
                     onMouseEnter={() => setHoveredSlug(resort.slug)}
                     onMouseLeave={() => setHoveredSlug(null)}
                   >
-                    <SummitResortCard resort={resort} />
+                    <SummitResortCard
+                      resort={resort}
+                      isFavorited={favoriteIds.has(resort.id)}
+                      onToggleFavorite={() => handleToggleFavorite(resort.id)}
+                    />
                   </div>
                 ))}
               </div>

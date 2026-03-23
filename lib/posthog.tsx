@@ -78,3 +78,11 @@ export function trackSearch(query: string, resultCount: number) {
 export function trackFilter(filterType: string, filterValue: string) {
   posthog.capture("filter_applied", { filter_type: filterType, filter_value: filterValue });
 }
+
+export function trackFavoriteToggle(resortId: string, action: "add" | "remove") {
+  posthog.capture("favorite_toggled", { resort_id: resortId, action });
+}
+
+export function trackShareClick(resortSlug: string, method: "native" | "copy") {
+  posthog.capture("share_clicked", { resort_slug: resortSlug, method });
+}

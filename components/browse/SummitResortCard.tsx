@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
-import { Camera, ArrowLeftRight } from "lucide-react";
+import { Camera, ArrowLeftRight, Heart } from "lucide-react";
 import type { ResortWithData, ConditionRating } from "@/lib/types";
 import { trackResortCardClick } from "@/lib/posthog";
 
@@ -59,9 +59,11 @@ const conditionColors: Record<ConditionRating, string> = {
 
 interface Props {
   resort: ResortWithData;
+  isFavorited?: boolean;
+  onToggleFavorite?: () => void;
 }
 
-export function SummitResortCard({ resort }: Props) {
+export function SummitResortCard({ resort, isFavorited = false, onToggleFavorite }: Props) {
   const snow = resort.snow_report;
   const baseDepth = snow?.base_depth ?? 0;
   const snow24h = snow?.new_snow_24h ?? 0;
@@ -188,15 +190,28 @@ export function SummitResortCard({ resort }: Props) {
           </div>
         </Link>
 
-        {/* Compare button — separate link outside the main card link */}
-        <div className="px-6 pb-5 pt-1">
+        {/* Action buttons — outside the main card link */}
+        <div className="px-6 pb-5 pt-1 flex gap-2">
           <Link
             href={`/compare?resorts=${resort.slug}`}
-            className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg border border-border/60 text-text-muted hover:text-cyan hover:border-cyan/40 hover:bg-cyan/5 transition-all duration-200 text-xs font-medium"
+            className="flex items-center justify-center gap-1.5 flex-1 py-2 rounded-lg border border-border/60 text-text-muted hover:text-cyan hover:border-cyan/40 hover:bg-cyan/5 transition-all duration-200 text-xs font-medium"
           >
             <ArrowLeftRight size={12} />
             Compare
           </Link>
+          {onToggleFavorite && (
+            <button
+              onClick={(e) => { e.preventDefault(); onToggleFavorite(); }}
+              aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
+              className={`flex items-center justify-center gap-1 px-3 py-2 rounded-lg border transition-all duration-200 text-xs font-medium ${
+                isFavorited
+                  ? "border-alpenglow/50 text-alpenglow bg-alpenglow/10 hover:bg-alpenglow/20"
+                  : "border-border/60 text-text-muted hover:text-alpenglow hover:border-alpenglow/40 hover:bg-alpenglow/5"
+              }`}
+            >
+              <Heart size={12} fill={isFavorited ? "currentColor" : "none"} />
+            </button>
+          )}
         </div>
       </div>
     </motion.div>

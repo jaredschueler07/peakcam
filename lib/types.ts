@@ -139,6 +139,14 @@ export interface UserCondition {
   submitted_at: string;
 }
 
+// ── User Favorites ────────────────────────────────────────────
+export interface UserFavorite {
+  id: string;
+  user_id: string;
+  resort_id: string;
+  created_at: string;
+}
+
 // ── NWS Weather ──────────────────────────────────────────────
 export interface WeatherPeriod {
   dow: string;             // "Today", "Mon", "Tue" …
