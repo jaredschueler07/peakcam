@@ -120,7 +120,7 @@ export default async function ResortPage({
 
   const skiResortLd = {
     "@context": "https://schema.org",
-    "@type": "SkiResort",
+    "@type": ["SkiResort", "TouristAttraction"],
     name: resort.name,
     description: snow
       ? `${resort.name} — ${snow.base_depth ?? "?"}″ base depth, ${snow.conditions ?? "current conditions"}. ${resort.cams.length} live webcams available.`

@@ -6,6 +6,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
+        disallow: ["/auth", "/alerts", "/favorites"],
       },
     ],
     sitemap: "https://peakcam.io/sitemap.xml",
