@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
-import { Camera, ArrowLeftRight } from "lucide-react";
-import type { ResortWithData, ConditionRating } from "@/lib/types";
+import { Camera, ArrowLeftRight, TrendingUp, TrendingDown, Minus, Snowflake, Sun, Thermometer } from "lucide-react";
+import type { ResortWithData, ConditionRating, SnowTrend, SnowOutlook } from "@/lib/types";
 import { trackResortCardClick } from "@/lib/posthog";
 
 // ── Animated count-up number ─────────────────────────────────────────────────
@@ -55,6 +55,33 @@ const conditionColors: Record<ConditionRating, string> = {
   poor:  "#f87171",
 };
 
+// ── Trend indicator ──────────────────────────────────────────────────────────
+
+const trendConfig: Record<SnowTrend, { icon: typeof TrendingUp; color: string; label: string }> = {
+  rising:  { icon: TrendingUp, color: "#2ECC8F", label: "Rising" },
+  stable:  { icon: Minus, color: "#8AA3BE", label: "Stable" },
+  falling: { icon: TrendingDown, color: "#f87171", label: "Falling" },
+};
+
+function TrendBadge({ trend }: { trend: SnowTrend }) {
+  const cfg = trendConfig[trend];
+  const Icon = cfg.icon;
+  return (
+    <span className="inline-flex items-center gap-0.5" style={{ color: cfg.color }} title={`7-day trend: ${cfg.label}`}>
+      <Icon size={12} />
+    </span>
+  );
+}
+
+// ── Outlook indicator ────────────────────────────────────────────────────────
+
+const outlookConfig: Record<SnowOutlook, { icon: typeof Snowflake; color: string; label: string }> = {
+  more_snow:  { icon: Snowflake, color: "#60C8FF", label: "More snow" },
+  stable:     { icon: Minus, color: "#8AA3BE", label: "Stable" },
+  warming:    { icon: Sun, color: "#FBBF24", label: "Warming" },
+  melt_risk:  { icon: Thermometer, color: "#f87171", label: "Melt risk" },
+};
+
 // ── SummitResortCard ─────────────────────────────────────────────────────────
 
 interface Props {
@@ -73,6 +100,9 @@ export function SummitResortCard({ resort }: Props) {
   const gradient = regionGradients[resort.region] ?? defaultGradient;
   const condColor = resort.cond_rating ? conditionColors[resort.cond_rating] : null;
   const condLabel = resort.cond_rating?.toUpperCase() ?? null;
+  const pctNormal = snow?.pct_of_normal;
+  const trend = snow?.trend_7d as SnowTrend | null;
+  const outlook = snow?.outlook as SnowOutlook | null;
 
   return (
     <motion.div
@@ -164,22 +194,35 @@ export function SummitResortCard({ resort }: Props) {
               </div>
             </div>
 
-            {/* Condition & cameras */}
+            {/* Condition, trend, % normal, cameras */}
             <div className="flex items-center justify-between pt-4 border-t border-border">
-              {condColor && condLabel ? (
-                <div
-                  className="px-3 py-1 rounded text-sm font-semibold"
-                  style={{
-                    backgroundColor: `${condColor}20`,
-                    color: condColor,
-                    border: `1px solid ${condColor}40`,
-                  }}
-                >
-                  {condLabel}
-                </div>
-              ) : (
-                <span className="text-text-muted text-xs">&mdash;</span>
-              )}
+              <div className="flex items-center gap-2">
+                {condColor && condLabel ? (
+                  <div
+                    className="px-3 py-1 rounded text-sm font-semibold"
+                    style={{
+                      backgroundColor: `${condColor}20`,
+                      color: condColor,
+                      border: `1px solid ${condColor}40`,
+                    }}
+                  >
+                    {condLabel}
+                  </div>
+                ) : (
+                  <span className="text-text-muted text-xs">&mdash;</span>
+                )}
+                {trend && <TrendBadge trend={trend} />}
+                {pctNormal != null && (
+                  <span className={`text-xs font-mono ${pctNormal >= 110 ? "text-[#2ECC8F]" : pctNormal >= 90 ? "text-text-subtle" : pctNormal >= 70 ? "text-yellow-400" : "text-red-400"}`}>
+                    {pctNormal}%
+                  </span>
+                )}
+                {outlook && outlook !== "stable" && (
+                  <span title={outlookConfig[outlook].label} style={{ color: outlookConfig[outlook].color }}>
+                    {(() => { const Icon = outlookConfig[outlook].icon; return <Icon size={12} />; })()}
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-1 text-text-subtle">
                 <Camera size={16} />
                 <span className="text-sm">{camCount}</span>

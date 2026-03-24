@@ -6,7 +6,7 @@ import { Header } from "@/components/layout/Header";
 import { ConditionBadge } from "@/components/ui/Badge";
 import type { ResortWithData } from "@/lib/types";
 
-type SortKey = "name" | "base" | "24h" | "48h" | "trails" | "lifts" | "conditions";
+type SortKey = "name" | "base" | "24h" | "48h" | "trails" | "lifts" | "conditions" | "pctNormal" | "trend";
 type SortDir = "asc" | "desc";
 
 export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
@@ -36,6 +36,11 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
         case "48h": diff = (sa.new_snow_48h ?? -1) - (sb.new_snow_48h ?? -1); break;
         case "trails": diff = (sa.trails_open ?? -1) - (sb.trails_open ?? -1); break;
         case "lifts": diff = (sa.lifts_open ?? -1) - (sb.lifts_open ?? -1); break;
+        case "pctNormal": diff = (sa.pct_of_normal ?? -1) - (sb.pct_of_normal ?? -1); break;
+        case "trend": {
+          const tOrd: Record<string, number> = { rising: 2, stable: 1, falling: 0 };
+          diff = (tOrd[sa.trend_7d ?? ""] ?? -1) - (tOrd[sb.trend_7d ?? ""] ?? -1); break;
+        }
         case "conditions": diff = (CONDITION_ORDER[a.cond_rating] ?? 99) - (CONDITION_ORDER[b.cond_rating] ?? 99); break;
       }
 
@@ -129,6 +134,8 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
                 <th className="text-right px-3 py-3 hidden md:table-cell"><SortHeader label="48h" field="48h" /></th>
                 <th className="text-right px-3 py-3 hidden md:table-cell"><SortHeader label="Trails" field="trails" /></th>
                 <th className="text-right px-3 py-3 hidden lg:table-cell"><SortHeader label="Lifts" field="lifts" /></th>
+                <th className="text-right px-3 py-3 hidden lg:table-cell"><SortHeader label="% Normal" field="pctNormal" /></th>
+                <th className="text-center px-3 py-3 hidden lg:table-cell"><SortHeader label="Trend" field="trend" /></th>
                 <th className="text-center px-3 py-3"><SortHeader label="Conditions" field="conditions" /></th>
               </tr>
             </thead>
@@ -176,6 +183,31 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
                         {snow.lifts_open != null && snow.lifts_total != null
                           ? `${snow.lifts_open}/${snow.lifts_total}` : "—"}
                       </span>
+                    </td>
+                    <td className="px-3 py-3 text-right hidden lg:table-cell">
+                      {snow.pct_of_normal != null ? (
+                        <span className={`font-bold tabular-nums ${
+                          snow.pct_of_normal >= 110 ? "text-[#2ECC8F]" :
+                          snow.pct_of_normal >= 90 ? "text-text-base" :
+                          snow.pct_of_normal >= 70 ? "text-yellow-400" : "text-red-400"
+                        }`}>
+                          {snow.pct_of_normal}%
+                        </span>
+                      ) : (
+                        <span className="text-text-muted">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-center hidden lg:table-cell">
+                      {snow.trend_7d ? (
+                        <span className={`text-sm ${
+                          snow.trend_7d === "rising" ? "text-[#2ECC8F]" :
+                          snow.trend_7d === "falling" ? "text-red-400" : "text-text-subtle"
+                        }`}>
+                          {snow.trend_7d === "rising" ? "↑" : snow.trend_7d === "falling" ? "↓" : "→"}
+                        </span>
+                      ) : (
+                        <span className="text-text-muted">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-3 text-center">
                       <ConditionBadge

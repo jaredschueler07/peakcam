@@ -195,10 +195,36 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
   const snow = resort.snow_report;
   if (!snow) return null;
 
+  const trendIcons: Record<string, string> = { rising: "↑", stable: "→", falling: "↓" };
+  const trendColors: Record<string, string> = { rising: "text-[#2ECC8F]", stable: "text-text-subtle", falling: "text-red-400" };
+  const outlookLabels: Record<string, string> = {
+    more_snow: "More snow expected",
+    stable: "Conditions stable",
+    warming: "Warming trend",
+    melt_risk: "Melt risk",
+  };
+  const outlookColors: Record<string, string> = {
+    more_snow: "text-cyan",
+    stable: "text-text-subtle",
+    warming: "text-yellow-400",
+    melt_risk: "text-red-400",
+  };
+
   const stats = [
     { label: "Base Depth", value: snow.base_depth != null ? `${snow.base_depth}″` : "—", color: "text-powder" },
     { label: "24h New Snow", value: snow.new_snow_24h != null ? `${snow.new_snow_24h}″` : "—", color: "text-cyan" },
     { label: "48h New Snow", value: snow.new_snow_48h != null ? `${snow.new_snow_48h}″` : "—", color: "text-text-subtle" },
+    ...(snow.swe_in != null ? [{ label: "SWE", value: `${snow.swe_in}″`, color: "text-text-base" }] : []),
+    ...(snow.pct_of_normal != null ? [{
+      label: "% of Normal",
+      value: `${snow.pct_of_normal}%`,
+      color: snow.pct_of_normal >= 110 ? "text-[#2ECC8F]" : snow.pct_of_normal >= 90 ? "text-text-base" : snow.pct_of_normal >= 70 ? "text-yellow-400" : "text-red-400",
+    }] : []),
+    ...(snow.trend_7d ? [{
+      label: "7-Day Trend",
+      value: `${trendIcons[snow.trend_7d] ?? ""} ${snow.trend_7d.charAt(0).toUpperCase() + snow.trend_7d.slice(1)}`,
+      color: trendColors[snow.trend_7d] ?? "text-text-base",
+    }] : []),
     {
       label: "Trails Open",
       value: snow.trails_open != null ? `${snow.trails_open}${snow.trails_total ? `/${snow.trails_total}` : ""}` : "—",
@@ -241,6 +267,12 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
           </div>
         );
       })()}
+      {snow.outlook && (
+        <div className={`bg-surface border border-border rounded-xl px-4 py-3 ${outlookColors[snow.outlook] ?? "text-text-base"}`}>
+          <div className="text-sm font-semibold">{outlookLabels[snow.outlook] ?? snow.outlook}</div>
+          <div className="text-text-muted text-xs mt-1">Outlook</div>
+        </div>
+      )}
     </div>
   );
 }
