@@ -7,7 +7,7 @@ export const revalidate = 3600;
 export const metadata = {
   title: "Ski Resort Snow Report — Live Base Depth & Trail Conditions | PeakCam",
   description:
-    "Compare live snow conditions across 70+ North American ski resorts. " +
+    "Compare live snow conditions across 128 North American ski resorts. " +
     "Base depth, 24h & 48h fresh snow, open trails, lift status, and powder day alerts — updated hourly.",
   keywords: [
     "ski snow report",
@@ -22,14 +22,14 @@ export const metadata = {
   ],
   openGraph: {
     title: "Ski Resort Snow Report — Live Base Depth & Conditions | PeakCam",
-    description: "Compare live snow conditions, base depths, and powder alerts for 70+ North American ski resorts.",
+    description: "Compare live snow conditions, base depths, and powder alerts for 128 North American ski resorts.",
     url: "https://peakcam.io/snow-report",
     type: "website" as const,
   },
   twitter: {
     card: "summary_large_image" as const,
     title: "Live Ski Snow Report | PeakCam",
-    description: "Base depth, fresh snow, and lift status for 70+ ski resorts. Updated hourly.",
+    description: "Base depth, fresh snow, and lift status for 128 ski resorts. Updated hourly.",
   },
 };
 
@@ -38,7 +38,7 @@ const jsonLd = {
   "@type": "WebPage",
   name: "Snow Report — PeakCam",
   description:
-    "Compare live snow conditions across 70+ North American ski resorts. Base depth, fresh snow, trail counts, and lift status at a glance.",
+    "Compare live snow conditions across 128 North American ski resorts. Base depth, fresh snow, trail counts, and lift status at a glance.",
   url: "https://peakcam.io/snow-report",
   isPartOf: {
     "@type": "WebSite",

@@ -23,7 +23,7 @@ export default function About() {
 
           <p>
             PeakCam is the fastest way to check real-time conditions across
-            70+ ski resorts in Colorado, Utah, and beyond. Live webcams, snow
+            128 ski resorts in Colorado, Utah, and beyond. Live webcams, snow
             totals, weather forecasts, and trail counts — all on one page, all
             free, no account required.
           </p>

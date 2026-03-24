@@ -12,7 +12,7 @@ export const revalidate = 3600;
 export const metadata = {
   title: "PeakCam — Live Ski Resort Webcams, Snow Reports & Conditions",
   description:
-    "Browse live webcams, real-time snow reports, base depths, and trail conditions for 75+ ski resorts across North America. " +
+    "Browse live webcams, real-time snow reports, base depths, and trail conditions for 128 ski resorts across North America. " +
     "Compare powder days, check lift status, and plan your next ski trip with PeakCam.",
   keywords: [
     "live ski resort webcams",
@@ -31,14 +31,14 @@ export const metadata = {
   openGraph: {
     title: "PeakCam — Live Ski Resort Webcams, Snow Reports & Conditions",
     description:
-      "Browse live webcams, real-time snow reports, and powder alerts for 75+ ski resorts across North America.",
+      "Browse live webcams, real-time snow reports, and powder alerts for 128 ski resorts across North America.",
     url: "https://peakcam.io",
     type: "website" as const,
   },
   twitter: {
     card: "summary_large_image" as const,
     title: "PeakCam — Live Ski Webcams & Snow Reports",
-    description: "Real-time powder alerts, base depths, and live cams for 75+ North American ski resorts.",
+    description: "Real-time powder alerts, base depths, and live cams for 128 North American ski resorts.",
   },
 };
 
