@@ -60,6 +60,7 @@ export interface SnowReport {
   trend_7d: SnowTrend | null;
   outlook: SnowOutlook | null;
   auto_cond_rating: ConditionRating | null;
+  snowing_now: boolean;
 }
 
 // ── Snowpack & Conditions Engine Types ───────────────────────

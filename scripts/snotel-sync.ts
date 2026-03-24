@@ -318,9 +318,12 @@ async function fetchSweHistory(
 
 // ─── Step 8: Fetch NWS forecast summary & Grid Data ────────────────────────
 
+const SNOW_KEYWORDS = ["snow", "blizzard", "flurr", "wintry", "sleet", "freezing"];
+
 interface ForecastSummary {
   snowInchesNext48h: number;
   maxHighTemp48h: number;
+  snowingNow: boolean;
   gridData: any | null;
 }
 
@@ -328,7 +331,7 @@ async function fetchNwsForecast(
   lat: number,
   lng: number,
 ): Promise<ForecastSummary> {
-  const defaults: ForecastSummary = { snowInchesNext48h: 0, maxHighTemp48h: 32, gridData: null };
+  const defaults: ForecastSummary = { snowInchesNext48h: 0, maxHighTemp48h: 32, snowingNow: false, gridData: null };
   try {
     // Step 1: resolve gridpoint
     const pointsRes = await fetch(
@@ -349,6 +352,7 @@ async function fetchNwsForecast(
     
     let totalSnow = 0;
     let maxHigh = -Infinity;
+    let snowingNow = false;
     
     if (forecastRes.ok) {
       const forecastData = await forecastRes.json();
@@ -367,6 +371,12 @@ async function fetchNwsForecast(
           maxHigh = Math.max(maxHigh, p.temperature);
         }
       }
+
+      // Detect if it's currently snowing from the first (current) period
+      if (periods.length > 0) {
+        const currentForecast = periods[0].shortForecast.toLowerCase();
+        snowingNow = SNOW_KEYWORDS.some((kw) => currentForecast.includes(kw));
+      }
     }
 
     // Step 3: fetch Grid Data (for tags/narrative)
@@ -381,6 +391,7 @@ async function fetchNwsForecast(
     return {
       snowInchesNext48h: totalSnow,
       maxHighTemp48h: maxHigh === -Infinity ? 32 : maxHigh,
+      snowingNow,
       gridData: gridData?.properties || null
     };
   } catch {
@@ -401,6 +412,7 @@ async function insertSnowReport(
   latest: ParsedDay,
   deltas: { newSnow24h: number; newSnow48h: number },
   conditions: ReturnType<typeof computeConditions>,
+  snowingNow: boolean = false,
 ): Promise<void> {
   
   // Combine tags and narrative into the single conditions string field
@@ -417,6 +429,7 @@ async function insertSnowReport(
     outlook: conditions.outlook,
     auto_cond_rating: conditions.condRating,
     conditions: conditionsString,
+    snowing_now: snowingNow,
     source: "snotel",
     updated_at: new Date().toISOString(),
   };
@@ -557,7 +570,7 @@ async function main(): Promise<void> {
       const conditions = computeConditions(conditionsInput);
 
       // 4j. Insert into snow_reports (append-only)
-      await insertSnowReport(resort.id, latest, deltas, conditions);
+      await insertSnowReport(resort.id, latest, deltas, conditions, forecast.snowingNow);
 
       // 4k. Update resorts.cond_rating
       await updateResortRating(resort.id, conditions.condRating);
