@@ -71,14 +71,38 @@ async function fetchAllCams() {
 
 // ─── Step 2: Check a single cam ─────────────────────────────────────────
 
-async function checkCam(cam) {
-  const timeout = 10_000;
+const HEADERS = {
+  "User-Agent": "PeakCam/1.0 (https://peakcam.io; contact@peakcam.io) cam-health-check",
+  "Accept": "text/html,application/xhtml+xml,image/jpeg,image/png,*/*",
+  "Referer": "https://peakcam.io/",
+};
 
+async function checkCam(cam) {
+  const timeout = 12_000;
+  const maxRetries = 2;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await checkCamOnce(cam, timeout);
+      if (result.ok || attempt === maxRetries) return result;
+      // Retry on transient failures (timeout, 500, 502, 503, 504)
+      if (result.status > 0 && result.status < 500) return result; // 4xx = permanent, don't retry
+      await sleep(1000 * (attempt + 1)); // backoff
+    } catch {
+      if (attempt === maxRetries) return { ok: false, status: 0, error: "max retries exceeded" };
+      await sleep(1000 * (attempt + 1));
+    }
+  }
+  return { ok: false, status: 0, error: "unreachable" };
+}
+
+async function checkCamOnce(cam, timeout) {
+  // YouTube — oEmbed check
   if (cam.embed_type === "youtube" && cam.youtube_id) {
-    // YouTube oembed check
     const oembedUrl = `https://www.youtube.com/oembed?url=https://youtube.com/watch?v=${cam.youtube_id}&format=json`;
     try {
       const resp = await fetch(oembedUrl, {
+        headers: HEADERS,
         signal: AbortSignal.timeout(timeout),
       });
       return { ok: resp.ok, status: resp.status };
@@ -87,29 +111,58 @@ async function checkCam(cam) {
     }
   }
 
-  if (cam.embed_url) {
-    // iframe or link — HEAD request
+  if (!cam.embed_url) return { ok: false, status: 0, error: "no URL or youtube_id" };
+
+  // Image cams — GET request (some servers reject HEAD)
+  if (cam.embed_type === "image") {
     try {
       const resp = await fetch(cam.embed_url, {
-        method: "HEAD",
-        redirect: "manual",
+        method: "GET",
+        headers: { ...HEADERS, "Accept": "image/jpeg,image/png,image/*,*/*" },
+        redirect: "follow",
         signal: AbortSignal.timeout(timeout),
       });
-      const ok = resp.status === 200 || resp.status === 301 || resp.status === 302;
-      return { ok, status: resp.status };
+      const contentType = resp.headers.get("content-type") || "";
+      const contentLength = parseInt(resp.headers.get("content-length") || "0", 10);
+      const lastModified = resp.headers.get("last-modified");
+      // Consume body to prevent memory leak
+      await resp.arrayBuffer();
+      const isImage = contentType.startsWith("image/") || contentLength > 1000;
+      return {
+        ok: resp.ok && isImage,
+        status: resp.status,
+        contentLength,
+        lastModified,
+        contentType,
+      };
     } catch (err) {
       return { ok: false, status: 0, error: err.message };
     }
   }
 
-  return { ok: false, status: 0, error: "no URL or youtube_id" };
+  // iframe / link — GET request with proper headers
+  try {
+    const resp = await fetch(cam.embed_url, {
+      method: "GET",
+      headers: HEADERS,
+      redirect: "follow",
+      signal: AbortSignal.timeout(timeout),
+    });
+    // Consume body
+    await resp.text();
+    const ok = resp.status >= 200 && resp.status < 400;
+    return { ok, status: resp.status };
+  } catch (err) {
+    return { ok: false, status: 0, error: err.message };
+  }
 }
 
 // ─── Step 3: Update last_checked_at ─────────────────────────────────────
 
 async function updateCamStatus(camId, isAlive) {
+  // Only update last_checked_at — don't set is_active=false on a single failure.
+  // The cam should stay active until manually reviewed or consecutive failures threshold.
   const body = { last_checked_at: new Date().toISOString() };
-  if (!isAlive) body.is_active = false;
 
   const resp = await fetch(
     `${SUPABASE_URL}/rest/v1/cams?id=eq.${camId}`,

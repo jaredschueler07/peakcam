@@ -268,8 +268,8 @@ windham,Base,3100,iframe,https://player.brownrice.com/embed/windhammountainclub/
 belleayre,Overlook,3429,image,https://images-webcams.windy.com/74/1706697774/current/full/1706697774.jpg,,true
 belleayre,Discovery,3429,image,https://images-webcams.windy.com/16/1706697616/current/full/1706697616.jpg,,true
 jiminy-peak,Webcams,2380,link,https://jiminypeak.com/webcams/,,true
-wachusett,Summit,2006,image,https://api.wetmet.net/widgets/stream/frame.php?uid=ae0a41d92d6d4c74d5c696e2d18ae88f,,true
-wachusett,NASTAR,2006,image,https://api.wetmet.net/widgets/stream/frame.php?uid=c5d9979a7622e03eb89b208a83d65810,,true
+wachusett,Summit,2006,iframe,https://api.wetmet.net/widgets/stream/frame.php?uid=ae0a41d92d6d4c74d5c696e2d18ae88f,,true
+wachusett,NASTAR,2006,iframe,https://api.wetmet.net/widgets/stream/frame.php?uid=c5d9979a7622e03eb89b208a83d65810,,true
 seven-springs,Webcams,2994,link,https://7springs.com/the-mountain/mountain-conditions/mountain-cams.aspx,,true
 camelback,Webcams,2133,link,https://camelbackresort.com/resort-information/live-cameras,,true
 wintergreen,Classic,3515,image,https://ftp.resortcams.com/wintergreen/skyline.jpg,,true
