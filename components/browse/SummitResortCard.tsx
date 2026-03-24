@@ -103,6 +103,7 @@ export function SummitResortCard({ resort }: Props) {
   const pctNormal = snow?.pct_of_normal;
   const trend = snow?.trend_7d as SnowTrend | null;
   const outlook = snow?.outlook as SnowOutlook | null;
+  const isSnowing = snow?.snowing_now ?? false;
 
   return (
     <motion.div
@@ -135,6 +136,15 @@ export function SummitResortCard({ resort }: Props) {
               </span>
             </div>
           </>
+        )}
+
+        {/* Snowing now badge */}
+        {isSnowing && !isFresh && (
+          <div className="absolute top-4 right-4 z-10 px-3 py-1 bg-cyan/15 backdrop-blur-sm border border-cyan/40 rounded-full">
+            <span className="text-cyan text-xs font-semibold flex items-center gap-1">
+              <Snowflake size={12} /> SNOWING
+            </span>
+          </div>
         )}
 
         {/* Main card link */}

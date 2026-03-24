@@ -3,6 +3,7 @@ import { BrowsePage } from "@/components/browse/BrowsePage";
 import { PeakHero } from "@/components/home/PeakHero";
 import { PowderTicker } from "@/components/home/PowderTicker";
 import { LiveWebcams } from "@/components/home/LiveWebcams";
+import { SnowCams } from "@/components/home/SnowCams";
 import { PeakFooter } from "@/components/home/PeakFooter";
 import type { ResortWithData } from "@/lib/types";
 
@@ -62,10 +63,26 @@ export default async function Home() {
     .flatMap((r) => r.cams.filter((c) => c.is_active))
     .slice(0, 4);
 
+  // Snow cams — resorts where it's currently snowing, pick best cam per resort
+  const snowCams = resorts
+    .filter((r) => r.snow_report?.snowing_now)
+    .map((r) => {
+      // Prefer YouTube > iframe > image for best live experience
+      const activeCams = r.cams.filter((c) => c.is_active);
+      const best =
+        activeCams.find((c) => c.embed_type === "youtube") ??
+        activeCams.find((c) => c.embed_type === "iframe") ??
+        activeCams.find((c) => c.embed_type === "image") ??
+        activeCams[0];
+      return best ? { cam: best, resort: r } : null;
+    })
+    .filter(Boolean) as { cam: (typeof resorts)[0]["cams"][0]; resort: ResortWithData }[];
+
   return (
     <>
       <PeakHero />
       <PowderTicker alerts={powderAlerts} />
+      {snowCams.length > 0 && <SnowCams snowCams={snowCams} />}
       <BrowsePage resorts={resorts} />
       <LiveWebcams cams={featuredCams} />
       <PeakFooter />
