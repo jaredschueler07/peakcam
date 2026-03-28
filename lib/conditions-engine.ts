@@ -4,7 +4,16 @@
 // from SNOTEL data, 30-year normals, and NWS forecast.
 // ─────────────────────────────────────────────────────────────
 
-import type { ConditionRating } from "./types";
+import type { ConditionRating, UserSnowQuality, UserVisibility, UserWind, UserTrailConditions } from "./types";
+
+// ── User Conditions Summary ─────────────────────────────────
+
+export interface UserConditionReport {
+  snow_quality: UserSnowQuality;
+  visibility: UserVisibility;
+  wind: UserWind;
+  trail_conditions: UserTrailConditions;
+}
 
 // ── Inputs ───────────────────────────────────────────────────
 
@@ -39,6 +48,8 @@ export interface ConditionsInput {
     iceAccumulationMax: number; // inches
     probOfPrecipMax: number;    // %
   } | null;
+  /** Recent user-submitted conditions reports (last 24h, unflagged). */
+  userReports?: UserConditionReport[];
 }
 
 // ── Outputs ──────────────────────────────────────────────────
@@ -131,9 +142,56 @@ export function computeOutlook(
   };
 }
 
+// ── User Conditions Score ────────────────────────────────────
+
+const SNOW_QUALITY_SCORES: Record<UserSnowQuality, number> = {
+  powder: 4, packed: 3, icy: 1, slush: 1,
+};
+const VISIBILITY_SCORES: Record<UserVisibility, number> = {
+  clear: 3, foggy: 2, whiteout: 1,
+};
+const WIND_SCORES: Record<UserWind, number> = {
+  calm: 3, breezy: 2, gusty: 1, high: 0,
+};
+const TRAIL_SCORES: Record<UserTrailConditions, number> = {
+  groomed: 3, ungroomed: 2, moguls: 2, variable: 1,
+};
+
+/**
+ * Aggregate user reports into a normalized 0–1 quality score.
+ * Snow quality is weighted most heavily (40%), with visibility (20%),
+ * wind (20%), and trail conditions (20%) splitting the remainder.
+ * Returns null if no reports are available.
+ */
+export function computeUserScore(reports: UserConditionReport[]): number | null {
+  if (reports.length === 0) return null;
+
+  let totalScore = 0;
+  for (const r of reports) {
+    const snowNorm = SNOW_QUALITY_SCORES[r.snow_quality] / 4;   // 0–1
+    const visNorm = VISIBILITY_SCORES[r.visibility] / 3;         // 0–1
+    const windNorm = WIND_SCORES[r.wind] / 3;                    // 0–1
+    const trailNorm = TRAIL_SCORES[r.trail_conditions] / 3;      // 0–1
+    totalScore += snowNorm * 0.4 + visNorm * 0.2 + windNorm * 0.2 + trailNorm * 0.2;
+  }
+  return totalScore / reports.length;
+}
+
 // ── Condition Rating ─────────────────────────────────────────
 
-export function computeConditionRating(
+// Rating order for numeric blending
+const RATING_ORDER: ConditionRating[] = ["poor", "fair", "good", "great"];
+
+function ratingToIndex(r: ConditionRating): number {
+  return RATING_ORDER.indexOf(r);
+}
+
+function indexToRating(i: number): ConditionRating {
+  return RATING_ORDER[Math.max(0, Math.min(3, Math.round(i)))];
+}
+
+/** SNOTEL-only rating based on snow depth, new snow, and % of normal. */
+export function computeSnotelRating(
   newSnow24h: number,
   newSnow48h: number,
   snowDepthIn: number | null,
@@ -145,8 +203,42 @@ export function computeConditionRating(
   if (newSnow24h >= t.good.newSnow24h) return "good";
   if (pctOfNormal != null && pctOfNormal >= t.good.pctOfNormal && snowDepthIn != null && snowDepthIn >= t.good.minDepth) return "good";
   if (snowDepthIn != null && snowDepthIn >= t.fair.minDepth && (pctOfNormal == null || pctOfNormal >= t.fair.pctOfNormal)) return "fair";
-  
+
   return "poor";
+}
+
+/**
+ * Compute the final condition rating by blending SNOTEL data with user reports.
+ * SNOTEL provides the base rating (always present). If user reports exist
+ * (minimum 2 for signal quality), they can shift the rating by up to ±1 tier.
+ *
+ * Weights: SNOTEL 70%, user reports 30% (when available).
+ */
+export function computeConditionRating(
+  newSnow24h: number,
+  newSnow48h: number,
+  snowDepthIn: number | null,
+  pctOfNormal: number | null,
+  userReports?: UserConditionReport[],
+): ConditionRating {
+  const snotelRating = computeSnotelRating(newSnow24h, newSnow48h, snowDepthIn, pctOfNormal);
+
+  // Need at least 2 user reports to incorporate user signal
+  const userScore = (userReports && userReports.length >= 2)
+    ? computeUserScore(userReports)
+    : null;
+
+  if (userScore == null) return snotelRating;
+
+  // Convert user score (0–1) to rating index (0–3)
+  const userRatingIdx = userScore * 3;
+  const snotelIdx = ratingToIndex(snotelRating);
+
+  // Blend: 70% SNOTEL + 30% user, clamped to ±1 tier from SNOTEL
+  const blended = snotelIdx * 0.7 + userRatingIdx * 0.3;
+  const clamped = Math.max(snotelIdx - 1, Math.min(snotelIdx + 1, blended));
+
+  return indexToRating(clamped);
 }
 
 // ── Tags & Narrative Synthesis ───────────────────────────────
@@ -240,6 +332,7 @@ export function computeConditions(input: ConditionsInput): ConditionsOutput {
     input.current.newSnow48h,
     input.current.snowDepthIn,
     pctOfNormal,
+    input.userReports,
   );
 
   const { tags, narrative } = synthesizeGridData(input);

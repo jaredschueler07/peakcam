@@ -8,6 +8,7 @@ import { Search, SlidersHorizontal } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { SummitResortCard } from "@/components/browse/SummitResortCard";
 import { PowderAlertSignup } from "@/components/alerts/PowderAlertSignup";
+import { useFavorites } from "@/lib/useFavorites";
 import type { ResortWithData } from "@/lib/types";
 import { trackSearch, trackFilter } from "@/lib/posthog";
 
@@ -205,9 +206,11 @@ export function BrowsePage({ resorts }: Props) {
   const [condFilter, setCondFilter] = useState<ConditionFilter>("all");
   const [hasLiveCams, setHasLiveCams] = useState(false);
   const [freshSnow, setFreshSnow] = useState(false);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [sort, setSort] = useState<SortOption>("name");
   const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(true);
+  const { user, isFavorite, toggle: toggleFav } = useFavorites();
 
   const availableStates = useMemo(() => {
     return [...new Set(resorts.map((r) => r.state))].sort();
@@ -226,6 +229,7 @@ export function BrowsePage({ resorts }: Props) {
     if (condFilter !== "all") list = list.filter((r) => r.cond_rating === condFilter);
     if (hasLiveCams) list = list.filter((r) => r.cams.some((c) => c.is_active));
     if (freshSnow) list = list.filter((r) => (r.snow_report?.new_snow_24h ?? 0) >= 8);
+    if (showFavoritesOnly) list = list.filter((r) => isFavorite(r.id));
 
     if (sort === "name") {
       list = [...list].sort((a, b) => a.name.localeCompare(b.name));
@@ -241,7 +245,7 @@ export function BrowsePage({ resorts }: Props) {
     }
 
     return list;
-  }, [resorts, fuse, search, stateFilter, condFilter, hasLiveCams, freshSnow, sort]);
+  }, [resorts, fuse, search, stateFilter, condFilter, hasLiveCams, freshSnow, showFavoritesOnly, isFavorite, sort]);
 
   const handleClearSearch = useCallback(() => setSearch(""), []);
 
@@ -340,6 +344,9 @@ export function BrowsePage({ resorts }: Props) {
             {/* Feature filters */}
             <FilterChip label="Fresh Snow" active={freshSnow} onClick={() => setFreshSnow((v) => !v)} />
             <FilterChip label="Live Cams" active={hasLiveCams} onClick={() => setHasLiveCams((v) => !v)} />
+            {user && (
+              <FilterChip label="My Favorites" active={showFavoritesOnly} onClick={() => setShowFavoritesOnly((v) => !v)} />
+            )}
 
             <span className="w-px h-5 bg-border mx-1 hidden sm:block" />
 
@@ -415,7 +422,11 @@ export function BrowsePage({ resorts }: Props) {
                     onMouseEnter={() => setHoveredSlug(resort.slug)}
                     onMouseLeave={() => setHoveredSlug(null)}
                   >
-                    <SummitResortCard resort={resort} />
+                    <SummitResortCard
+                      resort={resort}
+                      favorited={isFavorite(resort.id)}
+                      onToggleFavorite={user ? () => toggleFav(resort.id) : undefined}
+                    />
                   </div>
                 ))}
               </div>

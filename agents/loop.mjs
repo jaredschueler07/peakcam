@@ -806,6 +806,11 @@ async function main() {
 
   log('info', null, `${activeAgents.length} agents active. Starting poll loop...`);
 
+  // Catch unhandled rejections so a stray promise can't kill the process
+  process.on('unhandledRejection', (reason) => {
+    log('error', null, `Unhandled rejection (loop continues): ${reason}`);
+  });
+
   // Graceful shutdown
   let running = true;
   process.on('SIGINT', () => {
@@ -845,8 +850,9 @@ async function main() {
         const messages = await getNewMessages(state.token, agent.channel, state.lastSeen);
 
         for (const msg of messages) {
-          // Update lastSeen regardless
-          if (parseFloat(msg.ts) > parseFloat(state.lastSeen)) {
+          // Only advance lastSeen from human messages — bot messages use dedup
+          // so they don't push the cursor past unprocessed human messages.
+          if (!msg.bot_id && parseFloat(msg.ts) > parseFloat(state.lastSeen)) {
             state.lastSeen = msg.ts;
           }
 

@@ -16,6 +16,7 @@ const navLinks = [
   { label: "Map",         href: "/map" },
   { label: "Compare",     href: "/compare" },
   { label: "Snow Report", href: "/snow-report" },
+  { label: "Favorites",   href: "/favorites", authOnly: true },
   { label: "About",       href: "/about" },
 ];
 
@@ -97,7 +98,7 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
 
       {/* Nav */}
       <nav className="flex items-center gap-0.5 ml-auto flex-shrink-0">
-        {navLinks.map((link) => (
+        {navLinks.filter((link) => !("authOnly" in link && link.authOnly) || user).map((link) => (
           <Link
             key={link.href}
             href={link.href}

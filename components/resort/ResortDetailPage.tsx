@@ -3,11 +3,14 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
+import { Heart } from "lucide-react";
 import { ConditionBadge } from "@/components/ui/Badge";
 import type { ResortWithData, WeatherPeriod, LiveConditions, Cam, UserCondition } from "@/lib/types";
 import { ConditionVoter } from "@/components/resort/ConditionVoter";
 import { UserConditionsForm } from "@/components/resort/UserConditionsForm";
 import { UserConditionsList } from "@/components/resort/UserConditionsList";
+import { useFavorites } from "@/lib/useFavorites";
+import { AuthModal } from "@/components/auth/AuthModal";
 import { trackResortView, trackCamClick } from "@/lib/posthog";
 
 interface Props {
@@ -282,6 +285,9 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
 export function ResortDetailPage({ resort, weather, liveConditions, userConditions = [] }: Props) {
   const activeCams = resort.cams.filter((c) => c.is_active);
   const snow = resort.snow_report;
+  const { user, isFavorite, toggle: toggleFav } = useFavorites();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const favorited = isFavorite(resort.id);
 
   useEffect(() => {
     trackResortView(resort.name, resort.slug);
@@ -289,6 +295,7 @@ export function ResortDetailPage({ resort, weather, liveConditions, userConditio
 
   return (
     <div className="min-h-screen bg-bg">
+      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
       <Header showSearch={false} />
 
       {/* ── Hero ──────────────────────────────────────────────── */}
@@ -330,6 +337,21 @@ export function ResortDetailPage({ resort, weather, liveConditions, userConditio
                   label={resort.cond_rating.charAt(0).toUpperCase() + resort.cond_rating.slice(1)}
                 />
               )}
+              <button
+                onClick={() => {
+                  if (!user) { setShowAuthModal(true); return; }
+                  toggleFav(resort.id);
+                }}
+                className={`p-2 rounded-lg border transition-all duration-[220ms] ${
+                  favorited
+                    ? "bg-alpenglow/15 border-alpenglow/40 text-alpenglow hover:bg-alpenglow/25"
+                    : "bg-surface2/50 border-border text-text-muted hover:text-alpenglow hover:border-alpenglow/30 hover:bg-alpenglow/10"
+                }`}
+                aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
+                title={favorited ? "Remove from favorites" : "Add to favorites"}
+              >
+                <Heart size={18} fill={favorited ? "currentColor" : "none"} strokeWidth={favorited ? 0 : 1.5} />
+              </button>
               <div className="flex items-center gap-2">
                 {resort.instagram_url && (
                   <a href={resort.instagram_url} target="_blank" rel="noopener noreferrer"

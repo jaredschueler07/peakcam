@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
-import { Camera, ArrowLeftRight, TrendingUp, TrendingDown, Minus, Snowflake, Sun, Thermometer } from "lucide-react";
+import { Camera, ArrowLeftRight, TrendingUp, TrendingDown, Minus, Snowflake, Sun, Thermometer, Heart } from "lucide-react";
 import type { ResortWithData, ConditionRating, SnowTrend, SnowOutlook } from "@/lib/types";
 import { trackResortCardClick } from "@/lib/posthog";
 
@@ -86,9 +86,11 @@ const outlookConfig: Record<SnowOutlook, { icon: typeof Snowflake; color: string
 
 interface Props {
   resort: ResortWithData;
+  favorited?: boolean;
+  onToggleFavorite?: () => void;
 }
 
-export function SummitResortCard({ resort }: Props) {
+export function SummitResortCard({ resort, favorited, onToggleFavorite }: Props) {
   const snow = resort.snow_report;
   const baseDepth = snow?.base_depth ?? 0;
   const snow24h = snow?.new_snow_24h ?? 0;
@@ -233,9 +235,24 @@ export function SummitResortCard({ resort }: Props) {
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-1 text-text-subtle">
-                <Camera size={16} />
-                <span className="text-sm">{camCount}</span>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 text-text-subtle">
+                  <Camera size={16} />
+                  <span className="text-sm">{camCount}</span>
+                </div>
+                {onToggleFavorite && (
+                  <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(); }}
+                    className={`p-1.5 rounded-lg border transition-all duration-[220ms] ${
+                      favorited
+                        ? "bg-alpenglow/15 border-alpenglow/40 text-alpenglow hover:bg-alpenglow/25"
+                        : "bg-surface2/50 border-border text-text-muted hover:text-alpenglow hover:border-alpenglow/30 hover:bg-alpenglow/10"
+                    }`}
+                    aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
+                  >
+                    <Heart size={14} fill={favorited ? "currentColor" : "none"} strokeWidth={favorited ? 0 : 1.5} />
+                  </button>
+                )}
               </div>
             </div>
           </div>

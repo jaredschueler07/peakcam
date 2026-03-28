@@ -105,6 +105,10 @@ export default async function ResortPage({
       amenityFeature.push({ "@type": "LocationFeatureSpecification", name: "Trails Open", value: `${snow.trails_open} of ${snow.trails_total}` });
     if (snow.lifts_open != null && snow.lifts_total != null)
       amenityFeature.push({ "@type": "LocationFeatureSpecification", name: "Lifts Open", value: `${snow.lifts_open} of ${snow.lifts_total}` });
+    if (snow.swe_in != null)
+      amenityFeature.push({ "@type": "LocationFeatureSpecification", name: "Snow Water Equivalent", value: `${snow.swe_in} inches` });
+    if (snow.conditions)
+      amenityFeature.push({ "@type": "LocationFeatureSpecification", name: "Current Conditions", value: snow.conditions.includes("||") ? snow.conditions.split("||")[1] : snow.conditions });
   }
 
   // Build VideoObject entries for YouTube webcams
@@ -118,6 +122,13 @@ export default async function ResortPage({
     uploadDate: resort.created_at,
   }));
 
+  // Collect social / official links for sameAs
+  const sameAs: string[] = [];
+  if (resort.website_url) sameAs.push(resort.website_url);
+  if (resort.x_url) sameAs.push(resort.x_url);
+  if (resort.facebook_url) sameAs.push(resort.facebook_url);
+  if (resort.instagram_url) sameAs.push(resort.instagram_url);
+
   const skiResortLd = {
     "@context": "https://schema.org",
     "@type": ["SkiResort", "TouristAttraction"],
@@ -126,6 +137,7 @@ export default async function ResortPage({
       ? `${resort.name} — ${snow.base_depth ?? "?"}″ base depth, ${snow.conditions ?? "current conditions"}. ${resort.cams.length} live webcams available.`
       : `Live webcams and snow conditions at ${resort.name}, ${resort.state}.`,
     url: pageUrl,
+    image: `${BASE_URL}/resorts/${resort.slug}/opengraph-image`,
     address: {
       "@type": "PostalAddress",
       addressRegion: resort.state,
@@ -136,7 +148,9 @@ export default async function ResortPage({
       latitude: resort.lat,
       longitude: resort.lng,
     },
-    ...(resort.website_url ? { sameAs: resort.website_url } : {}),
+    touristType: ["Skiing", "Snowboarding", "Winter Sports"],
+    isAccessibleForFree: false,
+    ...(sameAs.length ? { sameAs } : {}),
     ...(amenityFeature.length ? { amenityFeature } : {}),
     ...(videos.length ? { video: videos } : {}),
   };

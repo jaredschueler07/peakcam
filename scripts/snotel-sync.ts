@@ -28,6 +28,7 @@ import {
 import {
   computeConditions,
   type ConditionsInput,
+  type UserConditionReport,
 } from "../lib/conditions-engine.js";
 
 // ─── Load .env.local manually ────────────────────────────────────────────
@@ -316,6 +317,19 @@ async function fetchSweHistory(
   return rows.map((r) => r.swe_in).reverse();
 }
 
+// ─── Step 7b: Fetch recent user conditions reports ───────────────────────
+
+async function fetchUserReports(
+  resortId: string,
+): Promise<UserConditionReport[]> {
+  const cutoff = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const url =
+    `${SUPABASE_URL}/rest/v1/user_conditions?resort_id=eq.${resortId}&is_flagged=eq.false&submitted_at=gte.${cutoff}&select=snow_quality,visibility,wind,trail_conditions`;
+  const resp = await fetch(url, { headers: supaHeaders });
+  if (!resp.ok) return [];
+  return await resp.json();
+}
+
 // ─── Step 8: Fetch NWS forecast summary & Grid Data ────────────────────────
 
 const SNOW_KEYWORDS = ["snow", "blizzard", "flurr", "wintry", "sleet", "freezing"];
@@ -530,8 +544,11 @@ async function main(): Promise<void> {
       const dowy = dayOfWaterYear(new Date());
       const normals = await fetchNormals(resort.snotel_station_id, dowy);
 
-      // 4g. Get 7-day SWE history
-      const sweHistory = await fetchSweHistory(resort.id);
+      // 4g. Get 7-day SWE history + user reports
+      const [sweHistory, userReports] = await Promise.all([
+        fetchSweHistory(resort.id),
+        fetchUserReports(resort.id),
+      ]);
 
       // 4h. Fetch NWS forecast summary
       const forecast = await fetchNwsForecast(resort.lat, resort.lng);
@@ -564,7 +581,8 @@ async function main(): Promise<void> {
           resortElevBase: resort.lat, // Assuming we don't have elevation, we'll estimate or ignore. Wait! Resort table has lat/lng.
           iceAccumulationMax: (getGridVal(forecast.gridData.iceAccumulation) ?? 0) / 25.4, // mm to inches
           probOfPrecipMax: getGridVal(forecast.gridData.probabilityOfPrecipitation) ?? 0,
-        } : null
+        } : null,
+        userReports: userReports.length > 0 ? userReports : undefined,
       };
 
       const conditions = computeConditions(conditionsInput);
