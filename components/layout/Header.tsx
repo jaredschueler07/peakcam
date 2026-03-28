@@ -17,6 +17,7 @@ const navLinks = [
   { label: "Compare",     href: "/compare" },
   { label: "Snow Report", href: "/snow-report" },
   { label: "Favorites",   href: "/favorites", authOnly: true },
+  { label: "My Peak",     href: "/dashboard", authOnly: true },
   { label: "About",       href: "/about" },
 ];
 

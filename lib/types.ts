@@ -149,3 +149,33 @@ export interface WeatherPeriod {
   snowInches: number;      // estimated snow inches (0 if none)
   shortForecast: string;   // "Heavy Snow", "Sunny" etc.
 }
+
+// ── Dashboard & Favorites ────────────────────────────────────
+export type FavoriteType = "resort" | "cam" | "region";
+
+export interface UserFavorite {
+  id: string;
+  user_id: string;
+  item_type: FavoriteType;
+  item_id: string;
+  created_at: string;
+}
+
+export interface WidgetConfig {
+  id: string;          // corresponds to item_id
+  type: FavoriteType;  // determines which component to render
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  data?: unknown;          // cache for static info if needed
+}
+
+export interface DashboardLayout {
+  id: string;
+  user_id: string;
+  config: {
+    widgets: WidgetConfig[];
+  };
+  updated_at: string;
+}

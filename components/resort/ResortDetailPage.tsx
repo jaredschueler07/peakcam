@@ -12,6 +12,7 @@ import { UserConditionsList } from "@/components/resort/UserConditionsList";
 import { useFavorites } from "@/lib/useFavorites";
 import { AuthModal } from "@/components/auth/AuthModal";
 import { trackResortView, trackCamClick } from "@/lib/posthog";
+import { FavoriteButton } from "../ui/FavoriteButton";
 
 interface Props {
   resort: ResortWithData;
@@ -47,46 +48,52 @@ function ImageCam({ url, name }: { url: string; name: string }) {
 // ─── Cam player ──────────────────────────────────────────────────────────────
 
 function CamPlayer({ cam, resortSlug }: { cam: Cam; resortSlug: string }) {
-  const [loaded, setLoaded] = useState(true);
+  // Autoplay YouTube/iframe cams by default, but lazy-load image cams
+  const [loaded, setLoaded] = useState(cam.embed_type !== "image");
 
   // Link-out cams — no embed available
   if (cam.embed_type === "link") {
     return (
-      <a
-        href={cam.embed_url ?? "#"}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={() => trackCamClick(resortSlug, cam.name, cam.embed_type)}
-        className="group flex flex-col items-center justify-center gap-3 bg-surface2 rounded-xl
-                   border border-border hover:border-border-hi aspect-video
-                   transition-all duration-220 hover:shadow-card-hover"
-      >
-        <div className="w-12 h-12 rounded-full bg-bg border border-border flex items-center justify-center
-                        group-hover:border-cyan group-hover:text-cyan text-text-muted transition-all duration-220">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-          </svg>
+      <div className="relative group">
+        <a
+          href={cam.embed_url ?? "#"}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => trackCamClick(resortSlug, cam.name, cam.embed_type)}
+          className="flex flex-col items-center justify-center gap-3 bg-surface2 rounded-xl
+                     border border-border hover:border-border-hi aspect-video
+                     transition-all duration-220 hover:shadow-card-hover"
+        >
+          <div className="w-12 h-12 rounded-full bg-bg border border-border flex items-center justify-center
+                          group-hover:border-cyan group-hover:text-cyan text-text-muted transition-all duration-220">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </div>
+          <div className="text-center px-4">
+            <p className="text-text-subtle text-sm font-medium group-hover:text-cyan transition-colors">
+              {cam.name}
+            </p>
+            <p className="text-text-muted text-xs mt-0.5">Opens on resort website</p>
+          </div>
+        </a>
+        <div className="absolute top-2 right-2 z-20">
+          <FavoriteButton itemId={cam.id} itemType="cam" variant="ghost" className="bg-surface/50 backdrop-blur-sm" />
         </div>
-        <div className="text-center px-4">
-          <p className="text-text-subtle text-sm font-medium group-hover:text-cyan transition-colors">
-            {cam.name}
-          </p>
-          <p className="text-text-muted text-xs mt-0.5">Opens on resort website</p>
-        </div>
-      </a>
+      </div>
     );
   }
 
   // Image cams — auto-refreshing snapshot
   if (cam.embed_type === "image") {
     return (
-      <div className="relative aspect-video bg-surface2 rounded-xl overflow-hidden border border-border">
+      <div className="relative aspect-video bg-surface2 rounded-xl overflow-hidden border border-border group">
         {!loaded ? (
           <button
             onClick={() => { setLoaded(true); trackCamClick(resortSlug, cam.name, cam.embed_type); }}
             className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-3
-                       hover:bg-white/5 transition-colors group"
+                       hover:bg-white/5 transition-colors"
           >
             <div className="w-14 h-14 rounded-full bg-cyan/10 border border-cyan/30 flex items-center justify-center
                             group-hover:bg-cyan/20 group-hover:border-cyan transition-all duration-220">
@@ -108,6 +115,9 @@ function CamPlayer({ cam, resortSlug }: { cam: Cam; resortSlug: string }) {
         ) : (
           <ImageCam url={cam.embed_url ?? ""} name={cam.name} />
         )}
+        <div className="absolute top-2 right-2 z-20">
+          <FavoriteButton itemId={cam.id} itemType="cam" variant="ghost" className="bg-surface/50 backdrop-blur-sm" />
+        </div>
       </div>
     );
   }
@@ -119,13 +129,13 @@ function CamPlayer({ cam, resortSlug }: { cam: Cam; resortSlug: string }) {
       : cam.embed_url ?? "";
 
   return (
-    <div className="relative aspect-video bg-surface2 rounded-xl overflow-hidden border border-border">
+    <div className="relative aspect-video bg-surface2 rounded-xl overflow-hidden border border-border group">
       {/* Placeholder until user clicks */}
       {!loaded && (
         <button
           onClick={() => { setLoaded(true); trackCamClick(resortSlug, cam.name, cam.embed_type); }}
           className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-3
-                     hover:bg-white/5 transition-colors group"
+                     hover:bg-white/5 transition-colors"
         >
           <div className="w-14 h-14 rounded-full bg-cyan/10 border border-cyan/30 flex items-center justify-center
                           group-hover:bg-cyan/20 group-hover:border-cyan transition-all duration-220">
@@ -158,6 +168,11 @@ function CamPlayer({ cam, resortSlug }: { cam: Cam; resortSlug: string }) {
           className="absolute inset-0 w-full h-full border-0"
         />
       )}
+      
+      {/* Favorite Button (overlay) */}
+      <div className="absolute top-2 right-2 z-20">
+        <FavoriteButton itemId={cam.id} itemType="cam" variant="ghost" className="bg-surface/50 backdrop-blur-sm" />
+      </div>
     </div>
   );
 }
@@ -323,9 +338,12 @@ export function ResortDetailPage({ resort, weather, liveConditions, userConditio
 
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl md:text-4xl font-heading font-bold text-text-base uppercase tracking-wider leading-tight">
-                {resort.name}
-              </h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl md:text-4xl font-heading font-bold text-text-base uppercase tracking-wider leading-tight">
+                  {resort.name}
+                </h1>
+                <FavoriteButton itemId={resort.id} itemType="resort" size="md" variant="outline" className="mt-1" />
+              </div>
               <p className="text-text-muted text-sm mt-1.5">
                 {resort.region} · {resort.state}
               </p>
