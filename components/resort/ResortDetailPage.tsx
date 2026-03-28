@@ -12,6 +12,7 @@ import { UserConditionsList } from "@/components/resort/UserConditionsList";
 import { useFavorites } from "@/lib/useFavorites";
 import { AuthModal } from "@/components/auth/AuthModal";
 import { trackResortView, trackCamClick } from "@/lib/posthog";
+import { trackViewContent } from "@/lib/meta-pixel-events";
 import { FavoriteButton } from "../ui/FavoriteButton";
 
 interface Props {
@@ -306,6 +307,7 @@ export function ResortDetailPage({ resort, weather, liveConditions, userConditio
 
   useEffect(() => {
     trackResortView(resort.name, resort.slug);
+    trackViewContent(resort.name, resort.slug);
   }, [resort.name, resort.slug]);
 
   return (

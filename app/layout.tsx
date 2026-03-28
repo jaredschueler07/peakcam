@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { PostHogProvider } from "@/lib/posthog";
+import { MetaPixel } from "@/lib/meta-pixel";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
@@ -84,6 +85,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteLd) }}
         />
         <PostHogProvider>{children}</PostHogProvider>
+        <MetaPixel />
         <Analytics />
         <SpeedInsights />
       </body>
