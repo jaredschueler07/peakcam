@@ -9,6 +9,7 @@ import { Header } from "@/components/layout/Header";
 import { SummitResortCard } from "@/components/browse/SummitResortCard";
 import { PowderAlertSignup } from "@/components/alerts/PowderAlertSignup";
 import { useFavorites } from "@/lib/useFavorites";
+import { AuthModal } from "@/components/auth/AuthModal";
 import type { ResortWithData } from "@/lib/types";
 import { trackSearch, trackFilter } from "@/lib/posthog";
 
@@ -210,6 +211,7 @@ export function BrowsePage({ resorts }: Props) {
   const [sort, setSort] = useState<SortOption>("name");
   const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const { user, isFavorite, toggle: toggleFav } = useFavorites();
 
   const availableStates = useMemo(() => {
@@ -425,7 +427,7 @@ export function BrowsePage({ resorts }: Props) {
                     <SummitResortCard
                       resort={resort}
                       favorited={isFavorite(resort.id)}
-                      onToggleFavorite={user ? () => toggleFav(resort.id) : undefined}
+                      onToggleFavorite={user ? () => toggleFav(resort.id) : () => setShowAuthModal(true)}
                     />
                   </div>
                 ))}
@@ -447,6 +449,8 @@ export function BrowsePage({ resorts }: Props) {
           )}
         </div>
       </div>
+
+      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
     </div>
   );
 }

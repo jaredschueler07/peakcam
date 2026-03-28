@@ -3,8 +3,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
-import { AuthModal } from "@/components/auth/AuthModal";
 import type { User } from "@supabase/supabase-js";
+import { Menu, X } from "lucide-react";
 
 interface HeaderProps {
   onSearch?: (query: string) => void;
@@ -25,7 +25,11 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
@@ -53,8 +57,6 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
   }
 
   return (
-    <>
-      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
     <header className="sticky top-0 z-50 h-[60px] flex items-center gap-5 px-7
       bg-bg/88 backdrop-blur-md border-b border-border">
 
@@ -96,8 +98,8 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
         </div>
       )}
 
-      {/* Nav */}
-      <nav className="flex items-center gap-0.5 ml-auto flex-shrink-0">
+      {/* Desktop Nav */}
+      <nav className="hidden md:flex items-center gap-0.5 ml-auto flex-shrink-0">
         {navLinks.filter((link) => !("authOnly" in link && link.authOnly) || user).map((link) => (
           <Link
             key={link.href}
@@ -125,16 +127,60 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
             Sign out
           </button>
         ) : (
-          <button
-            onClick={() => setShowAuthModal(true)}
+          <Link
+            href={`/auth?next=${encodeURIComponent(pathname)}`}
             className="ml-1 px-3 py-1.5 rounded text-[13px] font-semibold whitespace-nowrap
               text-cyan border border-cyan/30 hover:bg-cyan-dim transition-all duration-150"
           >
             Sign in
-          </button>
+          </Link>
         )}
       </nav>
+
+      {/* Mobile Menu Toggle */}
+      <button 
+        className="md:hidden ml-auto p-2 text-text-muted hover:text-text-base flex-shrink-0"
+        onClick={() => setIsMenuOpen(!isMenuOpen)}
+        aria-label="Toggle menu"
+      >
+        {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+      </button>
+
+      {/* Mobile Menu Overlay */}
+      {isMenuOpen && (
+        <div className="absolute top-[60px] left-0 right-0 bg-surface/98 backdrop-blur-md border-b border-border shadow-lg p-4 flex flex-col gap-2 md:hidden">
+          {navLinks.filter((link) => !("authOnly" in link && link.authOnly) || user).map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={`
+                px-4 py-3 rounded-lg text-sm font-medium
+                ${pathname === link.href ? "text-cyan bg-cyan/10" : "text-text-base hover:bg-surface2"}
+              `}
+            >
+              {link.label}
+            </Link>
+          ))}
+          
+          <div className="h-px bg-border my-2" />
+          
+          {user ? (
+            <button
+              onClick={() => { handleSignOut(); setIsMenuOpen(false); }}
+              className="px-4 py-3 rounded-lg text-sm font-medium text-left text-text-muted hover:bg-surface2"
+            >
+              Sign out ({user.email})
+            </button>
+          ) : (
+            <Link
+              href={`/auth?next=${encodeURIComponent(pathname)}`}
+              className="px-4 py-3 rounded-lg text-sm font-semibold text-center text-bg bg-cyan hover:bg-cyan/90 transition-colors"
+            >
+              Sign in
+            </Link>
+          )}
+        </div>
+      )}
     </header>
-    </>
   );
 }

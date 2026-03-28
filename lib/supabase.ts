@@ -183,6 +183,54 @@ export async function getUserConditions(resortId: string, limit = 10): Promise<U
 }
 
 // ─────────────────────────────────────────────────────────────
+// Pipeline Queries
+// ─────────────────────────────────────────────────────────────
+
+/** Fetch blended conditions summary for a single resort. */
+export async function getResortConditionsSummary(resortId: string) {
+  const { data, error } = await supabase
+    .from("resort_conditions_summary")
+    .select("*")
+    .eq("resort_id", resortId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("[PeakCam] Could not fetch conditions summary:", error.message);
+    return null;
+  }
+  return data;
+}
+
+/** Fetch all blended conditions summaries (one per resort). */
+export async function getAllConditionsSummaries() {
+  const { data, error } = await supabase
+    .from("resort_conditions_summary")
+    .select("*");
+
+  if (error) {
+    console.warn("[PeakCam] Could not fetch all conditions summaries:", error.message);
+    return [];
+  }
+  return data ?? [];
+}
+
+/** Fetch a resort by slug with its metadata joined. */
+export async function getResortWithMetadata(slug: string) {
+  const { data, error } = await supabase
+    .from("resorts")
+    .select("*, resort_metadata(*)")
+    .eq("slug", slug)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("[PeakCam] Could not fetch resort with metadata:", error.message);
+    return null;
+  }
+  return data;
+}
+
+// ─────────────────────────────────────────────────────────────
 // Static Params
 // ─────────────────────────────────────────────────────────────
 
