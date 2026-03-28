@@ -6,6 +6,7 @@ import { motion } from "motion/react";
 import { Camera, ArrowLeftRight, TrendingUp, TrendingDown, Minus, Snowflake, Sun, Thermometer, Heart } from "lucide-react";
 import type { ResortWithData, ConditionRating, SnowTrend, SnowOutlook } from "@/lib/types";
 import { trackResortCardClick } from "@/lib/posthog";
+import { FavoriteButton } from "../ui/FavoriteButton";
 
 // ── Animated count-up number ─────────────────────────────────────────────────
 
@@ -267,6 +268,11 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite }: Props)
             <ArrowLeftRight size={12} />
             Compare
           </Link>
+        </div>
+
+        {/* Favorite Button (top right, on top of everything) */}
+        <div className="absolute top-3 right-3 z-50">
+          <FavoriteButton itemId={resort.id} itemType="resort" />
         </div>
       </div>
     </motion.div>

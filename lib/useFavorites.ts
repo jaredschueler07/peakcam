@@ -26,8 +26,6 @@ export function useFavorites() {
 
   useEffect(() => {
     if (!user) {
-      // No user — reset outside the effect via microtask to avoid
-      // synchronous setState-in-effect lint warning.
       queueMicrotask(() => {
         setFavorites(new Set());
         setLoaded(true);
@@ -60,7 +58,7 @@ export function useFavorites() {
         return next;
       });
 
-      const result = await toggleFavorite(resortId);
+      const result = await toggleFavorite(resortId, "resort");
 
       if (result.error) {
         // Revert optimistic update
