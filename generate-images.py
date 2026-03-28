@@ -133,6 +133,28 @@ IMAGES = [
         ),
     },
     {
+        "key": "fb-profile",
+        "filename": "fb-profile.jpg",
+        "aspect_ratio": "1:1",
+        "prompt": (
+            "Square social media profile picture, will be cropped to circle. "
+            "Deep navy-black background (#080E1A). A dramatic jagged mountain peak "
+            "silhouette — like the Matterhorn — fills the upper 60% of the frame. "
+            "The summit catches warm amber-orange light (#E8A050, #F0C070) with a "
+            "warm halo radiating from behind. A single electric cyan line (#22D3EE) "
+            "traces the right ridgeline. Below the mountain, centered, the text "
+            "'PEAKCAM' in bold condensed sans-serif uppercase — 'PEAK' in clean white "
+            "(#F0F0F0), 'CAM' in bright cyan (#22D3EE). The text is large enough to "
+            "read at small sizes, with generous letter-spacing. CRITICAL LAYOUT: "
+            "The image will be cropped to a CIRCLE so nothing can be near the edges. "
+            "The mountain peak should be compact, sitting in the upper-center. The "
+            "PEAKCAM text must be in the CENTER of the frame (not the bottom), with "
+            "at least 25% padding below the text to the frame edge. Everything must "
+            "fit inside a circle inscribed within the square. Cinematic, high-contrast, "
+            "premium outdoor brand. Dark, confident, warm."
+        ),
+    },
+    {
         "key": "og-image",
         "filename": "og-image.jpg",
         "aspect_ratio": "16:9",

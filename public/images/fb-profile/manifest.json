@@ -1,0 +1,15 @@
+{
+  "key": "fb-profile",
+  "versions": [
+    {
+      "version": "v0",
+      "filename": "v0.jpg",
+      "timestamp": "2026-03-28T20:30:00Z",
+      "prompt": "Square icon for social media profile. Bold minimal mountain peak silhouette against midnight navy (#0B1120). Snow cap with warm amber-gold dawn light (#E8B896). Cyan accent line (#22D3EE) tracing ridgeline. Clean, recognizable at 32x32px. No text.",
+      "model": "grok-imagine-image",
+      "analysis": "Clean execution. Mountain peak centered with warm amber snow cap and cyan contour line. Dark navy background works perfectly for Facebook's circle crop. The warm glow behind the summit adds depth. Cyan ridgeline is bold and on-brand. Recognizable at small sizes.",
+      "iterate_notes": "Could try a slightly larger peak to fill more of the circle crop area. The white corners will be cropped on Facebook."
+    }
+  ],
+  "current": "v0"
+}
