@@ -1,10 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "motion/react";
 import Link from "next/link";
+import { Menu, X } from "lucide-react";
 import { navLinks } from "@/components/layout/Header";
 
 export function PeakHero() {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <div className="relative h-screen w-full overflow-hidden bg-bg">
       {/* Mountain background with overlay */}
@@ -28,8 +32,28 @@ export function PeakHero() {
               {l.label}
             </Link>
           ))}
+          <Link href="/auth" className="text-text-base/90 hover:text-text-base font-semibold border border-text-base/30 rounded-full px-4 py-1.5 transition-all hover:border-text-base/60">
+            Sign In
+          </Link>
         </div>
+        <button
+          className="md:hidden text-text-base/70 hover:text-text-base transition-colors"
+          onClick={() => setMenuOpen(!menuOpen)}
+          aria-label="Toggle menu"
+        >
+          {menuOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
       </nav>
+
+      {/* Mobile menu dropdown */}
+      {menuOpen && (
+        <div className="absolute top-14 left-0 right-0 bg-bg/95 backdrop-blur-md border-b border-text-base/10 p-4 flex flex-col gap-3 md:hidden z-20">
+          {navLinks.filter(l => !l.authOnly).map(l => (
+            <Link key={l.href} href={l.href} className="text-text-base/80 hover:text-text-base py-2 transition-colors" onClick={() => setMenuOpen(false)}>{l.label}</Link>
+          ))}
+          <Link href="/auth" className="text-cyan font-semibold py-2 transition-colors" onClick={() => setMenuOpen(false)}>Sign In</Link>
+        </div>
+      )}
 
       {/* Content */}
       <div className="relative z-10 h-full flex flex-col items-center justify-center px-6">

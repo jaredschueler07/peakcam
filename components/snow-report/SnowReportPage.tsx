@@ -17,6 +17,8 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
   const states = useMemo(() => [...new Set(resorts.map((r) => r.state))].sort(), [resorts]);
   const hasPctNormal = useMemo(() => resorts.some(r => r.snow_report?.pct_of_normal != null), [resorts]);
   const hasTrend = useMemo(() => resorts.some(r => r.snow_report?.trend_7d != null), [resorts]);
+  const hasTrails = useMemo(() => resorts.some(r => r.snow_report?.trails_open != null), [resorts]);
+  const hasLifts = useMemo(() => resorts.some(r => r.snow_report?.lifts_open != null), [resorts]);
 
   const CONDITION_ORDER: Record<string, number> = {
     great: 0, good: 1, fair: 2, poor: 3,
@@ -134,8 +136,8 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
                 <th className="text-right px-3 py-3"><SortHeader label="Base" field="base" /></th>
                 <th className="text-right px-3 py-3"><SortHeader label="24h" field="24h" /></th>
                 <th className="text-right px-3 py-3 hidden md:table-cell"><SortHeader label="48h" field="48h" /></th>
-                <th className="text-right px-3 py-3 hidden md:table-cell"><SortHeader label="Trails" field="trails" /></th>
-                <th className="text-right px-3 py-3 hidden lg:table-cell"><SortHeader label="Lifts" field="lifts" /></th>
+                {hasTrails && <th className="text-right px-3 py-3 hidden md:table-cell"><SortHeader label="Trails" field="trails" /></th>}
+                {hasLifts && <th className="text-right px-3 py-3 hidden lg:table-cell"><SortHeader label="Lifts" field="lifts" /></th>}
                 {hasPctNormal && <th className="text-right px-3 py-3 hidden lg:table-cell"><SortHeader label="% Normal" field="pctNormal" /></th>}
                 {hasTrend && <th className="text-center px-3 py-3 hidden lg:table-cell"><SortHeader label="Trend" field="trend" /></th>}
                 <th className="text-center px-3 py-3"><SortHeader label="Conditions" field="conditions" /></th>
@@ -174,18 +176,22 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
                         {snow.new_snow_48h != null ? `${snow.new_snow_48h}″` : "—"}
                       </span>
                     </td>
+                    {hasTrails && (
                     <td className="px-3 py-3 text-right hidden md:table-cell">
                       <span className="text-text-base tabular-nums">
                         {snow.trails_open != null && snow.trails_total != null
                           ? `${snow.trails_open}/${snow.trails_total}` : "—"}
                       </span>
                     </td>
+                    )}
+                    {hasLifts && (
                     <td className="px-3 py-3 text-right hidden lg:table-cell">
                       <span className="text-text-base tabular-nums">
                         {snow.lifts_open != null && snow.lifts_total != null
                           ? `${snow.lifts_open}/${snow.lifts_total}` : "—"}
                       </span>
                     </td>
+                    )}
                     {hasPctNormal && (
                     <td className="px-3 py-3 text-right hidden lg:table-cell">
                       {snow.pct_of_normal != null ? (

@@ -43,7 +43,11 @@ function isBestHigh(value: number | null, allValues: (number | null)[]): boolean
   if (value === null) return false;
   const valid = allValues.filter((v): v is number => v !== null);
   if (valid.length < 2) return false;
-  return value === Math.max(...valid);
+  const max = Math.max(...valid);
+  if (max === 0) return false;
+  const countAtMax = valid.filter(v => v === max).length;
+  if (countAtMax === valid.length) return false;
+  return value === max;
 }
 
 /** Returns true if `value` is the lowest (best rank) among `allValues`. */
@@ -51,11 +55,18 @@ function isBestLow(value: number | null, allValues: (number | null)[]): boolean 
   if (value === null) return false;
   const valid = allValues.filter((v): v is number => v !== null);
   if (valid.length < 2) return false;
-  return value === Math.min(...valid);
+  const min = Math.min(...valid);
+  const countAtMin = valid.filter(v => v === min).length;
+  if (countAtMin === valid.length) return false;
+  return value === min;
 }
 
-function getFirstYoutubeCam(resort: ResortWithData) {
-  return resort.cams.find((c) => c.embed_type === "youtube" && c.youtube_id) ?? null;
+function getFirstCamThumbnail(resort: ResortWithData) {
+  const ytCam = resort.cams.find((c) => c.embed_type === "youtube" && c.youtube_id);
+  if (ytCam) return { type: "youtube" as const, url: `https://img.youtube.com/vi/${ytCam.youtube_id}/mqdefault.jpg` };
+  const imgCam = resort.cams.find((c) => c.embed_type === "image" && c.embed_url && c.is_active);
+  if (imgCam) return { type: "image" as const, url: imgCam.embed_url! };
+  return null;
 }
 
 // ── Resort picker ─────────────────────────────────────────────────────────────
@@ -157,17 +168,17 @@ function ResortColumnHeader({
   onRemove: () => void;
 }) {
   const condColor = resort.cond_rating ? conditionColors[resort.cond_rating] : null;
-  const cam = getFirstYoutubeCam(resort);
+  const thumb = getFirstCamThumbnail(resort);
   const activeCamCount = resort.cams.filter((c) => c.is_active).length;
 
   return (
     <div className="flex flex-col gap-3 p-4">
       {/* Webcam thumbnail */}
       <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-surface2 border border-border">
-        {cam?.youtube_id ? (
+        {thumb ? (
           <Link href={`/resorts/${resort.slug}`} tabIndex={-1}>
             <img
-              src={`https://img.youtube.com/vi/${cam.youtube_id}/mqdefault.jpg`}
+              src={thumb.url}
               alt={`${resort.name} webcam`}
               className="w-full h-full object-cover"
             />
@@ -357,7 +368,15 @@ export function ComparePage({ allResorts, initialResorts }: Props) {
     {
       label: "CONDITIONS",
       values: resorts.map((r, i) => ({
-        display: r.snow_report?.conditions ?? r.cond_rating?.toUpperCase() ?? "—",
+        display: (() => {
+          const raw = r.snow_report?.conditions;
+          if (!raw) return r.cond_rating?.toUpperCase() ?? "—";
+          if (raw.includes("||")) {
+            const [, narrative] = raw.split("||");
+            return narrative || raw;
+          }
+          return raw;
+        })(),
         isBest: isBestLow(condRanks[i], condRanks),
       })),
     },

@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import Fuse from "fuse.js";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search, SlidersHorizontal, MapPin, ChevronDown } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { SummitResortCard } from "@/components/browse/SummitResortCard";
 import { PowderAlertSignup } from "@/components/alerts/PowderAlertSignup";
@@ -93,7 +93,7 @@ function FilterChip({
 
 function FeaturedRow({ resorts }: { resorts: ResortWithData[] }) {
   const featured = useMemo(() => {
-    return resorts
+    const sorted = resorts
       .filter((r) => r.snow_report && r.cond_rating)
       .sort((a, b) => {
         const condDiff = (CONDITION_ORDER[a.cond_rating] ?? 99) - (CONDITION_ORDER[b.cond_rating] ?? 99);
@@ -101,6 +101,8 @@ function FeaturedRow({ resorts }: { resorts: ResortWithData[] }) {
         return (b.snow_report?.new_snow_24h ?? 0) - (a.snow_report?.new_snow_24h ?? 0);
       })
       .slice(0, 4);
+    const hasGoodOrBetter = sorted.some(r => r.cond_rating === "great" || r.cond_rating === "good");
+    return hasGoodOrBetter ? sorted : [];
   }, [resorts]);
 
   if (featured.length === 0) return null;
@@ -224,6 +226,7 @@ export function BrowsePage({ resorts }: Props) {
   const [sort, setSort] = useState<SortOption>("name");
   const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(false);
+  const [showStates, setShowStates] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const { user, isFavorite, toggle: toggleFav } = useFavorites();
 
@@ -332,17 +335,19 @@ export function BrowsePage({ resorts }: Props) {
 
           {/* Filter chips row */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* State chips */}
-            <FilterChip label="All" active={stateFilter === "All"} onClick={() => setStateFilter("All")} />
-            {availableStates.map((s) => (
-              <FilterChip
-                key={s}
-                label={s}
-                active={stateFilter === s}
-                onClick={() => setStateFilter(stateFilter === s ? "All" : s)}
-                title={STATE_NAMES[s] ?? s}
-              />
-            ))}
+            {/* State dropdown */}
+            <button
+              onClick={() => setShowStates(v => !v)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 min-h-[44px] text-sm font-medium border cursor-pointer select-none transition-colors duration-200 whitespace-nowrap ${
+                stateFilter !== "All"
+                  ? "bg-cyan/20 border-cyan/50 text-cyan"
+                  : "bg-text-base/10 border-text-base/20 text-text-subtle hover:bg-text-base/20"
+              }`}
+            >
+              <MapPin size={14} />
+              {stateFilter === "All" ? "All States" : `${stateFilter} — ${STATE_NAMES[stateFilter] ?? stateFilter}`}
+              <ChevronDown size={14} className={`transition-transform ${showStates ? "rotate-180" : ""}`} />
+            </button>
 
             <span className="w-px h-5 bg-border mx-1 hidden sm:block" />
 
@@ -395,6 +400,16 @@ export function BrowsePage({ resorts }: Props) {
               ))}
             </div>
           </div>
+          {showStates && (
+            <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-border">
+              <FilterChip label="All" active={stateFilter === "All"} onClick={() => { setStateFilter("All"); setShowStates(false); }} />
+              {availableStates.map((s) => (
+                <FilterChip key={s} label={s} active={stateFilter === s}
+                  onClick={() => { setStateFilter(stateFilter === s ? "All" : s); setShowStates(false); }}
+                  title={STATE_NAMES[s] ?? s} />
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
