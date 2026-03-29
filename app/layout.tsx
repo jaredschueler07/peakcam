@@ -76,6 +76,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
+        <a href="#main-content"
+           className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100]
+                      focus:px-4 focus:py-2 focus:bg-cyan focus:text-bg focus:rounded-lg focus:text-sm focus:font-semibold">
+          Skip to main content
+        </a>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationLd) }}

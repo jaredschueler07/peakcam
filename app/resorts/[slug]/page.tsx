@@ -55,13 +55,13 @@ export async function generateMetadata({
       openGraph: {
         type: "website",
         url: pageUrl,
-        title: `${resort.name} Live Webcams | PeakCam`,
+        title: `${resort.name} Live Webcams`,
         description: desc,
         siteName: "PeakCam",
       },
       twitter: {
         card: "summary_large_image",
-        title: `${resort.name} Live Webcams | PeakCam`,
+        title: `${resort.name} Live Webcams`,
         description: desc,
       },
       alternates: { canonical: pageUrl },
@@ -166,7 +166,7 @@ export default async function ResortPage({
   };
 
   return (
-    <>
+    <main id="main-content">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(skiResortLd) }}
@@ -176,6 +176,6 @@ export default async function ResortPage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
       />
       <ResortDetailPage resort={resort} weather={weather} liveConditions={liveConditions} userConditions={userConditions} />
-    </>
+    </main>
   );
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import { motion } from "motion/react";
+import Link from "next/link";
+import { navLinks } from "@/components/layout/Header";
 
 export function PeakHero() {
   return (
@@ -15,10 +17,24 @@ export function PeakHero() {
         <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/70 to-transparent" />
       </div>
 
+      {/* Overlay navigation */}
+      <nav className="absolute top-0 left-0 right-0 z-20 px-7 py-4 flex items-center justify-between">
+        <Link href="/" className="font-display text-xl text-text-base tracking-tight">
+          PEAKCAM
+        </Link>
+        <div className="hidden md:flex items-center gap-6">
+          {navLinks.filter(l => !l.authOnly).map(l => (
+            <Link key={l.href} href={l.href} className="text-text-base/70 hover:text-text-base transition-colors">
+              {l.label}
+            </Link>
+          ))}
+        </div>
+      </nav>
+
       {/* Content */}
       <div className="relative z-10 h-full flex flex-col items-center justify-center px-6">
         <motion.div
-          initial={{ opacity: 0, y: 40 }}
+          initial={{ opacity: 0.3, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, ease: "easeOut" }}
           className="text-center"
@@ -28,7 +44,7 @@ export function PeakHero() {
           </h1>
 
           <motion.p
-            className="text-xl md:text-2xl text-text-subtle mb-16 max-w-2xl mx-auto"
+            className="text-xl md:text-2xl text-text-base/80 mb-4 max-w-2xl mx-auto"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4, duration: 0.8 }}
@@ -36,9 +52,18 @@ export function PeakHero() {
             Real conditions. No marketing noise.
           </motion.p>
 
+          <motion.p
+            className="text-base text-text-base/60 mb-16 max-w-xl mx-auto"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6, duration: 0.8 }}
+          >
+            Live webcams + real-time snow reports for 128+ ski resorts across North America.
+          </motion.p>
+
           <motion.a
             href="#conditions"
-            className="inline-block px-8 py-4 text-lg bg-text-base/10 hover:bg-text-base/20 backdrop-blur-md border border-text-base/30 rounded-full text-text-base transition-all duration-slow"
+            className="inline-block px-8 py-4 text-lg bg-text-base/20 hover:bg-text-base/30 backdrop-blur-lg border border-text-base/50 rounded-full text-text-base transition-all duration-slow"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6, duration: 0.6 }}

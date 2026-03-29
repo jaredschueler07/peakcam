@@ -11,7 +11,7 @@ interface HeaderProps {
   showSearch?: boolean;
 }
 
-const navLinks = [
+export const navLinks = [
   { label: "Resorts",     href: "/" },
   { label: "Map",         href: "/map" },
   { label: "Compare",     href: "/compare" },
@@ -132,6 +132,7 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
             href={`/auth?next=${encodeURIComponent(pathname)}`}
             className="ml-1 px-3 py-1.5 rounded text-[13px] font-semibold whitespace-nowrap
               text-cyan border border-cyan/30 hover:bg-cyan-dim transition-all duration-150"
+            title="Sign in to save favorites, set powder alerts, and submit reports"
           >
             Sign in
           </Link>

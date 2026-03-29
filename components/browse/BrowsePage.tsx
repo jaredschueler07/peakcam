@@ -39,6 +39,15 @@ const CONDITION_ORDER: Record<string, number> = {
   great: 0, good: 1, fair: 2, poor: 3,
 };
 
+const STATE_NAMES: Record<string, string> = {
+  AZ: "Arizona", BC: "British Columbia", CA: "California", CO: "Colorado",
+  ID: "Idaho", MA: "Massachusetts", MD: "Maryland", ME: "Maine",
+  MI: "Michigan", MN: "Minnesota", MT: "Montana", NH: "New Hampshire",
+  NM: "New Mexico", NV: "Nevada", NY: "New York", OR: "Oregon",
+  PA: "Pennsylvania", UT: "Utah", VA: "Virginia", VT: "Vermont",
+  WA: "Washington", WI: "Wisconsin", WV: "West Virginia", WY: "Wyoming",
+};
+
 const FUSE_OPTIONS: import("fuse.js").IFuseOptions<ResortWithData> = {
   keys: [
     { name: "name", weight: 0.5 },
@@ -56,16 +65,19 @@ function FilterChip({
   active,
   onClick,
   icon,
+  title,
 }: {
   label: string;
   active: boolean;
   onClick: () => void;
   icon?: React.ReactNode;
+  title?: string;
 }) {
   return (
     <button
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium border cursor-pointer select-none transition-colors duration-200 whitespace-nowrap ${
+      title={title}
+      className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 min-h-[44px] text-sm font-medium border cursor-pointer select-none transition-colors duration-200 whitespace-nowrap ${
         active
           ? "bg-cyan/20 border-cyan/50 text-cyan hover:bg-cyan/30"
           : "bg-text-base/10 border-text-base/20 text-text-subtle hover:bg-text-base/20"
@@ -95,9 +107,10 @@ function FeaturedRow({ resorts }: { resorts: ResortWithData[] }) {
 
   return (
     <div className="mb-10">
-      <h2 className="font-display text-4xl md:text-5xl text-text-base mb-6 tracking-wide">
+      <h2 className="font-display text-4xl md:text-5xl text-text-base mb-2 tracking-wide">
         TODAY&apos;S TOP CONDITIONS
       </h2>
+      <p className="text-text-muted text-sm mb-4">Ranked by condition rating and recent snowfall</p>
       <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
         {featured.map((resort) => {
           const snow = resort.snow_report;
@@ -210,7 +223,7 @@ export function BrowsePage({ resorts }: Props) {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [sort, setSort] = useState<SortOption>("name");
   const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
-  const [showMap, setShowMap] = useState(true);
+  const [showMap, setShowMap] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const { user, isFavorite, toggle: toggleFav } = useFavorites();
 
@@ -285,7 +298,7 @@ export function BrowsePage({ resorts }: Props) {
 
   return (
     <div id="conditions" className="min-h-screen bg-bg">
-      <Header />
+      <Header showSearch={false} />
 
       {/* ── Frosted glass search + filter bar ─────────────────── */}
       <div className="sticky top-0 z-30 border-b border-border backdrop-blur-md bg-surface/85">
@@ -315,17 +328,6 @@ export function BrowsePage({ resorts }: Props) {
                 </button>
               )}
             </div>
-            <button
-              onClick={() => setShowMap((v) => !v)}
-              className="hidden md:flex items-center gap-2 text-text-muted hover:text-text-base text-sm
-                         border border-border rounded-lg px-3 py-2.5 transition-colors duration-150"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                  d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 13l4.553 2.276A1 1 0 0021 21.382V10.618a1 1 0 00-1.447-.894L15 12m0 8V12m0 0L9 7" />
-              </svg>
-              {showMap ? "Hide map" : "Show map"}
-            </button>
           </div>
 
           {/* Filter chips row */}
@@ -338,6 +340,7 @@ export function BrowsePage({ resorts }: Props) {
                 label={s}
                 active={stateFilter === s}
                 onClick={() => setStateFilter(stateFilter === s ? "All" : s)}
+                title={STATE_NAMES[s] ?? s}
               />
             ))}
 
@@ -362,8 +365,19 @@ export function BrowsePage({ resorts }: Props) {
               />
             ))}
 
-            {/* Sort */}
+            {/* Sort + Map toggle */}
             <div className="ml-auto flex items-center gap-1.5">
+              <button
+                onClick={() => setShowMap((v) => !v)}
+                className="hidden md:flex items-center gap-2 text-text-muted hover:text-text-base text-sm
+                           border border-border rounded-lg px-3 py-2.5 transition-colors duration-150 mr-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                    d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 13l4.553 2.276A1 1 0 0021 21.382V10.618a1 1 0 00-1.447-.894L15 12m0 8V12m0 0L9 7" />
+                </svg>
+                {showMap ? "Hide map" : "Show map"}
+              </button>
               <SlidersHorizontal size={14} className="text-text-muted" />
               <span className="text-text-muted text-xs hidden sm:block">Sort:</span>
               {(["name", "snow", "conditions"] as SortOption[]).map((opt) => (
@@ -389,6 +403,15 @@ export function BrowsePage({ resorts }: Props) {
         <FeaturedRow resorts={resorts} />
         <PowderAlert resorts={resorts} />
 
+        {/* Powder alert signup banner */}
+        <div className="flex items-center justify-between gap-4 px-5 py-4 bg-surface border border-border rounded-lg mb-8">
+          <div>
+            <p className="text-text-base font-semibold text-sm">Never miss a powder day</p>
+            <p className="text-text-muted text-xs">Get email alerts when your resorts hit your snow threshold.</p>
+          </div>
+          <PowderAlertSignup resorts={resorts} />
+        </div>
+
         {/* Section header */}
         <div className="flex items-end justify-between gap-4 mb-8 flex-wrap">
           <div>
@@ -399,7 +422,6 @@ export function BrowsePage({ resorts }: Props) {
               Real-time snow reports from {filtered.length} of {resorts.length} resorts
             </p>
           </div>
-          <PowderAlertSignup resorts={resorts} />
         </div>
 
         <div className={`grid gap-6 ${showMap ? "lg:grid-cols-[1fr_380px]" : ""}`}>

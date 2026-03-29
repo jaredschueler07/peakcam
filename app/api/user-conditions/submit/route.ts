@@ -9,7 +9,7 @@ import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { containsProfanity } from "@/lib/profanity";
 import type { UserSnowQuality, UserVisibility, UserWind, UserTrailConditions } from "@/lib/types";
 
-const SNOW_QUALITY_VALUES: UserSnowQuality[] = ["powder", "packed", "icy", "slush"];
+const SNOW_QUALITY_VALUES: UserSnowQuality[] = ["powder", "packed", "crud", "ice", "spring"];
 const VISIBILITY_VALUES: UserVisibility[] = ["clear", "foggy", "whiteout"];
 const WIND_VALUES: UserWind[] = ["calm", "breezy", "gusty", "high"];
 const TRAIL_CONDITIONS_VALUES: UserTrailConditions[] = ["groomed", "ungroomed", "moguls", "variable"];

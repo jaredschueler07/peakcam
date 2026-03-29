@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { 
-  CloudSnow, 
-  CheckCircle2, 
-  IceCream, 
-  Droplets, 
-  Sun, 
-  CloudFog, 
+import {
+  CloudSnow,
+  CheckCircle2,
+  IceCream,
+  Activity,
+  Sun,
+  CloudFog,
   EyeOff, 
   Wind, 
   WindArrowDown, 
@@ -28,8 +28,9 @@ import type { UserSnowQuality, UserVisibility, UserWind, UserTrailConditions } f
 const snowOptions: { value: UserSnowQuality; label: string; icon: any }[] = [
   { value: "powder",  label: "Powder",  icon: CloudSnow },
   { value: "packed",  label: "Packed",  icon: CheckCircle2 },
-  { value: "icy",     label: "Icy",     icon: IceCream },
-  { value: "slush",   label: "Slush",   icon: Droplets },
+  { value: "crud",    label: "Crud",    icon: Activity },
+  { value: "ice",     label: "Ice",     icon: IceCream },
+  { value: "spring",  label: "Spring",  icon: Sun },
 ];
 
 const visibilityOptions: { value: UserVisibility; label: string; icon: any }[] = [
@@ -199,7 +200,7 @@ export function UserConditionsForm({ resortId, resortSlug, onSubmitted }: Props)
         {/* Header */}
         <div className="flex items-center justify-between mb-1">
           <h3 className="font-heading text-lg font-semibold uppercase tracking-wider text-text-base">
-            Submit a Report
+            Detailed Conditions Report
           </h3>
           {!loadingUser && user && (
             <div className="flex items-center gap-2">
@@ -213,7 +214,7 @@ export function UserConditionsForm({ resortId, resortSlug, onSubmitted }: Props)
             </div>
           )}
         </div>
-        <p className="text-text-muted text-xs mb-4">Tell other skiers what it&apos;s like out there today.</p>
+        <p className="text-text-muted text-xs mb-4">Sign in for a full report with visibility, wind, and trail conditions.</p>
 
         {submitted ? (
           // Success

@@ -122,7 +122,7 @@ export interface ResortWithData extends Resort {
 }
 
 // ── User Conditions Reports ───────────────────────────────────
-export type UserSnowQuality = "powder" | "packed" | "icy" | "slush";
+export type UserSnowQuality = "powder" | "packed" | "crud" | "ice" | "spring";
 export type UserVisibility = "clear" | "foggy" | "whiteout";
 export type UserWind = "calm" | "breezy" | "gusty" | "high";
 export type UserTrailConditions = "groomed" | "ungroomed" | "moguls" | "variable";

@@ -6,11 +6,11 @@ import { FullPageMap } from "./FullPageMap";
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "Interactive Ski Resort Map — PeakCam",
+  title: "Interactive Ski Resort Map",
   description:
     "Explore 128 ski resorts on an interactive map with live snow conditions, base depth, weather radar, and terrain visualization.",
   openGraph: {
-    title: "Interactive Ski Resort Map — PeakCam",
+    title: "Interactive Ski Resort Map",
     description:
       "Explore ski resorts on an interactive map with live snow data and weather radar.",
     url: "https://peakcam.io/map",
@@ -24,5 +24,5 @@ export default async function MapPage() {
     getLatestRadarTileUrl().catch(() => null),
   ]);
 
-  return <FullPageMap resorts={resorts} radarTileUrl={radarTileUrl} />;
+  return <main id="main-content"><FullPageMap resorts={resorts} radarTileUrl={radarTileUrl} /></main>;
 }

@@ -48,9 +48,9 @@ function ImageCam({ url, name }: { url: string; name: string }) {
 
 // ─── Cam player ──────────────────────────────────────────────────────────────
 
-function CamPlayer({ cam, resortSlug }: { cam: Cam; resortSlug: string }) {
-  // Autoplay YouTube/iframe cams by default, but lazy-load image cams
-  const [loaded, setLoaded] = useState(cam.embed_type !== "image");
+function CamPlayer({ cam, resortSlug, index = 99 }: { cam: Cam; resortSlug: string; index?: number }) {
+  // Auto-load first 2 image cams; lazy-load the rest
+  const [loaded, setLoaded] = useState(cam.embed_type !== "image" || index < 2);
 
   // Link-out cams — no embed available
   if (cam.embed_type === "link") {
@@ -368,7 +368,7 @@ export function ResortDetailPage({ resort, weather, liveConditions, userConditio
                     : "bg-surface2/50 border-border text-text-muted hover:text-alpenglow hover:border-alpenglow/30 hover:bg-alpenglow/10"
                 }`}
                 aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
-                title={favorited ? "Remove from favorites" : "Add to favorites"}
+                title={favorited ? "Remove from favorites" : user ? "Add to favorites" : "Sign in to save favorites"}
               >
                 <Heart size={18} fill={favorited ? "currentColor" : "none"} strokeWidth={favorited ? 0 : 1.5} />
               </button>
@@ -518,9 +518,9 @@ export function ResortDetailPage({ resort, weather, liveConditions, userConditio
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {activeCams.map((cam) => (
+              {activeCams.map((cam, i) => (
                 <div key={cam.id}>
-                  <CamPlayer cam={cam} resortSlug={resort.slug} />
+                  <CamPlayer cam={cam} resortSlug={resort.slug} index={i} />
                   <p className="text-text-muted text-xs mt-1.5 px-1">
                     {cam.name}
                     {cam.elevation && (
@@ -535,15 +535,18 @@ export function ResortDetailPage({ resort, weather, liveConditions, userConditio
           )}
         </section>
 
-        {/* User-verified conditions (quick vote) */}
-        <ConditionVoter resortId={resort.id} resortSlug={resort.slug} liveConditions={liveConditions ?? null} />
-
-        {/* User conditions reports — submit + list */}
+        {/* Community conditions — vote + detailed report */}
         <section>
           <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base mb-4">
-            Conditions Reports
+            Community Conditions
           </h2>
           <div className="space-y-4">
+            <ConditionVoter resortId={resort.id} resortSlug={resort.slug} liveConditions={liveConditions ?? null} />
+            {!user && (
+              <p className="text-text-muted text-xs text-center mt-2">
+                <Link href="/auth" className="text-cyan hover:underline">Sign in</Link> to save favorites and get powder alerts.
+              </p>
+            )}
             <UserConditionsForm resortId={resort.id} resortSlug={resort.slug} />
             <UserConditionsList conditions={userConditions} />
           </div>

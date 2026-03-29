@@ -10,7 +10,7 @@ import type { ResortWithData } from "@/lib/types";
 export const revalidate = 3600;
 
 export const metadata = {
-  title: "PeakCam — Live Ski Resort Webcams, Snow Reports & Conditions",
+  title: "Live Ski Resort Webcams, Snow Reports & Conditions",
   description:
     "Browse live webcams, real-time snow reports, base depths, and trail conditions for 128 ski resorts across North America. " +
     "Compare powder days, check lift status, and plan your next ski trip with PeakCam.",
@@ -29,7 +29,7 @@ export const metadata = {
     "best powder days",
   ],
   openGraph: {
-    title: "PeakCam — Live Ski Resort Webcams, Snow Reports & Conditions",
+    title: "Live Ski Resort Webcams, Snow Reports & Conditions",
     description:
       "Browse live webcams, real-time snow reports, and powder alerts for 128 ski resorts across North America.",
     url: "https://peakcam.io",
@@ -79,13 +79,13 @@ export default async function Home() {
     .filter(Boolean) as { cam: (typeof resorts)[0]["cams"][0]; resort: ResortWithData }[];
 
   return (
-    <>
+    <main id="main-content">
       <PeakHero />
       <PowderTicker alerts={powderAlerts} />
       {snowCams.length > 0 && <SnowCams snowCams={snowCams} />}
       <BrowsePage resorts={resorts} />
       <LiveWebcams cams={featuredCams} />
       <PeakFooter />
-    </>
+    </main>
   );
 }

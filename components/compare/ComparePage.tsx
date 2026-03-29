@@ -423,16 +423,26 @@ export function ComparePage({ allResorts, initialResorts }: Props) {
 
         {/* Empty state */}
         {resorts.length === 0 && (
-          <div className="text-center py-24 border border-dashed border-border rounded-xl">
+          <div className="text-center py-16">
             <div className="text-5xl mb-4">⛷</div>
             <h2 className="text-text-base font-semibold text-xl mb-2">No resorts selected</h2>
-            <p className="text-text-muted text-sm mb-6">
-              Search above to add resorts, or use the Compare button on any{" "}
-              <Link href="/" className="text-cyan hover:underline">
-                resort card
-              </Link>
-              .
+            <p className="text-text-muted text-sm mb-8">
+              Search above to add resorts, or try a popular comparison:
             </p>
+            <div className="flex flex-wrap justify-center gap-3">
+              {[["alta", "snowbird"], ["jackson-hole", "big-sky"], ["vail", "breckenridge"]].map(([a, b]) => {
+                const ra = allResorts.find(r => r.slug === a);
+                const rb = allResorts.find(r => r.slug === b);
+                if (!ra || !rb) return null;
+                return (
+                  <button key={`${a}-${b}`}
+                    onClick={() => { addResort(ra); addResort(rb); }}
+                    className="px-4 py-2.5 bg-surface2 border border-border hover:border-cyan/50 rounded-lg text-text-subtle hover:text-cyan text-sm transition-colors">
+                    {ra.name} vs {rb.name}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 

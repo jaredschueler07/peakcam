@@ -14,8 +14,8 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   const slugs = params.resorts?.split(",").filter(Boolean) ?? [];
   const title =
     slugs.length > 0
-      ? `Compare ${slugs.length} Resort${slugs.length > 1 ? "s" : ""} — PeakCam`
-      : "Compare Ski Resorts — PeakCam";
+      ? `Compare ${slugs.length} Resort${slugs.length > 1 ? "s" : ""}`
+      : "Compare Ski Resorts";
   return {
     title,
     description:
@@ -38,5 +38,5 @@ export default async function ComparePageRoute({ searchParams }: Props) {
     .map((slug) => allResorts.find((r) => r.slug === slug))
     .filter((r): r is ResortWithData => r !== undefined);
 
-  return <ComparePage allResorts={allResorts} initialResorts={compareResorts} />;
+  return <main id="main-content"><ComparePage allResorts={allResorts} initialResorts={compareResorts} /></main>;
 }

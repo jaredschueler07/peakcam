@@ -2,13 +2,13 @@ import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 
 export const metadata = {
-  title: "About — PeakCam",
+  title: "About",
   description: "PeakCam is a free, real-time mountain webcam and snow report aggregator for North American ski resorts.",
 };
 
 export default function About() {
   return (
-    <div className="min-h-screen bg-bg">
+    <main id="main-content" className="min-h-screen bg-bg">
       <Header />
 
       <div className="max-w-2xl mx-auto px-4 py-12 md:px-8">
@@ -91,6 +91,6 @@ export default function About() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

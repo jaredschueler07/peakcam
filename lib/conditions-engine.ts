@@ -145,7 +145,7 @@ export function computeOutlook(
 // ── User Conditions Score ────────────────────────────────────
 
 const SNOW_QUALITY_SCORES: Record<UserSnowQuality, number> = {
-  powder: 4, packed: 3, icy: 1, slush: 1,
+  powder: 4, packed: 3, crud: 2, ice: 1, spring: 2,
 };
 const VISIBILITY_SCORES: Record<UserVisibility, number> = {
   clear: 3, foggy: 2, whiteout: 1,

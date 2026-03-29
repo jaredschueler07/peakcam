@@ -5,7 +5,7 @@ import type { ResortWithData } from "@/lib/types";
 export const revalidate = 3600;
 
 export const metadata = {
-  title: "Ski Resort Snow Report — Live Base Depth & Trail Conditions | PeakCam",
+  title: "Ski Resort Snow Report — Live Base Depth & Trail Conditions",
   description:
     "Compare live snow conditions across 128 North American ski resorts. " +
     "Base depth, 24h & 48h fresh snow, open trails, lift status, and powder day alerts — updated hourly.",
@@ -21,14 +21,14 @@ export const metadata = {
     "ski resort base depth comparison",
   ],
   openGraph: {
-    title: "Ski Resort Snow Report — Live Base Depth & Conditions | PeakCam",
+    title: "Ski Resort Snow Report — Live Base Depth & Conditions",
     description: "Compare live snow conditions, base depths, and powder alerts for 128 North American ski resorts.",
     url: "https://peakcam.io/snow-report",
     type: "website" as const,
   },
   twitter: {
     card: "summary_large_image" as const,
-    title: "Live Ski Snow Report | PeakCam",
+    title: "Live Ski Snow Report",
     description: "Base depth, fresh snow, and lift status for 128 ski resorts. Updated hourly.",
   },
 };
@@ -62,7 +62,9 @@ export default async function SnowReport() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <SnowReportPage resorts={resorts} />
+      <main id="main-content">
+        <SnowReportPage resorts={resorts} />
+      </main>
     </>
   );
 }

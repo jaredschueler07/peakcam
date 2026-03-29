@@ -68,7 +68,7 @@ function TrendBadge({ trend }: { trend: SnowTrend }) {
   const cfg = trendConfig[trend];
   const Icon = cfg.icon;
   return (
-    <span className="inline-flex items-center gap-0.5" style={{ color: cfg.color }} title={`7-day trend: ${cfg.label}`}>
+    <span className="inline-flex items-center gap-0.5" style={{ color: cfg.color }} title={`7-day trend: ${cfg.label}`} role="img" aria-label={`7-day trend: ${cfg.label}`}>
       <Icon size={12} />
     </span>
   );
@@ -231,13 +231,13 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite }: Props)
                   </span>
                 )}
                 {outlook && outlook !== "stable" && (
-                  <span title={outlookConfig[outlook].label} style={{ color: outlookConfig[outlook].color }}>
+                  <span title={outlookConfig[outlook].label} style={{ color: outlookConfig[outlook].color }} role="img" aria-label={outlookConfig[outlook].label}>
                     {(() => { const Icon = outlookConfig[outlook].icon; return <Icon size={12} />; })()}
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 text-text-subtle">
+                <div className="flex items-center gap-1 text-text-subtle" role="img" aria-label={`${camCount} webcam${camCount !== 1 ? 's' : ''} available`}>
                   <Camera size={16} />
                   <span className="text-sm">{camCount}</span>
                 </div>

@@ -123,9 +123,10 @@ export function ConditionVoter({ resortId, resortSlug, liveConditions }: Props) 
   return (
     <div className="bg-surface border border-border rounded-xl p-5">
       {/* Header */}
-      <h3 className="font-heading text-lg font-semibold uppercase tracking-wider text-text-base mb-1">
-        How&apos;s it skiing?
+      <h3 className="font-heading text-lg font-semibold uppercase tracking-wider text-text-base mb-0.5">
+        Quick Conditions Vote
       </h3>
+      <p className="text-text-muted text-xs mb-3">Anonymous — no sign-in required.</p>
 
       {/* Live aggregated conditions */}
       {liveConditions && liveConditions.total_votes_12h > 0 && (
