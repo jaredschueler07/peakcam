@@ -1,20 +1,10 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import dynamic from "next/dynamic";
 import { Inter, Bebas_Neue, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-
-const PostHogProvider = dynamic(
-  () => import("@/lib/posthog").then((mod) => mod.PostHogProvider),
-  { ssr: false }
-);
-
-const MetaPixel = dynamic(
-  () => import("@/lib/meta-pixel").then((mod) => mod.MetaPixel),
-  { ssr: false }
-);
+import { ClientProviders } from "./client-providers";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -121,8 +111,7 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteLd) }}
         />
-        <PostHogProvider>{children}</PostHogProvider>
-        <MetaPixel />
+        <ClientProviders>{children}</ClientProviders>
         <Suspense>
           <Analytics />
         </Suspense>
