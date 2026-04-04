@@ -2,6 +2,7 @@
 
 import type { MapMetric } from "@/lib/map-utils";
 import { metricLabel } from "@/lib/map-utils";
+import WeatherIcon from "@/components/weather/WeatherIcon";
 
 const METRICS: MapMetric[] = ["baseDepth", "snow24h", "conditions"];
 
@@ -12,6 +13,7 @@ interface MapControlsProps {
   onToggleRadar: () => void;
   radarAvailable: boolean;
   variant: "sidebar" | "fullpage";
+  className?: string;
 }
 
 export default function MapControls({
@@ -20,9 +22,13 @@ export default function MapControls({
   showRadar,
   onToggleRadar,
   radarAvailable,
+  variant,
+  className,
 }: MapControlsProps) {
+  const positionClass = className ?? (variant === "fullpage" ? "top-14 left-3 max-[400px]:top-16" : "top-3 left-3");
+
   return (
-    <div className="absolute top-3 left-3 z-10 flex flex-col gap-2">
+    <div className={`absolute z-10 flex flex-col gap-2 ${positionClass}`}>
       {/* Metric toggle row */}
       <div className="flex bg-surface/90 backdrop-blur-md rounded-lg p-1 gap-0.5">
         {METRICS.map((m) => {
@@ -53,7 +59,7 @@ export default function MapControls({
               : "bg-surface/90 text-text-muted hover:text-text-subtle"
           }`}
         >
-          <span>{showRadar ? "\u{1F327}\uFE0F" : "\u2601\uFE0F"}</span>
+          <WeatherIcon condition={showRadar ? "rain" : "cloudy"} size={16} />
           Radar {showRadar ? "ON" : "OFF"}
         </button>
       )}

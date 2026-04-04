@@ -10,23 +10,23 @@ interface MapPopupCardProps {
 
 export default function MapPopupCard({
   resort,
-  onViewResort,
 }: MapPopupCardProps) {
   const snow = resort.snow_report;
   const badgeColor = conditionColor(resort.cond_rating);
   const ratingLabel =
     resort.cond_rating.charAt(0).toUpperCase() + resort.cond_rating.slice(1);
 
+  const resortHref = `/resorts/${resort.slug}`;
+
   return (
-    <div 
-      className="min-w-[240px] cursor-pointer group/popup"
-      onClick={() => onViewResort(resort.slug)}
-    >
+    <div className="min-w-[240px] cursor-default">
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-2">
         <div>
-          <h3 className="text-text-base font-semibold text-sm group-hover/popup:text-cyan transition-colors">
-            {resort.name}
+          <h3 className="text-text-base font-semibold text-sm">
+            <a href={resortHref} className="hover:text-cyan cursor-pointer transition-colors">
+              {resort.name}
+            </a>
           </h3>
           <p className="text-text-muted text-xs">
             {resort.region}, {resort.state}
@@ -75,9 +75,9 @@ export default function MapPopupCard({
         <span className="text-text-muted text-xs">
           {resort.cams.length} cam{resort.cams.length !== 1 ? "s" : ""}
         </span>
-        <div className="text-cyan text-xs font-semibold hover:underline transition-colors duration-220">
+        <a href={resortHref} className="text-cyan text-xs font-semibold hover:underline transition-colors duration-220 cursor-pointer">
           View Resort &rarr;
-        </div>
+        </a>
       </div>
     </div>
   );
