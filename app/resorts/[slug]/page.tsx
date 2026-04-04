@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getResortBySlug, getAllResortSlugs, getLiveConditions, getUserConditions } from "@/lib/supabase";
-import { getWeatherForecast } from "@/lib/weather";
+import { getWeatherForecast, getHourlyForecast, bucketIntoPeriods } from "@/lib/weather";
 import { ResortDetailPage } from "@/components/resort/ResortDetailPage";
 
 const BASE_URL = "https://peakcam.io";
@@ -83,11 +83,14 @@ export default async function ResortPage({
   if (!resort) return notFound();
 
   // Fetch weather, live conditions, and user reports server-side
-  const [weather, liveConditions, userConditions] = await Promise.all([
+  const [weather, hourlyRaw, liveConditions, userConditions] = await Promise.all([
     getWeatherForecast(resort.lat, resort.lng),
+    getHourlyForecast(resort.lat, resort.lng),
     getLiveConditions(resort.id),
     getUserConditions(resort.id),
   ]);
+
+  const forecastPeriods = hourlyRaw ? bucketIntoPeriods(hourlyRaw) : null;
 
   const snow = resort.snow_report;
   const pageUrl = `${BASE_URL}/resorts/${resort.slug}`;
@@ -175,7 +178,7 @@ export default async function ResortPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
       />
-      <ResortDetailPage resort={resort} weather={weather} liveConditions={liveConditions} userConditions={userConditions} />
+      <ResortDetailPage resort={resort} weather={weather} forecastPeriods={forecastPeriods} hourlyData={hourlyRaw} liveConditions={liveConditions} userConditions={userConditions} />
     </main>
   );
 }

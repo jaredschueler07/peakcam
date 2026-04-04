@@ -155,6 +155,153 @@ IMAGES = [
         ),
     },
     {
+        "key": "ad-hero-1x1",
+        "filename": "ad-hero-1x1.jpg",
+        "aspect_ratio": "1:1",
+        "prompt": (
+            "Dark, cinematic 1:1 social media ad image. A moody mountain landscape at "
+            "dawn — a dramatic snow-covered peak emerging from dark clouds, warm amber-gold "
+            "light hitting the summit. The bottom 35% of the image is very dark (near black) "
+            "to allow text overlay. The text 'Real conditions.' appears in large bold white "
+            "condensed sans-serif, and below it 'No marketing noise.' in the same style but "
+            "slightly smaller. At the very bottom in small cyan text (#22D3EE): "
+            "'peakcam.io — 128 resorts. Free.' The mood is dramatic, confident, premium. "
+            "The mountain is real and rugged, not illustrated. Warm amber undertone, dark "
+            "navy shadows. Film grain. The feeling is: this is the anti-corporate ski app."
+        ),
+    },
+    {
+        "key": "ad-powder-4x5",
+        "filename": "ad-powder-4x5.jpg",
+        "aspect_ratio": "4:5",
+        "prompt": (
+            "Vertical 4:5 photograph of a skier making a deep powder turn through "
+            "untouched snow in a tree glade. Early morning golden light filtering through "
+            "the trees. Huge snow spray. The skier is small in the frame — the snow and "
+            "trees dominate. Heavy snowfall, large flakes. The bottom 30% of the image "
+            "fades to near-black for text overlay. Text in large bold white: "
+            "'Free. No account needed.' Below in smaller text: '128 resorts. Live cams. "
+            "Real conditions.' At the bottom: 'peakcam.io' in cyan (#22D3EE). "
+            "The mood is pure stoke — this is the powder day you've been waiting for. "
+            "Warm color palette despite the snow. Film grain, editorial quality."
+        ),
+    },
+    {
+        "key": "ad-carousel-mammoth",
+        "filename": "ad-carousel-mammoth.jpg",
+        "aspect_ratio": "1:1",
+        "prompt": (
+            "Dark 1:1 social ad card for Mammoth Mountain, California. A dramatic view of "
+            "Mammoth's volcanic peaks covered in deep snow, stormy sky, snow actively falling. "
+            "The top shows 'MAMMOTH MOUNTAIN' in bold condensed white text. Below: 'CA' in "
+            "a small badge. Center-bottom: a large snow depth number like '186\"' in huge "
+            "white display font. Below: 'base depth' in tiny cyan text (#22D3EE). At the "
+            "bottom: 'Still dumping. Check live cams →' in cyan. Very dark background "
+            "(midnight navy #0B1120), cinematic, moody. The mountain should be visible but "
+            "dark, serving as atmosphere behind the data."
+        ),
+    },
+    {
+        "key": "ad-carousel-jackson",
+        "filename": "ad-carousel-jackson.jpg",
+        "aspect_ratio": "1:1",
+        "prompt": (
+            "Dark 1:1 social ad card for Jackson Hole, Wyoming. The iconic Teton range "
+            "silhouetted against a fiery orange-amber sunset sky. Snow-covered peaks, dramatic "
+            "ridgeline. 'JACKSON HOLE' in bold condensed white text at top. 'WY' badge. "
+            "Center: large snow stat number '124\"' in huge white display font. Below: "
+            "'base depth' in tiny cyan (#22D3EE). Bottom: 'The steeps are loaded. Check "
+            "live cams →' in cyan. Very dark, cinematic. The Tetons are iconic and instantly "
+            "recognizable — use that."
+        ),
+    },
+    {
+        "key": "ad-carousel-whistler",
+        "filename": "ad-carousel-whistler.jpg",
+        "aspect_ratio": "1:1",
+        "prompt": (
+            "Dark 1:1 social ad card for Whistler Blackcomb, British Columbia. A massive "
+            "snow-covered peak disappearing into thick clouds — the scale is immense. Heavy "
+            "snowfall, Pacific Northwest atmosphere. 'WHISTLER' in bold condensed white text "
+            "at top. 'BC' badge. Center: '210\"' in huge white display font. Below: 'base "
+            "depth' in tiny cyan (#22D3EE). Bottom: 'North America\\'s biggest. Check live "
+            "cams →' in cyan. Dark, moody, atmospheric. Fog and snow create depth."
+        ),
+    },
+    {
+        "key": "ad-carousel-parkcity",
+        "filename": "ad-carousel-parkcity.jpg",
+        "aspect_ratio": "1:1",
+        "prompt": (
+            "Dark 1:1 social ad card for Park City Mountain, Utah. Wide view of endless "
+            "ski runs cutting through aspen groves, Utah's famous light dry powder covering "
+            "everything. Blue sky breaking through clouds. 'PARK CITY' in bold condensed "
+            "white text at top. 'UT' badge. Center: '94\"' in huge white display font. "
+            "Below: 'base depth' in tiny cyan (#22D3EE). Bottom: '300+ runs. Check live "
+            "cams →' in cyan. Dark overall with the white snow creating contrast."
+        ),
+    },
+    {
+        "key": "ad-carousel-stowe",
+        "filename": "ad-carousel-stowe.jpg",
+        "aspect_ratio": "1:1",
+        "prompt": (
+            "Dark 1:1 social ad card for Stowe Mountain Resort, Vermont. A classic New "
+            "England mountain scene — Mansfield's distinctive profile covered in rime ice "
+            "and snow, bare birch trees in foreground, moody overcast sky. 'STOWE' in bold "
+            "condensed white text at top. 'VT' badge. Center: '72\"' in huge white display "
+            "font. Below: 'base depth' in tiny cyan (#22D3EE). Bottom: 'East coast powder? "
+            "It happens. Check live cams →' in cyan. Dark, atmospheric, cold but beautiful."
+        ),
+    },
+    {
+        "key": "weather-icons-concept",
+        "filename": "weather-icons-concept.jpg",
+        "aspect_ratio": "16:9",
+        "prompt": (
+            "A design reference sheet showing 12 minimal weather condition icons arranged "
+            "in a 4x3 grid on a dark midnight navy background (#0B1120). Each icon is "
+            "rendered in a thin-line illustration style using only white (#E8E8E8) and "
+            "cyan (#22D3EE) on the dark background. The icons represent: "
+            "Row 1: clear sun, partly cloudy, overcast clouds, fog/mist. "
+            "Row 2: light snow (few flakes), heavy snow (dense flakes), blizzard (wind+snow), rain. "
+            "Row 3: freezing rain (rain with ice crystals), mixed precipitation (snow+rain), "
+            "strong wind (flowing lines), thermometer (cold). "
+            "Style: clean geometric line art, NOT cartoon or playful. Think architectural "
+            "drawing meets topographic map — precise, technical, beautiful. Lines are thin "
+            "and consistent weight. Snow is represented as small asterisk/star shapes, not "
+            "circles. Wind is represented as flowing parallel curves. Clouds are simple "
+            "overlapping arcs. The sun is a circle with short radiating lines. Each icon "
+            "sits in its own cell with subtle border lines. Below each icon is a small "
+            "label in monospace font. The overall feel is a premium outdoor instrument "
+            "panel — like the gauges on a high-end altimeter watch. Professional, precise, "
+            "minimal. No color other than white, cyan, and the dark background."
+        ),
+    },
+    {
+        "key": "forecast-ui-concept",
+        "filename": "forecast-ui-concept.jpg",
+        "aspect_ratio": "16:9",
+        "prompt": (
+            "A UI mockup screenshot of a weather forecast section for a ski resort website. "
+            "Dark midnight navy background (#0B1120). The design shows a 5-day forecast "
+            "in a horizontal table layout with morning/afternoon/evening columns per day. "
+            "Each cell contains: a small minimal weather icon (white line art), temperature "
+            "in clean sans-serif (large number + small degree symbol), a tiny wind arrow "
+            "rotated to show direction with speed in small text, and a vertical bar showing "
+            "snowfall amount (taller bar = more snow, colored in graduated cyan-to-bright-cyan). "
+            "Above the table: a 'conditions hero' section showing large numbers: current "
+            "temperature (48 degrees), feels like (32 degrees), 24hr snowfall (6 inches in "
+            "large bold cyan text), wind (15 mph SW with a directional arrow). "
+            "Below the table: a subtle 48-hour timeline chart with a temperature curve "
+            "(thin white line), snow accumulation bars (cyan), and tiny wind direction "
+            "arrows along the bottom. The overall design is data-dense but clean — inspired "
+            "by Yr.no and OpenSnow. Dark theme, professional, no emoji anywhere. Typography "
+            "is Inter font. Accent color is cyan (#22D3EE). The design feels like a premium "
+            "weather instrument, not a toy. Crisp, high-contrast, information-rich."
+        ),
+    },
+    {
         "key": "og-image",
         "filename": "og-image.jpg",
         "aspect_ratio": "16:9",

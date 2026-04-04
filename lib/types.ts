@@ -142,12 +142,46 @@ export interface UserCondition {
 
 // ── NWS Weather ──────────────────────────────────────────────
 export interface WeatherPeriod {
-  dow: string;             // "Today", "Mon", "Tue" …
-  icon: string;            // emoji
-  high: number;            // °F
-  low: number | null;      // °F — null on overnight periods
-  snowInches: number;      // estimated snow inches (0 if none)
-  shortForecast: string;   // "Heavy Snow", "Sunny" etc.
+  dow: string;                    // "Today", "Mon", "Tue" …
+  condition: string;              // "clear" | "partly-cloudy" | "heavy-snow" etc.
+  high: number;                   // °F
+  low: number | null;             // °F — null on overnight periods
+  snowInches: number;             // estimated snow inches (0 if none)
+  shortForecast: string;          // "Heavy Snow", "Sunny" etc.
+  windSpeed: number | null;       // mph
+  windDirection: string | null;   // "N", "NW", "SSE" etc.
+  windGust: number | null;        // mph
+  precipProbability: number | null; // 0-100
+  feelsLike: number | null;       // °F (wind chill adjusted)
+}
+
+/** Raw hourly data from NWS */
+export interface HourlyWeather {
+  time: string;            // ISO timestamp
+  temperature: number;     // °F
+  windSpeed: number;       // mph
+  windDirection: string;   // compass direction
+  shortForecast: string;
+  condition: string;       // icon key
+  snowInches: number;
+  precipProbability: number;
+  feelsLike: number;
+}
+
+/** Bucketed period (morning/afternoon/evening) */
+export interface ForecastPeriod {
+  day: string;             // "Mon", "Tue" etc.
+  period: "morning" | "afternoon" | "evening";
+  condition: string;       // dominant condition
+  highTemp: number;
+  lowTemp: number;
+  feelsLike: number;
+  windSpeed: number;       // average
+  windGust: number;        // max
+  windDirection: string;   // dominant
+  snowInches: number;      // total
+  precipProbability: number; // max
+  shortForecast: string;   // most representative
 }
 
 // ── Dashboard & Favorites ────────────────────────────────────

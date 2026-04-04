@@ -5,7 +5,10 @@ import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { Heart } from "lucide-react";
 import { ConditionBadge } from "@/components/ui/Badge";
-import type { ResortWithData, WeatherPeriod, LiveConditions, Cam, UserCondition } from "@/lib/types";
+import type { ResortWithData, WeatherPeriod, LiveConditions, Cam, UserCondition, ForecastPeriod, HourlyWeather } from "@/lib/types";
+import { ConditionsHero } from "@/components/resort/ConditionsHero";
+import { ForecastTable } from "@/components/resort/ForecastTable";
+import { HourlyTimeline } from "@/components/resort/HourlyTimeline";
 import dynamic from "next/dynamic";
 const ConditionVoter = dynamic(() => import("./ConditionVoter").then(m => ({ default: m.ConditionVoter })));
 const UserConditionsForm = dynamic(() => import("./UserConditionsForm").then(m => ({ default: m.UserConditionsForm })));
@@ -19,6 +22,8 @@ import { FavoriteButton } from "../ui/FavoriteButton";
 interface Props {
   resort: ResortWithData;
   weather: WeatherPeriod[] | null;
+  forecastPeriods?: ForecastPeriod[] | null;
+  hourlyData?: HourlyWeather[] | null;
   liveConditions?: LiveConditions | null;
   userConditions?: UserCondition[];
 }
@@ -179,36 +184,6 @@ function CamPlayer({ cam, resortSlug, index = 99 }: { cam: Cam; resortSlug: stri
   );
 }
 
-// ─── Weather strip ───────────────────────────────────────────────────────────
-
-function WeatherStrip({ weather }: { weather: WeatherPeriod[] }) {
-  return (
-    <div className="flex gap-2 overflow-x-auto pb-1" style={{ WebkitOverflowScrolling: "touch" }}>
-      {weather.map((day, i) => (
-        <div
-          key={i}
-          className={`shrink-0 flex flex-col items-center gap-1.5 rounded-xl px-4 py-3 border min-w-[72px]
-            ${i === 0 ? "bg-surface2 border-border-hi" : "bg-surface border-border"}`}
-        >
-          <span className="text-text-muted text-[11px] font-medium">{day.dow}</span>
-          <span className="text-xl">{day.icon}</span>
-          <div className="text-center">
-            <span className="text-text-base text-sm font-semibold">{day.high}°</span>
-            {day.low != null && (
-              <span className="text-text-muted text-xs"> / {day.low}°</span>
-            )}
-          </div>
-          {day.snowInches > 0 && (
-            <span className="text-powder text-[11px] font-medium">
-              ⛄ {day.snowInches}″
-            </span>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // ─── Conditions strip ────────────────────────────────────────────────────────
 
 function ConditionsStrip({ resort }: { resort: ResortWithData }) {
@@ -299,7 +274,7 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-export function ResortDetailPage({ resort, weather, liveConditions, userConditions = [] }: Props) {
+export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData, liveConditions, userConditions = [] }: Props) {
   const activeCams = resort.cams.filter((c) => c.is_active);
   const snow = resort.snow_report;
   const { user, isFavorite, toggle: toggleFav } = useFavorites();
@@ -418,7 +393,28 @@ export function ResortDetailPage({ resort, weather, liveConditions, userConditio
       {/* ── Content ───────────────────────────────────────────── */}
       <div className="max-w-5xl mx-auto px-4 py-8 md:px-8 space-y-10">
 
-        {/* Snow conditions */}
+        {/* ConditionsHero — big glanceable numbers */}
+        {weather && weather.length > 0 ? (
+          <section>
+            <ConditionsHero
+              currentTemp={weather[0].high}
+              feelsLike={weather[0].feelsLike}
+              newSnow24h={snow?.new_snow_24h}
+              windSpeed={weather[0].windSpeed}
+              windDirection={weather[0].windDirection}
+              windGust={weather[0].windGust}
+              precipProbability={weather[0].precipProbability}
+            />
+          </section>
+        ) : (
+          <section>
+            <div className="bg-surface border border-border rounded-xl p-6 text-center text-text-muted text-sm">
+              Forecast unavailable — weather data temporarily unreachable.
+            </div>
+          </section>
+        )}
+
+        {/* Snow conditions strip */}
         {snow ? (
           <section>
             <div className="flex items-center justify-between mb-4">
@@ -450,8 +446,8 @@ export function ResortDetailPage({ resort, weather, liveConditions, userConditio
           </section>
         )}
 
-        {/* Weather forecast */}
-        {weather && weather.length > 0 ? (
+        {/* ForecastTable — 5-day morning/afternoon/evening */}
+        {forecastPeriods && forecastPeriods.length > 0 ? (
           <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">5-Day Forecast</h2>
@@ -464,12 +460,12 @@ export function ResortDetailPage({ resort, weather, liveConditions, userConditio
                 NWS Forecast ↗
               </a>
             </div>
-            <WeatherStrip weather={weather} />
+            <ForecastTable periods={forecastPeriods} />
             <p className="text-text-muted text-xs mt-2">Via National Weather Service · Updated hourly</p>
           </section>
         ) : (
           <section>
-             <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4">
               <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">5-Day Forecast</h2>
               <a
                 href={`https://forecast.weather.gov/MapClick.php?lat=${resort.lat}&lon=${resort.lng}`}
@@ -483,6 +479,13 @@ export function ResortDetailPage({ resort, weather, liveConditions, userConditio
             <div className="bg-surface border border-border rounded-xl p-6 text-center text-text-muted text-sm">
               Weather data temporarily unavailable.
             </div>
+          </section>
+        )}
+
+        {/* HourlyTimeline — 48h collapsible chart */}
+        {hourlyData && hourlyData.length > 0 && (
+          <section>
+            <HourlyTimeline hourlyData={hourlyData} />
           </section>
         )}
 
