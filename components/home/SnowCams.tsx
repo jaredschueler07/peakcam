@@ -119,9 +119,11 @@ function SnowCamCard({
           isImage ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={`${cam.embed_url}${cam.embed_url?.includes("?") ? "&" : "?"}_t=${Date.now()}`}
+              src={cam.embed_url ?? ""}
               alt={cam.name}
               className="w-full h-full object-cover"
+              loading="lazy"
+              decoding="async"
             />
           ) : cam.embed_type === "link" ? null : (
             <iframe

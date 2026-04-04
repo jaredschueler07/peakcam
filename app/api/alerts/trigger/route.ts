@@ -36,16 +36,17 @@ interface SnowReport {
   new_snow_24h: number | null;
 }
 
-// POST /api/alerts/trigger
+// Shared handler for both GET (Vercel Cron) and POST (script) invocations.
 // Protected by Authorization: Bearer <CRON_SECRET>
 // Checks latest SNOTEL data against subscriber thresholds and fires emails.
-export async function POST(request: NextRequest) {
-  // Auth check
-  if (CRON_SECRET) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${CRON_SECRET}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+async function handleTrigger(request: NextRequest) {
+  // Auth check — fail closed when CRON_SECRET is not configured
+  if (!CRON_SECRET) {
+    return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
+  }
+  const auth = request.headers.get("authorization");
+  if (auth !== `Bearer ${CRON_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   // 1. Load all alert preferences with subscriber + resort info
@@ -147,4 +148,14 @@ export async function POST(request: NextRequest) {
 
   console.log(`[alerts/trigger] Done — ${sent} emails sent, ${failed} failed`);
   return NextResponse.json({ ok: true, sent, failed });
+}
+
+// GET — Vercel Cron invokes routes via GET
+export async function GET(request: NextRequest) {
+  return handleTrigger(request);
+}
+
+// POST — powder-alert-check.mjs script uses POST
+export async function POST(request: NextRequest) {
+  return handleTrigger(request);
 }

@@ -9,10 +9,10 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        display: ['"Bebas Neue"', "sans-serif"],
-        heading: ["Inter", "system-ui", "sans-serif"],
-        sans:    ["Inter", "system-ui", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
-        mono:    ['"JetBrains Mono"', '"Fira Code"', "monospace"],
+        display: ["var(--font-bebas)", "sans-serif"],
+        heading: ["var(--font-inter)", "system-ui", "sans-serif"],
+        sans:    ["var(--font-inter)", "system-ui", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+        mono:    ["var(--font-jetbrains)", '"Fira Code"', "monospace"],
       },
       colors: {
         // ── Summit Light base palette ──

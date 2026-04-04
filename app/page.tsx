@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { getAllResorts } from "@/lib/supabase";
 import { BrowsePage } from "@/components/browse/BrowsePage";
 import { PeakHero } from "@/components/home/PeakHero";
@@ -82,9 +83,15 @@ export default async function Home() {
     <main id="main-content">
       <PeakHero />
       <PowderTicker alerts={powderAlerts} />
-      {snowCams.length > 0 && <SnowCams snowCams={snowCams} />}
+      {snowCams.length > 0 && (
+        <Suspense fallback={<div className="h-96 animate-pulse bg-surface rounded-lg" />}>
+          <SnowCams snowCams={snowCams} />
+        </Suspense>
+      )}
       <BrowsePage resorts={resorts} />
-      <LiveWebcams cams={featuredCams} />
+      <Suspense fallback={<div className="h-96 animate-pulse bg-surface rounded-lg" />}>
+        <LiveWebcams cams={featuredCams} />
+      </Suspense>
       <PeakFooter />
     </main>
   );

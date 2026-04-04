@@ -1,7 +1,8 @@
 "use client";
 
 import { useDashboard } from "@/hooks/useDashboard";
-import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
+import dynamic from "next/dynamic";
+const DashboardGrid = dynamic(() => import("@/components/dashboard/DashboardGrid").then(m => ({ default: m.DashboardGrid })));
 import { Header } from "@/components/layout/Header";
 import { PeakFooter } from "@/components/home/PeakFooter";
 import { Star, Layout, Loader2 } from "lucide-react";

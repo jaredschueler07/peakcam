@@ -1,9 +1,41 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import dynamic from "next/dynamic";
+import { Inter, Bebas_Neue, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { PostHogProvider } from "@/lib/posthog";
-import { MetaPixel } from "@/lib/meta-pixel";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+
+const PostHogProvider = dynamic(
+  () => import("@/lib/posthog").then((mod) => mod.PostHogProvider),
+  { ssr: false }
+);
+
+const MetaPixel = dynamic(
+  () => import("@/lib/meta-pixel").then((mod) => mod.MetaPixel),
+  { ssr: false }
+);
+
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const bebasNeue = Bebas_Neue({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-bebas",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-jetbrains",
+  display: "swap",
+});
 
 const BASE_URL = "https://peakcam.io";
 
@@ -74,8 +106,8 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body className="antialiased">
+    <html lang="en" className={`${inter.variable} ${bebasNeue.variable} ${jetbrainsMono.variable}`}>
+      <body className={`${inter.className} antialiased`}>
         <a href="#main-content"
            className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100]
                       focus:px-4 focus:py-2 focus:bg-cyan focus:text-bg focus:rounded-lg focus:text-sm focus:font-semibold">
@@ -91,8 +123,12 @@ export default function RootLayout({
         />
         <PostHogProvider>{children}</PostHogProvider>
         <MetaPixel />
-        <Analytics />
-        <SpeedInsights />
+        <Suspense>
+          <Analytics />
+        </Suspense>
+        <Suspense>
+          <SpeedInsights />
+        </Suspense>
       </body>
     </html>
   );

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import Link from "next/link";
+import Image from "next/image";
 import { Menu, X } from "lucide-react";
 import { navLinks } from "@/components/layout/Header";
 
@@ -13,10 +14,13 @@ export function PeakHero() {
     <div className="relative h-screen w-full overflow-hidden bg-bg">
       {/* Mountain background with overlay */}
       <div className="absolute inset-0">
-        <img
+        <Image
           src="/images/hero-mountain.jpg"
           alt="Mountain dawn"
-          className="w-full h-full object-cover opacity-40"
+          fill
+          priority
+          className="object-cover opacity-40"
+          sizes="100vw"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/70 to-transparent" />
       </div>
