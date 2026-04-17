@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { Bell, BellOff, Check, Loader2, Trash2 } from "lucide-react";
+import { track, EVENTS } from "@/lib/analytics-events";
 
 interface Resort {
   id: string;
@@ -41,6 +42,13 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
   const [unsubscribing, setUnsubscribing] = useState(false);
   const [unsubscribed, setUnsubscribed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Fire ALERT_CONFIRMED once on mount — by the time this component renders,
+  // the token has already been validated server-side and preferences loaded.
+  useEffect(() => {
+    track(EVENTS.ALERT_CONFIRMED, { token: token.slice(0, 8) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filteredResorts = resorts.filter(
     (r) =>
