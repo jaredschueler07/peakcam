@@ -64,3 +64,13 @@ npx tsx scripts/seed-openskistats.ts
 
 Then the orchestrator run (either manual `scripts/pipeline-backfill.ts` or the 06:00 launchd trigger) will pick up the enriched metadata and start writing `data_source_readings` + `resort_conditions_summary`.
 
+## Additional Discovery Findings
+
+A test backfill was attempted against prod before migration 010 lands; as expected the `snow_reports` inserts failed on the check constraint (log at `logs/pipeline-backfill.log`). The same run also surfaced three secondary issues not tied to migration 010:
+
+1. **SNOTEL HTML error parsing** — when the NRCS SNOTEL server is unavailable, the fetcher parses the HTML error page (`<p class="note">The server is currently unavailable...</p>`) as a date column and throws PostgREST `22007` on every resort. Only affects outage windows; independent of migration 010. File a V0.5 bug: `lib/pipeline/fetchers/snotel.ts` needs content-type validation before passing the response to the parser.
+2. **`user_conditions.submitted_at` schema mismatch** — the user-reports fetcher selects a column that doesn't exist in the `user_conditions` table. Will still fail after migration 010. File a V0.5 bug: either add the column via a new migration or update the fetcher's select list.
+3. **SNODAS tar missing file `1036`** — every resort's SNODAS fetch fails to find the snow-depth product file. May be an upstream catalog change or a stale filename constant. File a V0.5 bug.
+
+None of the three blocks launch: alerts (the user-visible V0 feature) runs off `snow_reports` which is populated by `npm run snotel-sync`. The pipeline's role is the *richer* conditions engine (`% of normal`, trend, outlook) which is nice-to-have for V0 launch but not critical.
+
