@@ -6,6 +6,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { Button } from "./Button";
 import { type FavoriteType } from "@/lib/types";
 import { AuthModal } from "../auth/AuthModal";
+import { track, EVENTS } from "@/lib/analytics-events";
 
 interface FavoriteButtonProps {
   itemId: string;
@@ -92,6 +93,7 @@ export function FavoriteButton({
 
         if (error) throw error;
         setIsFavorited(false);
+        track(EVENTS.FAVORITE_REMOVED, { item_id: itemId, item_type: itemType });
       } else {
         const { error } = await supabase
           .from("user_favorites")
@@ -103,6 +105,7 @@ export function FavoriteButton({
 
         if (error) throw error;
         setIsFavorited(true);
+        track(EVENTS.FAVORITE_ADDED, { item_id: itemId, item_type: itemType });
       }
     } catch (err: any) {
       console.error("[FavoriteButton] Error toggling favorite:", err.message || err);
