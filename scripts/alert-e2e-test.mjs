@@ -47,6 +47,10 @@ if (!args.email || !args["resort-slug"]) {
   console.error("Usage: --email X --resort-slug Y");
   process.exit(1);
 }
+if (!CRON_SECRET) {
+  console.error("Missing CRON_SECRET in .env.local — required to trigger /api/alerts/trigger");
+  process.exit(1);
+}
 
 async function j(url, init) {
   const r = await fetch(url, init);
@@ -96,9 +100,14 @@ const trig2 = await j(`${SITE}/api/alerts/trigger`, {
   headers: { Authorization: `Bearer ${CRON_SECRET}`, "Content-Type": "application/json" },
 });
 console.log("  status:", trig2.status, "body:", trig2.body);
-if (trig.body?.sent > 0 && trig2.body?.sent > 0) {
+if ((trig.body?.sent ?? 0) === 0) {
+  console.warn("  WARN: dedup check not exercised — first trigger sent 0 emails.");
+  console.warn("        Pick a resort with fresh snow above threshold to exercise dedup.");
+} else if (trig.body?.sent > 0 && trig2.body?.sent > 0) {
   console.error("  FAIL: dedup did not prevent second send");
   process.exit(1);
+} else {
+  console.log("  OK: dedup suppressed second send");
 }
 
 console.log("[4/4] Done. Check inbox for email; use manage link to test edit/unsubscribe.");
