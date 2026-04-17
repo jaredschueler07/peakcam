@@ -60,3 +60,5 @@ agents/loop.log
 scripts/*.log
 .test_write
 .claude/worktrees/
+.worktrees/
+.agent-team/
