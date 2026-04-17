@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Bell, Check, Loader2, X, Search } from "lucide-react";
 import type { ResortWithData } from "@/lib/types";
+import { track, EVENTS } from "@/lib/analytics-events";
 
 interface Props {
   resorts: ResortWithData[];
@@ -99,6 +100,16 @@ export function PowderAlertSignup({ resorts }: Props) {
 
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error ?? "Something went wrong");
+      const resort_slugs = resorts
+        .filter((r) => selected.has(r.id))
+        .map((r) => r.slug);
+      track(EVENTS.ALERT_SIGNUP_SUBMITTED, {
+        resort_slugs,
+        resort_count: selected.size,
+        thresholds: Object.fromEntries(
+          [...selected].map((id) => [id, thresholds[id] ?? 6])
+        ),
+      });
       setStep("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
