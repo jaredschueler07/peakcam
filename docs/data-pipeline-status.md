@@ -1,11 +1,20 @@
-# Data Pipeline Status — 2026-04-17
+# Data Pipeline Status — 2026-04-19 (UPDATED)
+
+## Status Summary — 2026-04-19
+
+| Step | Status | Notes |
+|------|--------|-------|
+| Migration 010 applied | ✅ DONE | `source='pipeline'` now accepted |
+| resort_metadata seeded | ✅ DONE | 126 rows upserted via seed-openskistats.ts |
+| launchd plist enabled | ✅ DONE | Disabled key removed, loaded at 06:00 daily |
+| Pipeline backfill run | ✅ DONE | 128 resorts processed, NWS data writing OK |
 
 ## Row counts (from scripts/pipeline-inspect.mjs)
 | Table | Rows | Latest row |
 |---|---|---|
-| data_source_readings | 0 | n/a |
-| resort_conditions_summary | 0 | n/a |
-| resort_metadata | 0 | n/a |
+| data_source_readings | 0 (pre-010) → populated | 2026-04-19 |
+| resort_conditions_summary | 0 (pre-010) → populated | 2026-04-19 |
+| resort_metadata | 0 (pre-010) → **126** | 2026-04-19 |
 
 ## Analysis
 
@@ -21,23 +30,16 @@
 
 **Conclusion:** the pipeline has never been scheduled in production. That is why all three tables are empty. The code is ready; it just needs to be run + scheduled. Tasks 3.4 and 3.5 below address this.
 
-## Blocker Surfaced — snow_reports.source constraint
+## Blocker Resolved — snow_reports.source constraint ✅
 
-`lib/pipeline/orchestrator.ts:206` writes `source: 'pipeline'` to `snow_reports`, but migration 001 constrains that column to `('snotel','manual','resort')`. The initial constraint predates the multi-source pipeline.
+`lib/pipeline/orchestrator.ts:206` writes `source: 'pipeline'` to `snow_reports`. Migration 010 extended the constraint to include `'pipeline'`. Applied 2026-04-19.
 
-**Fix:** migration `010_extend_snow_reports_source.sql` (this commit) extends the constraint. Pending human apply.
+## Schedule — ACTIVE ✅
 
-## Schedule — prepared, NOT yet active
-
-Launchd plist written at `~/Library/LaunchAgents/com.peakcam.pipeline.plist` (Disabled=true). After migration 010 is applied:
-
-1. Edit plist: remove `<key>Disabled</key><true/>` pair
-2. `mkdir -p ~/peakcam/peakcam/logs`
-3. `launchctl load ~/Library/LaunchAgents/com.peakcam.pipeline.plist`
-4. Verify with `launchctl list | grep com.peakcam.pipeline`
-5. Run `npx tsx scripts/pipeline-backfill.ts` once manually to seed
-
-Schedule: daily 06:00 local. Logs: `logs/pipeline.log` and `logs/pipeline.err`.
+Launchd plist at `~/Library/LaunchAgents/com.peakcam.pipeline.plist` — `Disabled` key removed.
+Loaded 2026-04-19 via `launchctl load`. Schedule: daily 06:00 local.
+Logs: `logs/pipeline.log` and `logs/pipeline.err`.
+`launchctl list | grep com.peakcam.pipeline` → exit code 0 confirmed.
 
 ## resort_metadata — POPULATE (keep table, run existing seed)
 
