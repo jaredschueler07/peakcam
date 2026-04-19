@@ -27,7 +27,7 @@ interface AlertPreference {
   subscriber_id: string;
   resort_id: string;
   threshold_inches: number;
-  subscribers: Subscriber;
+  alert_subscribers: Subscriber;
   resorts: { name: string; slug: string };
 }
 
@@ -51,7 +51,7 @@ async function handleTrigger(request: NextRequest) {
 
   // 1. Load all alert preferences with subscriber + resort info
   const prefsResp = await sbFetch(
-    `/alert_preferences?select=subscriber_id,resort_id,threshold_inches,subscribers(id,email,manage_token),resorts(name,slug)`
+    `/alert_preferences?select=subscriber_id,resort_id,threshold_inches,alert_subscribers(id,email,manage_token),resorts(name,slug)`
   );
   if (!prefsResp.ok) {
     return NextResponse.json({ error: "Failed to load preferences" }, { status: 500 });
@@ -96,7 +96,7 @@ async function handleTrigger(request: NextRequest) {
     const dedupKey = `${pref.subscriber_id}:${pref.resort_id}`;
     if (alreadySent.has(dedupKey)) continue;
 
-    const sub = pref.subscribers;
+    const sub = pref.alert_subscribers;
     if (!bySubscriber.has(pref.subscriber_id)) {
       bySubscriber.set(pref.subscriber_id, { subscriber: sub, alerts: [] });
     }
