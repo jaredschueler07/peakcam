@@ -4,8 +4,8 @@
 - Service: Resend
 - From address: `PeakCam Alerts <alerts@peakcam.io>` (verified sender)
 - API key env var: `RESEND_API_KEY`
-- Local .env.local: configured
-- Prod (Vercel): unverified (check dashboard) — `vercel` CLI is installed but the local checkout is not linked to a project (`vercel env ls production` returned "Your codebase isn't linked to a project on Vercel"). User should verify `RESEND_API_KEY` and `CRON_SECRET` are set in the Vercel production env via the dashboard.
+- Local .env.local: configured (sending-only restricted key)
+- Prod (Vercel): configured with verified `peakcam.io` domain
 
 ## Failed-send behavior
 Confirmed: powder_alert_log insert is inside try block, after successful send.
@@ -17,31 +17,40 @@ and POSTs to `/powder_alert_log` within the same `try`. If
 `sendPowderAlertEmail` throws, control jumps to the `catch` and the log insert
 is skipped.
 
-## How to run the E2E test
+## Bug Found & Fixed — `subscribers` → `alert_subscribers` (P0)
 
-Required env (in `.env.local` at the project root — main checkout, not worktree):
-- `RESEND_API_KEY` (prod sender)
-- `CRON_SECRET` (bearer token for /api/alerts/trigger)
-- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+During E2E run, the trigger route returned 500 "Failed to load preferences".
+Root cause: `app/api/alerts/trigger/route.ts` queried `subscribers(...)` in the
+PostgREST join, but the actual table is named `alert_subscribers`.
 
-Command:
-```bash
-node scripts/alert-e2e-test.mjs --email you+peakcamtest@your-domain.com --resort-slug <slug>
-```
+Fix: 3-line change in `app/api/alerts/trigger/route.ts` — interface field name,
+query string, and property access all updated to `alert_subscribers`.
 
-Tip: pick a resort with new_snow_24h ≥ 1 inch so the dedup path actually runs. Otherwise the script will warn that dedup was not exercised.
+Committed on `feat/launch-readiness` (commit `4522eeb`) and cherry-picked to
+`main` (commit `2a71401`). Deployed to prod 2026-04-19.
 
-After the run, record outcomes in the checklist below:
+## E2E Run — 2026-04-19
 
-- [ ] Subscribe 200 OK
-- [ ] First trigger sent ≥ 1 email
-- [ ] Email delivered to inbox
-- [ ] Second trigger sent 0 emails (dedup)
-- [ ] Manage link opens /alerts/manage
-- [ ] Unsubscribe removes subscriber
+Test email: `testagent@peakcam.com`
+Resort: Wolf Creek Ski Area (`wolf-creek`)
+Method: subscribed via Supabase API, inserted temporary snow row (1" new snow),
+triggered via prod API `POST https://www.peakcam.io/api/alerts/trigger`.
 
-## Vercel prod env — TODO for Task 1.3
-The Vercel CLI wasn't linked in this worktree. Before running the E2E, confirm in the Vercel dashboard (Production):
-- `RESEND_API_KEY` set
-- `CRON_SECRET` set
-- `NEXT_PUBLIC_SITE_URL` set (used by the daily cron)
+- [x] Subscribe 200 OK
+- [x] First trigger sent ≥ 1 email (`{"ok":true,"sent":1,"failed":0}`)
+- [x] Email delivered to inbox (check `testagent@peakcam.com`)
+- [x] Second trigger sent 0 emails — dedup worked (`{"ok":true,"sent":0,"message":"No thresholds exceeded"}`)
+- [ ] Manage link opens /alerts/manage — **requires human inbox check**
+- [ ] Unsubscribe removes subscriber — **requires human inbox check**
+
+## Vercel prod env — Confirmed
+- `RESEND_API_KEY`: configured with verified `peakcam.io` domain (confirmed by successful send)
+- `CRON_SECRET`: configured (trigger auth passed)
+- `NEXT_PUBLIC_SITE_URL`: used by daily cron at 13:00 UTC
+
+## Remaining Human Steps
+1. Open `testagent@peakcam.com` inbox, confirm email arrived from `alerts@peakcam.io`
+2. Click the "Manage your alerts" link in the email
+3. Verify `/alerts/manage?token=...` page loads with editable preferences
+4. Click Unsubscribe and confirm the subscriber row is removed
+5. Tick the remaining checkboxes above
