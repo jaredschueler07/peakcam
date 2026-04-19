@@ -17,8 +17,8 @@ import { trackSearch, trackFilter } from "@/lib/posthog";
 const MapView = dynamic(() => import("@/components/map/MapView"), {
   ssr: false,
   loading: () => (
-    <div className="h-full w-full bg-surface animate-pulse rounded-xl flex items-center justify-center">
-      <span className="text-text-muted text-sm">Loading map...</span>
+    <div className="h-full w-full bg-cream animate-pulse rounded-[18px] border-[1.5px] border-ink flex items-center justify-center">
+      <span className="font-mono text-bark text-xs uppercase tracking-[0.14em]">Loading map…</span>
     </div>
   ),
 });
@@ -31,7 +31,13 @@ interface Props {
 
 type StateFilter = string;
 type ConditionFilter = "all" | "great" | "good" | "fair" | "poor";
-type SortOption = "name" | "snow" | "conditions";
+type SortOption = "best" | "snow" | "name";
+
+const SORT_LABEL: Record<SortOption, string> = {
+  best: "Best",
+  snow: "Snow",
+  name: "Name",
+};
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -77,10 +83,10 @@ function FilterChip({
     <button
       onClick={onClick}
       title={title}
-      className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 min-h-[44px] text-sm font-medium border cursor-pointer select-none transition-colors duration-200 whitespace-nowrap ${
+      className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 min-h-[40px] text-[13px] font-semibold border-[1.5px] cursor-pointer select-none transition-colors duration-150 whitespace-nowrap ${
         active
-          ? "bg-cyan/20 border-cyan/50 text-cyan hover:bg-cyan/30"
-          : "bg-text-base/10 border-text-base/20 text-text-subtle hover:bg-text-base/20"
+          ? "bg-ink border-ink text-cream-50"
+          : "bg-cream-50 border-bark text-ink hover:border-ink hover:bg-cream"
       }`}
     >
       {icon}
@@ -107,67 +113,72 @@ function FeaturedRow({ resorts }: { resorts: ResortWithData[] }) {
 
   if (featured.length === 0) return null;
 
+  // Condition chip palette — matches ConditionBadge tokens
+  const chipClass: Record<string, string> = {
+    great: "bg-great text-cream-50 border-forest-dk",
+    good:  "bg-good text-cream-50 border-forest-dk",
+    fair:  "bg-fair text-ink border-bark-dk",
+    poor:  "bg-poor text-cream-50 border-bark-dk",
+  };
+
   return (
     <div className="mb-10">
-      <h2 className="font-display text-4xl md:text-5xl text-text-base mb-2 tracking-wide">
-        TODAY&apos;S TOP CONDITIONS
+      <div className="pc-eyebrow mb-1" style={{ color: "var(--pc-bark)" }}>
+        Today&apos;s Top
+      </div>
+      <h2 className="font-display font-black text-4xl md:text-5xl text-ink mb-1 leading-[0.95] tracking-[-0.02em]">
+        Got the <em className="text-alpen not-italic font-bold italic">goods</em>.
       </h2>
-      <p className="text-text-muted text-sm mb-4">Ranked by condition rating and recent snowfall</p>
-      <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
+      <p className="text-bark text-sm mb-5">Ranked by condition rating and recent snowfall.</p>
+      <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 scrollbar-hide">
         {featured.map((resort) => {
           const snow = resort.snow_report;
-          const condColor =
-            resort.cond_rating === "great" ? "#2ECC8F"
-            : resort.cond_rating === "good" ? "#60C8FF"
-            : resort.cond_rating === "fair" ? "#8AA3BE"
-            : "#f87171";
+          const chip = chipClass[resort.cond_rating] ?? "bg-cream-50 text-ink border-bark";
           return (
             <Link
               key={resort.id}
               href={`/resorts/${resort.slug}`}
-              className="group relative flex-shrink-0 w-72 bg-surface border border-border rounded-lg overflow-hidden
-                         hover:border-cyan/50 hover:shadow-glow-ice transition-all duration-300
-                         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan"
+              className="group relative flex-shrink-0 w-72 bg-cream-50 border-[1.5px] border-ink rounded-[18px] overflow-hidden
+                         shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]
+                         transition-[transform,box-shadow] duration-150
+                         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alpen"
             >
-              {/* Alpenglow accent bar */}
-              <div className="h-1 w-full bg-gradient-to-r from-alpenglow via-cyan to-alpenglow" />
-
               <div className="p-5">
                 <div className="flex items-start justify-between gap-2 mb-4">
-                  <div>
-                    <h3 className="text-text-base font-semibold text-lg leading-tight group-hover:text-cyan transition-colors duration-150">
+                  <div className="min-w-0">
+                    <div className="inline-flex items-center gap-2 font-mono font-bold text-[10.5px] text-bark uppercase tracking-[0.14em] mb-1.5">
+                      <span className="px-2 py-0.5 bg-ink text-cream-50 rounded-full">{resort.state}</span>
+                    </div>
+                    <h3 className="font-display font-black text-[20px] leading-[1.05] tracking-[-0.01em] text-ink">
                       {resort.name}
                     </h3>
-                    <p className="text-text-muted text-xs mt-1">{resort.region}, {resort.state}</p>
+                    <p className="text-bark text-xs mt-1">{resort.region}</p>
                   </div>
-                  <div
-                    className="px-2.5 py-1 rounded text-xs font-semibold shrink-0"
-                    style={{
-                      backgroundColor: `${condColor}20`,
-                      color: condColor,
-                      border: `1px solid ${condColor}40`,
-                    }}
-                  >
+                  <span className={`inline-flex items-center rounded-full border-[1.5px] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] shrink-0 ${chip}`}>
                     {resort.cond_rating.toUpperCase()}
-                  </div>
+                  </span>
                 </div>
 
                 {snow && (
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-bg/50 rounded-lg p-2 text-center">
-                      <div className="text-powder font-mono font-bold text-xl leading-none">{snow.base_depth ?? "\u2014"}</div>
-                      <div className="text-text-muted text-[10px] mt-1">base&quot;</div>
+                  <div className="grid grid-cols-3 gap-2 pt-3 border-t-[1.5px] border-dashed border-bark/60">
+                    <div className="text-center">
+                      <div className="font-display font-black text-ink text-2xl leading-none tabular-nums">
+                        {snow.base_depth ?? "\u2014"}
+                      </div>
+                      <div className="pc-eyebrow mt-1" style={{ fontSize: 9.5 }}>Base&quot;</div>
                     </div>
-                    <div className="bg-bg/50 rounded-lg p-2 text-center">
-                      <div className="text-cyan font-mono font-bold text-xl leading-none">{snow.new_snow_24h ?? "\u2014"}</div>
-                      <div className="text-text-muted text-[10px] mt-1">24h&quot;</div>
+                    <div className="text-center">
+                      <div className="font-display font-black text-alpen text-2xl leading-none tabular-nums">
+                        {snow.new_snow_24h ?? "\u2014"}
+                      </div>
+                      <div className="pc-eyebrow mt-1" style={{ fontSize: 9.5 }}>24h&quot;</div>
                     </div>
-                    <div className="bg-bg/50 rounded-lg p-2 text-center">
-                      <div className="text-text-base font-mono font-bold text-xl leading-none">
+                    <div className="text-center">
+                      <div className="font-display font-black text-ink text-2xl leading-none tabular-nums">
                         {snow.trails_open != null && snow.trails_total != null
                           ? `${snow.trails_open}/${snow.trails_total}` : "\u2014"}
                       </div>
-                      <div className="text-text-muted text-[10px] mt-1">runs</div>
+                      <div className="pc-eyebrow mt-1" style={{ fontSize: 9.5 }}>Runs</div>
                     </div>
                   </div>
                 )}
@@ -191,22 +202,21 @@ function PowderAlert({ resorts }: { resorts: ResortWithData[] }) {
   if (alerts.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-3 px-5 py-3 bg-alpenglow/10 border border-alpenglow/30 rounded-lg mb-8">
-      {/* Pulsing dot */}
+    <div className="flex items-center gap-3 px-5 py-3 bg-alpen text-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp mb-8">
       <span className="relative flex h-3 w-3 shrink-0">
-        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-alpenglow opacity-75" />
-        <span className="relative inline-flex rounded-full h-3 w-3 bg-alpenglow" />
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cream-50 opacity-75" />
+        <span className="relative inline-flex rounded-full h-3 w-3 bg-cream-50" />
       </span>
       <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-alpenglow font-semibold text-sm">Powder Alert</span>
+        <span className="font-mono font-bold text-[11px] uppercase tracking-[0.16em]">Pow Day</span>
         {alerts.map((r) => (
           <Link
             key={r.slug}
             href={`/resorts/${r.slug}`}
-            className="text-text-subtle text-sm hover:text-cyan transition-colors"
+            className="text-cream-50 text-sm font-semibold hover:underline decoration-2 underline-offset-2"
           >
             {r.name}{" "}
-            <span className="text-powder font-medium">+{r.snow_report!.new_snow_24h}&quot;</span>
+            <span className="font-mono font-bold tabular-nums">+{r.snow_report!.new_snow_24h}&quot;</span>
           </Link>
         ))}
       </div>
@@ -223,7 +233,7 @@ export function BrowsePage({ resorts }: Props) {
   const [hasLiveCams, setHasLiveCams] = useState(false);
   const [freshSnow, setFreshSnow] = useState(false);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
-  const [sort, setSort] = useState<SortOption>("name");
+  const [sort, setSort] = useState<SortOption>("best");
   const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(false);
   const [showStates, setShowStates] = useState(false);
@@ -249,17 +259,24 @@ export function BrowsePage({ resorts }: Props) {
     if (freshSnow) list = list.filter((r) => (r.snow_report?.new_snow_24h ?? 0) >= 8);
     if (showFavoritesOnly) list = list.filter((r) => isFavorite(r.id));
 
-    if (sort === "name") {
-      list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+    if (sort === "best") {
+      // Condition rank first (great → poor, unknown last),
+      // tiebreak by 24h fresh snow desc so powder rises inside each tier.
+      list = [...list].sort((a, b) => {
+        const condDiff =
+          (CONDITION_ORDER[a.cond_rating] ?? 99) - (CONDITION_ORDER[b.cond_rating] ?? 99);
+        if (condDiff !== 0) return condDiff;
+        const aSnow = a.snow_report?.new_snow_24h ?? -1;
+        const bSnow = b.snow_report?.new_snow_24h ?? -1;
+        if (aSnow !== bSnow) return bSnow - aSnow;
+        return a.name.localeCompare(b.name);
+      });
     } else if (sort === "snow") {
       list = [...list].sort(
         (a, b) => (b.snow_report?.base_depth ?? -1) - (a.snow_report?.base_depth ?? -1)
       );
-    } else if (sort === "conditions") {
-      list = [...list].sort(
-        (a, b) =>
-          (CONDITION_ORDER[a.cond_rating] ?? 99) - (CONDITION_ORDER[b.cond_rating] ?? 99)
-      );
+    } else if (sort === "name") {
+      list = [...list].sort((a, b) => a.name.localeCompare(b.name));
     }
 
     return list;
@@ -300,33 +317,37 @@ export function BrowsePage({ resorts }: Props) {
   }, [hasLiveCams]);
 
   return (
-    <div id="conditions" className="min-h-screen bg-bg">
+    <div id="conditions" className="min-h-screen pc-paper">
       <Header showSearch={false} />
 
-      {/* ── Frosted glass search + filter bar ─────────────────── */}
-      <div className="sticky top-0 z-30 border-b border-border backdrop-blur-md bg-surface/85">
+      {/* ── Sticky paper search + filter bar ─────────────────── */}
+      <div className="sticky top-0 z-30 border-b-[1.5px] border-ink bg-cream/95 backdrop-blur-md">
         <div className="max-w-screen-2xl mx-auto px-4 py-5 md:px-8">
-          {/* Top row: search + map toggle */}
+          {/* Top row: search input (pc-input style) */}
           <div className="flex items-center gap-4 mb-4">
             <div className="flex-1 relative">
               <Search
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-text-subtle pointer-events-none"
-                size={20}
+                className="absolute left-5 top-1/2 -translate-y-1/2 text-bark pointer-events-none"
+                size={18}
               />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search resorts..."
-                className="w-full pl-12 pr-9 py-3 bg-bg/50 border border-border focus:border-cyan/50 rounded-lg text-text-base placeholder:text-text-muted outline-none transition-colors"
+                placeholder="Search 128 resorts…"
+                className="w-full pl-12 pr-10 py-3 bg-snow text-ink placeholder:text-bark
+                           border-[1.5px] border-ink rounded-full shadow-stamp
+                           focus:shadow-[4px_4px_0_#a93f20] focus:border-alpen-dk
+                           outline-none transition-shadow duration-100 font-medium"
               />
               {search && (
                 <button
                   onClick={handleClearSearch}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-base transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-bark hover:text-ink transition-colors"
+                  aria-label="Clear search"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               )}
@@ -338,10 +359,10 @@ export function BrowsePage({ resorts }: Props) {
             {/* State dropdown */}
             <button
               onClick={() => setShowStates(v => !v)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 min-h-[44px] text-sm font-medium border cursor-pointer select-none transition-colors duration-200 whitespace-nowrap ${
+              className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 min-h-[40px] text-[13px] font-semibold border-[1.5px] cursor-pointer select-none transition-colors duration-150 whitespace-nowrap ${
                 stateFilter !== "All"
-                  ? "bg-cyan/20 border-cyan/50 text-cyan"
-                  : "bg-text-base/10 border-text-base/20 text-text-subtle hover:bg-text-base/20"
+                  ? "bg-ink border-ink text-cream-50"
+                  : "bg-cream-50 border-bark text-ink hover:border-ink hover:bg-cream"
               }`}
             >
               <MapPin size={14} />
@@ -349,7 +370,7 @@ export function BrowsePage({ resorts }: Props) {
               <ChevronDown size={14} className={`transition-transform ${showStates ? "rotate-180" : ""}`} />
             </button>
 
-            <span className="w-px h-5 bg-border mx-1 hidden sm:block" />
+            <span className="w-px h-5 bg-bark/40 mx-1 hidden sm:block" />
 
             {/* Feature filters */}
             <FilterChip label="Fresh Snow" active={freshSnow} onClick={() => setFreshSnow((v) => !v)} />
@@ -358,7 +379,7 @@ export function BrowsePage({ resorts }: Props) {
               <FilterChip label="My Favorites" active={showFavoritesOnly} onClick={() => setShowFavoritesOnly((v) => !v)} />
             )}
 
-            <span className="w-px h-5 bg-border mx-1 hidden sm:block" />
+            <span className="w-px h-5 bg-bark/40 mx-1 hidden sm:block" />
 
             {/* Condition filters */}
             {(["all", "great", "good", "fair", "poor"] as ConditionFilter[]).map((c) => (
@@ -374,34 +395,36 @@ export function BrowsePage({ resorts }: Props) {
             <div className="ml-auto flex items-center gap-1.5">
               <button
                 onClick={() => setShowMap((v) => !v)}
-                className="hidden md:flex items-center gap-2 text-text-muted hover:text-text-base text-sm
-                           border border-border rounded-lg px-3 py-2.5 transition-colors duration-150 mr-2"
+                className="hidden md:flex items-center gap-2 text-ink text-[13px] font-semibold
+                           bg-cream-50 border-[1.5px] border-ink rounded-full px-3.5 py-2 shadow-stamp-sm
+                           hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]
+                           transition-[transform,box-shadow] duration-100 mr-2"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
                     d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 13l4.553 2.276A1 1 0 0021 21.382V10.618a1 1 0 00-1.447-.894L15 12m0 8V12m0 0L9 7" />
                 </svg>
                 {showMap ? "Hide map" : "Show map"}
               </button>
-              <SlidersHorizontal size={14} className="text-text-muted" />
-              <span className="text-text-muted text-xs hidden sm:block">Sort:</span>
-              {(["name", "snow", "conditions"] as SortOption[]).map((opt) => (
+              <SlidersHorizontal size={14} className="text-bark" />
+              <span className="font-mono text-[11px] text-bark uppercase tracking-[0.14em] hidden sm:block">Sort:</span>
+              {(["best", "snow", "name"] as SortOption[]).map((opt) => (
                 <button
                   key={opt}
                   onClick={() => setSort(opt)}
-                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors duration-200 ${
+                  className={`text-[12px] font-semibold px-3 py-1 rounded-full border-[1.5px] transition-colors duration-150 ${
                     sort === opt
-                      ? "bg-cyan/20 border-cyan/50 text-cyan"
-                      : "border-border text-text-muted hover:text-text-base"
+                      ? "bg-ink border-ink text-cream-50"
+                      : "border-bark text-ink hover:border-ink hover:bg-cream-50"
                   }`}
                 >
-                  {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                  {SORT_LABEL[opt]}
                 </button>
               ))}
             </div>
           </div>
           {showStates && (
-            <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-border">
+            <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t-[1.5px] border-dashed border-bark">
               <FilterChip label="All" active={stateFilter === "All"} onClick={() => { setStateFilter("All"); setShowStates(false); }} />
               {availableStates.map((s) => (
                 <FilterChip key={s} label={s} active={stateFilter === s}
@@ -418,11 +441,14 @@ export function BrowsePage({ resorts }: Props) {
         <FeaturedRow resorts={resorts} />
         <PowderAlert resorts={resorts} />
 
-        {/* Powder alert signup banner */}
-        <div className="flex items-center justify-between gap-4 px-5 py-4 bg-surface border border-border rounded-lg mb-8">
+        {/* Powder alert signup banner — forest card */}
+        <div className="flex items-center justify-between gap-4 px-6 py-5 bg-forest text-cream-50
+                        border-[1.5px] border-ink rounded-[18px] shadow-stamp mb-8">
           <div>
-            <p className="text-text-base font-semibold text-sm">Never miss a powder day</p>
-            <p className="text-text-muted text-xs">Get email alerts when your resorts hit your snow threshold.</p>
+            <p className="font-display font-black text-lg leading-tight">
+              Never miss a <em className="text-mustard italic">pow day</em>.
+            </p>
+            <p className="text-cream-50/80 text-sm mt-1">Email alerts when your resorts hit your snow threshold.</p>
           </div>
           <PowderAlertSignup resorts={resorts} />
         </div>
@@ -430,12 +456,12 @@ export function BrowsePage({ resorts }: Props) {
         {/* Section header */}
         <div className="flex items-end justify-between gap-4 mb-8 flex-wrap">
           <div>
-            <h2 className="font-display text-5xl md:text-6xl text-text-base mb-2">
-              TODAY&apos;S CONDITIONS
+            <div className="pc-eyebrow mb-1" style={{ color: "var(--pc-bark)" }}>
+              Real-time · {filtered.length} of {resorts.length}
+            </div>
+            <h2 className="font-display font-black text-5xl md:text-6xl text-ink leading-[0.95] tracking-[-0.02em]">
+              Today&apos;s <em className="text-alpen italic font-bold">conditions</em>.
             </h2>
-            <p className="text-text-subtle text-lg">
-              Real-time snow reports from {filtered.length} of {resorts.length} resorts
-            </p>
           </div>
         </div>
 
@@ -443,14 +469,17 @@ export function BrowsePage({ resorts }: Props) {
           {/* Resort grid */}
           <div>
             {filtered.length === 0 ? (
-              <div className="text-center py-20 text-text-muted">
-                <p className="text-lg font-medium text-text-subtle">No resorts found</p>
-                <p className="text-sm mt-1">Try a different search or clear your filters.</p>
+              <div className="text-center py-20 text-bark">
+                <p className="font-display font-black text-2xl text-ink">No resorts found.</p>
+                <p className="text-sm mt-1 text-bark">Try a different search or clear your filters.</p>
                 <button
                   onClick={() => { setSearch(""); setStateFilter("All"); setCondFilter("all"); setHasLiveCams(false); setFreshSnow(false); }}
-                  className="mt-4 text-cyan text-sm hover:underline"
+                  className="mt-4 inline-flex items-center gap-2 font-semibold text-[13px]
+                             bg-ink text-cream-50 border-[1.5px] border-ink rounded-full px-4 py-2
+                             shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]
+                             transition-[transform,box-shadow] duration-100"
                 >
-                  Clear all filters
+                  Clear all filters →
                 </button>
               </div>
             ) : (
@@ -474,7 +503,7 @@ export function BrowsePage({ resorts }: Props) {
 
           {/* Map sidebar */}
           {showMap && (
-            <div className="hidden lg:block sticky top-20 h-[calc(100vh-6rem)] rounded-xl overflow-hidden border border-border">
+            <div className="hidden lg:block sticky top-20 h-[calc(100vh-6rem)] rounded-[18px] overflow-hidden border-[1.5px] border-ink shadow-stamp">
               <MapView
                 resorts={filtered}
                 hoveredSlug={hoveredSlug}

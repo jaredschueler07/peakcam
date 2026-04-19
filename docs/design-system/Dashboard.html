@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PeakCam — Dashboard</title>
+<link rel="stylesheet" href="tokens.css" />
+<style>
+  body { margin: 0; }
+  .app { min-height: 100vh; padding: 28px 40px 80px; max-width: 1440px; margin: 0 auto; }
+
+  /* ===== Top bar ===== */
+  .topbar {
+    display: flex; align-items: center; gap: 20px;
+    padding: 12px 18px 12px 22px;
+    background: var(--pc-ink); color: var(--pc-cream-50);
+    border-radius: var(--pc-r-pill);
+    border: 2px solid var(--pc-ink);
+    box-shadow: var(--pc-stamp);
+    margin-bottom: 28px;
+  }
+  .topbar .brand { font-family: var(--pc-display); font-weight:900; font-size: 24px; letter-spacing: -.02em; }
+  .topbar .brand em { color: var(--pc-alpen); font-style: italic; }
+  .topbar nav { display:flex; gap: 4px; }
+  .topbar nav a {
+    color: var(--pc-cream-50); text-decoration:none;
+    font-family: var(--pc-sans); font-weight: 500; font-size: 14px;
+    padding: 7px 12px; border-radius: var(--pc-r-pill);
+  }
+  .topbar nav a.active { background: var(--pc-alpen); font-weight: 700; }
+  .topbar nav a:hover:not(.active) { background: rgba(241,231,207,.12); }
+  .topbar .spacer { flex: 1; }
+  .topbar .search {
+    display:flex; align-items:center; gap:8px;
+    background: rgba(241,231,207,.12);
+    border-radius: var(--pc-r-pill);
+    padding: 7px 14px; color: var(--pc-cream-50);
+    font-family: var(--pc-sans); font-size: 13px;
+    min-width: 260px;
+  }
+  .topbar .search input {
+    background: transparent; border: 0; outline: 0; color: var(--pc-cream-50);
+    font-family: var(--pc-sans); font-size: 14px; flex: 1;
+  }
+  .topbar .search input::placeholder { color: rgba(241,231,207,.55); }
+  .topbar .avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--pc-mustard);
+    display:grid; place-items:center;
+    font-family: var(--pc-display); font-weight: 900; color: var(--pc-ink);
+    border: 2px solid var(--pc-cream-50);
+  }
+
+  /* ===== Hero headline ===== */
+  .hero {
+    display: grid; grid-template-columns: 1.2fr .8fr; gap: 28px; align-items: end;
+    padding: 32px 36px;
+    border: var(--pc-border);
+    border-radius: var(--pc-r-lg);
+    background: var(--pc-cream-50);
+    box-shadow: var(--pc-stamp);
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content:''; position:absolute; inset:0;
+    background:
+      repeating-radial-gradient(ellipse 160% 90% at 110% 110%,
+        transparent 0 24px, rgba(74,54,32,.08) 24px 25px);
+    pointer-events:none;
+  }
+  .hero h1 {
+    font-family: var(--pc-display); font-weight: 900;
+    font-size: clamp(40px, 5.2vw, 72px);
+    line-height: .92; letter-spacing: -0.025em;
+    margin: 0;
+    position: relative;
+  }
+  .hero h1 em { font-style: italic; font-weight: 700; color: var(--pc-alpen); }
+  .hero .kicker {
+    font-family: var(--pc-sans); font-weight: 700;
+    font-size: 12px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--pc-bark); margin: 0 0 12px;
+  }
+  .hero .ticker {
+    position: relative;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+    padding: 18px 20px;
+    background: var(--pc-ink); color: var(--pc-cream-50);
+    border-radius: var(--pc-r-md);
+    border: 2px solid var(--pc-ink);
+    box-shadow: 4px 4px 0 var(--pc-alpen);
+  }
+  .ticker .t {
+    font-family: var(--pc-mono); font-weight: 700;
+  }
+  .ticker .t .k {
+    display:block; font-family: var(--pc-sans); font-size: 10px;
+    letter-spacing: .16em; text-transform: uppercase;
+    color: var(--pc-bark-50); margin-bottom: 4px;
+  }
+  .ticker .t .v {
+    font-family: var(--pc-display); font-weight: 900; font-size: 34px;
+    line-height: 1; letter-spacing: -0.01em;
+  }
+  .ticker .t .v em { color: var(--pc-alpen); font-style: normal; }
+
+  /* ===== Filter bar ===== */
+  .filterbar {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    padding: 14px 18px;
+    background: var(--pc-cream-50);
+    border: var(--pc-border);
+    border-radius: var(--pc-r-pill);
+    box-shadow: var(--pc-stamp);
+    margin-bottom: 24px;
+  }
+  .filterbar .sep { width: 1px; height: 20px; background: var(--pc-bark-50); }
+  .filterbar .label {
+    font-family: var(--pc-mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: .14em; color: var(--pc-bark);
+    margin-right: 4px;
+  }
+  .filterbar button {
+    font-family: var(--pc-sans); font-weight: 600; font-size: 13px;
+    padding: 6px 12px;
+    border-radius: var(--pc-r-pill);
+    border: 1.5px solid var(--pc-bark);
+    background: transparent; color: var(--pc-ink);
+    cursor: pointer;
+  }
+  .filterbar button.on {
+    background: var(--pc-ink); color: var(--pc-cream-50); border-color: var(--pc-ink);
+  }
+  .filterbar button.on.alpen { background: var(--pc-alpen); border-color: var(--pc-alpen-dk); }
+  .filterbar .count {
+    margin-left: auto;
+    font-family: var(--pc-mono); font-weight: 700; font-size: 12px;
+    color: var(--pc-bark);
+  }
+  .filterbar .count b { color: var(--pc-ink); font-size: 14px; }
+
+  /* ===== Section header ===== */
+  .section-head {
+    display:flex; align-items: baseline; gap: 16px; margin: 8px 4px 14px;
+  }
+  .section-head h2 {
+    font-family: var(--pc-display); font-weight: 900;
+    font-size: 28px; letter-spacing: -.01em; margin: 0;
+  }
+  .section-head .sub {
+    font-family: var(--pc-sans); font-size: 13px; color: var(--pc-bark);
+  }
+  .section-head .more {
+    margin-left: auto; font-family: var(--pc-sans); font-weight: 700; font-size: 13px;
+    color: var(--pc-alpen-dk); text-decoration: none;
+  }
+
+  /* ===== Cam tile grid ===== */
+  .cam-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+
+  .cam-tile {
+    background: var(--pc-cream-50);
+    border: var(--pc-border);
+    border-radius: var(--pc-r-lg);
+    box-shadow: var(--pc-stamp);
+    overflow: hidden; display: flex; flex-direction: column;
+    transition: transform .1s ease, box-shadow .1s ease;
+  }
+  .cam-tile:hover { transform: translate(-2px,-2px); box-shadow: 5px 5px 0 var(--pc-ink); }
+
+  .cam-tile__thumb {
+    position: relative; aspect-ratio: 16/10;
+    border-bottom: var(--pc-border); overflow: hidden;
+  }
+  .cam-tile__mtn { position: absolute; inset: 0; width:100%; height:100%; }
+  .cam-tile__live {
+    position: absolute; top: 10px; left: 10px;
+    display:inline-flex; align-items:center; gap:6px;
+    background: var(--pc-alpen); color: var(--pc-cream-50);
+    font-family: var(--pc-sans); font-weight:700; font-size: 10.5px;
+    letter-spacing: .14em; text-transform: uppercase;
+    padding: 4px 9px; border-radius: var(--pc-r-pill);
+    border: 1.5px solid var(--pc-ink); box-shadow: 2px 2px 0 var(--pc-ink);
+  }
+  .cam-tile__live::before {
+    content:''; width:6px; height:6px; border-radius:50%;
+    background: var(--pc-cream-50);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  .cam-tile__live.off { background: var(--pc-bark); }
+  .cam-tile__live.off::before { animation: none; background: var(--pc-cream); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .cam-tile__state {
+    position: absolute; top: 10px; right: 10px;
+  }
+  .cam-tile__body { padding: 14px 16px 16px; }
+  .cam-tile__resort { font-family: var(--pc-display); font-weight: 900; font-size: 22px; line-height: 1.05; letter-spacing: -.01em; margin: 0 0 2px; }
+  .cam-tile__region { font-family: var(--pc-sans); font-size: 12px; color: var(--pc-bark); margin: 0 0 12px; }
+  .cam-tile__stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+    padding: 10px 0 12px;
+    border-top: 1.5px dashed var(--pc-bark);
+    border-bottom: 1.5px dashed var(--pc-bark);
+  }
+  .cam-tile__stats .pc-stat__num { font-size: 20px; }
+  .cam-tile__stats .pc-stat__label { font-size: 9px; letter-spacing: .1em; }
+  .cam-tile__footer { display:flex; justify-content: space-between; align-items:center; padding-top: 10px; }
+
+  /* ===== Feature / "Pow of the day" poster card ===== */
+  .feature {
+    display: grid; grid-template-columns: 1.15fr 1fr;
+    background: var(--pc-forest); color: var(--pc-cream-50);
+    border: var(--pc-border);
+    border-radius: var(--pc-r-lg);
+    box-shadow: var(--pc-stamp-lg);
+    overflow: hidden;
+    margin-bottom: 32px;
+    position: relative;
+  }
+  .feature__img {
+    position: relative; min-height: 320px;
+    background: linear-gradient(180deg, #b9cfdd 0%, #d9c5a2 70%, #7a5a3a 100%);
+    border-right: var(--pc-border);
+    overflow: hidden;
+  }
+  .feature__img svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .feature__sticker {
+    position: absolute; top: 22px; right: 22px;
+    width: 110px; height: 110px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-family: var(--pc-display); font-weight: 900; font-size: 12px;
+    color: var(--pc-ink); text-align: center; line-height: 1.05;
+    background: var(--pc-mustard);
+    border: 2.5px solid var(--pc-ink);
+    box-shadow: var(--pc-stamp-lg);
+    transform: rotate(-8deg);
+    letter-spacing: .03em;
+  }
+  .feature__sticker span { display:block; font-size: 28px; letter-spacing: -0.02em; margin: 2px 0; }
+  .feature__body { padding: 34px 36px; display: flex; flex-direction: column; gap: 18px; }
+  .feature__kicker {
+    font-family: var(--pc-sans); font-weight:700; font-size: 11.5px;
+    letter-spacing: .2em; text-transform: uppercase;
+    color: var(--pc-mustard);
+  }
+  .feature h2 {
+    font-family: var(--pc-display); font-weight: 900;
+    font-size: 52px; line-height: .95; letter-spacing: -0.02em;
+    margin: 0;
+  }
+  .feature h2 em { font-style: italic; color: var(--pc-mustard); }
+  .feature .stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+    padding: 14px 0;
+    border-top: 1.5px dashed rgba(241,231,207,.35);
+    border-bottom: 1.5px dashed rgba(241,231,207,.35);
+  }
+  .feature .stats .k {
+    font-family: var(--pc-sans); font-size: 10px; letter-spacing: .14em;
+    text-transform: uppercase; color: rgba(241,231,207,.6);
+    margin-bottom: 2px;
+  }
+  .feature .stats .v {
+    font-family: var(--pc-display); font-weight: 900; font-size: 28px;
+    letter-spacing: -0.01em; line-height: 1;
+  }
+  .feature .stats .v em { color: var(--pc-mustard); font-style: normal; }
+  .feature .cta { display:flex; gap: 12px; }
+
+  /* ===== Side rail (variation B) ===== */
+  .split { display: grid; grid-template-columns: 280px 1fr; gap: 28px; align-items: start; }
+  .rail {
+    position: sticky; top: 20px;
+    background: var(--pc-cream-50);
+    border: var(--pc-border);
+    border-radius: var(--pc-r-lg);
+    box-shadow: var(--pc-stamp);
+    padding: 20px 20px 10px;
+  }
+  .rail h3 {
+    font-family: var(--pc-sans); font-weight: 700; font-size: 11px;
+    letter-spacing: .18em; text-transform: uppercase; color: var(--pc-bark);
+    margin: 0 0 12px;
+  }
+  .rail + * .cam-grid { grid-template-columns: repeat(3, 1fr); }
+  .rail ul { list-style: none; margin: 0 0 12px; padding: 0; }
+  .rail li {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 0;
+    border-top: 1px dashed var(--pc-bark-50);
+    font-family: var(--pc-sans); font-size: 14px;
+  }
+  .rail li:first-child { border-top: 0; }
+  .rail li .code {
+    font-family: var(--pc-mono); font-size: 10.5px;
+    background: var(--pc-ink); color: var(--pc-cream-50);
+    padding: 3px 6px; border-radius: 4px;
+    letter-spacing: .06em;
+  }
+  .rail li .count {
+    margin-left: auto; font-family: var(--pc-mono); font-weight: 700;
+    color: var(--pc-bark);
+  }
+  .rail li.on { color: var(--pc-alpen-dk); font-weight: 700; }
+  .rail li.on .count { color: var(--pc-alpen-dk); }
+
+  /* ===== Tweaks panel ===== */
+  .tweaks {
+    position: fixed; bottom: 20px; right: 20px;
+    width: 280px;
+    background: var(--pc-cream-50);
+    border: var(--pc-border);
+    border-radius: var(--pc-r-lg);
+    box-shadow: var(--pc-stamp-lg);
+    padding: 18px 18px 16px;
+    z-index: 50;
+    display: none;
+  }
+  .tweaks.open { display: block; }
+  .tweaks h4 {
+    font-family: var(--pc-display); font-weight: 900; font-size: 18px;
+    margin: 0 0 4px;
+  }
+  .tweaks .sub {
+    font-family: var(--pc-sans); font-size: 11px; color: var(--pc-bark);
+    margin: 0 0 14px;
+  }
+  .tweaks .row {
+    display: flex; gap: 8px; margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .tweaks .row .lbl {
+    width: 100%; font-family: var(--pc-mono); font-size: 10.5px;
+    text-transform: uppercase; letter-spacing: .12em; color: var(--pc-bark);
+  }
+  .tweaks button {
+    font-family: var(--pc-sans); font-weight: 600; font-size: 12px;
+    padding: 5px 10px; border-radius: var(--pc-r-pill);
+    border: 1.5px solid var(--pc-bark); background: transparent;
+    cursor: pointer; color: var(--pc-ink);
+  }
+  .tweaks button.on { background: var(--pc-ink); color: var(--pc-cream-50); border-color: var(--pc-ink); }
+
+  /* ===== Variation B layout ===== */
+  body.v-rail .hero { grid-template-columns: 1fr; }
+  body.v-rail .hero .ticker { max-width: 560px; }
+  body.v-rail .main-grid { display: grid; grid-template-columns: 280px 1fr; gap: 28px; }
+  body:not(.v-rail) .rail { display: none; }
+  body.v-rail .filterbar { display: none; }
+
+  /* Night mode variant */
+  body.v-night { background: #13100b; }
+  body.v-night .app { color: var(--pc-cream-50); }
+  body.v-night .hero, body.v-night .cam-tile, body.v-night .rail, body.v-night .filterbar {
+    background: #211a11; color: var(--pc-cream-50);
+    border-color: #3b2e1e;
+    box-shadow: 3px 3px 0 #000;
+  }
+  body.v-night .cam-tile__resort, body.v-night .hero h1 { color: var(--pc-cream-50); }
+  body.v-night .section-head h2 { color: var(--pc-cream-50); }
+
+</style>
+</head>
+<body class="pc-paper">
+<div class="app">
+
+  <!-- ===== TOP BAR ===== -->
+  <header class="topbar">
+    <div class="brand">Peak<em>Cam</em></div>
+    <nav>
+      <a href="#" class="active">Resorts</a>
+      <a href="#">Cams</a>
+      <a href="#">Powder alerts</a>
+      <a href="#">Compare</a>
+    </nav>
+    <div class="spacer"></div>
+    <label class="search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input placeholder="Search 128 resorts…" />
+    </label>
+    <div class="avatar">M</div>
+  </header>
+
+  <!-- ===== HERO ===== -->
+  <div class="hero">
+    <div>
+      <p class="kicker">Friday · 7:12 AM MST · Season 25/26</p>
+      <h1>Lift's <em>spinning.</em><br/>Time to go.</h1>
+    </div>
+    <div class="ticker">
+      <div class="t"><div class="k">Live now</div><div class="v">94<span style="font-size:.55em">/128</span></div></div>
+      <div class="t"><div class="k">Pow day</div><div class="v"><em>12</em></div></div>
+      <div class="t"><div class="k">Biggest 24h</div><div class="v">14″</div></div>
+    </div>
+  </div>
+
+  <!-- ===== FILTER BAR (variation A) ===== -->
+  <div class="filterbar">
+    <span class="label">Region</span>
+    <button class="on">All</button>
+    <button>UT</button><button>CO</button><button>CA</button><button>WA</button>
+    <button>VT</button><button>NH</button><button>BC</button>
+    <span class="sep"></span>
+    <span class="label">Conditions</span>
+    <button class="on alpen">Fresh snow</button>
+    <button>Live cams</button>
+    <button>Any condition</button>
+    <span class="count">Showing <b>12</b> of <b>128</b> resorts</span>
+  </div>
+
+  <!-- ===== MAIN GRID ===== -->
+  <div class="main-grid">
+
+    <!-- Variation B rail -->
+    <aside class="rail">
+      <h3>By state</h3>
+      <ul>
+        <li class="on"><span class="code">UT</span> Utah <span class="count">14</span></li>
+        <li><span class="code">CO</span> Colorado <span class="count">22</span></li>
+        <li><span class="code">CA</span> California <span class="count">11</span></li>
+        <li><span class="code">WA</span> Washington <span class="count">7</span></li>
+        <li><span class="code">VT</span> Vermont <span class="count">9</span></li>
+        <li><span class="code">BC</span> British Columbia <span class="count">6</span></li>
+      </ul>
+      <h3 style="margin-top: 18px;">Conditions</h3>
+      <ul>
+        <li><span class="pc-chip pc-chip--great">Great</span><span class="count">18</span></li>
+        <li><span class="pc-chip pc-chip--good">Good</span><span class="count">34</span></li>
+        <li><span class="pc-chip pc-chip--fair">Fair</span><span class="count">41</span></li>
+        <li><span class="pc-chip pc-chip--poor">Poor</span><span class="count">35</span></li>
+      </ul>
+    </aside>
+
+    <div>
+      <!-- Feature poster: Pow of the day -->
+      <div class="feature">
+        <div class="feature__img">
+          <svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <linearGradient id="fsky" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#d9c5a2"/>
+                <stop offset=".5" stop-color="#e8b48a"/>
+                <stop offset="1" stop-color="#b06a3a"/>
+              </linearGradient>
+            </defs>
+            <rect width="400" height="400" fill="url(#fsky)"/>
+            <circle cx="310" cy="110" r="46" fill="#f3d48a" opacity=".9"/>
+            <!-- back range -->
+            <polygon points="-10,400 40,240 110,280 180,200 260,260 340,220 410,260 410,400" fill="#7a5a3a" opacity=".75"/>
+            <!-- front range with snow -->
+            <polygon points="-10,400 50,280 110,320 170,220 230,290 290,250 360,310 410,290 410,400" fill="#3c5a3a"/>
+            <polygon points="-10,400 50,280 110,320 170,220 230,290 290,250 360,310 410,290 410,400"
+                     fill="white" opacity=".35"
+                     clip-path="polygon(0 30%, 100% 30%, 100% 58%, 0 68%)"/>
+            <!-- trees -->
+            <g fill="#1f3322">
+              <polygon points="60,360 70,340 80,360"/><polygon points="62,370 74,345 86,370"/>
+              <polygon points="100,370 110,350 120,370"/><polygon points="140,365 152,340 164,365"/>
+              <polygon points="200,375 212,350 224,375"/>
+              <polygon points="280,370 292,345 304,370"/><polygon points="330,365 342,340 354,365"/>
+            </g>
+          </svg>
+          <div class="feature__sticker">POW<span>DAY</span>UT · 14″</div>
+        </div>
+        <div class="feature__body">
+          <p class="feature__kicker">Pow of the day · 25/26 · Friday</p>
+          <h2>Little<br/>Cottonwood<br/>got the <em>goods.</em></h2>
+          <div class="stats">
+            <div><div class="k">24h</div><div class="v"><em>14″</em></div></div>
+            <div><div class="k">Base</div><div class="v">142″</div></div>
+            <div><div class="k">Runs</div><div class="v">87</div></div>
+            <div><div class="k">Wind</div><div class="v">6<span style="font-size:.55em">mph</span></div></div>
+          </div>
+          <div class="cta">
+            <button class="pc-btn pc-btn--accent">Watch the cam</button>
+            <button class="pc-btn" style="background: transparent; color: var(--pc-cream-50); border-color: var(--pc-cream-50); box-shadow: 3px 3px 0 var(--pc-alpen);">Set powder alert</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section: Fresh snow -->
+      <div class="section-head">
+        <h2>Got the goods</h2>
+        <span class="sub">12 resorts with fresh in the last 24h</span>
+        <a href="#" class="more">See all →</a>
+      </div>
+      <div class="cam-grid" id="cam-grid"></div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== TWEAKS PANEL ===== -->
+<div class="tweaks" id="tweaks">
+  <h4>Tweaks</h4>
+  <p class="sub">Shape the dashboard. Persists on reload.</p>
+
+  <div class="row">
+    <div class="lbl">Layout</div>
+    <button data-k="layout" data-v="filters">Filter bar</button>
+    <button data-k="layout" data-v="rail">Side rail</button>
+  </div>
+  <div class="row">
+    <div class="lbl">Mode</div>
+    <button data-k="mode" data-v="day">Day</button>
+    <button data-k="mode" data-v="night">Night</button>
+  </div>
+  <div class="row">
+    <div class="lbl">Accent</div>
+    <button data-k="accent" data-v="alpen" style="background:#d9552f;color:#faf4e6;border-color:#a93f20">Alpenglow</button>
+    <button data-k="accent" data-v="mustard" style="background:#e2a740;color:#2a1f14;border-color:#7a5a3a">Mustard</button>
+    <button data-k="accent" data-v="forest" style="background:#3c5a3a;color:#faf4e6;border-color:#1f3322">Forest</button>
+  </div>
+  <div class="row">
+    <div class="lbl">Voice</div>
+    <button data-k="voice" data-v="insider">Insider</button>
+    <button data-k="voice" data-v="plain">Plain</button>
+  </div>
+</div>
+
+<script>
+/* ===== Cam tile renderer =====
+   Real vocab from peakcam.io — base depth, 24h/48h, runs, conditions. */
+const CAMS = [
+  { name: "Little Cottonwood", region: "Wasatch · Utah",        state: "UT", base: 142, h24: 14, h48: 24, runs: "87/114", cond: "great", live: true, sceneId: 1 },
+  { name: "Crystal Mountain",  region: "Cascades · Washington", state: "WA", base: 118, h24: 11, h48: 18, runs: "62/86",  cond: "great", live: true, sceneId: 2 },
+  { name: "Whistler Blackcomb",region: "Coast Range · BC",      state: "BC", base: 205, h24: 9,  h48: 16, runs:"186/210", cond: "great", live: true, sceneId: 3 },
+  { name: "Jay Peak",          region: "Northeast Kingdom · VT",state: "VT", base: 88,  h24: 8,  h48: 11, runs: "74/79",  cond: "good",  live: true, sceneId: 4 },
+  { name: "Elk Mountains",     region: "Roaring Fork · Colorado",state:"CO", base: 96,  h24: 2,  h48: 4,  runs: "54/121", cond: "fair",  live: true, sceneId: 5 },
+  { name: "June Mountain",     region: "Sierra Nevada · CA",    state: "CA", base: 72,  h24: 3,  h48: 5,  runs: "31/41",  cond: "good",  live: true, sceneId: 6 },
+  { name: "Moreno Valley",     region: "Sangre de Cristo · NM", state: "NM", base: 41,  h24: 0,  h48: 1,  runs: "12/28",  cond: "poor",  live: true, sceneId: 7 },
+  { name: "Summit County",     region: "Ten Mile Range · CO",   state: "CO", base: 84,  h24: 1,  h48: 3,  runs: "41/63",  cond: "fair",  live: true, sceneId: 8 },
+  { name: "Selkirks",          region: "Okanogan · Washington", state: "WA", base: null,h24: 0,  h48: 0,  runs: "2/18",   cond: "poor",  live: false, sceneId: 9 },
+];
+
+const scenes = {
+  1: `<rect width="320" height="200" fill="#c9d9d6"/>
+      <polygon points="-10,200 60,110 100,140 150,70 210,130 260,95 340,200" fill="#3c5a3a"/>
+      <polygon points="-10,200 60,110 100,140 150,70 210,130 260,95 340,200" fill="white" opacity=".22" clip-path="polygon(0 0, 100% 0, 100% 45%, 0 55%)"/>
+      <polygon points="-10,200 40,160 90,135 140,155 190,120 250,155 340,135 340,200" fill="#1f3322"/>
+      <circle cx="245" cy="50" r="16" fill="#e2a740"/>`,
+  2: `<defs><linearGradient id="s2" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#b9cfdd"/><stop offset="1" stop-color="#d9c5a2"/></linearGradient></defs>
+      <rect width="320" height="200" fill="url(#s2)"/>
+      <polygon points="-10,200 80,100 130,140 180,80 240,130 340,90 340,200" fill="#3c5a3a"/>
+      <polygon points="-10,200 80,100 130,140 180,80 240,130 340,90 340,200" fill="white" opacity=".4" clip-path="polygon(0 0,100% 0,100% 40%, 0 55%)"/>`,
+  3: `<defs><linearGradient id="s3" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#8aa3b3"/><stop offset="1" stop-color="#c9d9d6"/></linearGradient></defs>
+      <rect width="320" height="200" fill="url(#s3)"/>
+      <polygon points="-10,200 40,80 90,110 140,50 200,110 260,70 340,110 340,200" fill="#1f3322"/>
+      <polygon points="-10,200 40,80 90,110 140,50 200,110 260,70 340,110 340,200" fill="white" opacity=".4" clip-path="polygon(0 0,100% 0,100% 45%, 0 55%)"/>
+      <polygon points="-10,200 60,160 110,140 160,160 220,135 280,155 340,140 340,200" fill="#3c5a3a"/>`,
+  4: `<rect width="320" height="200" fill="#dfe6d8"/>
+      <polygon points="-10,200 70,120 130,150 180,95 240,140 340,115 340,200" fill="#3c5a3a"/>
+      <polygon points="-10,200 70,120 130,150 180,95 240,140 340,115 340,200" fill="white" opacity=".35" clip-path="polygon(0 0,100% 0,100% 50%, 0 60%)"/>
+      <g fill="#1f3322"><polygon points="40,180 50,160 60,180"/><polygon points="75,185 85,162 95,185"/><polygon points="270,180 280,160 290,180"/></g>`,
+  5: `<defs><linearGradient id="s5" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#e3d5b2"/><stop offset="1" stop-color="#b59b74"/></linearGradient></defs>
+      <rect width="320" height="200" fill="url(#s5)"/>
+      <polygon points="-10,200 70,90 120,130 180,60 240,120 340,80 340,200" fill="#7a5a3a"/>
+      <polygon points="-10,200 70,90 120,130 180,60 240,120 340,80 340,200" fill="white" opacity=".22" clip-path="polygon(0 0,100% 0,100% 40%, 0 55%)"/>
+      <circle cx="255" cy="55" r="18" fill="#d9552f"/>`,
+  6: `<defs><linearGradient id="s6" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#f0cfa6"/><stop offset="1" stop-color="#b06a3a"/></linearGradient></defs>
+      <rect width="320" height="200" fill="url(#s6)"/>
+      <polygon points="-10,200 90,100 150,140 210,80 280,130 340,110 340,200" fill="#7a5a3a"/>
+      <polygon points="-10,200 90,100 150,140 210,80 280,130 340,110 340,200" fill="white" opacity=".3" clip-path="polygon(0 0,100% 0,100% 45%, 0 55%)"/>
+      <circle cx="80" cy="55" r="14" fill="#d9552f"/>`,
+  7: `<rect width="320" height="200" fill="#e3d5b2"/>
+      <polygon points="-10,200 80,150 150,170 220,140 300,165 340,160 340,200" fill="#b59b74"/>
+      <polygon points="-10,200 110,170 180,180 260,160 340,175 340,200" fill="#7a5a3a"/>`,
+  8: `<rect width="320" height="200" fill="#c9d9d6"/>
+      <polygon points="-10,200 70,130 130,155 190,95 260,140 340,115 340,200" fill="#3c5a3a"/>
+      <polygon points="-10,200 70,130 130,155 190,95 260,140 340,115 340,200" fill="white" opacity=".2" clip-path="polygon(0 0,100% 0,100% 45%, 0 60%)"/>`,
+  9: `<rect width="320" height="200" fill="#4a3620"/>
+      <polygon points="-10,200 90,120 140,160 200,90 260,140 340,110 340,200" fill="#1f3322" opacity=".9"/>
+      <g stroke="rgba(241,231,207,.6)" stroke-width="1.5" fill="none">
+        <line x1="10" y1="40" x2="310" y2="55"/>
+        <line x1="10" y1="65" x2="310" y2="80"/>
+        <line x1="10" y1="90" x2="310" y2="105"/>
+      </g>`,
+};
+
+const condLabel = { great: "Great", good: "Good", fair: "Fair", poor: "Poor" };
+
+function tile(c) {
+  const baseDisp = c.base == null ? "—" : `${c.base}<span style="font-size:.5em">″</span>`;
+  const liveClass = c.live ? "" : "off";
+  const liveText  = c.live ? "Live" : "Offline";
+  const freshCol  = c.h24 >= 6 ? "color: var(--pc-alpen);" : "";
+  return `
+    <article class="cam-tile">
+      <div class="cam-tile__thumb">
+        <svg class="cam-tile__mtn" viewBox="0 0 320 200" preserveAspectRatio="none">${scenes[c.sceneId]}</svg>
+        <span class="cam-tile__live ${liveClass}">${liveText}</span>
+        <span class="cam-tile__state pc-chip pc-chip--state">${c.state}</span>
+      </div>
+      <div class="cam-tile__body">
+        <h4 class="cam-tile__resort">${c.name}</h4>
+        <p class="cam-tile__region">${c.region}</p>
+        <div class="cam-tile__stats">
+          <div class="pc-stat"><div class="pc-stat__num">${baseDisp}</div><div class="pc-stat__label">Base</div></div>
+          <div class="pc-stat"><div class="pc-stat__num" style="${freshCol}">${c.h24}<span style="font-size:.5em">″</span></div><div class="pc-stat__label">24h</div></div>
+          <div class="pc-stat"><div class="pc-stat__num">${c.h48}<span style="font-size:.5em">″</span></div><div class="pc-stat__label">48h</div></div>
+          <div class="pc-stat"><div class="pc-stat__num">${c.runs.split('/')[0]}</div><div class="pc-stat__label">Runs</div></div>
+        </div>
+        <div class="cam-tile__footer">
+          <span class="pc-chip pc-chip--${c.cond}">${condLabel[c.cond]}</span>
+          <button class="pc-btn pc-btn--sm pc-btn--ghost">Compare →</button>
+        </div>
+      </div>
+    </article>`;
+}
+document.getElementById('cam-grid').innerHTML = CAMS.map(tile).join('');
+
+/* ===== Tweaks =====
+   Persist layout/mode/accent/voice. Expose via parent postMessage. */
+const TWEAKS = /*EDITMODE-BEGIN*/{
+  "layout": "filters",
+  "mode": "day",
+  "accent": "alpen",
+  "voice": "insider"
+}/*EDITMODE-END*/;
+
+const state = { ...TWEAKS, ...(JSON.parse(localStorage.getItem('pc-tweaks')||'{}')) };
+
+function apply() {
+  document.body.classList.toggle('v-rail',  state.layout === 'rail');
+  document.body.classList.toggle('v-night', state.mode === 'night');
+
+  const accentMap = {
+    alpen:  { c: '#d9552f', dk: '#a93f20' },
+    mustard:{ c: '#e2a740', dk: '#7a5a3a' },
+    forest: { c: '#3c5a3a', dk: '#1f3322' },
+  };
+  const a = accentMap[state.accent] || accentMap.alpen;
+  document.documentElement.style.setProperty('--pc-alpen', a.c);
+  document.documentElement.style.setProperty('--pc-alpen-dk', a.dk);
+
+  // Voice rewrites
+  const H1 = document.querySelector('.hero h1');
+  const FEAT = document.querySelector('.feature h2');
+  const SECTION = document.querySelector('.section-head h2');
+  const SUB = document.querySelector('.section-head .sub');
+  if (state.voice === 'plain') {
+    H1.innerHTML = "Live resort<br/>conditions.";
+    FEAT.innerHTML = "Little<br/>Cottonwood<br/>leads today.";
+    SECTION.textContent = "Fresh snow";
+    SUB.textContent = "12 resorts with snow in the last 24h";
+  } else {
+    H1.innerHTML = "Lift's <em>spinning.</em><br/>Time to go.";
+    FEAT.innerHTML = "Little<br/>Cottonwood<br/>got the <em>goods.</em>";
+    SECTION.textContent = "Got the goods";
+    SUB.textContent = "12 resorts with fresh in the last 24h";
+  }
+
+  // Reflect active buttons
+  document.querySelectorAll('.tweaks button').forEach(b => {
+    b.classList.toggle('on', state[b.dataset.k] === b.dataset.v);
+  });
+}
+apply();
+
+document.querySelectorAll('.tweaks button').forEach(b => {
+  b.addEventListener('click', () => {
+    state[b.dataset.k] = b.dataset.v;
+    localStorage.setItem('pc-tweaks', JSON.stringify(state));
+    try { window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { [b.dataset.k]: b.dataset.v } }, '*'); } catch(e){}
+    apply();
+  });
+});
+
+// Edit mode protocol
+window.addEventListener('message', (e) => {
+  const d = e.data || {};
+  if (d.type === '__activate_edit_mode')   document.getElementById('tweaks').classList.add('open');
+  if (d.type === '__deactivate_edit_mode') document.getElementById('tweaks').classList.remove('open');
+});
+try { window.parent.postMessage({ type: '__edit_mode_available' }, '*'); } catch(e){}
+</script>
+
+</body>
+</html>

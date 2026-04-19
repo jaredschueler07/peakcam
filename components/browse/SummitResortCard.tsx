@@ -34,33 +34,21 @@ function AnimatedNumber({ value }: { value: number }) {
   return <>{count}</>;
 }
 
-// ── Region gradient map ──────────────────────────────────────────────────────
+// ── Condition palette (earth tones) ──────────────────────────────────────────
 
-const regionGradients: Record<string, string> = {
-  "Wasatch":       "linear-gradient(135deg, rgba(15, 35, 58, 0.9), rgba(12, 26, 45, 0.95))",
-  "Tetons":        "linear-gradient(135deg, rgba(13, 31, 53, 0.9), rgba(10, 22, 40, 0.95))",
-  "Front Range":   "linear-gradient(135deg, rgba(13, 29, 47, 0.9), rgba(10, 21, 36, 0.95))",
-  "San Juan":      "linear-gradient(135deg, rgba(12, 27, 45, 0.9), rgba(9, 19, 34, 0.95))",
-  "Sierra Nevada": "linear-gradient(135deg, rgba(12, 28, 48, 0.9), rgba(10, 20, 38, 0.95))",
-  "Cascades":      "linear-gradient(135deg, rgba(10, 25, 42, 0.9), rgba(8, 18, 32, 0.95))",
-};
-const defaultGradient = "linear-gradient(135deg, rgba(14, 24, 37, 0.9), rgba(8, 13, 20, 0.95))";
-
-// ── Condition colors ─────────────────────────────────────────────────────────
-
-const conditionColors: Record<ConditionRating, string> = {
-  great: "#2ECC8F",
-  good:  "#60C8FF",
-  fair:  "#8AA3BE",
-  poor:  "#f87171",
+const conditionColors: Record<ConditionRating, { bg: string; text: string; border: string; label: string }> = {
+  great: { bg: "bg-great",  text: "text-cream-50", border: "border-forest-dk", label: "GREAT" },
+  good:  { bg: "bg-good",   text: "text-cream-50", border: "border-forest-dk", label: "GOOD"  },
+  fair:  { bg: "bg-fair",   text: "text-ink",      border: "border-bark-dk",   label: "FAIR"  },
+  poor:  { bg: "bg-poor",   text: "text-cream-50", border: "border-bark-dk",   label: "POOR"  },
 };
 
 // ── Trend indicator ──────────────────────────────────────────────────────────
 
 const trendConfig: Record<SnowTrend, { icon: typeof TrendingUp; color: string; label: string }> = {
-  rising:  { icon: TrendingUp, color: "#2ECC8F", label: "Rising" },
-  stable:  { icon: Minus, color: "#8AA3BE", label: "Stable" },
-  falling: { icon: TrendingDown, color: "#f87171", label: "Falling" },
+  rising:  { icon: TrendingUp,   color: "#3c5a3a", label: "Rising"  },
+  stable:  { icon: Minus,        color: "#7a5a3a", label: "Stable"  },
+  falling: { icon: TrendingDown, color: "#a93f20", label: "Falling" },
 };
 
 function TrendBadge({ trend }: { trend: SnowTrend }) {
@@ -68,7 +56,7 @@ function TrendBadge({ trend }: { trend: SnowTrend }) {
   const Icon = cfg.icon;
   return (
     <span className="inline-flex items-center gap-0.5" style={{ color: cfg.color }} title={`7-day trend: ${cfg.label}`} role="img" aria-label={`7-day trend: ${cfg.label}`}>
-      <Icon size={12} />
+      <Icon size={13} strokeWidth={2.5} />
     </span>
   );
 }
@@ -76,13 +64,13 @@ function TrendBadge({ trend }: { trend: SnowTrend }) {
 // ── Outlook indicator ────────────────────────────────────────────────────────
 
 const outlookConfig: Record<SnowOutlook, { icon: typeof Snowflake; color: string; label: string }> = {
-  more_snow:  { icon: Snowflake, color: "#60C8FF", label: "More snow" },
-  stable:     { icon: Minus, color: "#8AA3BE", label: "Stable" },
-  warming:    { icon: Sun, color: "#FBBF24", label: "Warming" },
-  melt_risk:  { icon: Thermometer, color: "#f87171", label: "Melt risk" },
+  more_snow:  { icon: Snowflake,  color: "#3c5a3a", label: "More snow" },
+  stable:     { icon: Minus,      color: "#7a5a3a", label: "Stable"    },
+  warming:    { icon: Sun,        color: "#e2a740", label: "Warming"   },
+  melt_risk:  { icon: Thermometer,color: "#a93f20", label: "Melt risk" },
 };
 
-// ── SummitResortCard ─────────────────────────────────────────────────────────
+// ── SummitResortCard (pc-cam-tile) ───────────────────────────────────────────
 
 interface Props {
   resort: ResortWithData;
@@ -99,9 +87,7 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite }: Props)
   const trailsTotal = snow?.trails_total;
   const camCount = resort.cams.filter((c) => c.is_active).length;
   const isFresh = snow24h >= 8;
-  const gradient = regionGradients[resort.region] ?? defaultGradient;
-  const condColor = resort.cond_rating ? conditionColors[resort.cond_rating] : null;
-  const condLabel = resort.cond_rating?.toUpperCase() ?? null;
+  const cond = resort.cond_rating ? conditionColors[resort.cond_rating] : null;
   const pctNormal = snow?.pct_of_normal;
   const trend = snow?.trend_7d as SnowTrend | null;
   const outlook = snow?.outlook as SnowOutlook | null;
@@ -109,43 +95,33 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite }: Props)
 
   return (
     <motion.div
-      className="group relative rounded-lg overflow-hidden cursor-pointer"
+      className="group relative rounded-[18px] cursor-pointer"
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      whileHover={{ y: -8 }}
-      transition={{ duration: 0.2 }}
+      whileHover={{ y: -4, x: -1 }}
+      transition={{ duration: 0.15 }}
     >
-      <div
-        className="noise-overlay relative h-full border border-border hover:border-cyan/50 hover:shadow-glow-ice transition-all duration-300"
-        style={{ background: gradient }}
-      >
-        {/* Alpenglow top border on hover */}
-        <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-alpenglow to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      {/* Card paper — cream-50 bg, ink border, stamp shadow */}
+      <div className="relative bg-cream-50 border-[1.5px] border-ink rounded-[18px]
+        shadow-stamp group-hover:shadow-stamp-hover transition-shadow duration-150
+        overflow-hidden">
 
-        {/* Fresh snow shimmer overlay */}
+        {/* Fresh snow ribbon */}
         {isFresh && (
-          <>
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-br from-transparent via-white/5 to-transparent pointer-events-none"
-              animate={{ backgroundPosition: ["0% 0%", "100% 100%"] }}
-              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-              style={{ backgroundSize: "200% 200%" }}
-            />
-            <div className="absolute top-4 right-4 z-10 px-3 py-1 bg-cyan/20 backdrop-blur-sm border border-cyan/50 rounded-full">
-              <span className="text-cyan text-xs font-semibold flex items-center gap-1">
-                &#10052; FRESH
-              </span>
-            </div>
-          </>
+          <div className="absolute top-4 right-4 z-10 px-3 py-1 bg-alpen text-cream-50
+            border-[1.5px] border-alpen-dk rounded-full shadow-[2px_2px_0_#2a1f14]
+            font-mono font-bold text-[10.5px] tracking-[0.14em] uppercase flex items-center gap-1">
+            <Snowflake size={11} strokeWidth={2.5} /> Fresh
+          </div>
         )}
 
         {/* Snowing now badge */}
         {isSnowing && !isFresh && (
-          <div className="absolute top-4 right-4 z-10 px-3 py-1 bg-cyan/15 backdrop-blur-sm border border-cyan/40 rounded-full">
-            <span className="text-cyan text-xs font-semibold flex items-center gap-1">
-              <Snowflake size={12} /> SNOWING
-            </span>
+          <div className="absolute top-4 right-4 z-10 px-3 py-1 bg-ink text-cream-50
+            border-[1.5px] border-ink rounded-full font-mono font-bold text-[10.5px]
+            tracking-[0.14em] uppercase flex items-center gap-1">
+            <Snowflake size={11} strokeWidth={2.5} /> Snowing
           </div>
         )}
 
@@ -155,102 +131,102 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite }: Props)
           className="block p-6"
           onClick={() => trackResortCardClick(resort.name, resort.slug)}
         >
-          <div className="relative space-y-6">
-            {/* Giant base depth number */}
-            <div className="text-center py-8">
+          <div className="relative space-y-5">
+            {/* Eyebrow: state / region */}
+            <div className="flex items-center gap-2 font-mono font-bold text-[10.5px] text-bark uppercase tracking-[0.14em]">
+              <span className="px-2 py-0.5 bg-ink text-cream-50 rounded-full">
+                {resort.state}
+              </span>
+              <span className="text-bark">{resort.region}</span>
+            </div>
+
+            {/* Resort name — Fraunces 900, tight */}
+            <h3 className="font-display font-black text-[28px] leading-[0.95] tracking-[-0.02em] text-ink">
+              {resort.name}
+            </h3>
+
+            {/* Giant base depth stat — centered poster-style */}
+            <div className="text-center py-4">
               <div
-                className="text-[8rem] leading-none text-text-base group-hover:scale-105 transition-transform duration-300 font-display"
+                className="font-display font-black text-[6.5rem] leading-none text-ink tracking-[-0.04em] group-hover:scale-[1.03] transition-transform duration-200"
                 style={{ fontVariantNumeric: "tabular-nums" }}
               >
                 {baseDepth > 0 ? (
                   <>
-                    <AnimatedNumber value={baseDepth} />&quot;
+                    <AnimatedNumber value={baseDepth} />
+                    <span className="text-alpen">&quot;</span>
                   </>
                 ) : (
-                  <span className="text-text-muted text-6xl">&mdash;</span>
+                  <span className="text-bark/60 text-6xl">&mdash;</span>
                 )}
               </div>
-              <div className="text-text-muted text-xs uppercase tracking-widest mt-2">
-                BASE DEPTH
+              <div className="font-mono font-bold text-[10.5px] text-bark tracking-[0.18em] uppercase mt-1">
+                Base Depth
               </div>
             </div>
 
-            {/* Resort info */}
-            <div className="space-y-2">
-              <h3 className="text-2xl text-text-base font-semibold">{resort.name}</h3>
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 bg-text-base/10 border border-text-base/20 rounded text-text-subtle text-xs">
-                  {resort.state}
-                </span>
-                <span className="text-text-muted text-sm">{resort.region}</span>
-              </div>
-            </div>
-
-            {/* Data strip */}
-            <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border">
+            {/* Data strip — dashed bark rule top/bottom, mono numbers */}
+            <div className="grid grid-cols-3 gap-4 py-4 border-t border-b border-dashed border-bark/60">
               <div className="text-center">
-                <div className="text-text-base font-mono text-lg">{snow24h}&quot;</div>
-                <div className="text-text-muted text-xs uppercase">24h</div>
+                <div className="font-mono font-bold text-xl text-ink tabular-nums">{snow24h}&quot;</div>
+                <div className="font-mono text-[10px] text-bark uppercase tracking-widest mt-0.5">24H</div>
+              </div>
+              <div className="text-center border-x border-dashed border-bark/60">
+                <div className="font-mono font-bold text-xl text-ink tabular-nums">{snow48h}&quot;</div>
+                <div className="font-mono text-[10px] text-bark uppercase tracking-widest mt-0.5">48H</div>
               </div>
               <div className="text-center">
-                <div className="text-text-base font-mono text-lg">{snow48h}&quot;</div>
-                <div className="text-text-muted text-xs uppercase">48h</div>
-              </div>
-              <div className="text-center">
-                <div className="text-text-base font-mono text-lg">
+                <div className="font-mono font-bold text-xl text-ink tabular-nums">
                   {trailsOpen != null && trailsTotal != null
                     ? `${trailsOpen}/${trailsTotal}`
                     : "\u2014"}
                 </div>
-                <div className="text-text-muted text-xs uppercase">Runs</div>
+                <div className="font-mono text-[10px] text-bark uppercase tracking-widest mt-0.5">Runs</div>
               </div>
             </div>
 
-            {/* Condition, trend, % normal, cameras */}
-            <div className="flex items-center justify-between pt-4 border-t border-border">
+            {/* Footer: condition chip + trend + cameras + favorite */}
+            <div className="flex items-center justify-between pt-1">
               <div className="flex items-center gap-2">
-                {condColor && condLabel ? (
-                  <div
-                    className="px-3 py-1 rounded text-sm font-semibold"
-                    style={{
-                      backgroundColor: `${condColor}20`,
-                      color: condColor,
-                      border: `1px solid ${condColor}40`,
-                    }}
+                {cond ? (
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
+                      border font-bold text-[11.5px] tracking-[0.08em] uppercase
+                      ${cond.bg} ${cond.text} ${cond.border}`}
                   >
-                    {condLabel}
-                  </div>
+                    {cond.label}
+                  </span>
                 ) : (
-                  <span className="text-text-muted text-xs">&mdash;</span>
+                  <span className="text-bark/70 text-xs">&mdash;</span>
                 )}
                 {trend && <TrendBadge trend={trend} />}
                 {pctNormal != null && (
-                  <span className={`text-xs font-mono ${pctNormal >= 110 ? "text-[#2ECC8F]" : pctNormal >= 90 ? "text-text-subtle" : pctNormal >= 70 ? "text-yellow-400" : "text-red-400"}`}>
+                  <span className={`font-mono font-bold text-[11px] tabular-nums ${pctNormal >= 110 ? "text-forest" : pctNormal >= 90 ? "text-bark-dk" : pctNormal >= 70 ? "text-mustard" : "text-alpen-dk"}`}>
                     {pctNormal}%
                   </span>
                 )}
                 {outlook && outlook !== "stable" && (
                   <span title={outlookConfig[outlook].label} style={{ color: outlookConfig[outlook].color }} role="img" aria-label={outlookConfig[outlook].label}>
-                    {(() => { const Icon = outlookConfig[outlook].icon; return <Icon size={12} />; })()}
+                    {(() => { const Icon = outlookConfig[outlook].icon; return <Icon size={13} strokeWidth={2.5} />; })()}
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 text-text-subtle" role="img" aria-label={`${camCount} webcam${camCount !== 1 ? 's' : ''} available`}>
-                  <Camera size={16} />
-                  <span className="text-sm">{camCount}</span>
+                <div className="flex items-center gap-1 text-bark-dk" role="img" aria-label={`${camCount} webcam${camCount !== 1 ? 's' : ''} available`}>
+                  <Camera size={14} strokeWidth={2.3} />
+                  <span className="font-mono font-bold text-[13px] tabular-nums">{camCount}</span>
                 </div>
                 {onToggleFavorite && (
                   <button
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(); }}
-                    className={`p-1.5 rounded-lg border transition-all duration-[220ms] ${
+                    className={`p-1.5 rounded-full border-[1.5px] transition-all duration-100 ${
                       favorited
-                        ? "bg-alpenglow/15 border-alpenglow/40 text-alpenglow hover:bg-alpenglow/25"
-                        : "bg-surface2/50 border-border text-text-muted hover:text-alpenglow hover:border-alpenglow/30 hover:bg-alpenglow/10"
+                        ? "bg-alpen/15 border-alpen text-alpen shadow-[2px_2px_0_#2a1f14]"
+                        : "bg-cream-50 border-ink/30 text-bark hover:text-alpen hover:border-ink hover:shadow-[2px_2px_0_#2a1f14]"
                     }`}
                     aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
                   >
-                    <Heart size={14} fill={favorited ? "currentColor" : "none"} strokeWidth={favorited ? 0 : 1.5} />
+                    <Heart size={13} fill={favorited ? "currentColor" : "none"} strokeWidth={favorited ? 0 : 2.2} />
                   </button>
                 )}
               </div>
@@ -258,13 +234,16 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite }: Props)
           </div>
         </Link>
 
-        {/* Compare button — separate link outside the main card link */}
-        <div className="px-6 pb-5 pt-1">
+        {/* Ghost compare button — separate link outside main card link */}
+        <div className="px-6 pb-5 pt-0">
           <Link
             href={`/compare?resorts=${resort.slug}`}
-            className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg border border-border/60 text-text-muted hover:text-cyan hover:border-cyan/40 hover:bg-cyan/5 transition-all duration-200 text-xs font-medium"
+            className="flex items-center justify-center gap-1.5 w-full py-2 rounded-full
+              border-[1.5px] border-ink/20 text-bark hover:text-ink hover:border-ink
+              hover:bg-ink/5 transition-colors duration-150
+              text-[12px] font-bold tracking-wide uppercase"
           >
-            <ArrowLeftRight size={12} />
+            <ArrowLeftRight size={12} strokeWidth={2.5} />
             Compare
           </Link>
         </div>

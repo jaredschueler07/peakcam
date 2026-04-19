@@ -12,11 +12,12 @@ import type { ResortWithData, ConditionRating } from "@/lib/types";
 
 const MAX_RESORTS = 4;
 
-const conditionColors: Record<ConditionRating, string> = {
-  great: "#2ECC8F",
-  good: "#60C8FF",
-  fair: "#8AA3BE",
-  poor: "#f87171",
+// Poster condition palette (matches ConditionBadge)
+const conditionChip: Record<ConditionRating, string> = {
+  great: "bg-great text-cream-50 border-forest-dk",
+  good:  "bg-good text-cream-50 border-forest-dk",
+  fair:  "bg-fair text-ink border-bark-dk",
+  poor:  "bg-poor text-cream-50 border-bark-dk",
 };
 
 const CONDITION_ORDER: Record<ConditionRating, number> = {
@@ -120,17 +121,20 @@ function ResortPicker({
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder="Add a resort..."
-          className="w-full pl-4 pr-9 py-2.5 bg-surface2 border border-border focus:border-cyan/50 rounded-lg text-text-base placeholder:text-text-muted outline-none text-sm transition-colors"
+          placeholder="Add a resort…"
+          className="w-full pl-4 pr-9 py-2.5 bg-snow text-ink placeholder:text-bark
+                     border-[1.5px] border-ink rounded-full shadow-stamp-sm
+                     focus:shadow-[3px_3px_0_#a93f20] focus:border-alpen-dk
+                     outline-none text-sm font-medium transition-shadow duration-100"
         />
         <Plus
           size={15}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-bark pointer-events-none"
         />
       </div>
 
       {open && results.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-surface2 border border-border rounded-lg shadow-card-hover z-50 max-h-60 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-cream-50 border-[1.5px] border-ink rounded-[14px] shadow-stamp z-50 max-h-60 overflow-y-auto">
           {results.map((resort) => (
             <button
               key={resort.slug}
@@ -139,14 +143,14 @@ function ResortPicker({
                 setQuery("");
                 setOpen(false);
               }}
-              className="w-full text-left px-4 py-2.5 hover:bg-surface3 transition-colors flex items-center justify-between gap-2"
+              className="w-full text-left px-4 py-2.5 hover:bg-cream transition-colors flex items-center justify-between gap-2 border-b border-dashed border-bark/30 last:border-b-0"
             >
               <div>
-                <span className="text-text-base text-sm font-medium">{resort.name}</span>
-                <span className="text-text-muted text-xs ml-2">{resort.state}</span>
+                <span className="font-display font-black text-ink text-[14px]">{resort.name}</span>
+                <span className="font-mono text-[10.5px] text-bark uppercase tracking-[0.12em] ml-2">{resort.state}</span>
               </div>
               {resort.snow_report?.base_depth != null && (
-                <span className="text-cyan text-xs font-mono shrink-0">
+                <span className="font-mono font-bold text-alpen-dk text-[12px] shrink-0 tabular-nums">
                   {resort.snow_report.base_depth}&quot;
                 </span>
               )}
@@ -167,29 +171,30 @@ function ResortColumnHeader({
   resort: ResortWithData;
   onRemove: () => void;
 }) {
-  const condColor = resort.cond_rating ? conditionColors[resort.cond_rating] : null;
+  const chipCls = resort.cond_rating ? conditionChip[resort.cond_rating] : null;
   const thumb = getFirstCamThumbnail(resort);
   const activeCamCount = resort.cams.filter((c) => c.is_active).length;
 
   return (
     <div className="flex flex-col gap-3 p-4">
       {/* Webcam thumbnail */}
-      <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-surface2 border border-border">
+      <div className="relative w-full aspect-video rounded-[14px] overflow-hidden bg-cream border-[1.5px] border-ink shadow-stamp-sm">
         {thumb ? (
           <Link href={`/resorts/${resort.slug}`} tabIndex={-1}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={thumb.url}
               alt={`${resort.name} webcam`}
               className="w-full h-full object-cover"
             />
-            <div className="absolute inset-0 bg-bg/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-              <Camera size={20} className="text-text-base" />
+            <div className="absolute inset-0 bg-ink/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+              <Camera size={20} className="text-cream-50" />
             </div>
           </Link>
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-text-muted">
+          <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-bark">
             <Camera size={18} />
-            <span className="text-xs">
+            <span className="font-mono text-[10.5px] uppercase tracking-[0.12em]">
               {activeCamCount} cam{activeCamCount !== 1 ? "s" : ""}
             </span>
           </div>
@@ -199,31 +204,26 @@ function ResortColumnHeader({
       {/* Resort info + remove button */}
       <div>
         <div className="flex items-start justify-between gap-1">
-          <Link href={`/resorts/${resort.slug}`} className="hover:text-cyan transition-colors flex-1 min-w-0">
-            <h3 className="font-semibold text-text-base text-sm leading-snug">{resort.name}</h3>
+          <Link href={`/resorts/${resort.slug}`} className="hover:text-alpen transition-colors flex-1 min-w-0">
+            <h3 className="font-display font-black text-ink text-[16px] leading-[1.05] tracking-[-0.01em]">{resort.name}</h3>
           </Link>
           <button
             onClick={onRemove}
-            className="shrink-0 text-text-muted hover:text-text-base transition-colors mt-0.5 p-0.5"
+            className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-cream-50 border-[1.5px] border-ink text-ink hover:bg-alpen hover:text-cream-50 shadow-[2px_2px_0_#2a1f14] transition-colors"
             aria-label={`Remove ${resort.name} from comparison`}
           >
-            <X size={13} />
+            <X size={12} strokeWidth={2.5} />
           </button>
         </div>
-        <p className="text-text-muted text-xs mt-0.5">
-          {resort.region}, {resort.state}
+        <p className="font-mono text-[10.5px] text-bark uppercase tracking-[0.12em] mt-1">
+          {resort.region} · {resort.state}
         </p>
-        {condColor && (
-          <div
-            className="inline-flex mt-2 px-2 py-0.5 rounded text-xs font-semibold"
-            style={{
-              backgroundColor: `${condColor}20`,
-              color: condColor,
-              border: `1px solid ${condColor}40`,
-            }}
+        {chipCls && (
+          <span
+            className={`inline-flex mt-2 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold uppercase tracking-[0.08em] border-[1.5px] ${chipCls}`}
           >
             {resort.cond_rating.toUpperCase()}
-          </div>
+          </span>
         )}
       </div>
     </div>
@@ -236,17 +236,17 @@ function StatCell({ value, isBest }: { value: string; isBest: boolean }) {
   return (
     <div
       className={`px-4 py-4 text-center h-full flex items-center justify-center transition-colors ${
-        isBest ? "bg-cyan/5" : ""
+        isBest ? "bg-alpen/10" : ""
       }`}
     >
       <span
-        className={`font-mono text-xl font-semibold tabular-nums ${
-          isBest ? "text-cyan" : "text-text-base"
+        className={`font-display font-black text-2xl tabular-nums tracking-[-0.01em] ${
+          isBest ? "text-alpen" : "text-ink"
         }`}
       >
         {value}
         {isBest && (
-          <span className="ml-1.5 text-[10px] font-sans font-normal text-cyan/70 align-middle">
+          <span className="ml-1.5 text-[10px] font-sans font-bold text-alpen/70 align-middle">
             ▲
           </span>
         )}
@@ -390,7 +390,7 @@ export function ComparePage({ allResorts, initialResorts }: Props) {
   ];
 
   return (
-    <div className="min-h-screen bg-bg">
+    <div className="min-h-screen pc-paper">
       <Header showSearch={false} />
 
       <div className="max-w-screen-xl mx-auto px-4 py-8 md:px-8">
@@ -398,17 +398,17 @@ export function ComparePage({ allResorts, initialResorts }: Props) {
         <div className="mb-8">
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 text-text-muted hover:text-text-subtle text-sm mb-5 transition-colors"
+            className="inline-flex items-center gap-1.5 text-bark hover:text-ink text-[13px] font-semibold mb-5 transition-colors"
           >
             <ArrowLeft size={14} />
-            Back to Resorts
+            Back to resorts
           </Link>
-          <h1 className="font-display text-5xl md:text-6xl text-text-base tracking-wide mb-2">
-            COMPARE RESORTS
+          <div className="pc-eyebrow mb-1" style={{ color: "var(--pc-bark)" }}>
+            Side-by-side · up to {MAX_RESORTS}
+          </div>
+          <h1 className="font-display font-black text-5xl md:text-6xl text-ink leading-[0.95] tracking-[-0.02em]">
+            Compare <em className="text-alpen italic font-bold">resorts</em>.
           </h1>
-          <p className="text-text-subtle">
-            Side-by-side snow conditions — up to {MAX_RESORTS} resorts
-          </p>
         </div>
 
         {/* Toolbar */}
@@ -425,14 +425,17 @@ export function ComparePage({ allResorts, initialResorts }: Props) {
             <>
               <button
                 onClick={handleShare}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-surface2 border border-border hover:border-cyan/50 rounded-lg text-text-subtle hover:text-text-base text-sm transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-cream-50 text-ink
+                           border-[1.5px] border-ink rounded-full shadow-stamp-sm
+                           hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]
+                           transition-[transform,box-shadow] duration-100 text-[13px] font-semibold"
               >
                 <Share2 size={14} />
                 {copied ? "Copied!" : "Share"}
               </button>
               <button
                 onClick={() => setResorts([])}
-                className="text-text-muted hover:text-text-base text-sm transition-colors"
+                className="text-bark hover:text-ink text-[13px] font-semibold transition-colors"
               >
                 Clear all
               </button>
@@ -444,8 +447,8 @@ export function ComparePage({ allResorts, initialResorts }: Props) {
         {resorts.length === 0 && (
           <div className="text-center py-16">
             <div className="text-5xl mb-4">⛷</div>
-            <h2 className="text-text-base font-semibold text-xl mb-2">No resorts selected</h2>
-            <p className="text-text-muted text-sm mb-8">
+            <h2 className="font-display font-black text-ink text-2xl leading-tight">No resorts selected.</h2>
+            <p className="text-bark text-sm mt-2 mb-8">
               Search above to add resorts, or try a popular comparison:
             </p>
             <div className="flex flex-wrap justify-center gap-3">
@@ -456,8 +459,10 @@ export function ComparePage({ allResorts, initialResorts }: Props) {
                 return (
                   <button key={`${a}-${b}`}
                     onClick={() => { addResort(ra); addResort(rb); }}
-                    className="px-4 py-2.5 bg-surface2 border border-border hover:border-cyan/50 rounded-lg text-text-subtle hover:text-cyan text-sm transition-colors">
-                    {ra.name} vs {rb.name}
+                    className="px-4 py-2 bg-cream-50 text-ink border-[1.5px] border-ink rounded-full
+                               shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]
+                               transition-[transform,box-shadow] duration-100 text-[13px] font-semibold">
+                    {ra.name} <span className="text-bark font-normal italic">vs</span> {rb.name}
                   </button>
                 );
               })}
@@ -467,7 +472,7 @@ export function ComparePage({ allResorts, initialResorts }: Props) {
 
         {/* Single resort prompt */}
         {resorts.length === 1 && (
-          <p className="text-text-muted text-sm mb-6 text-center">
+          <p className="text-bark text-sm mb-6 text-center italic">
             Add at least one more resort to start comparing.
           </p>
         )}
@@ -476,19 +481,19 @@ export function ComparePage({ allResorts, initialResorts }: Props) {
         {resorts.length > 0 && (
           <div className="overflow-x-auto -mx-4 px-4 pb-4">
             <div
-              className="min-w-fit rounded-xl border border-border overflow-hidden"
+              className="min-w-fit rounded-[18px] border-[1.5px] border-ink shadow-stamp overflow-hidden bg-cream-50"
               style={{
                 display: "grid",
                 gridTemplateColumns: `140px repeat(${resorts.length}, minmax(180px, 1fr))`,
               }}
             >
               {/* Header row */}
-              <div className="bg-surface2 border-b border-r border-border" />
+              <div className="bg-cream border-b-[1.5px] border-r-[1.5px] border-dashed border-bark" />
               {resorts.map((resort, i) => (
                 <div
                   key={resort.slug}
-                  className={`bg-surface2 border-b border-border ${
-                    i < resorts.length - 1 ? "border-r" : ""
+                  className={`bg-cream border-b-[1.5px] border-dashed border-bark ${
+                    i < resorts.length - 1 ? "border-r-[1.5px]" : ""
                   }`}
                 >
                   <ResortColumnHeader resort={resort} onRemove={() => removeResort(resort.slug)} />
@@ -502,11 +507,11 @@ export function ComparePage({ allResorts, initialResorts }: Props) {
                   <React.Fragment key={row.label}>
                     {/* Label cell */}
                     <div
-                      className={`bg-surface sticky left-0 z-10 flex items-center px-4 py-4 border-r border-border ${
+                      className={`bg-cream-50 sticky left-0 z-10 flex items-center px-4 py-4 border-r-[1.5px] border-dashed border-bark ${
                         isLast ? "" : "border-b"
                       }`}
                     >
-                      <span className="text-text-muted text-[11px] font-semibold tracking-wider uppercase">
+                      <span className="font-mono font-bold text-[11px] tracking-[0.14em] uppercase text-bark">
                         {row.label}
                       </span>
                     </div>
@@ -515,8 +520,8 @@ export function ComparePage({ allResorts, initialResorts }: Props) {
                     {row.values.map((cell, resortIdx) => (
                       <div
                         key={`${row.label}-${resorts[resortIdx].slug}`}
-                        className={`bg-surface border-border ${
-                          resortIdx < resorts.length - 1 ? "border-r" : ""
+                        className={`bg-cream-50 border-dashed border-bark ${
+                          resortIdx < resorts.length - 1 ? "border-r-[1.5px]" : ""
                         } ${isLast ? "" : "border-b"}`}
                       >
                         <StatCell value={cell.display} isBest={cell.isBest} />

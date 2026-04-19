@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PeakCam — Design System</title>
+<link rel="stylesheet" href="tokens.css" />
+<template id="__bundler_thumbnail">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+    <rect width="400" height="300" fill="#f1e7cf"/>
+    <polygon points="40,240 120,140 170,180 230,100 300,170 360,140 360,240" fill="#3c5a3a"/>
+    <circle cx="310" cy="90" r="24" fill="#d9552f"/>
+    <text x="200" y="280" font-family="Georgia, serif" font-weight="900" font-size="28" text-anchor="middle" fill="#2a1f14">PeakCam</text>
+  </svg>
+</template>
+<style>
+  /* ==== Specimen-page layout ==== */
+  body { margin: 0; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 56px 40px 120px; }
+
+  header.masthead {
+    display: grid; grid-template-columns: 1fr auto; align-items: end;
+    gap: 32px;
+    padding-bottom: 28px;
+    border-bottom: 2px solid var(--pc-ink);
+    margin-bottom: 56px;
+  }
+  .masthead h1 {
+    margin: 0;
+    font-family: var(--pc-display);
+    font-weight: 900;
+    font-size: clamp(56px, 8vw, 104px);
+    line-height: .9;
+    letter-spacing: -0.03em;
+  }
+  .masthead h1 em {
+    font-style: italic;
+    font-weight: 700;
+    color: var(--pc-alpen);
+  }
+  .masthead .meta {
+    font-family: var(--pc-mono);
+    font-size: 12px;
+    color: var(--pc-bark);
+    text-align: right;
+    line-height: 1.6;
+  }
+  .masthead .meta strong { color: var(--pc-ink); }
+
+  section { margin-top: 72px; }
+  section > h2 {
+    font-family: var(--pc-display);
+    font-weight: 900;
+    font-size: 40px;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  section > .sub {
+    font-family: var(--pc-sans);
+    color: var(--pc-bark);
+    margin: 0 0 28px;
+    max-width: 620px;
+  }
+
+  /* === Palette === */
+  .swatches {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 14px;
+  }
+  .sw {
+    border: var(--pc-border);
+    border-radius: var(--pc-r-md);
+    box-shadow: var(--pc-stamp);
+    overflow: hidden;
+    background: var(--pc-cream-50);
+  }
+  .sw__color { height: 100px; border-bottom: var(--pc-border); }
+  .sw__meta {
+    padding: 10px 12px 12px;
+    font-family: var(--pc-mono);
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  .sw__meta b { font-family: var(--pc-sans); font-size: 13px; display: block; margin-bottom: 2px; letter-spacing: .02em; }
+
+  /* === Type specimen === */
+  .type-row {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 24px;
+    align-items: baseline;
+    padding: 22px 0;
+    border-top: 1.5px dashed var(--pc-bark);
+  }
+  .type-row:first-child { border-top: 0; padding-top: 6px; }
+  .type-row .label {
+    font-family: var(--pc-mono);
+    font-size: 11px;
+    color: var(--pc-bark);
+    line-height: 1.5;
+  }
+  .type-row .label b { display:block; color: var(--pc-ink); font-family: var(--pc-sans); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 2px;}
+
+  .t-hero   { font-family: var(--pc-display); font-weight: 900; font-size: 96px; line-height: .88; letter-spacing: -0.03em; }
+  .t-hero em{ font-style: italic; font-weight: 700; color: var(--pc-alpen); }
+  .t-h1     { font-family: var(--pc-display); font-weight: 900; font-size: 56px; line-height: .95; letter-spacing: -0.02em;}
+  .t-h2     { font-family: var(--pc-display); font-weight: 700; font-size: 36px; line-height: 1.05;}
+  .t-body-l { font-family: var(--pc-sans); font-size: 20px; line-height: 1.45; max-width: 60ch;}
+  .t-body   { font-family: var(--pc-sans); font-size: 16px; line-height: 1.55; max-width: 65ch;}
+  .t-eyebrow{ font-family: var(--pc-sans); font-weight: 700; text-transform: uppercase; letter-spacing: .18em; font-size: 13px; color: var(--pc-bark);}
+  .t-mono   { font-family: var(--pc-mono); font-weight: 700; font-size: 16px; letter-spacing: .04em;}
+
+  /* === Component grid === */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .panel {
+    background: var(--pc-cream-50);
+    border: var(--pc-border);
+    border-radius: var(--pc-r-lg);
+    padding: 28px;
+    box-shadow: var(--pc-stamp);
+  }
+  .panel h3 {
+    margin: 0 0 18px;
+    font-family: var(--pc-sans);
+    font-size: 12px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--pc-bark);
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .row + .row { margin-top: 14px; }
+
+  /* === Cam tile (the key product component) === */
+  .cam-tile {
+    background: var(--pc-cream-50);
+    border: var(--pc-border);
+    border-radius: var(--pc-r-lg);
+    box-shadow: var(--pc-stamp);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .cam-tile__thumb {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    background:
+      linear-gradient(180deg, #9fb5c2 0%, #7e9aa6 40%, #e9dcc4 70%, #c7a880 100%);
+    border-bottom: var(--pc-border);
+    overflow: hidden;
+  }
+  /* Hand-drawn mountains inside the thumb */
+  .cam-tile__mtn {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+  }
+  .cam-tile__live {
+    position: absolute; top: 12px; left: 12px;
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--pc-alpen);
+    color: var(--pc-cream-50);
+    font-family: var(--pc-sans);
+    font-weight: 700; font-size: 11px;
+    letter-spacing: .14em; text-transform: uppercase;
+    padding: 4px 9px;
+    border-radius: var(--pc-r-pill);
+    border: 1.5px solid var(--pc-ink);
+    box-shadow: 2px 2px 0 var(--pc-ink);
+  }
+  .cam-tile__live::before {
+    content:''; width:7px; height:7px; border-radius:50%;
+    background: var(--pc-cream-50);
+    box-shadow: 0 0 0 2px rgba(255,255,255,.3);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .cam-tile__state {
+    position: absolute; top: 12px; right: 12px;
+  }
+  .cam-tile__body { padding: 16px 18px 18px; }
+  .cam-tile__resort {
+    font-family: var(--pc-display);
+    font-weight: 900;
+    font-size: 24px;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    margin: 0 0 2px;
+  }
+  .cam-tile__region {
+    font-family: var(--pc-sans);
+    font-size: 13px;
+    color: var(--pc-bark);
+    margin: 0 0 14px;
+  }
+  .cam-tile__stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    padding: 12px 0 14px;
+    border-top: 1.5px dashed var(--pc-bark);
+    border-bottom: 1.5px dashed var(--pc-bark);
+  }
+  .cam-tile__stats .pc-stat__num { font-size: 22px; }
+  .cam-tile__stats .pc-stat__label { font-size: 9.5px; letter-spacing: .1em; }
+  .cam-tile__footer {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-top: 12px;
+  }
+
+  /* === Stickers / badges for poster flavor === */
+  .sticker {
+    width: 120px; height: 120px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-family: var(--pc-display);
+    font-weight: 900;
+    font-size: 13px;
+    text-align: center;
+    line-height: 1;
+    color: var(--pc-cream-50);
+    background: var(--pc-alpen);
+    border: 2.5px solid var(--pc-ink);
+    box-shadow: var(--pc-stamp-lg);
+    transform: rotate(-6deg);
+    letter-spacing: .04em;
+  }
+  .sticker--forest { background: var(--pc-forest); }
+  .sticker--mustard { background: var(--pc-mustard); color: var(--pc-ink);}
+  .sticker span { display:block; font-size: 28px; letter-spacing: -.02em; }
+
+  /* === Nav bar demo === */
+  .navbar {
+    display: flex; align-items: center; gap: 24px;
+    padding: 14px 20px;
+    background: var(--pc-ink);
+    color: var(--pc-cream-50);
+    border-radius: var(--pc-r-pill);
+    border: 2px solid var(--pc-ink);
+  }
+  .navbar .brand {
+    font-family: var(--pc-display); font-weight: 900;
+    font-size: 22px; letter-spacing: -.02em;
+  }
+  .navbar .brand em { color: var(--pc-alpen); font-style: italic;}
+  .navbar ul { list-style:none; display:flex; gap: 6px; margin:0; padding:0; }
+  .navbar a {
+    color: var(--pc-cream-50);
+    text-decoration: none;
+    font-family: var(--pc-sans);
+    font-weight: 500;
+    font-size: 14px;
+    padding: 7px 12px; border-radius: var(--pc-r-pill);
+  }
+  .navbar a:hover { background: rgba(241,231,207,.12); }
+  .navbar a.active { background: var(--pc-alpen); font-weight: 700;}
+  .navbar .spacer { flex: 1; }
+
+  /* === Filter pill group === */
+  .filter-row {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    padding: 14px 16px;
+    background: var(--pc-cream-50);
+    border: var(--pc-border);
+    border-radius: var(--pc-r-pill);
+    box-shadow: var(--pc-stamp);
+  }
+  .filter-row .label {
+    font-family: var(--pc-mono);
+    font-size: 11px; text-transform: uppercase; letter-spacing: .14em;
+    color: var(--pc-bark);
+    align-self: center; margin-right: 6px;
+  }
+  .filter-row button {
+    font-family: var(--pc-sans);
+    font-weight: 600;
+    font-size: 13px;
+    padding: 6px 12px;
+    border-radius: var(--pc-r-pill);
+    border: 1.5px solid var(--pc-bark);
+    background: transparent;
+    color: var(--pc-ink);
+    cursor: pointer;
+  }
+  .filter-row button.on {
+    background: var(--pc-ink);
+    color: var(--pc-cream-50);
+    border-color: var(--pc-ink);
+  }
+
+  /* === Usage blocks for voice === */
+  .voice-card {
+    padding: 22px 26px;
+    background: var(--pc-forest);
+    color: var(--pc-cream-50);
+    border: var(--pc-border);
+    border-radius: var(--pc-r-lg);
+    box-shadow: var(--pc-stamp);
+  }
+  .voice-card .q {
+    font-family: var(--pc-display);
+    font-weight: 900;
+    font-style: italic;
+    font-size: 30px;
+    line-height: 1.1;
+    margin: 0 0 8px;
+  }
+  .voice-card .q em { color: var(--pc-mustard); font-style: normal; }
+  .voice-card .tag {
+    font-family: var(--pc-mono);
+    font-size: 11px;
+    opacity: .7;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+
+  /* === Shadow / radii specimens === */
+  .shadow-demo {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+  }
+  .shadow-demo > div {
+    height: 110px; border-radius: var(--pc-r-lg);
+    border: var(--pc-border); background: var(--pc-cream-50);
+    display: grid; place-items: center;
+    font-family: var(--pc-mono); font-size: 12px;
+  }
+  .sh-stamp    { box-shadow: var(--pc-stamp); }
+  .sh-stamp-lg { box-shadow: var(--pc-stamp-lg); }
+  .sh-soft     { box-shadow: var(--pc-soft); }
+
+</style>
+</head>
+<body class="pc-paper">
+<div class="wrap">
+
+  <header class="masthead">
+    <h1>Peak<em>Cam</em><br/>Design System</h1>
+    <div class="meta">
+      <strong>v0.1 · 25/26 SEASON</strong><br/>
+      RETRO SKI-POSTER · EARTH + SNOW<br/>
+      HUMANIST DISPLAY · HAND-STAMPED UI
+    </div>
+  </header>
+
+  <!-- ========== COLOR ========== -->
+  <section id="color">
+    <h2>01 · Color</h2>
+    <p class="sub">Earth + snow. Three families — cream paper, forest green, bark brown — with cold sky-grey for data surfaces. Alpenglow persimmon is the only hot accent; use it for primary CTAs, live indicators, and one element per screen. Mustard is reserved for the <code>GOOD</code> condition state.</p>
+
+    <div class="swatches">
+      <div class="sw"><div class="sw__color" style="background:var(--pc-cream-50)"></div><div class="sw__meta"><b>Cream 50</b>#faf4e6</div></div>
+      <div class="sw"><div class="sw__color" style="background:var(--pc-cream)"></div><div class="sw__meta"><b>Cream</b>#f1e7cf · body bg</div></div>
+      <div class="sw"><div class="sw__color" style="background:var(--pc-cream-dk)"></div><div class="sw__meta"><b>Cream dk</b>#e3d5b2</div></div>
+      <div class="sw"><div class="sw__color" style="background:var(--pc-bark-50)"></div><div class="sw__meta"><b>Bark 50</b>#b59b74</div></div>
+      <div class="sw"><div class="sw__color" style="background:var(--pc-bark)"></div><div class="sw__meta"><b>Bark</b>#7a5a3a · captions</div></div>
+      <div class="sw"><div class="sw__color" style="background:var(--pc-ink)"></div><div class="sw__meta"><b>Ink</b>#2a1f14 · text</div></div>
+      <div class="sw"><div class="sw__color" style="background:var(--pc-forest-50)"></div><div class="sw__meta"><b>Forest 50</b>#8aa37a</div></div>
+      <div class="sw"><div class="sw__color" style="background:var(--pc-forest)"></div><div class="sw__meta"><b>Forest</b>#3c5a3a · primary</div></div>
+      <div class="sw"><div class="sw__color" style="background:var(--pc-forest-dk)"></div><div class="sw__meta"><b>Forest dk</b>#1f3322</div></div>
+      <div class="sw"><div class="sw__color" style="background:var(--pc-sky)"></div><div class="sw__meta"><b>Sky</b>#c9d9d6 · data bg</div></div>
+      <div class="sw"><div class="sw__color" style="background:var(--pc-alpen)"></div><div class="sw__meta"><b>Alpenglow</b>#d9552f · accent</div></div>
+      <div class="sw"><div class="sw__color" style="background:var(--pc-mustard)"></div><div class="sw__meta"><b>Mustard</b>#e2a740 · "Good"</div></div>
+    </div>
+
+    <div style="margin-top:28px; display:grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+      <div style="padding:18px; background:var(--pc-great); color:var(--pc-cream-50); border:var(--pc-border); border-radius:var(--pc-r-md);">
+        <div class="pc-eyebrow" style="color:rgba(255,255,255,.7)">CONDITION</div>
+        <div style="font-family:var(--pc-display); font-weight:900; font-size:30px;">GREAT</div>
+      </div>
+      <div style="padding:18px; background:var(--pc-good); color:var(--pc-cream-50); border:var(--pc-border); border-radius:var(--pc-r-md);">
+        <div class="pc-eyebrow" style="color:rgba(255,255,255,.7)">CONDITION</div>
+        <div style="font-family:var(--pc-display); font-weight:900; font-size:30px;">GOOD</div>
+      </div>
+      <div style="padding:18px; background:var(--pc-fair); color:var(--pc-ink); border:var(--pc-border); border-radius:var(--pc-r-md);">
+        <div class="pc-eyebrow">CONDITION</div>
+        <div style="font-family:var(--pc-display); font-weight:900; font-size:30px;">FAIR</div>
+      </div>
+      <div style="padding:18px; background:var(--pc-poor); color:var(--pc-cream-50); border:var(--pc-border); border-radius:var(--pc-r-md);">
+        <div class="pc-eyebrow" style="color:rgba(255,255,255,.7)">CONDITION</div>
+        <div style="font-family:var(--pc-display); font-weight:900; font-size:30px;">POOR</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== TYPE ========== -->
+  <section id="type">
+    <h2>02 · Typography</h2>
+    <p class="sub">Fraunces does the heavy lifting — high optical-size display for poster energy, italic for accent words. DM Sans for all UI and body. JetBrains Mono for data readouts, snow totals, state codes.</p>
+
+    <div class="type-row">
+      <div class="label"><b>Display / Hero</b>Fraunces 900 · 96px<br/>letter-spacing −3%</div>
+      <div class="t-hero">Got the <em>goods</em>.</div>
+    </div>
+    <div class="type-row">
+      <div class="label"><b>H1</b>Fraunces 900 · 56px</div>
+      <div class="t-h1">Real-time snow reports<br/>from 128 resorts.</div>
+    </div>
+    <div class="type-row">
+      <div class="label"><b>H2</b>Fraunces 700 · 36px</div>
+      <div class="t-h2">Little Cottonwood Canyon</div>
+    </div>
+    <div class="type-row">
+      <div class="label"><b>Body L</b>DM Sans 400 · 20px</div>
+      <div class="t-body-l">Browse live webcams, real-time snow reports, base depths, and trail conditions for 128 ski resorts across North America.</div>
+    </div>
+    <div class="type-row">
+      <div class="label"><b>Body</b>DM Sans 400 · 16px</div>
+      <div class="t-body">Compare powder days, check lift status, and plan your next trip. The lift's spinning somewhere — we'll help you find it.</div>
+    </div>
+    <div class="type-row">
+      <div class="label"><b>Eyebrow</b>DM Sans 700 · 13px<br/>uppercase · +18%</div>
+      <div class="t-eyebrow">Selkirk Mountains · Washington</div>
+    </div>
+    <div class="type-row">
+      <div class="label"><b>Mono / Data</b>JetBrains Mono 700 · 16px</div>
+      <div class="t-mono">142" BASE · 11" 24H · 24" 48H · UT · 7am MST</div>
+    </div>
+  </section>
+
+  <!-- ========== COMPONENTS ========== -->
+  <section id="components">
+    <h2>03 · Components</h2>
+    <p class="sub">Every interactive surface is stamped: hard 3px ink offset, no blur, pill radius on controls. Hover nudges toward the user; active pushes the stamp back in.</p>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h3>Buttons</h3>
+        <div class="row">
+          <button class="pc-btn pc-btn--primary">Check conditions</button>
+          <button class="pc-btn pc-btn--accent">Get powder alerts</button>
+          <button class="pc-btn">Compare resorts</button>
+        </div>
+        <div class="row">
+          <button class="pc-btn pc-btn--sm pc-btn--primary">Small primary</button>
+          <button class="pc-btn pc-btn--sm">Small secondary</button>
+          <button class="pc-btn pc-btn--ghost pc-btn--sm">Ghost link →</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Chips &amp; badges</h3>
+        <div class="row">
+          <span class="pc-chip pc-chip--great">Great</span>
+          <span class="pc-chip pc-chip--good">Good</span>
+          <span class="pc-chip pc-chip--fair">Fair</span>
+          <span class="pc-chip pc-chip--poor">Poor</span>
+        </div>
+        <div class="row">
+          <span class="pc-chip pc-chip--state">UT</span>
+          <span class="pc-chip pc-chip--state">CO</span>
+          <span class="pc-chip pc-chip--state">WA</span>
+          <span class="pc-chip">Fresh snow</span>
+          <span class="pc-chip">Live cam</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Form input</h3>
+        <input class="pc-input" placeholder="Search 128 resorts…" />
+        <div style="height:14px"></div>
+        <div class="filter-row">
+          <span class="label">State</span>
+          <button class="on">All</button>
+          <button>CO</button>
+          <button>UT</button>
+          <button>WA</button>
+          <button>VT</button>
+          <button>BC</button>
+          <button>CA</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Stat readout</h3>
+        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:18px; padding-top:4px;">
+          <div class="pc-stat">
+            <div class="pc-stat__num">142<span style="font-size:.5em">″</span></div>
+            <div class="pc-stat__label">Base depth</div>
+          </div>
+          <div class="pc-stat">
+            <div class="pc-stat__num" style="color:var(--pc-alpen)">11<span style="font-size:.5em">″</span></div>
+            <div class="pc-stat__label">24h fresh</div>
+          </div>
+          <div class="pc-stat">
+            <div class="pc-stat__num">87<span style="font-size:.5em">/114</span></div>
+            <div class="pc-stat__label">Runs open</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <div class="panel" style="margin-top: 24px;">
+      <h3>Nav bar</h3>
+      <nav class="navbar">
+        <div class="brand">Peak<em>Cam</em></div>
+        <ul>
+          <li><a href="#" class="active">Resorts</a></li>
+          <li><a href="#">Cams</a></li>
+          <li><a href="#">Powder alerts</a></li>
+          <li><a href="#">Compare</a></li>
+        </ul>
+        <div class="spacer"></div>
+        <button class="pc-btn pc-btn--sm pc-btn--accent">Sign up</button>
+      </nav>
+    </div>
+
+    <!-- Cam tile -->
+    <div style="margin-top:28px;">
+      <h3 style="font-family:var(--pc-sans); font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--pc-bark); margin: 0 0 16px;">Cam tile — the product hero component</h3>
+      <div class="grid-3">
+
+        <!-- Cam 1: Great, live, UT -->
+        <article class="cam-tile">
+          <div class="cam-tile__thumb">
+            <svg class="cam-tile__mtn" viewBox="0 0 320 200" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="skyG1" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0" stop-color="#c9d9d6"/><stop offset="1" stop-color="#f1e7cf"/>
+                </linearGradient>
+              </defs>
+              <rect width="320" height="200" fill="url(#skyG1)"/>
+              <polygon points="-10,200 60,110 100,140 150,70 210,130 260,95 340,200" fill="#3c5a3a"/>
+              <polygon points="-10,200 60,110 100,140 150,70 210,130 260,95 340,200"
+                       fill="white" opacity=".18"
+                       clip-path="polygon(0 0, 100% 0, 100% 45%, 0 55%)"/>
+              <polygon points="-10,200 40,160 90,135 140,155 190,120 250,155 340,135 340,200" fill="#1f3322"/>
+              <circle cx="245" cy="50" r="16" fill="#e2a740"/>
+            </svg>
+            <span class="cam-tile__live">Live</span>
+            <span class="cam-tile__state pc-chip pc-chip--state">UT</span>
+          </div>
+          <div class="cam-tile__body">
+            <h4 class="cam-tile__resort">Little Cottonwood</h4>
+            <p class="cam-tile__region">Wasatch Range · Utah</p>
+            <div class="cam-tile__stats">
+              <div class="pc-stat"><div class="pc-stat__num">142<span style="font-size:.5em">″</span></div><div class="pc-stat__label">Base</div></div>
+              <div class="pc-stat"><div class="pc-stat__num" style="color:var(--pc-alpen)">11<span style="font-size:.5em">″</span></div><div class="pc-stat__label">24h</div></div>
+              <div class="pc-stat"><div class="pc-stat__num">24<span style="font-size:.5em">″</span></div><div class="pc-stat__label">48h</div></div>
+              <div class="pc-stat"><div class="pc-stat__num">87</div><div class="pc-stat__label">Runs</div></div>
+            </div>
+            <div class="cam-tile__footer">
+              <span class="pc-chip pc-chip--great">Great</span>
+              <button class="pc-btn pc-btn--sm pc-btn--ghost">Compare →</button>
+            </div>
+          </div>
+        </article>
+
+        <!-- Cam 2: Fair, CO -->
+        <article class="cam-tile">
+          <div class="cam-tile__thumb">
+            <svg class="cam-tile__mtn" viewBox="0 0 320 200" preserveAspectRatio="none" aria-hidden="true">
+              <rect width="320" height="200" fill="#e3d5b2"/>
+              <rect y="110" width="320" height="90" fill="#b59b74"/>
+              <polygon points="-10,200 70,90 120,130 180,60 240,120 340,80 340,200" fill="#7a5a3a"/>
+              <polygon points="-10,200 70,90 120,130 180,60 240,120 340,80 340,200"
+                       fill="white" opacity=".22"
+                       clip-path="polygon(0 0, 100% 0, 100% 40%, 0 55%)"/>
+              <circle cx="255" cy="55" r="18" fill="#d9552f"/>
+            </svg>
+            <span class="cam-tile__live">Live</span>
+            <span class="cam-tile__state pc-chip pc-chip--state">CO</span>
+          </div>
+          <div class="cam-tile__body">
+            <h4 class="cam-tile__resort">Elk Mountains</h4>
+            <p class="cam-tile__region">Roaring Fork · Colorado</p>
+            <div class="cam-tile__stats">
+              <div class="pc-stat"><div class="pc-stat__num">96<span style="font-size:.5em">″</span></div><div class="pc-stat__label">Base</div></div>
+              <div class="pc-stat"><div class="pc-stat__num">2<span style="font-size:.5em">″</span></div><div class="pc-stat__label">24h</div></div>
+              <div class="pc-stat"><div class="pc-stat__num">4<span style="font-size:.5em">″</span></div><div class="pc-stat__label">48h</div></div>
+              <div class="pc-stat"><div class="pc-stat__num">54</div><div class="pc-stat__label">Runs</div></div>
+            </div>
+            <div class="cam-tile__footer">
+              <span class="pc-chip pc-chip--fair">Fair</span>
+              <button class="pc-btn pc-btn--sm pc-btn--ghost">Compare →</button>
+            </div>
+          </div>
+        </article>
+
+        <!-- Cam 3: Poor, offline, WA -->
+        <article class="cam-tile">
+          <div class="cam-tile__thumb" style="background: linear-gradient(180deg, #6c8a88 0%, #4a3620 100%);">
+            <svg class="cam-tile__mtn" viewBox="0 0 320 200" preserveAspectRatio="none" aria-hidden="true">
+              <polygon points="-10,200 90,120 140,160 200,90 260,140 340,110 340,200" fill="#1f3322" opacity=".85"/>
+              <g stroke="rgba(241,231,207,.7)" stroke-width="1.5" fill="none">
+                <line x1="10" y1="40" x2="310" y2="55"/>
+                <line x1="10" y1="65" x2="310" y2="80"/>
+                <line x1="10" y1="90" x2="310" y2="105"/>
+              </g>
+            </svg>
+            <span class="cam-tile__live" style="background:var(--pc-bark); color:var(--pc-cream-50);">Offline</span>
+            <span class="cam-tile__state pc-chip pc-chip--state">WA</span>
+          </div>
+          <div class="cam-tile__body">
+            <h4 class="cam-tile__resort">Selkirks</h4>
+            <p class="cam-tile__region">Okanogan · Washington</p>
+            <div class="cam-tile__stats">
+              <div class="pc-stat"><div class="pc-stat__num">—</div><div class="pc-stat__label">Base</div></div>
+              <div class="pc-stat"><div class="pc-stat__num">0<span style="font-size:.5em">″</span></div><div class="pc-stat__label">24h</div></div>
+              <div class="pc-stat"><div class="pc-stat__num">0<span style="font-size:.5em">″</span></div><div class="pc-stat__label">48h</div></div>
+              <div class="pc-stat"><div class="pc-stat__num">2</div><div class="pc-stat__label">Runs</div></div>
+            </div>
+            <div class="cam-tile__footer">
+              <span class="pc-chip pc-chip--poor">Poor</span>
+              <button class="pc-btn pc-btn--sm pc-btn--ghost">Compare →</button>
+            </div>
+          </div>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== SHADOWS & RADII ========== -->
+  <section id="tokens">
+    <h2>04 · Shadows, radii &amp; surfaces</h2>
+    <p class="sub">The stamp is the signature. One hard-offset shadow pins a control to the paper; the long stamp is reserved for hero cards and stickers. Soft shadow only appears on hover states or modal lifts.</p>
+    <div class="shadow-demo">
+      <div class="sh-stamp">stamp · 3 3 0 ink</div>
+      <div class="sh-stamp-lg">stamp-lg · 6 6 0 ink</div>
+      <div class="sh-soft">soft · lift &amp; modal</div>
+    </div>
+  </section>
+
+  <!-- ========== BRAND / STICKERS ========== -->
+  <section id="brand">
+    <h2>05 · Stickers &amp; voice</h2>
+    <p class="sub">Round patch stickers ride the edge of hero layouts — ski-swap badge energy. Voice stays insider, short, and slightly dry. No corporate speak.</p>
+
+    <div style="display:flex; gap: 40px; align-items:center; padding: 30px 0;">
+      <div class="sticker"><div>Pow day<span>11″</span>24 hours</div></div>
+      <div class="sticker sticker--forest"><div>Lift's<span>SPINNING</span>open now</div></div>
+      <div class="sticker sticker--mustard"><div>Got the<span>GOODS</span>this week</div></div>
+    </div>
+
+    <div class="grid-2" style="margin-top: 20px;">
+      <div class="voice-card">
+        <p class="q">“The <em>lift's spinning.</em><br/>Time to go.”</p>
+        <div class="tag">Powder-alert push · 47 chars</div>
+      </div>
+      <div class="voice-card" style="background:var(--pc-alpen);">
+        <p class="q">“11″ overnight.<br/>You and your crew <em>got the goods.</em>”</p>
+        <div class="tag">Email subject · pow-day digest</div>
+      </div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

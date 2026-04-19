@@ -7,9 +7,10 @@ interface HourlyTimelineProps {
   hourlyData: HourlyWeather[];
 }
 
-const CYAN = "#60C8FF";
-const GREY = "#4A6480";
-const WHITE = "#E8F0F8";
+// Paper palette: alpen bars, bark axis labels, ink temperature line
+const SNOW_BAR = "#d9552f";   // pc-alpen
+const AXIS     = "#7a5a3a";   // pc-bark
+const TEMP_LINE = "#2a1f14";  // pc-ink
 
 /** Convert compass direction to degrees (arrow points where wind blows TO). */
 function compassDeg(dir: string): number {
@@ -96,22 +97,22 @@ export function HourlyTimeline({ hourlyData }: HourlyTimelineProps) {
   if (!chartData || hourlyData.length === 0) return null;
 
   return (
-    <div className="bg-surface rounded-lg border border-border overflow-hidden">
+    <div className="bg-cream-50 border-[1.5px] border-ink rounded-[18px] shadow-stamp overflow-hidden">
       {/* Header toggle */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-surface2/50 transition-colors"
+        className="w-full flex items-center justify-between px-5 py-3 hover:bg-cream transition-colors border-b-[1.5px] border-dashed border-bark"
       >
-        <span className="text-text-base text-sm font-medium">48-Hour Detail</span>
+        <span className="font-display font-black text-ink text-[15px] tracking-[-0.01em]">48-Hour Detail</span>
         <svg
-          className={`w-4 h-4 text-text-muted transition-transform duration-200 ${
+          className={`w-4 h-4 text-bark transition-transform duration-200 ${
             expanded ? "rotate-180" : ""
           }`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
 
@@ -133,7 +134,7 @@ export function HourlyTimeline({ hourlyData }: HourlyTimelineProps) {
                   y={chartData.chartH - chartData.padBottom - Math.min(h.snowInches * 8, 40)}
                   width={chartData.slotW - 4}
                   height={Math.min(h.snowInches * 8, 40)}
-                  fill={CYAN}
+                  fill={SNOW_BAR}
                   opacity={snowOpacity(h.snowInches)}
                   rx={2}
                 />
@@ -147,18 +148,18 @@ export function HourlyTimeline({ hourlyData }: HourlyTimelineProps) {
                 y1={chartData.freezeY}
                 x2={chartData.chartW}
                 y2={chartData.freezeY}
-                stroke={GREY}
-                strokeWidth={1}
+                stroke={AXIS}
+                strokeWidth={1.25}
                 strokeDasharray="4 3"
-                opacity={0.5}
+                opacity={0.55}
               />
             )}
 
-            {/* Temperature line */}
+            {/* Temperature line — ink, slightly thicker for stamped feel */}
             <path
               d={chartData.pathD}
-              stroke={WHITE}
-              strokeWidth={1.5}
+              stroke={TEMP_LINE}
+              strokeWidth={2}
               fill="none"
               strokeLinejoin="round"
               strokeLinecap="round"
@@ -171,9 +172,11 @@ export function HourlyTimeline({ hourlyData }: HourlyTimelineProps) {
                 x={l.x}
                 y={chartData.chartH - 18}
                 textAnchor="middle"
-                fill={GREY}
+                fill={AXIS}
                 fontSize={10}
-                fontFamily="Inter, sans-serif"
+                fontFamily="JetBrains Mono, monospace"
+                fontWeight={700}
+                letterSpacing="0.04em"
               >
                 {l.text}
               </text>
@@ -185,7 +188,7 @@ export function HourlyTimeline({ hourlyData }: HourlyTimelineProps) {
                 key={`wind-${i}`}
                 transform={`translate(${w.x}, ${chartData.chartH - 8}) rotate(${w.deg})`}
               >
-                <path d="M0 -4L2.5 2H-2.5L0 -4Z" fill={GREY} opacity={0.7} />
+                <path d="M0 -4L2.5 2H-2.5L0 -4Z" fill={AXIS} opacity={0.75} />
               </g>
             ))}
           </svg>

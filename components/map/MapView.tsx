@@ -31,19 +31,20 @@ import MapWeatherOverlay from "./MapWeatherOverlay";
 
 function getMapStyle(apiKey: string | undefined): maplibregl.StyleSpecification | string {
   if (apiKey) {
-    return `https://api.maptiler.com/maps/landscape-dark/style.json?key=${apiKey}`;
+    // Paper/poster aesthetic — landscape (light terrain) vector style
+    return `https://api.maptiler.com/maps/landscape/style.json?key=${apiKey}`;
   }
-  // Fallback: Carto Dark Matter raster tiles (free, no key, but no terrain)
+  // Fallback: Carto Voyager raster tiles (light, free, no key)
   return {
     version: 8 as const,
-    name: "carto-dark",
+    name: "carto-voyager",
     sources: {
-      "carto-dark": {
+      "carto-voyager": {
         type: "raster" as const,
         tiles: [
-          "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
-          "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
-          "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
+          "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
+          "https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
+          "https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
         ],
         tileSize: 256,
         maxzoom: 18,
@@ -52,7 +53,7 @@ function getMapStyle(apiKey: string | undefined): maplibregl.StyleSpecification 
       },
     },
     layers: [
-      { id: "carto-dark-layer", type: "raster" as const, source: "carto-dark" },
+      { id: "carto-voyager-layer", type: "raster" as const, source: "carto-voyager" },
     ],
   };
 }
@@ -270,7 +271,7 @@ export default function MapView({
           clusterMaxZoom={10}
           clusterRadius={50}
         >
-          {/* Cluster circles */}
+          {/* Cluster circles — ink with cream stroke (hand-stamp feel) */}
           <Layer
             id="clusters"
             type="circle"
@@ -282,9 +283,9 @@ export default function MapView({
                 10, 24,
                 50, 32,
               ],
-              "circle-color": "#1A6B7A",
+              "circle-color": "#2a1f14",           /* pc-ink */
               "circle-stroke-width": 2,
-              "circle-stroke-color": "rgba(255,255,255,0.2)",
+              "circle-stroke-color": "#faf4e6",    /* pc-cream-50 */
             }}
           />
 
@@ -296,9 +297,10 @@ export default function MapView({
             layout={{
               "text-field": ["get", "point_count_abbreviated"],
               "text-size": 12,
+              "text-font": ["Noto Sans Bold", "Arial Unicode MS Bold"],
             }}
             paint={{
-              "text-color": "#ffffff",
+              "text-color": "#faf4e6",             /* pc-cream-50 */
             }}
           />
 
@@ -314,7 +316,7 @@ export default function MapView({
             }}
           />
 
-          {/* Visible resort markers — enlarged for data display */}
+          {/* Visible resort markers — earth palette, ink stroke */}
           <Layer
             id="resort-markers"
             type="circle"
@@ -329,11 +331,11 @@ export default function MapView({
               "circle-color": [
                 "match",
                 ["get", "condRating"],
-                "great", "#2ECC8F",
-                "good", "#60C8FF",
-                "fair", "#8AA3BE",
-                "poor", "#f87171",
-                "#8AA3BE",
+                "great", "#3c5a3a",                /* pc-forest */
+                "good",  "#6d8a4a",                /* pc-good (moss) */
+                "fair",  "#e2a740",                /* pc-mustard */
+                "poor",  "#a93f20",                /* pc-alpen-dk */
+                "#7a5a3a",                          /* pc-bark fallback */
               ],
               "circle-stroke-width": [
                 "case",
@@ -341,13 +343,8 @@ export default function MapView({
                 2.5,
                 1.5,
               ],
-              "circle-stroke-color": [
-                "case",
-                ["==", ["get", "slug"], hoveredSlug ?? ""],
-                "#ffffff",
-                "rgba(255,255,255,0.3)",
-              ],
-              "circle-opacity": 0.9,
+              "circle-stroke-color": "#2a1f14",    /* pc-ink — always ink for stamp feel */
+              "circle-opacity": 0.95,
             }}
           />
 
@@ -361,9 +358,16 @@ export default function MapView({
               "text-size": 10,
               "text-allow-overlap": true,
               "text-ignore-placement": true,
+              "text-font": ["Noto Sans Bold", "Arial Unicode MS Bold"],
             }}
             paint={{
-              "text-color": "#ffffff",
+              /* Fair (mustard) needs ink text; others get cream */
+              "text-color": [
+                "match",
+                ["get", "condRating"],
+                "fair", "#2a1f14",
+                "#faf4e6",
+              ],
             }}
           />
 
@@ -379,10 +383,11 @@ export default function MapView({
               "text-offset": [0, -2.2],
               "text-anchor": "bottom",
               "text-allow-overlap": false,
+              "text-font": ["Noto Sans Bold", "Arial Unicode MS Bold"],
             }}
             paint={{
-              "text-color": "#E8F0F8",
-              "text-halo-color": "#080D14",
+              "text-color": "#2a1f14",             /* pc-ink */
+              "text-halo-color": "#faf4e6",        /* pc-cream-50 halo */
               "text-halo-width": 1.5,
             }}
           />
@@ -400,11 +405,12 @@ export default function MapView({
               "text-anchor": "top",
               "text-allow-overlap": false,
               "text-max-width": 10,
+              "text-font": ["Noto Sans Regular", "Arial Unicode MS Regular"],
             }}
             paint={{
-              "text-color": "#8AA3BE",
-              "text-halo-color": "#080D14",
-              "text-halo-width": 1,
+              "text-color": "#4a3620",             /* pc-bark-dk */
+              "text-halo-color": "#faf4e6",        /* pc-cream-50 halo */
+              "text-halo-width": 1.25,
             }}
           />
         </Source>

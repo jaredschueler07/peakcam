@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PeakCam — Starter Deck</title>
+<link rel="stylesheet" href="tokens.css" />
+<script src="deck-stage.js"></script>
+<template id="__bundler_thumbnail">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+    <rect width="400" height="300" fill="#f1e7cf"/>
+    <polygon points="40,240 120,140 170,180 230,100 300,170 360,140 360,240" fill="#3c5a3a"/>
+    <circle cx="310" cy="90" r="24" fill="#d9552f"/>
+    <text x="200" y="280" font-family="Georgia, serif" font-weight="900" font-size="28" text-anchor="middle" fill="#2a1f14">PeakCam</text>
+  </svg>
+</template>
+<style>
+  html, body { margin: 0; background: #000; }
+
+  /* Every slide is 1920x1080; deck_stage scales to viewport */
+  .slide {
+    width: 1920px; height: 1080px;
+    background: var(--pc-cream);
+    color: var(--pc-ink);
+    position: relative;
+    overflow: hidden;
+    font-family: var(--pc-sans);
+  }
+  .slide.paper {
+    background-color: var(--pc-cream);
+    background-image:
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .16  0 0 0 0 .12  0 0 0 0 .08  0 0 0 .18 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>"),
+      radial-gradient(1800px 900px at 0% 0%, rgba(217,85,47,.06), transparent 60%),
+      radial-gradient(1600px 900px at 110% 110%, rgba(60,90,58,.09), transparent 60%);
+  }
+  .slide.forest { background: var(--pc-forest); color: var(--pc-cream-50); }
+  .slide.ink { background: var(--pc-ink); color: var(--pc-cream-50); }
+
+  /* Reusable slide frame */
+  .pad { padding: 96px 120px; box-sizing: border-box; width:100%; height:100%; position:relative; }
+  .header-row {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 48px;
+  }
+  .brand {
+    font-family: var(--pc-display); font-weight: 900;
+    font-size: 42px; letter-spacing: -0.02em;
+  }
+  .brand em { color: var(--pc-alpen); font-style: italic; }
+  .slide.forest .brand em, .slide.ink .brand em { color: var(--pc-mustard); }
+  .slide-no {
+    font-family: var(--pc-mono); font-weight: 700;
+    font-size: 18px; letter-spacing: .18em;
+    color: var(--pc-bark);
+  }
+  .slide.forest .slide-no, .slide.ink .slide-no { color: var(--pc-cream-50); opacity: .6; }
+  .kicker {
+    font-family: var(--pc-sans); font-weight: 700;
+    font-size: 20px; letter-spacing: .24em; text-transform: uppercase;
+    color: var(--pc-bark);
+  }
+  .slide.forest .kicker { color: var(--pc-mustard); }
+  .slide.ink .kicker { color: var(--pc-alpen); }
+
+  /* ============ SLIDE 1 — TITLE (poster) ============ */
+  .s-title .pad { padding: 0; display: grid; grid-template-rows: auto 1fr auto;}
+  .s-title .top-bar { padding: 60px 120px 0; display:flex; justify-content:space-between; align-items:center; }
+  .s-title .middle { padding: 40px 120px; display:flex; flex-direction:column; justify-content:center;
+                     position: relative; }
+  .s-title h1 {
+    font-family: var(--pc-display); font-weight: 900;
+    font-size: 320px; line-height: .84; letter-spacing: -0.04em;
+    margin: 0;
+    position: relative; z-index: 2;
+  }
+  .s-title h1 em { font-style: italic; font-weight: 700; color: var(--pc-alpen); }
+  .s-title .sub {
+    font-family: var(--pc-sans); font-size: 38px; font-weight: 500;
+    margin-top: 28px; max-width: 1100px; line-height: 1.2; color: var(--pc-ink);
+    position: relative; z-index: 2;
+  }
+  .s-title .bot-bar {
+    padding: 40px 120px 60px;
+    display:flex; justify-content: space-between; align-items: flex-end;
+    border-top: 3px solid var(--pc-ink);
+    margin: 0 120px 0; /* visual only */
+  }
+  .s-title .meta {
+    font-family: var(--pc-mono); font-weight: 700;
+    font-size: 22px; letter-spacing: .14em; text-transform: uppercase;
+    line-height: 1.5;
+  }
+  .s-title .meta .s { color: var(--pc-bark); }
+  .s-title .sticker {
+    width: 260px; height: 260px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-family: var(--pc-display); font-weight: 900;
+    color: var(--pc-cream-50); text-align:center; line-height: 1;
+    background: var(--pc-alpen);
+    border: 6px solid var(--pc-ink);
+    box-shadow: 12px 12px 0 var(--pc-ink);
+    transform: rotate(-8deg);
+    font-size: 28px; letter-spacing: .02em;
+    position: absolute; right: 140px; top: 140px;
+  }
+  .s-title .sticker span { display:block; font-size: 80px; margin: 8px 0; letter-spacing: -.02em; }
+  /* Background range */
+  .s-title .range {
+    position: absolute; left:0; right:0; bottom: 280px; height: 420px;
+    z-index: 1; opacity: .18; pointer-events:none;
+  }
+
+  /* ============ SLIDE 2 — SECTION DIVIDER ============ */
+  .s-section .pad { display:flex; flex-direction:column; justify-content:center; align-items:flex-start; }
+  .s-section h1 {
+    font-family: var(--pc-display); font-weight: 900;
+    font-size: 240px; line-height: .9; letter-spacing: -.03em;
+    margin: 20px 0 0;
+  }
+  .s-section h1 em { font-style: italic; color: var(--pc-mustard); }
+  .s-section .kicker { margin-bottom: 0; }
+  .s-section .num {
+    font-family: var(--pc-mono); font-weight: 700;
+    font-size: 120px; line-height: 1; color: var(--pc-mustard);
+    margin-bottom: 30px;
+  }
+  .s-section .rule {
+    width: 420px; height: 8px; background: var(--pc-mustard);
+    margin-top: 80px;
+  }
+  .s-section .note {
+    font-family: var(--pc-sans); font-size: 30px;
+    color: var(--pc-cream-50); opacity: .8;
+    margin-top: 40px; max-width: 900px; line-height: 1.35;
+  }
+  .s-section .topo-bg {
+    position:absolute; inset:0; opacity: .12; pointer-events:none;
+    background-image: repeating-radial-gradient(ellipse 160% 90% at 110% 110%,
+      transparent 0 56px, rgba(241,231,207,.55) 56px 58px);
+  }
+
+  /* ============ SLIDE 3 — COMPARISON (two-column) ============ */
+  .s-cmp .pad { padding: 96px 120px 80px; }
+  .s-cmp .title {
+    font-family: var(--pc-display); font-weight: 900;
+    font-size: 112px; line-height: .92; letter-spacing: -.03em;
+    margin: 0 0 56px; max-width: 1500px;
+  }
+  .s-cmp .title em { font-style: italic; color: var(--pc-alpen); }
+  .cmp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+  .cmp-card {
+    background: var(--pc-cream-50);
+    border: 3px solid var(--pc-ink);
+    border-radius: 28px;
+    padding: 44px 44px 40px;
+    box-shadow: 10px 10px 0 var(--pc-ink);
+    position: relative;
+  }
+  .cmp-card.forest { background: var(--pc-forest); color: var(--pc-cream-50); }
+  .cmp-card .h {
+    font-family: var(--pc-display); font-weight: 900;
+    font-size: 64px; letter-spacing: -.02em; margin: 0;
+    line-height: .95;
+  }
+  .cmp-card .region {
+    font-family: var(--pc-sans); font-size: 24px;
+    color: var(--pc-bark); margin: 12px 0 28px;
+  }
+  .cmp-card.forest .region { color: var(--pc-mustard); }
+  .cmp-card .stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
+    padding: 28px 0;
+    border-top: 2px dashed var(--pc-bark);
+    border-bottom: 2px dashed var(--pc-bark);
+  }
+  .cmp-card.forest .stats { border-color: rgba(241,231,207,.35); }
+  .cmp-card .stats .k {
+    font-family: var(--pc-sans); font-size: 16px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--pc-bark); margin-bottom: 4px;
+  }
+  .cmp-card.forest .stats .k { color: var(--pc-mustard); opacity: .9; }
+  .cmp-card .stats .v {
+    font-family: var(--pc-display); font-weight: 900; font-size: 60px; line-height: 1;
+    letter-spacing: -.01em;
+  }
+  .cmp-card .stats .v em { color: var(--pc-alpen); font-style: normal; }
+  .cmp-card.forest .stats .v em { color: var(--pc-mustard); }
+  .cmp-card .foot {
+    display:flex; justify-content: space-between; align-items: center;
+    margin-top: 28px;
+  }
+  .cmp-card .foot .bigchip {
+    font-family: var(--pc-sans); font-weight: 700;
+    font-size: 22px; letter-spacing: .14em; text-transform: uppercase;
+    padding: 10px 22px; border-radius: 999px;
+    border: 2px solid var(--pc-ink);
+  }
+  .cmp-card .foot .great { background: var(--pc-mustard); color: var(--pc-ink); }
+  .cmp-card .foot .fair  { background: var(--pc-fair); color: var(--pc-ink); border-color: var(--pc-bark-dk); }
+  .cmp-card .stamp {
+    position: absolute; top: -26px; right: 40px;
+    background: var(--pc-alpen); color: var(--pc-cream-50);
+    font-family: var(--pc-display); font-weight: 900; font-size: 26px;
+    letter-spacing: .08em; padding: 10px 20px;
+    border: 3px solid var(--pc-ink); border-radius: 999px;
+    box-shadow: 4px 4px 0 var(--pc-ink);
+    transform: rotate(-4deg);
+  }
+
+  /* ============ SLIDE 4 — BIG QUOTE ============ */
+  .s-quote .pad { display:flex; flex-direction:column; justify-content: center; padding: 120px 160px; }
+  .s-quote blockquote {
+    margin: 0;
+    font-family: var(--pc-display); font-weight: 700;
+    font-style: italic;
+    font-size: 156px; line-height: .98; letter-spacing: -0.02em;
+    color: var(--pc-cream-50);
+    max-width: 1600px;
+  }
+  .s-quote blockquote em { color: var(--pc-mustard); font-style: italic; }
+  .s-quote .mark {
+    font-family: var(--pc-display); font-weight: 900;
+    font-size: 280px; line-height: 1; color: var(--pc-alpen);
+    position: absolute; left: 90px; top: 80px;
+  }
+  .s-quote .by {
+    font-family: var(--pc-mono); font-weight: 700;
+    font-size: 26px; letter-spacing: .22em; text-transform: uppercase;
+    margin-top: 80px;
+    color: var(--pc-mustard);
+  }
+  .s-quote .by b { color: var(--pc-cream-50); font-family: var(--pc-sans); }
+
+  /* ============ SLIDE 5 — DATA ============ */
+  .s-data .pad { padding: 96px 120px 80px; }
+  .s-data .title {
+    font-family: var(--pc-display); font-weight: 900;
+    font-size: 120px; line-height: .92; letter-spacing: -.03em;
+    margin: 0 0 50px; max-width: 1500px;
+  }
+  .s-data .title em { font-style: italic; color: var(--pc-alpen); }
+  .data-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 48px; align-items: start; }
+  .big-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+  .big-stat {
+    background: var(--pc-cream-50);
+    border: 3px solid var(--pc-ink);
+    border-radius: 24px;
+    padding: 36px 40px;
+    box-shadow: 8px 8px 0 var(--pc-ink);
+  }
+  .big-stat .k {
+    font-family: var(--pc-sans); font-weight: 700; font-size: 20px;
+    letter-spacing: .18em; text-transform: uppercase; color: var(--pc-bark);
+    margin-bottom: 14px;
+  }
+  .big-stat .v {
+    font-family: var(--pc-display); font-weight: 900; font-size: 140px;
+    line-height: .9; letter-spacing: -.03em;
+  }
+  .big-stat .v em { color: var(--pc-alpen); font-style: normal; }
+  .big-stat .d {
+    font-family: var(--pc-sans); font-size: 22px; color: var(--pc-bark);
+    margin-top: 10px;
+  }
+
+  /* Bar chart */
+  .chart {
+    background: var(--pc-ink); color: var(--pc-cream-50);
+    border-radius: 24px; padding: 36px 36px 28px;
+    border: 3px solid var(--pc-ink);
+    box-shadow: 8px 8px 0 var(--pc-alpen);
+  }
+  .chart h3 {
+    font-family: var(--pc-sans); font-weight:700; font-size: 18px;
+    letter-spacing: .18em; text-transform: uppercase; color: var(--pc-mustard);
+    margin: 0 0 22px;
+  }
+  .chart .bars { display:flex; flex-direction:column; gap: 14px; }
+  .chart .bar-row { display:grid; grid-template-columns: 180px 1fr 80px; gap: 16px; align-items: center; }
+  .chart .bar-row .label {
+    font-family: var(--pc-mono); font-weight: 700; font-size: 18px;
+    letter-spacing: .08em; text-transform: uppercase;
+  }
+  .chart .bar {
+    height: 28px; border-radius: 8px;
+    background: linear-gradient(90deg, var(--pc-alpen), var(--pc-mustard));
+    border: 1.5px solid var(--pc-cream-50);
+  }
+  .chart .bar.mid { background: var(--pc-mustard); }
+  .chart .bar.lo  { background: var(--pc-bark-50); }
+  .chart .bar.hi  { background: var(--pc-alpen); }
+  .chart .v { font-family: var(--pc-display); font-weight: 900; font-size: 30px; letter-spacing: -.01em; text-align:right; }
+  .chart .foot {
+    margin-top: 20px; padding-top: 16px; border-top: 1.5px dashed rgba(241,231,207,.3);
+    font-family: var(--pc-mono); font-size: 14px; letter-spacing: .1em; color: var(--pc-mustard);
+  }
+
+  /* ============ SLIDE 6 — CLOSE / CTA ============ */
+  .s-close .pad { display:flex; flex-direction:column; justify-content:center; align-items:center;
+                  text-align:center; padding: 120px; }
+  .s-close h1 {
+    font-family: var(--pc-display); font-weight: 900;
+    font-size: 240px; line-height: .9; letter-spacing: -.03em;
+    margin: 0 0 40px;
+  }
+  .s-close h1 em { font-style: italic; color: var(--pc-alpen); }
+  .s-close .sub {
+    font-family: var(--pc-sans); font-size: 36px; color: var(--pc-bark);
+    margin-bottom: 60px; max-width: 1200px; line-height: 1.3;
+  }
+  .s-close .cta {
+    display: inline-flex; align-items: center; gap: 18px;
+    background: var(--pc-ink); color: var(--pc-cream-50);
+    font-family: var(--pc-sans); font-weight: 700; font-size: 36px;
+    padding: 28px 48px; border-radius: 999px;
+    border: 4px solid var(--pc-ink);
+    box-shadow: 10px 10px 0 var(--pc-alpen);
+  }
+  .s-close .cta em { color: var(--pc-alpen); font-style: italic; font-family: var(--pc-display); font-weight: 900; }
+  .s-close .foot {
+    position: absolute; bottom: 60px; left: 0; right: 0;
+    display:flex; justify-content: space-between; padding: 0 120px;
+    font-family: var(--pc-mono); font-size: 20px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--pc-bark);
+  }
+</style>
+</head>
+<body>
+
+<deck-stage width="1920" height="1080">
+
+  <!-- ============ SLIDE 1 · TITLE ============ -->
+  <section class="slide paper s-title" data-label="Cover">
+    <svg class="range" viewBox="0 0 1920 420" preserveAspectRatio="none">
+      <polygon points="0,420 0,260 160,200 300,240 460,140 640,220 780,150 940,230 1120,160 1280,240 1460,170 1640,240 1820,180 1920,210 1920,420"
+               fill="#2a1f14"/>
+    </svg>
+
+    <div class="top-bar">
+      <div class="brand">Peak<em>Cam</em></div>
+      <div class="slide-no">01 / 06 · BRAND DECK</div>
+    </div>
+
+    <div class="middle">
+      <div class="kicker" style="margin-bottom: 30px;">Season 25/26 — Real-time snow, live cams</div>
+      <h1>Got the<br/><em>goods.</em></h1>
+      <p class="sub">Live webcams, snow reports, base depths and trail conditions for 128 ski resorts across North America. Check it before you chuck it.</p>
+
+      <div class="sticker">POW<span>14″</span>UT · 24h</div>
+    </div>
+
+    <div class="bot-bar">
+      <div class="meta">
+        <div>peakcam.io</div>
+        <div class="s">Resort intelligence · 128 of 128</div>
+      </div>
+      <div class="meta" style="text-align:right;">
+        <div>25 / 26 SEASON</div>
+        <div class="s">V0.1 · Brand deck</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SLIDE 2 · SECTION DIVIDER ============ -->
+  <section class="slide forest s-section" data-label="Section">
+    <div class="topo-bg"></div>
+    <div class="pad">
+      <div class="num">— 02</div>
+      <div class="kicker">Chapter two · Why we built it</div>
+      <h1>Chasing<br/>the <em>storm</em>.</h1>
+      <div class="rule"></div>
+      <p class="note">Skiers check 6+ resort sites before every trip. Cam feeds buffer. Snow reports lie. We pulled it all into one page and told the truth: inches, runs, conditions. No marketing speak.</p>
+    </div>
+  </section>
+
+  <!-- ============ SLIDE 3 · COMPARISON ============ -->
+  <section class="slide paper s-cmp" data-label="Compare">
+    <div class="pad">
+      <div class="header-row">
+        <div class="kicker">Comparison · Friday 7AM MST</div>
+        <div class="slide-no">03 / 06</div>
+      </div>
+      <h2 class="title">Same state.<br/><em>Different</em> day.</h2>
+
+      <div class="cmp-grid">
+        <div class="cmp-card forest">
+          <div class="stamp">POW DAY</div>
+          <h3 class="h">Little Cottonwood</h3>
+          <p class="region">Wasatch Range · Utah</p>
+          <div class="stats">
+            <div><div class="k">Base</div><div class="v">142<span style="font-size:.55em">″</span></div></div>
+            <div><div class="k">24h</div><div class="v"><em>14″</em></div></div>
+            <div><div class="k">48h</div><div class="v">24<span style="font-size:.55em">″</span></div></div>
+            <div><div class="k">Runs</div><div class="v">87</div></div>
+          </div>
+          <div class="foot">
+            <span class="bigchip great">Great</span>
+            <span style="font-family:var(--pc-mono); font-size: 20px; letter-spacing:.12em; color: var(--pc-mustard);">LIVE · 3 CAMS</span>
+          </div>
+        </div>
+
+        <div class="cmp-card">
+          <h3 class="h">Elk Mountains</h3>
+          <p class="region">Roaring Fork · Colorado</p>
+          <div class="stats">
+            <div><div class="k">Base</div><div class="v">96<span style="font-size:.55em">″</span></div></div>
+            <div><div class="k">24h</div><div class="v">2<span style="font-size:.55em">″</span></div></div>
+            <div><div class="k">48h</div><div class="v">4<span style="font-size:.55em">″</span></div></div>
+            <div><div class="k">Runs</div><div class="v">54</div></div>
+          </div>
+          <div class="foot">
+            <span class="bigchip fair">Fair</span>
+            <span style="font-family:var(--pc-mono); font-size: 20px; letter-spacing:.12em; color: var(--pc-bark);">LIVE · 4 CAMS</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SLIDE 4 · BIG QUOTE ============ -->
+  <section class="slide ink s-quote" data-label="Quote">
+    <div class="mark">&ldquo;</div>
+    <div class="pad">
+      <blockquote>Checked the cam at<br/>6am. Lift's <em>spinning</em>.<br/>Left my desk at 6:02.</blockquote>
+      <div class="by"><b>Maya R.</b> &nbsp;·&nbsp; Salt Lake City, UT &nbsp;·&nbsp; Beta user since Oct '25</div>
+    </div>
+  </section>
+
+  <!-- ============ SLIDE 5 · DATA ============ -->
+  <section class="slide paper s-data" data-label="Data">
+    <div class="pad">
+      <div class="header-row">
+        <div class="kicker">Season to date · 25/26</div>
+        <div class="slide-no">05 / 06</div>
+      </div>
+      <h2 class="title">The numbers<br/>are <em>stacked</em>.</h2>
+
+      <div class="data-grid">
+        <div class="big-stats">
+          <div class="big-stat">
+            <div class="k">Resorts live</div>
+            <div class="v"><em>128</em></div>
+            <div class="d">North America · US &amp; Canada</div>
+          </div>
+          <div class="big-stat">
+            <div class="k">Pow-day alerts sent</div>
+            <div class="v">41K</div>
+            <div class="d">6″+ overnight · since Dec 1</div>
+          </div>
+          <div class="big-stat">
+            <div class="k">Weekly actives</div>
+            <div class="v">72K</div>
+            <div class="d">+38% vs. last season</div>
+          </div>
+          <div class="big-stat">
+            <div class="k">Avg. daily checks</div>
+            <div class="v">5.4<span style="font-size:.5em">×</span></div>
+            <div class="d">Per user · Fri–Sun</div>
+          </div>
+        </div>
+
+        <div class="chart">
+          <h3>Top 24h snowfall · this week</h3>
+          <div class="bars">
+            <div class="bar-row"><div class="label">UT · Cottonwood</div><div class="bar hi" style="width: 100%"></div><div class="v">14″</div></div>
+            <div class="bar-row"><div class="label">WA · Crystal</div><div class="bar hi" style="width: 78%"></div><div class="v">11″</div></div>
+            <div class="bar-row"><div class="label">BC · Whistler</div><div class="bar mid" style="width: 64%"></div><div class="v">9″</div></div>
+            <div class="bar-row"><div class="label">VT · Jay Peak</div><div class="bar mid" style="width: 57%"></div><div class="v">8″</div></div>
+            <div class="bar-row"><div class="label">CA · June Mtn</div><div class="bar lo" style="width: 21%"></div><div class="v">3″</div></div>
+            <div class="bar-row"><div class="label">CO · Elk Mtns</div><div class="bar lo" style="width: 14%"></div><div class="v">2″</div></div>
+          </div>
+          <div class="foot">Week of Feb 2–8 · 25/26 · source: PeakCam telemetry</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SLIDE 6 · CLOSE ============ -->
+  <section class="slide paper s-close" data-label="Close">
+    <div class="pad">
+      <div class="kicker" style="margin-bottom: 40px;">One tab. Every mountain.</div>
+      <h1>Lift's<br/><em>spinning</em>.</h1>
+      <p class="sub">Real-time powder alerts, base depths, and live cams for 128 North American ski resorts. Set a watchlist, get pinged, go.</p>
+
+      <div class="cta">Start your watchlist → <em>peakcam.io</em></div>
+
+      <div class="foot">
+        <div>&copy; 25/26 PEAKCAM</div>
+        <div>BRAND DECK · V0.1</div>
+        <div>06 / 06</div>
+      </div>
+    </div>
+  </section>
+
+</deck-stage>
+
+</body>
+</html>

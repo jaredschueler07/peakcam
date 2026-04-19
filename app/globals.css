@@ -1,51 +1,147 @@
 @import "tailwindcss";
 @config "../tailwind.config.ts";
 
-/* ── Root variables (Summit Light) ── */
+/* ── PeakCam design tokens — retro ski poster, earth + snow ── */
 :root {
-  --bg:          #080D14;
-  --surface:     #0E1825;
-  --surface2:    #0D1F35;
-  --surface3:    #1A2840;
-  --border:      rgba(232, 240, 248, 0.1);
-  --border-hi:   rgba(232, 240, 248, 0.2);
-  --cyan:        #60C8FF;
-  --cyan-dim:    rgba(96, 200, 255, 0.1);
-  --cyan-mid:    rgba(96, 200, 255, 0.2);
-  --alpenglow:   #FF7B5E;
-  --snow:        #60C8FF;
-  --powder:      #2ECC8F;
-  --text-base:   #E8F0F8;
-  --text-subtle: #8AA3BE;
-  --text-muted:  #4A6480;
+  /* Paper / cream */
+  --pc-cream-50:   #faf4e6;
+  --pc-cream:      #f1e7cf;
+  --pc-cream-dk:   #e3d5b2;
+
+  /* Bark */
+  --pc-bark-50:    #b59b74;
+  --pc-bark:       #7a5a3a;
+  --pc-bark-dk:    #4a3620;
+  --pc-ink:        #2a1f14;
+
+  /* Forest */
+  --pc-forest-50:  #8aa37a;
+  --pc-forest:     #3c5a3a;
+  --pc-forest-dk:  #1f3322;
+
+  /* Sky / snow */
+  --pc-sky:        #c9d9d6;
+  --pc-sky-dk:     #6c8a88;
+  --pc-snow:       #ffffff;
+
+  /* Alpenglow */
+  --pc-alpen:      #d9552f;
+  --pc-alpen-dk:   #a93f20;
+  --pc-mustard:    #e2a740;
+
+  /* Condition semantics */
+  --pc-great:      #3c5a3a;
+  --pc-good:       #6d8a4a;
+  --pc-fair:       #e2a740;
+  --pc-poor:       #a93f20;
+
+  /* Type */
+  --pc-display: var(--font-fraunces), 'Recoleta', Georgia, serif;
+  --pc-sans:    var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --pc-mono:    var(--font-jetbrains), ui-monospace, Menlo, monospace;
+
+  /* Radii */
+  --pc-r-sm: 4px;
+  --pc-r-md: 10px;
+  --pc-r-lg: 18px;
+  --pc-r-pill: 999px;
+
+  /* Stamp shadows */
+  --pc-stamp:      3px 3px 0 var(--pc-ink);
+  --pc-stamp-lg:   6px 6px 0 var(--pc-ink);
+  --pc-stamp-sm:   2px 2px 0 var(--pc-ink);
+  --pc-stamp-alpen: 3px 3px 0 var(--pc-alpen-dk);
+
+  /* Soft shadow */
+  --pc-soft: 0 8px 24px -12px rgba(42,31,20,.35);
+
+  /* Borders */
+  --pc-border:      1.5px solid var(--pc-ink);
+  --pc-border-thin: 1px solid var(--pc-bark);
+
+  /* Paper grain */
+  --pc-grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .16  0 0 0 0 .12  0 0 0 0 .08  0 0 0 .18 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
 }
 
 /* ── Base ── */
 *, *::before, *::after { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body {
-  font-family: var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  background: var(--bg);
-  color: var(--text-base);
+  font-family: var(--pc-sans);
+  background: var(--pc-cream);
+  color: var(--pc-ink);
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+  line-height: 1.45;
 }
 
-/* ── Noise texture overlay (applied to sections that need it) ── */
+/* ── Paper + topo backgrounds ── */
+.pc-paper {
+  background-color: var(--pc-cream);
+  background-image:
+    var(--pc-grain),
+    radial-gradient(1200px 600px at 10% -10%, rgba(217,85,47,.06), transparent 60%),
+    radial-gradient(900px 500px at 110% 10%, rgba(60,90,58,.08), transparent 60%);
+  background-size: 160px 160px, auto, auto;
+}
+
+.pc-topo {
+  background-color: var(--pc-cream);
+  background-image:
+    repeating-radial-gradient(ellipse 120% 80% at 50% 100%,
+      transparent 0 22px,
+      rgba(74,54,32,.11) 22px 23px),
+    var(--pc-grain);
+  background-size: auto, 160px 160px;
+}
+
+.pc-grain {
+  background-image: var(--pc-grain);
+  background-size: 160px 160px;
+}
+
+/* ── Type utilities ── */
+.pc-display {
+  font-family: var(--pc-display);
+  font-weight: 900;
+  font-optical-sizing: auto;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+}
+.pc-display--italic { font-style: italic; font-weight: 700; }
+
+.pc-eyebrow {
+  font-family: var(--pc-sans);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 12px;
+  color: var(--pc-bark);
+}
+
+.pc-mono {
+  font-family: var(--pc-mono);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Legacy noise overlay (kept for components that use it) */
 .noise-overlay::before {
   content: '';
   position: absolute;
   inset: 0;
-  opacity: 0.04;
+  opacity: 0.06;
   pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-image: var(--pc-grain);
+  background-size: 160px 160px;
 }
 
 /* ── Scrollbars ── */
-::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(232, 240, 248, 0.1); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(232, 240, 248, 0.2); }
+::-webkit-scrollbar-thumb { background: rgba(42,31,20,.2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(42,31,20,.4); }
 
 /* ── Animations ── */
 @keyframes fadeIn    { from { opacity: 0 }                              to { opacity: 1 } }
@@ -58,51 +154,52 @@ body {
 .animate-livePulse { animation: livePulse 2s   infinite; }
 .animate-blink     { animation: blink     1.5s ease infinite; }
 
-/* ── MapLibre dark popup overrides (Summit Light) ── */
+/* ── MapLibre popup overrides (cream paper) ── */
 .peakcam-maplibre-popup .maplibregl-popup-content {
-  background: #0E1825 !important;
-  border: 1px solid rgba(232, 240, 248, 0.15) !important;
+  background: var(--pc-cream-50) !important;
+  border: 1.5px solid var(--pc-ink) !important;
   border-radius: 12px !important;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6) !important;
+  box-shadow: var(--pc-stamp) !important;
   padding: 16px !important;
-  color: #E8F0F8 !important;
+  color: var(--pc-ink) !important;
 }
 .peakcam-maplibre-popup .maplibregl-popup-tip {
-  border-top-color: #0E1825 !important;
+  border-top-color: var(--pc-cream-50) !important;
 }
 .peakcam-maplibre-popup .maplibregl-popup-close-button {
-  color: #4A6480 !important;
+  color: var(--pc-bark) !important;
   font-size: 18px !important;
   right: 8px !important;
   top: 8px !important;
 }
 .peakcam-maplibre-popup .maplibregl-popup-close-button:hover {
-  color: #E8F0F8 !important;
+  color: var(--pc-ink) !important;
   background: transparent !important;
 }
 
-/* ── MapLibre control overrides ── */
+/* ── MapLibre control overrides (cream paper) ── */
 .maplibregl-ctrl-group {
-  background: #0E1825 !important;
-  border: 1px solid rgba(232, 240, 248, 0.1) !important;
+  background: var(--pc-cream-50) !important;
+  border: 1.5px solid var(--pc-ink) !important;
   border-radius: 8px !important;
+  box-shadow: var(--pc-stamp-sm) !important;
   overflow: hidden;
 }
 .maplibregl-ctrl-group button {
   background: transparent !important;
-  border-color: rgba(232, 240, 248, 0.1) !important;
+  border-color: rgba(42,31,20,.15) !important;
 }
 .maplibregl-ctrl-group button:hover {
-  background: #1A2840 !important;
+  background: var(--pc-cream-dk) !important;
 }
 .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
-  filter: invert(1) brightness(0.85);
+  filter: none;
 }
 .maplibregl-ctrl-attrib {
-  background: rgba(8, 13, 20, 0.7) !important;
-  color: #4A6480 !important;
+  background: rgba(241,231,207,.85) !important;
+  color: var(--pc-bark) !important;
   font-size: 10px !important;
 }
 .maplibregl-ctrl-attrib a {
-  color: #4A6480 !important;
+  color: var(--pc-bark-dk) !important;
 }
