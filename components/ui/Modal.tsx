@@ -25,41 +25,43 @@ export function Modal({ open, onClose, title, children, footer }: ModalProps) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-6
-        bg-black/88 backdrop-blur-sm animate-fadeIn"
+        bg-ink/70 backdrop-blur-sm animate-fadeIn"
       onClick={(e) => e.target === e.currentTarget && onClose()}
       aria-modal="true"
       role="dialog"
     >
-      <div className="w-full max-w-3xl bg-surface2 border border-border-hi
-        rounded-xl overflow-hidden animate-slideUp">
+      <div className="w-full max-w-3xl bg-cream-50 border-[1.5px] border-ink
+        rounded-[18px] overflow-hidden animate-slideUp shadow-stamp-lg">
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+        {/* Header — ink bar, cream text, alpen LIVE stamp */}
+        <div className="flex items-center justify-between px-5 py-4 bg-ink text-cream-50 border-b-[1.5px] border-ink">
           <div className="flex items-center gap-2.5">
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded
-              bg-red-950/40 text-red-400 border border-red-400/30 tracking-wide">
-              ● LIVE
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full
+              bg-alpen text-cream-50 border-[1.5px] border-ink uppercase tracking-[0.14em] shadow-[2px_2px_0_#2a1f14]">
+              <span className="w-1.5 h-1.5 rounded-full bg-cream-50 animate-pulse-live" />
+              Live
             </span>
-            <span className="text-[15px] font-bold tracking-tight">{title}</span>
+            <span className="font-display font-black text-[18px] tracking-[-0.01em]">{title}</span>
           </div>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="w-7 h-7 flex items-center justify-center rounded-md
-              bg-surface3 border border-border text-text-muted text-base
-              hover:text-text-base hover:bg-border transition-colors duration-150"
+            className="w-8 h-8 flex items-center justify-center rounded-full
+              bg-cream-50 text-ink border-[1.5px] border-ink text-lg font-bold
+              hover:bg-alpen hover:text-cream-50 transition-colors duration-150
+              shadow-[2px_2px_0_#2a1f14]"
           >
             ×
           </button>
         </div>
 
         {/* Body */}
-        <div>{children}</div>
+        <div className="bg-cream-50">{children}</div>
 
         {/* Footer */}
         {footer && (
           <div className="flex items-center justify-between px-5 py-3.5
-            border-t border-border">
+            bg-cream border-t-[1.5px] border-dashed border-bark">
             {footer}
           </div>
         )}

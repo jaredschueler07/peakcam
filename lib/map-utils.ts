@@ -81,11 +81,12 @@ export function resortsToGeoJSON(
 
 // ── Condition Colors ─────────────────────────────────────────
 
+// Earth palette — matches MapView markers and ConditionBadge
 const CONDITION_COLORS: Record<ConditionRating, string> = {
-  great: "#2ECC8F",
-  good: "#60C8FF",
-  fair: "#8AA3BE",
-  poor: "#f87171",
+  great: "#3c5a3a",   // pc-forest
+  good:  "#6d8a4a",   // pc-good (moss)
+  fair:  "#e2a740",   // pc-mustard
+  poor:  "#a93f20",   // pc-alpen-dk
 };
 
 export function conditionColor(rating: ConditionRating): string {

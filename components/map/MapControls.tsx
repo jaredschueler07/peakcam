@@ -16,6 +16,7 @@ interface MapControlsProps {
   className?: string;
 }
 
+// Poster map controls — stamped cream pills on paper
 export default function MapControls({
   metric,
   onMetricChange,
@@ -30,17 +31,17 @@ export default function MapControls({
   return (
     <div className={`absolute z-10 flex flex-col gap-2 ${positionClass}`}>
       {/* Metric toggle row */}
-      <div className="flex bg-surface/90 backdrop-blur-md rounded-lg p-1 gap-0.5">
+      <div className="flex bg-cream-50 border-[1.5px] border-ink rounded-full p-1 gap-0.5 shadow-stamp-sm">
         {METRICS.map((m) => {
           const isActive = metric === m;
           return (
             <button
               key={m}
               onClick={() => onMetricChange(m)}
-              className={`px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors duration-220 ${
+              className={`px-3 py-1 text-[11.5px] font-bold rounded-full border-[1.5px] transition-colors duration-150 uppercase tracking-[0.06em] ${
                 isActive
-                  ? "bg-cyan/20 text-cyan border-cyan/30"
-                  : "border-transparent text-text-muted hover:text-text-subtle"
+                  ? "bg-ink text-cream-50 border-ink"
+                  : "border-transparent text-bark hover:text-ink"
               }`}
             >
               {metricLabel(m)}
@@ -53,14 +54,14 @@ export default function MapControls({
       {radarAvailable && (
         <button
           onClick={onToggleRadar}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors duration-220 ${
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border-[1.5px] text-[11.5px] font-bold uppercase tracking-[0.06em] transition-[transform,box-shadow] duration-100 ${
             showRadar
-              ? "bg-alpenglow/20 text-alpenglow"
-              : "bg-surface/90 text-text-muted hover:text-text-subtle"
+              ? "bg-alpen text-cream-50 border-ink shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]"
+              : "bg-cream-50 text-ink border-ink shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]"
           }`}
         >
-          <WeatherIcon condition={showRadar ? "rain" : "cloudy"} size={16} />
-          Radar {showRadar ? "ON" : "OFF"}
+          <WeatherIcon condition={showRadar ? "rain" : "cloudy"} size={14} />
+          Radar {showRadar ? "on" : "off"}
         </button>
       )}
     </div>

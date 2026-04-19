@@ -1,28 +1,29 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { Inter, Bebas_Neue, JetBrains_Mono } from "next/font/google";
+import { Fraunces, DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ClientProviders } from "./client-providers";
 
-const inter = Inter({
+const fraunces = Fraunces({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-inter",
+  weight: ["500", "700", "900"],
+  style: ["normal", "italic"],
+  variable: "--font-fraunces",
   display: "swap",
 });
 
-const bebasNeue = Bebas_Neue({
+const dmSans = DM_Sans({
   subsets: ["latin"],
-  weight: "400",
-  variable: "--font-bebas",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-dm-sans",
   display: "swap",
 });
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["500", "700"],
   variable: "--font-jetbrains",
   display: "swap",
 });
@@ -96,11 +97,11 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${bebasNeue.variable} ${jetbrainsMono.variable}`}>
-      <body className={`${inter.className} antialiased`}>
+    <html lang="en" className={`${fraunces.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}>
+      <body className={`${dmSans.className} antialiased`}>
         <a href="#main-content"
            className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100]
-                      focus:px-4 focus:py-2 focus:bg-cyan focus:text-bg focus:rounded-lg focus:text-sm focus:font-semibold">
+                      focus:px-4 focus:py-2 focus:bg-forest focus:text-cream-50 focus:rounded-full focus:text-sm focus:font-semibold focus:shadow-stamp">
           Skip to main content
         </a>
         <script

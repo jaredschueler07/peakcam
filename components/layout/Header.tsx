@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import type { User } from "@supabase/supabase-js";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Search } from "lucide-react";
 
 interface HeaderProps {
   onSearch?: (query: string) => void;
@@ -58,39 +58,39 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
   }
 
   return (
-    <header className="sticky top-0 z-50 h-[60px] flex items-center gap-5 px-7
-      bg-bg/88 backdrop-blur-md border-b border-border">
+    <header className="sticky top-0 z-50 h-[64px] flex items-center gap-5 px-6 md:px-7
+      bg-ink text-cream-50 border-b-[1.5px] border-ink">
 
-      {/* Logo */}
+      {/* Logo — Fraunces display, italic, PEAK cream + CAM alpen */}
       <Link href="/" className="flex items-center flex-shrink-0 group">
-        <span className="font-heading font-bold tracking-wider text-lg text-text-base group-hover:opacity-85 transition-opacity duration-150">
-          PEAK<span className="text-cyan">CAM</span>
+        <span className="font-display italic font-black text-[22px] tracking-tight leading-none group-hover:opacity-90 transition-opacity duration-150">
+          <span className="text-cream-50">Peak</span>
+          <span className="text-alpen">Cam</span>
         </span>
       </Link>
 
-      {/* Search */}
+      {/* Search — cream bg, ink border, stamp shadow, pill radius */}
       {showSearch && (
-        <div className="flex-1 max-w-[400px] relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm pointer-events-none">
-            🔍
-          </span>
+        <div className="flex-1 max-w-[420px] relative hidden sm:block">
+          <Search size={15} strokeWidth={2.5}
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-bark pointer-events-none" />
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={handleChange}
             placeholder="Search resorts, states, regions…"
-            className="w-full bg-surface2 border border-border rounded-[10px]
-              pl-9 pr-8 py-[9px] text-[13.5px] font-['Inter'] text-text-base
-              placeholder:text-text-muted outline-none
-              transition-all duration-[220ms]
-              focus:border-cyan focus:bg-surface3"
+            className="w-full bg-cream-50 border-[1.5px] border-ink
+              rounded-full shadow-[2px_2px_0_#2a1f14]
+              pl-10 pr-9 py-2 text-[13.5px] text-ink placeholder:text-bark
+              outline-none transition-shadow duration-100
+              focus:shadow-[3px_3px_0_#a93f20] focus:border-alpen-dk"
           />
           {query && (
             <button
               onClick={clearSearch}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted
-                text-base px-1 hover:text-text-base transition-colors duration-150"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-bark
+                text-lg px-1 hover:text-ink transition-colors duration-150"
               aria-label="Clear search"
             >
               ×
@@ -100,17 +100,18 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
       )}
 
       {/* Desktop Nav */}
-      <nav className="hidden md:flex items-center gap-0.5 ml-auto flex-shrink-0">
+      <nav className="hidden md:flex items-center gap-1 ml-auto flex-shrink-0">
         {navLinks.filter((link) => !("authOnly" in link && link.authOnly) || user).map((link) => (
           <Link
             key={link.href}
             href={link.href}
             className={`
-              px-3 py-1.5 rounded text-[13px] font-medium whitespace-nowrap
-              transition-all duration-150
+              px-3.5 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap
+              tracking-wide
+              transition-colors duration-150
               ${pathname === link.href
-                ? "text-cyan"
-                : "text-text-muted hover:text-text-subtle hover:bg-surface2"}
+                ? "text-alpen"
+                : "text-cream-50/80 hover:text-cream-50 hover:bg-cream-50/10"}
             `}
           >
             {link.label}
@@ -121,8 +122,8 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
         {user ? (
           <button
             onClick={handleSignOut}
-            className="ml-1 px-3 py-1.5 rounded text-[13px] font-medium whitespace-nowrap
-              text-text-muted hover:text-text-subtle hover:bg-surface2 transition-all duration-150"
+            className="ml-1 px-3.5 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap
+              text-cream-50/80 hover:text-cream-50 hover:bg-cream-50/10 transition-colors duration-150"
             title={user.email ?? "Signed in"}
           >
             Sign out
@@ -130,8 +131,12 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
         ) : (
           <Link
             href={`/auth?next=${encodeURIComponent(pathname)}`}
-            className="ml-1 px-3 py-1.5 rounded text-[13px] font-semibold whitespace-nowrap
-              text-cyan border border-cyan/30 hover:bg-cyan-dim transition-all duration-150"
+            className="ml-2 px-4 py-1.5 rounded-full text-[13px] font-bold whitespace-nowrap
+              bg-alpen text-cream-50 border-[1.5px] border-ink
+              shadow-[2px_2px_0_#faf4e6] hover:shadow-[3px_3px_0_#faf4e6]
+              hover:-translate-x-[1px] hover:-translate-y-[1px]
+              active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_#faf4e6]
+              transition-all duration-100"
             title="Sign in to save favorites, set powder alerts, and submit reports"
           >
             Sign in
@@ -140,8 +145,8 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
       </nav>
 
       {/* Mobile Menu Toggle */}
-      <button 
-        className="md:hidden ml-auto p-2 text-text-muted hover:text-text-base flex-shrink-0"
+      <button
+        className="md:hidden ml-auto p-2 text-cream-50/80 hover:text-cream-50 flex-shrink-0"
         onClick={() => setIsMenuOpen(!isMenuOpen)}
         aria-label="Toggle menu"
       >
@@ -150,33 +155,37 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
 
       {/* Mobile Menu Overlay */}
       {isMenuOpen && (
-        <div className="absolute top-[60px] left-0 right-0 bg-surface/98 backdrop-blur-md border-b border-border shadow-lg p-4 flex flex-col gap-2 md:hidden">
+        <div className="absolute top-[64px] left-0 right-0 bg-ink border-b-[1.5px] border-ink shadow-lg p-4 flex flex-col gap-1 md:hidden">
           {navLinks.filter((link) => !("authOnly" in link && link.authOnly) || user).map((link) => (
             <Link
               key={link.href}
               href={link.href}
               className={`
-                px-4 py-3 rounded-lg text-sm font-medium
-                ${pathname === link.href ? "text-cyan bg-cyan/10" : "text-text-base hover:bg-surface2"}
+                px-4 py-3 rounded-full text-sm font-semibold
+                ${pathname === link.href
+                  ? "text-alpen bg-cream-50/10"
+                  : "text-cream-50 hover:bg-cream-50/10"}
               `}
             >
               {link.label}
             </Link>
           ))}
-          
-          <div className="h-px bg-border my-2" />
-          
+
+          <div className="h-px bg-cream-50/15 my-2" />
+
           {user ? (
             <button
               onClick={() => { handleSignOut(); setIsMenuOpen(false); }}
-              className="px-4 py-3 rounded-lg text-sm font-medium text-left text-text-muted hover:bg-surface2"
+              className="px-4 py-3 rounded-full text-sm font-semibold text-left text-cream-50/80 hover:bg-cream-50/10"
             >
               Sign out ({user.email})
             </button>
           ) : (
             <Link
               href={`/auth?next=${encodeURIComponent(pathname)}`}
-              className="px-4 py-3 rounded-lg text-sm font-semibold text-center text-bg bg-cyan hover:bg-cyan/90 transition-colors"
+              className="px-4 py-3 rounded-full text-sm font-bold text-center
+                bg-alpen text-cream-50 border-[1.5px] border-cream-50
+                shadow-[2px_2px_0_#faf4e6]"
             >
               Sign in
             </Link>

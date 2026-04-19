@@ -9,6 +9,7 @@ interface LiveWebcamsProps {
   cams: Cam[];
 }
 
+// Poster "Live feeds" — paper section, Fraunces headline with alpen italic, stamped cam tiles
 export function LiveWebcams({ cams }: LiveWebcamsProps) {
   const [loadedCams, setLoadedCams] = useState<Set<string>>(new Set());
 
@@ -22,28 +23,24 @@ export function LiveWebcams({ cams }: LiveWebcamsProps) {
   const secondaryCams = cams.slice(1);
 
   return (
-    <section className="relative py-20 px-6 bg-gradient-to-br from-surface2 via-surface to-bg">
-      {/* Background "LIVE FEEDS" watermark */}
-      <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
-        <span className="text-[12rem] md:text-[20rem] font-display text-text-base opacity-[0.03] select-none whitespace-nowrap">
-          LIVE FEEDS
-        </span>
-      </div>
-
+    <section className="relative py-20 px-6 pc-topo">
+      {/* Masthead */}
       <div className="relative max-w-7xl mx-auto">
-        {/* Section Header */}
         <div className="mb-12 text-center">
-          <h2 className="text-5xl md:text-6xl font-display text-text-base mb-4">
-            LIVE FEEDS
+          <div className="pc-eyebrow mb-3" style={{ color: "var(--pc-bark)" }}>
+            Live from the mountain
+          </div>
+          <h2 className="font-display font-black text-5xl md:text-6xl text-ink leading-[0.95] tracking-[-0.02em]">
+            Live <em className="text-alpen italic font-bold">feeds</em>.
           </h2>
-          <p className="text-text-subtle text-lg">
-            Real-time conditions from the mountain
+          <p className="text-bark text-lg mt-3">
+            Real-time conditions from 128 resorts across North America.
           </p>
         </div>
 
-        {/* Webcam Grid */}
+        {/* Webcam grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Hero camera - full width */}
+          {/* Hero camera — full width */}
           <div className="md:col-span-2">
             <WebcamTile
               cam={heroCam}
@@ -86,13 +83,15 @@ function WebcamTile({
 
   return (
     <motion.div
-      className="group relative aspect-video rounded-lg overflow-hidden cursor-pointer border border-border hover:border-cyan/50 transition-all duration-slow"
+      className="group relative aspect-video rounded-[18px] overflow-hidden cursor-pointer
+                 bg-cream-50 border-[1.5px] border-ink shadow-stamp
+                 hover:shadow-stamp-hover transition-shadow duration-150"
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      whileHover={{ y: -4 }}
+      whileHover={{ y: -2, x: -1 }}
     >
-      {/* Loaded state: show actual embed */}
+      {/* Loaded state: actual embed */}
       {isLoaded && embedSrc && (
         <iframe
           src={embedSrc}
@@ -103,37 +102,48 @@ function WebcamTile({
         />
       )}
 
-      {/* Unloaded overlay */}
+      {/* Unloaded poster overlay */}
       {!isLoaded && (
         <motion.div
-          className="absolute inset-0 bg-surface/95 backdrop-blur-sm flex flex-col items-center justify-center gap-4"
+          className="absolute inset-0 bg-cream flex flex-col items-center justify-center gap-4
+                     bg-[image:var(--pc-grain)] bg-[length:160px_160px]"
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          <Camera className="text-text-subtle" size={isHero ? 64 : 48} />
-          <div className="text-center">
-            <h3 className="text-text-base text-2xl mb-2">{cam.name}</h3>
+          <span className="inline-flex items-center justify-center rounded-full
+                         bg-cream-50 border-[1.5px] border-ink shadow-stamp-sm p-3">
+            <Camera className="text-ink" size={isHero ? 40 : 32} strokeWidth={2} />
+          </span>
+          <div className="text-center px-4">
+            <h3 className="font-display font-black text-ink text-2xl leading-tight">{cam.name}</h3>
             {cam.elevation && (
-              <div className="px-3 py-1 bg-text-base/10 border border-border-hi rounded-full text-text-subtle text-sm inline-block mb-4">
+              <span className="mt-2 inline-block font-mono font-bold text-[10.5px] px-2.5 py-0.5
+                               rounded-full bg-ink text-cream-50 uppercase tracking-[0.14em]">
                 {cam.elevation}
-              </div>
+              </span>
             )}
           </div>
           <button
             onClick={onLoad}
-            className="px-6 py-3 bg-cyan-dim hover:bg-cyan-mid border border-cyan/50 rounded-lg text-cyan font-semibold flex items-center gap-2 transition-colors duration-base"
+            className="inline-flex items-center gap-2 px-5 py-2.5
+                       bg-alpen text-cream-50 font-semibold text-[14px]
+                       rounded-full border-[1.5px] border-ink shadow-stamp
+                       hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]
+                       transition-[transform,box-shadow] duration-100"
           >
-            <Play size={20} />
-            LOAD LIVE FEED
+            <Play size={16} />
+            Load live feed
           </button>
         </motion.div>
       )}
 
-      {/* Live indicator on loaded cams */}
+      {/* Live indicator on loaded cams — alpen stamp pill */}
       {isLoaded && (
-        <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-2 bg-surface/80 backdrop-blur-sm rounded-lg border-t-2 border-alpenglow">
-          <div className="w-2 h-2 bg-alpenglow rounded-full animate-pulse-live" />
-          <span className="text-text-base text-sm font-semibold">LIVE</span>
+        <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-0.5
+                        bg-alpen text-cream-50 border-[1.5px] border-ink rounded-full
+                        shadow-[2px_2px_0_#2a1f14] font-bold text-[11px] uppercase tracking-[0.14em]">
+          <span className="w-1.5 h-1.5 bg-cream-50 rounded-full animate-pulse-live" />
+          Live
         </div>
       )}
     </motion.div>

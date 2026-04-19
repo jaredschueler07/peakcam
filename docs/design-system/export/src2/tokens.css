@@ -1,0 +1,222 @@
+/* =========================================================
+   PeakCam — design tokens
+   Retro ski poster · earth + snow · humanist type
+   ========================================================= */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;0,9..144,900;1,9..144,700&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap');
+
+:root {
+  /* -------- Palette: earth + snow --------------------------------- */
+  /* Paper / cream */
+  --pc-cream-50:   #faf4e6;   /* lightest paper */
+  --pc-cream:      #f1e7cf;   /* body bg */
+  --pc-cream-dk:   #e3d5b2;   /* hairline / card edge */
+
+  /* Bark */
+  --pc-bark-50:    #b59b74;
+  --pc-bark:       #7a5a3a;
+  --pc-bark-dk:    #4a3620;
+  --pc-ink:        #2a1f14;   /* body text, ink-stamp black-brown */
+
+  /* Forest */
+  --pc-forest-50:  #8aa37a;
+  --pc-forest:     #3c5a3a;   /* primary */
+  --pc-forest-dk:  #1f3322;
+
+  /* Sky / snow */
+  --pc-sky:        #c9d9d6;   /* cool grey-blue */
+  --pc-sky-dk:     #6c8a88;
+  --pc-snow:       #ffffff;
+
+  /* Alpenglow — single hot accent */
+  --pc-alpen:      #d9552f;   /* persimmon */
+  --pc-alpen-dk:   #a93f20;
+  --pc-mustard:    #e2a740;   /* secondary accent, for condition=GOOD */
+
+  /* Condition semantics (Great/Good/Fair/Poor) */
+  --pc-great:      #3c5a3a;   /* forest */
+  --pc-good:       #6d8a4a;   /* moss */
+  --pc-fair:       #e2a740;   /* mustard */
+  --pc-poor:       #a93f20;   /* alpen-dk */
+
+  /* -------- Type -------------------------------------------------- */
+  --pc-display: 'Fraunces', 'Recoleta', Georgia, serif;
+  --pc-sans:    'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --pc-mono:    'JetBrains Mono', ui-monospace, Menlo, monospace;
+
+  /* -------- Radii, shadow, spacing ------------------------------- */
+  --pc-r-sm: 4px;
+  --pc-r-md: 10px;
+  --pc-r-lg: 18px;
+  --pc-r-pill: 999px;
+
+  /* "Stamped" shadow — hard offset, no blur, for poster feel */
+  --pc-stamp:    3px 3px 0 var(--pc-ink);
+  --pc-stamp-lg: 6px 6px 0 var(--pc-ink);
+  --pc-stamp-alpen: 3px 3px 0 var(--pc-alpen-dk);
+
+  /* Soft shadow for lifted cards (used sparingly) */
+  --pc-soft: 0 8px 24px -12px rgba(42,31,20,.35);
+
+  /* Hairline border */
+  --pc-border: 1.5px solid var(--pc-ink);
+  --pc-border-thin: 1px solid var(--pc-bark);
+
+  /* Grain + topo textures — reusable backgrounds */
+  --pc-grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .16  0 0 0 0 .12  0 0 0 0 .08  0 0 0 .18 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* -------- Base ---------------------------------------------------- */
+html, body {
+  background: var(--pc-cream);
+  color: var(--pc-ink);
+  font-family: var(--pc-sans);
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Paper background utility */
+.pc-paper {
+  background-color: var(--pc-cream);
+  background-image:
+    var(--pc-grain),
+    radial-gradient(1200px 600px at 10% -10%, rgba(217,85,47,.06), transparent 60%),
+    radial-gradient(900px 500px at 110% 10%, rgba(60,90,58,.08), transparent 60%);
+  background-size: 160px 160px, auto, auto;
+}
+
+/* Topo-line background — concentric contour curves */
+.pc-topo {
+  background-color: var(--pc-cream);
+  background-image:
+    repeating-radial-gradient(ellipse 120% 80% at 50% 100%,
+      transparent 0 22px,
+      rgba(74,54,32,.11) 22px 23px),
+    var(--pc-grain);
+  background-size: auto, 160px 160px;
+}
+
+/* -------- Type specimens ----------------------------------------- */
+.pc-display {
+  font-family: var(--pc-display);
+  font-weight: 900;
+  font-style: normal;
+  font-optical-sizing: auto;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+}
+.pc-display--italic { font-style: italic; font-weight: 700; }
+
+.pc-eyebrow {
+  font-family: var(--pc-sans);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 12px;
+  color: var(--pc-bark);
+}
+
+.pc-mono {
+  font-family: var(--pc-mono);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------- Buttons ------------------------------------------------- */
+.pc-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--pc-sans);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  padding: 12px 20px;
+  border-radius: var(--pc-r-pill);
+  border: var(--pc-border);
+  background: var(--pc-snow);
+  color: var(--pc-ink);
+  box-shadow: var(--pc-stamp);
+  cursor: pointer;
+  transition: transform .08s ease, box-shadow .08s ease;
+  text-decoration: none;
+}
+.pc-btn:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--pc-ink); }
+.pc-btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--pc-ink); }
+
+.pc-btn--primary { background: var(--pc-forest); color: var(--pc-cream-50); }
+.pc-btn--accent  { background: var(--pc-alpen);  color: var(--pc-cream-50); }
+.pc-btn--ghost   { background: transparent; box-shadow: none; }
+.pc-btn--ghost:hover { background: rgba(42,31,20,.06); transform: none; box-shadow: none; }
+.pc-btn--sm { padding: 7px 14px; font-size: 13px; }
+
+/* -------- Chip / badge ------------------------------------------- */
+.pc-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--pc-sans);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 5px 11px;
+  border-radius: var(--pc-r-pill);
+  border: var(--pc-border-thin);
+  background: var(--pc-cream-50);
+  color: var(--pc-ink);
+}
+.pc-chip--great { background: var(--pc-great); color: var(--pc-cream-50); border-color: var(--pc-forest-dk); }
+.pc-chip--good  { background: var(--pc-good);  color: var(--pc-cream-50); border-color: var(--pc-forest-dk); }
+.pc-chip--fair  { background: var(--pc-fair);  color: var(--pc-ink); border-color: var(--pc-bark-dk); }
+.pc-chip--poor  { background: var(--pc-poor);  color: var(--pc-cream-50); border-color: var(--pc-bark-dk); }
+.pc-chip--state { background: var(--pc-ink); color: var(--pc-cream-50); font-family: var(--pc-mono); letter-spacing: 0.1em; }
+
+/* -------- Card --------------------------------------------------- */
+.pc-card {
+  background: var(--pc-cream-50);
+  border: var(--pc-border);
+  border-radius: var(--pc-r-lg);
+  box-shadow: var(--pc-stamp);
+  overflow: hidden;
+}
+
+/* -------- Stat readout ------------------------------------------- */
+.pc-stat {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.pc-stat__num {
+  font-family: var(--pc-display);
+  font-weight: 900;
+  font-size: 44px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.pc-stat__label {
+  font-family: var(--pc-sans);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--pc-bark);
+}
+
+/* -------- Divider ------------------------------------------------ */
+.pc-rule {
+  border: 0;
+  border-top: 1.5px dashed var(--pc-bark);
+  opacity: .7;
+}
+
+/* -------- Form --------------------------------------------------- */
+.pc-input {
+  width: 100%;
+  font-family: var(--pc-sans);
+  font-size: 15px;
+  color: var(--pc-ink);
+  background: var(--pc-snow);
+  border: var(--pc-border);
+  border-radius: var(--pc-r-pill);
+  padding: 11px 18px;
+  box-shadow: var(--pc-stamp);
+  outline: none;
+}
+.pc-input::placeholder { color: var(--pc-bark); }
+.pc-input:focus { box-shadow: 4px 4px 0 var(--pc-alpen-dk); border-color: var(--pc-alpen-dk); }

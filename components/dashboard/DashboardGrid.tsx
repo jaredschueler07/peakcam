@@ -67,13 +67,13 @@ export function DashboardGrid({ initialLayout = [] }: DashboardGridProps) {
       <div className="flex justify-end mb-4 gap-2">
         <button
           onClick={() => setIsEditMode(!isEditMode)}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+          className={`px-4 py-2 rounded-full text-[13px] font-semibold border-[1.5px] transition-[transform,box-shadow] duration-100 ${
             isEditMode
-              ? "bg-cyan text-surface border border-cyan"
-              : "bg-surface2 text-text-subtle border border-border hover:border-cyan/50"
+              ? "bg-alpen text-cream-50 border-ink shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]"
+              : "bg-cream-50 text-ink border-ink shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]"
           }`}
         >
-          {isEditMode ? "Finish Editing" : "Customize Layout"}
+          {isEditMode ? "Finish editing" : "Customize layout"}
         </button>
       </div>
 
@@ -91,27 +91,26 @@ export function DashboardGrid({ initialLayout = [] }: DashboardGridProps) {
         {layout.map((widget) => (
           <div
             key={widget.id}
-            className="bg-surface2 border border-border rounded-xl overflow-hidden group shadow-lg"
+            className="bg-cream-50 border-[1.5px] border-ink rounded-[18px] overflow-hidden group shadow-stamp"
           >
             {isEditMode && (
-              <div className="drag-handle absolute top-2 left-2 z-30 p-1 bg-surface/80 rounded cursor-move opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="drag-handle absolute top-2 left-2 z-30 p-1 bg-ink/80 text-cream-50 rounded cursor-move opacity-0 group-hover:opacity-100 transition-opacity">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>
               </div>
             )}
-            
+
             <div className="w-full h-full flex flex-col items-center justify-center p-4">
-              <span className="text-text-muted text-xs uppercase tracking-widest">{widget.type}</span>
-              <span className="text-text-base font-semibold">{widget.id.slice(0, 8)}</span>
-              {/* Actual widget content will be rendered here based on type */}
+              <span className="pc-eyebrow" style={{ color: "var(--pc-bark)" }}>{widget.type}</span>
+              <span className="font-display font-black text-ink mt-1">{widget.id.slice(0, 8)}</span>
             </div>
           </div>
         ))}
       </ResponsiveGridLayout>
 
       {layout.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-border rounded-2xl">
-          <p className="text-text-muted mb-4 text-lg">Your dashboard is empty</p>
-          <p className="text-text-dim text-sm max-w-xs text-center">
+        <div className="flex flex-col items-center justify-center py-20 border-[1.5px] border-dashed border-bark rounded-[18px] bg-cream-50/50">
+          <p className="font-display font-black text-ink text-2xl mb-2">Your dashboard is <em className="italic text-alpen">empty</em>.</p>
+          <p className="text-bark text-sm max-w-xs text-center">
             Star your favorite resorts and cams to build your personal mission control.
           </p>
         </div>

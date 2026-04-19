@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
-import { Snowflake, Camera, Play } from "lucide-react";
+import { Snowflake, Play } from "lucide-react";
 import type { Cam, ResortWithData } from "@/lib/types";
 
 interface SnowCam {
@@ -15,6 +15,7 @@ interface SnowCamsProps {
   snowCams: SnowCam[];
 }
 
+// "Snowing now" — paper strip, alpen snowflake badge, stamped cam cards
 export function SnowCams({ snowCams }: SnowCamsProps) {
   const [loadedCams, setLoadedCams] = useState<Set<string>>(new Set());
 
@@ -25,40 +26,35 @@ export function SnowCams({ snowCams }: SnowCamsProps) {
   };
 
   return (
-    <section className="relative py-16 px-6 bg-gradient-to-b from-bg via-surface/30 to-bg">
-      {/* Background watermark */}
-      <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
-        <span className="text-[10rem] md:text-[16rem] font-display text-text-base opacity-[0.02] select-none whitespace-nowrap">
-          SNOWING NOW
-        </span>
-      </div>
-
+    <section className="relative py-16 px-6 bg-cream">
       <div className="relative max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-end justify-between mb-8 flex-wrap gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-cyan/10 border border-cyan/30 rounded-lg">
-              <Snowflake className="text-cyan" size={24} />
-            </div>
+            <span className="inline-flex items-center justify-center w-11 h-11 rounded-full
+                             bg-alpen text-cream-50 border-[1.5px] border-ink shadow-stamp-sm">
+              <Snowflake size={20} strokeWidth={2.25} />
+            </span>
             <div>
-              <h2 className="text-2xl md:text-3xl font-display text-text-base">
-                SNOWING NOW
+              <div className="pc-eyebrow" style={{ color: "var(--pc-bark)" }}>
+                Right now
+              </div>
+              <h2 className="font-display font-black text-3xl md:text-4xl text-ink leading-[0.95] tracking-[-0.02em]">
+                Snowing <em className="text-alpen italic font-bold">now</em>.
               </h2>
-              <p className="text-text-muted text-sm mt-0.5">
-                Live cams from resorts with active snowfall
-              </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-cyan/10 border border-cyan/30 rounded-full">
-            <div className="w-2 h-2 bg-cyan rounded-full animate-pulse" />
-            <span className="text-cyan text-xs font-semibold">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full
+                          bg-ink text-cream-50 border-[1.5px] border-ink shadow-stamp-sm">
+            <span className="w-2 h-2 bg-alpen rounded-full animate-pulse-live" />
+            <span className="font-mono font-bold text-[11px] uppercase tracking-[0.14em]">
               {snowCams.length} {snowCams.length === 1 ? "resort" : "resorts"}
             </span>
           </div>
         </div>
 
         {/* Cam grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {snowCams.slice(0, 6).map(({ cam, resort }) => (
             <SnowCamCard
               key={cam.id}
@@ -70,10 +66,10 @@ export function SnowCams({ snowCams }: SnowCamsProps) {
           ))}
         </div>
 
-        {/* Show more link */}
+        {/* Show more caption */}
         {snowCams.length > 6 && (
           <div className="text-center mt-6">
-            <span className="text-text-muted text-sm">
+            <span className="font-mono text-[12px] text-bark uppercase tracking-[0.12em]">
               + {snowCams.length - 6} more resorts with active snow
             </span>
           </div>
@@ -96,7 +92,6 @@ function SnowCamCard({
 }) {
   const snow = resort.snow_report;
 
-  // Build embed src
   const embedSrc =
     cam.embed_type === "youtube" && cam.youtube_id
       ? `https://www.youtube.com/embed/${cam.youtube_id}?autoplay=1&mute=1`
@@ -108,13 +103,16 @@ function SnowCamCard({
 
   return (
     <motion.div
-      className="group relative rounded-xl overflow-hidden border border-cyan/20 hover:border-cyan/50 transition-all duration-300"
+      className="group relative rounded-[18px] overflow-hidden
+                 bg-cream-50 border-[1.5px] border-ink shadow-stamp
+                 hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]
+                 transition-[transform,box-shadow] duration-150"
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
     >
       {/* Cam embed */}
-      <div className="relative aspect-video bg-surface2">
+      <div className="relative aspect-video bg-cream border-b-[1.5px] border-ink">
         {isLoaded ? (
           isImage ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -137,46 +135,60 @@ function SnowCamCard({
         ) : (
           <button
             onClick={onLoad}
-            className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2 hover:bg-white/5 transition-colors"
+            className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2
+                       hover:bg-ink/5 transition-colors"
           >
-            <div className="w-12 h-12 rounded-full bg-cyan/10 border border-cyan/30 flex items-center justify-center group-hover:bg-cyan/20 transition-all">
-              <Play className="w-5 h-5 text-cyan ml-0.5" />
-            </div>
-            <span className="text-text-muted text-xs">Load cam</span>
+            <span className="inline-flex items-center justify-center w-12 h-12 rounded-full
+                             bg-alpen text-cream-50 border-[1.5px] border-ink shadow-stamp-sm
+                             group-hover:shadow-stamp transition-shadow">
+              <Play className="w-5 h-5 ml-0.5" />
+            </span>
+            <span className="font-mono text-[11px] text-bark uppercase tracking-[0.14em]">Load cam</span>
           </button>
         )}
 
-        {/* SNOWING badge */}
-        <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 bg-cyan/20 backdrop-blur-sm border border-cyan/40 rounded-full">
-          <Snowflake size={12} className="text-cyan" />
-          <span className="text-cyan text-[10px] font-bold uppercase tracking-wider">Snowing</span>
+        {/* SNOWING badge — alpen stamp */}
+        <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-0.5
+                        bg-alpen text-cream-50 border-[1.5px] border-ink rounded-full
+                        shadow-[2px_2px_0_#2a1f14] font-bold text-[11px] uppercase tracking-[0.14em]">
+          <Snowflake size={11} strokeWidth={2.5} />
+          Snowing
         </div>
 
         {/* Live indicator */}
         {isLoaded && (
-          <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 bg-surface/80 backdrop-blur-sm rounded-full">
-            <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-            <span className="text-text-base text-[10px] font-semibold">LIVE</span>
+          <div className="absolute top-3 right-3 inline-flex items-center gap-1 px-2 py-0.5
+                          bg-ink text-cream-50 border-[1.5px] border-ink rounded-full">
+            <span className="w-1.5 h-1.5 bg-alpen rounded-full animate-pulse-live" />
+            <span className="font-mono font-bold text-[10px] uppercase tracking-[0.14em]">Live</span>
           </div>
         )}
       </div>
 
-      {/* Info bar */}
+      {/* Info bar — cream paper footer */}
       <Link
         href={`/resorts/${resort.slug}`}
-        className="block px-3 py-2.5 bg-surface border-t border-border hover:bg-surface2 transition-colors"
+        className="block px-4 py-3 bg-cream-50 hover:bg-cream transition-colors"
       >
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-text-base text-sm font-semibold">{resort.name}</h3>
-            <p className="text-text-muted text-xs mt-0.5">{cam.name} · {resort.state}</p>
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h3 className="font-display font-black text-ink text-[17px] leading-tight truncate">
+              {resort.name}
+            </h3>
+            <p className="font-mono text-[10.5px] text-bark uppercase tracking-[0.1em] mt-0.5 truncate">
+              {cam.name} · {resort.state}
+            </p>
           </div>
-          <div className="text-right">
+          <div className="text-right shrink-0">
             {snow && snow.new_snow_24h != null && snow.new_snow_24h > 0 && (
-              <div className="text-cyan text-sm font-bold">{snow.new_snow_24h}″</div>
+              <div className="font-display font-black text-alpen text-lg leading-none tabular-nums">
+                {snow.new_snow_24h}″
+              </div>
             )}
             {snow && snow.base_depth != null && (
-              <div className="text-text-muted text-xs">{snow.base_depth}″ base</div>
+              <div className="font-mono text-bark text-[10.5px] tabular-nums mt-0.5">
+                {snow.base_depth}″ base
+              </div>
             )}
           </div>
         </div>

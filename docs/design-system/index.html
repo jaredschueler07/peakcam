@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PeakCam Design System</title>
+<link rel="stylesheet" href="tokens.css" />
+<style>
+  body { margin: 0; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 72px 40px 120px; }
+  .head {
+    padding-bottom: 32px; margin-bottom: 56px;
+    border-bottom: 2px solid var(--pc-ink);
+    display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 32px;
+  }
+  .head h1 {
+    margin: 0;
+    font-family: var(--pc-display); font-weight: 900;
+    font-size: clamp(60px, 9vw, 128px); line-height: .88; letter-spacing: -0.03em;
+  }
+  .head h1 em { color: var(--pc-alpen); font-style: italic; font-weight: 700; }
+  .head .meta {
+    font-family: var(--pc-mono); font-size: 13px; line-height: 1.6;
+    color: var(--pc-bark); text-align: right;
+  }
+  .head .meta b { color: var(--pc-ink); }
+  .lede {
+    font-family: var(--pc-sans); font-size: 22px; line-height: 1.4;
+    max-width: 72ch; margin: 0 0 48px; color: var(--pc-ink);
+  }
+  .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 22px; }
+  .card {
+    display: flex; flex-direction: column;
+    background: var(--pc-cream-50);
+    border: var(--pc-border); border-radius: var(--pc-r-lg);
+    box-shadow: var(--pc-stamp);
+    overflow: hidden;
+    text-decoration: none; color: inherit;
+    transition: transform .1s ease, box-shadow .1s ease;
+  }
+  .card:hover { transform: translate(-2px,-2px); box-shadow: 5px 5px 0 var(--pc-ink); }
+  .card .prev {
+    height: 180px; border-bottom: var(--pc-border);
+    display: grid; place-items: center;
+    font-family: var(--pc-display); font-weight: 900; font-size: 40px;
+    letter-spacing: -0.02em;
+  }
+  .card .prev em { font-style: italic; color: var(--pc-alpen); }
+  .card .prev.fg  { background: var(--pc-forest); color: var(--pc-cream-50); }
+  .card .prev.fg em { color: var(--pc-mustard); }
+  .card .prev.ink { background: var(--pc-ink); color: var(--pc-cream-50); }
+  .card .body { padding: 20px 22px 22px; }
+  .card .kicker {
+    font-family: var(--pc-mono); font-size: 11px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--pc-bark); margin-bottom: 6px;
+  }
+  .card h3 {
+    font-family: var(--pc-display); font-weight: 900; font-size: 28px;
+    letter-spacing: -0.01em; margin: 0 0 8px;
+  }
+  .card p { font-family: var(--pc-sans); font-size: 14px; color: var(--pc-bark); margin: 0 0 14px; line-height: 1.5;}
+  .card .more {
+    font-family: var(--pc-sans); font-weight: 700; font-size: 14px;
+    color: var(--pc-alpen-dk);
+  }
+
+  .note {
+    margin-top: 56px; padding: 22px 24px;
+    background: transparent; border-top: 1.5px dashed var(--pc-bark);
+    font-family: var(--pc-sans); color: var(--pc-bark); font-size: 14px;
+    line-height: 1.6;
+  }
+  .note b { color: var(--pc-ink); }
+</style>
+</head>
+<body class="pc-paper">
+<div class="wrap">
+  <header class="head">
+    <h1>Peak<em>Cam</em><br/>design system</h1>
+    <div class="meta">
+      <b>V0.1 · 25/26 SEASON</b><br/>
+      RETRO SKI-POSTER<br/>
+      EARTH + SNOW · HUMANIST<br/>
+      HAND-STAMPED UI
+    </div>
+  </header>
+
+  <p class="lede">Brand system for PeakCam — live webcams, snow reports and trail conditions for 128 North American ski resorts. Three artifacts below: the foundations, a real dashboard showing the system in use, and a starter brand deck.</p>
+
+  <div class="grid">
+    <a class="card" href="Components.html">
+      <div class="prev">Peak<em>Cam</em></div>
+      <div class="body">
+        <div class="kicker">01 · Foundations</div>
+        <h3>Components</h3>
+        <p>Color, typography, buttons, chips, cam tile, stickers, voice samples. The source of truth.</p>
+        <span class="more">Open specimen →</span>
+      </div>
+    </a>
+
+    <a class="card" href="Dashboard.html">
+      <div class="prev fg">Lift's <em>spinning.</em></div>
+      <div class="body">
+        <div class="kicker">02 · In-use</div>
+        <h3>Dashboard</h3>
+        <p>Full web app mock: hero ticker, pow-of-the-day, filter bar and 9 cam tiles. Two layouts + day/night via Tweaks.</p>
+        <span class="more">Open prototype →</span>
+      </div>
+    </a>
+
+    <a class="card" href="Deck.html">
+      <div class="prev ink">Got the <em>goods.</em></div>
+      <div class="body">
+        <div class="kicker">03 · Starter deck</div>
+        <h3>Deck · 6 slides</h3>
+        <p>Title, section, comparison, big quote, data, close. 1920×1080, keyboard nav, print-to-PDF ready.</p>
+        <span class="more">Open deck →</span>
+      </div>
+    </a>
+  </div>
+
+  <p class="note"><b>Tweaks</b> — toggle the <i>Tweaks</i> button in the top toolbar on the Dashboard to swap layout (filter bar ↔ side rail), mode (day ↔ night), accent color, and voice (insider ↔ plain). Settings persist on reload.</p>
+</div>
+</body>
+</html>
