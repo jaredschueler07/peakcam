@@ -13,7 +13,7 @@ import {
   Snowflake
 } from "lucide-react";
 import type { SnowQuality, ComfortLevel, LiveConditions } from "@/lib/types";
-import { trackConditionVote } from "@/lib/posthog";
+import { track, EVENTS } from "@/lib/analytics-events";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -110,7 +110,11 @@ export function ConditionVoter({ resortId, resortSlug, liveConditions }: Props) 
       }
 
       setSubmitted(true);
-      trackConditionVote(resortSlug, snow, comfort);
+      track(EVENTS.CONDITION_VOTED, {
+        resort_slug: resortSlug,
+        snow_quality: snow,
+        comfort,
+      });
     } catch {
       setError("Network error. Check your connection and try again.");
     } finally {

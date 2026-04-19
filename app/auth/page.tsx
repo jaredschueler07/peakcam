@@ -4,6 +4,7 @@ import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { track, EVENTS } from "@/lib/analytics-events";
 
 function AuthForm() {
   const router = useRouter();
@@ -39,6 +40,8 @@ function AuthForm() {
         router.refresh();
       }
     } else {
+      const email_domain = email.trim().split("@")[1] ?? "";
+      track(EVENTS.AUTH_SIGNUP_STARTED, { email_domain });
       const callbackUrl = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
       const { error } = await supabase.auth.signUp({
         email: email.trim(),
@@ -49,6 +52,7 @@ function AuthForm() {
         setError(error.message);
         setLoading(false);
       } else {
+        track(EVENTS.AUTH_SIGNUP_COMPLETED, { email_domain });
         setSignupDone(true);
         setLoading(false);
       }
