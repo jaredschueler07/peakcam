@@ -10,7 +10,7 @@
 | Production | https://www.peakcam.io |
 | Vercel dashboard | https://vercel.com/ → peakcam project |
 | Supabase | https://supabase.com/dashboard → peakcam project |
-| PostHog | https://us.posthog.com/ (dashboard URL: **TBD — populated by Task 4.7**) |
+| PostHog | https://us.posthog.com/project/350200/dashboard/1486208 |
 | GitHub | https://github.com/jaredschueler07/peakcam |
 
 ## Secrets
@@ -125,7 +125,7 @@ See `docs/alerts-verification.md` for the E2E run log.
 | Vercel function logs | Vercel dashboard → Functions → Logs |
 | Vercel cron runs | Vercel dashboard → Crons |
 | Supabase query logs | Supabase dashboard → Logs |
-| Analytics | PostHog dashboard (**URL TBD — Task 4.7**) |
+| Analytics | PostHog dashboard (https://us.posthog.com/project/350200/dashboard/1486208) |
 | Resend deliveries | Resend dashboard → Logs |
 | Launchd jobs | `launchctl list \| grep com.peakcam` |
 
