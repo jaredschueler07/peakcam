@@ -69,7 +69,7 @@ export function CamReportButton({ cam, resortName }: Props) {
         type="button"
         onClick={() => setOpen(true)}
         disabled={disabled}
-        className={`absolute top-3 right-3 z-10 inline-flex items-center gap-1.5
+        className={`absolute top-3 left-3 z-10 inline-flex items-center gap-1.5
           px-2.5 py-0.5 rounded-full border-[1.5px] text-[11px] font-bold
           uppercase tracking-[0.14em] shadow-[2px_2px_0_#2a1f14]
           transition-[transform,box-shadow] duration-100

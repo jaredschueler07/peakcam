@@ -6,6 +6,7 @@ import { Header } from "@/components/layout/Header";
 import { Heart } from "lucide-react";
 import { ConditionBadge } from "@/components/ui/Badge";
 import type { ResortWithData, WeatherPeriod, LiveConditions, Cam, UserCondition, ForecastPeriod, HourlyWeather } from "@/lib/types";
+import { CamReportButton } from "@/components/cam/CamReportButton";
 import { ConditionsHero } from "@/components/resort/ConditionsHero";
 import { ForecastTable } from "@/components/resort/ForecastTable";
 import { HourlyTimeline } from "@/components/resort/HourlyTimeline";
@@ -54,7 +55,17 @@ function ImageCam({ url, name }: { url: string; name: string }) {
 
 // ─── Cam player ──────────────────────────────────────────────────────────────
 
-function CamPlayer({ cam, resortSlug, index = 99 }: { cam: Cam; resortSlug: string; index?: number }) {
+function CamPlayer({
+  cam,
+  resortSlug,
+  resortName,
+  index = 99,
+}: {
+  cam: Cam;
+  resortSlug: string;
+  resortName: string;
+  index?: number;
+}) {
   // Auto-load first 2 image cams; lazy-load the rest
   const [loaded, setLoaded] = useState(cam.embed_type !== "image" || index < 2);
 
@@ -62,6 +73,7 @@ function CamPlayer({ cam, resortSlug, index = 99 }: { cam: Cam; resortSlug: stri
   if (cam.embed_type === "link") {
     return (
       <div className="relative group">
+        <CamReportButton cam={cam} resortName={resortName} />
         <a
           href={cam.embed_url ?? "#"}
           target="_blank"
@@ -96,6 +108,7 @@ function CamPlayer({ cam, resortSlug, index = 99 }: { cam: Cam; resortSlug: stri
   if (cam.embed_type === "image") {
     return (
       <div className="relative aspect-video bg-surface2 rounded-xl overflow-hidden border border-border group">
+        <CamReportButton cam={cam} resortName={resortName} />
         {!loaded ? (
           <button
             onClick={() => { setLoaded(true); trackCamClick(resortSlug, cam.name, cam.embed_type); }}
@@ -137,6 +150,7 @@ function CamPlayer({ cam, resortSlug, index = 99 }: { cam: Cam; resortSlug: stri
 
   return (
     <div className="relative aspect-video bg-surface2 rounded-xl overflow-hidden border border-border group">
+      <CamReportButton cam={cam} resortName={resortName} />
       {/* Placeholder until user clicks */}
       {!loaded && (
         <button
@@ -524,7 +538,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {activeCams.map((cam, i) => (
                 <div key={cam.id}>
-                  <CamPlayer cam={cam} resortSlug={resort.slug} index={i} />
+                  <CamPlayer cam={cam} resortSlug={resort.slug} resortName={resort.name} index={i} />
                   <p className="text-text-muted text-xs mt-1.5 px-1">
                     {cam.name}
                     {cam.elevation && (
