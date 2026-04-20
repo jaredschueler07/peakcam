@@ -41,6 +41,24 @@ export interface Cam {
   created_at: string;
 }
 
+// ── Cam reports ──────────────────────────────────────────────
+export type CamReportReason = "broken" | "wrong_view" | "other";
+
+export interface CamReport {
+  id: string;
+  cam_id: string;
+  session_id: string;
+  reason: CamReportReason;
+  resort_link_dead: boolean;
+  suggested_url: string | null;
+  user_agent: string | null;
+  ip_hash: string | null;
+  resolved: boolean;
+  resolved_at: string | null;
+  admin_note: string | null;
+  created_at: string;
+}
+
 // ── Snow Reports ─────────────────────────────────────────────
 export interface SnowReport {
   id: string;
