@@ -31,12 +31,13 @@ interface Props {
 
 type StateFilter = string;
 type ConditionFilter = "all" | "great" | "good" | "fair" | "poor";
-type SortOption = "best" | "snow" | "name";
+type SortOption = "popular" | "best" | "snow" | "name";
 
 const SORT_LABEL: Record<SortOption, string> = {
-  best: "Best",
-  snow: "Snow",
-  name: "Name",
+  popular: "Popular",
+  best:    "Best",
+  snow:    "Snow",
+  name:    "Name",
 };
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -44,6 +45,26 @@ const SORT_LABEL: Record<SortOption, string> = {
 const CONDITION_ORDER: Record<string, number> = {
   great: 0, good: 1, fair: 2, poor: 3,
 };
+
+// Curated popularity ranking — order matters, top of list = top of grid.
+// Based on brand recognition / skier visits; adjust freely.
+const POPULAR_SLUGS: string[] = [
+  "vail",
+  "aspen-snowmass",
+  "park-city",
+  "jackson-hole",
+  "whistler-blackcomb",
+  "mammoth",
+  "breckenridge",
+  "palisades-tahoe",
+  "big-sky",
+  "killington",
+  "stowe",
+  "alta",
+];
+const POPULAR_RANK: Record<string, number> = Object.fromEntries(
+  POPULAR_SLUGS.map((slug, idx) => [slug, idx]),
+);
 
 const STATE_NAMES: Record<string, string> = {
   AZ: "Arizona", BC: "British Columbia", CA: "California", CO: "Colorado",
@@ -233,7 +254,7 @@ export function BrowsePage({ resorts }: Props) {
   const [hasLiveCams, setHasLiveCams] = useState(false);
   const [freshSnow, setFreshSnow] = useState(false);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
-  const [sort, setSort] = useState<SortOption>("best");
+  const [sort, setSort] = useState<SortOption>("popular");
   const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(false);
   const [showStates, setShowStates] = useState(false);
@@ -259,7 +280,24 @@ export function BrowsePage({ resorts }: Props) {
     if (freshSnow) list = list.filter((r) => (r.snow_report?.new_snow_24h ?? 0) >= 8);
     if (showFavoritesOnly) list = list.filter((r) => isFavorite(r.id));
 
-    if (sort === "best") {
+    if (sort === "popular") {
+      // Curated list first (in configured order), then the rest sorted
+      // by "best" (condition rank → 24h snow desc → name) as a tiebreaker.
+      list = [...list].sort((a, b) => {
+        const aPop = POPULAR_RANK[a.slug];
+        const bPop = POPULAR_RANK[b.slug];
+        if (aPop != null && bPop != null) return aPop - bPop;
+        if (aPop != null) return -1;
+        if (bPop != null) return 1;
+        const condDiff =
+          (CONDITION_ORDER[a.cond_rating] ?? 99) - (CONDITION_ORDER[b.cond_rating] ?? 99);
+        if (condDiff !== 0) return condDiff;
+        const aSnow = a.snow_report?.new_snow_24h ?? -1;
+        const bSnow = b.snow_report?.new_snow_24h ?? -1;
+        if (aSnow !== bSnow) return bSnow - aSnow;
+        return a.name.localeCompare(b.name);
+      });
+    } else if (sort === "best") {
       // Condition rank first (great → poor, unknown last),
       // tiebreak by 24h fresh snow desc so powder rises inside each tier.
       list = [...list].sort((a, b) => {
@@ -408,7 +446,7 @@ export function BrowsePage({ resorts }: Props) {
               </button>
               <SlidersHorizontal size={14} className="text-bark" />
               <span className="font-mono text-[11px] text-bark uppercase tracking-[0.14em] hidden sm:block">Sort:</span>
-              {(["best", "snow", "name"] as SortOption[]).map((opt) => (
+              {(["popular", "best", "snow", "name"] as SortOption[]).map((opt) => (
                 <button
                   key={opt}
                   onClick={() => setSort(opt)}
