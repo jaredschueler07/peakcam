@@ -229,8 +229,16 @@ async function importCams(slugToId) {
       embed_type:      r.embed_type,
       embed_url:       blankToNull(r.embed_url),
       youtube_id:      blankToNull(r.youtube_id),
-      is_active:       toBool(r.is_active),
-      last_checked_at: new Date().toISOString(),
+      // Deliberately NOT sending is_active or last_checked_at:
+      // cam-health-check.mjs owns a cam's active state (auto-disable
+      // after 3 consecutive failures, auto-recovery on success) and its
+      // check timestamps. Sending is_active from the CSV re-enabled all
+      // 47 auto-disabled dead cams on a full-CSV re-import (observed
+      // live, 2026-07-13). New rows get the schema defaults
+      // (is_active=true, last_checked_at=null); existing rows keep the
+      // health checker's authoritative state. Every cams.csv row is
+      // is_active=true anyway — nothing depended on CSV-driven
+      // deactivation.
     }));
 
   if (skipped.length > 0) {
