@@ -363,8 +363,17 @@ export default function MapView({
           cluster={true}
           clusterMaxZoom={10}
           clusterRadius={50}
+          /* Aggregate a per-rating count into each cluster so the bubble can
+             show the dominant condition of the region, not just a headcount. */
+          clusterProperties={{
+            great: ["+", ["case", ["==", ["get", "condRating"], "great"], 1, 0]],
+            good: ["+", ["case", ["==", ["get", "condRating"], "good"], 1, 0]],
+            fair: ["+", ["case", ["==", ["get", "condRating"], "fair"], 1, 0]],
+            poor: ["+", ["case", ["==", ["get", "condRating"], "poor"], 1, 0]],
+          }}
         >
-          {/* Cluster circles — ink with cream stroke (hand-stamp feel) */}
+          {/* Cluster circles — filled with the DOMINANT condition color
+             (ties break toward the better rating), cream stroke for stamp feel. */}
           <Layer
             id="clusters"
             type="circle"
@@ -376,13 +385,33 @@ export default function MapView({
                 10, 24,
                 50, 32,
               ],
-              "circle-color": "#2a1f14",           /* pc-ink */
+              "circle-color": [
+                "let",
+                "g", ["to-number", ["get", "great"], 0],
+                "o", ["to-number", ["get", "good"], 0],
+                "f", ["to-number", ["get", "fair"], 0],
+                "p", ["to-number", ["get", "poor"], 0],
+                [
+                  "case",
+                  ["all",
+                    [">=", ["var", "g"], ["var", "o"]],
+                    [">=", ["var", "g"], ["var", "f"]],
+                    [">=", ["var", "g"], ["var", "p"]]], "#3c5a3a",  /* great → forest */
+                  ["all",
+                    [">=", ["var", "o"], ["var", "f"]],
+                    [">=", ["var", "o"], ["var", "p"]]], "#6d8a4a",  /* good → moss */
+                  [">=", ["var", "f"], ["var", "p"]], "#e2a740",     /* fair → mustard */
+                  "#a93f20",                                          /* poor → alpen-dk */
+                ],
+              ],
               "circle-stroke-width": 2,
               "circle-stroke-color": "#faf4e6",    /* pc-cream-50 */
             }}
           />
 
-          {/* Cluster count labels */}
+          {/* Cluster count labels — ink on a mustard (fair-dominant) bubble for
+             contrast, cream otherwise. Mirrors the circle-color case order so
+             the text tone always matches the resolved dominant background. */}
           <Layer
             id="cluster-count"
             type="symbol"
@@ -393,7 +422,25 @@ export default function MapView({
               "text-font": ["Noto Sans Bold", "Arial Unicode MS Bold"],
             }}
             paint={{
-              "text-color": "#faf4e6",             /* pc-cream-50 */
+              "text-color": [
+                "let",
+                "g", ["to-number", ["get", "great"], 0],
+                "o", ["to-number", ["get", "good"], 0],
+                "f", ["to-number", ["get", "fair"], 0],
+                "p", ["to-number", ["get", "poor"], 0],
+                [
+                  "case",
+                  ["all",
+                    [">=", ["var", "g"], ["var", "o"]],
+                    [">=", ["var", "g"], ["var", "f"]],
+                    [">=", ["var", "g"], ["var", "p"]]], "#faf4e6",  /* great → cream */
+                  ["all",
+                    [">=", ["var", "o"], ["var", "f"]],
+                    [">=", ["var", "o"], ["var", "p"]]], "#faf4e6",  /* good → cream */
+                  [">=", ["var", "f"], ["var", "p"]], "#2a1f14",     /* fair → ink */
+                  "#faf4e6",                                          /* poor → cream */
+                ],
+              ],
             }}
           />
 

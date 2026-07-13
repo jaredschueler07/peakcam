@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import Fuse from "fuse.js";
-import { Search, SlidersHorizontal, MapPin, ChevronDown } from "lucide-react";
+import { Search, SlidersHorizontal, MapPin, ChevronDown, Snowflake } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { SummitResortCard } from "@/components/browse/SummitResortCard";
 import { PowderAlertSignup } from "@/components/alerts/PowderAlertSignup";
@@ -32,7 +32,9 @@ interface Props {
 }
 
 type StateFilter = string;
-type ConditionFilter = "all" | "great" | "good" | "fair" | "poor";
+// "goods" is a one-tap shortcut for great OR good — the core "which resort has
+// the goods right now" job, surfaced as its own prominent chip.
+type ConditionFilter = "all" | "goods" | "great" | "good" | "fair" | "poor";
 type SortOption = "popular" | "best" | "snow" | "name";
 
 const SORT_LABEL: Record<SortOption, string> = {
@@ -343,7 +345,11 @@ export function BrowsePage({ resorts, radarTileUrl = null }: Props) {
     }
 
     if (stateFilter !== "All") list = list.filter((r) => r.state === stateFilter);
-    if (condFilter !== "all") list = list.filter((r) => r.cond_rating === condFilter);
+    if (condFilter === "goods") {
+      list = list.filter((r) => r.cond_rating === "great" || r.cond_rating === "good");
+    } else if (condFilter !== "all") {
+      list = list.filter((r) => r.cond_rating === condFilter);
+    }
     if (hasLiveCams) list = list.filter((r) => r.cams.some((c) => c.is_active));
     if (freshSnow) list = list.filter((r) => (r.snow_report?.new_snow_24h ?? 0) >= 8);
     if (showFavoritesOnly) list = list.filter((r) => isFavorite(r.id));
@@ -487,7 +493,16 @@ export function BrowsePage({ resorts, radarTileUrl = null }: Props) {
 
             <span className="w-px h-5 bg-bark/40 mx-1 hidden sm:block" />
 
-            {/* Condition filters */}
+            {/* Condition filters — "The Goods" (great+good) is the headline
+                one-tap shortcut for the core user job, then the granular
+                rating chips. */}
+            <FilterChip
+              label="The Goods"
+              icon={<Snowflake size={14} />}
+              active={condFilter === "goods"}
+              onClick={() => setCondFilter(condFilter === "goods" ? "all" : "goods")}
+              title="Great or Good conditions only"
+            />
             {(["all", "great", "good", "fair", "poor"] as ConditionFilter[]).map((c) => (
               <FilterChip
                 key={c}
