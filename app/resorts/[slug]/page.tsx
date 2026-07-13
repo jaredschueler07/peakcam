@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getResortBySlug, getAllResortSlugs, getLiveConditions, getUserConditions } from "@/lib/supabase";
+import { getResortBySlug, getAllResortSlugs, getLiveConditions, getUserConditions, getResortElevationFt } from "@/lib/supabase";
 import { getWeatherForecast, getHourlyForecast, bucketIntoPeriods } from "@/lib/weather";
+import { getOpenMeteoForecast, getOpenMeteoHourly } from "@/lib/open-meteo";
 import { ResortDetailPage } from "@/components/resort/ResortDetailPage";
 
 const BASE_URL = "https://peakcam.io";
@@ -83,9 +84,16 @@ export default async function ResortPage({
   if (!resort) return notFound();
 
   // Fetch weather, live conditions, and user reports server-side
+  const isUS = resort.country === "US";
+  const elevationFt = isUS ? null : await getResortElevationFt(resort.id);
+
   const [weather, hourlyRaw, liveConditions, userConditions] = await Promise.all([
-    getWeatherForecast(resort.lat, resort.lng),
-    getHourlyForecast(resort.lat, resort.lng),
+    isUS
+      ? getWeatherForecast(resort.lat, resort.lng)
+      : getOpenMeteoForecast(resort.lat, resort.lng, elevationFt),
+    isUS
+      ? getHourlyForecast(resort.lat, resort.lng)
+      : getOpenMeteoHourly(resort.lat, resort.lng, elevationFt),
     getLiveConditions(resort.id),
     getUserConditions(resort.id),
   ]);
