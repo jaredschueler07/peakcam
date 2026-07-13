@@ -266,7 +266,12 @@ async function main(): Promise<void> {
         history7d: {
           // Depth values, not SWE — computeTrend doesn't care about units,
           // only deltas, so this reuses the same field with a larger threshold.
-          sweValues: [...depthHistory, snapshot.snowDepthIn],
+          // depthHistory is fetched AFTER today's snowpack_daily upsert above,
+          // so on a live run it already includes today's just-written depth
+          // as its newest entry (same as scripts/snotel-sync.ts's sweHistory
+          // usage) — do not append snapshot.snowDepthIn again here, or today
+          // gets double-counted and the 7-day window shrinks to 6 prior days.
+          sweValues: depthHistory,
           thresholdIn: DEPTH_TREND_THRESHOLD_IN,
         },
         forecast: {
