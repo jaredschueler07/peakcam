@@ -13,6 +13,7 @@
     "agents:dry-run": "node agents/loop.mjs --dry-run",
     "agents:extract-plugins": "for f in plugins/*.plugin; do name=$(basename \"$f\" .plugin); mkdir -p \"agents/plugins/$name\" && unzip -o \"$f\" -d \"agents/plugins/$name\"; done",
     "snotel-sync": "tsx scripts/snotel-sync.ts",
+    "model-sync": "tsx scripts/model-sync.ts",
     "liftie-sync": "tsx scripts/liftie-sync.ts",
     "snodas-sync": "tsx scripts/snodas-sync.ts",
     "pipeline-sync": "tsx scripts/pipeline-sync.ts",

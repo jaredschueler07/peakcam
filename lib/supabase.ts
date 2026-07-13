@@ -230,6 +230,22 @@ export async function getResortWithMetadata(slug: string) {
   return data;
 }
 
+/** Midpoint elevation (base+summit)/2 in feet, for resorts with resort_metadata. Returns base-only or null if incomplete/missing. */
+export async function getResortElevationFt(resortId: string): Promise<number | null> {
+  const { data, error } = await supabase
+    .from("resort_metadata")
+    .select("elevation_base_ft, elevation_summit_ft")
+    .eq("resort_id", resortId)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  const { elevation_base_ft, elevation_summit_ft } = data;
+  if (elevation_base_ft != null && elevation_summit_ft != null) {
+    return Math.round((elevation_base_ft + elevation_summit_ft) / 2);
+  }
+  return elevation_base_ft ?? null;
+}
+
 // ─────────────────────────────────────────────────────────────
 // Static Params
 // ─────────────────────────────────────────────────────────────
