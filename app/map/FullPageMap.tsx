@@ -13,7 +13,7 @@ const MapView = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-full w-full bg-cream flex items-center justify-center">
+      <div className="pc-topo h-full w-full flex items-center justify-center">
         <span className="font-mono text-bark text-xs uppercase tracking-[0.14em]">Loading map…</span>
       </div>
     ),

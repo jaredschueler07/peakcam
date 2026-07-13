@@ -413,7 +413,8 @@ export default function MapView({
       >
         {/* Navigation controls */}
         <NavigationControl position="top-right" showCompass visualizePitch />
-        {variant === "fullpage" && <GeolocateControl position="top-right" />}
+        {/* "Where near me" on both surfaces — the sidebar map used to lack it. */}
+        <GeolocateControl position="top-right" />
         <ScaleControl position="bottom-left" />
         <MapLegend metric={metric} />
 

@@ -17,7 +17,7 @@ import { trackSearch, trackFilter } from "@/lib/posthog";
 const MapView = dynamic(() => import("@/components/map/MapView"), {
   ssr: false,
   loading: () => (
-    <div className="h-full w-full bg-cream animate-pulse rounded-[18px] border-[1.5px] border-ink flex items-center justify-center">
+    <div className="pc-topo h-full w-full animate-pulse rounded-[18px] border-[1.5px] border-ink flex items-center justify-center">
       <span className="font-mono text-bark text-xs uppercase tracking-[0.14em]">Loading map…</span>
     </div>
   ),
