@@ -64,7 +64,15 @@ interface MapViewProps {
   resorts: ResortWithData[];
   hoveredSlug?: string | null;
   onResortHover?: (slug: string | null) => void;
-  onResortClick?: (slug: string) => void;
+  /**
+   * Fired when a marker is tapped. The parent may use this to show a mobile
+   * detail sheet. It does NOT navigate — tapping a marker only *selects* it.
+   * Navigation happens on the explicit second action (the popup / sheet's
+   * "View resort" button → onViewResort).
+   */
+  onResortSelect?: (slug: string) => void;
+  /** Navigate to a resort detail page — fired by the "View resort" action. */
+  onViewResort?: (slug: string) => void;
   /** "sidebar" for browse page, "fullpage" for /map route */
   variant?: "sidebar" | "fullpage";
   /** Radar tile URL fetched server-side */
@@ -78,7 +86,8 @@ export default function MapView({
   resorts,
   hoveredSlug,
   onResortHover,
-  onResortClick,
+  onResortSelect,
+  onViewResort,
   variant = "sidebar",
   radarTileUrl = null,
   className = "",
@@ -95,6 +104,25 @@ export default function MapView({
   const [metric, setMetric] = useState<MapMetric>("baseDepth");
   const [showRadar, setShowRadar] = useState(false);
   const [cursor, setCursor] = useState<string>("grab");
+
+  // The in-map popup card is a desktop affordance; on smaller screens the
+  // parent shows a bottom sheet instead (via onResortSelect). Rendering both
+  // let the sheet's full-screen backdrop cover the popup — the two used to
+  // race. Gate the popup so exactly one detail surface shows per breakpoint.
+  // MapView is client-only (dynamic ssr:false), so window is available at
+  // first render — initialize eagerly to avoid a popup flash on mobile.
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window === "undefined"
+      ? true
+      : window.matchMedia("(min-width: 1024px)").matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   // Build GeoJSON from resorts
   const geojson = useMemo(() => resortsToGeoJSON(resorts), [resorts]);
@@ -181,18 +209,33 @@ export default function MapView({
 
   // ── Interaction handlers ────────────────────────────────────────
 
+  // Hover is throttled: onMouseMove fires on every native mousemove (every
+  // pixel), and each call re-renders hover-highlight state across every grid
+  // card. Diff against the last-emitted slug and coalesce to one rAF tick so
+  // we only notify the parent when the hovered marker actually changes.
+  const lastHoverRef = useRef<string | null>(null);
+  const hoverRafRef = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (hoverRafRef.current) cancelAnimationFrame(hoverRafRef.current);
+    },
+    [],
+  );
+
   const onMouseEnter = useCallback(() => setCursor("pointer"), []);
   const onMouseLeave = useCallback(() => {
     setCursor("grab");
+    lastHoverRef.current = null;
     onResortHover?.(null);
   }, [onResortHover]);
 
   const onMouseMove = useCallback(
     (e: MapLayerMouseEvent) => {
-      if (e.features && e.features.length > 0) {
-        const slug = e.features[0].properties?.slug as string | undefined;
-        if (slug) onResortHover?.(slug);
-      }
+      const slug = e.features?.[0]?.properties?.slug as string | undefined;
+      if (!slug || slug === lastHoverRef.current) return;
+      lastHoverRef.current = slug;
+      if (hoverRafRef.current) cancelAnimationFrame(hoverRafRef.current);
+      hoverRafRef.current = requestAnimationFrame(() => onResortHover?.(slug));
     },
     [onResortHover],
   );
@@ -224,15 +267,14 @@ export default function MapView({
         return;
       }
 
-      // Handle resort marker click
+      // Handle resort marker click — SELECT only, never navigate. On desktop
+      // this drives the in-map popup; on mobile the parent shows a sheet via
+      // onResortSelect. Navigation is deferred to the "View resort" action.
       const slug = feature.properties?.slug as string;
       if (!slug) return;
 
-      if (onResortClick) {
-        onResortClick(slug);
-      }
-
       setSelectedSlug(slug);
+      onResortSelect?.(slug);
 
       const coords = (feature.geometry as GeoJSON.Point).coordinates;
       mapRef.current?.flyTo({
@@ -241,20 +283,20 @@ export default function MapView({
         duration: 1200,
       });
     },
-    [onResortClick],
+    [onResortSelect],
   );
 
   const handlePopupClose = useCallback(() => setSelectedSlug(null), []);
 
   const handleViewResort = useCallback(
     (slug: string) => {
-      if (onResortClick) {
-        onResortClick(slug);
+      if (onViewResort) {
+        onViewResort(slug);
       } else {
         window.location.href = `/resorts/${slug}`;
       }
     },
-    [onResortClick],
+    [onViewResort],
   );
 
   // ── Render ──────────────────────────────────────────────────────
@@ -274,6 +316,9 @@ export default function MapView({
         onMouseMove={onMouseMove}
         onClick={onClick}
         attributionControl={{}}
+        /* Sidebar map lives inside a scrollable page — require a modifier /
+           two-finger gesture to pan/zoom so it doesn't hijack page scroll. */
+        cooperativeGestures={variant === "sidebar"}
         reuseMaps
       >
         {/* Navigation controls */}
@@ -357,13 +402,18 @@ export default function MapView({
                 "poor",  "#a93f20",                /* pc-alpen-dk */
                 "#7a5a3a",                          /* pc-bark fallback */
               ],
+              /* The ink stroke is a REQUIRED accessibility layer, not just a
+                 stamp-feel flourish: "fair" (mustard #e2a740) is only 1.74:1
+                 on cream and "good" (moss) is a marginal 3.17:1 — both fail /
+                 barely pass WCAG 1.4.11 (3:1 non-text) on fill alone. The 2px
+                 ink outline is what carries the contrast. Do not drop it. */
               "circle-stroke-width": [
                 "case",
                 ["==", ["get", "slug"], hoveredSlug ?? ""],
                 2.5,
-                1.5,
+                2,
               ],
-              "circle-stroke-color": "#2a1f14",    /* pc-ink — always ink for stamp feel */
+              "circle-stroke-color": "#2a1f14",    /* pc-ink — always ink for stamp feel + a11y contrast */
               "circle-opacity": 0.95,
             }}
           />
@@ -435,13 +485,16 @@ export default function MapView({
           />
         </Source>
 
-        {/* Weather radar overlay */}
+        {/* Weather radar overlay — inserted BELOW the resort markers
+            (beforeId) so condition dots stay the figure and radar is the
+            background context, per standard weather-map layering. */}
         {showRadar && radarTileUrl && (
-          <MapWeatherOverlay tileUrl={radarTileUrl} />
+          <MapWeatherOverlay tileUrl={radarTileUrl} beforeId="clusters" />
         )}
 
-        {/* Selected resort popup */}
-        {selectedResort && (
+        {/* Selected resort popup — desktop only (mobile gets the parent's
+            bottom sheet; see isDesktop note above). */}
+        {isDesktop && selectedResort && (
           <Popup
             longitude={selectedResort.lng}
             latitude={selectedResort.lat}

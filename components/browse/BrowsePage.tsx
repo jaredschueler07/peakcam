@@ -27,6 +27,8 @@ const MapView = dynamic(() => import("@/components/map/MapView"), {
 
 interface Props {
   resorts: ResortWithData[];
+  /** RainViewer tile URL for the sidebar map's radar layer (best-effort). */
+  radarTileUrl?: string | null;
 }
 
 type StateFilter = string;
@@ -301,7 +303,7 @@ function SouthernSeasonBanner({
 
 // ── Main BrowsePage ──────────────────────────────────────────────────────────
 
-export function BrowsePage({ resorts }: Props) {
+export function BrowsePage({ resorts, radarTileUrl = null }: Props) {
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState<StateFilter>("All");
   const [condFilter, setCondFilter] = useState<ConditionFilter>("all");
@@ -497,9 +499,12 @@ export function BrowsePage({ resorts }: Props) {
 
             {/* Sort + Map toggle */}
             <div className="ml-auto flex items-center gap-1.5">
+              {/* lg: matches the map wrapper's `hidden lg:block` — the toggle
+                  is only shown when the map can actually appear, so there's no
+                  dead tap on 768–1023px tablets. */}
               <button
                 onClick={() => setShowMap((v) => !v)}
-                className="hidden md:flex items-center gap-2 text-ink text-[13px] font-semibold
+                className="hidden lg:flex items-center gap-2 text-ink text-[13px] font-semibold
                            bg-cream-50 border-[1.5px] border-ink rounded-full px-3.5 py-2 shadow-stamp-sm
                            hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]
                            transition-[transform,box-shadow] duration-100 mr-2"
@@ -628,7 +633,8 @@ export function BrowsePage({ resorts }: Props) {
                 resorts={filtered}
                 hoveredSlug={hoveredSlug}
                 onResortHover={setHoveredSlug}
-                onResortClick={(slug) => { window.location.href = `/resorts/${slug}`; }}
+                onViewResort={(slug) => { window.location.href = `/resorts/${slug}`; }}
+                radarTileUrl={radarTileUrl}
                 variant="sidebar"
               />
             </div>

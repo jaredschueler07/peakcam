@@ -29,17 +29,19 @@ export function FullPageMap({ resorts, radarTileUrl }: Props) {
   const router = useRouter();
   const [selectedResort, setSelectedResort] = useState<ResortWithData | null>(null);
 
-  const handleResortClick = useCallback(
+  const handleResortSelect = useCallback(
     (slug: string) => {
-      // On mobile: show bottom sheet. On desktop: navigate.
+      // Tapping a marker SELECTS it — it never navigates. On mobile we show the
+      // bottom sheet; on desktop MapView renders its own in-map popup card, so
+      // there's nothing to do here. Navigation is the explicit second action
+      // ("View resort" → handleViewResort). This kills the old race where a
+      // hard nav / flyTo fired at the same instant as the popup.
       if (typeof window !== "undefined" && window.innerWidth < 1024) {
         const resort = resorts.find((r) => r.slug === slug) ?? null;
         setSelectedResort(resort);
-      } else {
-        router.push(`/resorts/${slug}`);
       }
     },
-    [resorts, router],
+    [resorts],
   );
 
   const handleViewResort = useCallback(
@@ -67,7 +69,8 @@ export function FullPageMap({ resorts, radarTileUrl }: Props) {
       {/* Full-page map */}
       <MapView
         resorts={resorts}
-        onResortClick={handleResortClick}
+        onResortSelect={handleResortSelect}
+        onViewResort={handleViewResort}
         radarTileUrl={radarTileUrl}
         variant="fullpage"
       />
