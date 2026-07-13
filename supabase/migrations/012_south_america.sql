@@ -2,9 +2,14 @@
 -- Migration 012 — South America expansion
 -- Adds resorts.country (for Chile/Argentina resorts fed by the
 -- new model-sync pipeline instead of SNOTEL), extends
--- snow_reports.source to admit 'open_meteo', and fixes the cams
+-- snow_reports.source to admit 'open_meteo', fixes the cams
 -- table's missing unique constraint (import-resorts-standalone.mjs
--- previously could duplicate cam rows on re-run).
+-- previously could duplicate cam rows on re-run), and backfills
+-- snow_reports.snowing_now — written by both sync scripts and read
+-- by the app, but never created by any prior migration file (it
+-- exists in production only because it was added out-of-band; a
+-- fresh database rebuilt purely from migrations 001-011 would be
+-- missing it entirely, and model-sync's insertSnowReport would fail).
 -- ─────────────────────────────────────────────────────────────
 
 -- ── resorts.country ──────────────────────────────────────────
@@ -13,6 +18,12 @@ alter table resorts add column if not exists country text not null default 'US';
 update resorts set country = 'CA' where state = 'BC';
 
 create index if not exists resorts_country_idx on resorts (country);
+
+-- ── snow_reports.snowing_now ─────────────────────────────────
+-- Matches the live production column exactly (nullable, default false)
+-- rather than tightening to NOT NULL, so this is a true no-op backfill
+-- on a database that already has the out-of-band column.
+alter table snow_reports add column if not exists snowing_now boolean default false;
 
 -- ── snow_reports.source — admit 'open_meteo' ─────────────────
 alter table snow_reports drop constraint if exists snow_reports_source_check;

@@ -25,7 +25,7 @@
 - Create: `supabase/migrations/012_south_america.sql`
 
 **Interfaces:**
-- Produces: `resorts.country` (text, not null, default `'US'`), `snow_reports.source` check constraint now admits `'open_meteo'`, a new unique index `cams_resort_embed_url_idx` on `cams(resort_id, embed_url, name)` (name is part of the key — see Step 1 for why; NOT partial — see Step 1's note on why a `where embed_url is not null` predicate is both unnecessary and incompatible with PostgREST's `on_conflict=` upsert mechanism).
+- Produces: `resorts.country` (text, not null, default `'US'`), `snow_reports.source` check constraint now admits `'open_meteo'`, a new unique index `cams_resort_embed_url_idx` on `cams(resort_id, embed_url, name)` (name is part of the key — see Step 1 for why; NOT partial — see Step 1's note on why a `where embed_url is not null` predicate is both unnecessary and incompatible with PostgREST's `on_conflict=` upsert mechanism), and `snow_reports.snowing_now` (boolean, default false — backfills a column the final whole-branch review found was written/read throughout the codebase but never created by any migration; see Step 1).
 
 - [ ] **Step 1: Write the migration file**
 
@@ -34,9 +34,14 @@
 -- Migration 012 — South America expansion
 -- Adds resorts.country (for Chile/Argentina resorts fed by the
 -- new model-sync pipeline instead of SNOTEL), extends
--- snow_reports.source to admit 'open_meteo', and fixes the cams
+-- snow_reports.source to admit 'open_meteo', fixes the cams
 -- table's missing unique constraint (import-resorts-standalone.mjs
--- previously could duplicate cam rows on re-run).
+-- previously could duplicate cam rows on re-run), and backfills
+-- snow_reports.snowing_now — written by both sync scripts and read
+-- by the app, but never created by any prior migration file (it
+-- exists in production only because it was added out-of-band; a
+-- fresh database rebuilt purely from migrations 001-011 would be
+-- missing it entirely, and model-sync's insertSnowReport would fail).
 -- ─────────────────────────────────────────────────────────────
 
 -- ── resorts.country ──────────────────────────────────────────
@@ -45,6 +50,12 @@ alter table resorts add column if not exists country text not null default 'US';
 update resorts set country = 'CA' where state = 'BC';
 
 create index if not exists resorts_country_idx on resorts (country);
+
+-- ── snow_reports.snowing_now ─────────────────────────────────
+-- Matches the live production column exactly (nullable, default false)
+-- rather than tightening to NOT NULL, so this is a true no-op backfill
+-- on a database that already has the out-of-band column.
+alter table snow_reports add column if not exists snowing_now boolean default false;
 
 -- ── snow_reports.source — admit 'open_meteo' ─────────────────
 alter table snow_reports drop constraint if exists snow_reports_source_check;
@@ -1798,6 +1809,17 @@ Create `com.peakcam.model-sync.plist` content (share with the operator to save a
 git add com.peakcam.model-sync.plist
 git commit -m "docs(ops): add model-sync launchd schedule (every 6h, matches snotel-sync cadence)"
 ```
+
+---
+
+## Post-Execution: Final Whole-Branch Review Fixes
+
+After all 10 tasks landed and were individually reviewed, a final whole-branch review (Opus) checked cross-task integration and found two real issues neither task-level review could have caught alone:
+
+1. **BC/Canada `country` clobber.** Task 1's migration set `country='CA' where state='BC'` for the 3 existing Canadian resorts (Whistler Blackcomb, Sun Peaks, Big White), but `data/resorts.csv`'s pre-existing rows for them left `country` blank, and the Task 8 importer's `country: r.country || "US"` reset them to `'US'` on every run — confirmed live in production (`select country from resorts where state='BC'` showed `'US'` for all three). This silently broke Task 7's routing for them (`isUS` true → NWS, which returns nothing for Canadian coordinates). **Fixed:** added `,CA,,` (country=CA, elevation blank) to the 3 BC rows in `data/resorts.csv` so CSV and migration agree going forward, and ran the corrective `update resorts set country='CA' where state='BC'` directly against production to fix the currently-live data immediately (verified: all 3 now show `country='CA'`).
+2. **Missing `snow_reports.snowing_now` migration.** This column is written by both `scripts/snotel-sync.ts` and `scripts/model-sync.ts` and read throughout the app, but no migration file (001-011) ever created it — it exists in production only because it was added out-of-band at some point. A fresh database rebuilt purely from migrations would break `model-sync`'s insert on its very first write. **Fixed:** added `alter table snow_reports add column if not exists snowing_now boolean default false;` to migration 012 (matching the live column's actual nullable/default-false definition exactly, so it's a true no-op against the current production database).
+
+Both fixes are reflected in Task 1's SQL above and in the actual committed `supabase/migrations/012_south_america.sql` / `data/resorts.csv` files.
 
 ---
 
