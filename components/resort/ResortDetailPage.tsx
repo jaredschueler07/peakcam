@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
-import { Heart } from "lucide-react";
+import { Heart, Maximize2 } from "lucide-react";
 import { ConditionBadge } from "@/components/ui/Badge";
 import type { ResortWithData, WeatherPeriod, LiveConditions, Cam, UserCondition, ForecastPeriod, HourlyWeather } from "@/lib/types";
 import { CamReportButton } from "@/components/cam/CamReportButton";
 import { CamEmbed } from "@/components/cam/CamEmbed";
+import { CamLightbox } from "@/components/cam/CamLightbox";
 import { ConditionsHero } from "@/components/resort/ConditionsHero";
 import { ForecastTable } from "@/components/resort/ForecastTable";
 import { HourlyTimeline } from "@/components/resort/HourlyTimeline";
@@ -37,11 +38,13 @@ function CamPlayer({
   resortSlug,
   resortName,
   index = 99,
+  onExpand,
 }: {
   cam: Cam;
   resortSlug: string;
   resortName: string;
   index?: number;
+  onExpand?: () => void;
 }) {
   // Auto-load first 2 image cams; lazy-load the rest
   const [loaded, setLoaded] = useState(cam.embed_type !== "image" || index < 2);
@@ -110,7 +113,18 @@ function CamPlayer({
             </div>
           </button>
         ) : (
-          <CamEmbed cam={cam} resortSlug={resortSlug} variant="tile" />
+          <>
+            <CamEmbed cam={cam} resortSlug={resortSlug} variant="tile" />
+            {onExpand && (
+              <button
+                onClick={onExpand}
+                aria-label="Open fullscreen"
+                className="absolute bottom-3 right-3 z-20 p-1.5 bg-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp text-ink hover:-translate-y-0.5 transition-transform"
+              >
+                <Maximize2 size={14} strokeWidth={2.5} />
+              </button>
+            )}
+          </>
         )}
         <div className="absolute top-2 right-2 z-20">
           <FavoriteButton itemId={cam.id} itemType="cam" variant="ghost" className="bg-surface/50 backdrop-blur-sm" />
@@ -153,7 +167,18 @@ function CamPlayer({
 
       {/* Actual embed */}
       {loaded && <CamEmbed cam={cam} resortSlug={resortSlug} variant="tile" />}
-      
+
+      {/* Expand to fullscreen (overlay) */}
+      {loaded && onExpand && (
+        <button
+          onClick={onExpand}
+          aria-label="Open fullscreen"
+          className="absolute bottom-3 right-3 z-20 p-1.5 bg-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp text-ink hover:-translate-y-0.5 transition-transform"
+        >
+          <Maximize2 size={14} strokeWidth={2.5} />
+        </button>
+      )}
+
       {/* Favorite Button (overlay) */}
       <div className="absolute top-2 right-2 z-20">
         <FavoriteButton itemId={cam.id} itemType="cam" variant="ghost" className="bg-surface/50 backdrop-blur-sm" />
@@ -254,10 +279,12 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
 
 export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData, liveConditions, userConditions = [] }: Props) {
   const activeCams = resort.cams.filter((c) => c.is_active);
+  const embeddableCams = activeCams.filter((c) => c.embed_type !== "link");
   const snow = resort.snow_report;
   const isUS = resort.country === "US";
   const { user, isFavorite, toggle: toggleFav } = useFavorites();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const favorited = isFavorite(resort.id);
 
   useEffect(() => {
@@ -509,7 +536,20 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {activeCams.map((cam, i) => (
                 <div key={cam.id}>
-                  <CamPlayer cam={cam} resortSlug={resort.slug} resortName={resort.name} index={i} />
+                  <CamPlayer
+                    cam={cam}
+                    resortSlug={resort.slug}
+                    resortName={resort.name}
+                    index={i}
+                    onExpand={
+                      cam.embed_type !== "link"
+                        ? () => {
+                            trackCamClick(resort.slug, cam.name, "lightbox");
+                            setLightboxIndex(embeddableCams.findIndex((c) => c.id === cam.id));
+                          }
+                        : undefined
+                    }
+                  />
                   <p className="text-text-muted text-xs mt-1.5 px-1">
                     {cam.name}
                     {cam.elevation && (
@@ -555,6 +595,16 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
         </div>
 
       </div>
+
+      {lightboxIndex !== null && (
+        <CamLightbox
+          cams={embeddableCams}
+          initialIndex={lightboxIndex}
+          resortSlug={resort.slug}
+          resortName={resort.name}
+          onClose={() => setLightboxIndex(null)}
+        />
+      )}
     </div>
   );
 }
