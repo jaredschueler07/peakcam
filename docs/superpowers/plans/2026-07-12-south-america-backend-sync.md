@@ -25,7 +25,7 @@
 - Create: `supabase/migrations/012_south_america.sql`
 
 **Interfaces:**
-- Produces: `resorts.country` (text, not null, default `'US'`), `snow_reports.source` check constraint now admits `'open_meteo'`, a new partial unique index `cams_resort_embed_url_idx` on `cams(resort_id, embed_url, name)` (name is part of the key — see Step 1 for why).
+- Produces: `resorts.country` (text, not null, default `'US'`), `snow_reports.source` check constraint now admits `'open_meteo'`, a new unique index `cams_resort_embed_url_idx` on `cams(resort_id, embed_url, name)` (name is part of the key — see Step 1 for why; NOT partial — see Step 1's note on why a `where embed_url is not null` predicate is both unnecessary and incompatible with PostgREST's `on_conflict=` upsert mechanism).
 
 - [ ] **Step 1: Write the migration file**
 
@@ -78,9 +78,18 @@ delete from cams a using cams b
     and (a.created_at > b.created_at
          or (a.created_at = b.created_at and a.id > b.id));
 
+-- Not partial: PostgREST's on_conflict= query parameter only accepts a
+-- plain column list, and Postgres's ON CONFLICT inference requires the
+-- conflict target's predicate to syntactically match a partial index's
+-- predicate exactly — a bare column list can never infer a partial
+-- index, so any upsert through the REST API would fail with "no unique
+-- or exclusion constraint matching the ON CONFLICT specification"
+-- (verified against the live DB — see Task 8's note). No predicate is
+-- needed anyway: Postgres never treats NULL as equal to another NULL
+-- for uniqueness, so rows with embed_url IS NULL already coexist freely
+-- under a plain unique index.
 create unique index if not exists cams_resort_embed_url_idx
-  on cams (resort_id, embed_url, name)
-  where embed_url is not null;
+  on cams (resort_id, embed_url, name);
 ```
 
 - [ ] **Step 2: Apply the migration**
