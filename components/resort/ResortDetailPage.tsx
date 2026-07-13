@@ -7,6 +7,7 @@ import { Heart } from "lucide-react";
 import { ConditionBadge } from "@/components/ui/Badge";
 import type { ResortWithData, WeatherPeriod, LiveConditions, Cam, UserCondition, ForecastPeriod, HourlyWeather } from "@/lib/types";
 import { CamReportButton } from "@/components/cam/CamReportButton";
+import { CamEmbed } from "@/components/cam/CamEmbed";
 import { ConditionsHero } from "@/components/resort/ConditionsHero";
 import { ForecastTable } from "@/components/resort/ForecastTable";
 import { HourlyTimeline } from "@/components/resort/HourlyTimeline";
@@ -27,30 +28,6 @@ interface Props {
   hourlyData?: HourlyWeather[] | null;
   liveConditions?: LiveConditions | null;
   userConditions?: UserCondition[];
-}
-
-// ─── Auto-refreshing image cam ───────────────────────────────────────────────
-
-function ImageCam({ url, name }: { url: string; name: string }) {
-  const [src, setSrc] = useState(url);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const sep = url.includes("?") ? "&" : "?";
-      setSrc(`${url}${sep}_t=${Date.now()}`);
-    }, 30_000); // refresh every 30 seconds
-    return () => clearInterval(interval);
-  }, [url]);
-
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={name}
-      className="absolute inset-0 w-full h-full object-cover"
-      loading="lazy"
-    />
-  );
 }
 
 // ─── Cam player ──────────────────────────────────────────────────────────────
@@ -133,7 +110,7 @@ function CamPlayer({
             </div>
           </button>
         ) : (
-          <ImageCam url={cam.embed_url ?? ""} name={cam.name} />
+          <CamEmbed cam={cam} resortSlug={resortSlug} variant="tile" />
         )}
         <div className="absolute top-2 right-2 z-20">
           <FavoriteButton itemId={cam.id} itemType="cam" variant="ghost" className="bg-surface/50 backdrop-blur-sm" />
@@ -143,11 +120,6 @@ function CamPlayer({
   }
 
   // YouTube + iframe — click-to-play
-  const embedSrc =
-    cam.embed_type === "youtube" && cam.youtube_id
-      ? `https://www.youtube.com/embed/${cam.youtube_id}?autoplay=1&mute=1`
-      : cam.embed_url ?? "";
-
   return (
     <div className="relative aspect-video bg-surface2 rounded-xl overflow-hidden border border-border group">
       <CamReportButton cam={cam} resortName={resortName} />
@@ -180,15 +152,7 @@ function CamPlayer({
       )}
 
       {/* Actual embed */}
-      {loaded && (
-        <iframe
-          src={embedSrc}
-          title={cam.name}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-          className="absolute inset-0 w-full h-full border-0"
-        />
-      )}
+      {loaded && <CamEmbed cam={cam} resortSlug={resortSlug} variant="tile" />}
       
       {/* Favorite Button (overlay) */}
       <div className="absolute top-2 right-2 z-20">
