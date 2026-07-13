@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import MapBottomSheet from "@/components/map/MapBottomSheet";
+import { isOffSeason } from "@/lib/map-utils";
 import type { ResortWithData } from "@/lib/types";
 
 // MapLibre needs window — dynamic import with no SSR
@@ -13,8 +14,8 @@ const MapView = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-full w-full bg-bg flex items-center justify-center">
-        <span className="text-text-muted text-sm">Loading map...</span>
+      <div className="h-full w-full bg-cream flex items-center justify-center">
+        <span className="font-mono text-bark text-xs uppercase tracking-[0.14em]">Loading map…</span>
       </div>
     ),
   },
@@ -52,12 +53,36 @@ export function FullPageMap({ resorts, radarTileUrl }: Props) {
   );
 
   return (
-    <div className="h-screen w-full relative bg-bg">
+    <div className="h-screen w-full relative bg-cream">
+      {/* Screen-reader equivalent for the map (WCAG 1.1.1). The MapLibre canvas
+          exposes no accessible representation of its markers, so mirror the same
+          resorts — with conditions — as a navigable list. SSR'd, so it's present
+          before the (client-only) map mounts. */}
+      <nav aria-label="Ski resorts shown on the map" className="sr-only">
+        <h2>Ski resorts on the map</h2>
+        <ul>
+          {resorts.map((r) => {
+            const off = isOffSeason(r.lat, new Date());
+            const base = r.snow_report?.base_depth;
+            return (
+              <li key={r.slug}>
+                <a href={`/resorts/${r.slug}`}>
+                  {r.name} — {r.region}, {r.state}.{" "}
+                  {off
+                    ? "Off-season."
+                    : `${r.cond_rating} conditions${base != null ? `, ${base} inch base` : ""}.`}
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+
       {/* Back nav overlay */}
       <div className="absolute top-4 left-16 z-20">
         <Link
           href="/"
-          className="flex items-center gap-1.5 px-3 py-2 bg-surface/90 backdrop-blur-md border border-border rounded-lg text-text-subtle text-sm hover:text-cyan transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-2 bg-cream-50 border-[1.5px] border-ink rounded-full text-ink text-sm font-semibold shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px] transition-[transform,box-shadow] duration-100"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
