@@ -47,6 +47,7 @@ import-error.log
 .test_write
 agents/loop.log
 scripts/snotel-sync.log
+logs/
 
 # extracted agent plugins (built from .plugin zips)
 agents/plugins/
