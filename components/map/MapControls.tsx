@@ -12,6 +12,8 @@ interface MapControlsProps {
   showRadar: boolean;
   onToggleRadar: () => void;
   radarAvailable: boolean;
+  inSeasonOnly: boolean;
+  onToggleInSeason: () => void;
   variant: "sidebar" | "fullpage";
   className?: string;
 }
@@ -23,6 +25,8 @@ export default function MapControls({
   showRadar,
   onToggleRadar,
   radarAvailable,
+  inSeasonOnly,
+  onToggleInSeason,
   variant,
   className,
 }: MapControlsProps) {
@@ -64,6 +68,20 @@ export default function MapControls({
           Radar {showRadar ? "on" : "off"}
         </button>
       )}
+
+      {/* In-season-only toggle — hides off-season (summer) resorts */}
+      <button
+        onClick={onToggleInSeason}
+        aria-pressed={inSeasonOnly}
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border-[1.5px] text-[11.5px] font-bold uppercase tracking-[0.06em] transition-[transform,box-shadow] duration-100 ${
+          inSeasonOnly
+            ? "bg-forest text-cream-50 border-ink shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]"
+            : "bg-cream-50 text-ink border-ink shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]"
+        }`}
+      >
+        <WeatherIcon condition={inSeasonOnly ? "clear" : "cold"} size={14} />
+        In-season {inSeasonOnly ? "only" : "+ off"}
+      </button>
     </div>
   );
 }

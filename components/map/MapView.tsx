@@ -103,6 +103,7 @@ export default function MapView({
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [metric, setMetric] = useState<MapMetric>("baseDepth");
   const [showRadar, setShowRadar] = useState(false);
+  const [inSeasonOnly, setInSeasonOnly] = useState(false);
   const [cursor, setCursor] = useState<string>("grab");
 
   // The in-map popup card is a desktop affordance; on smaller screens the
@@ -131,7 +132,13 @@ export default function MapView({
   }, []);
 
   // Build GeoJSON from resorts
-  const geojson = useMemo(() => resortsToGeoJSON(resorts), [resorts]);
+  // Filter off-season resorts out BEFORE clustering (so off-season-only regions
+  // don't leave a stray cluster) when the "in-season only" toggle is on.
+  const geojson = useMemo(() => {
+    const fc = resortsToGeoJSON(resorts);
+    if (!inSeasonOnly) return fc;
+    return { ...fc, features: fc.features.filter((f) => !f.properties.offSeason) };
+  }, [resorts, inSeasonOnly]);
 
   // Find selected resort for popup
   const selectedResort = useMemo(
@@ -193,24 +200,29 @@ export default function MapView({
   // ── Metric-dependent text field expression ──────────────────────
 
   const textFieldExpr = useMemo(() => {
-    switch (metric) {
-      case "baseDepth":
-        return [
-          "case",
-          ["!=", ["get", "baseDepth"], null],
-          ["concat", ["to-string", ["get", "baseDepth"]], '"'],
-          "—",
-        ];
-      case "snow24h":
-        return [
-          "case",
-          ["!=", ["get", "snow24h"], null],
-          ["concat", ["to-string", ["get", "snow24h"]], '"'],
-          "—",
-        ];
-      case "conditions":
-        return ["get", "condRating"];
-    }
+    const forMetric = (() => {
+      switch (metric) {
+        case "baseDepth":
+          return [
+            "case",
+            ["!=", ["get", "baseDepth"], null],
+            ["concat", ["to-string", ["get", "baseDepth"]], '"'],
+            "—",
+          ];
+        case "snow24h":
+          return [
+            "case",
+            ["!=", ["get", "snow24h"], null],
+            ["concat", ["to-string", ["get", "snow24h"]], '"'],
+            "—",
+          ];
+        case "conditions":
+          return ["get", "condRating"];
+      }
+    })();
+    // Blank the on-marker readout for off-season resorts — a neutral dot with no
+    // number reads as "closed for the season", not "0 inches".
+    return ["case", ["get", "offSeason"], "", forMetric];
   }, [metric]);
 
   // ── Interaction handlers ────────────────────────────────────────
@@ -469,13 +481,19 @@ export default function MapView({
                 14,
               ],
               "circle-color": [
-                "match",
-                ["get", "condRating"],
-                "great", "#3c5a3a",                /* pc-forest */
-                "good",  "#6d8a4a",                /* pc-good (moss) */
-                "fair",  "#e2a740",                /* pc-mustard */
-                "poor",  "#a93f20",                /* pc-alpen-dk */
-                "#7a5a3a",                          /* pc-bark fallback */
+                "case",
+                /* Off-season → desaturated, hue-neutral bark so it never reads
+                   as a red "poor" rating. It's summer, not bad snow. */
+                ["get", "offSeason"], "#b59b74",
+                [
+                  "match",
+                  ["get", "condRating"],
+                  "great", "#3c5a3a",                /* pc-forest */
+                  "good",  "#6d8a4a",                /* pc-good (moss) */
+                  "fair",  "#e2a740",                /* pc-mustard */
+                  "poor",  "#a93f20",                /* pc-alpen-dk */
+                  "#7a5a3a",                          /* pc-bark fallback */
+                ],
               ],
               /* The ink stroke is a REQUIRED accessibility layer, not just a
                  stamp-feel flourish: "fair" (mustard #e2a740) is only 1.74:1
@@ -596,6 +614,8 @@ export default function MapView({
         showRadar={showRadar}
         onToggleRadar={() => setShowRadar((v) => !v)}
         radarAvailable={!!radarTileUrl}
+        inSeasonOnly={inSeasonOnly}
+        onToggleInSeason={() => setInSeasonOnly((v) => !v)}
         variant={variant}
       />
     </div>

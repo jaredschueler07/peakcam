@@ -14,6 +14,7 @@ export interface ResortFeatureProperties {
   state: string;
   region: string;
   condRating: ConditionRating;
+  offSeason: boolean;
   baseDepth: number | null;
   snow24h: number | null;
   snow48h: number | null;
@@ -23,6 +24,26 @@ export interface ResortFeatureProperties {
   liftsTotal: number | null;
   camCount: number;
   conditions: string | null;
+}
+
+// ── Off-season heuristic ─────────────────────────────────────
+//
+// A resort is "off-season" when the current month falls in the local warm half
+// of the year. This is a DISPLAY heuristic only (no schema/data change): it lets
+// summer resorts render as a neutral "Off-season" marker instead of a false red
+// "Poor" dot — the rating engine still scores base depth as usual.
+//
+// Hemisphere comes from latitude. Northern ski season is treated as Nov–Apr,
+// Southern (Andes) as May–Oct — a clean symmetric split. Deliberately crude at
+// the shoulders (an early-Nov opening or summer glacier skiing may misclassify);
+// the tradeoff is zero new data and full reversibility.
+export function isOffSeason(lat: number, date: Date): boolean {
+  const month = date.getMonth() + 1; // 1–12
+  const northern = lat >= 0;
+  const inSeason = northern
+    ? month >= 11 || month <= 4 // Nov–Apr
+    : month >= 5 && month <= 10; // May–Oct
+  return !inSeason;
 }
 
 export interface ResortFeature {
@@ -44,7 +65,8 @@ export type MapMetric = "baseDepth" | "snow24h" | "conditions";
 // ── GeoJSON Conversion ───────────────────────────────────────
 
 export function resortsToGeoJSON(
-  resorts: ResortWithData[]
+  resorts: ResortWithData[],
+  now: Date = new Date()
 ): ResortFeatureCollection {
   return {
     type: "FeatureCollection",
@@ -62,6 +84,7 @@ export function resortsToGeoJSON(
           state: resort.state,
           region: resort.region,
           condRating: resort.cond_rating,
+          offSeason: isOffSeason(resort.lat, now),
           baseDepth: snow?.base_depth ?? null,
           snow24h: snow?.new_snow_24h ?? null,
           snow48h: snow?.new_snow_48h ?? null,

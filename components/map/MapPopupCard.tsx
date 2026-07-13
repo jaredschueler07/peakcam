@@ -2,6 +2,7 @@
 
 import type { MouseEvent } from "react";
 import type { ResortWithData, ConditionRating } from "@/lib/types";
+import { isOffSeason } from "@/lib/map-utils";
 
 // Condition chip palette — matches ConditionBadge
 const conditionChip: Record<ConditionRating, string> = {
@@ -39,6 +40,7 @@ export default function MapPopupCard({ resort, onViewResort }: MapPopupCardProps
 
   const resortHref = `/resorts/${resort.slug}`;
   const updated = timeAgo(snow?.updated_at);
+  const offSeason = isOffSeason(resort.lat, new Date());
 
   // Prefer SPA navigation when the parent provides it (/map uses next/router);
   // otherwise the anchor's href handles a normal navigation. Let modifier /
@@ -73,12 +75,20 @@ export default function MapPopupCard({ resort, onViewResort }: MapPopupCardProps
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
-          <span
-            className={`rounded-full border-[1.5px] px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] leading-tight ${chipCls}`}
-          >
-            {ratingLabel}
-          </span>
-          {snow?.snowing_now && (
+          {offSeason ? (
+            /* Neutral bark pill — matches the off-season map marker; the rating
+               engine's "poor" is meaningless in the local summer. */
+            <span className="rounded-full border-[1.5px] border-ink bg-[#b59b74] px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] leading-tight text-ink">
+              Off-season
+            </span>
+          ) : (
+            <span
+              className={`rounded-full border-[1.5px] px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] leading-tight ${chipCls}`}
+            >
+              {ratingLabel}
+            </span>
+          )}
+          {!offSeason && snow?.snowing_now && (
             /* pale "sky/snow" pill, ink text — deliberately NOT a rating hue
                so it never collides with the forest "great" chip above it. */
             <span className="inline-flex items-center gap-1 rounded-full border-[1.5px] border-ink bg-sky px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] leading-tight text-ink">

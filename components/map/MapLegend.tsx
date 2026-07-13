@@ -4,10 +4,11 @@ import { useState, useEffect, useRef } from "react";
 
 // Earth palette — matches MapView marker colors
 const LEGEND_ITEMS = [
-  { color: "#3c5a3a", label: "Great" },   // pc-forest
-  { color: "#6d8a4a", label: "Good" },    // pc-good (moss)
-  { color: "#e2a740", label: "Fair" },    // pc-mustard
-  { color: "#a93f20", label: "Poor" },    // pc-alpen-dk
+  { color: "#3c5a3a", label: "Great" },       // pc-forest
+  { color: "#6d8a4a", label: "Good" },        // pc-good (moss)
+  { color: "#e2a740", label: "Fair" },        // pc-mustard
+  { color: "#a93f20", label: "Poor" },        // pc-alpen-dk
+  { color: "#b59b74", label: "Off-season" },  // neutral bark — summer/closed
 ] as const;
 
 export default function MapLegend() {
