@@ -38,6 +38,8 @@ export interface Cam {
   embed_url: string | null;      // iframe src URL or link-out URL
   youtube_id: string | null;     // YouTube video/stream ID
   is_active: boolean;
+  consecutive_failures: number;
+  auto_disabled: boolean;
   last_checked_at: string | null;
   created_at: string;
 }
