@@ -32,6 +32,8 @@ export interface ConditionsInput {
   history7d: {
     /** Last 7 days of SWE values, oldest first. May contain nulls. */
     sweValues: (number | null)[];
+    /** Optional override for the rising/falling threshold (inches). Defaults to 0.5in, tuned for SWE. Pass a larger value (e.g. 2.0) when sweValues actually holds snow-depth data. */
+    thresholdIn?: number;
   };
   forecast: {
     /** Sum of estimated snow (inches) over the next 48 hours. */
@@ -93,7 +95,10 @@ export function computePctOfNormal(
 
 // ── Trend ────────────────────────────────────────────────────
 
-export function computeTrend(sweValues: (number | null)[]): SnowTrend {
+export function computeTrend(
+  sweValues: (number | null)[],
+  thresholdIn: number = TREND_THRESHOLD_IN,
+): SnowTrend {
   // Need at least 3 days of data to determine a trend
   const valid = sweValues.filter((v): v is number => v != null);
   if (valid.length < 3) return "stable";
@@ -102,8 +107,8 @@ export function computeTrend(sweValues: (number | null)[]): SnowTrend {
   const newest = valid[valid.length - 1];
   const delta = newest - oldest;
 
-  if (delta > TREND_THRESHOLD_IN) return "rising";
-  if (delta < -TREND_THRESHOLD_IN) return "falling";
+  if (delta > thresholdIn) return "rising";
+  if (delta < -thresholdIn) return "falling";
   return "stable";
 }
 
@@ -319,7 +324,7 @@ export function computeConditions(input: ConditionsInput): ConditionsOutput {
     input.normals.medianSweIn,
   );
 
-  const trend7d = computeTrend(input.history7d.sweValues);
+  const trend7d = computeTrend(input.history7d.sweValues, input.history7d.thresholdIn);
 
   const { outlook, outlookLabel } = computeOutlook(
     trend7d,
