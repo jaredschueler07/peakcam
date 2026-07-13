@@ -1,0 +1,1801 @@
+{
+  "summary": "Research Chile/Argentina ski resorts for PeakCam expansion: status, coords, elevation, webcams",
+  "agentCount": 36,
+  "logs": [
+    "20/20 resorts researched; 48 candidate cams found"
+  ],
+  "result": {
+    "resorts": [
+      {
+        "cam_page_url": "https://skiportillo.com/en/our-mountain/portillo-snow-forecast-conditions/",
+        "cams": [
+          {
+            "cam_name": "Laguna (Inca Lake)",
+            "embed_type": "iframe",
+            "embed_url": "https://g3.ipcamlive.com/player/player.php?alias=laguna",
+            "youtube_id": null,
+            "evidence": "Found on skiportillo.com/en/our-mountain/portillo-snow-forecast-conditions/ under 'Mountain Cams'. Fetched player URL directly on 2026-07-12 (with resort referer header) -> HTTP 200, page title 'Live video stream', JS shows ipcamliveplayer.embedOnline(...) with streamid '28wiqf1gysm3duude', confirming the cam is currently live (not offline)."
+          },
+          {
+            "cam_name": "Tío Bob's",
+            "embed_type": "iframe",
+            "embed_url": "https://g3.ipcamlive.com/player/player.php?alias=tiobobs",
+            "youtube_id": null,
+            "evidence": "Same source page as Laguna cam. Direct fetch on 2026-07-12 -> HTTP 200, embedOnline() with streamid '88rnk2stf8i1gkfy7', confirming live status."
+          },
+          {
+            "cam_name": "Plateau",
+            "embed_type": "iframe",
+            "embed_url": "https://g3.ipcamlive.com/player/player.php?alias=plateau",
+            "youtube_id": null,
+            "evidence": "Same source page as Laguna cam. Direct fetch on 2026-07-12 -> HTTP 200, embedOnline() with streamid '8ffjl1oc0dptzqups', confirming live status."
+          },
+          {
+            "cam_name": "Escuela (Ski School)",
+            "embed_type": "iframe",
+            "embed_url": "https://g3.ipcamlive.com/player/player.php?alias=escuela",
+            "youtube_id": null,
+            "evidence": "Same source page as Laguna cam. Direct fetch on 2026-07-12 -> HTTP 200, embedOnline() with streamid '51dntwamcybpy0gw6', confirming live status."
+          }
+        ],
+        "country": "CL",
+        "elevation_base_ft": 8360,
+        "elevation_summit_ft": 10860,
+        "lat": -32.8367,
+        "lng": -70.1289,
+        "name": "Ski Portillo",
+        "notes": "Operating for the 2026 season: multiple 2026 trade-press articles (Powder, FreeSkier, SnowBrains, Unofficial Networks, snowsportsnews) report Ski Portillo operating June 20 - Sept 26, 2026, following two consecutive above-average snow years. As of today (2026-07-12, mid-season) all 4 official webcams were fetched live/online, which is itself direct confirmation the resort is currently operating. Coordinates cross-checked: Wikipedia (32°50′10″S 70°07′44″W = -32.8361,-70.1289) vs latitude.to (-32.8370,-70.1289); averaged to -32.8367,-70.1289. Elevations: base_ft uses the lowest-lift base (2,548 m/8,360 ft per Wikipedia); note the hotel/village itself sits higher at 2,880 m (9,450 ft). Summit_ft uses the highest lift-served point (3,310 m/10,860 ft); the true mountain summit (Ojos de Agua, ungroomed/off-piste terrain) reaches 4,222 m (13,852 ft) but is not the lift-served summit. Vertical drop 762 m (2,500 ft). Official webcam page is under 'Our Mountain > Snow Forecast/Conditions' and embeds 4 ipcamlive.com live players (Laguna/Inca Lake, Tío Bob's, Plateau, Escuela) - classified as 'iframe' type per PeakCam taxonomy since these are direct embeddable player.php URLs, not static images or YouTube streams. No official YouTube live stream was found for Ski Portillo in this search. X/Twitter account (x.com/skiportillo) exists per search results but could not be content-verified directly (x.com blocks unauthenticated fetch, HTTP 402); Instagram and Facebook were confirmed via search result titles matching official branding.",
+        "operating_2026": "operating - Multiple 2026 ski-press sources (Powder, FreeSkier, SnowBrains, Unofficial Networks) confirm season running June 20-Sept 26, 2026; as of research date 2026-07-12 all 4 official webcams returned live/online status, directly confirming current operation.",
+        "region_label": "Chile",
+        "social": {
+          "instagram_url": "https://www.instagram.com/skiportillo/",
+          "facebook_url": "https://www.facebook.com/skiportillo/",
+          "x_url": "https://x.com/skiportillo"
+        },
+        "website_url": "https://skiportillo.com/en/home/",
+        "cam_verification": [
+          {
+            "embed_url": "https://g3.ipcamlive.com/player/player.php?alias=laguna",
+            "verdict": "working",
+            "detail": "Page loads (HTTP 200 with browser UA; ipcamlive blocks non-browser UAs with 403). Title 'Live video stream', valid streamid '28wiqf1gysm3duude' assigned, and player JS calls ipcamliveplayer.embedOnline(...) — ipcamlive uses embedOffline() for dead/removed cameras, so embedOnline indicates the stream is currently registered as live. Actual video frames require JS/WebSocket rendering that can't be fully confirmed headlessly, but all server-side signals indicate an active stream."
+          },
+          {
+            "embed_url": "https://g3.ipcamlive.com/player/player.php?alias=tiobobs",
+            "verdict": "working",
+            "detail": "Page loads (HTTP 200 with browser UA; 403 without). Title 'Live video stream', valid streamid '88rnk2stf8i1gkfy7', and embedOnline() call present, matching the pattern of an active camera rather than embedOffline() used for dead streams."
+          },
+          {
+            "embed_url": "https://g3.ipcamlive.com/player/player.php?alias=plateau",
+            "verdict": "working",
+            "detail": "Page loads (HTTP 200 with browser UA; 403 without). Title 'Live video stream', valid streamid '8ffjl1oc0dptzqups', embedOnline() call present, consistent with an active stream registration."
+          },
+          {
+            "embed_url": "https://g3.ipcamlive.com/player/player.php?alias=escuela",
+            "verdict": "working",
+            "detail": "Page loads (HTTP 200 with browser UA; 403 without). Title 'Live video stream', valid streamid '51dntwamcybpy0gw6', embedOnline() call present, consistent with an active stream registration."
+          }
+        ]
+      },
+      {
+        "cam_page_url": "https://www.vallenevado.com/en/cameras/",
+        "cams": [
+          {
+            "cam_name": "La Fourchette Terrace",
+            "embed_type": "youtube",
+            "embed_url": "https://www.youtube.com/embed/tWNxInShxZI",
+            "youtube_id": "tWNxInShxZI",
+            "evidence": "Fetched raw HTML of https://www.vallenevado.com/en/cameras/ via curl; found <iframe src=\"https://www.youtube.com/embed/tWNxInShxZI?feature=oembed\" title=\"Valle Nevado Ski Resort Live - La Fourchette\">. Confirmed live/valid via YouTube oEmbed API (https://www.youtube.com/oembed?url=...v=tWNxInShxZI), which returned title 'Valle Nevado Ski Resort Live - La Fourchette', author_name 'Valle Nevado Ski Resort', author_url https://www.youtube.com/@vallenevadoskiresort."
+          },
+          {
+            "cam_name": "Pool (Piscina)",
+            "embed_type": "youtube",
+            "embed_url": "https://www.youtube.com/embed/uyt8JsITTac",
+            "youtube_id": "uyt8JsITTac",
+            "evidence": "Same source page; iframe title 'Valle Nevado Ski Resort Live - Piscina'. Confirmed via oEmbed API: title matches, author 'Valle Nevado Ski Resort' (@vallenevadoskiresort)."
+          },
+          {
+            "cam_name": "Hotel Puerta del Sol",
+            "embed_type": "youtube",
+            "embed_url": "https://www.youtube.com/embed/tmS73xQ4zVc",
+            "youtube_id": "tmS73xQ4zVc",
+            "evidence": "Same source page; iframe title 'Valle Nevado Ski Resort Live - Hotel Puerta del Sol'. Confirmed via oEmbed API: title matches, author 'Valle Nevado Ski Resort'."
+          },
+          {
+            "cam_name": "La Góndola",
+            "embed_type": "youtube",
+            "embed_url": "https://www.youtube.com/embed/_oWY76RiLZQ",
+            "youtube_id": "_oWY76RiLZQ",
+            "evidence": "Same source page; iframe title 'Valle Nevado Ski Resort – La Góndola'. Confirmed via oEmbed API: title matches, author 'Valle Nevado Ski Resort'."
+          }
+        ],
+        "country": "CL",
+        "elevation_base_ft": 9843,
+        "elevation_summit_ft": 12041,
+        "lat": -33.3567,
+        "lng": -70.2495,
+        "name": "Valle Nevado",
+        "notes": "Operating for 2026 season: opened June 19, 2026 (Vaivén chairlift first, other lifts phased in with snowfall), scheduled to run through Oct 4, 2026 conditions permitting. Now integrated with La Parva under the \"Tres Valles\" combined pass/mountain concept (with El Colorado planned to join), giving one of South America's largest lift-served domains (~1,700 ha, 87 runs, 30 lifts combined). $3.3M in 2026 capex: new Aconcagua Ski Residences (39 units), expanded snowmaking, lift/grooming upgrades. Sources: Teton Gravity Research, SnowBrains, Powder, WinterInsight (all June 2026).\n\nCoordinates cross-checked: Wikipedia gives 33.356687°S, 70.249468°W; latitude.to gives -33.3547, -70.2498 (independent source, within ~250m — both plausible base-area points; used the Wikipedia value, rounded).\n\nElevation note/caution: Wikipedia's infobox \"summit\" figure of 5,430 m / 17,815 ft is NOT the resort's ski-lift summit — that number matches Cerro/Nevado El Plomo, a mountaineering peak (5,424–5,430 m) accessible from the resort but well above lift-served terrain. The actual ski-area summit, cross-checked independently on skimap.org and directly fetched from OnTheSnow, is 3,670 m / 12,041 ft, with base at 2,999–3,000 m / 9,843 ft (vertical drop ~810 m / 2,657–2,658 ft). Used the skimap.org/OnTheSnow figures as they describe the actual skiable summit, not a nearby mountaineering objective.\n\nWebcams: Official site's /en/cameras/ page embeds 4 YouTube live streams (not static images or Vimeo/other iframe as sometimes seen at other Andes resorts). All 4 verified live via YouTube's oEmbed API and attributed to the official \"Valle Nevado Ski Resort\" YouTube channel (https://www.youtube.com/channel/UCeugwuttf3KGSyVuax_AzNw / @vallenevadoskiresort). No standalone static-image or link-only cams found beyond these 4.\n\nSocial links found in the official site's JSON-LD (Organization schema) at /en/cameras/: Facebook https://www.facebook.com/vallenevadoskiresort and X https://x.com/valle_nevado. Instagram (@valle_nevado, ~265K followers) confirmed via web search at https://www.instagram.com/valle_nevado/ — not independently fetched/verified live but URL/handle consistent with resort's other official branding (X handle also \"valle_nevado\").",
+        "operating_2026": "operating — official 2026 season opened June 19, 2026 (Vaivén chairlift first, phased opening as conditions allowed), scheduled through Oct 4, 2026; per Teton Gravity Research, SnowBrains, Powder Magazine, and WinterInsight (all reporting June 2026), plus $3.3M in capital upgrades and new Aconcagua Ski Residences for this season.",
+        "region_label": "Chile",
+        "social": {
+          "instagram_url": "https://www.instagram.com/valle_nevado/",
+          "facebook_url": "https://www.facebook.com/vallenevadoskiresort",
+          "x_url": "https://x.com/valle_nevado"
+        },
+        "website_url": "https://www.vallenevado.com/en/",
+        "cam_verification": [
+          {
+            "embed_url": "https://www.youtube.com/embed/tWNxInShxZI",
+            "verdict": "unverifiable",
+            "detail": "Video exists (oembed 200): 'Valle Nevado Ski Resort Live - La Fourchette' by Valle Nevado Ski Resort channel. Not removed/dead, but live-stream active status requires JS-rendered player, which WebFetch/curl cannot confirm."
+          },
+          {
+            "embed_url": "https://www.youtube.com/embed/uyt8JsITTac",
+            "verdict": "unverifiable",
+            "detail": "Video exists (oembed 200): 'Valle Nevado Ski Resort Live - Piscina' by Valle Nevado Ski Resort channel. Not removed/dead, but current live/active status can't be confirmed without JS execution."
+          },
+          {
+            "embed_url": "https://www.youtube.com/embed/tmS73xQ4zVc",
+            "verdict": "unverifiable",
+            "detail": "Video exists (oembed 200): 'Valle Nevado Ski Resort Live - Hotel Puerta del Sol' by Valle Nevado Ski Resort channel. Not removed/dead, but current live/active status can't be confirmed without JS execution."
+          },
+          {
+            "embed_url": "https://www.youtube.com/embed/_oWY76RiLZQ",
+            "verdict": "unverifiable",
+            "detail": "Video exists (oembed 200): 'Valle Nevado Ski Resort - La Góndola' by Valle Nevado Ski Resort channel. Not removed/dead, but current live/active status can't be confirmed without JS execution."
+          }
+        ]
+      },
+      {
+        "cam_page_url": "https://laparva.cl/en/mountain-report/web-cameras/",
+        "cams": [
+          {
+            "cam_name": "Parva Chica",
+            "embed_type": "youtube",
+            "embed_url": "https://www.youtube.com/embed/dEF-ujYXgkU",
+            "youtube_id": "dEF-ujYXgkU",
+            "evidence": "Fetched raw HTML of https://laparva.cl/en/mountain-report/web-cameras/ via curl; found <iframe src=\"https://www.youtube.com/embed/dEF-ujYXgkU\" title=\"Parva Chica\">. Confirmed the video ID is live/valid via YouTube oembed API (https://www.youtube.com/oembed?url=...v=dEF-ujYXgkU), which returned metadata from channel 'Ski La Parva' (@laparvaskiresort); YouTube's own video title is 'La Parva - Escuela de Ski en vivo' (site labels the embed slot 'Parva Chica')."
+          },
+          {
+            "cam_name": "Parva Comercial",
+            "embed_type": "youtube",
+            "embed_url": "https://www.youtube.com/embed/Q3P64_RPNlY",
+            "youtube_id": "Q3P64_RPNlY",
+            "evidence": "Fetched raw HTML of https://laparva.cl/en/mountain-report/web-cameras/ via curl; found <iframe src=\"https://www.youtube.com/embed/Q3P64_RPNlY\" title=\"Parva Comercial\">. Confirmed valid via YouTube oembed API, channel 'Ski La Parva' (@laparvaskiresort); YouTube's own video title is 'La Parva - Parva Chica en vivo' (site labels this embed slot 'Parva Comercial' — a labeling/title mismatch between the site and YouTube metadata, but both video IDs are confirmed live and embeddable)."
+          }
+        ],
+        "country": "CL",
+        "elevation_base_ft": 8760,
+        "elevation_summit_ft": 11910,
+        "lat": -33.3356,
+        "lng": -70.2905,
+        "name": "La Parva",
+        "notes": "Operating status confirmed for the current 2026 season (not just website existence): La Parva opened June 27, 2026 as part of the integrated 'Tres Valles' pass with Valle Nevado (and El Colorado), a combined domain of 1,700+ ha / 87 runs / 30 lifts. As of the most recent snow report checked (skiinfo.com, dated July 10, 2026), status = Open, base depth ~5cm at report time with 2 of 15 lifts running (early-season/low-snow conditions, not a closure) — corroborated by a separate search snippet citing 10 of 15 lifts open with 35cm base around the same period, i.e. it fluctuates day to day but the resort is actively operating, not shut down for the season. Elevation figures (2,670m/8,760ft base; 3,630m/11,910ft summit) cross-checked between Wikipedia's infobox and PowderQuest/OnTheSnow (which independently cite the same 3,630m summit and 2,670m-equivalent base in meters, though OnTheSnow's own ft conversion rounds slightly differently). Coordinates cross-checked between Wikipedia (33°20′08″S 70°17′26″W = -33.3356, -70.2905) and a second aggregator citing -33.33282, -70.28263 — the two agree to within ~1.3 km, consistent with 'base area' vs. resort-centroid coordinate choices; Wikipedia's figure used as primary. Official webcams page (laparva.cl/en/mountain-report/web-cameras/) hosts exactly two embedded YouTube live streams, both confirmed reachable/valid via YouTube's oembed endpoint. Social links (Instagram @skilaparva, Facebook /skilaparva) were pulled directly from the official site's own footer HTML (verified via curl), not just search results. An X/Twitter account at twitter.com/skilaparva appears in web search results using the same consistent handle as the verified Instagram/Facebook, but it was NOT found linked from the official site itself, so treat that one link as less strongly verified than the other two.",
+        "operating_2026": "operating — confirmed open as of July 10, 2026 snow report (skiinfo.com: \"Open,\" base depth reported, 2/15 lifts running that day); resort began 2026 season June 27 under the Tres Valles combined pass with Valle Nevado/El Colorado.",
+        "region_label": "Chile",
+        "social": {
+          "instagram_url": "https://www.instagram.com/skilaparva/",
+          "facebook_url": "https://www.facebook.com/skilaparva",
+          "x_url": "https://twitter.com/skilaparva"
+        },
+        "website_url": "https://laparva.cl/en/",
+        "cam_verification": [
+          {
+            "embed_url": "https://www.youtube.com/embed/dEF-ujYXgkU",
+            "verdict": "unverifiable",
+            "detail": "Video exists and is valid (oembed confirms title 'La Parva - Escuela de Ski en vivo' by channel Ski La Parva, HTTP 200). Not dead/removed. However, whether it is currently live/streaming cannot be confirmed via WebFetch or oembed (embed page requires JS rendering; WebFetch returned only a bare 'YouTube' string with no player state)."
+          },
+          {
+            "embed_url": "https://www.youtube.com/embed/Q3P64_RPNlY",
+            "verdict": "unverifiable",
+            "detail": "Video exists and is valid (oembed confirms title 'La Parva - Parva Chica en vivo' by channel Ski La Parva, HTTP 200). Not dead/removed. However, whether it is currently live/streaming cannot be confirmed via WebFetch or oembed (embed page requires JS rendering; WebFetch returned only a bare 'YouTube' string with no player state)."
+          }
+        ]
+      },
+      {
+        "cam_page_url": "https://www.elcolorado.cl/live-cam/",
+        "cams": [
+          {
+            "cam_name": "Parador Pista",
+            "embed_type": "youtube",
+            "embed_url": "https://www.youtube.com/embed/r3vGVM_gW64",
+            "youtube_id": "r3vGVM_gW64",
+            "evidence": "Fetched raw HTML of https://www.elcolorado.cl/live-cam/ (curl); found <h3 class=livecam__title>Parador Pista</h3> immediately followed by iframe src=youtube.com/embed/r3vGVM_gW64. Confirmed live via YouTube oEmbed API (youtube.com/oembed?url=...): title 'El Colorado - Parador', author 'Webcams' / channel @andacorwebcams (Andacor is the operator of El Colorado per its own homepage)."
+          },
+          {
+            "cam_name": "Mirador Cima",
+            "embed_type": "youtube",
+            "embed_url": "https://www.youtube.com/embed/xr0iN3zNe8U",
+            "youtube_id": "xr0iN3zNe8U",
+            "evidence": "Same page fetch; <h3>Mirador Cima</h3> followed by iframe src=youtube.com/embed/xr0iN3zNe8U. Confirmed via YouTube oEmbed API: title 'El Colorado - Mirador', channel @andacorwebcams."
+          },
+          {
+            "cam_name": "Liebre Base",
+            "embed_type": "youtube",
+            "embed_url": "https://www.youtube.com/embed/qxh2rEl_PFU",
+            "youtube_id": "qxh2rEl_PFU",
+            "evidence": "Same page fetch; <h3>Liebre Base</h3> followed by iframe src=youtube.com/embed/qxh2rEl_PFU. Confirmed via YouTube oEmbed API: title 'Liebre', channel @andacorwebcams."
+          }
+        ],
+        "country": "CL",
+        "elevation_base_ft": 7972,
+        "elevation_summit_ft": 10935,
+        "lat": -33.3493,
+        "lng": -70.2923,
+        "name": "El Colorado",
+        "notes": "Operating 2026: confirmed operating. Multiple July-2026 sources (FullTour, gochile.cl) report El Colorado opened its 2026 season on June 19, 2026 with partial opening June 27; operator Andacor projects visitor numbers above 2024/2025 records and season is expected to run to mid-September. Not a closed area.\n\nElevation: sources conflict slightly. Ski-industry sources (OnTheSnow, J2Ski, chileanski.com) agree on ~2,400-2,430 m base / ~3,300-3,333 m summit (903 m vertical) — used here (2,430 m / 3,333 m -> 7,972 ft / 10,935 ft). The English Wikipedia infobox for 'El Colorado (Chile)' gives a conflicting base of 1,540 m / summit 2,430 m, which appears to be a data error or references a different boundary (e.g. Farellones village access road) — not used, since three independent ski-specific sources concur on the higher figures.\n\nCoordinates cross-checked: Wikipedia 'El Colorado (Chile)' infobox and Wikidata Q5821498 both give 33°20'57.5\"S, 70°17'32.3\"W (-33.3493, -70.2923).\n\nWebsite is WordPress-based (elcolorado.cl); live-cam page renders 3 embedded YouTube iframes client-side (not visible to simple text scrapers) — required raw HTML fetch via curl to extract. All 3 are hosted on the YouTube channel @andacorwebcams ('Webcams'), which is the operator (Andacor) that also runs Farellones, Pillán and Volcán Osorno per El Colorado's own homepage — treated as the official source. No static-image or standalone iframe (non-YouTube) cams were found on the resort site or via meteoblue/snow-forecast/worldcamera aggregator searches (those third-party sites re-embed the same YouTube feeds or are themselves paywalled/broken).\n\nSocial: Instagram and Facebook links pulled directly from the live-cam page HTML (verified via curl) and cross-confirmed by web search. No official X/Twitter account found on-site or via search.",
+        "operating_2026": "operating — official 2026 season opened June 19/27, 2026 per resort operator Andacor (FullTour, gochile.cl, July 2026 coverage); running through ~mid-September 2026.",
+        "region_label": "Chile",
+        "social": {
+          "instagram_url": "https://www.instagram.com/elcoloradofare/",
+          "facebook_url": "https://www.facebook.com/ElColorado/",
+          "x_url": null
+        },
+        "website_url": "https://www.elcolorado.cl",
+        "cam_verification": [
+          {
+            "embed_url": "https://www.youtube.com/embed/r3vGVM_gW64",
+            "verdict": "unverifiable",
+            "detail": "WebFetch returned only the literal text 'YouTube' with no player content or error message — YouTube embed pages render via JavaScript, so a static HTML fetch cannot determine if the video is live, available, or removed. Requires a JS-capable browser check or the YouTube Data API to confirm."
+          },
+          {
+            "embed_url": "https://www.youtube.com/embed/xr0iN3zNe8U",
+            "verdict": "unverifiable",
+            "detail": "Same result: WebFetch returned only 'YouTube' text, no indication of player state or error. Cannot confirm working/dead without JS rendering or API lookup."
+          },
+          {
+            "embed_url": "https://www.youtube.com/embed/qxh2rEl_PFU",
+            "verdict": "unverifiable",
+            "detail": "Same result: WebFetch returned only 'YouTube' text, no indication of player state or error. Cannot confirm working/dead without JS rendering or API lookup."
+          }
+        ]
+      },
+      {
+        "cam_page_url": null,
+        "cams": [],
+        "country": "CL",
+        "elevation_base_ft": 7218,
+        "elevation_summit_ft": 8366,
+        "lat": -33.6071,
+        "lng": -70.2888,
+        "name": "Lagunillas",
+        "notes": "Lagunillas (Centro de Ski Lagunillas) is Chile's only non-commercial ski center, founded and operated by Club Andino de Chile since 1933. Located in Cajón del Maipo, San José de Maipo commune, ~67 km/60 km SE of Santiago via Ruta G-25. Small area: 3 lifts, 13 runs, 200 hectares, night skiing offered. NO WEBCAM FOUND despite thorough checking: (1) official site skilagunillas.cl could not be reached directly by the fetch tool (connection refused on every attempt, both http/https) but was reachable via search-engine snippets/cache, and no webcam page appeared in any indexed subpage (checked schedule, routes, dining, norms, day-pass, season-pass-sales pages); (2) snow-forecast.com's dedicated webcam page for the resort explicitly states 'We don't have a live webcam for this resort'; (3) chilenieve.com's regional webcam roundup lists 8 other Chilean resorts but omits Lagunillas entirely; (4) no official YouTube live-stream channel found (only old promotional/tourist videos, e.g. a 2014 cinematic clip and 2024 vlogs - not live cams). Cams array is correctly empty per instructions. Elevation figures vary by source (base ~1896-2293m per snow-forecast/ioverlander vs. base 2200m/summit 2550m per skiresort.info and the resort's own '2,200m/7,200ft' marketing line) - I used skiresort.info's base/summit split (2200m/2550m, 350m vertical) since it's the only source giving both figures consistently and its 350m vertical roughly matches the ~305m (1000ft) vertical drop cited elsewhere. Coordinates cross-checked: ioverlander.com listing 'Ski center and cabins Lagunillas' gives -33.60710, -70.28884 (elev 2293m); snow-forecast.com independently gives 33.61°S, 70.28°W - close agreement, used the more precise ioverlander figure.",
+        "operating_2026": "operating (seasonal, pre-season as of report date) - skiresort.info states the resort is \"currently closed for the season\" but that the \"2026 season opens July 18\" (today is 2026-07-12, 6 days before that date); this is normal pre-season status, not a permanent closure. No evidence found of Lagunillas ceasing operations - Club Andino de Chile continues to run it, season-pass-sales page (venta-pase-temporada) exists on the current site, and multiple 2026-current travel/tourism articles (tripadvisor \"2026\" attraction listing, turismoencajondelmaipo.cl winter-2026 snow guide) reference it as an active, visitable resort for the 2026 winter.",
+        "region_label": "Chile",
+        "social": {
+          "instagram_url": "https://www.instagram.com/skilagunillas/",
+          "facebook_url": "https://www.facebook.com/LagunillasCentrodeSki/",
+          "x_url": "https://x.com/skilagunillas"
+        },
+        "website_url": "https://www.skilagunillas.cl/",
+        "cam_verification": []
+      },
+      {
+        "cam_page_url": "https://www.nevadosdechillan.com/camaras",
+        "cams": [
+          {
+            "cam_name": "Novicios (Pista Novicios)",
+            "embed_type": "iframe",
+            "embed_url": "https://g3.ipcamlive.com/player/player.php?alias=pistanovicios&autoplay=1",
+            "youtube_id": null,
+            "evidence": "Fetched https://www.nevadosdechillan.com/camaras (raw HTML via curl) and found <iframe src=\"https://g3.ipcamlive.com/player/player.php?alias=pistanovicios&autoplay=1\"> under heading 'Cámara Novicios' / 'Pista Novicios'. Directly curled the player URL: HTTP 200, returns ipcamlive live-stream player HTML with active stream token (streamid=515h6ix42ffahlred), confirming it is a live embeddable feed."
+          },
+          {
+            "cam_name": "Plaza Tata",
+            "embed_type": "iframe",
+            "embed_url": "https://g3.ipcamlive.com/player/player.php?alias=plazatata&autoplay=1",
+            "youtube_id": null,
+            "evidence": "Same page (https://www.nevadosdechillan.com/camaras), second <iframe src=\"https://g3.ipcamlive.com/player/player.php?alias=plazatata&autoplay=1\"> under heading 'Cámara Plaza Tata'. Curl HTTP 200 confirms live ipcamlive player responds."
+          }
+        ],
+        "country": "CL",
+        "elevation_base_ft": 5020,
+        "elevation_summit_ft": 7874,
+        "lat": -36.9065,
+        "lng": -71.4142,
+        "name": "Nevados de Chillán",
+        "notes": "OPERATING STATUS: Operating for the 2026 season, but as of the research date (2026-07-12) is under a TEMPORARY weather closure. skiresort.info's live snow report (fetched 2026-07-12) shows current season dates \"2026-06-29 - 2026-09-27\" but status \"Ski resort closed — Temporary\" with 0 of 35km slopes / 0 of 16 lifts open due to conditions, base snow depth 0cm at time of check (5cm top/2400m). This matches the official site (nevadosdechillan.com homepage), which as of 2026-07-08 announced mountain activities (Parque Aventura + ski runs) suspended due to heavy rainfall, with the Adventure Park reopening 2026-07-11 (ski runs status not yet confirmed reopened). Earlier in the season (per press, July 3) the resort had reported 20cm base / 6 of 15 lifts open, so this is a storm-driven pause within an active season, not a season cancellation. Recommend a follow-up check closer to publish time given volatility.\n\nELEVATION: Cross-checked two sources — skiresort.info (base 1530m / summit 2400m, live snow-report page) and Spanish Wikipedia \"Nevados de Chillán (centro de esquí)\" (base 1540m / summit 2400m). Used 1530m/2400m (skiresort.info) → 5,020 ft base / 7,874 ft summit. Note: the volcanic summit itself (Nevados de Chillán volcanic complex, per English Wikipedia) is much higher at 3,212m/10,538ft — that is the mountain's true high point, not the ski area's lift-served summit (2400m), which is what's reported here per PeakCam convention (resort-served elevations).\n\nCOORDINATES: Cross-checked two sources for the ski-resort BASE AREA (not the volcano peak): (1) Spanish Wikipedia ski-resort article gives 36°54′33″S 71°25′08″O = -36.9092, -71.4189; (2) a web aggregator citation gives -36.903745, -71.409477. These two cluster within ~1.3 km of each other in the Valle Las Trancas / Termas de Chillán base area, so I used their midpoint (-36.9065, -71.4142). IMPORTANT: do not confuse with the volcanic-complex summit coordinates (-36.8633, -71.3767 per English Wikipedia / -36.858,-71.373 per latitude.to), which refer to the mountain peak ~5-6km away, not the ski base.\n\nWEBCAMS: Official site's /camaras page (fetched raw HTML, since WebFetch's JS-rendering missed the iframes) embeds two ipcamlive.com live streams: \"Novicios\" (Pista Novicios) and \"Plaza Tata\". Both iframe URLs were curled directly and returned HTTP 200 with active ipcamlive player/stream tokens — confirmed live, not dead links. No YouTube live stream found: the resort's YouTube channel (youtube.com/channel/UCai0b2vM5thJK3Gt74rUupQ) exists and is linked in the footer, but the only embedded YouTube video discovered (via skiresort.info, id s9ZbR48rOYI) is a static 2021 promotional video (\"Temporada Invierno 2021\"), not a live cam — excluded. A third-party aggregator (vision-environnement.com) claims a Nevados de Chillán webcam but its direct image URL (https://www.vision-environnement.com/live/image/webcam/nevados-de-chillan.JPG) 302-redirected to the site's homepage rather than returning an image, so it was not included as a verified cam. OnTheSnow/snow-forecast/skiinfo/snow2day all appear to just be re-displaying the same two official Plaza Tata / Novicios cams rather than offering independent feeds.\n\nSOCIAL: All three links found on the official homepage (nevadosdechillan.com) and confirmed reachable via curl (HTTP 200/301): Instagram, Facebook, and X (twitter.com/nevadosski redirects 301 to x.com/nevadosski, which returns 200).",
+        "operating_2026": "operating (with a temporary weather-driven pause as of 2026-07-12) — season dates 2026-06-29 to 2026-09-27 per skiresort.info; official site confirms mountain ops suspended 2026-07-08 due to heavy rain, Adventure Park reopened 2026-07-11; earlier in season (2026-07-03 press) reported 20cm base / 6 of 15 lifts running, so this is an active season with an intermittent storm closure, not a resort-wide 2026 closure.",
+        "region_label": "Chile",
+        "social": {
+          "instagram_url": "https://www.instagram.com/nevadosdechillan/",
+          "facebook_url": "https://www.facebook.com/nevadosdechillan/",
+          "x_url": "https://x.com/nevadosski"
+        },
+        "website_url": "https://www.nevadosdechillan.com/",
+        "cam_verification": [
+          {
+            "embed_url": "https://g3.ipcamlive.com/player/player.php?alias=pistanovicios&autoplay=1",
+            "verdict": "working",
+            "detail": "HTTP 200. Page returns valid ipcamlive player HTML with available=1, a live stream token, and stream server address (s81.ipcamlive.com/streamid 515h6ix42ffahlred), indicating an active live stream. WebFetch tool got a 403 (likely bot-detection on that fetcher), but direct curl with a browser User-Agent confirmed 200 and legitimate player content. Actual video rendering requires JS/WebSocket in a real browser, which could not be visually confirmed in this check."
+          },
+          {
+            "embed_url": "https://g3.ipcamlive.com/player/player.php?alias=plazatata&autoplay=1",
+            "verdict": "working",
+            "detail": "HTTP 200. Page returns valid ipcamlive player HTML with available=1, a live stream token, and stream server address (s81.ipcamlive.com/streamid 51gn81fuwclxzdght), indicating an active live stream. WebFetch tool got a 403 (likely bot-detection), but direct curl with a browser User-Agent confirmed 200 and legitimate player content. Actual video rendering requires JS/WebSocket in a real browser, which could not be visually confirmed in this check."
+          }
+        ]
+      },
+      {
+        "cam_page_url": "https://webcam.corralco.com/",
+        "cams": [
+          {
+            "cam_name": "Hotel",
+            "embed_type": "iframe",
+            "embed_url": "https://www.ipcamlive.com/player/player.php?alias=hotel",
+            "youtube_id": null,
+            "evidence": "Fetched raw HTML of https://webcam.corralco.com/ (official Corralco webcam subdomain) which embeds this iframe directly. Confirmed HTTP 200 response from the player URL via curl."
+          },
+          {
+            "cam_name": "ZCB Ski Area",
+            "embed_type": "iframe",
+            "embed_url": "https://www.ipcamlive.com/player/player.php?alias=zcbski",
+            "youtube_id": null,
+            "evidence": "Fetched raw HTML of https://webcam.corralco.com/ which embeds this iframe directly. Confirmed HTTP 200 response from the player URL via curl."
+          },
+          {
+            "cam_name": "Vista 1600",
+            "embed_type": "iframe",
+            "embed_url": "https://www.ipcamlive.com/player/player.php?alias=vista1600",
+            "youtube_id": null,
+            "evidence": "Fetched raw HTML of https://webcam.corralco.com/ which embeds this iframe directly. Confirmed HTTP 200 response from the player URL via curl."
+          },
+          {
+            "cam_name": "Retorno Cornisa",
+            "embed_type": "iframe",
+            "embed_url": "https://www.ipcamlive.com/player/player.php?alias=recornisa",
+            "youtube_id": null,
+            "evidence": "Fetched raw HTML of https://webcam.corralco.com/ which embeds this iframe directly. Confirmed HTTP 200 response from the player URL via curl."
+          }
+        ],
+        "country": "CL",
+        "elevation_base_ft": 5085,
+        "elevation_summit_ft": 7874,
+        "lat": -38.410833,
+        "lng": -71.545313,
+        "name": "Corralco",
+        "notes": "OPERATING STATUS: Confirmed operating for 2026 season. Official homepage (corralco.com) banner states \"Abierto desde el 23 de junio\" (Open since June 23, 2026). Cross-confirmed by the-ski-guru.com (2026-07-06 article): resort opened June 23 with a phased ramp from 4 lifts/10 pistes to 5 lifts/12 pistes, ~70cm accumulated snow, plus 2026-season upgrades (relocated Coloradito lift, 2 new pistes, new \"Escuelita\" magic carpet, new 1,600m \"Oasis\" service hub with food trucks).\\n\\nCOORDINATES: Base-area lat/lng -38.410833, -71.545313 taken directly from official corralco.com homepage text (\"Reserva Nacional Malalcahuello, Comuna de Curacautín\"). Cross-checked against snow-forecast.com/resorts/Lonquimay, which independently lists 38.40°S, 71.55°W — matches to two decimal places.\\n\\nELEVATION: Reported base/summit (1550m/5085ft base, 2400m/7874ft summit) reflect the lift-served ski area and are cross-checked across skiresort.info (1550m base / 2400m summit, 850m vertical) and snow-forecast.com (1530m base / 2399m summit, 869m vertical) and chileanski.com (top \"Cumbre\" lift reaches 2400m). NOTE: Marketing/travel-agency sources (Indy Pass, PowderQuest, search aggregators) instead commonly cite base 1630m/5348ft and summit 2865m/9400ft (vertical 1235m/4052ft) — this figure appears to include the backcountry/ski-touring ascent up Lonquimay Volcano itself (volcano true summit ~2865m per PeakVisor/SummitPost) rather than the lift-served terrain. Flagging both for PeakCam's judgment on which to display; I used the lift-served (skiresort.info/snow-forecast) figures as primary since two independent ski-data sites agree closely.\\n\\nWEBCAMS: Official webcam hub at webcam.corralco.com is a lightweight page embedding 4 ipcamlive.com iframe players (aliases: hotel, zcbski, vista1600, recornisa) covering hotel base area, ZCB ski zone, the 1,600m viewpoint, and the Cornisa return point — all confirmed HTTP 200 via curl. A third-party mirror site (snow2day.com) republishes what appear to be the same 4 camera positions (Vista Hotel, Retorno Cornisa, Area ZCB, Cumbre) as static refreshing JPEGs, but the official ipcamlive iframes are the primary/preferred embeds and were prioritized here. No official YouTube live stream was found for Corralco.\\n\\nWEBSITE: Two live domains resolve for the resort — corralco.com (main/informational site, used for the operating-status banner and coordinates) and discover.corralco.com (booking/packages microsite). corralco.com was used as the canonical official website URL.\\n\\nSOCIAL: Instagram @skicorralco (instagram.com/skicorralco — HTTP 200), X @corralco (x.com/corralco — HTTP 200, also cross-confirmed via an archived tweet at x.com/corralco/status/1003427662218584066), Facebook facebook.com/Corralco/ (cross-confirmed via web search as the official \"Corralco Resort de Montaña\" page, ~4,054 reviews).",
+        "operating_2026": "operating - Official site (corralco.com) banner \"Abierto desde el 23 de junio\" confirms 2026-season opening June 23; the-ski-guru.com's 2026-07-06 season-status roundup independently confirms Corralco opened June 23, 2026 and has since scaled up to 5 lifts / 12 pistes with ~70cm base.",
+        "region_label": "Chile",
+        "social": {
+          "instagram_url": "https://www.instagram.com/skicorralco/",
+          "facebook_url": "https://www.facebook.com/Corralco/",
+          "x_url": "https://x.com/corralco"
+        },
+        "website_url": "https://corralco.com/",
+        "cam_verification": [
+          {
+            "embed_url": "https://www.ipcamlive.com/player/player.php?alias=hotel",
+            "verdict": "unverifiable",
+            "detail": "Page loads (200) with a valid streamid ('28jbouixylvos3tc9') embedded, meaning the alias is registered on ipcamlive. However, the actual video is delivered live via websocket/JS at runtime, which cannot be observed via WebFetch (403) or curl (static HTML only) — so I cannot confirm the camera is actually online/streaming right now, only that the alias exists."
+          },
+          {
+            "embed_url": "https://www.ipcamlive.com/player/player.php?alias=zcbski",
+            "verdict": "unverifiable",
+            "detail": "Page loads (200) with a valid streamid ('51x06opz7njnw5yba') embedded, confirming the alias is registered. Same limitation as above: live/offline status is only knowable via the JS-driven websocket connection at view time, not via static fetch."
+          },
+          {
+            "embed_url": "https://www.ipcamlive.com/player/player.php?alias=vista1600",
+            "verdict": "unverifiable",
+            "detail": "Page loads (200) with a valid streamid ('28bspwotajd9iwlsr') embedded, confirming the alias is registered. Live status cannot be confirmed without executing the page's JS/websocket connection."
+          },
+          {
+            "embed_url": "https://www.ipcamlive.com/player/player.php?alias=recornisa",
+            "verdict": "unverifiable",
+            "detail": "Page loads (200) with a valid streamid ('28oas780nrt2cunjt') embedded, confirming the alias is registered. Live status cannot be confirmed without executing the page's JS/websocket connection."
+          }
+        ]
+      },
+      {
+        "cam_page_url": "https://www.antillanca.cl/webcams/",
+        "cams": [
+          {
+            "cam_name": "Vista Don Pedro (Haique lift view)",
+            "embed_type": "image",
+            "embed_url": "https://www.antillanca.cl/wp-json/antillanca/v1/webcam/1",
+            "youtube_id": null,
+            "evidence": "Fetched directly on 2026-07-12; returned a live JPEG (7.6KB) with on-image burned-in text 'Vista Don Pedro' and timestamp '12-07-2026 19:13:42' matching current date, confirming an actively updating feed. Antillanca's own /webcams/ page labels this camera slot 'Vista Haique' (view toward the Haique ski lift), so the camera's on-screen name and the site's marketing label differ slightly."
+          },
+          {
+            "cam_name": "Vista Flecha",
+            "embed_type": "image",
+            "embed_url": "https://www.antillanca.cl/wp-json/antillanca/v1/webcam/2",
+            "youtube_id": null,
+            "evidence": "Fetched directly on 2026-07-12; returned a valid JPEG (5.8KB) via the same live-webcam API pattern as cam 1. Image was solid dark/black (consistent with ~7:13pm local, past sunset in Chilean winter) with no visible OSD text, so content couldn't be visually confirmed, but the endpoint is live and matches the resort's own /webcams/ page, which labels this slot 'Vista Flecha' (view toward the Flecha run and mountain base). Also referenced independently by snow2day.com's Antillanca webcam listing."
+          }
+        ],
+        "country": "CL",
+        "elevation_base_ft": 3410,
+        "elevation_summit_ft": 5050,
+        "lat": -40.775589,
+        "lng": -72.204641,
+        "name": "Antillanca",
+        "notes": "Operated by Club Andino Osorno inside Puyehue National Park, on the slopes of Casablanca volcano, Los Lagos Region, Chile. Base elevation ~1,040-1,045m (3,410-3,428ft) and summit ~1,525-1,540m (5,003-5,050ft) depending on source (Wikipedia vs skiresort.info); used Wikipedia's explicit ft conversion (3,410/5,050) as primary. Coordinates cross-checked: precise value -40.775589,-72.204641 recurs across multiple search aggregations (likely sourced from Google's business listing for 'Antillanca Centro de Ski y Montaña'); a rougher secondary reference from interpatagonia.com gives 40°45'00\\\"S 72°09'00\\\"W (-40.75,-72.15), ~3km off, likely describing the broader park area rather than the exact base lodge -- could not independently verify via a Google Maps iframe embed or Wikipedia coord template (neither exposed raw coordinates to WebFetch). Root domain antillanca.cl fails DNS resolution directly but www.antillanca.cl resolves fine and is the working official site. Only 2 webcams found (both hosted on antillanca.cl's own API, not YouTube); no separate YouTube live stream located. Season 2026 runs June 20 - Sept 30 per site copy; site has live 'Tarifas 2026' and 'Preventa Temporada 2026' pages, and both webcam endpoints returned freshly timestamped/live imagery on the day of this research (2026-07-12), which is strong direct evidence the resort is operating this season rather than shuttered.",
+        "operating_2026": "operating — live webcam endpoint (wp-json/antillanca/v1/webcam/1) returned a JPEG with burned-in timestamp '12-07-2026 19:13:42' when fetched on 2026-07-12, i.e. same-day live imagery; site also has active 'Tarifas 2026' and 'Preventa Temporada 2026' (season pass presale) pages and states the 2026 season runs June 20 - Sept 30.",
+        "region_label": "Chile",
+        "social": {
+          "instagram_url": "https://www.instagram.com/skiantillanca/",
+          "facebook_url": "https://www.facebook.com/antillancachile/",
+          "x_url": "https://x.com/antillancachile"
+        },
+        "website_url": "https://www.antillanca.cl/",
+        "cam_verification": [
+          {
+            "embed_url": "https://www.antillanca.cl/wp-json/antillanca/v1/webcam/1",
+            "verdict": "working",
+            "detail": "Returns a valid JPEG image (7.6KB) with a live timestamp overlay '12-07-2026 19:13:42' and label 'Vista Don Pedro'. Frame is black because it's nighttime in Chile at that timestamp, but the endpoint is actively serving a current camera frame, not a dead/static placeholder."
+          },
+          {
+            "embed_url": "https://www.antillanca.cl/wp-json/antillanca/v1/webcam/2",
+            "verdict": "working",
+            "detail": "Returns a valid JPEG image (5.8KB), correct content-type image/jpeg with proper JFIF headers. Frame is entirely black (nighttime) with no visible timestamp/label overlay burned into this particular frame, but the request succeeds and returns real image data (not a 404 or error page), consistent with an active feed."
+          }
+        ]
+      },
+      {
+        "cam_page_url": "https://centrovolcanosorno.cl/live-cam/",
+        "cams": [
+          {
+            "cam_name": "Camara VO - Cono VO",
+            "embed_type": "youtube",
+            "embed_url": "https://www.youtube.com/embed/2uBn7TRSYjI",
+            "youtube_id": "2uBn7TRSYjI",
+            "evidence": "Fetched raw HTML of https://centrovolcanosorno.cl/live-cam/ via curl; found <iframe src=\"https://www.youtube.com/embed/2uBn7TRSYjI?autoplay=1&mute=1\" title=\"Camara VO - Cono VO\">. Confirmed active via YouTube oembed API (author: Webcams / @andacorwebcams channel) and via YouTube watch-page player response JSON showing \"isLiveNow\":true, \"isLive\":true at time of check."
+          },
+          {
+            "cam_name": "Camara VO - Zona Boleterias",
+            "embed_type": "youtube",
+            "embed_url": "https://www.youtube.com/embed/BhJ-RasFPTM",
+            "youtube_id": "BhJ-RasFPTM",
+            "evidence": "Fetched raw HTML of https://centrovolcanosorno.cl/live-cam/ via curl; found <iframe src=\"https://www.youtube.com/embed/BhJ-RasFPTM?autoplay=1&mute=1\" title=\"Camara VO - Zona Boleterias\">. Confirmed active via YouTube oembed API (author: Webcams / @andacorwebcams channel) and via YouTube watch-page player response JSON showing \"isLiveNow\":true, \"isLive\":true at time of check."
+          }
+        ],
+        "country": "CL",
+        "elevation_base_ft": 4035,
+        "elevation_summit_ft": 5774,
+        "lat": -41.1278,
+        "lng": -72.53,
+        "name": "Volcán Osorno (Centro de Ski y Montaña Volcán Osorno)",
+        "notes": "Operating status: OPERATING for 2026. Official site's ticket page (centrovolcanosorno.cl/ticket/) states 2026 high season = \"29 de junio al 17 de julio\" (June 29-July 17, 2026) plus weekends/holidays through the season; today's date (2026-07-12) falls inside that window. Corroborated live by both official webcams on centrovolcanosorno.cl/live-cam/ returning YouTube player state \"isLiveNow\":true at time of check (a dead/closed resort would not maintain two live-streaming cams). General season typically runs late June - early/mid October depending on snow.\n\nElevation: Base 1,230 m / 4,035 ft and top-lift (summit) 1,760 m / 5,774 ft per skiresort.info and lugaresdenieve.com (both agree, vertical drop 530 m). Do not confuse with the Osorno VOLCANO's true summit (2,652-2,662 m / ~8,701 ft per Wikipedia/PeakVisor) — the ski lifts do NOT reach the volcano's true summit, only ~1,760 m on its lower slopes. The base facility is called \"Estación Enlace\" (~1,240 m, service center/parking/rental).\n\nCoordinates: -41.1278, -72.5300 is the base-area facility (\"Centro de Ski y Montaña Volcán Osorno\"), verified directly via OpenStreetMap Nominatim API (osm_id 886368782, leisure=sports_centre, lat -41.1277550 lon -72.5300068), cross-checked against an independent web listing giving -41.127686, -72.529674 (~30-40m apart, consistent). This is distinct from the volcano's true summit coordinate (~-41.1052, -72.4962 per PeakVisor/Wikipedia), which some aggregator sites (e.g. lugaresdenieve.com) incorrectly reuse as the \"ski station\" pin — flagging this so PeakCam doesn't inherit that error.\n\nWebsite's own live-cam page footer/social links (centrovolcanosorno.cl/en/home-2/) point to Instagram/Facebook for \"parquesdefarellones\" — this is almost certainly a shared-template bug from parent operator Andacor (which also runs Farellones/Parque de Farellones), NOT Volcán Osorno's real accounts. Do not use those; use the ones reported in the social block instead, found and verified separately.\n\nParent operator: Andacor (also runs the \"Webcams\"/@andacorwebcams YouTube channel used for the embeds, and the Parque de Farellones resort near Santiago — do not confuse the two properties).",
+        "operating_2026": "operating — 2026 high-season window (Jun 29-Jul 17) per official site's ticket page spans today's date (2026-07-12); both official webcams independently confirmed live via YouTube API at time of check",
+        "region_label": "Chile",
+        "social": {
+          "instagram_url": "https://www.instagram.com/volcanosornocentrodemontana/",
+          "facebook_url": "https://www.facebook.com/vnosorno/",
+          "x_url": null
+        },
+        "website_url": "https://centrovolcanosorno.cl/",
+        "cam_verification": [
+          {
+            "embed_url": "https://www.youtube.com/embed/2uBn7TRSYjI",
+            "verdict": "unverifiable",
+            "detail": "Video exists (oembed confirms title 'Camara VO - Cono VO' by channel andacorwebcams, thumbnail present, not deleted/private). WebFetch cannot execute JS so it cannot confirm the embed actually plays a live stream right now; page fetch returned only bare 'YouTube' text (expected for JS-rendered embed pages, not evidence of failure)."
+          },
+          {
+            "embed_url": "https://www.youtube.com/embed/BhJ-RasFPTM",
+            "verdict": "unverifiable",
+            "detail": "Video exists (oembed confirms title 'Camara VO - Zona Boleterias' by channel andacorwebcams, thumbnail present, not deleted/private). Same JS-rendering limitation as above prevents confirming live playback state via WebFetch."
+          }
+        ]
+      },
+      {
+        "name": "Cerro Mirador (Punta Arenas)",
+        "country": "CL",
+        "region_label": "Chile",
+        "operating_2026": "operating — radiopolar.com (Chilean regional news) published a story dated 2026-07-06 confirming activities resumed at Club Andino / Cerro Mirador after a recent snowfall; the official site clubandino.cl's sitemap shows its tickets and content pages last-modified 2026-07-08, indicating active current-season operation.",
+        "lat": -53.1612232,
+        "lng": -71.0259379,
+        "elevation_base_ft": 1247,
+        "elevation_summit_ft": 1870,
+        "website_url": "https://www.clubandino.cl/",
+        "cam_page_url": null,
+        "cams": [],
+        "social": {
+          "instagram_url": "https://www.instagram.com/clubandinopuq/",
+          "facebook_url": "https://www.facebook.com/CerroMiradorClubAndino/",
+          "x_url": null
+        },
+        "notes": "Operated by Club Andino de Punta Arenas (founded 1938); known as the world's southernmost ski area, inside Reserva Nacional Magallanes, ~8-9km/15min drive west of Punta Arenas city center. Typical season runs June-September (weather dependent). Terrain: 11-14 runs, ~18 skiable hectares of 209 total, served by a double chairlift plus a rope tow/baby lift. COORDINATES: -53.1612232, -71.0259379 sourced from OSM (cross-checked via two independent geocoders, Nominatim and Photon, both returning identical values); consistent with editorial descriptions placing it ~7-8km west of downtown Punta Arenas (-53.163, -70.912). ELEVATION: skiresort.info lists base 380m/summit 570m (used for the ft conversion: 1,247ft/1,870ft); snow-forecast.com lists a close but slightly different base 357m/summit 576m — both sources agree the vertical drop is roughly 190-220m. Some general web-search summaries mention a much higher \"600-866m\" figure for \"Mount Fenton/Cerro Fenton\" — this appears to conflate the ski area with a taller, separate antenna-topped peak nearby and was not corroborated by any ski-specific database, so it was not used. WEBSITE: official site is a Wix build (clubandino.cl); its full page sitemap (14 pages: home, tickets/book-online, trainers, FAQ, etc.) contains no webcam/camera page. WEBCAMS: none found anywhere. Checked (1) official site sitemap — no cam page; (2) snow-forecast.com's dedicated webcam page for this resort, which explicitly states in Spanish \"No tenemos una webcam en directo para esta estación\" (no live webcam for this station); (3) YouTube search for official/live streams — only found one-off uploaded videos (drone footage, news clips), no channel with a live cam. Per instructions, reporting an empty cams array as the accurate answer rather than fabricating one. SOCIAL: official Instagram @clubandinopuq (~17K followers, active) and Facebook page \"Cerro Mirador, Club Andino\" both confirmed via search; no official X/Twitter account found for the resort specifically.",
+        "cam_verification": []
+      },
+      {
+        "cam_page_url": "https://catedralaltapatagonia.com/webcams/",
+        "cams": [
+          {
+            "cam_name": "Punta Princesa (live)",
+            "embed_type": "iframe",
+            "embed_url": "https://g3.ipcamlive.com/player/player.php?alias=6a2c31a02eaf9&skin=white&autoplay=1&mute=1&disableautofullscreen=1&disablezoombutton=1&disableframecapture=1&disablestorageplayer=1&disabledownloadbutton=1&disableplaybackspeedbutton=1",
+            "youtube_id": null,
+            "evidence": "Fetched https://catedralaltapatagonia.com/webcams/ (raw HTML) - iframe labeled 'Cámara en vivo Punta Princesa - Cerro Catedral' uses ipcamlive.com player alias 6a2c31a02eaf9. Fetched the iframe URL directly: HTTP 200, Content-Type text/html (live player loads). Site copy confirms 'La cámara destacada de Punta Princesa transmite en vivo.'"
+          },
+          {
+            "cam_name": "Centro Superior (Desembarque)",
+            "embed_type": "image",
+            "embed_url": "https://varitech.ar/cameras/cam006/latest.jpg",
+            "youtube_id": null,
+            "evidence": "Fetched https://catedralaltapatagonia.com/webcams/ and https://varitech.ar/centro/catedral - labeled 'Centro superior'. Downloaded the image directly: HTTP 200, Content-Type image/jpeg, 139KB. Visually inspected: shows a chairlift ('DESEMBARQUE CENTRO SUPERIOR') with lake/mountain backdrop, on-image timestamp overlay read 12-07-2026 19:00:00 (today's date), confirming live/current feed with snow on the ground."
+          },
+          {
+            "cam_name": "Pista Eventos (vista desde la base)",
+            "embed_type": "image",
+            "embed_url": "https://varitech.ar/cameras/cam005/latest.jpg",
+            "youtube_id": null,
+            "evidence": "Listed on https://catedralaltapatagonia.com/webcams/ and https://varitech.ar/centro/catedral. Fetched directly: HTTP 200, Content-Type image/jpeg, ~97KB, updates every 5 minutes per site."
+          },
+          {
+            "cam_name": "Playpark (Base)",
+            "embed_type": "image",
+            "embed_url": "https://varitech.ar/cameras/cam002/latest.jpg",
+            "youtube_id": null,
+            "evidence": "Listed on https://catedralaltapatagonia.com/webcams/ and https://varitech.ar/centro/catedral. Fetched directly: HTTP 200, Content-Type image/jpeg, ~96KB."
+          },
+          {
+            "cam_name": "Plaza Catalina Reynal (Base)",
+            "embed_type": "image",
+            "embed_url": "https://varitech.ar/cameras/cam003/latest.jpg",
+            "youtube_id": null,
+            "evidence": "Listed on https://catedralaltapatagonia.com/webcams/ and https://varitech.ar/centro/catedral. Fetched directly: HTTP 200, Content-Type image/jpeg, ~180KB."
+          },
+          {
+            "cam_name": "Diente de Caballo Sur",
+            "embed_type": "image",
+            "embed_url": "https://varitech.ar/cameras/cam008/latest.jpg",
+            "youtube_id": null,
+            "evidence": "Listed on https://catedralaltapatagonia.com/webcams/ and https://varitech.ar/centro/catedral. Fetched directly: HTTP 200, Content-Type image/jpeg, ~177KB."
+          },
+          {
+            "cam_name": "Punta Princesa (static snapshot)",
+            "embed_type": "image",
+            "embed_url": "https://varitech.ar/cameras/cam001/latest.jpg",
+            "youtube_id": null,
+            "evidence": "Static counterpart of the same Punta Princesa camera also listed on https://varitech.ar/centro/catedral. Fetched directly: HTTP 200, Content-Type image/jpeg, ~163-167KB. Visually inspected: labeled 'Punta Princesa' with on-image timestamp 12-07-2026 18:48:56 (today), sunset view over Nahuel Huapi lake with snow-covered ridge in foreground - confirms live/current and resort operating with snow cover."
+          }
+        ],
+        "country": "AR",
+        "elevation_base_ft": 3379,
+        "elevation_summit_ft": 7152,
+        "lat": -41.1652,
+        "lng": -71.4395,
+        "name": "Cerro Catedral (Bariloche)",
+        "notes": "Operating status: Confirmed OPERATING for 2026. Opened (partially) on Mon July 6 2026 per La Nación (https://www.lanacion.com.ar/sociedad/bariloche-tras-semanas-de-incertidumbre-abrio-parcialmente-el-cerro-catedral-nid06072026/) - only the beginner/learning sector plus two snowmaking-supported blue runs (Bajador, Cascada) were open initially, with more terrain to open as snowfall improves (delayed opening blamed on low natural snow so far this season). Direct evidence of continued operation as of today (2026-07-12): both the Punta Princesa and Centro Superior (top-of-lift) webcam images carry on-image timestamps of 12-07-2026 and show a loaded, apparently-running chairlift and snow-covered terrain.\\n\\nCoordinates: Base-area coordinates (Villa Catedral village) from OpenStreetMap/Nominatim: -41.1652469, -71.4394927 (village boundary centroid), cross-checked for plausibility against Wikipedia's summit-rock coordinate (41°11'S 71°27'W / -41.183,-71.450), which sits ~3km SSW and higher up the mountain as expected for a base-to-peak relationship. skimap.org (skiareas/view/1124) returned HTTP 403 and could not be used as a second direct source; Nominatim was used instead.\\n\\nElevations: skiresort.info (independently corroborated by search-result snippets) states the lift-served ski area runs 1,030m-2,180m (3,379ft-7,152ft) - used here as base/summit. Note: the actual rock summit of Cerro Catedral (the 'cathedral' spires) is higher, ~2,388m/7,835ft per other sources, but that point is above the lift-served/skiable terrain, so 2,180m/7,152ft (skiresort.info's 'top') is the more relevant 'summit' figure for a ski-conditions site. Wikipedia lists summit as 2,100m/6,900ft - a third, slightly different figure for the same general area; flagged here in case PeakCam wants to reconcile.\\n\\nWebcams: Official page https://catedralaltapatagonia.com/webcams/ (WordPress/Elementor site) embeds a mix of a genuinely live iframe (Punta Princesa, via ipcamlive.com) and five auto-refreshing (5-min) static JPEGs served from varitech.ar, which is Cerro Catedral's webcam/snow-report vendor (also independently viewable at https://varitech.ar/centro/catedral, which lists the same 7 camera slots). One additional camera, 'Cable carril inferior' (cam004), was explicitly noted on the page as removed from the current live grid ('Cable carril inferior removida') even though the raw image URL https://varitech.ar/cameras/cam004/latest.jpg still returns HTTP 200 - excluded from the cams list here since the site itself flags it as retired/inactive. A second, differently-aliased ipcamlive iframe (alias 685a8622c91cb) appears in a hidden/legacy mobile-only markup block on the same page with no visible label; not included since its identity/currency could not be confirmed.\\n\\nSocial: Instagram and Facebook found directly on the official site footer; X/Twitter handle @CerroCatedralok found via search (https://x.com/cerrocatedralok) and not independently re-verified by direct fetch (X requires auth for WebFetch).",
+        "operating_2026": "operating - partially open since July 6, 2026 (learning sector + 2 snowmaking-covered runs per La Nación); webcam timestamps from today (2026-07-12) show snow cover and an apparently running chairlift, confirming continued operation",
+        "region_label": "Argentina",
+        "social": {
+          "instagram_url": "https://www.instagram.com/cerrocatedralok/",
+          "facebook_url": "https://www.facebook.com/CatedralAltaPatagonia",
+          "x_url": "https://x.com/cerrocatedralok"
+        },
+        "website_url": "https://catedralaltapatagonia.com/",
+        "cam_verification": [
+          {
+            "embed_url": "https://g3.ipcamlive.com/player/player.php?alias=6a2c31a02eaf9&skin=white&autoplay=1&mute=1&disableautofullscreen=1&disablezoombutton=1&disableframecapture=1&disablestorageplayer=1&disabledownloadbutton=1&disableplaybackspeedbutton=1",
+            "verdict": "unverifiable",
+            "detail": "WebFetch returned HTTP 403 Forbidden. This is consistent with ipcamlive.com blocking non-browser user agents/bots (common for their embed players) rather than a confirmed dead camera. Cannot confirm working or dead without a real browser session (would need mcp__claude-in-chrome tools to verify definitively)."
+          },
+          {
+            "embed_url": "https://varitech.ar/cameras/cam006/latest.jpg",
+            "verdict": "working",
+            "detail": "Returned a valid 142.4KB JPEG. Image shows 'Desembarque Centro Superior' chairlift station at Cerro Catedral with timestamp 12-07-2026 19:05:00 (today's date), snow-covered mountain, sunset sky, Nahuel Huapi lake and Bariloche lights visible. Confirmed live and current."
+          },
+          {
+            "embed_url": "https://varitech.ar/cameras/cam005/latest.jpg",
+            "verdict": "working",
+            "detail": "Returned a valid 99.6KB JPEG. Image shows 'Pista Eventos' ski slope with chairlift, people skiing, timestamp 12-07-2026 18:55:10 (today's date). Confirmed live and current."
+          },
+          {
+            "embed_url": "https://varitech.ar/cameras/cam002/latest.jpg",
+            "verdict": "working",
+            "detail": "Returned a valid 94.9KB JPEG. Image shows 'Play Park Centro' snow area at dusk, timestamp 12-07-2026 18:58:01 (today's date). Confirmed live and current."
+          },
+          {
+            "embed_url": "https://varitech.ar/cameras/cam003/latest.jpg",
+            "verdict": "working",
+            "detail": "Returned a valid 171.8KB JPEG. Image shows 'Base Catalina Reynal' base area with buildings, ski school signage, timestamp 12-07-2026 19:03:03 (today's date). Confirmed live and current."
+          },
+          {
+            "embed_url": "https://varitech.ar/cameras/cam008/latest.jpg",
+            "verdict": "working",
+            "detail": "Returned a valid 166.1KB JPEG. Image shows 'Diente de Caballo Sur' high-altitude terrain, blue dusk lighting, timestamp 12-07-2026 18:03:35 (today's date). Confirmed live and current."
+          },
+          {
+            "embed_url": "https://varitech.ar/cameras/cam001/latest.jpg",
+            "verdict": "working",
+            "detail": "Returned a valid 151.7KB JPEG. Image shows 'Punta Princesa' summit view overlooking Nahuel Huapi lake and Bariloche at sunset, timestamp 12-07-2026 18:53:56 (today's date). Confirmed live and current."
+          }
+        ]
+      },
+      {
+        "cam_page_url": "https://www.cerrochapelco.com.ar/webcams-cerro-chapelco/",
+        "cams": [
+          {
+            "cam_name": "Pradera del Puma",
+            "embed_type": "image",
+            "embed_url": "https://varitech.ar/cameras/cam016/latest.jpg",
+            "youtube_id": null,
+            "evidence": "Fetched via curl -I: HTTP 200 OK, Content-Type: image/jpeg, Last-Modified: Sun 12 Jul 2026 21:42:49 GMT (same-day as research, confirming active refresh, ~5min interval per site copy). Listed as 'Mocho Inferior En vivo' on https://www.cerrochapelco.com.ar/webcams-cerro-chapelco/ and identified by name 'Pradera del Puma' (cam016) in the camera-selector HTML of https://chapelco.com.ar/camaras (redirect target of camaras.chapelco.com.ar)."
+          },
+          {
+            "cam_name": "Lift del Puente",
+            "embed_type": "image",
+            "embed_url": "https://varitech.ar/cameras/cam017/latest.jpg",
+            "youtube_id": null,
+            "evidence": "Fetched via curl -I: HTTP 200 OK, Content-Type: image/jpeg, Last-Modified: Sun 12 Jul 2026 21:42:50 GMT. Listed as 'Lift Inferior En vivo' on https://www.cerrochapelco.com.ar/webcams-cerro-chapelco/ and identified by name 'Lift del Puente' (cam017) in https://chapelco.com.ar/camaras."
+          },
+          {
+            "cam_name": "Rancho Grande (Desenganche Silla Rancho Grande, hacia la cordillera)",
+            "embed_type": "image",
+            "embed_url": "https://varitech.ar/cameras/cam018/latest.jpg",
+            "youtube_id": null,
+            "evidence": "Found on https://chapelco.com.ar/camaras (default/active camera, labeled 'Cámara 18 - Desenganche Silla Rancho Grande'). Confirmed live via curl -I: HTTP 200 OK, Content-Type: image/jpeg, Last-Modified: Sun 12 Jul 2026 21:42:51 GMT. Page also showed timelapse day-links up to 'Hoy, Domingo 12 de Julio' (today), confirming currently operating camera."
+          }
+        ],
+        "country": "AR",
+        "elevation_base_ft": 4101,
+        "elevation_summit_ft": 6496,
+        "lat": -40.1978659,
+        "lng": -71.3192884,
+        "name": "Chapelco (Cerro Chapelco Ski Resort)",
+        "notes": "OPERATING STATUS: Confirmed operating for 2026 season. Official site (cerrochapelco.com.ar) currently displays \"CHAPELCO ABRE LA TEMPORADA 2026\" and sells day passes; skiresort.info lists \"Current season: 2026-07-11 to 2026-09-20\"; the-ski-guru.com and mountainmarker.com both report Chapelco opened to the public July 8, 2026 with a new 10-person gondola (Telecabina) to 1,600m; all three webcam images returned HTTP 200 with Last-Modified timestamps from today (12 Jul 2026, ~21:42 GMT), directly confirming the resort's camera/lift infrastructure is live right now.\n\nCOORDINATES: Base-area point cross-checked two ways: (1) OpenStreetMap/Nominatim node \"Chapelco Ski Resort\" (leisure=sports_centre) at \"Acceso a Las Pendientes Ski Village\" = -40.1978659, -71.3192884 (used as primary — precise, named base-facility node); (2) English Wikipedia infobox coordinate for the broader Chapelco massif/resort = 40°10'S 71°20'W (~-40.167, -71.333), ~3-4km away, consistent with being the mountain/summit area vs. the base village access point. Also cross-referenced an OSM \"winter_sports\" landuse polygon spanning -40.2225 to -40.1966 lat / -71.3205 to -71.2848 lon, which contains both points, i.e. the whole ski area.\n\nELEVATION: English Wikipedia gives base 1,250m/summit 1,980m (used here, converted to 4,101ft/6,496ft). skiresort.info gives a slightly different range (1,255-1,970m = ~4,117-6,463ft) — minor source variance typical for lift-served vertical vs. skiable terrain top; figures are consistent within ~30-50ft.\n\nWEBSITE: Official operating site is https://www.cerrochapelco.com.ar/ (confirmed via content: season messaging, ticket shop at tienda.cerrochapelco.com.ar, daily conditions report). A second domain, chapelco.com.ar, appears to function partly as a subdomain-hosting/parking page (contact email \"dominios@chapelco.com.ar\") but ALSO hosts the live camera viewer at chapelco.com.ar/camaras (camaras.chapelco.com.ar redirects there) — this is the same backend (varitech.ar) as the images embedded on the main cerrochapelco.com.ar webcam page, so both domains are legitimately tied to the resort's live-cam infrastructure. www.chapelco.com does not resolve (DNS failure) — treat as dead/legacy.\n\nWEBCAMS: All 3 confirmed cams are static refreshing JPEGs (varitech.ar backend), matching PeakCam's \"image\" embed type. The official webcam page states streaming video is \"Próximamente\" (coming soon) — no live video stream exists yet. A YouTube channel titled \"Cerro Chapelco\" exists (https://www.youtube.com/channel/UCN4JPs2cxIuFt19BAnESe7w) but I could not confirm an active/current live stream or obtain a video ID, so it is NOT included as a cam (no verifiable evidence of a live embed).\n\nSOCIAL: Two Instagram accounts exist — @cerro_chapelco (larger/older, ~208K followers, widely cited as official) and @cerrochapelco.ok (verified badge, 30.8K followers, bio links directly to cerrochapelco.com.ar, posts \"Invierno 2026\" content) — both appear resort-run; reported @cerro_chapelco as primary. Facebook has a numeric-ID profile (facebook.com/profile.php?id=61577956382470) linked from the site's homepage plus a separate, better-established \"ChapelcoSkiResort\" page (131,706 likes, self-described \"Facebook Oficial de Chapelco Ski Resort\") — reported the latter as primary. X/Twitter @cerro_chapelco self-describes as \"Twitter Oficial del mejor centro de Ski y Snowboard de la Argentina.\"",
+        "operating_2026": "operating — official site shows live 2026-season pass sales and \"CHAPELCO ABRE LA TEMPORADA 2026\"; skiresort.info lists current season 2026-07-11 to 2026-09-20; resort opened to public July 8, 2026 with new gondola (per the-ski-guru.com, mountainmarker.com); webcam images verified live-updating as of today (12 Jul 2026).",
+        "region_label": "Argentina",
+        "social": {
+          "instagram_url": "https://www.instagram.com/cerro_chapelco/",
+          "facebook_url": "https://www.facebook.com/ChapelcoSkiResort/",
+          "x_url": "https://x.com/cerro_chapelco"
+        },
+        "website_url": "https://www.cerrochapelco.com.ar/",
+        "cam_verification": [
+          {
+            "embed_url": "https://varitech.ar/cameras/cam016/latest.jpg",
+            "verdict": "working",
+            "detail": "Returns a live JPEG snapshot (165KB) with current timestamp 12-07-2026 18:45:29, labeled 'Mocho Inferior'. However, the on-image logo reads 'ANAPELCO', not Chapelco/CHAPELCO — this appears to be a different resort's camera mislabeled/misassigned as a Chapelco cam. Image content itself is live and valid, but it is not actually a Chapelco webcam."
+          },
+          {
+            "embed_url": "https://varitech.ar/cameras/cam017/latest.jpg",
+            "verdict": "working",
+            "detail": "Returns a live JPEG snapshot (141KB) with current timestamp 07-12-2026 Sun 18:45:30, labeled 'Lift Sup', with the CHAPELCO logo visible in the corner. Confirmed live, current, and correctly branded Chapelco webcam."
+          },
+          {
+            "embed_url": "https://varitech.ar/cameras/cam018/latest.jpg",
+            "verdict": "working",
+            "detail": "Returns a live JPEG snapshot (188KB) with current timestamp 12-07-2026 18:50:37, labeled 'Rancho G Sup', with the CHAPELCO logo visible. Confirmed live, current, and correctly branded Chapelco webcam."
+          }
+        ]
+      },
+      {
+        "cam_page_url": "https://laslenas.com/camara-en-vivo/",
+        "cams": [
+          {
+            "cam_name": "Base / Live Cam (official)",
+            "embed_type": "iframe",
+            "embed_url": "https://tv.streamcasthd.com/live-stream-video-widget/laslenas",
+            "youtube_id": null,
+            "evidence": "Fetched https://laslenas.com/camara-en-vivo/ directly (curl): the page embeds a lazyloaded <iframe> whose data-orig-src is this streamcasthd.com widget URL. Fetched that widget URL directly and got HTTP 200 with an HLS video player page titled 'Las Leñas | Powered by: VDO Panel', showing a live 'Live' status badge and a viewer counter (198) at fetch time (2026-07-12 21:49 GMT). Note: the laslenas.com page currently displays a Spanish-language banner stating the camera is under technical maintenance and may have intermittent interruptions, so treat as live-but-flaky."
+          },
+          {
+            "cam_name": "Pirámide",
+            "embed_type": "image",
+            "embed_url": "https://snow2day.com/imgs/webcams/Valle_de_Las_Lenas_Piramide_ar61783890389805xl.jpg",
+            "youtube_id": null,
+            "evidence": "Found on https://snow2day.com/en/argentina/valle-de-las-lenas/webcams, which attributes this camera to source '(laslenas.com)'. Fetched the image URL directly with curl: HTTP 200, content-type image/jpeg, content-length 8006 bytes, Last-Modified 2026-07-12 21:08:32 GMT — same-day timestamp confirming a live-refreshing snapshot, not a stale placeholder."
+          },
+          {
+            "cam_name": "Principal",
+            "embed_type": "image",
+            "embed_url": "https://snow2day.com/imgs/webcams/Valle_de_Las_Lenas_Principal_ar61783890441754xl.jpg",
+            "youtube_id": null,
+            "evidence": "Found on https://snow2day.com/en/argentina/valle-de-las-lenas/webcams, attributed to source '(laslenas.com)'. Fetched directly: HTTP 200, content-type image/jpeg, content-length 55825 bytes, Last-Modified 2026-07-12 21:08:32 GMT (same-day), confirming a live-refreshing snapshot distinct from the Pirámide cam."
+          }
+        ],
+        "country": "AR",
+        "elevation_base_ft": 7349,
+        "elevation_summit_ft": 11253,
+        "lat": -35.1476,
+        "lng": -70.0828,
+        "name": "Las Leñas",
+        "notes": "Operating status: confirmed OPEN but running limited/progressive operations as of early-mid July 2026, not fully open. skiresort.info's live snow report (fetched) showed 3.5 of 29 km of slopes open (12%) and 3 of 15 lifts running. The Ski Guru (the-ski-guru.com, published 2026-07-06) reported the resort began the season with pedestrian/snow-play operations only (Telesilla Vesta for pedestrians, Parque Aventura, food service, manufactured-snow play area) while awaiting natural snowfall to open ski terrain, and highlighted a 2026 investment in new Titan 4.0 Silent snowmaking guns to improve early-season reliability. Net: resort is operating this season, just with condition-dependent/partial terrain — worth flagging as \"limited\" rather than \"fully open\" on the site.\n\nCoordinates cross-checked: Wikipedia gives -35.1476, -70.0828; a secondary source (latitude.to) gives -35.1500, -70.0833 — both agree within ~300m, used Wikipedia's as primary.\n\nElevations: base 2,240 m / summit 3,430 m per Wikipedia and skiresort.info (skiresort.info showed base as 2,200m, a ~40m discrepancy vs. Wikipedia's 2,240m; used the more commonly cited 2,240 m figure, which also matches snow2day's listed base level of \"2240\" for this resort, converted to feet: base 7,349 ft, summit 11,253 ft).\n\nWebsite: official site is https://laslenas.com/ (also resolves as https://www.laslenas.com/). Its webcam page (camara-en-vivo) currently carries a single official live-video iframe (see cams), but historical/mirrored evidence via snow2day.com shows the resort also (or previously) fed two named static-image cameras — Pirámide and Principal — attributed back to laslenas.com as the source; both returned fresh (same-day) JPEGs at fetch time, so included as image-type cams with direct evidence. Did not find an active YouTube live stream: the channel's /live URL (https://www.youtube.com/channel/UCKaYCA8d6sqmWEFGUzYdcAg/live) redirected to the plain channel page rather than a live watch page, indicating no live broadcast was active at check time — omitted rather than guessed.\n\nSocial links were pulled from laslenas.com's own JSON-LD Organization schema (sameAs array), so these are first-party-confirmed official accounts.",
+        "operating_2026": "operating — limited/partial terrain as of check date; skiresort.info snow report showed 3.5 of 29 km (12%) and 3 of 15 lifts open, and the-ski-guru.com (2026-07-06) reported the season opened with pedestrian/snow-play ops only while natural snow accumulates, backed by new 2026 Titan 4.0 snowmaking investment.",
+        "region_label": "Argentina",
+        "social": {
+          "instagram_url": "https://www.instagram.com/laslenasresort/",
+          "facebook_url": "https://www.facebook.com/LasLenasResort/",
+          "x_url": "https://x.com/laslenasresort"
+        },
+        "website_url": "https://laslenas.com/",
+        "cam_verification": [
+          {
+            "embed_url": "https://tv.streamcasthd.com/live-stream-video-widget/laslenas",
+            "verdict": "unverifiable",
+            "detail": "Returns a minimal page reading 'Live _205_' with 'Powered by: VDO Panel' footer - appears to be a JS-driven video widget shell. WebFetch cannot execute the JS player, so actual live stream playback could not be confirmed."
+          },
+          {
+            "embed_url": "https://snow2day.com/imgs/webcams/Valle_de_Las_Lenas_Piramide_ar61783890389805xl.jpg",
+            "verdict": "working",
+            "detail": "Returns a valid JPEG image (verified by direct inspection of the fetched binary). Shows a dark/dim mountain scene, likely a nighttime or low-light/dusk capture, but it is a genuine rendered photo, not an error page."
+          },
+          {
+            "embed_url": "https://snow2day.com/imgs/webcams/Valle_de_Las_Lenas_Principal_ar61783890441754xl.jpg",
+            "verdict": "working",
+            "detail": "Returns a valid, clear JPEG image showing the Las Lenas base area with snow-covered slopes, buildings, and a visible 'Las Lenas' watermark plus timestamp overlay (Jul-02-2026 10:56:50), confirming it is an active, currently-updating webcam feed."
+          }
+        ]
+      },
+      {
+        "cam_page_url": "https://www.cerrocastor.com/es_ar/live.html",
+        "cams": [
+          {
+            "cam_name": "Cerro Castor Live Stream",
+            "embed_type": "youtube",
+            "embed_url": "https://www.youtube.com/embed/RVuTqjTyrr0",
+            "youtube_id": "RVuTqjTyrr0",
+            "evidence": "Fetched https://www.youtube.com/watch?v=RVuTqjTyrr0 directly: page metadata confirms isLiveNow:true, isLiveBroadcast content=True, startDate 2026-07-09T14:01:24Z, title 'Emisión en directo de Cerro Castor', channelId UCdRznjZhMfIArULYvuXxzZg, canonical channel handle /@CerroCastorUshuaia (matches Cerro Castor's official YouTube channel found via search and linked from the resort's own footer social icons). Independently confirmed by fetching https://www.youtube.com/channel/UCdRznjZhMfIArULYvuXxzZg/live which sets <link rel=canonical href=.../watch?v=RVuTqjTyrr0> to the same video ID — i.e. this is the channel's current persistent live-stream endpoint. Also cross-confirmed by two independent third-party aggregators that embed the same feed: worldcam.eu/liveview/33266 (page titled 'Cerro Castor - Ski resort - Live View', contains <iframe src=https://www.youtube.com/embed/RVuTqjTyrr0>) and webcamhopper.com/map/4915.html ('Cerro Castor Ski Resort Webcam', links to youtube.com/@CerroCastorUshuaia/streams). Note: because this is a rolling livestream, the specific video ID RVuTqjTyrr0 may rotate over time — the stable long-term embed is the channel-live endpoint https://www.youtube.com/embed/live_stream?channel=UCdRznjZhMfIArULYvuXxzZg. The resort's own https://www.cerrocastor.com/es_ar/live.html page (title 'Live | Cerro Castor') could only be retrieved via a Wayback Machine snapshot (2026-05-10) because this sandbox's network could not resolve the www.cerrocastor.com host directly (DNS/egress restriction, confirmed via curl: 'Could not resolve host'); that snapshot's static HTML contained no embed markup (likely injected client-side by JS at runtime), so the YouTube channel is reported as the verified cam source rather than a scraped embed off the resort's own page."
+          }
+        ],
+        "country": "AR",
+        "elevation_base_ft": 640,
+        "elevation_summit_ft": 3143,
+        "lat": -54.7239,
+        "lng": -68.0170417,
+        "name": "Cerro Castor (Ushuaia)",
+        "notes": "OPERATING STATUS: Confirmed operating for the 2026 season. Multiple Argentine news sources dated July 2-6, 2026 (lamuy.com.ar, elenviador.com, surenio.com.ar, sur54.com, prensamercosur.org) report the 2026 season opened July 4, 2026, with the national 'Fiesta Nacional del Invierno' opening event held July 10, 2026. This is further corroborated by the resort's official YouTube channel showing an active live broadcast (isLiveNow:true) as of July 9-12, 2026, i.e. during this research. Recent press also states current stats: 650 hectares, 35 trails, 14 lifts (6 chairs, 4 surface lifts, 4 magic carpets), snowmaking covering >35% of terrain, and a maximum elevation figure of 1,057m cited by 2026 press (vs. 958m summit / 195m base used below for the ski-area figures, which come from two independent technical sources, Wikipedia and skiresort.info, that agree with each other on the ski-terrain elevations and vertical drop of 763m). The 1,057m figure likely refers to the true summit of Mt. Krund/Cerro Castor above the highest lift-served point.\\n\\nCOORDINATES: Cross-checked two sources — Wikipedia infobox (54°43'26.04'S 68°1'1.35'W = -54.7239, -68.0170417) and a second aggregator citing -54.723039, -68.016797 — both agree to within ~0.001°, so the Wikipedia value is used as primary.\\n\\nWEBSITE/NETWORK NOTE: The canonical site is https://www.cerrocastor.com/ (bare cerrocastor.com 301-redirects to it). This sandbox's outbound network could resolve/reach the bare domain via curl but could not resolve www.cerrocastor.com (both curl and the WebFetch tool failed with host-resolution errors on the www host specifically) — worth knowing if a future automated fetch job hits the same wall; using an archive.org snapshot worked around it for page content.\\n\\nSOCIAL: Instagram and Facebook confirmed directly from the official site's footer social icons (archived snapshot). No X/Twitter icon appears in that footer; a plausible @Cerro_Castor handle turned up in a general web search but could not be verified as active/official (X's app shell blocks unauthenticated scraping/WebFetch with a 402), so X is reported as null rather than guessed.",
+        "operating_2026": "operating — 2026 season opened July 4, 2026 per multiple July 2026 Argentine news reports; official YouTube livestream confirmed actively broadcasting July 9-12, 2026",
+        "region_label": "Argentina",
+        "social": {
+          "instagram_url": "https://www.instagram.com/cerrocastor/",
+          "facebook_url": "https://www.facebook.com/CerroCastorUshuaia/",
+          "x_url": null
+        },
+        "website_url": "https://www.cerrocastor.com/",
+        "cam_verification": [
+          {
+            "embed_url": "https://www.youtube.com/embed/RVuTqjTyrr0",
+            "verdict": "unverifiable",
+            "detail": "WebFetch returned only the bare 'YouTube' shell with no video status/error text, since the embed page is JS-rendered and requires a real browser to determine if the live stream is active or the video has been removed. Recommend checking manually in a browser or via YouTube oEmbed/Data API (video ID RVuTqjTyrr0) to confirm live status."
+          }
+        ]
+      },
+      {
+        "cam_page_url": "https://www.caviahue.com/camara-web",
+        "cams": [
+          {
+            "cam_name": "Copahue Volcano - Agrio Superior Station (AGS)",
+            "embed_type": "image",
+            "embed_url": "https://oavv.segemar.gob.ar/CP/AGS.png",
+            "youtube_id": null,
+            "evidence": "Fetched directly: HTTP 200, image/png, 1920x1080, timestamp burned into image reads '2026-07-12 21:50:02 UTC' (matches current date). Found via meteoblue.com/en/weather/webcams/caviahue_argentina_8556186 and outdooractive.com listing this as a Caviahue-area cam (~4.5km from resort). Official Argentine government volcano observatory (SEGEMAR/OAVV) camera, not a resort-branded slope cam."
+          },
+          {
+            "cam_name": "Copahue Volcano - Aerodrome Node (AER)",
+            "embed_type": "image",
+            "embed_url": "https://oavv.segemar.gob.ar/CP/AER.png",
+            "youtube_id": null,
+            "evidence": "Fetched directly: HTTP 200, image/png, 1920x1080, timestamp burned into image reads '2026-07-12 21:53:02 UTC' (matches current date); shows araucaria pines and snow-covered Copahue volcano. Aggregated by outdooractive.com as 'Caviahue › West: Volcan Copahue' (~4.5km from resort). Official SEGEMAR/OAVV monitoring cam, not resort-branded."
+          },
+          {
+            "cam_name": "Copahue Volcano - Laguna Escondida Station (ESC)",
+            "embed_type": "image",
+            "embed_url": "https://oavv.segemar.gob.ar/CP/ESC.png",
+            "youtube_id": null,
+            "evidence": "Fetched directly: HTTP 200, image/png, 1920x1080. Listed on oavv.segemar.gob.ar/monitoreo-volcanico/copahue/ (official Argentine volcano observatory page). Volcano-crater monitoring cam near Caviahue, not a resort slope cam."
+          },
+          {
+            "cam_name": "Copahue Volcano - Mellizas Station (MLZ)",
+            "embed_type": "image",
+            "embed_url": "https://oavv.segemar.gob.ar/CP/MLZ.png",
+            "youtube_id": null,
+            "evidence": "Fetched directly: HTTP 200, image/png, 1920x1080, timestamp '2026-07-12 21:42:01 UTC' matches current date. Aggregated by outdooractive.com as 'Copahue › West' (~6.3km from resort). Official SEGEMAR/OAVV monitoring cam."
+          }
+        ],
+        "country": "AR",
+        "elevation_base_ft": 5413,
+        "elevation_summit_ft": 6785,
+        "lat": -37.867,
+        "lng": -71.083,
+        "name": "Caviahue",
+        "notes": "OPERATING STATUS: Operating for 2026 season. Reported opening ~July 4, 2026 (the-ski-guru.com \"South America Ski Season 2026\" roundup and OnTheSnow's 2026 season page, projected close ~Aug 30 2026). No closure reports found.\n\nCOORDINATES: Cross-checked base-area coordinates between English Wikipedia (town of Caviahue: 37°52'S 71°05'W = -37.867, -71.083) and Spanish Wikipedia's dedicated ski-resort infobox (Caviahue (centro de esquí): -37.86666667, -71.08333333) — both agree closely. A separate Google-indexed source gave a slightly more precise business-listing coordinate of -37.862131, -71.074569 (~1km east), likely the specific base lodge/parking; reported lat/lng uses the Wikipedia consensus figure.\n\nELEVATION: skiresort.info and onthesnow.com both independently report base 1,650m/5,413ft and summit/top 2,068m/6,785ft (vertical 418m/1,371ft) — used as primary figures since two independent sources agree exactly. Spanish Wikipedia gives slightly lower figures (base 1,640m/summit 2,045m); official site (caviahue.com/en/informaciongeneral) confirms base 1,650m but doesn't state summit. All sources agree the resort sits at the foot of Volcán Copahue (~2,900m).\n\nWEBSITE: https://www.caviahue.com/ (HTTP 200 confirmed). English version at en.caviahue.com.\n\nWEBCAMS: The official site DOES have a page titled \"CAMARA WEB\" (https://www.caviahue.com/camara-web), but inspection of the raw page source shows it is a Wix video-gallery widget serving 4 pre-recorded/promotional HLS video clips (m3u8, hosted on Wix's static media CDN), NOT a live camera feed — no live webcam is actually embedded there. Two Windy.com webcam listings specifically tagged for Caviahue ski resort exist (id 1313697779 'Base del Cerro - Centro Internacional de Esquí de Neuquén Patagonia' and id 1359545355 'Copahue volcano') but both returned 'Source is unreachable' when the underlying image URL was fetched directly — i.e., dead/offline cams. An older tourism-site page (argentinaturismo.com.ar/cerrocaviahue/webcam.php) embeds a hardcoded Windy image URL with an expired 2024 token pointing to webcam id 1699543824, which now returns 'Invalid URL' — also dead. \n\nThe ONLY currently-live, verified image feeds found for the Caviahue/Copahue area are 4 official webcams operated by Argentina's volcano observatory (SEGEMAR/OAVV) at oavv.segemar.gob.ar/monitoreo-volcanico/copahue/, all confirmed live via direct fetch (HTTP 200, valid PNG images, on-image timestamps matching the current date/time of this research). These are volcano-crater/hazard-monitoring cameras located roughly 4.5-8km from the ski base (per outdooractive.com's distance tags), not resort-branded slope/lift cams — they show the Copahue volcano and surrounding araucaria forest, useful as regional snow-cover proxies but not an official PeakCam-style base/summit/plaza cam. Reported here per instructions to report cams with evidence rather than return an empty array, but flagged clearly given they are not resort-operated.\n\nNo official YouTube live stream found for Caviahue.\n\nSOCIAL: Instagram @caviahueskiresort and Facebook /caviahueskiresort both confirmed live (HTTP 200), ~40K IG followers. No official X/Twitter account found.",
+        "operating_2026": "operating - opened ~July 4, 2026 per the-ski-guru.com's \"South America Ski Season 2026\" roundup and OnTheSnow's 2026 season dates (projected close ~Aug 30 2026); no closure reports found",
+        "region_label": "Argentina",
+        "social": {
+          "instagram_url": "https://www.instagram.com/caviahueskiresort/",
+          "facebook_url": "https://www.facebook.com/caviahueskiresort/",
+          "x_url": null
+        },
+        "website_url": "https://www.caviahue.com/",
+        "cam_verification": [
+          {
+            "embed_url": "https://oavv.segemar.gob.ar/CP/AGS.png",
+            "verdict": "working",
+            "detail": "Fetched successfully; returned a valid PNG image (~1.2MB) with proper PNG signature and IHDR/IDAT chunks."
+          },
+          {
+            "embed_url": "https://oavv.segemar.gob.ar/CP/AER.png",
+            "verdict": "working",
+            "detail": "Fetched successfully; returned a valid PNG image (~780KB) with proper PNG signature and headers."
+          },
+          {
+            "embed_url": "https://oavv.segemar.gob.ar/CP/ESC.png",
+            "verdict": "working",
+            "detail": "Fetched successfully; returned a valid PNG image (~620KB) with proper PNG signature and headers."
+          },
+          {
+            "embed_url": "https://oavv.segemar.gob.ar/CP/MLZ.png",
+            "verdict": "working",
+            "detail": "Fetched successfully; returned a valid PNG image (~2.1MB) with proper PNG signature and headers."
+          }
+        ]
+      },
+      {
+        "name": "Cerro Bayo",
+        "country": "AR",
+        "region_label": "Argentina",
+        "operating_2026": "operating — the-ski-guru.com (Jul 6, 2026) lists Cerro Bayo as one of the 2026-season \"early starters\" with beginner terrain running on snowmaking; no closure reports found and official site (cerrobayo.com.ar) is live with active 2026 pass/financing promos.",
+        "lat": -40.7508,
+        "lng": -71.6025,
+        "elevation_base_ft": 3445,
+        "elevation_summit_ft": 5906,
+        "website_url": "https://www.cerrobayo.com.ar",
+        "cam_page_url": "https://www.cerrobayo.com.ar/montana/camara/",
+        "cams": [
+          {
+            "cam_name": "Cumbre (Summit, 1800m)",
+            "embed_type": "image",
+            "embed_url": "https://ipcamlive.com/player/snapshot.php?alias=cumbre",
+            "youtube_id": null,
+            "evidence": "Found on official cam page https://www.cerrobayo.com.ar/montana/camara/ as <img alt=\"Cumbre\">. Fetched via curl -L: HTTP 200, Content-Type image/jpeg, redirects to https://s132.ipcamlive.com/streams/84nxof9tr41izrkmy/snapshot.jpg (77KB JPEG)."
+          },
+          {
+            "cam_name": "Copitos Pista 3 (1500m)",
+            "embed_type": "image",
+            "embed_url": "https://ipcamlive.com/player/snapshot.php?alias=copitos",
+            "youtube_id": null,
+            "evidence": "Found on official cam page as <img alt=\"Copitos Pista 3\">. Fetched via curl -L: HTTP 200, Content-Type image/jpeg, redirects to https://s132.ipcamlive.com/streams/84ldhbrwuctoveyba/snapshot.jpg (77KB JPEG)."
+          },
+          {
+            "cam_name": "Principiantes 1500",
+            "embed_type": "image",
+            "embed_url": "https://ipcamlive.com/player/snapshot.php?alias=principiantes1500",
+            "youtube_id": null,
+            "evidence": "Found on official cam page as <img alt=\"Principiantes 1500\">. Fetched via curl -L: HTTP 200, Content-Type image/jpeg, redirects to https://s81.ipcamlive.com/streams/51trdmkcdalivzowo/snapshot.jpg (75KB JPEG)."
+          },
+          {
+            "cam_name": "Telecabina 1500",
+            "embed_type": "image",
+            "embed_url": "https://ipcamlive.com/player/snapshot.php?alias=telecabina1500",
+            "youtube_id": null,
+            "evidence": "Found on official cam page and its own dedicated page https://www.cerrobayo.com.ar/montana/camara/telecabina1500.php as <img alt=\"Telecabina 1500\">. Fetched via curl -L: HTTP 200, Content-Type image/jpeg, redirects to https://s40.ipcamlive.com/streams/28hjptarw3uubcmoy/snapshot.jpg (86KB JPEG)."
+          },
+          {
+            "cam_name": "Telesilla Lagos",
+            "embed_type": "image",
+            "embed_url": "https://ipcamlive.com/player/snapshot.php?alias=lagos2",
+            "youtube_id": null,
+            "evidence": "Found on official cam page as <img alt=\"Telesilla Lagos\">. Fetched via curl -L: HTTP 200, Content-Type image/jpeg, redirects to https://s132.ipcamlive.com/streams/84iw1qaenjpvuwmjq/snapshot.jpg (256KB JPEG)."
+          },
+          {
+            "cam_name": "Principiantes Pista 2",
+            "embed_type": "image",
+            "embed_url": "https://ipcamlive.com/player/snapshot.php?alias=principiantes2",
+            "youtube_id": null,
+            "evidence": "Found on official cam page as <img alt=\"Principiantes Pista 2\">. Fetched via curl -L: HTTP 200, Content-Type image/jpeg, redirects to https://s81.ipcamlive.com/streams/512aucicdhrtkwmyn/snapshot.jpg (42KB JPEG)."
+          }
+        ],
+        "social": {
+          "instagram_url": "https://www.instagram.com/cerro_bayo",
+          "facebook_url": "https://www.facebook.com/cerrobayo/",
+          "x_url": null
+        },
+        "notes": "Resort near Villa La Angostura, Neuquén Province, Patagonia (~9km NE of town, on the north shore of Lake Nahuel Huapi). Base/summit elevations of 1050m/1800m (3445ft/5906ft) confirmed by both skiresort.info and the official site's own text (\"between 1,050 and 1,800 m\"); one third-party source (skicentral.com) gave a slightly lower summit of 5846ft (1782m) — treated as the minor outlier. Coordinates -40.7508, -71.6025 (-40°45'2.99\"S -71°36'8.99\"W) corroborated across multiple ski-info aggregator search snippets and consistent with resort's known position northeast of Villa La Angostura town center (-40.7697,-71.6423); could not independently cross-check against a live Google Maps pin or Wikipedia infobox (Cerro Bayo has no standalone Wikipedia page found; a PeakVisor \"Cerro Bayo\" entry at -37.17,-69.95 is a different, unrelated peak of the same name further north in Neuquén and was discarded). Official YouTube channel exists (youtube.com/CerroBayoChannel, linked from homepage) but no active/scheduled live stream could be confirmed from the channel page content — omitted from cams rather than guessed. No official X/Twitter account found. All 6 webcams are static JPEG snapshots (not true live video) hosted on ipcamlive.com and embedded via <img> tags on the official site's camera page and dedicated telecabina1500 sub-page.",
+        "cam_verification": [
+          {
+            "embed_url": "https://ipcamlive.com/player/snapshot.php?alias=cumbre",
+            "verdict": "working",
+            "detail": "Returns HTTP 200 image/jpeg (1280x720, 78KB) after redirect to s132.ipcamlive.com/streams/84nxof9tr41izrkmy/snapshot.jpg. WebFetch got 403 (bot-blocked, no UA/referer) but curl with Chrome UA + referer confirms it's a live valid image."
+          },
+          {
+            "embed_url": "https://ipcamlive.com/player/snapshot.php?alias=copitos",
+            "verdict": "working",
+            "detail": "Returns HTTP 200 image/jpeg (1280x720, 70KB) after redirect to s132.ipcamlive.com/streams/84ldhbrwuctoveyba/snapshot.jpg. Confirmed live via curl with browser UA/referer (WebFetch alone 403s due to bot blocking)."
+          },
+          {
+            "embed_url": "https://ipcamlive.com/player/snapshot.php?alias=principiantes1500",
+            "verdict": "working",
+            "detail": "Returns HTTP 200 image/jpeg (1280x720, 75KB) after redirect to s81.ipcamlive.com/streams/51trdmkcdalivzowo/snapshot.jpg. Confirmed live via curl with browser UA/referer."
+          },
+          {
+            "embed_url": "https://ipcamlive.com/player/snapshot.php?alias=telecabina1500",
+            "verdict": "working",
+            "detail": "Returns HTTP 200 image/jpeg (1280x720, 76KB) after redirect to s40.ipcamlive.com/streams/28hjptarw3uubcmoy/snapshot.jpg. Confirmed live via curl with browser UA/referer."
+          },
+          {
+            "embed_url": "https://ipcamlive.com/player/snapshot.php?alias=lagos2",
+            "verdict": "working",
+            "detail": "Returns HTTP 200 image/jpeg (1920x1080, 251KB) after redirect to s132.ipcamlive.com/streams/84iw1qaenjpvuwmjq/snapshot.jpg. Confirmed live via curl with browser UA/referer."
+          },
+          {
+            "embed_url": "https://ipcamlive.com/player/snapshot.php?alias=principiantes2",
+            "verdict": "working",
+            "detail": "Returns HTTP 200 image/jpeg (704x576, 38KB) after redirect to s81.ipcamlive.com/streams/512aucicdhrtkwmyn/snapshot.jpg. Confirmed live via curl with browser UA/referer."
+          }
+        ]
+      },
+      {
+        "cam_page_url": "https://skilahoya.com/webcams/",
+        "cams": [
+          {
+            "cam_name": "Principiantes / Plano Base 1600",
+            "embed_type": "image",
+            "embed_url": "https://varitech.ar/cameras/cam031/latest.jpg",
+            "youtube_id": null,
+            "evidence": "Fetched directly via WebFetch and rendered the returned JPEG: shows the 'LA HOYA' logo overlay, a 'Plano 1600' label, and an in-image timestamp of '12-07-2026 18:50:38' matching today's date, confirming the cam is live and actively refreshing. Also cross-listed as cam031 'En línea' (online) on varitech.ar/centro/lahoya and mirrored on skilahoya.com/webcams/ and snow2day.com."
+          }
+        ],
+        "country": "AR",
+        "elevation_base_ft": 4692,
+        "elevation_summit_ft": 6808,
+        "lat": -42.8331,
+        "lng": -71.2574,
+        "name": "La Hoya (Esquel)",
+        "notes": "OPERATING STATUS: Operating for the 2026 season. Official opening was Saturday July 11, 2026 (confirmed by skilahoya.com news items \"La Hoya inaugura la temporada invernal 2026\" and cholilaonline.ar article \"La Hoya inicia la temporada invernal 2026 este sábado en Esquel\"). As of opening, only a phased subset of terrain (Learning Slope, Las Lengas chairlift, rentals, ski school) was running 10:00-17:00 daily, with progressive opening of more sectors as snow conditions permit; season expected to run mid-June to ~late September. Independently re-confirmed live via the Principiantes/Plano 1600 webcam image fetched today (in-image timestamp 12-07-2026), which shows a snow-covered base area with visible lift infrastructure and staff/snowmobile activity.\n\nELEVATIONS: Base 1,430 m / Summit 2,075 m, consistent across skiresort.info and multiple resort-guide sites (converted here to 4,692 ft / 6,808 ft). A few secondary sources cite slightly different summit figures (~2,050-2,150 m) but 1,430/2,075 m is the majority/most-cited figure and matches skiresort.info's stated elevation band.\n\nCOORDINATES: Cross-checked two independent sources — English Wikipedia's \"La Hoya, Chubut\" article (42°50'00\"S 71°15'23\"W = -42.8333, -71.2564) and OpenStreetMap/Nominatim, which returned two nearby points: a \"winter sports\" landuse polygon at -42.8192, -71.2578 and a \"sports centre\" POI at -42.8331, -71.2574 (labeled \"La Hoya, Camino a La Hoya, Municipio de Esquel\"). The sports-centre POI is essentially identical to the Wikipedia coordinate, so I used -42.8331, -71.2574 as the base-area point; all three sources agree within ~2 km.\n\nWEBCAMS: The official webcam page (skilahoya.com/webcams/) currently surfaces one live camera, \"Principiantes, Base 1600\" (image cam031 via varitech.ar, the resort's camera vendor). Varitech's own dashboard (varitech.ar/centro/lahoya) lists a second camera, \"Plateau\" (cam032), but it is explicitly marked \"Cámara fuera de servicio\" (out of service) right now, so it is NOT reported as a working cam. A third image, \"Domo Silla,\" appears on the aggregator snow2day.com and did return a valid (if heavily fogged-out) JPEG, but it is not listed among skilahoya.com's or varitech's own current camera set and snow2day flagged its last update as ~1 month stale, so it was excluded from the confirmed cams array for reliability. No 24/7 YouTube live stream was found — the official channel (youtube.com/@CAMLaHoya, aka youtube.com/user/camlahoya) posts occasional \"EN VIVO\" event broadcasts (e.g. a snowfall clip) rather than a continuous embeddable live feed, so no YouTube cam is reported.\n\nSOCIAL: Instagram and Facebook handles are both branded \"CamLaHoya\"/\"@camlahoya\" and are linked from the resort's own webcam page, so treated as official. No official X/Twitter account was found.",
+        "operating_2026": "operating - officially opened Sat July 11, 2026 (phased opening of terrain); confirmed via skilahoya.com season-opening news post and independently via a live webcam image timestamped today (12-07-2026)",
+        "region_label": "Argentina",
+        "social": {
+          "instagram_url": "https://www.instagram.com/camlahoya/",
+          "facebook_url": "https://www.facebook.com/CamLaHoya/",
+          "x_url": null
+        },
+        "website_url": "https://skilahoya.com/",
+        "cam_verification": [
+          {
+            "embed_url": "https://varitech.ar/cameras/cam031/latest.jpg",
+            "verdict": "working",
+            "detail": "Returns a valid 1280x720 progressive JPEG image (174.9KB), confirmed via `file` command on the downloaded content. Fetched successfully with no errors, redirects, or auth blocks."
+          }
+        ]
+      },
+      {
+        "cam_page_url": null,
+        "cams": [],
+        "country": "AR",
+        "elevation_base_ft": 5413,
+        "elevation_summit_ft": 5709,
+        "lat": -38.832546,
+        "lng": -71.222804,
+        "name": "Batea Mahuida",
+        "notes": "OPERATING STATUS: Confirmed operating for 2026 season. Official site (cerrobateamahuida.com) shows active \"Invierno 2026\"/\"Tarifas 2026\" branding and a presale campaign; NoticiasNQN (noticiasnqn.com.ar, published 2026-06-22) reports the resort \"lanzó los últimos días de preventa para la temporada 2026\" (last days of 2026 season presale), with peak-season lift ticket at 60,000 ARS and presale discounts up to 36%. Season typically runs late June-Sept/Oct. No evidence of closure.\n\nELEVATION: Sources conflict, likely due to different reference points (lift-served ski terrain vs. volcano crater viewpoint). skiresort.info and a matching snow-online summary both give base 1,650m / summit 1,740m (only 90m vertical) — used for the reported figures. The official site instead cites \"1,900 msnm\" for the crater-rim viewpoint (not necessarily lift top). A third source (soloski.net/derutasydestinos via search snippet) cites base 1,250m / summit 1,980m. Interpatagonia notes the main run (600m long) sits at 1,700m. Wikipedia's volcano-summit coordinate elevation is 1,948m (an separate figure for Volcán Batea Mahuida itself, ~1948-1980m per various sources). Treat elevation as approximate/low-confidence given the spread; the resort itself is very small (2.5km of runs, 3 lifts, ~90-100m vertical per most operator-facing sources).\n\nCOORDINATES: -38.832546, -71.222804 appears consistently across independent aggregator/tourism pages specifically referencing the Batea Mahuida ski center/snow park (interpatagonia.com and a second independent search-result citation), used as the base-area coordinate. This differs from Wikipedia's volcano-summit coordinate (-38.8189, -71.1929) and from Villa Pehuenia town-center coordinates (-38.891, -71.185) — those are for the peak/town, not the ski base, so were not used.\n\nWEBCAMS: None found. Checked (a) official site cerrobateamahuida.com and its \"El Cerro\" section including Parte Diario/Clima subpages — no camera page or link; (b) snow-forecast.com's dedicated webcam page for Cerro-Batea-Mahuida explicitly states \"We don't have a live webcam for this resort\" and instead lists nearby resorts' cams (Corralco, Caviahue, Chapelco); (c) YouTube search for live/en vivo streams returned only pre-recorded travel/vlog videos, no official live cam channel. Empty cams array is accurate, not a gap in research.\n\nRESORT PROFILE: Small community-run snow park on/near Volcán Batea Mahuida, ~8-10km from Villa Pehuenia, Neuquén Province, Argentina, near the Chile border. Entirely administered by the Mapuche Puel community (Lof Puel). Activities: alpine skiing, Nordic/cross-country skiing, snowboarding, snowmobiles, snowshoeing. ~2.5km of total slope length, 3 lifts. Known as one of the cheapest ski areas in Argentina.\n\nSOCIAL: Instagram (@bateamahuida) and Facebook (cerrobateamahuida) handles were both listed directly on the official website's own social links, giving strong first-party confirmation, though profile content couldn't be fully verified via fetch (Instagram/Facebook block unauthenticated scraping of bio/follower details). X/Twitter handle @bateamahuida was found via search result title \"Cerro Batea Mahuida (@BateaMahuida) / X\" but could not be fetched to verify (X returns 402 to unauthenticated fetch) — lower confidence than the other two.",
+        "operating_2026": "operating — official site shows live \"Invierno 2026\"/\"Tarifas 2026\" content and a 2026 presale; NoticiasNQN (2026-06-22) confirms 2026 season presale is running.",
+        "region_label": "Argentina",
+        "social": {
+          "instagram_url": "https://www.instagram.com/bateamahuida/",
+          "facebook_url": "https://www.facebook.com/cerrobateamahuida/",
+          "x_url": "https://x.com/bateamahuida"
+        },
+        "website_url": "https://www.cerrobateamahuida.com/",
+        "cam_verification": []
+      },
+      {
+        "cam_page_url": null,
+        "cams": [],
+        "country": "AR",
+        "elevation_base_ft": 2953,
+        "elevation_summit_ft": 5577,
+        "lat": -41.790152,
+        "lng": -71.563997,
+        "name": "Cerro Perito Moreno (El Bolsón)",
+        "notes": "OPERATING STATUS: Confirmed open for 2026 season. Multiple dated news sources (Río Negro, BarilocheOpina, Diario Crónica, Diario Neuquino — all June/July 2026) report the operator \"Laderas\" opened pedestrian access June 23, 2026, days ahead of the planned June 27 date, citing snowfall + new snowmaking cannons; a new quad chairlift and Refugio Albrecht Rudolph renovation were also announced for this season.\n\nCOORDINATES: Base-area coordinates cross-checked 3 ways: (1) cited ski-resort GPS \"41°47'24\"S/71°33'52\"W\" (=-41.790,-71.5644), (2) Google Maps \"Cerro Perito Moreno\" place-pin resolved via maps.app.goo.gl redirect to -41.790152,-71.563997 (used as primary), (3) Spanish Wikipedia mountain infobox at -41.78889,-71.57167. All three agree within ~600m, northwest of El Bolsón near Mallín Ahogado, Río Negro province.\n\nELEVATION: Two figures found, both plausible for different reference points. Used here (base 900m/2953ft, summit 1700m/5577ft = the lift-served \"Plateau\" top) per El Bolsón Turismo municipal tourism page, which quotes the operator directly (\"desde el estacionamiento, a 900m ... hasta los 1700m\"). Alternate aggregator figure from skiresort.info: base 990m/3248ft, summit 1730m/5676ft (740m vertical). Note: the untouched mountain PEAK (not lift-served, hike-only) is 2216-2294m per Wikipedia/Grado42 — do not confuse with ski-area summit.\n\nWEBSITE: www.laderas.com.ar is the confirmed official operator site per numerous independently-dated 2026 press articles and the municipal tourism board page, but direct WebFetch attempts to it returned a DNS resolution failure (tool/network-side issue, not evidence the site is offline — it is actively cited in July 2026 news). A second domain, cerroperitomoreno.com.ar, also exists but returned HTTP 403 (bot-blocked) on every fetch attempt.\n\nWEBCAMS: No evidence of any live webcam found after checking: TheProjectPowder.com snow-cams page (explicitly empty for this resort), Snow-Forecast.com (explicit text: \"We don't have a live webcam for this resort\"), targeted searches for Holfuy/Windy camera installations (none — only unrelated hits for the Perito Moreno GLACIER near El Calafate, Santa Cruz, a completely different location which was NOT conflated with this ski resort), and direct attempts at both candidate official domains (unreachable/blocked, no cached webcam page found via search either). A Facebook post titled \"Así se ven las cámaras\" appears to be manually-posted on-mountain snapshots, not an embeddable/confirmable live feed — no direct image/video URL could be found or fetched. Per task instructions, reporting empty cams array as the evidence-based answer.\n\nSOCIAL: Instagram handle @laderascerroperitomoreno surfaced via Instagram's own auto-generated meta title format in search results (strong signal of correct handle). Facebook facebook.com/cerroperitomoreno confirmed via matching page title \"Cerro Perito Moreno | El Bolsón\" on fetch. No official X/Twitter account found.",
+        "operating_2026": "operating — official operator \"Laderas\" opened the 2026 winter season June 23, 2026 (ahead of schedule), per Diario Río Negro, BarilocheOpina, and Diario Crónica articles dated June-July 2026",
+        "region_label": "Argentina",
+        "social": {
+          "instagram_url": "https://www.instagram.com/laderascerroperitomoreno/",
+          "facebook_url": "https://www.facebook.com/cerroperitomoreno/",
+          "x_url": null
+        },
+        "website_url": "https://www.laderas.com.ar",
+        "cam_verification": []
+      },
+      {
+        "cam_page_url": null,
+        "cams": [],
+        "country": "AR",
+        "elevation_base_ft": 8461,
+        "elevation_summit_ft": 10479,
+        "lat": -32.840754,
+        "lng": -69.839691,
+        "name": "Penitentes (Los Penitentes / Penitentes Park)",
+        "notes": "OPERATING STATUS (2026): Best classified as \"operating but not a traditional ski resort.\" Los Penitentes was closed for ~8 years after ~2016 due to financial/infrastructure collapse. Mendoza province re-tendered the concession; in July 2025 a 20-year concession was awarded to Mapsa Group S.A. (operator of Andes Truck, Villavicencio Park, Potrerillos Park), which rebranded operations as \"Penitentes Park.\" As of July 2026 (current date), multiple Argentine outlets (infomendoza.info, June 8 2026; mendozaski.com; elsol.com.ar; sitioandino.com.ar; mdzol.com) confirm: it is NOT a fully operational lift-served ski center in 2026 — described explicitly as \"sin centro de esquí operativo\" / a \"transition year\" while the province negotiates a fuller long-term concession. It IS open daily 9am-5pm as a year-round \"mountain recreational park\": restaurant, bathrooms, parking, ski/snowboard rental, a ski school, and — key detail — the historic Pirca chairlift was mechanically restored and passed an INTI safety inspection, but as of July 2026 it is running for pedestrian/panoramic rides only, not full skier lift service. A search dated within the current season (La Nacion, \"Llega el invierno,\" 20 June 2026) notes Mendoza resorts generally are contending with low natural snowfall in winter 2026, and a July-2026-dated result specifically says Penitentes has a restaurant/bathrooms running since early July but sledding/snow-play activities are suspended for lack of snow accumulation. Net: site is accessible and operating as a mountain park with a chairlift, but not delivering traditional downhill skiing this season — flag as \"operating (limited/non-ski)\" rather than a clean yes/no.\n\nLOCATION: Km 1210 of National Route 7 (RN7), Las Heras department, Mendoza Province, Argentina — at the foot of Aconcagua, ~25 km from the Chile border (Paso Los Libertadores) and ~170-180 km from Mendoza City.\n\nCOORDINATES: Cross-checked two sources — skiresort.info page metadata gives -32.840754, -69.839691; Wikipedia gives 32°50'30\"S 69°50'16\"W = -32.841624, -69.837752. Both cluster within ~150m of each other at the resort base, so confidence is high. Used the skiresort.info value as primary.\n\nELEVATIONS: skiresort.info states base 2,579 m / summit 3,194 m (a 615 m vertical), consistent with the commonly cited \"2,580 m base\" figure used by Mendoza Tourism. Converted: 2,579 m = 8,461 ft; 3,194 m = 10,479 ft.\n\nWEBSITE: No reliable current official website found. The historical official domain penitentesweb.com now 301-redirects to an unrelated third-party site (smslwithheidi.com) — dead/hijacked. The concessionaire's corporate domain mapsagroupsa.com resolves but renders as a placeholder/parked page with no Penitentes content reachable via fetch. The closest thing to an \"official\" online presence is the Mendoza provincial government press release (mendoza.gov.ar/prensa) announcing the concession, and the Instagram account below, which the operator uses as its primary channel for hours/pricing/status updates.\n\nWEBCAMS: Extensive search turned up no live webcam for this resort. Evidence: (1) snow-forecast.com's dedicated webcam page for \"Los Penitentes\" explicitly states \"We don't have a live webcam for this resort\" and shows only a single archived/static gallery photo, no live feed; (2) meteoblue's \"Cordillera de los Penitentes\" webcam page actually surfaces two unrelated cams — Laguna del Inca and Hotel Portillo — both in Chile, ~45 km away, not at this resort; (3) soloski.net has a page titled \"Webcam del Centro de Esquí de Penitentes\" but inspection of the raw HTML shows it only embeds a static 2011-vintage logo/photo (og:image dated 2011, last modified 2020) with no iframe or live camera element — not a functioning cam; (4) a YouTube \"ACONCAGUA LIVE WEBCAM AT BASE CAMP\" stream exists but is located at Aconcagua base camp (~4,300 m, Plaza de Mulas/Confluencia area), a distinct location from the Penitentes ski-resort base, so it was not counted as a resort cam; (5) no webcam links were found on the operator's Instagram bio or on any Facebook/X page. Per instructions, reporting an empty cams array since no cam met the bar of a fetch-confirmed, resort-specific live feed.\n\nSOCIAL: Instagram @penitentespark (https://www.instagram.com/penitentespark/) is confirmed as the operator's active official account (~24K followers, described consistently across multiple independent search results as \"Penitentes Park / Parque recreativo de montaña,\" posting hours/pricing/activity updates). A Facebook page \"Ski Penitentes\" (facebook.com/skipenitentes) and an X/Twitter handle (x.com/penitentes) surfaced in search but could not be fetched/verified as currently active or operator-controlled (X returned HTTP 402 on fetch; Facebook page content was not retrievable) — omitted rather than reported with low confidence.",
+        "operating_2026": "uncertain — open as a year-round \"mountain park\" (restaurant, rentals, restored Pirca chairlift for panoramic/pedestrian rides) per July 2026 sources, but explicitly NOT a fully operational lift-served ski center this season, and snow-dependent activities are currently suspended due to low snowfall (infomendoza.info, June 8 2026; multiple Mendoza outlets, July 2026)",
+        "region_label": "Argentina",
+        "social": {
+          "instagram_url": "https://www.instagram.com/penitentespark/",
+          "facebook_url": null,
+          "x_url": null
+        },
+        "website_url": null,
+        "cam_verification": []
+      }
+    ],
+    "critic": {
+      "missed_resorts": [
+        "Pillán / Centro de Ski Volcán Villarrica (formerly \"Ski Pucón\") — notable operating resort near Pucón with lift-accessed tree skiing on an active volcano; has multiple public webcams (Villarrica 01, Villarrica Llafenco, Volcán Villarrica cams per snow2day.com and OnTheSnow) that the sweep entirely missed.",
+        "Chapa Verde (Rancagua/Cachapoal) — CODELCO-operated club ski resort, 22 runs, season mid-June–mid-October; no public webcam found (multiple sources confirm none exists), so if added it should be logged with 0 cams.",
+        "Ski Antuco (Volcán Antuco, Laguna del Laja National Park, Biobío region) — smaller Los Ángeles Ski Club-run area; no public webcam found, would be logged with 0 cams.",
+        "El Azufre (south of Las Leñas, Mendoza) — borderline/optional: emerging cat-skiing/backcountry operation rather than a conventional lift-served resort; flagging for the team to decide whether it counts toward the target list."
+      ],
+      "missed_cams": [
+        {
+          "resort": "Cerro Mirador (Punta Arenas)",
+          "lead": "Marked 0 cams, but snow-forecast.com hosts a dedicated webcam page (es.snow-forecast.com/resorts/CerroMirador/webcams/latest) with current + archived daily images. Verify whether this pulls a still-live official/club-andino feed the researcher missed."
+        },
+        {
+          "resort": "Batea Mahuida",
+          "lead": "Marked 0 cams, but snow-forecast.com hosts a webcam page (snow-forecast.com/resorts/Cerro-Batea-Mahuida/webcams/latest) with current conditions + a month-long image archive. Confirm if it's a live feed or just periodic manual uploads before crediting a cam."
+        },
+        {
+          "resort": "Cerro Perito Moreno (El Bolsón)",
+          "lead": "Marked 0 cams, but snow-forecast.com/resorts/PeritoMoreno/webcams/latest has an archived image feed, and the resort's own Facebook (@cerroperitomoreno) periodically posts \"así se ven las cámaras\" (snow-condition camera) images each season, suggesting an official mountain cam exists even if not embedded on laderas.com.ar. Worth a direct check of laderas.com.ar for a live cam page."
+        }
+      ],
+      "status_corrections": [
+        "No outright status errors found — all 20 resorts' operating/closed statuses checked against current (2026-07) sources were consistent with the fleet's findings. One adjacent data point: Vallecitos (Mendoza) is NOT in the fleet's list at all, but note for context if it's added later — multiple sources describe it as currently lift-less/informal (closed as a commercial lift resort due to insufficient snow investment), so it should not be added as a full 'operating' entry without that caveat."
+      ]
+    }
+  },
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Research"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 2,
+      "title": "Verify cams"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 3,
+      "title": "Completeness"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "research:Portillo",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "a1817c44543397207",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783892735838,
+      "queuedAt": 1783892735827,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "https://skiportillo.com/en/our-mountain/portillo-snow-forec…",
+      "promptPreview": "You are researching a South American ski resort for PeakCam (peakcam.io), a ski webcam + snow conditions site. Resort: **Portillo** (Chile).\n\nUse WebSearch and WebFetch (load them via ToolSearch first). Find and verify:\n1. Operating status for the 2026 season (some Andes areas have closed — check recent sources, not just the existence of a website).\n2. Precise base-area lat/lng (cross-check two so…",
+      "lastProgressAt": 1783892826501,
+      "tokens": 39976,
+      "toolCalls": 21,
+      "durationMs": 90663,
+      "resultPreview": "{\"cam_page_url\":\"https://skiportillo.com/en/our-mountain/portillo-snow-forecast-conditions/\",\"cams\":[{\"cam_name\":\"Laguna (Inca Lake)\",\"embed_type\":\"iframe\",\"embed_url\":\"https://g3.ipcamlive.com/player/player.php?alias=laguna\",\"youtube_id\":null,\"evidence\":\"Found on skiportillo.com/en/our-mountain/portillo-snow-forecast-conditions/ under 'Mountain Cams'. Fetched player URL directly on 2026-07-12 (wi…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "research:Valle Nevado",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "a7d833906c9d29026",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783892735838,
+      "queuedAt": 1783892735828,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "https://www.vallenevado.com/en/cameras/",
+      "promptPreview": "You are researching a South American ski resort for PeakCam (peakcam.io), a ski webcam + snow conditions site. Resort: **Valle Nevado** (Chile).\n\nUse WebSearch and WebFetch (load them via ToolSearch first). Find and verify:\n1. Operating status for the 2026 season (some Andes areas have closed — check recent sources, not just the existence of a website).\n2. Precise base-area lat/lng (cross-check tw…",
+      "lastProgressAt": 1783892829088,
+      "tokens": 55044,
+      "toolCalls": 15,
+      "durationMs": 93250,
+      "resultPreview": "{\"cam_page_url\":\"https://www.vallenevado.com/en/cameras/\",\"cams\":[{\"cam_name\":\"La Fourchette Terrace\",\"embed_type\":\"youtube\",\"embed_url\":\"https://www.youtube.com/embed/tWNxInShxZI\",\"youtube_id\":\"tWNxInShxZI\",\"evidence\":\"Fetched raw HTML of https://www.vallenevado.com/en/cameras/ via curl; found <iframe src=\\\"https://www.youtube.com/embed/tWNxInShxZI?feature=oembed\\\" title=\\\"Valle Nevado Ski Resort…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "research:La Parva",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "af6c4dda43c474bf6",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783892735839,
+      "queuedAt": 1783892735828,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "https://laparva.cl/en/mountain-report/web-cameras/",
+      "promptPreview": "You are researching a South American ski resort for PeakCam (peakcam.io), a ski webcam + snow conditions site. Resort: **La Parva** (Chile).\n\nUse WebSearch and WebFetch (load them via ToolSearch first). Find and verify:\n1. Operating status for the 2026 season (some Andes areas have closed — check recent sources, not just the existence of a website).\n2. Precise base-area lat/lng (cross-check two so…",
+      "lastProgressAt": 1783892871822,
+      "tokens": 54346,
+      "toolCalls": 21,
+      "durationMs": 135983,
+      "resultPreview": "{\"cam_page_url\":\"https://laparva.cl/en/mountain-report/web-cameras/\",\"cams\":[{\"cam_name\":\"Parva Chica\",\"embed_type\":\"youtube\",\"embed_url\":\"https://www.youtube.com/embed/dEF-ujYXgkU\",\"youtube_id\":\"dEF-ujYXgkU\",\"evidence\":\"Fetched raw HTML of https://laparva.cl/en/mountain-report/web-cameras/ via curl; found <iframe src=\\\"https://www.youtube.com/embed/dEF-ujYXgkU\\\" title=\\\"Parva Chica\\\">. Confirmed …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "research:El Colorado",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "a262429c6a54a0ad9",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783892735839,
+      "queuedAt": 1783892735828,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "https://www.elcolorado.cl/live-cam/",
+      "promptPreview": "You are researching a South American ski resort for PeakCam (peakcam.io), a ski webcam + snow conditions site. Resort: **El Colorado** (Chile).\n\nUse WebSearch and WebFetch (load them via ToolSearch first). Find and verify:\n1. Operating status for the 2026 season (some Andes areas have closed — check recent sources, not just the existence of a website).\n2. Precise base-area lat/lng (cross-check two…",
+      "lastProgressAt": 1783892855479,
+      "tokens": 43320,
+      "toolCalls": 23,
+      "durationMs": 119640,
+      "resultPreview": "{\"cam_page_url\":\"https://www.elcolorado.cl/live-cam/\",\"cams\":[{\"cam_name\":\"Parador Pista\",\"embed_type\":\"youtube\",\"embed_url\":\"https://www.youtube.com/embed/r3vGVM_gW64\",\"youtube_id\":\"r3vGVM_gW64\",\"evidence\":\"Fetched raw HTML of https://www.elcolorado.cl/live-cam/ (curl); found <h3 class=livecam__title>Parador Pista</h3> immediately followed by iframe src=youtube.com/embed/r3vGVM_gW64. Confirmed li…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 5,
+      "label": "research:Lagunillas",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "ae2c642c900be8113",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783892735839,
+      "queuedAt": 1783892735828,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "CL",
+      "promptPreview": "You are researching a South American ski resort for PeakCam (peakcam.io), a ski webcam + snow conditions site. Resort: **Lagunillas** (Chile).\n\nUse WebSearch and WebFetch (load them via ToolSearch first). Find and verify:\n1. Operating status for the 2026 season (some Andes areas have closed — check recent sources, not just the existence of a website).\n2. Precise base-area lat/lng (cross-check two …",
+      "lastProgressAt": 1783893197617,
+      "tokens": 48784,
+      "toolCalls": 31,
+      "durationMs": 461778,
+      "resultPreview": "{\"cam_page_url\":null,\"cams\":[],\"country\":\"CL\",\"elevation_base_ft\":7218,\"elevation_summit_ft\":8366,\"lat\":-33.6071,\"lng\":-70.2888,\"name\":\"Lagunillas\",\"notes\":\"Lagunillas (Centro de Ski Lagunillas) is Chile's only non-commercial ski center, founded and operated by Club Andino de Chile since 1933. Located in Cajón del Maipo, San José de Maipo commune, ~67 km/60 km SE of Santiago via Ruta G-25. Small a…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 6,
+      "label": "research:Nevados de Chillán",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "a0cea244b52069a93",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783892735839,
+      "queuedAt": 1783892735828,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "https://www.nevadosdechillan.com/camaras",
+      "promptPreview": "You are researching a South American ski resort for PeakCam (peakcam.io), a ski webcam + snow conditions site. Resort: **Nevados de Chillán** (Chile).\n\nUse WebSearch and WebFetch (load them via ToolSearch first). Find and verify:\n1. Operating status for the 2026 season (some Andes areas have closed — check recent sources, not just the existence of a website).\n2. Precise base-area lat/lng (cross-ch…",
+      "lastProgressAt": 1783892948413,
+      "tokens": 67496,
+      "toolCalls": 34,
+      "durationMs": 212574,
+      "resultPreview": "{\"cam_page_url\":\"https://www.nevadosdechillan.com/camaras\",\"cams\":[{\"cam_name\":\"Novicios (Pista Novicios)\",\"embed_type\":\"iframe\",\"embed_url\":\"https://g3.ipcamlive.com/player/player.php?alias=pistanovicios&autoplay=1\",\"youtube_id\":null,\"evidence\":\"Fetched https://www.nevadosdechillan.com/camaras (raw HTML via curl) and found <iframe src=\\\"https://g3.ipcamlive.com/player/player.php?alias=pistanovici…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 7,
+      "label": "research:Corralco",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "a4a778f16f5be3c8d",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783892735840,
+      "queuedAt": 1783892735828,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "https://webcam.corralco.com/",
+      "promptPreview": "You are researching a South American ski resort for PeakCam (peakcam.io), a ski webcam + snow conditions site. Resort: **Corralco** (Chile).\n\nUse WebSearch and WebFetch (load them via ToolSearch first). Find and verify:\n1. Operating status for the 2026 season (some Andes areas have closed — check recent sources, not just the existence of a website).\n2. Precise base-area lat/lng (cross-check two so…",
+      "lastProgressAt": 1783892891057,
+      "tokens": 46246,
+      "toolCalls": 25,
+      "durationMs": 155217,
+      "resultPreview": "{\"cam_page_url\":\"https://webcam.corralco.com/\",\"cams\":[{\"cam_name\":\"Hotel\",\"embed_type\":\"iframe\",\"embed_url\":\"https://www.ipcamlive.com/player/player.php?alias=hotel\",\"youtube_id\":null,\"evidence\":\"Fetched raw HTML of https://webcam.corralco.com/ (official Corralco webcam subdomain) which embeds this iframe directly. Confirmed HTTP 200 response from the player URL via curl.\"},{\"cam_name\":\"ZCB Ski A…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 8,
+      "label": "research:Antillanca",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "a7ee495bf79863b7d",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783892735840,
+      "queuedAt": 1783892735828,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "https://www.antillanca.cl/webcams/",
+      "promptPreview": "You are researching a South American ski resort for PeakCam (peakcam.io), a ski webcam + snow conditions site. Resort: **Antillanca** (Chile).\n\nUse WebSearch and WebFetch (load them via ToolSearch first). Find and verify:\n1. Operating status for the 2026 season (some Andes areas have closed — check recent sources, not just the existence of a website).\n2. Precise base-area lat/lng (cross-check two …",
+      "lastProgressAt": 1783892909486,
+      "tokens": 46828,
+      "toolCalls": 30,
+      "durationMs": 173646,
+      "resultPreview": "{\"cam_page_url\":\"https://www.antillanca.cl/webcams/\",\"cams\":[{\"cam_name\":\"Vista Don Pedro (Haique lift view)\",\"embed_type\":\"image\",\"embed_url\":\"https://www.antillanca.cl/wp-json/antillanca/v1/webcam/1\",\"youtube_id\":null,\"evidence\":\"Fetched directly on 2026-07-12; returned a live JPEG (7.6KB) with on-image burned-in text 'Vista Don Pedro' and timestamp '12-07-2026 19:13:42' matching current date, c…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 9,
+      "label": "research:Volcán Osorno",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "ac2a853888b4e9967",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783892826502,
+      "queuedAt": 1783892735828,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "https://centrovolcanosorno.cl/live-cam/",
+      "promptPreview": "You are researching a South American ski resort for PeakCam (peakcam.io), a ski webcam + snow conditions site. Resort: **Volcán Osorno** (Chile).\n\nUse WebSearch and WebFetch (load them via ToolSearch first). Find and verify:\n1. Operating status for the 2026 season (some Andes areas have closed — check recent sources, not just the existence of a website).\n2. Precise base-area lat/lng (cross-check t…",
+      "lastProgressAt": 1783893240711,
+      "tokens": 66830,
+      "toolCalls": 52,
+      "durationMs": 414209,
+      "resultPreview": "{\"cam_page_url\":\"https://centrovolcanosorno.cl/live-cam/\",\"cams\":[{\"cam_name\":\"Camara VO - Cono VO\",\"embed_type\":\"youtube\",\"embed_url\":\"https://www.youtube.com/embed/2uBn7TRSYjI\",\"youtube_id\":\"2uBn7TRSYjI\",\"evidence\":\"Fetched raw HTML of https://centrovolcanosorno.cl/live-cam/ via curl; found <iframe src=\\\"https://www.youtube.com/embed/2uBn7TRSYjI?autoplay=1&mute=1\\\" title=\\\"Camara VO - Cono VO\\\">…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 10,
+      "label": "research:Cerro Mirador (Punta Arenas)",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "afffb26a7bc0b89c3",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783892829089,
+      "queuedAt": 1783892735828,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "Cerro Mirador (Punta Arenas)",
+      "promptPreview": "You are researching a South American ski resort for PeakCam (peakcam.io), a ski webcam + snow conditions site. Resort: **Cerro Mirador (Punta Arenas)** (Chile).\n\nUse WebSearch and WebFetch (load them via ToolSearch first). Find and verify:\n1. Operating status for the 2026 season (some Andes areas have closed — check recent sources, not just the existence of a website).\n2. Precise base-area lat/lng…",
+      "lastProgressAt": 1783893082761,
+      "tokens": 66253,
+      "toolCalls": 51,
+      "durationMs": 253671,
+      "resultPreview": "{\"name\":\"Cerro Mirador (Punta Arenas)\",\"country\":\"CL\",\"region_label\":\"Chile\",\"operating_2026\":\"operating — radiopolar.com (Chilean regional news) published a story dated 2026-07-06 confirming activities resumed at Club Andino / Cerro Mirador after a recent snowfall; the official site clubandino.cl's sitemap shows its tickets and content pages last-modified 2026-07-08, indicating active current-sea…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 11,
+      "label": "research:Cerro Catedral (Bariloche)",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "a6f572c0a7841c440",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783892855479,
+      "queuedAt": 1783892735828,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "https://catedralaltapatagonia.com/webcams/",
+      "promptPreview": "You are researching a South American ski resort for PeakCam (peakcam.io), a ski webcam + snow conditions site. Resort: **Cerro Catedral (Bariloche)** (Argentina).\n\nUse WebSearch and WebFetch (load them via ToolSearch first). Find and verify:\n1. Operating status for the 2026 season (some Andes areas have closed — check recent sources, not just the existence of a website).\n2. Precise base-area lat/l…",
+      "lastProgressAt": 1783893073155,
+      "tokens": 60640,
+      "toolCalls": 32,
+      "durationMs": 217676,
+      "resultPreview": "{\"cam_page_url\":\"https://catedralaltapatagonia.com/webcams/\",\"cams\":[{\"cam_name\":\"Punta Princesa (live)\",\"embed_type\":\"iframe\",\"embed_url\":\"https://g3.ipcamlive.com/player/player.php?alias=6a2c31a02eaf9&skin=white&autoplay=1&mute=1&disableautofullscreen=1&disablezoombutton=1&disableframecapture=1&disablestorageplayer=1&disabledownloadbutton=1&disableplaybackspeedbutton=1\",\"youtube_id\":null,\"eviden…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 12,
+      "label": "research:Chapelco (San Martín de los Andes)",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "a5585651c38380a00",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783892871823,
+      "queuedAt": 1783892735828,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "https://www.cerrochapelco.com.ar/webcams-cerro-chapelco/",
+      "promptPreview": "You are researching a South American ski resort for PeakCam (peakcam.io), a ski webcam + snow conditions site. Resort: **Chapelco (San Martín de los Andes)** (Argentina).\n\nUse WebSearch and WebFetch (load them via ToolSearch first). Find and verify:\n1. Operating status for the 2026 season (some Andes areas have closed — check recent sources, not just the existence of a website).\n2. Precise base-ar…",
+      "lastProgressAt": 1783893210682,
+      "tokens": 56498,
+      "toolCalls": 35,
+      "durationMs": 338859,
+      "resultPreview": "{\"cam_page_url\":\"https://www.cerrochapelco.com.ar/webcams-cerro-chapelco/\",\"cams\":[{\"cam_name\":\"Pradera del Puma\",\"embed_type\":\"image\",\"embed_url\":\"https://varitech.ar/cameras/cam016/latest.jpg\",\"youtube_id\":null,\"evidence\":\"Fetched via curl -I: HTTP 200 OK, Content-Type: image/jpeg, Last-Modified: Sun 12 Jul 2026 21:42:49 GMT (same-day as research, confirming active refresh, ~5min interval per si…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 13,
+      "label": "research:Las Leñas",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "a2023b3917ac02f14",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783892891058,
+      "queuedAt": 1783892735828,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "https://laslenas.com/camara-en-vivo/",
+      "promptPreview": "You are researching a South American ski resort for PeakCam (peakcam.io), a ski webcam + snow conditions site. Resort: **Las Leñas** (Argentina).\n\nUse WebSearch and WebFetch (load them via ToolSearch first). Find and verify:\n1. Operating status for the 2026 season (some Andes areas have closed — check recent sources, not just the existence of a website).\n2. Precise base-area lat/lng (cross-check t…",
+      "lastProgressAt": 1783893071615,
+      "tokens": 59458,
+      "toolCalls": 29,
+      "durationMs": 180557,
+      "resultPreview": "{\"cam_page_url\":\"https://laslenas.com/camara-en-vivo/\",\"cams\":[{\"cam_name\":\"Base / Live Cam (official)\",\"embed_type\":\"iframe\",\"embed_url\":\"https://tv.streamcasthd.com/live-stream-video-widget/laslenas\",\"youtube_id\":null,\"evidence\":\"Fetched https://laslenas.com/camara-en-vivo/ directly (curl): the page embeds a lazyloaded <iframe> whose data-orig-src is this streamcasthd.com widget URL. Fetched tha…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 14,
+      "label": "research:Cerro Castor (Ushuaia)",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "a7af60b47085535fd",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783892909487,
+      "queuedAt": 1783892735828,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "https://www.cerrocastor.com/es_ar/live.html",
+      "promptPreview": "You are researching a South American ski resort for PeakCam (peakcam.io), a ski webcam + snow conditions site. Resort: **Cerro Castor (Ushuaia)** (Argentina).\n\nUse WebSearch and WebFetch (load them via ToolSearch first). Find and verify:\n1. Operating status for the 2026 season (some Andes areas have closed — check recent sources, not just the existence of a website).\n2. Precise base-area lat/lng (…",
+      "lastProgressAt": 1783893260708,
+      "tokens": 73479,
+      "toolCalls": 54,
+      "durationMs": 351221,
+      "resultPreview": "{\"cam_page_url\":\"https://www.cerrocastor.com/es_ar/live.html\",\"cams\":[{\"cam_name\":\"Cerro Castor Live Stream\",\"embed_type\":\"youtube\",\"embed_url\":\"https://www.youtube.com/embed/RVuTqjTyrr0\",\"youtube_id\":\"RVuTqjTyrr0\",\"evidence\":\"Fetched https://www.youtube.com/watch?v=RVuTqjTyrr0 directly: page metadata confirms isLiveNow:true, isLiveBroadcast content=True, startDate 2026-07-09T14:01:24Z, title 'Emi…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 15,
+      "label": "research:Caviahue",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "a378d72ce37bafc70",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783892948414,
+      "queuedAt": 1783892735828,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "https://www.caviahue.com/camara-web",
+      "promptPreview": "You are researching a South American ski resort for PeakCam (peakcam.io), a ski webcam + snow conditions site. Resort: **Caviahue** (Argentina).\n\nUse WebSearch and WebFetch (load them via ToolSearch first). Find and verify:\n1. Operating status for the 2026 season (some Andes areas have closed — check recent sources, not just the existence of a website).\n2. Precise base-area lat/lng (cross-check tw…",
+      "lastProgressAt": 1783893297014,
+      "tokens": 102142,
+      "toolCalls": 49,
+      "durationMs": 348600,
+      "resultPreview": "{\"cam_page_url\":\"https://www.caviahue.com/camara-web\",\"cams\":[{\"cam_name\":\"Copahue Volcano - Agrio Superior Station (AGS)\",\"embed_type\":\"image\",\"embed_url\":\"https://oavv.segemar.gob.ar/CP/AGS.png\",\"youtube_id\":null,\"evidence\":\"Fetched directly: HTTP 200, image/png, 1920x1080, timestamp burned into image reads '2026-07-12 21:50:02 UTC' (matches current date). Found via meteoblue.com/en/weather/webc…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 16,
+      "label": "research:Cerro Bayo",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "a5676c8a0c89b0477",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893071629,
+      "queuedAt": 1783892735828,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "Cerro Bayo",
+      "promptPreview": "You are researching a South American ski resort for PeakCam (peakcam.io), a ski webcam + snow conditions site. Resort: **Cerro Bayo** (Argentina).\n\nUse WebSearch and WebFetch (load them via ToolSearch first). Find and verify:\n1. Operating status for the 2026 season (some Andes areas have closed — check recent sources, not just the existence of a website).\n2. Precise base-area lat/lng (cross-check …",
+      "lastProgressAt": 1783893229540,
+      "tokens": 47040,
+      "toolCalls": 22,
+      "durationMs": 157911,
+      "resultPreview": "{\"name\":\"Cerro Bayo\",\"country\":\"AR\",\"region_label\":\"Argentina\",\"operating_2026\":\"operating — the-ski-guru.com (Jul 6, 2026) lists Cerro Bayo as one of the 2026-season \\\"early starters\\\" with beginner terrain running on snowmaking; no closure reports found and official site (cerrobayo.com.ar) is live with active 2026 pass/financing promos.\",\"lat\":-40.7508,\"lng\":-71.6025,\"elevation_base_ft\":3445,\"el…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 17,
+      "label": "research:La Hoya (Esquel)",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "a050c060b4bf1d9f2",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893073156,
+      "queuedAt": 1783892735828,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "https://skilahoya.com/webcams/",
+      "promptPreview": "You are researching a South American ski resort for PeakCam (peakcam.io), a ski webcam + snow conditions site. Resort: **La Hoya (Esquel)** (Argentina).\n\nUse WebSearch and WebFetch (load them via ToolSearch first). Find and verify:\n1. Operating status for the 2026 season (some Andes areas have closed — check recent sources, not just the existence of a website).\n2. Precise base-area lat/lng (cross-…",
+      "lastProgressAt": 1783893254056,
+      "tokens": 49934,
+      "toolCalls": 37,
+      "durationMs": 180900,
+      "resultPreview": "{\"cam_page_url\":\"https://skilahoya.com/webcams/\",\"cams\":[{\"cam_name\":\"Principiantes / Plano Base 1600\",\"embed_type\":\"image\",\"embed_url\":\"https://varitech.ar/cameras/cam031/latest.jpg\",\"youtube_id\":null,\"evidence\":\"Fetched directly via WebFetch and rendered the returned JPEG: shows the 'LA HOYA' logo overlay, a 'Plano 1600' label, and an in-image timestamp of '12-07-2026 18:50:38' matching today's …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 18,
+      "label": "research:Batea Mahuida",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "a7e839944834966cd",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893082762,
+      "queuedAt": 1783892735828,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "AR",
+      "promptPreview": "You are researching a South American ski resort for PeakCam (peakcam.io), a ski webcam + snow conditions site. Resort: **Batea Mahuida** (Argentina).\n\nUse WebSearch and WebFetch (load them via ToolSearch first). Find and verify:\n1. Operating status for the 2026 season (some Andes areas have closed — check recent sources, not just the existence of a website).\n2. Precise base-area lat/lng (cross-che…",
+      "lastProgressAt": 1783893237896,
+      "tokens": 47775,
+      "toolCalls": 26,
+      "durationMs": 155134,
+      "resultPreview": "{\"cam_page_url\":null,\"cams\":[],\"country\":\"AR\",\"elevation_base_ft\":5413,\"elevation_summit_ft\":5709,\"lat\":-38.832546,\"lng\":-71.222804,\"name\":\"Batea Mahuida\",\"notes\":\"OPERATING STATUS: Confirmed operating for 2026 season. Official site (cerrobateamahuida.com) shows active \\\"Invierno 2026\\\"/\\\"Tarifas 2026\\\" branding and a presale campaign; NoticiasNQN (noticiasnqn.com.ar, published 2026-06-22) reports…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 19,
+      "label": "research:Cerro Perito Moreno (El Bolsón)",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "ab38927569739de00",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893197618,
+      "queuedAt": 1783892735828,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "AR",
+      "promptPreview": "You are researching a South American ski resort for PeakCam (peakcam.io), a ski webcam + snow conditions site. Resort: **Cerro Perito Moreno (El Bolsón)** (Argentina).\n\nUse WebSearch and WebFetch (load them via ToolSearch first). Find and verify:\n1. Operating status for the 2026 season (some Andes areas have closed — check recent sources, not just the existence of a website).\n2. Precise base-area …",
+      "lastProgressAt": 1783893450609,
+      "tokens": 54363,
+      "toolCalls": 35,
+      "durationMs": 252991,
+      "resultPreview": "{\"cam_page_url\":null,\"cams\":[],\"country\":\"AR\",\"elevation_base_ft\":2953,\"elevation_summit_ft\":5577,\"lat\":-41.790152,\"lng\":-71.563997,\"name\":\"Cerro Perito Moreno (El Bolsón)\",\"notes\":\"OPERATING STATUS: Confirmed open for 2026 season. Multiple dated news sources (Río Negro, BarilocheOpina, Diario Crónica, Diario Neuquino — all June/July 2026) report the operator \\\"Laderas\\\" opened pedestrian access J…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 20,
+      "label": "research:Penitentes",
+      "phaseIndex": 1,
+      "phaseTitle": "Research",
+      "agentId": "a063be7ca82c4c781",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893210683,
+      "queuedAt": 1783892735828,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "AR",
+      "promptPreview": "You are researching a South American ski resort for PeakCam (peakcam.io), a ski webcam + snow conditions site. Resort: **Penitentes** (Argentina).\n\nUse WebSearch and WebFetch (load them via ToolSearch first). Find and verify:\n1. Operating status for the 2026 season (some Andes areas have closed — check recent sources, not just the existence of a website).\n2. Precise base-area lat/lng (cross-check …",
+      "lastProgressAt": 1783893508066,
+      "tokens": 70791,
+      "toolCalls": 42,
+      "durationMs": 297383,
+      "resultPreview": "{\"cam_page_url\":null,\"cams\":[],\"country\":\"AR\",\"elevation_base_ft\":8461,\"elevation_summit_ft\":10479,\"lat\":-32.840754,\"lng\":-69.839691,\"name\":\"Penitentes (Los Penitentes / Penitentes Park)\",\"notes\":\"OPERATING STATUS (2026): Best classified as \\\"operating but not a traditional ski resort.\\\" Los Penitentes was closed for ~8 years after ~2016 due to financial/infrastructure collapse. Mendoza province r…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 21,
+      "label": "verify:Portillo",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify cams",
+      "agentId": "a62c36aecbdee8c0e",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893229551,
+      "queuedAt": 1783892826503,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Verify these webcam URLs for Portillo actually work RIGHT NOW. Load WebFetch via ToolSearch. For each URL: fetch it; report working (returns the expected content type — an image, a live player page, an active YouTube live), dead (404/timeout/removed video), or unverifiable (blocked/CORS/requires JS). URLs:\n- [iframe] https://g3.ipcamlive.com/player/player.php?alias=laguna\n- [iframe] https://g3.ipc…",
+      "lastProgressAt": 1783893251962,
+      "tokens": 28402,
+      "toolCalls": 8,
+      "durationMs": 22411,
+      "resultPreview": "{\"results\":[{\"embed_url\":\"https://g3.ipcamlive.com/player/player.php?alias=laguna\",\"verdict\":\"working\",\"detail\":\"Page loads (HTTP 200 with browser UA; ipcamlive blocks non-browser UAs with 403). Title 'Live video stream', valid streamid '28wiqf1gysm3duude' assigned, and player JS calls ipcamliveplayer.embedOnline(...) — ipcamlive uses embedOffline() for dead/removed cameras, so embedOnline indicat…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 22,
+      "label": "verify:Valle Nevado",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify cams",
+      "agentId": "af7bc342e60d5c42b",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893237897,
+      "queuedAt": 1783892829093,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Verify these webcam URLs for Valle Nevado actually work RIGHT NOW. Load WebFetch via ToolSearch. For each URL: fetch it; report working (returns the expected content type — an image, a live player page, an active YouTube live), dead (404/timeout/removed video), or unverifiable (blocked/CORS/requires JS). URLs:\n- [youtube] https://www.youtube.com/embed/tWNxInShxZI\n- [youtube] https://www.youtube.co…",
+      "lastProgressAt": 1783893258457,
+      "tokens": 29457,
+      "toolCalls": 7,
+      "durationMs": 20560,
+      "resultPreview": "{\"results\":[{\"embed_url\":\"https://www.youtube.com/embed/tWNxInShxZI\",\"verdict\":\"unverifiable\",\"detail\":\"Video exists (oembed 200): 'Valle Nevado Ski Resort Live - La Fourchette' by Valle Nevado Ski Resort channel. Not removed/dead, but live-stream active status requires JS-rendered player, which WebFetch/curl cannot confirm.\"},{\"embed_url\":\"https://www.youtube.com/embed/uyt8JsITTac\",\"verdict\":\"unv…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 23,
+      "label": "verify:El Colorado",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify cams",
+      "agentId": "a50824a827b20073b",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893240711,
+      "queuedAt": 1783892855480,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Verify these webcam URLs for El Colorado actually work RIGHT NOW. Load WebFetch via ToolSearch. For each URL: fetch it; report working (returns the expected content type — an image, a live player page, an active YouTube live), dead (404/timeout/removed video), or unverifiable (blocked/CORS/requires JS). URLs:\n- [youtube] https://www.youtube.com/embed/r3vGVM_gW64\n- [youtube] https://www.youtube.com…",
+      "lastProgressAt": 1783893254717,
+      "tokens": 27101,
+      "toolCalls": 5,
+      "durationMs": 14006,
+      "resultPreview": "{\"results\":[{\"embed_url\":\"https://www.youtube.com/embed/r3vGVM_gW64\",\"verdict\":\"unverifiable\",\"detail\":\"WebFetch returned only the literal text 'YouTube' with no player content or error message — YouTube embed pages render via JavaScript, so a static HTML fetch cannot determine if the video is live, available, or removed. Requires a JS-capable browser check or the YouTube Data API to confirm.\"},{\"…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 24,
+      "label": "verify:La Parva",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify cams",
+      "agentId": "add2b7b05318cb47d",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893251963,
+      "queuedAt": 1783892871823,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Verify these webcam URLs for La Parva actually work RIGHT NOW. Load WebFetch via ToolSearch. For each URL: fetch it; report working (returns the expected content type — an image, a live player page, an active YouTube live), dead (404/timeout/removed video), or unverifiable (blocked/CORS/requires JS). URLs:\n- [youtube] https://www.youtube.com/embed/dEF-ujYXgkU\n- [youtube] https://www.youtube.com/em…",
+      "lastProgressAt": 1783893269283,
+      "tokens": 28086,
+      "toolCalls": 5,
+      "durationMs": 17320,
+      "resultPreview": "{\"results\":[{\"embed_url\":\"https://www.youtube.com/embed/dEF-ujYXgkU\",\"verdict\":\"unverifiable\",\"detail\":\"Video exists and is valid (oembed confirms title 'La Parva - Escuela de Ski en vivo' by channel Ski La Parva, HTTP 200). Not dead/removed. However, whether it is currently live/streaming cannot be confirmed via WebFetch or oembed (embed page requires JS rendering; WebFetch returned only a bare '…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 25,
+      "label": "verify:Corralco",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify cams",
+      "agentId": "a9acf16e9f5045419",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893254056,
+      "queuedAt": 1783892891059,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Verify these webcam URLs for Corralco actually work RIGHT NOW. Load WebFetch via ToolSearch. For each URL: fetch it; report working (returns the expected content type — an image, a live player page, an active YouTube live), dead (404/timeout/removed video), or unverifiable (blocked/CORS/requires JS). URLs:\n- [iframe] https://www.ipcamlive.com/player/player.php?alias=hotel\n- [iframe] https://www.ip…",
+      "lastProgressAt": 1783893287840,
+      "tokens": 29253,
+      "toolCalls": 10,
+      "durationMs": 33784,
+      "resultPreview": "{\"results\":[{\"embed_url\":\"https://www.ipcamlive.com/player/player.php?alias=hotel\",\"verdict\":\"unverifiable\",\"detail\":\"Page loads (200) with a valid streamid ('28jbouixylvos3tc9') embedded, meaning the alias is registered on ipcamlive. However, the actual video is delivered live via websocket/JS at runtime, which cannot be observed via WebFetch (403) or curl (static HTML only) — so I cannot confirm…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 26,
+      "label": "verify:Antillanca",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify cams",
+      "agentId": "a301f6997863ff626",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893254717,
+      "queuedAt": 1783892909488,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Verify these webcam URLs for Antillanca actually work RIGHT NOW. Load WebFetch via ToolSearch. For each URL: fetch it; report working (returns the expected content type — an image, a live player page, an active YouTube live), dead (404/timeout/removed video), or unverifiable (blocked/CORS/requires JS). URLs:\n- [image] https://www.antillanca.cl/wp-json/antillanca/v1/webcam/1\n- [image] https://www.a…",
+      "lastProgressAt": 1783893271596,
+      "tokens": 28550,
+      "toolCalls": 6,
+      "durationMs": 16879,
+      "resultPreview": "{\"results\":[{\"embed_url\":\"https://www.antillanca.cl/wp-json/antillanca/v1/webcam/1\",\"verdict\":\"working\",\"detail\":\"Returns a valid JPEG image (7.6KB) with a live timestamp overlay '12-07-2026 19:13:42' and label 'Vista Don Pedro'. Frame is black because it's nighttime in Chile at that timestamp, but the endpoint is actively serving a current camera frame, not a dead/static placeholder.\"},{\"embed_ur…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 27,
+      "label": "verify:Nevados de Chillán",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify cams",
+      "agentId": "aa5d4925da3a84dbe",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893258458,
+      "queuedAt": 1783892948415,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Verify these webcam URLs for Nevados de Chillán actually work RIGHT NOW. Load WebFetch via ToolSearch. For each URL: fetch it; report working (returns the expected content type — an image, a live player page, an active YouTube live), dead (404/timeout/removed video), or unverifiable (blocked/CORS/requires JS). URLs:\n- [iframe] https://g3.ipcamlive.com/player/player.php?alias=pistanovicios&autoplay…",
+      "lastProgressAt": 1783893278409,
+      "tokens": 30169,
+      "toolCalls": 7,
+      "durationMs": 19951,
+      "resultPreview": "{\"results\":[{\"embed_url\":\"https://g3.ipcamlive.com/player/player.php?alias=pistanovicios&autoplay=1\",\"verdict\":\"working\",\"detail\":\"HTTP 200. Page returns valid ipcamlive player HTML with available=1, a live stream token, and stream server address (s81.ipcamlive.com/streamid 515h6ix42ffahlred), indicating an active live stream. WebFetch tool got a 403 (likely bot-detection on that fetcher), but dir…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 28,
+      "label": "verify:Las Leñas",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify cams",
+      "agentId": "a1fd394a7bff1d034",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893260708,
+      "queuedAt": 1783893071641,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Verify these webcam URLs for Las Leñas actually work RIGHT NOW. Load WebFetch via ToolSearch. For each URL: fetch it; report working (returns the expected content type — an image, a live player page, an active YouTube live), dead (404/timeout/removed video), or unverifiable (blocked/CORS/requires JS). URLs:\n- [iframe] https://tv.streamcasthd.com/live-stream-video-widget/laslenas\n- [image] https://…",
+      "lastProgressAt": 1783893281680,
+      "tokens": 29007,
+      "toolCalls": 7,
+      "durationMs": 20972,
+      "resultPreview": "{\"results\":[{\"embed_url\":\"https://tv.streamcasthd.com/live-stream-video-widget/laslenas\",\"verdict\":\"unverifiable\",\"detail\":\"Returns a minimal page reading 'Live _205_' with 'Powered by: VDO Panel' footer - appears to be a JS-driven video widget shell. WebFetch cannot execute the JS player, so actual live stream playback could not be confirmed.\"},{\"embed_url\":\"https://snow2day.com/imgs/webcams/Vall…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 29,
+      "label": "verify:Cerro Catedral (Bariloche)",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify cams",
+      "agentId": "a91a2aae817cb8587",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893269284,
+      "queuedAt": 1783893073156,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Verify these webcam URLs for Cerro Catedral (Bariloche) actually work RIGHT NOW. Load WebFetch via ToolSearch. For each URL: fetch it; report working (returns the expected content type — an image, a live player page, an active YouTube live), dead (404/timeout/removed video), or unverifiable (blocked/CORS/requires JS). URLs:\n- [iframe] https://g3.ipcamlive.com/player/player.php?alias=6a2c31a02eaf9&…",
+      "lastProgressAt": 1783893301205,
+      "tokens": 37576,
+      "toolCalls": 15,
+      "durationMs": 31921,
+      "resultPreview": "{\"results\":[{\"embed_url\":\"https://g3.ipcamlive.com/player/player.php?alias=6a2c31a02eaf9&skin=white&autoplay=1&mute=1&disableautofullscreen=1&disablezoombutton=1&disableframecapture=1&disablestorageplayer=1&disabledownloadbutton=1&disableplaybackspeedbutton=1\",\"verdict\":\"unverifiable\",\"detail\":\"WebFetch returned HTTP 403 Forbidden. This is consistent with ipcamlive.com blocking non-browser user ag…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 30,
+      "label": "verify:Chapelco (San Martín de los Andes)",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify cams",
+      "agentId": "a2e30fd6e19292f4d",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893271596,
+      "queuedAt": 1783893210684,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Verify these webcam URLs for Chapelco (San Martín de los Andes) actually work RIGHT NOW. Load WebFetch via ToolSearch. For each URL: fetch it; report working (returns the expected content type — an image, a live player page, an active YouTube live), dead (404/timeout/removed video), or unverifiable (blocked/CORS/requires JS). URLs:\n- [image] https://varitech.ar/cameras/cam016/latest.jpg\n- [image] …",
+      "lastProgressAt": 1783893292450,
+      "tokens": 31869,
+      "toolCalls": 8,
+      "durationMs": 20854,
+      "resultPreview": "{\"results\":[{\"embed_url\":\"https://varitech.ar/cameras/cam016/latest.jpg\",\"verdict\":\"working\",\"detail\":\"Returns a live JPEG snapshot (165KB) with current timestamp 12-07-2026 18:45:29, labeled 'Mocho Inferior'. However, the on-image logo reads 'ANAPELCO', not Chapelco/CHAPELCO — this appears to be a different resort's camera mislabeled/misassigned as a Chapelco cam. Image content itself is live and…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 31,
+      "label": "verify:Cerro Bayo",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify cams",
+      "agentId": "a8071e0db1afd6b3e",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893278410,
+      "queuedAt": 1783893229552,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Verify these webcam URLs for Cerro Bayo actually work RIGHT NOW. Load WebFetch via ToolSearch. For each URL: fetch it; report working (returns the expected content type — an image, a live player page, an active YouTube live), dead (404/timeout/removed video), or unverifiable (blocked/CORS/requires JS). URLs:\n- [image] https://ipcamlive.com/player/snapshot.php?alias=cumbre\n- [image] https://ipcamli…",
+      "lastProgressAt": 1783893307276,
+      "tokens": 29534,
+      "toolCalls": 10,
+      "durationMs": 28865,
+      "resultPreview": "{\"results\":[{\"embed_url\":\"https://ipcamlive.com/player/snapshot.php?alias=cumbre\",\"verdict\":\"working\",\"detail\":\"Returns HTTP 200 image/jpeg (1280x720, 78KB) after redirect to s132.ipcamlive.com/streams/84nxof9tr41izrkmy/snapshot.jpg. WebFetch got 403 (bot-blocked, no UA/referer) but curl with Chrome UA + referer confirms it's a live valid image.\"},{\"embed_url\":\"https://ipcamlive.com/player/snapsho…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 32,
+      "label": "verify:Volcán Osorno",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify cams",
+      "agentId": "adbf6435353416c97",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893281681,
+      "queuedAt": 1783893240712,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Verify these webcam URLs for Volcán Osorno actually work RIGHT NOW. Load WebFetch via ToolSearch. For each URL: fetch it; report working (returns the expected content type — an image, a live player page, an active YouTube live), dead (404/timeout/removed video), or unverifiable (blocked/CORS/requires JS). URLs:\n- [youtube] https://www.youtube.com/embed/2uBn7TRSYjI\n- [youtube] https://www.youtube.c…",
+      "lastProgressAt": 1783893301427,
+      "tokens": 28097,
+      "toolCalls": 6,
+      "durationMs": 19746,
+      "resultPreview": "{\"results\":[{\"embed_url\":\"https://www.youtube.com/embed/2uBn7TRSYjI\",\"verdict\":\"unverifiable\",\"detail\":\"Video exists (oembed confirms title 'Camara VO - Cono VO' by channel andacorwebcams, thumbnail present, not deleted/private). WebFetch cannot execute JS so it cannot confirm the embed actually plays a live stream right now; page fetch returned only bare 'YouTube' text (expected for JS-rendered e…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 33,
+      "label": "verify:La Hoya (Esquel)",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify cams",
+      "agentId": "a57c1a3d1c3e6ed7c",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893287841,
+      "queuedAt": 1783893254057,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Verify these webcam URLs for La Hoya (Esquel) actually work RIGHT NOW. Load WebFetch via ToolSearch. For each URL: fetch it; report working (returns the expected content type — an image, a live player page, an active YouTube live), dead (404/timeout/removed video), or unverifiable (blocked/CORS/requires JS). URLs:\n- [image] https://varitech.ar/cameras/cam031/latest.jpg",
+      "lastProgressAt": 1783893301750,
+      "tokens": 27059,
+      "toolCalls": 4,
+      "durationMs": 13909,
+      "resultPreview": "{\"results\":[{\"embed_url\":\"https://varitech.ar/cameras/cam031/latest.jpg\",\"verdict\":\"working\",\"detail\":\"Returns a valid 1280x720 progressive JPEG image (174.9KB), confirmed via `file` command on the downloaded content. Fetched successfully with no errors, redirects, or auth blocks.\"}]}"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 34,
+      "label": "verify:Cerro Castor (Ushuaia)",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify cams",
+      "agentId": "a167ebdb5bb3c13d3",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893292451,
+      "queuedAt": 1783893260711,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Verify these webcam URLs for Cerro Castor (Ushuaia) actually work RIGHT NOW. Load WebFetch via ToolSearch. For each URL: fetch it; report working (returns the expected content type — an image, a live player page, an active YouTube live), dead (404/timeout/removed video), or unverifiable (blocked/CORS/requires JS). URLs:\n- [youtube] https://www.youtube.com/embed/RVuTqjTyrr0",
+      "lastProgressAt": 1783893301332,
+      "tokens": 26487,
+      "toolCalls": 3,
+      "durationMs": 8880,
+      "resultPreview": "{\"results\":[{\"embed_url\":\"https://www.youtube.com/embed/RVuTqjTyrr0\",\"verdict\":\"unverifiable\",\"detail\":\"WebFetch returned only the bare 'YouTube' shell with no video status/error text, since the embed page is JS-rendered and requires a real browser to determine if the live stream is active or the video has been removed. Recommend checking manually in a browser or via YouTube oEmbed/Data API (video…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 35,
+      "label": "verify:Caviahue",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify cams",
+      "agentId": "ac67d3f31b5d22744",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893297015,
+      "queuedAt": 1783893297015,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Verify these webcam URLs for Caviahue actually work RIGHT NOW. Load WebFetch via ToolSearch. For each URL: fetch it; report working (returns the expected content type — an image, a live player page, an active YouTube live), dead (404/timeout/removed video), or unverifiable (blocked/CORS/requires JS). URLs:\n- [image] https://oavv.segemar.gob.ar/CP/AGS.png\n- [image] https://oavv.segemar.gob.ar/CP/AE…",
+      "lastProgressAt": 1783893316566,
+      "tokens": 27988,
+      "toolCalls": 6,
+      "durationMs": 19551,
+      "resultPreview": "{\"results\":[{\"embed_url\":\"https://oavv.segemar.gob.ar/CP/AGS.png\",\"verdict\":\"working\",\"detail\":\"Fetched successfully; returned a valid PNG image (~1.2MB) with proper PNG signature and IHDR/IDAT chunks.\"},{\"embed_url\":\"https://oavv.segemar.gob.ar/CP/AER.png\",\"verdict\":\"working\",\"detail\":\"Fetched successfully; returned a valid PNG image (~780KB) with proper PNG signature and headers.\"},{\"embed_url\":…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 36,
+      "label": "completeness-critic",
+      "phaseIndex": 3,
+      "phaseTitle": "Completeness",
+      "agentId": "a8da308e199bf9d4a",
+      "model": "claude-sonnet-5",
+      "state": "done",
+      "startedAt": 1783893508076,
+      "queuedAt": 1783893508069,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are a completeness critic for a South America ski resort research sweep (PeakCam expansion, target ~20-25 resorts in Chile + Argentina). Below is what the fleet found. Use WebSearch (load via ToolSearch) to check: (1) any notable operating Chilean/Argentine ski areas MISSED entirely (e.g. check lists like 'ski resorts Chile Argentina 2026 season'), (2) resorts reported with ZERO cams where a q…",
+      "lastProgressAt": 1783893596375,
+      "tokens": 46766,
+      "toolCalls": 15,
+      "durationMs": 88299,
+      "resultPreview": "{\"missed_resorts\":[\"Pillán / Centro de Ski Volcán Villarrica (formerly \\\"Ski Pucón\\\") — notable operating resort near Pucón with lift-accessed tree skiing on an active volcano; has multiple public webcams (Villarrica 01, Villarrica Llafenco, Volcán Villarrica cams per snow2day.com and OnTheSnow) that the sweep entirely missed.\",\"Chapa Verde (Rancagua/Cachapoal) — CODELCO-operated club ski resort, …"
+    }
+  ],
+  "totalTokens": 1642644,
+  "totalToolCalls": 786
+}
