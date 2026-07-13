@@ -39,12 +39,11 @@ loadEnv(path.join(ROOT, ".env.local"));
 loadEnv(path.join(ROOT, ".env"));
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!SUPABASE_URL || !ANON_KEY || !SERVICE_KEY) {
+if (!SUPABASE_URL || !SERVICE_KEY) {
   console.error(
-    "Missing env vars. Set NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY in .env.local"
+    "Missing env vars. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local"
   );
   process.exit(1);
 }
