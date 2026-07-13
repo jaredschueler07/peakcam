@@ -4,74 +4,97 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PeakCam is a live mountain webcam and snow report aggregator for North American ski resorts. Built with Next.js 16 (App Router), React 19, Supabase, Tailwind CSS 4, and Leaflet. Dark-themed UI with a midnight navy palette.
+PeakCam is a live mountain webcam and snow report aggregator, in production at https://www.peakcam.io (Vercel, auto-deploy on push to main). Stack: Next.js 16 (App Router), React 19, Supabase (Postgres + Auth), Tailwind CSS 4, MapLibre GL (react-map-gl), Resend, PostHog. ~127 resorts and ~299 cams seeded from `data/*.csv`.
 
 ## Commands
 
 ```bash
-npm run dev              # Start dev server (localhost:3000)
+npm run dev              # Dev server (localhost:3000)
 npm run build            # Production build
-npm run lint             # ESLint (flat config, Next.js core-web-vitals + TS)
-npm run import-resorts:standalone  # Import resorts/cams from CSV into Supabase (no deps beyond Node 18+)
+npm run lint             # ESLint (flat config, next/core-web-vitals + TS)
+npx tsc --noEmit         # Type check
+npx tsx --test lib/analytics-events.test.ts   # Run the only test (node:test); no npm test script exists
+
+# Data & ops scripts (all load .env.local themselves, write via service-role key)
+npm run import-resorts:standalone  # Seed resorts/cams from data/*.csv (the maintained importer)
+npm run snotel-sync      # SNOTEL sync — the production data feed (launchd runs it every 6h)
+npm run pipeline-sync    # Multi-source pipeline (currently dormant in prod — see Gotchas)
+npm run seed-normals     # 30-year SNOTEL normals (run-once/annual)
+npm run cam-health       # Probe all cam URLs, stamp cams.last_checked_at
 ```
+
+Beware: `npm run liftie-sync` and `npm run snodas-sync` reference script files that do not exist (the logic lives in `lib/pipeline/fetchers/`). `npm run import-resorts` (the ts-node variant) is stale and truncates SNOTEL triplet IDs — use `:standalone`.
 
 ## Architecture
 
-### Data Flow
+### Read path (the site)
 
-Server Components (`app/page.tsx`, `app/resorts/[slug]/page.tsx`) fetch data from Supabase, then pass it as props to Client Components. All Supabase queries are server-side only. Weather data comes from the NWS API (no key required). Pages use ISR with `revalidate = 3600` (1 hour).
+Every data-bearing page is a thin Server Component with ISR (`export const revalidate = 3600`) that fetches via `lib/supabase.ts` (anon-key client) and passes the full dataset as props to one large `"use client"` component that owns all interactivity. There is no client-side fetching of resort/snow data. `getAllResorts()` runs 3 queries (active resorts, `latest_snow_reports` view, active cams) and stitches them into `ResortWithData[]` in JS.
 
-### Key Layers
+- `/` → `BrowsePage` (Fuse.js search, filter chips, sort incl. curated `POPULAR_SLUGS`, optional map sidebar)
+- `/resorts/[slug]` → SSG via `generateStaticParams` + live NWS forecast (`lib/weather.ts`) + crowd reports; dynamic OG image
+- `/map` → MapLibre full-page map with clustered GeoJSON (`lib/map-utils.ts`) + RainViewer radar
+- `/compare`, `/snow-report`, `/favorites`, `/dashboard` (client-only, react-grid-layout), `/auth`, `/alerts/manage`
 
-- **`lib/supabase.ts`** — Supabase client + all DB queries (`getAllResorts`, `getResortBySlug`, `getAllResortSlugs`). Manually joins resorts with their latest snow_report and cams (no DB views used in queries).
-- **`lib/types.ts`** — TypeScript interfaces mirroring the Supabase schema. `ResortWithData` is the primary composite type (resort + snow_report + cams[]).
-- **`lib/weather.ts`** — NWS API integration. Two-step fetch: resolve grid point, then get forecast. Collapses day/night periods into `WeatherPeriod[]`. Snow amounts are heuristic estimates from forecast strings.
+Cam embeds are click-to-play by `embed_type`: `youtube` (autoplay+mute embed), `iframe`, `image` (30s cache-buster auto-refresh), `link` (link-out). Cam tiles carry `CamReportButton` → `/api/cam-reports/submit`.
 
-### Database (Supabase/Postgres)
+### Three Supabase clients — pick the right one
 
-Three tables: `resorts`, `cams`, `snow_reports`. Schema in `supabase/migrations/001_initial.sql`. RLS enabled — public read-only via anon key, writes via service role key only. A `latest_snow_reports` view exists but queries currently do manual dedup instead.
+- `lib/supabase.ts` — module-level anon client + all public read queries. Throws at import if env vars missing (affects builds).
+- `lib/supabase-browser.ts` — `@supabase/ssr` browser client for Client Components needing auth (favorites, dashboard, auth UI).
+- `lib/supabase-server.ts` — cookie-bound server client for Route Handlers / Server Components needing the user session (RLS as the user).
 
-### Pages
+`proxy.ts` (Next 16 middleware successor) refreshes the Supabase session on every non-static request.
 
-- **`/`** — Browse page. Server component fetches all resorts, renders `BrowsePage` (client). Has search, state filter chips, condition filter, sort (name/snow/conditions), powder alert banner, and a Leaflet map sidebar.
-- **`/resorts/[slug]`** — Resort detail. Uses `generateStaticParams` for SSG. Shows snow report, 5-day NWS forecast, and click-to-play cam embeds (YouTube/iframe/link-out).
+### Write path (API routes)
 
-### Components
+7 route handlers in `app/api/`, each with a different auth model: alerts subscribe/manage/unsubscribe (capability `manage_token`, service-role writes, deny-all RLS), `alerts/trigger` (Bearer `CRON_SECRET`; Vercel cron daily 13:00 UTC per `vercel.json`), `conditions/vote` (anonymous, localStorage session UUID), `user-conditions/submit` (auth session + RLS + profanity flag), `cam-reports/submit` (anonymous, validated by `lib/cam-reports/validate.ts`, salted IP hash, Resend admin email).
 
-- `components/browse/` — `BrowsePage` (main browse UI), `ResortMap` (Leaflet, dynamically imported with `ssr: false`, uses `require("leaflet")` internally)
-- `components/resort/` — `ResortDetailPage` with `CamPlayer` (click-to-play embed), `WeatherStrip`, `ConditionsStrip`
-- `components/layout/` — `Header` (sticky, with search input and nav)
-- `components/ui/` — `Badge`, `Button`, `Chip`, `Modal` (reusable primitives)
+### Data ingestion — two pipelines, one live
 
-### Data Import
+1. **`scripts/snotel-sync.ts` — the production feed** (launchd `com.peakcam.snotel-sync`, every 6h). NRCS AWDB API → QC via `lib/snow-quality.ts` (range/spike checks, carry-forward) → `snowpack_daily` → full conditions engine (normals, 7-day SWE history, user reports, NWS grid) → appends `snow_reports` (source='snotel') + patches `resorts.cond_rating`. This is the only thing feeding the live site.
+2. **`lib/pipeline/` — multi-source blender** (SNOTEL + NWS + Liftie + SNODAS + Weather Unlocked + user reports → `data_source_readings` + `resort_conditions_summary`). Code-complete but dormant: its launchd job has never succeeded (plist missing PATH), the blender has stubbed inputs (pct_of_normal=null, NWS grid fields never populated, elevation hardcoded), and no UI code reads its output tables. Both pipelines write `snow_reports` and overwrite `resorts.cond_rating` — last writer wins.
 
-CSV seed data lives in `data/resorts.csv` and `data/cams.csv`. The standalone import script (`scripts/import-resorts-standalone.mjs`) reads these CSVs, loads `.env.local` manually, and upserts into Supabase via REST API using the service role key. Resorts upsert on `slug`; cams insert with ignore-duplicates.
+### Conditions engine
 
-### Path Aliases
+`lib/conditions-engine.ts` — pure functions: rating thresholds (`RATING_THRESHOLDS`), 7-day trend, outlook ladder, tag/narrative synthesis, and a 70/30 SNOTEL/user-report blend (needs ≥2 unflagged reports, clamped ±1 tier). `lib/snow-quality.ts` holds QC + water-year math. Keep these pure — scripts and (nominally) the pipeline both import them.
 
-`@/*` maps to the project root (configured in `tsconfig.json`).
+### Database
 
-## Design System
+18 tables + 2 views, migrations `supabase/migrations/001–011`. Migrations are applied **by hand** (SQL Editor / MCP `apply_migration`) — there is no Supabase CLI config, numbering is documentation only, and 004/005 each have two files. RLS postures: public-read (catalog/snow tables), anon-insert (`condition_votes`, `agent_memory`), auth.uid()-scoped (`user_conditions`, `user_favorites`, `dashboard_layouts`), deny-all/service-role-only (alerts tables, `cam_reports`).
 
-Dark theme defined in `tailwind.config.ts` and CSS custom properties in `globals.css`. Key tokens:
-- Background hierarchy: `bg` → `surface` → `surface2` → `surface3`
-- Text hierarchy: `text-base` → `text-subtle` → `text-muted`
-- Accent: `cyan` (#22D3EE) — used for interactive elements, glow effects, brand accent
-- Condition colors: `powder`/cyan (great), `good`/blue, `fair`/yellow, `poor`/red
-- Font: Inter, loaded via Google Fonts CSS import
-- Transitions default to 220ms
+Known live-DB drift from the repo migrations (verify against prod before trusting a migration file):
+- `user_conditions.snow_quality`: migration checks `icy/slush`; code and UI submit `crud/ice/spring`.
+- `latest_snow_reports` view was created as `SELECT *` in 001; columns added to `snow_reports` by 005/007 required manual view recreation in prod — no migration records it.
+- `cams` has no unique constraint: re-running the importer duplicates cam rows (`ignore-duplicates` is a no-op).
+
+`snow_reports.conditions` is an overloaded string: `"tag1,tag2||narrative"`. Consumers must split on `||` (done in ConditionsStrip, ComparePage, map-utils). Don't add new consumers without unpacking it.
+
+### Design system
+
+Retro ski-poster theme (cream paper / ink / forest / alpenglow; Fraunces display, DM Sans body, JetBrains Mono readouts; hard "stamp" shadows) defined in `tailwind.config.ts` + `app/globals.css` (`--pc-*` tokens, `.pc-paper`/`.pc-topo` utilities). Light theme only. `tailwind.config.ts` contains a **legacy alias layer** remapping old dark-theme token names (`bg`, `surface*`, `text-*`, even `cyan` → forest green) so un-migrated components still render. Still on legacy tokens: ResortDetailPage internals, SnowReportPage, FavoritesPage, AlertManagePage, ConditionVoter, UserConditionsForm, MapBottomSheet, weather icons (which hardcode dark-theme hex). Use the new `pc-*`/poster tokens for all new work; migrating a legacy component means replacing old class names, not extending the alias layer.
+
+### Adjacent subsystems (same repo, not part of the web app)
+
+- `agents/` — 9-bot Slack "company" (`agents/loop.mjs`, polling + Anthropic API, shared memory in `agent_memory`). Runs via launchd but is effectively dormant.
+- `dashboard/` — standalone Express ops dashboard on port 3333. **Unauthenticated and can spawn `claude --dangerously-skip-permissions`** — never expose beyond localhost/LAN.
+- `generate-images.py` (repo root) — canonical brand-image generator (xAI Grok), driven by the user-level `peakcam-imagegen` skill; `scripts/generate-images.mjs` is its abandoned predecessor. Nothing in `public/images/` is referenced by app code.
+
+### Scheduling map
+
+- Vercel cron: `/api/alerts/trigger` daily 13:00 UTC (`vercel.json`).
+- Mac Mini launchd (`~/Library/LaunchAgents/com.peakcam.*`): snotel-sync every 6h, cam-health-check daily 06:00, pipeline daily 06:00 (failing), agents (KeepAlive). Plists are the scheduling ground truth — `docs/runbook.md`'s job table is stale.
 
 ## Environment Variables
 
-Copy `.env.local.example` to `.env.local`:
-- `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL (exposed to browser)
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase anon key (exposed to browser)
-- `SUPABASE_SERVICE_ROLE_KEY` — For import scripts only (never in browser)
+`.env.local.example` documents only ~9 of the ~24 vars the code reads. Beyond the example (Supabase ×3, MapTiler, site URL, Resend, CRON_SECRET, cam-report admin/salt), code also reads: `ANTHROPIC_API_KEY`, `SLACK_BOT_TOKEN_*` (9, agents), `NEXT_PUBLIC_POSTHOG_KEY/HOST`, `NEXT_PUBLIC_META_PIXEL_ID`, `WEATHER_UNLOCKED_APP_ID/API_KEY`, `XAI_API_KEY`, `PEAKCAM_POLL_INTERVAL/LOG_LEVEL/CLAUDE_MODEL`. Secrets live in `.env.local` (local), Vercel project env (prod), and launchd jobs source `.env.local`.
 
-## Key Patterns
+## Key Patterns & Gotchas
 
-- Leaflet requires `dynamic(() => import(...), { ssr: false })` — it depends on `window`/`document`
-- Cam embeds are click-to-play (lazy loaded iframes) to avoid loading all streams at once
-- The `ResortMap` component uses Leaflet's imperative API via refs, not a React wrapper
-- Snow report source can be `snotel`, `manual`, or `resort` — anticipates future automated ingestion
-- Condition ratings (`great`/`good`/`fair`/`poor`) are stored on the resort row, not derived
+- Path alias `@/*` maps to the repo root (`tsconfig.json`).
+- MapLibre (`components/map/MapView.tsx`) must be loaded with `dynamic(..., { ssr: false })`.
+- `snow_reports` is append-only; the latest row per resort comes from the `latest_snow_reports` view.
+- Powder threshold (8") and the "128 resorts" copy are hardcoded in multiple places — grep before changing either.
+- NWS forecast snow amounts are keyword heuristics (`lib/weather.ts`), not QPF.
+- Two auth UX flows coexist: `/auth` page (email+password) and `AuthModal` (magic link). Both land on `/auth/callback`.
+- Docs trust: `GEMINI.md` is an accurate high-level overview; `docs/runbook.md` has stale schedules; `UX-AUDIT-PLAN*.md` are executed historical artifacts.
