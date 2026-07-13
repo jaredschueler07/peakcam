@@ -14,7 +14,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -55,14 +55,50 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+export const DISABLE_THRESHOLD = 3;
+
+/**
+ * Pure state transition for one cam's health check result.
+ * Returns { body, transition } — body is the PATCH payload,
+ * transition is null | "disabled" | "recovered" (for logging).
+ * Never touches manually-disabled cams (is_active=false && !auto_disabled).
+ */
+export function computeCamUpdate(cam, isAlive) {
+  const body = { last_checked_at: new Date().toISOString() };
+  const manuallyDisabled = !cam.is_active && !cam.auto_disabled;
+  if (isAlive) {
+    body.consecutive_failures = 0;
+    if (manuallyDisabled) return { body: { last_checked_at: body.last_checked_at }, transition: null };
+    if (cam.auto_disabled) {
+      body.is_active = true;
+      body.auto_disabled = false;
+      return { body, transition: "recovered" };
+    }
+    return { body, transition: null };
+  }
+  const failures = (cam.consecutive_failures ?? 0) + 1;
+  body.consecutive_failures = failures;
+  if (manuallyDisabled) return { body: { last_checked_at: body.last_checked_at }, transition: null };
+  if (cam.is_active && failures >= DISABLE_THRESHOLD) {
+    body.is_active = false;
+    body.auto_disabled = true;
+    return { body, transition: "disabled" };
+  }
+  return { body, transition: null };
+}
+
 // ─── Step 1: Fetch all cams ─────────────────────────────────────────────
 
 async function fetchAllCams() {
-  const url = `${SUPABASE_URL}/rest/v1/cams?select=id,name,resort_id,embed_type,embed_url,youtube_id,is_active&order=id`;
+  const url = `${SUPABASE_URL}/rest/v1/cams?select=id,name,resort_id,embed_type,embed_url,youtube_id,is_active,auto_disabled,consecutive_failures&order=id`;
+  // Use the service role key (bypasses RLS) rather than the anon key: the
+  // "Public cams read" RLS policy restricts anon reads to is_active=true,
+  // which would hide auto-disabled cams from every future run and make
+  // auto-recovery unreachable in practice.
   const resp = await fetch(url, {
     headers: {
-      apikey: ANON_KEY,
-      Authorization: `Bearer ${ANON_KEY}`,
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
     },
   });
   if (!resp.ok) throw new Error(`Supabase cams fetch failed: ${resp.status}`);
@@ -159,13 +195,13 @@ async function checkCamOnce(cam, timeout) {
 
 // ─── Step 3: Update last_checked_at ─────────────────────────────────────
 
-async function updateCamStatus(camId, isAlive) {
-  // Only update last_checked_at — don't set is_active=false on a single failure.
-  // The cam should stay active until manually reviewed or consecutive failures threshold.
-  const body = { last_checked_at: new Date().toISOString() };
+async function updateCamStatus(cam, isAlive) {
+  // Auto-disable a cam after DISABLE_THRESHOLD consecutive failures; auto-recover
+  // it once it comes back alive. Manually disabled cams are never touched.
+  const { body, transition } = computeCamUpdate(cam, isAlive);
 
   const resp = await fetch(
-    `${SUPABASE_URL}/rest/v1/cams?id=eq.${camId}`,
+    `${SUPABASE_URL}/rest/v1/cams?id=eq.${cam.id}`,
     {
       method: "PATCH",
       headers: {
@@ -181,6 +217,7 @@ async function updateCamStatus(camId, isAlive) {
     const text = await resp.text();
     throw new Error(`cam status update failed (${resp.status}): ${text}`);
   }
+  return transition;
 }
 
 // ─── Main ───────────────────────────────────────────────────────────────
@@ -193,6 +230,8 @@ async function main() {
 
   const results = { working: [], dead: [] };
   const byType = {};
+  let disabledCount = 0;
+  let recoveredCount = 0;
 
   for (const cam of cams) {
     const type = cam.embed_type || "unknown";
@@ -211,9 +250,16 @@ async function main() {
       console.log(`  DEAD [${type}] ${cam.name} — ${detail}`);
     }
 
-    // Update last_checked_at and set is_active=false for dead cams
+    // Update last_checked_at, tally consecutive failures, and auto-disable/recover
     try {
-      await updateCamStatus(cam.id, check.ok);
+      const transition = await updateCamStatus(cam, check.ok);
+      if (transition === "disabled") {
+        disabledCount++;
+        console.log(`  ⛔  Auto-disabled ${cam.name} after ${DISABLE_THRESHOLD} consecutive failures`);
+      } else if (transition === "recovered") {
+        recoveredCount++;
+        console.log(`  ✅  Auto-recovered ${cam.name}`);
+      }
     } catch (err) {
       console.error(`  WARN Could not update cam status for ${cam.name}: ${err.message}`);
     }
@@ -246,9 +292,19 @@ async function main() {
   console.log(
     `\n[cam-health] Done. ${results.working.length}/${cams.length} cams healthy.`
   );
+  console.log(`[cam-health] ${disabledCount} disabled this run, ${recoveredCount} recovered`);
 }
 
-main().catch((err) => {
-  console.error("[cam-health] Fatal:", err.message);
-  process.exit(1);
-});
+// Only run main() when this file is executed directly (e.g.
+// `node scripts/cam-health-check.mjs`), not when it's imported as a
+// module (e.g. by scripts/cam-health-check.test.mjs) — an import must
+// never have the side effect of hitting the live database.
+const isDirectRun =
+  process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isDirectRun) {
+  main().catch((err) => {
+    console.error("[cam-health] Fatal:", err.message);
+    process.exit(1);
+  });
+}
