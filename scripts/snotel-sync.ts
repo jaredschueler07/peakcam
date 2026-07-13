@@ -100,6 +100,7 @@ interface SnotelResort {
   snotel_station_id: string;
   lat: number;
   lng: number;
+  resort_metadata: { elevation_base_ft: number | null } | null;
 }
 
 interface SnotelApiValue {
@@ -125,7 +126,7 @@ interface ParsedDay {
 // ─── Step 1: Fetch resorts with snotel_station_id ─────────────────────────
 
 async function fetchResorts(): Promise<SnotelResort[]> {
-  const url = `${SUPABASE_URL}/rest/v1/resorts?select=id,name,state,snotel_station_id,lat,lng&is_active=eq.true&snotel_station_id=not.is.null`;
+  const url = `${SUPABASE_URL}/rest/v1/resorts?select=id,name,state,snotel_station_id,lat,lng,resort_metadata(elevation_base_ft)&is_active=eq.true&snotel_station_id=not.is.null`;
   const resp = await fetch(url, { headers: supaHeaders });
   if (!resp.ok) throw new Error(`Supabase resorts fetch failed: ${resp.status}`);
   return resp.json();
@@ -578,7 +579,7 @@ async function main(): Promise<void> {
           windGustMax: (getGridVal(forecast.gridData.windGust) ?? 0) * 0.621371, // km/h to mph
           windChillAvg: (getGridVal(forecast.gridData.windChill) ?? 0) * 9/5 + 32, // C to F
           snowLevelAvg: (getGridVal(forecast.gridData.snowLevel) ?? 0) * 3.28084, // m to ft
-          resortElevBase: resort.lat, // Assuming we don't have elevation, we'll estimate or ignore. Wait! Resort table has lat/lng.
+          resortElevBase: resort.resort_metadata?.elevation_base_ft ?? 99999, // unknown elevation → effectively disable the "Rain at Base" check (was: resort.lat, a latitude misused as feet)
           iceAccumulationMax: (getGridVal(forecast.gridData.iceAccumulation) ?? 0) / 25.4, // mm to inches
           probOfPrecipMax: getGridVal(forecast.gridData.probabilityOfPrecipitation) ?? 0,
         } : null,
