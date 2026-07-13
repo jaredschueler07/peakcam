@@ -5,7 +5,7 @@
 
 export type ConditionRating = "great" | "good" | "fair" | "poor";
 export type EmbedType = "youtube" | "iframe" | "image" | "link";
-export type SnowReportSource = "snotel" | "manual" | "resort";
+export type SnowReportSource = "snotel" | "manual" | "resort" | "pipeline" | "open_meteo";
 
 // ── Resorts ──────────────────────────────────────────────────
 export interface Resort {
@@ -13,6 +13,7 @@ export interface Resort {
   name: string;
   slug: string;
   state: string;
+  country: string;         // "US" | "CA" | "CL" | "AR"
   region: string;
   lat: number;
   lng: number;
