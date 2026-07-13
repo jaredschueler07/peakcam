@@ -2,7 +2,7 @@
 
 import type { MouseEvent } from "react";
 import type { ResortWithData, ConditionRating } from "@/lib/types";
-import { isOffSeason } from "@/lib/map-utils";
+import { isOffSeason, timeAgo, OFF_SEASON_COLOR } from "@/lib/map-utils";
 
 // Condition chip palette — matches ConditionBadge
 const conditionChip: Record<ConditionRating, string> = {
@@ -15,20 +15,6 @@ const conditionChip: Record<ConditionRating, string> = {
 interface MapPopupCardProps {
   resort: ResortWithData;
   onViewResort?: (slug: string) => void;
-}
-
-/** "3h ago" / "just now" from an ISO timestamp; null if unparseable. */
-function timeAgo(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return null;
-  const mins = Math.floor((Date.now() - then) / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
 }
 
 // Poster popup — paper bg is applied by the wrapping maplibregl popup CSS in globals.css
@@ -78,7 +64,10 @@ export default function MapPopupCard({ resort, onViewResort }: MapPopupCardProps
           {offSeason ? (
             /* Neutral bark pill — matches the off-season map marker; the rating
                engine's "poor" is meaningless in the local summer. */
-            <span className="rounded-full border-[1.5px] border-ink bg-[#b59b74] px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] leading-tight text-ink">
+            <span
+              className="rounded-full border-[1.5px] border-ink px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] leading-tight text-ink"
+              style={{ backgroundColor: OFF_SEASON_COLOR }}
+            >
               Off-season
             </span>
           ) : (
