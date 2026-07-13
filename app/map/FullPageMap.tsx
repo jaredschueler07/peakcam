@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import MapBottomSheet from "@/components/map/MapBottomSheet";
-import { isOffSeason } from "@/lib/map-utils";
 import type { ResortWithData } from "@/lib/types";
 
 // MapLibre needs window — dynamic import with no SSR
@@ -54,30 +53,6 @@ export function FullPageMap({ resorts, radarTileUrl }: Props) {
 
   return (
     <div className="h-screen w-full relative bg-cream">
-      {/* Screen-reader equivalent for the map (WCAG 1.1.1). The MapLibre canvas
-          exposes no accessible representation of its markers, so mirror the same
-          resorts — with conditions — as a navigable list. SSR'd, so it's present
-          before the (client-only) map mounts. */}
-      <nav aria-label="Ski resorts shown on the map" className="sr-only">
-        <h2>Ski resorts on the map</h2>
-        <ul>
-          {resorts.map((r) => {
-            const off = isOffSeason(r.lat, new Date());
-            const base = r.snow_report?.base_depth;
-            return (
-              <li key={r.slug}>
-                <a href={`/resorts/${r.slug}`}>
-                  {r.name} — {r.region}, {r.state}.{" "}
-                  {off
-                    ? "Off-season."
-                    : `${r.cond_rating} conditions${base != null ? `, ${base} inch base` : ""}.`}
-                </a>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-
       {/* Back nav overlay */}
       <div className="absolute top-4 left-16 z-20">
         <Link
