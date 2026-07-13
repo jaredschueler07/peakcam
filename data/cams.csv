@@ -298,3 +298,51 @@ granite-peak,Summit,1940,image,https://b10.hdrelay.com/camera/1446cadc-5c06-427a
 granite-peak,Base,1940,image,https://b10.hdrelay.com/camera/839ba6a3-b9e3-4153-a720-222a75898532/snapshot,,true
 lutsen,Roundshot 360,1688,iframe,https://lutsen.roundshot.com/,,true
 spirit-mountain,Live Cam,1052,image,https://tools.hbi.com/wx/wdio/dynamic_weather_spiritmtn.jpg,,true
+ski-portillo,Laguna (Inca Lake),,iframe,https://g3.ipcamlive.com/player/player.php?alias=laguna,,true
+ski-portillo,Tío Bob's,,iframe,https://g3.ipcamlive.com/player/player.php?alias=tiobobs,,true
+ski-portillo,Plateau,,iframe,https://g3.ipcamlive.com/player/player.php?alias=plateau,,true
+ski-portillo,Escuela (Ski School),,iframe,https://g3.ipcamlive.com/player/player.php?alias=escuela,,true
+valle-nevado,La Fourchette Terrace,,youtube,https://www.youtube.com/embed/tWNxInShxZI,tWNxInShxZI,true
+valle-nevado,Pool (Piscina),,youtube,https://www.youtube.com/embed/uyt8JsITTac,uyt8JsITTac,true
+valle-nevado,Hotel Puerta del Sol,,youtube,https://www.youtube.com/embed/tmS73xQ4zVc,tmS73xQ4zVc,true
+valle-nevado,La Góndola,,youtube,https://www.youtube.com/embed/_oWY76RiLZQ,_oWY76RiLZQ,true
+la-parva,Parva Chica,,youtube,https://www.youtube.com/embed/dEF-ujYXgkU,dEF-ujYXgkU,true
+la-parva,Parva Comercial,,youtube,https://www.youtube.com/embed/Q3P64_RPNlY,Q3P64_RPNlY,true
+el-colorado,Parador Pista,,youtube,https://www.youtube.com/embed/r3vGVM_gW64,r3vGVM_gW64,true
+el-colorado,Mirador Cima,,youtube,https://www.youtube.com/embed/xr0iN3zNe8U,xr0iN3zNe8U,true
+el-colorado,Liebre Base,,youtube,https://www.youtube.com/embed/qxh2rEl_PFU,qxh2rEl_PFU,true
+nevados-de-chillan,Novicios (Pista Novicios),,iframe,https://g3.ipcamlive.com/player/player.php?alias=pistanovicios&autoplay=1,,true
+nevados-de-chillan,Plaza Tata,,iframe,https://g3.ipcamlive.com/player/player.php?alias=plazatata&autoplay=1,,true
+corralco,Hotel,,iframe,https://www.ipcamlive.com/player/player.php?alias=hotel,,true
+corralco,ZCB Ski Area,,iframe,https://www.ipcamlive.com/player/player.php?alias=zcbski,,true
+corralco,Vista 1600,,iframe,https://www.ipcamlive.com/player/player.php?alias=vista1600,,true
+corralco,Retorno Cornisa,,iframe,https://www.ipcamlive.com/player/player.php?alias=recornisa,,true
+antillanca,Vista Don Pedro (Haique lift view),,image,https://www.antillanca.cl/wp-json/antillanca/v1/webcam/1,,true
+antillanca,Vista Flecha,,image,https://www.antillanca.cl/wp-json/antillanca/v1/webcam/2,,true
+volcan-osorno,Camara VO - Cono VO,,youtube,https://www.youtube.com/embed/2uBn7TRSYjI,2uBn7TRSYjI,true
+volcan-osorno,Camara VO - Zona Boleterias,,youtube,https://www.youtube.com/embed/BhJ-RasFPTM,BhJ-RasFPTM,true
+cerro-catedral,Punta Princesa (live),,iframe,https://g3.ipcamlive.com/player/player.php?alias=6a2c31a02eaf9&skin=white&autoplay=1&mute=1&disableautofullscreen=1&disablezoombutton=1&disableframecapture=1&disablestorageplayer=1&disabledownloadbutton=1&disableplaybackspeedbutton=1,,true
+cerro-catedral,Centro Superior (Desembarque),,image,https://varitech.ar/cameras/cam006/latest.jpg,,true
+cerro-catedral,Pista Eventos (vista desde la base),,image,https://varitech.ar/cameras/cam005/latest.jpg,,true
+cerro-catedral,Playpark (Base),,image,https://varitech.ar/cameras/cam002/latest.jpg,,true
+cerro-catedral,Plaza Catalina Reynal (Base),,image,https://varitech.ar/cameras/cam003/latest.jpg,,true
+cerro-catedral,Diente de Caballo Sur,,image,https://varitech.ar/cameras/cam008/latest.jpg,,true
+cerro-catedral,Punta Princesa (static snapshot),,image,https://varitech.ar/cameras/cam001/latest.jpg,,true
+chapelco,Pradera del Puma,,image,https://varitech.ar/cameras/cam016/latest.jpg,,true
+chapelco,Lift del Puente,,image,https://varitech.ar/cameras/cam017/latest.jpg,,true
+chapelco,"Rancho Grande (Desenganche Silla Rancho Grande, hacia la cordillera)",,image,https://varitech.ar/cameras/cam018/latest.jpg,,true
+las-lenas,Base / Live Cam (official),,iframe,https://tv.streamcasthd.com/live-stream-video-widget/laslenas,,true
+las-lenas,Pirámide,,image,https://snow2day.com/imgs/webcams/Valle_de_Las_Lenas_Piramide_ar61783890389805xl.jpg,,true
+las-lenas,Principal,,image,https://snow2day.com/imgs/webcams/Valle_de_Las_Lenas_Principal_ar61783890441754xl.jpg,,true
+cerro-castor,Cerro Castor Live Stream,,youtube,https://www.youtube.com/embed/RVuTqjTyrr0,RVuTqjTyrr0,true
+caviahue,Copahue Volcano - Agrio Superior Station (AGS),,image,https://oavv.segemar.gob.ar/CP/AGS.png,,true
+caviahue,Copahue Volcano - Aerodrome Node (AER),,image,https://oavv.segemar.gob.ar/CP/AER.png,,true
+caviahue,Copahue Volcano - Laguna Escondida Station (ESC),,image,https://oavv.segemar.gob.ar/CP/ESC.png,,true
+caviahue,Copahue Volcano - Mellizas Station (MLZ),,image,https://oavv.segemar.gob.ar/CP/MLZ.png,,true
+cerro-bayo,Cumbre (Summit 1800m),,image,https://ipcamlive.com/player/snapshot.php?alias=cumbre,,true
+cerro-bayo,Copitos Pista 3 (1500m),,image,https://ipcamlive.com/player/snapshot.php?alias=copitos,,true
+cerro-bayo,Principiantes 1500,,image,https://ipcamlive.com/player/snapshot.php?alias=principiantes1500,,true
+cerro-bayo,Telecabina 1500,,image,https://ipcamlive.com/player/snapshot.php?alias=telecabina1500,,true
+cerro-bayo,Telesilla Lagos,,image,https://ipcamlive.com/player/snapshot.php?alias=lagos2,,true
+cerro-bayo,Principiantes Pista 2,,image,https://ipcamlive.com/player/snapshot.php?alias=principiantes2,,true
+la-hoya,Principiantes / Plano Base 1600,,image,https://varitech.ar/cameras/cam031/latest.jpg,,true
