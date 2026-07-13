@@ -58,6 +58,19 @@ function getMapStyle(apiKey: string | undefined): maplibregl.StyleSpecification 
   };
 }
 
+// ── Sequential metric ramp ────────────────────────────────────────
+// In base-depth / 24h-snow modes markers use a light→dark single-hue (forest)
+// ramp so the COLOR answers the same question as the number, instead of staying
+// pinned to condition rating. `max` = where the ramp saturates to dark; `mid` =
+// where the on-marker number flips ink→cream for contrast against the fill.
+const METRIC_RAMP = {
+  baseDepth: { max: 100, mid: 45 },
+  snow24h: { max: 20, mid: 9 },
+} as const;
+const RAMP_LIGHT = "#dbe6d4";  // pale forest
+const RAMP_DARK = "#1f3322";   // pc-forest-dk
+const RAMP_NODATA = "#e3d5b2"; // pc-cream-dk — "no reading"
+
 // ── Props ─────────────────────────────────────────────────────────
 
 interface MapViewProps {
@@ -225,6 +238,43 @@ export default function MapView({
     return ["case", ["get", "offSeason"], "", forMetric];
   }, [metric]);
 
+  // ── Metric-dependent marker fill + on-marker text color ─────────
+  // Off-season always wins (neutral bark). In "conditions" mode the fill is the
+  // rating color; in a metric mode it's the sequential ramp (null → no-data
+  // cream). The on-marker number's color tracks fill lightness so it stays
+  // legible at both ends of the ramp.
+  const circleColorExpr = useMemo(() => {
+    const ratingColor = [
+      "match", ["get", "condRating"],
+      "great", "#3c5a3a", "good", "#6d8a4a", "fair", "#e2a740", "poor", "#a93f20",
+      "#7a5a3a",
+    ];
+    const byMetric =
+      metric === "conditions"
+        ? ratingColor
+        : [
+            "case",
+            ["==", ["get", metric], null], RAMP_NODATA,
+            [
+              "interpolate", ["linear"], ["to-number", ["get", metric], 0],
+              0, RAMP_LIGHT,
+              METRIC_RAMP[metric].max, RAMP_DARK,
+            ],
+          ];
+    return ["case", ["get", "offSeason"], "#b59b74", byMetric];
+  }, [metric]);
+
+  const markerTextColorExpr = useMemo(() => {
+    if (metric === "conditions") {
+      return ["match", ["get", "condRating"], "fair", "#2a1f14", "#faf4e6"];
+    }
+    return [
+      "case",
+      ["==", ["get", metric], null], "#2a1f14", // no-data (light) → ink
+      ["step", ["to-number", ["get", metric], 0], "#2a1f14", METRIC_RAMP[metric].mid, "#faf4e6"],
+    ];
+  }, [metric]);
+
   // ── Interaction handlers ────────────────────────────────────────
 
   // Hover is throttled: onMouseMove fires on every native mousemove (every
@@ -365,7 +415,7 @@ export default function MapView({
         <NavigationControl position="top-right" showCompass visualizePitch />
         {variant === "fullpage" && <GeolocateControl position="top-right" />}
         <ScaleControl position="bottom-left" />
-        <MapLegend />
+        <MapLegend metric={metric} />
 
         {/* Resort markers — clustered GeoJSON source */}
         <Source
@@ -480,21 +530,9 @@ export default function MapView({
                 16,
                 14,
               ],
-              "circle-color": [
-                "case",
-                /* Off-season → desaturated, hue-neutral bark so it never reads
-                   as a red "poor" rating. It's summer, not bad snow. */
-                ["get", "offSeason"], "#b59b74",
-                [
-                  "match",
-                  ["get", "condRating"],
-                  "great", "#3c5a3a",                /* pc-forest */
-                  "good",  "#6d8a4a",                /* pc-good (moss) */
-                  "fair",  "#e2a740",                /* pc-mustard */
-                  "poor",  "#a93f20",                /* pc-alpen-dk */
-                  "#7a5a3a",                          /* pc-bark fallback */
-                ],
-              ],
+              /* Off-season → neutral bark; conditions mode → rating color;
+                 metric mode → sequential ramp. See circleColorExpr. */
+              "circle-color": circleColorExpr as maplibregl.ExpressionSpecification,
               /* The ink stroke is a REQUIRED accessibility layer, not just a
                  stamp-feel flourish: "fair" (mustard #e2a740) is only 1.74:1
                  on cream and "good" (moss) is a marginal 3.17:1 — both fail /
@@ -524,13 +562,9 @@ export default function MapView({
               "text-font": ["Noto Sans Bold", "Arial Unicode MS Bold"],
             }}
             paint={{
-              /* Fair (mustard) needs ink text; others get cream */
-              "text-color": [
-                "match",
-                ["get", "condRating"],
-                "fair", "#2a1f14",
-                "#faf4e6",
-              ],
+              /* Ink on light fills (mustard / low ramp / no-data), cream on
+                 dark fills — see markerTextColorExpr. */
+              "text-color": markerTextColorExpr as maplibregl.ExpressionSpecification,
             }}
           />
 

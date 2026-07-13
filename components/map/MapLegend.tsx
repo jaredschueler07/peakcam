@@ -1,17 +1,32 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import type { MapMetric } from "@/lib/map-utils";
 
-// Earth palette — matches MapView marker colors
-const LEGEND_ITEMS = [
+// Categorical rating swatches — matches MapView marker colors.
+const RATING_ITEMS = [
   { color: "#3c5a3a", label: "Great" },       // pc-forest
   { color: "#6d8a4a", label: "Good" },        // pc-good (moss)
   { color: "#e2a740", label: "Fair" },        // pc-mustard
   { color: "#a93f20", label: "Poor" },        // pc-alpen-dk
-  { color: "#b59b74", label: "Off-season" },  // neutral bark — summer/closed
 ] as const;
+const OFF_SEASON = { color: "#b59b74", label: "Off-season" }; // neutral bark
 
-export default function MapLegend() {
+// Sequential ramp legend — mirrors MapView's METRIC_RAMP + RAMP_LIGHT..DARK.
+const RAMP_CSS = "linear-gradient(90deg, #dbe6d4, #1f3322)";
+const METRIC_LEGEND: Record<
+  Exclude<MapMetric, "conditions">,
+  { title: string; max: string }
+> = {
+  baseDepth: { title: "Base depth", max: '100"+' },
+  snow24h: { title: "24h snow", max: '20"+' },
+};
+
+interface MapLegendProps {
+  metric: MapMetric;
+}
+
+export default function MapLegend({ metric }: MapLegendProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -26,6 +41,9 @@ export default function MapLegend() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
+  // Narrow the metric so the sequential-legend lookup is type-safe.
+  const seq = metric !== "conditions" ? METRIC_LEGEND[metric] : null;
+
   return (
     <div ref={ref} className="absolute bottom-3 right-3 z-10">
       {open ? (
@@ -37,19 +55,47 @@ export default function MapLegend() {
           >
             Legend ×
           </button>
-          <div className="flex flex-col gap-1.5">
-            {LEGEND_ITEMS.map(({ color, label }) => (
-              <div key={label} className="flex items-center gap-2">
+
+          {seq ? (
+            // Sequential ramp: gradient bar + endpoints, plus the off-season swatch.
+            <div className="flex flex-col gap-2">
+              <div className="font-mono font-bold text-[11px] text-ink uppercase tracking-[0.1em]">
+                {seq.title}
+              </div>
+              <div
+                className="w-40 h-3 rounded-full border-[1.5px] border-ink"
+                style={{ background: RAMP_CSS }}
+              />
+              <div className="flex justify-between font-mono text-[10px] text-bark tabular-nums">
+                <span>0&quot;</span>
+                <span>{seq.max}</span>
+              </div>
+              <div className="flex items-center gap-2 pt-1.5 border-t-[1.5px] border-dashed border-bark/50">
                 <span
                   className="inline-block w-3 h-3 rounded-full shrink-0 border-[1.5px] border-ink"
-                  style={{ backgroundColor: color }}
+                  style={{ backgroundColor: OFF_SEASON.color }}
                 />
                 <span className="font-mono font-bold text-[11px] text-ink uppercase tracking-[0.1em]">
-                  {label}
+                  {OFF_SEASON.label}
                 </span>
               </div>
-            ))}
-          </div>
+            </div>
+          ) : (
+            // Categorical rating swatches.
+            <div className="flex flex-col gap-1.5">
+              {[...RATING_ITEMS, OFF_SEASON].map(({ color, label }) => (
+                <div key={label} className="flex items-center gap-2">
+                  <span
+                    className="inline-block w-3 h-3 rounded-full shrink-0 border-[1.5px] border-ink"
+                    style={{ backgroundColor: color }}
+                  />
+                  <span className="font-mono font-bold text-[11px] text-ink uppercase tracking-[0.1em]">
+                    {label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ) : (
         <button
