@@ -3,7 +3,8 @@ import { Header } from "@/components/layout/Header";
 
 export const metadata = {
   title: "About",
-  description: "PeakCam is a free, real-time mountain webcam and snow report aggregator for North American ski resorts.",
+  description:
+    "PeakCam is a free, real-time mountain webcam and snow report aggregator for ski resorts across North & South America.",
 };
 
 export default function About() {
@@ -23,15 +24,22 @@ export default function About() {
 
           <p>
             PeakCam is the fastest way to check real-time conditions across
-            128 ski resorts in Colorado, Utah, and beyond. Live webcams, snow
+            150+ ski resorts from the Rockies to the Andes — Colorado, Utah,
+            Chile, Argentina, and everywhere in between. Live webcams, snow
             totals, weather forecasts, and trail counts — all on one page, all
             free, no account required.
           </p>
 
           <p>
+            Winter doesn&apos;t clock out. When North America melts out, the
+            Andes light up — and PeakCam covers both hemispheres so there&apos;s
+            always a season live somewhere.
+          </p>
+
+          <p>
             We built this for the Thursday-night session: you and your crew
-            huddled around a phone, trying to figure out which mountain got
-            the goods. No more tab-juggling between resort sites, weather
+            huddled around a phone, trying to figure out where it&apos;s actually
+            good. No more tab-juggling between resort sites, weather
             apps, and cam aggregators that haven&apos;t been updated since 2014.
           </p>
 

@@ -19,9 +19,10 @@ export function PeakFooter() {
               </span>
             </div>
             <p className="text-ink/80 text-[15px] leading-relaxed max-w-md">
-              Real-time ski resort conditions, webcams, and snow reports for
-              skiers and riders who&rsquo;d rather be on the hill than reading marketing copy.
-              <span className="block mt-2 font-display italic text-bark">The lift&rsquo;s spinning somewhere.</span>
+              Real-time ski resort conditions, webcams, and snow reports from
+              the Rockies to the Andes — for skiers and riders who&rsquo;d rather be
+              on the hill than reading marketing copy.
+              <span className="block mt-2 font-display italic text-bark">Check before you go.</span>
             </p>
 
             {/* Social links */}

@@ -6,8 +6,17 @@ import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { navLinks } from "@/components/layout/Header";
 
-export function PeakHero() {
+interface PeakHeroProps {
+  /** Live resort count from the data layer — keeps the eyebrow honest as coverage grows. */
+  resortCount?: number;
+}
+
+export function PeakHero({ resortCount }: PeakHeroProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const countLabel =
+    typeof resortCount === "number" && resortCount > 0
+      ? `${resortCount} Resorts`
+      : "Both Hemispheres";
 
   return (
     <div className="pc-topo relative h-screen w-full overflow-hidden">
@@ -91,7 +100,7 @@ export function PeakHero() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.6 }}
           >
-            Est. 2025 · 128 Resorts
+            Est. 2025 · {countLabel}
           </motion.div>
 
           <h1 className="font-display font-black text-[26vw] sm:text-[22vw] md:text-[18vw] lg:text-[15rem] xl:text-[18rem] leading-[0.88] tracking-[-0.03em] mb-4">
@@ -105,7 +114,7 @@ export function PeakHero() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4, duration: 0.8 }}
           >
-            Got the goods?
+            Where&rsquo;s it good?
           </motion.p>
 
           <motion.p
@@ -114,8 +123,8 @@ export function PeakHero() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6, duration: 0.8 }}
           >
-            Live webcams + real-time snow reports for 128+ ski resorts across North America.
-            No marketing noise. Just the mountain.
+            Live webcams and real snow reports from the Rockies to the Andes.
+            Pick a mountain before you leave.
           </motion.p>
 
           <motion.a
@@ -129,7 +138,7 @@ export function PeakHero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.8, duration: 0.6 }}
           >
-            Check Conditions &rarr;
+            See conditions &rarr;
           </motion.a>
         </motion.div>
       </div>

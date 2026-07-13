@@ -105,22 +105,42 @@ export default function MapView({
     [selectedSlug, resorts],
   );
 
-  // Fit bounds when filtered resorts change
-  const prevResortCountRef = useRef(resorts.length);
+  // Fit bounds when filtered resorts change (state chips, search, etc.).
+  // Key by slug set so Chile→Argentina (same count, different places) still flies.
+  // On first paint keep DEFAULT_VIEW_STATE (North America). When the set spans
+  // both hemispheres (filter cleared), fly home rather than zooming to the world.
+  const prevResortKeyRef = useRef<string>("");
   useEffect(() => {
     const map = mapRef.current;
     if (!map || resorts.length === 0) return;
 
-    // Only auto-fit when the resort list changes (filter applied)
-    if (resorts.length === prevResortCountRef.current) return;
-    prevResortCountRef.current = resorts.length;
+    const key = resorts
+      .map((r) => r.slug)
+      .sort()
+      .join(",");
+    if (key === prevResortKeyRef.current) return;
+    const isInitial = prevResortKeyRef.current === "";
+    prevResortKeyRef.current = key;
+    if (isInitial) return;
 
     const bounds = resortBounds(resorts);
     if (!bounds) return;
 
+    const [, south, , north] = bounds;
+    // Spans both hemispheres (e.g. filter cleared) — return to default NA view
+    if (north - south > 50) {
+      map.flyTo({
+        center: [DEFAULT_VIEW_STATE.longitude, DEFAULT_VIEW_STATE.latitude],
+        zoom: DEFAULT_VIEW_STATE.zoom,
+        duration: 800,
+      });
+      return;
+    }
+
     map.fitBounds(bounds as [number, number, number, number], {
       padding: variant === "sidebar" ? 40 : 80,
       duration: 800,
+      maxZoom: 8,
     });
   }, [resorts, variant]);
 

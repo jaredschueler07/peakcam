@@ -47,7 +47,7 @@ const CONDITION_ORDER: Record<string, number> = {
 };
 
 // Curated popularity ranking — order matters, top of list = top of grid.
-// Based on brand recognition / skier visits; adjust freely.
+// Based on brand recognition / skier visits; SA heroes featured for Andes season.
 const POPULAR_SLUGS: string[] = [
   "vail",
   "aspen-snowmass",
@@ -61,10 +61,18 @@ const POPULAR_SLUGS: string[] = [
   "killington",
   "stowe",
   "alta",
+  // South America launch — strongest cam coverage + name recognition
+  "ski-portillo",
+  "valle-nevado",
+  "cerro-catedral",
+  "las-lenas",
 ];
 const POPULAR_RANK: Record<string, number> = Object.fromEntries(
   POPULAR_SLUGS.map((slug, idx) => [slug, idx]),
 );
+
+/** Full-country state values (not US/CA abbreviations). */
+const SA_STATES = new Set(["Chile", "Argentina"]);
 
 const STATE_NAMES: Record<string, string> = {
   AZ: "Arizona", BC: "British Columbia", CA: "California", CO: "Colorado",
@@ -73,7 +81,17 @@ const STATE_NAMES: Record<string, string> = {
   NM: "New Mexico", NV: "Nevada", NY: "New York", OR: "Oregon",
   PA: "Pennsylvania", UT: "Utah", VA: "Virginia", VT: "Vermont",
   WA: "Washington", WI: "Wisconsin", WV: "West Virginia", WY: "Wyoming",
+  Chile: "Chile",
+  Argentina: "Argentina",
 };
+
+function stateButtonLabel(stateFilter: string): string {
+  if (stateFilter === "All") return "All States";
+  // Full-country values (Chile, Argentina) — no "CODE — Name" redundancy
+  if (SA_STATES.has(stateFilter) || stateFilter.length > 2) return stateFilter;
+  const full = STATE_NAMES[stateFilter];
+  return full ? `${stateFilter} — ${full}` : stateFilter;
+}
 
 const FUSE_OPTIONS: import("fuse.js").IFuseOptions<ResortWithData> = {
   keys: [
@@ -148,7 +166,7 @@ function FeaturedRow({ resorts }: { resorts: ResortWithData[] }) {
         Today&apos;s Top
       </div>
       <h2 className="font-display font-black text-4xl md:text-5xl text-ink mb-1 leading-[0.95] tracking-[-0.02em]">
-        Got the <em className="text-alpen not-italic font-bold italic">goods</em>.
+        Best <em className="text-alpen not-italic font-bold italic">right now</em>.
       </h2>
       <p className="text-bark text-sm mb-5">Ranked by condition rating and recent snowfall.</p>
       <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 scrollbar-hide">
@@ -245,6 +263,42 @@ function PowderAlert({ resorts }: { resorts: ResortWithData[] }) {
   );
 }
 
+// ── Southern Hemisphere season callout ───────────────────────────────────────
+// Uses the same FilterChip setState pattern — no new filter system.
+// Visible only when Chile/Argentina resorts exist in the dataset.
+
+function SouthernSeasonBanner({
+  saCount,
+  stateFilter,
+  onFilterChile,
+  onFilterArgentina,
+}: {
+  saCount: number;
+  stateFilter: string;
+  onFilterChile: () => void;
+  onFilterArgentina: () => void;
+}) {
+  if (saCount === 0) return null;
+
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-4 mb-8
+                    bg-cream-50 border-[1.5px] border-ink rounded-[18px] shadow-stamp-sm">
+      <div className="min-w-0">
+        <div className="font-mono font-bold text-[10.5px] text-bark uppercase tracking-[0.14em] mb-1">
+          Southern Hemisphere · in season now
+        </div>
+        <p className="text-ink text-sm font-medium">
+          Chile &amp; Argentina are live — {saCount} Andes resorts with cams and snow reports.
+        </p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <FilterChip label="Chile" active={stateFilter === "Chile"} onClick={onFilterChile} />
+        <FilterChip label="Argentina" active={stateFilter === "Argentina"} onClick={onFilterArgentina} />
+      </div>
+    </div>
+  );
+}
+
 // ── Main BrowsePage ──────────────────────────────────────────────────────────
 
 export function BrowsePage({ resorts }: Props) {
@@ -261,9 +315,21 @@ export function BrowsePage({ resorts }: Props) {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const { user, isFavorite, toggle: toggleFav } = useFavorites();
 
+  // SA full-country labels first, then US/CA abbreviations alphabetically
   const availableStates = useMemo(() => {
-    return [...new Set(resorts.map((r) => r.state))].sort();
+    const states = [...new Set(resorts.map((r) => r.state))];
+    return states.sort((a, b) => {
+      const aSa = SA_STATES.has(a) ? 0 : 1;
+      const bSa = SA_STATES.has(b) ? 0 : 1;
+      if (aSa !== bSa) return aSa - bSa;
+      return a.localeCompare(b);
+    });
   }, [resorts]);
+
+  const saCount = useMemo(
+    () => resorts.filter((r) => SA_STATES.has(r.state)).length,
+    [resorts],
+  );
 
   const fuse = useMemo(() => new Fuse(resorts, FUSE_OPTIONS), [resorts]);
 
@@ -372,7 +438,7 @@ export function BrowsePage({ resorts }: Props) {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search 128 resorts…"
+                placeholder={`Search ${resorts.length} resorts…`}
                 className="w-full pl-12 pr-10 py-3 bg-snow text-ink placeholder:text-bark
                            border-[1.5px] border-ink rounded-full shadow-stamp
                            focus:shadow-[4px_4px_0_#a93f20] focus:border-alpen-dk
@@ -404,7 +470,7 @@ export function BrowsePage({ resorts }: Props) {
               }`}
             >
               <MapPin size={14} />
-              {stateFilter === "All" ? "All States" : `${stateFilter} — ${STATE_NAMES[stateFilter] ?? stateFilter}`}
+              {stateButtonLabel(stateFilter)}
               <ChevronDown size={14} className={`transition-transform ${showStates ? "rotate-180" : ""}`} />
             </button>
 
@@ -465,9 +531,13 @@ export function BrowsePage({ resorts }: Props) {
             <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t-[1.5px] border-dashed border-bark">
               <FilterChip label="All" active={stateFilter === "All"} onClick={() => { setStateFilter("All"); setShowStates(false); }} />
               {availableStates.map((s) => (
-                <FilterChip key={s} label={s} active={stateFilter === s}
+                <FilterChip
+                  key={s}
+                  label={s}
+                  active={stateFilter === s}
                   onClick={() => { setStateFilter(stateFilter === s ? "All" : s); setShowStates(false); }}
-                  title={STATE_NAMES[s] ?? s} />
+                  title={STATE_NAMES[s] ?? s}
+                />
               ))}
             </div>
           )}
@@ -476,6 +546,18 @@ export function BrowsePage({ resorts }: Props) {
 
       {/* ── Body ──────────────────────────────────────────────── */}
       <div className="max-w-screen-2xl mx-auto px-4 py-8 md:px-8">
+        <SouthernSeasonBanner
+          saCount={saCount}
+          stateFilter={stateFilter}
+          onFilterChile={() => {
+            setStateFilter((s) => (s === "Chile" ? "All" : "Chile"));
+            setShowStates(false);
+          }}
+          onFilterArgentina={() => {
+            setStateFilter((s) => (s === "Argentina" ? "All" : "Argentina"));
+            setShowStates(false);
+          }}
+        />
         <FeaturedRow resorts={resorts} />
         <PowderAlert resorts={resorts} />
 

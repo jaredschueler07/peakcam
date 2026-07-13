@@ -53,9 +53,9 @@ export function AuthModal({ onClose, redirectTo }: Props) {
               Sign in
             </div>
             <h2 className="font-display font-black text-ink text-2xl leading-[0.95] tracking-[-0.02em]">
-              Got the <em className="text-alpen italic font-bold">goods?</em>
+              Save your <em className="text-alpen italic font-bold">mountains</em>.
             </h2>
-            <p className="text-bark text-xs mt-1">Share the report with your crew.</p>
+            <p className="text-bark text-xs mt-1">Favorites and powder alerts for your crew.</p>
           </div>
           <button
             onClick={onClose}

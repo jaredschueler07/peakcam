@@ -8,7 +8,7 @@ export const revalidate = 3600;
 export const metadata: Metadata = {
   title: "Interactive Ski Resort Map",
   description:
-    "Explore 128 ski resorts on an interactive map with live snow conditions, base depth, weather radar, and terrain visualization.",
+    "Explore 150+ ski resorts across North & South America on an interactive map with live snow conditions, base depth, weather radar, and terrain visualization.",
   openGraph: {
     title: "Interactive Ski Resort Map",
     description:

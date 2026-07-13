@@ -7,10 +7,12 @@ import type { Cam } from "@/lib/types";
 
 interface LiveWebcamsProps {
   cams: Cam[];
+  /** Live resort count for copy — avoids hardcoding coverage numbers. */
+  resortCount?: number;
 }
 
 // Poster "Live feeds" — paper section, Fraunces headline with alpen italic, stamped cam tiles
-export function LiveWebcams({ cams }: LiveWebcamsProps) {
+export function LiveWebcams({ cams, resortCount }: LiveWebcamsProps) {
   const [loadedCams, setLoadedCams] = useState<Set<string>>(new Set());
 
   if (cams.length === 0) return null;
@@ -21,6 +23,10 @@ export function LiveWebcams({ cams }: LiveWebcamsProps) {
 
   const heroCam = cams[0];
   const secondaryCams = cams.slice(1);
+  const countPhrase =
+    typeof resortCount === "number" && resortCount > 0
+      ? `${resortCount} resorts across both hemispheres`
+      : "resorts across both hemispheres";
 
   return (
     <section className="relative py-20 px-6 pc-topo">
@@ -34,7 +40,7 @@ export function LiveWebcams({ cams }: LiveWebcamsProps) {
             Live <em className="text-alpen italic font-bold">feeds</em>.
           </h2>
           <p className="text-bark text-lg mt-3">
-            Real-time conditions from 128 resorts across North America.
+            Real-time conditions from {countPhrase}.
           </p>
         </div>
 

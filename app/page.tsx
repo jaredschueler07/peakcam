@@ -13,7 +13,7 @@ export const revalidate = 3600;
 export const metadata = {
   title: "Live Ski Resort Webcams, Snow Reports & Conditions",
   description:
-    "Browse live webcams, real-time snow reports, base depths, and trail conditions for 128 ski resorts across North America. " +
+    "Browse live webcams, real-time snow reports, base depths, and trail conditions for 150+ ski resorts across North & South America. " +
     "Compare powder days, check lift status, and plan your next ski trip with PeakCam.",
   keywords: [
     "live ski resort webcams",
@@ -26,20 +26,23 @@ export const metadata = {
     "lift status ski resort",
     "ski resort weather forecast",
     "North America ski resorts",
+    "South America ski resorts",
+    "Chile ski webcams",
+    "Argentina ski webcams",
     "ski cam live stream",
     "best powder days",
   ],
   openGraph: {
     title: "Live Ski Resort Webcams, Snow Reports & Conditions",
     description:
-      "Browse live webcams, real-time snow reports, and powder alerts for 128 ski resorts across North America.",
+      "Browse live webcams, real-time snow reports, and powder alerts for 150+ ski resorts across North & South America.",
     url: "https://peakcam.io",
     type: "website" as const,
   },
   twitter: {
     card: "summary_large_image" as const,
     title: "PeakCam — Live Ski Webcams & Snow Reports",
-    description: "Real-time powder alerts, base depths, and live cams for 128 North American ski resorts.",
+    description: "Real-time powder alerts, base depths, and live cams for 150+ ski resorts from the Rockies to the Andes.",
   },
 };
 
@@ -81,7 +84,7 @@ export default async function Home() {
 
   return (
     <main id="main-content">
-      <PeakHero />
+      <PeakHero resortCount={resorts.length} />
       <PowderTicker alerts={powderAlerts} />
       {snowCams.length > 0 && (
         <Suspense fallback={<div className="h-96 animate-pulse bg-surface rounded-lg" />}>
@@ -90,7 +93,7 @@ export default async function Home() {
       )}
       <BrowsePage resorts={resorts} />
       <Suspense fallback={<div className="h-96 animate-pulse bg-surface rounded-lg" />}>
-        <LiveWebcams cams={featuredCams} />
+        <LiveWebcams cams={featuredCams} resortCount={resorts.length} />
       </Suspense>
       <PeakFooter />
     </main>
