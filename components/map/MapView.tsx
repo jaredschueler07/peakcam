@@ -118,7 +118,13 @@ export default function MapView({
   );
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
-    const update = () => setIsDesktop(mq.matches);
+    const update = () => {
+      setIsDesktop(mq.matches);
+      // The desktop popup unmounts below 1024px and the parent only opens its
+      // mobile sheet on a fresh tap — clear a dangling desktop selection on a
+      // resize down so it doesn't linger invisibly.
+      if (!mq.matches) setSelectedSlug(null);
+    };
     update();
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
@@ -222,22 +228,41 @@ export default function MapView({
     [],
   );
 
+  const cancelPendingHover = useCallback(() => {
+    if (hoverRafRef.current) {
+      cancelAnimationFrame(hoverRafRef.current);
+      hoverRafRef.current = null;
+    }
+  }, []);
+
   const onMouseEnter = useCallback(() => setCursor("pointer"), []);
   const onMouseLeave = useCallback(() => {
     setCursor("grab");
+    // Cancel any queued hover so a stale slug can't re-highlight a marker the
+    // pointer has already left the map from.
+    cancelPendingHover();
     lastHoverRef.current = null;
     onResortHover?.(null);
-  }, [onResortHover]);
+  }, [onResortHover, cancelPendingHover]);
 
   const onMouseMove = useCallback(
     (e: MapLayerMouseEvent) => {
       const slug = e.features?.[0]?.properties?.slug as string | undefined;
-      if (!slug || slug === lastHoverRef.current) return;
+      // Moved onto empty map space — drop any pending hover and clear.
+      if (!slug) {
+        if (lastHoverRef.current !== null) {
+          cancelPendingHover();
+          lastHoverRef.current = null;
+          onResortHover?.(null);
+        }
+        return;
+      }
+      if (slug === lastHoverRef.current) return;
       lastHoverRef.current = slug;
-      if (hoverRafRef.current) cancelAnimationFrame(hoverRafRef.current);
+      cancelPendingHover();
       hoverRafRef.current = requestAnimationFrame(() => onResortHover?.(slug));
     },
-    [onResortHover],
+    [onResortHover, cancelPendingHover],
   );
 
   const onClick = useCallback(
@@ -317,9 +342,12 @@ export default function MapView({
         onClick={onClick}
         attributionControl={{}}
         /* Sidebar map lives inside a scrollable page — require a modifier /
-           two-finger gesture to pan/zoom so it doesn't hijack page scroll. */
+           two-finger gesture to pan/zoom so it doesn't hijack page scroll.
+           NOTE: cooperativeGestures is honored only at map construction, so we
+           must NOT reuseMaps — a recycled instance would carry the previous
+           variant's gesture setting across the /↔/map route change (react-map-gl
+           pools maps globally without keying on props), silently defeating this. */
         cooperativeGestures={variant === "sidebar"}
-        reuseMaps
       >
         {/* Navigation controls */}
         <NavigationControl position="top-right" showCompass visualizePitch />

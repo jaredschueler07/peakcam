@@ -41,9 +41,18 @@ export default function MapPopupCard({ resort, onViewResort }: MapPopupCardProps
   const updated = timeAgo(snow?.updated_at);
 
   // Prefer SPA navigation when the parent provides it (/map uses next/router);
-  // otherwise the anchor's href handles a normal navigation.
+  // otherwise the anchor's href handles a normal navigation. Let modifier /
+  // middle clicks fall through to the browser so "open in new tab/window"
+  // still works — only intercept a plain left click.
   const handleNav = (e: MouseEvent<HTMLAnchorElement>) => {
-    if (onViewResort) {
+    if (
+      onViewResort &&
+      e.button === 0 &&
+      !e.metaKey &&
+      !e.ctrlKey &&
+      !e.shiftKey &&
+      !e.altKey
+    ) {
       e.preventDefault();
       onViewResort(resort.slug);
     }
@@ -70,7 +79,9 @@ export default function MapPopupCard({ resort, onViewResort }: MapPopupCardProps
             {ratingLabel}
           </span>
           {snow?.snowing_now && (
-            <span className="inline-flex items-center gap-1 rounded-full border-[1.5px] border-forest-dk bg-forest px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] leading-tight text-cream-50">
+            /* pale "sky/snow" pill, ink text — deliberately NOT a rating hue
+               so it never collides with the forest "great" chip above it. */
+            <span className="inline-flex items-center gap-1 rounded-full border-[1.5px] border-ink bg-sky px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] leading-tight text-ink">
               <span aria-hidden>❄</span> Snowing
             </span>
           )}

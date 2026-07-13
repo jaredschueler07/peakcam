@@ -203,3 +203,23 @@ body {
 .maplibregl-ctrl-attrib a {
   color: var(--pc-bark-dk) !important;
 }
+
+/* ── MapLibre cooperative-gesture overlay (poster paper) ──
+   Shown on the sidebar map when a user scrolls without the modifier /
+   two-finger gesture. MapLibre's default is a dark scrim + white system font —
+   reskin it to the cream/ink stamp treatment so it stays on-brand. */
+.maplibregl-cooperative-gesture-screen {
+  background: rgba(42, 31, 20, 0.22) !important; /* soft ink scrim */
+  color: var(--pc-ink) !important;
+  font-size: 0.95rem !important;
+}
+.maplibregl-cooperative-gesture-screen .maplibregl-desktop-message,
+.maplibregl-cooperative-gesture-screen .maplibregl-mobile-message {
+  background: var(--pc-cream-50);
+  border: 1.5px solid var(--pc-ink);
+  border-radius: 999px;
+  box-shadow: var(--pc-stamp-sm);
+  padding: 8px 16px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
