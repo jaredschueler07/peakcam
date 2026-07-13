@@ -291,6 +291,7 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
 export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData, liveConditions, userConditions = [] }: Props) {
   const activeCams = resort.cams.filter((c) => c.is_active);
   const snow = resort.snow_report;
+  const isUS = resort.country === "US";
   const { user, isFavorite, toggle: toggleFav } = useFavorites();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const favorited = isFavorite(resort.id);
@@ -465,30 +466,36 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
           <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">5-Day Forecast</h2>
-              <a
-                href={`https://forecast.weather.gov/MapClick.php?lat=${resort.lat}&lon=${resort.lng}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-text-muted hover:text-cyan text-xs transition-colors"
-              >
-                NWS Forecast ↗
-              </a>
+              {isUS && (
+                <a
+                  href={`https://forecast.weather.gov/MapClick.php?lat=${resort.lat}&lon=${resort.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-text-muted hover:text-cyan text-xs transition-colors"
+                >
+                  NWS Forecast ↗
+                </a>
+              )}
             </div>
             <ForecastTable periods={forecastPeriods} />
-            <p className="text-text-muted text-xs mt-2">Via National Weather Service · Updated hourly</p>
+            <p className="text-text-muted text-xs mt-2">
+              {isUS ? "Via National Weather Service · Updated hourly" : "Via Open-Meteo · Updated hourly"}
+            </p>
           </section>
         ) : (
           <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">5-Day Forecast</h2>
-              <a
-                href={`https://forecast.weather.gov/MapClick.php?lat=${resort.lat}&lon=${resort.lng}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-text-muted hover:text-cyan text-xs transition-colors"
-              >
-                NWS Forecast ↗
-              </a>
+              {isUS && (
+                <a
+                  href={`https://forecast.weather.gov/MapClick.php?lat=${resort.lat}&lon=${resort.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-text-muted hover:text-cyan text-xs transition-colors"
+                >
+                  NWS Forecast ↗
+                </a>
+              )}
             </div>
             <div className="bg-surface border border-border rounded-xl p-6 text-center text-text-muted text-sm">
               Weather data temporarily unavailable.
