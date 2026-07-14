@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion } from "motion/react";
 import { Camera, ArrowLeftRight, TrendingUp, TrendingDown, Minus, Snowflake, Sun, Thermometer, Heart } from "lucide-react";
 import type { ResortWithData, ConditionRating, SnowTrend, SnowOutlook } from "@/lib/types";
+import { isOffSeason, OFF_SEASON_COLOR } from "@/lib/map-utils";
 import { trackResortCardClick } from "@/lib/posthog";
 
 // ── Animated count-up number ─────────────────────────────────────────────────
@@ -91,7 +92,11 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite }: Props)
   const pctNormal = snow?.pct_of_normal;
   const trend = snow?.trend_7d as SnowTrend | null;
   const outlook = snow?.outlook as SnowOutlook | null;
-  const isSnowing = snow?.snowing_now ?? false;
+  // Off-season (display heuristic, matches the map): the rating engine's
+  // "poor" is meaningless in the local summer — show a neutral chip instead,
+  // and suppress the snowing badge.
+  const offSeason = isOffSeason(resort.lat, new Date());
+  const isSnowing = (snow?.snowing_now ?? false) && !offSeason;
 
   return (
     <motion.div
@@ -188,7 +193,15 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite }: Props)
             {/* Footer: condition chip + trend + cameras + favorite */}
             <div className="flex items-center justify-between pt-1">
               <div className="flex items-center gap-2">
-                {cond ? (
+                {offSeason ? (
+                  <span
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
+                      border border-bark-dk font-bold text-[11.5px] tracking-[0.08em] uppercase text-ink"
+                    style={{ backgroundColor: OFF_SEASON_COLOR }}
+                  >
+                    Off-season
+                  </span>
+                ) : cond ? (
                   <span
                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
                       border font-bold text-[11.5px] tracking-[0.08em] uppercase

@@ -11,6 +11,7 @@ import { PowderAlertSignup } from "@/components/alerts/PowderAlertSignup";
 import { useFavorites } from "@/lib/useFavorites";
 import { AuthModal } from "@/components/auth/AuthModal";
 import type { ResortWithData } from "@/lib/types";
+import { isOffSeason } from "@/lib/map-utils";
 import { trackSearch, trackFilter } from "@/lib/posthog";
 
 // MapLibre map — dynamic import, no SSR (requires window)
@@ -142,8 +143,11 @@ function FilterChip({
 
 function FeaturedRow({ resorts }: { resorts: ResortWithData[] }) {
   const featured = useMemo(() => {
+    const now = new Date();
     const sorted = resorts
-      .filter((r) => r.snow_report && r.cond_rating)
+      // In-season only: a stale "great" on a summer-closed resort shouldn't
+      // headline "Today's Top" (matches the map's off-season treatment).
+      .filter((r) => r.snow_report && r.cond_rating && !isOffSeason(r.lat, now))
       .sort((a, b) => {
         const condDiff = (CONDITION_ORDER[a.cond_rating] ?? 99) - (CONDITION_ORDER[b.cond_rating] ?? 99);
         if (condDiff !== 0) return condDiff;
