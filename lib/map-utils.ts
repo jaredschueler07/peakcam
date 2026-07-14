@@ -201,3 +201,24 @@ export const DEFAULT_VIEW_STATE = {
   pitch: 0,
   bearing: 0,
 } as const;
+
+// Andes corridor (Santiago → Bariloche; Cerro Castor is a short pan south).
+export const ANDES_VIEW_STATE = {
+  longitude: -70.5,
+  latitude: -39.5,
+  zoom: 3.8,
+  pitch: 0,
+  bearing: 0,
+} as const;
+
+/**
+ * Season-aware default view: the map opens on whichever hemisphere is in ski
+ * season (same month split as isOffSeason). Deliberately NOT geolocation- or
+ * IP-based — both map pages are ISR-cached (one HTML for everyone), and the
+ * explicit GeolocateControl already covers "near me".
+ */
+export function seasonalDefaultViewState(date: Date) {
+  const month = date.getMonth() + 1;
+  const southernSeason = month >= 5 && month <= 10; // NH summer = Andes winter
+  return southernSeason ? ANDES_VIEW_STATE : DEFAULT_VIEW_STATE;
+}

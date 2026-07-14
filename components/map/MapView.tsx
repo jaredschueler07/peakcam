@@ -21,7 +21,7 @@ import type { MapMetric } from "@/lib/map-utils";
 import {
   resortsToGeoJSON,
   resortBounds,
-  DEFAULT_VIEW_STATE,
+  seasonalDefaultViewState,
 } from "@/lib/map-utils";
 import MapPopupCard from "./MapPopupCard";
 import MapControls from "./MapControls";
@@ -110,8 +110,12 @@ export default function MapView({
   const maptilerKey = process.env.NEXT_PUBLIC_MAPTILER_KEY;
   const mapStyle = useMemo(() => getMapStyle(maptilerKey), [maptilerKey]);
 
+  // Season-aware "home" view (NA in NH winter, the Andes in NH summer) —
+  // computed once per mount via lazy initializer (initializers run once, so
+  // the impure new Date() is safe here; MapView is client-only).
+  const [homeView] = useState(() => seasonalDefaultViewState(new Date()));
   const [viewState, setViewState] = useState<ViewState>({
-    ...DEFAULT_VIEW_STATE,
+    ...homeView,
     padding: { top: 0, bottom: 0, left: 0, right: 0 },
   });
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
@@ -203,8 +207,8 @@ export default function MapView({
 
   // Fit bounds when filtered resorts change (state chips, search, etc.).
   // Key by slug set so Chile→Argentina (same count, different places) still flies.
-  // On first paint keep DEFAULT_VIEW_STATE (North America). When the set spans
-  // both hemispheres (filter cleared), fly home rather than zooming to the world.
+  // On first paint keep the seasonal home view. When the set spans both
+  // hemispheres (filter cleared), fly home rather than zooming to the world.
   const prevResortKeyRef = useRef<string>("");
   useEffect(() => {
     const map = mapRef.current;
@@ -223,11 +227,11 @@ export default function MapView({
     if (!bounds) return;
 
     const [, south, , north] = bounds;
-    // Spans both hemispheres (e.g. filter cleared) — return to default NA view
+    // Spans both hemispheres (e.g. filter cleared) — return to the seasonal home
     if (north - south > 50) {
       map.flyTo({
-        center: [DEFAULT_VIEW_STATE.longitude, DEFAULT_VIEW_STATE.latitude],
-        zoom: DEFAULT_VIEW_STATE.zoom,
+        center: [homeView.longitude, homeView.latitude],
+        zoom: homeView.zoom,
         duration: 800,
       });
       return;
@@ -238,7 +242,7 @@ export default function MapView({
       duration: 800,
       maxZoom: 8,
     });
-  }, [resorts, variant]);
+  }, [resorts, variant, homeView]);
 
   // Ease to hovered resort from sidebar
   useEffect(() => {
