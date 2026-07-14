@@ -2,6 +2,7 @@
 
 import type { ResortWithData, ConditionRating } from "@/lib/types";
 import { isOffSeason, timeAgo, OFF_SEASON_COLOR } from "@/lib/map-utils";
+import MapCamPreview from "./MapCamPreview";
 
 // Condition chip palette — matches MapPopupCard / ConditionBadge.
 const conditionChip: Record<ConditionRating, string> = {
@@ -117,6 +118,14 @@ export default function MapBottomSheet({
               </div>
             ))}
           </div>
+
+          {/* Live cam glance — conditions + map + webcam in one view */}
+          <MapCamPreview
+            cams={resort.cams}
+            resortName={resort.name}
+            onClick={() => onViewResort(resort.slug)}
+            className="mb-4"
+          />
 
           {/* Actions */}
           <div className="flex items-center gap-3">
