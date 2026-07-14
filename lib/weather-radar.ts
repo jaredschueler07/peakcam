@@ -6,6 +6,8 @@
 export interface RadarFrame {
   time: number;
   tileUrl: string;
+  /** True for forecast (nowcast) frames; false for observed past frames. */
+  nowcast: boolean;
 }
 
 interface RainViewerResponse {
@@ -19,8 +21,9 @@ interface RainViewerResponse {
 }
 
 /**
- * Fetches radar frames from RainViewer.
- * Returns the last 6 past frames plus all available nowcast frames.
+ * Fetches radar frames from RainViewer for the animated radar loop.
+ * Returns the last 6 past frames plus up to 3 nowcast frames, oldest first.
+ * (Capped so the map mounts a bounded number of preloading raster layers.)
  * Tile URLs follow the pattern: `{host}{path}/256/{z}/{x}/{y}/2/1_1.png`
  *
  * Cached for 5 minutes via Next.js ISR.
@@ -39,29 +42,14 @@ export async function getRadarFrames(): Promise<RadarFrame[]> {
   const { host, radar } = data;
 
   const pastFrames = radar.past.slice(-6);
-  const nowcastFrames = radar.nowcast ?? [];
+  const nowcastFrames = (radar.nowcast ?? []).slice(0, 3);
 
-  const toFrame = (entry: { time: number; path: string }): RadarFrame => ({
-    time: entry.time,
-    tileUrl: `${host}${entry.path}/256/{z}/{x}/{y}/2/1_1.png`,
-  });
+  const toFrame = (nowcast: boolean) =>
+    (entry: { time: number; path: string }): RadarFrame => ({
+      time: entry.time,
+      tileUrl: `${host}${entry.path}/256/{z}/{x}/{y}/2/1_1.png`,
+      nowcast,
+    });
 
-  return [...pastFrames.map(toFrame), ...nowcastFrames.map(toFrame)];
-}
-
-/**
- * Returns the tile URL for the most recent past radar frame, or null
- * if the API is unavailable.
- */
-export async function getLatestRadarTileUrl(): Promise<string | null> {
-  const frames = await getRadarFrames();
-  if (frames.length === 0) return null;
-
-  // Find the last past frame (before any nowcast frames)
-  // Past frames come first in the array from getRadarFrames
-  const now = Math.floor(Date.now() / 1000);
-  const pastFrames = frames.filter((f) => f.time <= now);
-
-  if (pastFrames.length === 0) return null;
-  return pastFrames[pastFrames.length - 1].tileUrl;
+  return [...pastFrames.map(toFrame(false)), ...nowcastFrames.map(toFrame(true))];
 }

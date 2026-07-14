@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getAllResorts } from "@/lib/supabase";
-import { getLatestRadarTileUrl } from "@/lib/weather-radar";
+import { getRadarFrames } from "@/lib/weather-radar";
 import { isOffSeason } from "@/lib/map-utils";
 import { FullPageMap } from "./FullPageMap";
 
@@ -20,9 +20,9 @@ export const metadata: Metadata = {
 };
 
 export default async function MapPage() {
-  const [resorts, radarTileUrl] = await Promise.all([
+  const [resorts, radarFrames] = await Promise.all([
     getAllResorts().catch(() => []),
-    getLatestRadarTileUrl().catch(() => null),
+    getRadarFrames().catch(() => []),
   ]);
 
   const now = new Date();
@@ -54,7 +54,7 @@ export default async function MapPage() {
           })}
         </ul>
       </nav>
-      <FullPageMap resorts={resorts} radarTileUrl={radarTileUrl} />
+      <FullPageMap resorts={resorts} radarFrames={radarFrames} />
     </main>
   );
 }

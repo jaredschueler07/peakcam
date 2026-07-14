@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { getAllResorts } from "@/lib/supabase";
-import { getLatestRadarTileUrl } from "@/lib/weather-radar";
+import { getRadarFrames } from "@/lib/weather-radar";
 import { BrowsePage } from "@/components/browse/BrowsePage";
 import { PeakHero } from "@/components/home/PeakHero";
 import { PowderTicker } from "@/components/home/PowderTicker";
@@ -48,14 +48,14 @@ export const metadata = {
 };
 
 export default async function Home() {
-  // Fetch resorts and the radar tile in parallel — radar is best-effort so a
+  // Fetch resorts and the radar frames in parallel — radar is best-effort so a
   // RainViewer outage never blocks the page (or the sidebar map's radar layer).
-  const [resorts, radarTileUrl] = await Promise.all([
+  const [resorts, radarFrames] = await Promise.all([
     getAllResorts().catch(() => {
       console.warn("[PeakCam] Could not fetch resorts. Check .env.local.");
       return [] as ResortWithData[];
     }),
-    getLatestRadarTileUrl().catch(() => null),
+    getRadarFrames().catch(() => []),
   ]);
 
   // Build powder alerts for ticker — resorts with 8"+ fresh snow
@@ -94,7 +94,7 @@ export default async function Home() {
           <SnowCams snowCams={snowCams} />
         </Suspense>
       )}
-      <BrowsePage resorts={resorts} radarTileUrl={radarTileUrl} />
+      <BrowsePage resorts={resorts} radarFrames={radarFrames} />
       <Suspense fallback={<div className="h-96 animate-pulse bg-surface rounded-lg" />}>
         <LiveWebcams cams={featuredCams} resortCount={resorts.length} />
       </Suspense>

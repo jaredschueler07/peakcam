@@ -11,6 +11,7 @@ import { PowderAlertSignup } from "@/components/alerts/PowderAlertSignup";
 import { useFavorites } from "@/lib/useFavorites";
 import { AuthModal } from "@/components/auth/AuthModal";
 import type { ResortWithData } from "@/lib/types";
+import type { RadarFrame } from "@/lib/weather-radar";
 import { isOffSeason } from "@/lib/map-utils";
 import { trackSearch, trackFilter } from "@/lib/posthog";
 
@@ -28,8 +29,8 @@ const MapView = dynamic(() => import("@/components/map/MapView"), {
 
 interface Props {
   resorts: ResortWithData[];
-  /** RainViewer tile URL for the sidebar map's radar layer (best-effort). */
-  radarTileUrl?: string | null;
+  /** RainViewer radar frames for the sidebar map's radar loop (best-effort). */
+  radarFrames?: RadarFrame[];
 }
 
 type StateFilter = string;
@@ -309,7 +310,7 @@ function SouthernSeasonBanner({
 
 // ── Main BrowsePage ──────────────────────────────────────────────────────────
 
-export function BrowsePage({ resorts, radarTileUrl = null }: Props) {
+export function BrowsePage({ resorts, radarFrames = [] }: Props) {
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState<StateFilter>("All");
   const [condFilter, setCondFilter] = useState<ConditionFilter>("all");
@@ -653,7 +654,7 @@ export function BrowsePage({ resorts, radarTileUrl = null }: Props) {
                 hoveredSlug={hoveredSlug}
                 onResortHover={setHoveredSlug}
                 onViewResort={(slug) => { window.location.href = `/resorts/${slug}`; }}
-                radarTileUrl={radarTileUrl}
+                radarFrames={radarFrames}
                 variant="sidebar"
               />
             </div>

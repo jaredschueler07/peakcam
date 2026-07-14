@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import MapBottomSheet from "@/components/map/MapBottomSheet";
+import type { RadarFrame } from "@/lib/weather-radar";
 import type { ResortWithData } from "@/lib/types";
 
 // MapLibre needs window — dynamic import with no SSR
@@ -22,10 +23,10 @@ const MapView = dynamic(
 
 interface Props {
   resorts: ResortWithData[];
-  radarTileUrl: string | null;
+  radarFrames: RadarFrame[];
 }
 
-export function FullPageMap({ resorts, radarTileUrl }: Props) {
+export function FullPageMap({ resorts, radarFrames }: Props) {
   const router = useRouter();
   const [selectedResort, setSelectedResort] = useState<ResortWithData | null>(null);
 
@@ -71,7 +72,7 @@ export function FullPageMap({ resorts, radarTileUrl }: Props) {
         resorts={resorts}
         onResortSelect={handleResortSelect}
         onViewResort={handleViewResort}
-        radarTileUrl={radarTileUrl}
+        radarFrames={radarFrames}
         variant="fullpage"
       />
 

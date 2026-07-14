@@ -6,12 +6,24 @@ import WeatherIcon from "@/components/weather/WeatherIcon";
 
 const METRICS: MapMetric[] = ["baseDepth", "snow24h", "conditions"];
 
+interface RadarScrubber {
+  count: number;
+  index: number;
+  playing: boolean;
+  /** Relative time of the active frame, e.g. "-40m" / "Now" / "+10m". */
+  label: string;
+  onScrub: (index: number) => void;
+  onTogglePlay: () => void;
+}
+
 interface MapControlsProps {
   metric: MapMetric;
   onMetricChange: (metric: MapMetric) => void;
   showRadar: boolean;
   onToggleRadar: () => void;
   radarAvailable: boolean;
+  /** Present while radar is on with 2+ frames — renders the loop control. */
+  radarScrubber?: RadarScrubber | null;
   inSeasonOnly: boolean;
   onToggleInSeason: () => void;
   variant: "sidebar" | "fullpage";
@@ -25,6 +37,7 @@ export default function MapControls({
   showRadar,
   onToggleRadar,
   radarAvailable,
+  radarScrubber = null,
   inSeasonOnly,
   onToggleInSeason,
   variant,
@@ -67,6 +80,32 @@ export default function MapControls({
           <WeatherIcon condition={showRadar ? "rain" : "cloudy"} size={14} />
           Radar {showRadar ? "on" : "off"}
         </button>
+      )}
+
+      {/* Radar loop scrubber — play/pause + frame slider + relative time */}
+      {radarScrubber && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp-sm">
+          <button
+            onClick={radarScrubber.onTogglePlay}
+            aria-label={radarScrubber.playing ? "Pause radar loop" : "Play radar loop"}
+            className="text-ink hover:text-alpen transition-colors leading-none text-[13px]"
+          >
+            {radarScrubber.playing ? "❚❚" : "▶"}
+          </button>
+          <input
+            type="range"
+            min={0}
+            max={radarScrubber.count - 1}
+            step={1}
+            value={radarScrubber.index}
+            onChange={(e) => radarScrubber.onScrub(Number(e.target.value))}
+            aria-label="Radar frame time"
+            className="w-20 accent-alpen"
+          />
+          <span className="font-mono font-bold text-[10.5px] text-ink uppercase tracking-[0.08em] tabular-nums w-9 text-right">
+            {radarScrubber.label}
+          </span>
+        </div>
       )}
 
       {/* In-season-only toggle — hides off-season (summer) resorts */}

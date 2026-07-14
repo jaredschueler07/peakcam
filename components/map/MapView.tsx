@@ -16,6 +16,7 @@ import Map, {
 } from "react-map-gl/maplibre";
 import maplibregl from "maplibre-gl";
 import type { ResortWithData } from "@/lib/types";
+import type { RadarFrame } from "@/lib/weather-radar";
 import type { MapMetric } from "@/lib/map-utils";
 import {
   resortsToGeoJSON,
@@ -88,8 +89,8 @@ interface MapViewProps {
   onViewResort?: (slug: string) => void;
   /** "sidebar" for browse page, "fullpage" for /map route */
   variant?: "sidebar" | "fullpage";
-  /** Radar tile URL fetched server-side */
-  radarTileUrl?: string | null;
+  /** Radar frames (past + nowcast, oldest first) fetched server-side */
+  radarFrames?: RadarFrame[];
   className?: string;
 }
 
@@ -102,7 +103,7 @@ export default function MapView({
   onResortSelect,
   onViewResort,
   variant = "sidebar",
-  radarTileUrl = null,
+  radarFrames = [],
   className = "",
 }: MapViewProps) {
   const mapRef = useRef<MapRef>(null);
@@ -117,6 +118,47 @@ export default function MapView({
   const [metric, setMetric] = useState<MapMetric>("baseDepth");
   const [showRadar, setShowRadar] = useState(false);
   const [inSeasonOnly, setInSeasonOnly] = useState(false);
+
+  // ── Radar loop state ─────────────────────────────────────────────
+  // Frames are past + nowcast, oldest first. Default to the "now" frame — the
+  // newest observed (non-nowcast) frame; playback loops through the whole set.
+  // No autoplay — the user explicitly presses play. All time math is relative
+  // to the "now" frame's own timestamp (pure — no Date.now() during render).
+  const nowFrameIdx = useMemo(() => {
+    let idx = 0;
+    for (let i = 0; i < radarFrames.length; i++) {
+      if (!radarFrames[i].nowcast) idx = i;
+    }
+    return idx;
+  }, [radarFrames]);
+  const [radarIdx, setRadarIdx] = useState(nowFrameIdx);
+  const [radarPlaying, setRadarPlaying] = useState(false);
+  // Reset to the "now" frame if the frame set itself changes (adjust-during-
+  // render pattern — https://react.dev/learn/you-might-not-need-an-effect).
+  const [prevNowIdx, setPrevNowIdx] = useState(nowFrameIdx);
+  if (prevNowIdx !== nowFrameIdx) {
+    setPrevNowIdx(nowFrameIdx);
+    setRadarIdx(nowFrameIdx);
+  }
+
+  useEffect(() => {
+    if (!radarPlaying || !showRadar || radarFrames.length < 2) return;
+    const t = setInterval(
+      () => setRadarIdx((i) => (i + 1) % radarFrames.length),
+      600,
+    );
+    return () => clearInterval(t);
+  }, [radarPlaying, showRadar, radarFrames.length]);
+
+  // "-40m" / "Now" / "+10m" label — active frame relative to the "now" frame.
+  const radarLabel = useMemo(() => {
+    const frame = radarFrames[radarIdx];
+    const nowFrame = radarFrames[nowFrameIdx];
+    if (!frame || !nowFrame) return "";
+    const diffMin = Math.round((frame.time - nowFrame.time) / 60);
+    if (diffMin === 0) return "Now";
+    return diffMin < 0 ? `${diffMin}m` : `+${diffMin}m`;
+  }, [radarFrames, radarIdx, nowFrameIdx]);
   const [cursor, setCursor] = useState<string>("grab");
 
   // The in-map popup card is a desktop affordance; on smaller screens the
@@ -616,8 +658,12 @@ export default function MapView({
         {/* Weather radar overlay — inserted BELOW the resort markers
             (beforeId) so condition dots stay the figure and radar is the
             background context, per standard weather-map layering. */}
-        {showRadar && radarTileUrl && (
-          <MapWeatherOverlay tileUrl={radarTileUrl} beforeId="clusters" />
+        {showRadar && radarFrames.length > 0 && (
+          <MapWeatherOverlay
+            frames={radarFrames}
+            activeIndex={radarIdx}
+            beforeId="clusters"
+          />
         )}
 
         {/* Selected resort popup — desktop only (mobile gets the parent's
@@ -647,8 +693,26 @@ export default function MapView({
         metric={metric}
         onMetricChange={setMetric}
         showRadar={showRadar}
-        onToggleRadar={() => setShowRadar((v) => !v)}
-        radarAvailable={!!radarTileUrl}
+        onToggleRadar={() => {
+          setShowRadar((v) => !v);
+          setRadarPlaying(false);
+        }}
+        radarAvailable={radarFrames.length > 0}
+        radarScrubber={
+          showRadar && radarFrames.length > 1
+            ? {
+                count: radarFrames.length,
+                index: radarIdx,
+                playing: radarPlaying,
+                label: radarLabel,
+                onScrub: (i) => {
+                  setRadarPlaying(false);
+                  setRadarIdx(i);
+                },
+                onTogglePlay: () => setRadarPlaying((v) => !v),
+              }
+            : null
+        }
         inSeasonOnly={inSeasonOnly}
         onToggleInSeason={() => setInSeasonOnly((v) => !v)}
         variant={variant}
