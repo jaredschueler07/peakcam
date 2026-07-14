@@ -112,8 +112,12 @@ export default function MapPopupCard({ resort, onViewResort }: MapPopupCardProps
         </div>
       </div>
 
-      {/* Live cam glance — conditions + map + webcam in one view */}
+      {/* Live cam glance — conditions + map + webcam in one view.
+          key: full remount on resort switch — resets the internal `failed`
+          state (a broken cam on resort A must not suppress resort B's
+          preview) and re-busts the snapshot cache. */}
       <MapCamPreview
+        key={resort.id}
         cams={resort.cams}
         resortName={resort.name}
         onClick={() => (onViewResort ? onViewResort(resort.slug) : (window.location.href = resortHref))}

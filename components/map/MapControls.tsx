@@ -1,5 +1,6 @@
 "use client";
 
+import { Play, Pause } from "lucide-react";
 import type { MapMetric } from "@/lib/map-utils";
 import { metricLabel } from "@/lib/map-utils";
 import WeatherIcon from "@/components/weather/WeatherIcon";
@@ -85,12 +86,17 @@ export default function MapControls({
       {/* Radar loop scrubber — play/pause + frame slider + relative time */}
       {radarScrubber && (
         <div className="flex items-center gap-2 px-3 py-1.5 bg-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp-sm">
+          {/* min 24px hit area (WCAG 2.5.8) — the icon alone is too small a target */}
           <button
             onClick={radarScrubber.onTogglePlay}
             aria-label={radarScrubber.playing ? "Pause radar loop" : "Play radar loop"}
-            className="text-ink hover:text-alpen transition-colors leading-none text-[13px]"
+            className="flex min-h-[24px] min-w-[24px] items-center justify-center -my-1 text-ink hover:text-alpen transition-colors"
           >
-            {radarScrubber.playing ? "❚❚" : "▶"}
+            {radarScrubber.playing ? (
+              <Pause size={14} strokeWidth={2.5} fill="currentColor" />
+            ) : (
+              <Play size={14} strokeWidth={2.5} fill="currentColor" />
+            )}
           </button>
           <input
             type="range"
@@ -100,7 +106,7 @@ export default function MapControls({
             value={radarScrubber.index}
             onChange={(e) => radarScrubber.onScrub(Number(e.target.value))}
             aria-label="Radar frame time"
-            className="w-20 accent-alpen"
+            className="pc-range w-20"
           />
           <span className="font-mono font-bold text-[10.5px] text-ink uppercase tracking-[0.08em] tabular-nums w-9 text-right">
             {radarScrubber.label}

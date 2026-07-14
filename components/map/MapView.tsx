@@ -679,7 +679,10 @@ export default function MapView({
             onClose={handlePopupClose}
             closeButton={true}
             closeOnClick={false}
-            anchor="bottom"
+            /* No fixed anchor: a fixed "bottom" disables MapLibre's collision
+               repositioning, so the (now-taller) card clipped at the container
+               top for northern markers. Auto-anchor flips it below when there
+               is no room above. */
             offset={16}
             maxWidth="320px"
             className="peakcam-maplibre-popup"

@@ -94,8 +94,9 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite }: Props)
   const outlook = snow?.outlook as SnowOutlook | null;
   // Off-season (display heuristic, matches the map): the rating engine's
   // "poor" is meaningless in the local summer — show a neutral chip instead,
-  // and suppress the snowing badge.
-  const offSeason = isOffSeason(resort.lat, new Date());
+  // and suppress the snowing badge. Lazy-initialized so the impure new Date()
+  // runs once per mount, not on every hover-triggered grid re-render.
+  const [offSeason] = useState(() => isOffSeason(resort.lat, new Date()));
   const isSnowing = (snow?.snowing_now ?? false) && !offSeason;
 
   return (
@@ -194,9 +195,10 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite }: Props)
             <div className="flex items-center justify-between pt-1">
               <div className="flex items-center gap-2">
                 {offSeason ? (
+                  /* border matches MapPopupCard/MapBottomSheet's off-season chip */
                   <span
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
-                      border border-bark-dk font-bold text-[11.5px] tracking-[0.08em] uppercase text-ink"
+                      border-[1.5px] border-ink font-bold text-[11.5px] tracking-[0.08em] uppercase text-ink"
                     style={{ backgroundColor: OFF_SEASON_COLOR }}
                   >
                     Off-season

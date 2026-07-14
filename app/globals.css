@@ -163,8 +163,24 @@ body {
   padding: 16px !important;
   color: var(--pc-ink) !important;
 }
+/* Tip color per anchor direction — the popup auto-anchors (flips below the
+   marker when there's no room above), so every tip orientation needs cream. */
 .peakcam-maplibre-popup .maplibregl-popup-tip {
   border-top-color: var(--pc-cream-50) !important;
+}
+.peakcam-maplibre-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.peakcam-maplibre-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.peakcam-maplibre-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+  border-top-color: transparent !important;
+  border-bottom-color: var(--pc-cream-50) !important;
+}
+.peakcam-maplibre-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-top-color: transparent !important;
+  border-right-color: var(--pc-cream-50) !important;
+}
+.peakcam-maplibre-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-top-color: transparent !important;
+  border-left-color: var(--pc-cream-50) !important;
 }
 .peakcam-maplibre-popup .maplibregl-popup-close-button {
   color: var(--pc-bark) !important;
@@ -202,6 +218,40 @@ body {
 }
 .maplibregl-ctrl-attrib a {
   color: var(--pc-bark-dk) !important;
+}
+
+/* ── Radar scrubber slider (poster-styled range input) ── */
+.pc-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--pc-bark);
+  opacity: 0.55;
+  outline-offset: 3px;
+}
+.pc-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--pc-alpen);
+  border: 1.5px solid var(--pc-ink);
+  cursor: pointer;
+}
+.pc-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--pc-alpen);
+  border: 1.5px solid var(--pc-ink);
+  cursor: pointer;
+}
+.pc-range::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--pc-bark);
 }
 
 /* ── MapLibre cooperative-gesture overlay (poster paper) ──
