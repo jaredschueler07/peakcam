@@ -1,7 +1,30 @@
 // ─────────────────────────────────────────────────────────────
-// PeakCam — Weather Radar (RainViewer API)
-// Free precipitation radar tile URLs. No API key required.
+// PeakCam — Weather overlays
+// Radar: RainViewer (free, no key). Covers NA + Argentina (14
+//   SINARAME radars) — but NOT Chile (no Chilean network exists
+//   in any radar aggregator).
+// Satellite: NASA GIBS GOES-East ABI GeoColor (free, no key,
+//   CORS *). Full-disk Americas incl. the whole Andes — the
+//   storm-watching answer where radar doesn't exist. 10-min
+//   cadence; the literal "default" time segment resolves server-
+//   side to the newest frame (verified ~5–25 min latency), so no
+//   timestamp bookkeeping is needed.
 // ─────────────────────────────────────────────────────────────
+
+/**
+ * GOES-East GeoColor XYZ template for a MapLibre raster source. GIBS's REST
+ * layout is {z}/{row}/{col}, i.e. {z}/{y}/{x} — MapLibre substitutes the
+ * placeholders by name, order doesn't matter. Tiles outside the GOES-East
+ * disk (far Pacific/Asia) 404 and simply don't render.
+ */
+export const SATELLITE_TILE_URL =
+  "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-East_ABI_GeoColor/default/default/GoogleMapsCompatible_Level7/{z}/{y}/{x}.png";
+
+/** The layer's TileMatrixSet tops out at level 7 — MapLibre overzooms past it. */
+export const SATELLITE_MAX_ZOOM = 7;
+
+export const SATELLITE_ATTRIBUTION =
+  'Satellite: <a href="https://earthdata.nasa.gov/gibs">NASA EOSDIS GIBS</a>';
 
 export interface RadarFrame {
   time: number;

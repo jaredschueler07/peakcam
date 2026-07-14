@@ -7,6 +7,9 @@ import WeatherIcon from "@/components/weather/WeatherIcon";
 
 const METRICS: MapMetric[] = ["baseDepth", "snow24h", "conditions"];
 
+/** Weather overlay selection — radar (precipitation) or satellite (clouds). */
+export type WeatherLayer = "off" | "radar" | "satellite";
+
 interface RadarScrubber {
   count: number;
   index: number;
@@ -20,8 +23,8 @@ interface RadarScrubber {
 interface MapControlsProps {
   metric: MapMetric;
   onMetricChange: (metric: MapMetric) => void;
-  showRadar: boolean;
-  onToggleRadar: () => void;
+  weatherLayer: WeatherLayer;
+  onWeatherLayerChange: (layer: WeatherLayer) => void;
   radarAvailable: boolean;
   /** Present while radar is on with 2+ frames — renders the loop control. */
   radarScrubber?: RadarScrubber | null;
@@ -35,8 +38,8 @@ interface MapControlsProps {
 export default function MapControls({
   metric,
   onMetricChange,
-  showRadar,
-  onToggleRadar,
+  weatherLayer,
+  onWeatherLayerChange,
   radarAvailable,
   radarScrubber = null,
   inSeasonOnly,
@@ -68,20 +71,40 @@ export default function MapControls({
         })}
       </div>
 
-      {/* Radar toggle */}
-      {radarAvailable && (
+      {/* Weather layer selector — radar (precipitation echo) or satellite
+          (GOES-East clouds). Mutually exclusive; tapping the active one turns
+          it off. Radar has no coverage in Chile — satellite is the Andes
+          storm-watching answer, hence both options side by side. */}
+      <div className="flex gap-1.5">
+        {radarAvailable && (
+          <button
+            onClick={() => onWeatherLayerChange(weatherLayer === "radar" ? "off" : "radar")}
+            aria-pressed={weatherLayer === "radar"}
+            title="Precipitation radar (RainViewer) — no radar coverage in Chile; use Satellite there"
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border-[1.5px] text-[11.5px] font-bold uppercase tracking-[0.06em] transition-[transform,box-shadow] duration-100 ${
+              weatherLayer === "radar"
+                ? "bg-alpen text-cream-50 border-ink shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]"
+                : "bg-cream-50 text-ink border-ink shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]"
+            }`}
+          >
+            <WeatherIcon condition="rain" size={14} />
+            Radar
+          </button>
+        )}
         <button
-          onClick={onToggleRadar}
+          onClick={() => onWeatherLayerChange(weatherLayer === "satellite" ? "off" : "satellite")}
+          aria-pressed={weatherLayer === "satellite"}
+          title="GOES-East satellite (NASA GIBS) — clouds over the whole Americas, updated every 10 min"
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border-[1.5px] text-[11.5px] font-bold uppercase tracking-[0.06em] transition-[transform,box-shadow] duration-100 ${
-            showRadar
+            weatherLayer === "satellite"
               ? "bg-alpen text-cream-50 border-ink shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]"
               : "bg-cream-50 text-ink border-ink shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]"
           }`}
         >
-          <WeatherIcon condition={showRadar ? "rain" : "cloudy"} size={14} />
-          Radar {showRadar ? "on" : "off"}
+          <WeatherIcon condition="partly-cloudy" size={14} />
+          Sat
         </button>
-      )}
+      </div>
 
       {/* Radar loop scrubber — play/pause + frame slider + relative time */}
       {radarScrubber && (

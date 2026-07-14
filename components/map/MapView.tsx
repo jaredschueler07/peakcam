@@ -17,7 +17,13 @@ import Map, {
 import maplibregl from "maplibre-gl";
 import type { ResortWithData } from "@/lib/types";
 import type { RadarFrame } from "@/lib/weather-radar";
+import {
+  SATELLITE_TILE_URL,
+  SATELLITE_MAX_ZOOM,
+  SATELLITE_ATTRIBUTION,
+} from "@/lib/weather-radar";
 import type { MapMetric } from "@/lib/map-utils";
+import type { WeatherLayer } from "./MapControls";
 import {
   resortsToGeoJSON,
   resortBounds,
@@ -120,7 +126,9 @@ export default function MapView({
   });
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [metric, setMetric] = useState<MapMetric>("baseDepth");
-  const [showRadar, setShowRadar] = useState(false);
+  // Weather overlay: precipitation radar (RainViewer — no coverage in Chile)
+  // or GOES-East satellite (NASA GIBS — whole Americas incl. the Andes).
+  const [weatherLayer, setWeatherLayer] = useState<WeatherLayer>("off");
   const [inSeasonOnly, setInSeasonOnly] = useState(false);
 
   // ── Radar loop state ─────────────────────────────────────────────
@@ -146,13 +154,13 @@ export default function MapView({
   }
 
   useEffect(() => {
-    if (!radarPlaying || !showRadar || radarFrames.length < 2) return;
+    if (!radarPlaying || weatherLayer !== "radar" || radarFrames.length < 2) return;
     const t = setInterval(
       () => setRadarIdx((i) => (i + 1) % radarFrames.length),
       600,
     );
     return () => clearInterval(t);
-  }, [radarPlaying, showRadar, radarFrames.length]);
+  }, [radarPlaying, weatherLayer, radarFrames.length]);
 
   // "-40m" / "Now" / "+10m" label — active frame relative to the "now" frame.
   const radarLabel = useMemo(() => {
@@ -662,12 +670,33 @@ export default function MapView({
         {/* Weather radar overlay — inserted BELOW the resort markers
             (beforeId) so condition dots stay the figure and radar is the
             background context, per standard weather-map layering. */}
-        {showRadar && radarFrames.length > 0 && (
+        {weatherLayer === "radar" && radarFrames.length > 0 && (
           <MapWeatherOverlay
             frames={radarFrames}
             activeIndex={radarIdx}
             beforeId="clusters"
           />
+        )}
+
+        {/* GOES-East satellite (NASA GIBS, "default" = newest 10-min frame).
+            Full imagery, so a bit more opaque than radar; still below the
+            condition markers. Tiles outside the GOES-East disk 404 → skipped. */}
+        {weatherLayer === "satellite" && (
+          <Source
+            id="satellite-goes"
+            type="raster"
+            tiles={[SATELLITE_TILE_URL]}
+            tileSize={256}
+            maxzoom={SATELLITE_MAX_ZOOM}
+            attribution={SATELLITE_ATTRIBUTION}
+          >
+            <Layer
+              id="satellite-goes-layer"
+              type="raster"
+              beforeId="clusters"
+              paint={{ "raster-opacity": 0.7, "raster-fade-duration": 300 }}
+            />
+          </Source>
         )}
 
         {/* Selected resort popup — desktop only (mobile gets the parent's
@@ -699,14 +728,14 @@ export default function MapView({
       <MapControls
         metric={metric}
         onMetricChange={setMetric}
-        showRadar={showRadar}
-        onToggleRadar={() => {
-          setShowRadar((v) => !v);
+        weatherLayer={weatherLayer}
+        onWeatherLayerChange={(layer) => {
+          setWeatherLayer(layer);
           setRadarPlaying(false);
         }}
         radarAvailable={radarFrames.length > 0}
         radarScrubber={
-          showRadar && radarFrames.length > 1
+          weatherLayer === "radar" && radarFrames.length > 1
             ? {
                 count: radarFrames.length,
                 index: radarIdx,
