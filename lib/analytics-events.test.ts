@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { EVENTS } from "./analytics-events";
 
-test("EVENTS has the 9 required event names", () => {
+test("EVENTS has the required product event names", () => {
   assert.deepStrictEqual(EVENTS, {
     BROWSE_OPENED: "browse_opened",
     RESORT_VIEWED: "resort_viewed",
@@ -13,5 +13,7 @@ test("EVENTS has the 9 required event names", () => {
     FAVORITE_ADDED: "favorite_added",
     FAVORITE_REMOVED: "favorite_removed",
     CONDITION_VOTED: "condition_voted",
+    DROP_IN_OPENED: "drop_in_opened",
+    DROP_IN_STARTED: "drop_in_started",
   });
 });

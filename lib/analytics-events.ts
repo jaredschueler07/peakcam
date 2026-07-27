@@ -10,6 +10,8 @@ export const EVENTS = {
   FAVORITE_ADDED: "favorite_added",
   FAVORITE_REMOVED: "favorite_removed",
   CONDITION_VOTED: "condition_voted",
+  DROP_IN_OPENED: "drop_in_opened",
+  DROP_IN_STARTED: "drop_in_started",
 } as const;
 
 export type EventName = (typeof EVENTS)[keyof typeof EVENTS];
