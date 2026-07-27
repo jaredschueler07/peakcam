@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<!-- The hosting route is noindex, but that only covers the Next document. This
+     file is a static asset with its own URL, reachable via the iframe src, and
+     without a ?resort= param it renders nothing but an error line. -->
+<meta name="robots" content="noindex, nofollow">
 <title>Drop In — PeakCam</title>
 <style>
   :root{
@@ -87,9 +91,19 @@
     #ctrl, #fps, #mm{ display:none; }
     #touch-controls{
       position:fixed; left:0; right:0; bottom:max(14px,env(safe-area-inset-bottom));
-      z-index:24; display:flex; align-items:flex-end; justify-content:space-between;
+      z-index:24; display:flex; flex-direction:column; gap:10px;
       padding:0 12px; pointer-events:none;
     }
+    .touch-main{ display:flex; align-items:flex-end; justify-content:space-between; }
+    .touch-actions-row{ display:flex; justify-content:center; gap:8px; pointer-events:none; }
+    .touch-pill{
+      pointer-events:auto; touch-action:manipulation; -webkit-tap-highlight-color:transparent;
+      padding:8px 14px; min-height:34px; border:1px solid rgba(255,255,255,.28);
+      border-radius:999px; background:rgba(8,18,34,.52); color:#dceaff;
+      backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+      font:700 10px/1 system-ui,sans-serif; letter-spacing:.16em;
+    }
+    .touch-pill:active{ background:var(--accent); color:#081222; transform:translateY(1px); }
     .touch-cluster{ display:flex; align-items:flex-end; gap:9px; pointer-events:none; }
     .touch-cluster.actions{ flex-direction:column-reverse; align-items:flex-end; }
     .touch-row{ display:flex; gap:9px; }
@@ -104,6 +118,37 @@
     .touch-btn.word{ width:72px; font-size:10px; letter-spacing:.12em; }
     .touch-btn.jump{ width:82px; color:#081222; background:rgba(255,224,138,.88); border-color:#fff1bc; }
     .touch-btn.active{ transform:translateY(2px) scale(.96); background:var(--accent); color:#081222; }
+    /* Weather is the one binding with no touch equivalent — don't promise it. */
+    .kb-only{ display:none; }
+  }
+
+  /* Narrow phones. #tl and #tr are pinned to opposite edges and their min-content
+     widths sum past 390px, so they physically overlap on an iPhone 15 and below.
+     Shrink the type rather than stacking: speed and score have to stay glanceable
+     mid-run, and vertical space is what the touch controls need. */
+  @media (max-width:480px){
+    #tl{ left:10px; top:10px; padding:9px 11px 8px; min-width:0; }
+    #tr{ right:10px; top:10px; padding:9px 11px 8px; min-width:0; }
+    #speed{ font-size:31px; }
+    #speed small{ font-size:10px; margin-left:3px; }
+    #speedbar{ margin-top:6px; }
+    .row{ gap:9px; margin-top:7px; }
+    .stat{ min-width:0; }
+    .stat .v{ font-size:12px; }
+    .lbl{ font-size:8px; letter-spacing:.13em; }
+    #score{ font-size:23px; }
+    #combo{ font-size:10.5px; height:14px; }
+    #trail{ font-size:10px; margin-top:7px; gap:5px; }
+    #wx{ top:92px; right:10px; font-size:9px; padding:5px 9px; }
+  }
+
+  /* Vestibular safety. This is a full-screen first-person descent with randomized
+     camera shake — the most motion-intense surface on the site. The JS also reads
+     this query to damp shake and snowfall; the CSS half kills the chrome motion. */
+  @media (prefers-reduced-motion: reduce){
+    #cta{ animation:none !important; }
+    .pu.show{ animation-duration:.01ms !important; }
+    #speedbarf{ transition:none; }
   }
 
   #fps{ position:absolute; right:18px; bottom:16px; font-size:10.5px; letter-spacing:.12em; opacity:.5; }
@@ -124,6 +169,14 @@
   #crashmsg{ position:absolute; left:50%; top:47%; transform:translate(-50%,-50%); text-align:center; opacity:0; transition:opacity .2s; }
   #crashmsg .t{ font-size:40px; font-weight:800; letter-spacing:.18em; color:#ffd0d0; text-shadow:0 0 30px rgba(255,80,80,.5); }
   #crashmsg .s{ font-size:11.5px; letter-spacing:.3em; opacity:.7; margin-top:6px; }
+
+  /* Losing pointer lock halts the sim. It used to do so with no indication at
+     all — the scene simply stopped and the speed readout froze mid-run. */
+  #pausemsg{ position:absolute; left:50%; top:47%; transform:translate(-50%,-50%); text-align:center;
+    opacity:0; transition:opacity .18s; pointer-events:none; }
+  #pausemsg.show{ opacity:1; }
+  #pausemsg .t{ font-size:34px; font-weight:800; letter-spacing:.2em; color:#dceaff; text-shadow:0 0 30px rgba(120,190,255,.45); }
+  #pausemsg .s{ font-size:11px; letter-spacing:.26em; opacity:.72; margin-top:8px; }
 
   /* ---------- start screen ---------- */
   #start{
@@ -192,6 +245,7 @@
 
   <div id="pop"><div class="pu" id="pu"></div></div>
   <div id="crashmsg"><div class="t">WIPEOUT</div><div class="s">RECOVERING…</div></div>
+  <div id="pausemsg" role="status"><div class="t">PAUSED</div><div class="s">CLICK OR PRESS ENTER TO RESUME</div></div>
 
   <div id="ctrl" class="panel">
     <b>MOUSE</b>/<b>A D</b> carve <span>·</span> <b>W</b> tuck <span>·</span> <b>S</b> brake <span>·</span>
@@ -201,24 +255,33 @@
 </div>
 
 <div id="touch-controls" aria-label="Touch ski controls">
-  <div class="touch-cluster">
-    <button class="touch-btn" data-key="a" aria-label="Carve left">◀</button>
-    <button class="touch-btn" data-key="d" aria-label="Carve right">▶</button>
+  <!-- Discrete actions. These have no held-key equivalent, so they dispatch the
+       same functions the keyboard handler calls rather than setting keys[]. -->
+  <div class="touch-actions-row">
+    <button class="touch-pill" data-action="trail" aria-label="Switch trail">TRAIL</button>
+    <button class="touch-pill" data-action="lift" aria-label="Ride the summit lift">LIFT</button>
+    <button class="touch-pill" data-action="restart" aria-label="Restart the run">RESET</button>
   </div>
-  <div class="touch-cluster actions">
-    <button class="touch-btn jump word" data-key=" " aria-label="Jump">JUMP</button>
-    <div class="touch-row">
-      <button class="touch-btn word" data-key="s" aria-label="Brake">BRAKE</button>
-      <button class="touch-btn word" data-key="w" aria-label="Tuck">TUCK</button>
+  <div class="touch-main">
+    <div class="touch-cluster">
+      <button class="touch-btn" data-key="a" aria-label="Carve left">◀</button>
+      <button class="touch-btn" data-key="d" aria-label="Carve right">▶</button>
+    </div>
+    <div class="touch-cluster actions">
+      <button class="touch-btn jump word" data-key=" " aria-label="Jump">JUMP</button>
+      <div class="touch-row">
+        <button class="touch-btn word" data-key="s" aria-label="Brake">BRAKE</button>
+        <button class="touch-btn word" data-key="w" aria-label="Tuck">TUCK</button>
+      </div>
     </div>
   </div>
 </div>
 
-<div id="start">
+<div id="start" tabindex="0" role="button" aria-describedby="cta">
   <div id="startin">
     <div id="logo">DROP IN</div>
     <div id="tag">Procedural Big-Mountain Descent</div>
-    <div id="cta">CLICK TO DROP IN</div>
+    <div id="cta" role="status">CLICK OR PRESS ENTER TO DROP IN</div>
     <div id="keys">
       <div><b>MOUSE</b> / <b>A D</b> carve</div>
       <div><b>W</b> tuck</div>
@@ -227,7 +290,7 @@
       <div><b>T</b> switch trail</div>
       <div><b>G</b> ride summit lift</div>
       <div><b>R</b> restart</div>
-      <div><b>1–3 / L</b> weather</div>
+      <div class="kb-only"><b>1–3 / L</b> weather</div>
     </div>
   </div>
 </div>
@@ -424,16 +487,59 @@ document.documentElement.style.setProperty('--accent2', PROFILE.accent2);
     'linear-gradient(180deg,#0b1a33,#050a14)';
 }
 
+/* Tell the host the branded start screen is up, so it can drop its own loading
+   poster. The host cannot detect this itself: the frame is sandboxed without
+   allow-same-origin, so contentDocument is null to it, and relying on the
+   iframe's load event races hydration on a warm cache. */
+try {
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage({ type: 'peakcam:drop-in-ready', resort: RESORT_SLUG }, '*');
+  }
+} catch (e) { /* not framed */ }
+
+/* Vestibular safety: honoured by damping camera shake and snowfall below, and
+   by a matching CSS block that stills the chrome animations. */
+const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* The same query that sets `#mm { display:none }`, read from JS so the minimap
+   draw can be skipped outright instead of rendering 288x288 of invisible canvas
+   every frame on exactly the phones that can least afford it. */
+const compactHudMQ = window.matchMedia('(pointer:coarse), (max-width:820px)');
+
+/* The start affordance is bound BEFORE the engine module loads. The CTA is
+   visible and animating from first paint, so a click or Enter during the load
+   used to be silently dropped — the player tapped a live-looking button and
+   nothing happened. Now the intent is remembered and honoured on ready. */
+let engineReady = false;
+let startRequested = false;
+const startEl = document.getElementById('start');
+const ctaEl = document.getElementById('cta');
+const CTA_IDLE = 'CLICK OR PRESS ENTER TO DROP IN';
+
+function requestStart() {
+  if (startRequested || !startEl || startEl.classList.contains('hide')) return;
+  startRequested = true;
+  if (engineReady) beginGame();
+  else ctaEl.textContent = 'LOADING THE MOUNTAIN…';
+}
+startEl.addEventListener('click', requestStart);
+startEl.addEventListener('touchstart', (e) => { e.preventDefault(); requestStart(); }, { passive: false });
+startEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); requestStart(); }
+});
+startEl.focus({ preventScroll: true });
+
+/* Three.js is vendored beside this file (see scripts/sync-three.mjs). It used to
+   come from unpkg with a jsdelivr fallback: that put ~262KB of third-party code
+   on the critical path over mountain LTE, and — because the engine is served
+   same-origin from /public — gave whoever served it full access to peakcam.io.
+   Self-hosted, it is same-origin, cacheable, and covered by the deploy. */
 let THREE = null;
 try {
-  THREE = await import('https://unpkg.com/three@0.169.0/build/three.module.js');
+  THREE = await import('./three.module.js');
 } catch (e) {
-  try {
-    THREE = await import('https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js');
-  } catch (e2) {
-    fatal('Unable to load the Three.js r169 module from the CDN. Check the network connection and reload.');
-    throw e2;
-  }
+  fatal('Could not load the 3D engine. Reload the page to try again.');
+  throw e;
 }
 
 /* ----------------------------------------------------------------------------
@@ -490,7 +596,14 @@ function fbm(x, z, oct) {
 /* The fall-line budget: every large-scale term below is frequency-limited in z so
    that |dh/dz| from the noise can never exceed FALL — the mountain always descends. */
 const FALL = PROFILE.fall;                              // mean gradient: y drops as +z increases
-const ALT_BASE = Math.round(PROFILE.summitFt * 0.3048); // summit altitude in metres (cosmetic)
+/* Altimeter bounds, metres. `verticalFt` was declared on every profile and read
+   by nothing, so the readout was unbounded: the terrain streams forever, and a
+   Portillo run passed 0 m at roughly 3 minutes and then counted the player
+   below sea level in the Andes. The lift-served vertical now defines a real
+   base elevation and the readout clamps between the two. "Vertical" stays
+   cumulative — like every ski tracker, a day can total more than one lap. */
+const ALT_SUMMIT = Math.round(PROFILE.summitFt * 0.3048);
+const ALT_BASE = Math.round((PROFILE.summitFt - PROFILE.verticalFt) * 0.3048);
 const RELIEF = PROFILE.relief;                          // large-scale terrain amplitude scale
 
 /* The terrain seed becomes a domain offset into the shared value-noise field.
@@ -593,7 +706,18 @@ function terrainNormal(x, z, out) {
    2. RENDERER / SCENE / CAMERA
 ---------------------------------------------------------------------------- */
 const canvas = document.getElementById('gl');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+
+/* No WebGL, no game. This throws on blocklisted GPU drivers, older mobile
+   Safari, and browsers that have exhausted their ~16 live contexts across other
+   tabs — all of which used to leave the branded start screen sitting there
+   looking perfectly alive with nothing behind it. */
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+} catch (e) {
+  fatal('This browser could not start WebGL, so Drop In can’t run here. Try another browser, or close some tabs and reload.');
+  throw e;
+}
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.06;
@@ -1424,7 +1548,10 @@ function updateSpray(dt) {
 }
 
 /* --- snowfall --- */
-const SNOW_MAX = 3200, SNOW_BOX = 130;
+// Sized to the largest preset (Heavenly's Lake Whiteout, 3600). It was 3200,
+// so the three heaviest presets silently under-rendered while still burning
+// hundreds of NaN-producing loop iterations a frame against unallocated slots.
+const SNOW_MAX = 3600, SNOW_BOX = 130;
 const snowPos = new Float32Array(SNOW_MAX * 3);
 const snowAlpha = new Float32Array(SNOW_MAX);
 const snowSize = new Float32Array(SNOW_MAX);
@@ -1451,6 +1578,10 @@ snowPts.frustumCulled = false;
 scene.add(snowPts);
 
 function updateSnowfall(dt, t, cx, cy, cz, count) {
+  // Never iterate past the allocated slots, whatever a preset asks for; and cut
+  // the field right down when the player has asked for reduced motion.
+  count = Math.min(count | 0, SNOW_MAX);
+  if (REDUCED_MOTION) count = Math.min(count, 320);
   snowGeo.setDrawRange(0, count);
   const half = SNOW_BOX * 0.5;
   for (let i = 0; i < count; i++) {
@@ -1630,22 +1761,45 @@ function applyWeather(i) {
 const keys = Object.create(null);
 let mouseSteer = 0, hadLock = false;
 
+/* Discrete actions live in named functions so the keyboard handler and the touch
+   action pills drive exactly the same code. They used to exist only as inline
+   branches of the keydown handler, which is why phones — the primary way into
+   this feature — could carve and jump but never switch trail or ride the lift. */
+function actionSwitchTrail() {
+  if (!state.started || state.liftRide > 0) return;
+  state.selectedTrail = (state.selectedTrail + 1) % TRAILS.length;
+  resetRun();
+  popup(TRAILS[state.selectedTrail].name.toUpperCase(), TRAILS[state.selectedTrail].grade + ' DROP', TRAILS[state.selectedTrail].hex);
+}
+function actionRideLift() {
+  if (!state.started || state.liftRide > 0) return;
+  beginLiftRide();
+}
+function actionRestart() { resetRun(); }
+function actionWeather(i) {
+  applyWeather(i);
+  popup('WEATHER', WEATHER[wxIndex].name.toUpperCase(), '#9fd8ff');
+}
+
 addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
+  // Enter/Space before the run begins is a start, not a jump. The start overlay
+  // has its own handler; this covers focus sitting anywhere else in the frame.
+  if (!state.started && (k === 'enter' || k === ' ')) { e.preventDefault(); requestStart(); return; }
+  // Mid-run, Enter re-acquires the pointer lock the player released with Esc.
+  if (state.started && k === 'enter' && document.pointerLockElement !== canvas) {
+    e.preventDefault();
+    Sound.resume();
+    if (canvas.requestPointerLock) { try { canvas.requestPointerLock(); } catch (err) { /* ignore */ } }
+    return;
+  }
   keys[k] = true;
   if (k === ' ' || k === 'arrowup' || k === 'arrowdown' || k === 'arrowleft' || k === 'arrowright') e.preventDefault();
-  if (k === 'r') resetRun();
-  if (k === 't' && state.started && state.liftRide <= 0) {
-    state.selectedTrail = (state.selectedTrail + 1) % TRAILS.length;
-    resetRun();
-    popup(TRAILS[state.selectedTrail].name.toUpperCase(), TRAILS[state.selectedTrail].grade + ' DROP', TRAILS[state.selectedTrail].hex);
-  }
-  if (k === 'l') { applyWeather(wxIndex + 1); popup('WEATHER', WEATHER[wxIndex].name.toUpperCase(), '#9fd8ff'); }
-  if (k >= '1' && k <= '3') {
-    applyWeather(Number(k) - 1);
-    popup('WEATHER', WEATHER[wxIndex].name.toUpperCase(), '#9fd8ff');
-  }
-  if (k === 'g' && state.started && state.liftRide <= 0) beginLiftRide();
+  if (k === 'r') actionRestart();
+  if (k === 't') actionSwitchTrail();
+  if (k === 'l') actionWeather(wxIndex + 1);
+  if (k >= '1' && k <= '3') actionWeather(Number(k) - 1);
+  if (k === 'g') actionRideLift();
 }, { passive: false });
 addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -1669,6 +1823,13 @@ for (const button of document.querySelectorAll('#touch-controls [data-key]')) {
   button.addEventListener('lostpointercapture', release);
 }
 
+const TOUCH_ACTIONS = { trail: actionSwitchTrail, lift: actionRideLift, restart: actionRestart };
+for (const button of document.querySelectorAll('#touch-controls [data-action]')) {
+  const run = TOUCH_ACTIONS[button.dataset.action];
+  if (!run) continue;
+  button.addEventListener('click', (e) => { e.preventDefault(); run(); });
+}
+
 addEventListener('mousemove', (e) => {
   if (document.pointerLockElement === canvas) {
     mouseSteer += e.movementX * 0.0022;
@@ -1679,38 +1840,40 @@ document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement === canvas) hadLock = true;
 });
 
-const startEl = document.getElementById('start');
 let announcedStart = false;
-/** Tell the PeakCam host page the player actually dropped in. Same-origin only:
- *  the engine is served from the app's own origin, so anything else is a frame
- *  we did not put ourselves in and gets nothing. */
+/** Tell the PeakCam host page the player actually dropped in.
+ *
+ *  The host now sandboxes this frame without `allow-same-origin`, so our origin
+ *  is opaque ("null") and a targetOrigin of location.origin would never match
+ *  the parent — the message would be silently dropped. We send to '*' instead:
+ *  the payload is a slug and an event name, nothing sensitive, and the host
+ *  authenticates it by comparing event.source against the frame it mounted,
+ *  which is the check that actually matters. */
 function announceStart() {
   if (announcedStart) return;
   announcedStart = true;
   try {
     if (window.parent && window.parent !== window) {
-      window.parent.postMessage(
-        { type: 'peakcam:drop-in-started', resort: RESORT_SLUG },
-        location.origin
-      );
+      window.parent.postMessage({ type: 'peakcam:drop-in-started', resort: RESORT_SLUG }, '*');
     }
-  } catch (e) { /* host is gone or cross-origin — the game plays on regardless */ }
+  } catch (e) { /* host is gone — the game plays on regardless */ }
 }
 
 function beginGame() {
+  if (state.started) return;
   Sound.init();
   Sound.resume();
   startEl.classList.add('hide');
   state.started = true;
   announceStart();
+  // Pointer lock is an enhancement, not the control scheme: A/D and the touch
+  // buttons steer without it, so a refusal here is silent by design.
   if (canvas.requestPointerLock) {
     try { canvas.requestPointerLock(); } catch (e) { /* keyboard fallback */ }
   }
 }
-startEl.addEventListener('click', beginGame);
-startEl.addEventListener('touchstart', (e) => { e.preventDefault(); beginGame(); }, { passive: false });
 canvas.addEventListener('click', () => {
-  if (!state.started) { beginGame(); return; }
+  if (!state.started) { requestStart(); return; }
   Sound.resume();
   if (document.pointerLockElement !== canvas && canvas.requestPointerLock) {
     try { canvas.requestPointerLock(); } catch (e) { /* ignore */ }
@@ -1741,7 +1904,6 @@ const state = {
   jumpCharge: 0,
   selectedTrail: 0,
   liftRide: 0,
-  liftFrom: new THREE.Vector3(),
   liftFromZ: 0,
   liftToZ: 0,
   invuln: 0,
@@ -1749,8 +1911,12 @@ const state = {
   distance: 0
 };
 
-function resetRun() {
-  const z0 = 0;
+/** Respawn on the selected trail. `z0` defaults to the top of the mountain; the
+ *  lift passes its actual arrival point instead, because it animates you 1450m
+ *  up the hill and used to then dump you at z=0 regardless — for any ride
+ *  started below z=1450 the last 5.2s of chairlift was a lie about where you
+ *  ended up, and the world visibly jumped on the final frame. */
+function resetRun(z0 = 0) {
   const x0 = trailCenter(TRAILS[state.selectedTrail], z0);
   state.pos.set(x0, terrainHeight(x0, z0), z0);
   state.vel.set(0, 0, 15);
@@ -1777,7 +1943,6 @@ function resetRun() {
 function beginLiftRide() {
   if (state.crash > 0) return;
   state.liftRide = 5.2;
-  state.liftFrom.copy(state.pos);
   state.liftFromZ = state.pos.z;
   state.liftToZ = Math.max(0, state.pos.z - 1450);
   state.vel.set(0, 0, 0);
@@ -1805,7 +1970,7 @@ function physics(dt) {
     s.onGround = false;
     if (s.liftRide <= 0) {
       const best = Math.max(s.best, s.score);
-      resetRun();
+      resetRun(s.liftToZ);
       s.best = best;
     }
     return;
@@ -1861,6 +2026,18 @@ function physics(dt) {
     _tmp.sub(_tmp2);                                  // tangential accel
     s.vel.addScaledVector(_tmp, dt);
 
+    /* How much the heading actually points down the fall line: +1 straight
+       down, 0 across it, -1 straight up. The anti-stall assists below are
+       scaled by this. Unscaled they were applied along the heading with no
+       fall-line term, and since only gravity's *horizontal* projection opposes
+       them, they beat gravity outright on every profile — turn uphill and you
+       would accelerate to ~9-14 m/s and climb indefinitely, leaving the gates,
+       ramps and scoring behind. The 0.25 floor keeps an across-slope traverse
+       feeling alive without giving the uphill case anything. */
+    const fallLineMag = Math.hypot(_tmp.x, _tmp.z);
+    const fallLine = fallLineMag > 1e-4 ? (_fwd.x * _tmp.x + _fwd.z * _tmp.z) / fallLineMag : 1;
+    const assist = clamp01(fallLine * 1.5 + 0.25);
+
     // anisotropic (carving) friction: forward glides, lateral bites
     const vf = s.vel.dot(_fwd);
     const vr = s.vel.dot(_right);
@@ -1874,11 +2051,11 @@ function physics(dt) {
     let newVf = vf - drag * vf * dt - airDrag * dt;
     if (tuck) newVf += 6.2 * dt;                      // tuck boost, including standing starts
     if (!brake && newVf < 14) {
-      newVf += (14 - newVf) * 2.2 * dt;               // never strand the player in a shallow basin
+      newVf += (14 - newVf) * 2.2 * assist * dt;      // never strand the player in a shallow basin
     }
     if (brake) newVf -= 6.0 * dt * Math.sign(newVf);
     if (newVf < 0) newVf *= 0.5;                      // no real reverse
-    if (!brake && newVf < 5.0) newVf += 4.5 * dt;     // skate out of flats — never stuck
+    if (!brake && newVf < 5.0) newVf += 4.5 * assist * dt;  // skate out of flats — never stuck
 
     // recompose horizontally, then glue to the slope
     s.vel.x = _fwd.x * newVf + _right.x * newVr;
@@ -2174,7 +2351,7 @@ function updateSkier(dt, t) {
   camera.position.copy(camPos);
   camLook.copy(s.pos).addScaledVector(_fwd, 8).add(new THREE.Vector3(0, 1.6, 0));
   camera.lookAt(camLook);
-  const shake = s.crash > 0 ? s.crash * 0.06 : clamp01((flat - 34) / 40) * 0.012;
+  const shake = REDUCED_MOTION ? 0 : (s.crash > 0 ? s.crash * 0.06 : clamp01((flat - 34) / 40) * 0.012);
   if (shake > 0) {
     camera.position.x += (Math.random() - 0.5) * shake * 6;
     camera.position.y += (Math.random() - 0.5) * shake * 6;
@@ -2200,6 +2377,7 @@ const el = {
   fps: document.getElementById('fps'),
   pu: document.getElementById('pu')
 };
+const pauseMsgEl = document.getElementById('pausemsg');
 let puTimer = 0;
 function popup(main, sub, color) {
   el.pu.innerHTML = main + (sub ? '<span class="sub">' + sub + '</span>' : '');
@@ -2224,7 +2402,7 @@ function updateHUD(dt) {
   el.bar.style.width = clamp01(kmh / 190) * 100 + '%';
   el.time.textContent = fmtTime(s.time);
   el.vert.textContent = Math.max(0, Math.round(s.startY - s.pos.y)) + ' m';
-  el.alt.textContent = Math.round(ALT_BASE + s.pos.y) + ' m';
+  el.alt.textContent = clamp(Math.round(ALT_SUMMIT + s.pos.y), ALT_BASE, ALT_SUMMIT) + ' m';
   el.score.textContent = s.score.toLocaleString();
   el.combo.textContent = s.combo > 1 ? ('COMBO ×' + s.combo) : (s.best > 0 ? 'BEST ' + s.best.toLocaleString() : ' ');
   const nt = nearestTrail(s.pos.x, s.pos.z);
@@ -2357,6 +2535,10 @@ function frame(now) {
 
   const paused = !state.started || (hadLock && document.pointerLockElement !== canvas) || document.hidden;
 
+  // Say so. A frozen scene with a stuck speed readout and no message reads as a
+  // crashed game; the canvas click handler already restores the lock.
+  pauseMsgEl.classList.toggle('show', paused && state.started && !document.hidden);
+
   if (!paused) {
     simTime += dt;
     state.time += dt;
@@ -2412,10 +2594,21 @@ function frame(now) {
   sun.target.updateMatrixWorld();
 
   updateHUD(paused ? 0.05 : dt);
-  drawMinimap();
+  // #mm is display:none under the compact-HUD query, so drawing it there is
+  // ~1-2ms/frame of 2D canvas work plus a texture upload for zero visible
+  // pixels — enough to trip the resolution downscale on a mid-range phone.
+  if (!compactHudMQ.matches) drawMinimap();
 
   renderer.render(scene, camera);
 }
+
+/* Everything is constructed — the CTA is now backed by a real game. If the
+   player already clicked during load, honour it rather than making them click a
+   second time at a button that never told them it wasn't listening yet. */
+engineReady = true;
+if (startRequested) beginGame();
+else if (ctaEl) ctaEl.textContent = CTA_IDLE;
+
 requestAnimationFrame(frame);
 
 /* safety: recover from a lost WebGL context */

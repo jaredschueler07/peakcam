@@ -28,15 +28,36 @@ export default function DropInFrame({ profile, gameUrl }: DropInFrameProps) {
     track(EVENTS.DROP_IN_OPENED, { resort: profile.slug });
   }, [profile.slug]);
 
+  // Backstop. The engine announces itself (see the ready message below) and the
+  // iframe's own load event usually fires too — but the route is prerendered, so
+  // the frame starts loading at parse time and can finish before hydration
+  // attaches either handler. Never let the loading poster be the thing that
+  // makes a working game look broken.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setLoaded(true), 8000);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   useEffect(() => {
     function onMessage(event: MessageEvent) {
-      // Same-origin only, and only from the frame we mounted — the engine is
-      // served from our own origin, so anything else is not ours to trust.
-      if (event.origin !== window.location.origin) return;
-      if (frameRef.current && event.source !== frameRef.current.contentWindow) return;
+      // The frame is sandboxed without allow-same-origin, so its origin is the
+      // opaque "null" rather than ours. Identity therefore rests on the source
+      // check: this must be the exact window we mounted, not merely a frame
+      // claiming the right origin string.
+      if (event.origin !== "null" && event.origin !== window.location.origin) return;
+      if (!frameRef.current || event.source !== frameRef.current.contentWindow) return;
 
       const data = event.data as { type?: unknown; resort?: unknown } | null;
       if (!data || typeof data !== "object") return;
+
+      // The engine has painted its start screen — drop our poster.
+      if (data.type === "peakcam:drop-in-ready") {
+        setLoaded(true);
+        return;
+      }
+
+      // Only counted once the player actually clicks in; mounting just means
+      // somebody followed a link.
       if (data.type !== "peakcam:drop-in-started") return;
 
       track(EVENTS.DROP_IN_STARTED, {
@@ -98,11 +119,16 @@ export default function DropInFrame({ profile, gameUrl }: DropInFrameProps) {
         </div>
       )}
 
+      {/* `sandbox` deliberately omits allow-same-origin: the engine is served
+          from /public and would otherwise run with full first-party access to
+          peakcam.io — including the Supabase auth token, which is not httpOnly.
+          It needs no storage or cookies, so an opaque origin costs it nothing. */}
       <iframe
         ref={frameRef}
         src={gameUrl}
         title={`Drop In — ${profile.name} arcade ski descent`}
         onLoad={() => setLoaded(true)}
+        sandbox="allow-scripts allow-pointer-lock"
         allow="fullscreen; pointer-lock; autoplay"
         allowFullScreen
         className="h-full w-full border-0"

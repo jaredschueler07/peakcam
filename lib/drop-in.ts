@@ -39,7 +39,10 @@ export const DROP_IN_RESORT_SLUGS: readonly string[] = [
   "heavenly",
 ];
 
-const PROFILES: Record<string, DropInProfile> = {
+// Null-prototype: a plain literal resolves inherited members, so
+// getDropInProfile("constructor") returned the Object constructor and
+// generateMetadata then threw on profile.trailNames instead of 404ing.
+const PROFILES: Record<string, DropInProfile> = Object.assign(Object.create(null), {
   "ski-portillo": {
     slug: "ski-portillo",
     name: "Portillo",
@@ -91,7 +94,7 @@ const PROFILES: Record<string, DropInProfile> = {
       "Killebrew Canyon",
     ],
   },
-};
+});
 
 /** The profile for a pilot resort, or null for everything else. */
 export function getDropInProfile(slug: string): DropInProfile | null {
@@ -100,7 +103,7 @@ export function getDropInProfile(slug: string): DropInProfile | null {
 
 /** Whether a resort is part of the Drop In pilot. */
 export function isDropInResort(slug: string): boolean {
-  return Object.prototype.hasOwnProperty.call(PROFILES, slug);
+  return getDropInProfile(slug) !== null;
 }
 
 /**

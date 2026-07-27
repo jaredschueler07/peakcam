@@ -21,6 +21,8 @@ import { AuthModal } from "@/components/auth/AuthModal";
 import { trackResortView, trackCamClick } from "@/lib/posthog";
 import { trackViewContent } from "@/lib/meta-pixel-events";
 import { FavoriteButton } from "../ui/FavoriteButton";
+import { isDropInResort } from "@/lib/drop-in";
+import DropInLink from "@/components/drop-in/DropInLink";
 
 interface Props {
   resort: ResortWithData;
@@ -398,6 +400,15 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
 
       {/* ── Content ───────────────────────────────────────────── */}
       <div className="max-w-5xl mx-auto px-4 py-8 md:px-8 space-y-10">
+
+        {/* Drop In — pilot resorts only. The map cards were the only way in, so
+            the game's own "Back to conditions" landed you on a page with no way
+            to return to it. */}
+        {isDropInResort(resort.slug) && (
+          <section>
+            <DropInLink slug={resort.slug} variant="block" />
+          </section>
+        )}
 
         {/* ConditionsHero — big glanceable numbers */}
         {weather && weather.length > 0 ? (

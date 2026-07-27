@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "tsx --test lib/*.test.ts scripts/*.test.ts",
+    "drop-in:sync-three": "node scripts/sync-three.mjs",
     "import-resorts:standalone": "node scripts/import-resorts-standalone.mjs",
     "agents": "node agents/loop.mjs",
     "agents:dry-run": "node agents/loop.mjs --dry-run",
@@ -53,6 +55,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
+    "three": "0.169.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "typescript": "^5"

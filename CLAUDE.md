@@ -13,7 +13,8 @@ npm run dev              # Dev server (localhost:3000)
 npm run build            # Production build
 npm run lint             # ESLint (flat config, next/core-web-vitals + TS)
 npx tsc --noEmit         # Type check
-npx tsx --test lib/analytics-events.test.ts   # Run the only test (node:test); no npm test script exists
+npm test                 # node:test via tsx — lib/*.test.ts + scripts/*.test.ts
+npm run drop-in:sync-three   # Re-vendor public/drop-in/three.module.js after bumping `three`
 
 # Data & ops scripts (all load .env.local themselves, write via service-role key)
 npm run import-resorts:standalone  # Seed resorts/cams from data/*.csv (the maintained importer)
@@ -73,6 +74,12 @@ Known live-DB drift from the repo migrations (verify against prod before trustin
 ### Design system
 
 Retro ski-poster theme (cream paper / ink / forest / alpenglow; Fraunces display, DM Sans body, JetBrains Mono readouts; hard "stamp" shadows) defined in `tailwind.config.ts` + `app/globals.css` (`--pc-*` tokens, `.pc-paper`/`.pc-topo` utilities). Light theme only. `tailwind.config.ts` contains a **legacy alias layer** remapping old dark-theme token names (`bg`, `surface*`, `text-*`, even `cyan` → forest green) so un-migrated components still render. Still on legacy tokens: ResortDetailPage internals, SnowReportPage, FavoritesPage, AlertManagePage, ConditionVoter, UserConditionsForm, MapBottomSheet, weather icons (which hardcode dark-theme hex). Use the new `pc-*`/poster tokens for all new work; migrating a legacy component means replacing old class names, not extending the alias layer.
+
+### Drop In (`/resorts/[slug]/drop-in`)
+
+A self-contained arcade ski descent, live for three pilot resorts (`ski-portillo`, `breckenridge`, `heavenly`). Entry points: the map popup card, the mobile bottom sheet, and the resort detail page — all gated on `isDropInResort()`.
+
+`public/drop-in/engine.html` is the entire game in one file (markup, CSS, and an inline module) and imports a **vendored** `three.module.js` beside it. It is a bundler-free static asset, so it carries its own copy of every resort profile: **`RESORT_PROFILES` in the engine and `PROFILES` in `lib/drop-in.ts` must stay in sync by hand**, and `scripts/drop-in-engine.test.ts` fails the build if they drift. The host mounts it in an iframe sandboxed *without* `allow-same-origin` (`components/drop-in/DropInFrame.tsx`) — the engine therefore has an opaque origin, cannot touch app cookies, and announces itself over `postMessage` authenticated by `event.source`, not by origin. `proxy.ts` excludes `/drop-in/` so the static assets skip the Supabase session round-trip.
 
 ### Adjacent subsystems (same repo, not part of the web app)
 

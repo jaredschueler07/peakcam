@@ -16,7 +16,53 @@ export const EVENTS = {
 
 export type EventName = (typeof EVENTS)[keyof typeof EVENTS];
 
+/**
+ * PostHogProvider is mounted through `dynamic(..., { ssr: false })`, which makes
+ * it and the page subtree commit together — and React flushes child effects
+ * before parent ones. So any event captured from a mount effect on a cold page
+ * load fires before `posthog.init()` has run, and posthog-js discards it. That
+ * silently cost us every DROP_IN_OPENED, RESORT_VIEWED and BROWSE_OPENED on
+ * direct arrivals; only in-app navigations were being counted.
+ *
+ * Queue until the SDK is loaded, then drain in order. If init never happens
+ * (no key configured, blocked script), give up after a few seconds rather than
+ * holding the events forever.
+ */
+const pending: Array<[EventName, Record<string, unknown> | undefined]> = [];
+let draining = false;
+
+function isLoaded() {
+  return Boolean((posthog as unknown as { __loaded?: boolean }).__loaded);
+}
+
+function drain() {
+  if (draining) return;
+  draining = true;
+  let attempts = 0;
+  const tick = () => {
+    if (isLoaded()) {
+      draining = false;
+      for (const [event, properties] of pending.splice(0, pending.length)) {
+        posthog.capture(event, properties);
+      }
+      return;
+    }
+    if (++attempts > 40) {
+      draining = false;
+      pending.length = 0;
+      return;
+    }
+    setTimeout(tick, 100);
+  };
+  setTimeout(tick, 0);
+}
+
 export function track(event: EventName, properties?: Record<string, unknown>) {
   if (typeof window === "undefined") return;
+  if (!isLoaded()) {
+    pending.push([event, properties]);
+    drain();
+    return;
+  }
   posthog.capture(event, properties);
 }

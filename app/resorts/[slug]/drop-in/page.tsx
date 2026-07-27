@@ -64,5 +64,11 @@ export default async function DropInPage({
   // Anything outside the three-resort pilot is a 404, not a default mountain.
   if (!profile || !gameUrl) return notFound();
 
-  return <DropInFrame profile={profile} gameUrl={gameUrl} />;
+  // The layout's global skip link targets #main-content; every other route
+  // provides it, and without it "Skip to main content" lands on nothing.
+  return (
+    <main id="main-content">
+      <DropInFrame profile={profile} gameUrl={gameUrl} />
+    </main>
+  );
 }
