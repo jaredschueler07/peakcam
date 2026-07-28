@@ -40,11 +40,10 @@ export default function DropInFrame({ profile, gameUrl }: DropInFrameProps) {
 
   useEffect(() => {
     function onMessage(event: MessageEvent) {
-      // The frame is sandboxed without allow-same-origin, so its origin is the
-      // opaque "null" rather than ours. Identity therefore rests on the source
-      // check: this must be the exact window we mounted, not merely a frame
-      // claiming the right origin string.
-      if (event.origin !== "null" && event.origin !== window.location.origin) return;
+      // The engine posts with targetOrigin "*" (it can't know ours), so both
+      // checks matter: the origin must be ours, and the sender must be the
+      // exact window we mounted — not merely a frame claiming the right origin.
+      if (event.origin !== window.location.origin) return;
       if (!frameRef.current || event.source !== frameRef.current.contentWindow) return;
 
       const data = event.data as { type?: unknown; resort?: unknown } | null;
@@ -131,16 +130,23 @@ export default function DropInFrame({ profile, gameUrl }: DropInFrameProps) {
         </div>
       )}
 
-      {/* `sandbox` deliberately omits allow-same-origin: the engine is served
-          from /public and would otherwise run with full first-party access to
-          peakcam.io — including the Supabase auth token, which is not httpOnly.
-          It needs no storage or cookies, so an opaque origin costs it nothing. */}
+      {/* Deliberately NOT sandboxed, after trying it.
+          `sandbox` without allow-same-origin gives the engine an opaque origin,
+          and module scripts are always fetched in CORS mode with
+          credentials:"same-origin" — which from a null origin means no cookies
+          at all. Measured: cookie=ABSENT origin=null. So the engine's own
+          import('./three.module.js') can never pass an auth wall, and every
+          Vercel-protected preview deploy was permanently broken.
+          The threat that justified sandboxing was three.js arriving from a
+          third-party CDN; that is gone now the module is vendored. The engine's
+          remaining input surface is one slug, used only for a hasOwnProperty
+          lookup and textContent — no innerHTML, no eval, no fetch (enforced by
+          scripts/drop-in-engine.test.ts). Not worth an unreviewable preview. */}
       <iframe
         ref={frameRef}
         src={gameUrl}
         title={`Drop In — ${profile.name} arcade ski descent`}
         onLoad={() => setLoaded(true)}
-        sandbox="allow-scripts allow-pointer-lock"
         allow="fullscreen; pointer-lock; autoplay"
         allowFullScreen
         className="h-full w-full border-0"

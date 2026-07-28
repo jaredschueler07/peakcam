@@ -220,7 +220,7 @@
 <div id="hud">
   <div id="tl" class="panel">
     <div class="lbl">Velocity</div>
-    <div id="speed" class="num">0<small>KM/H</small></div>
+    <div id="speed" class="num"><span id="speedval">0</span><small>KM/H</small></div>
     <div id="speedbar"><div id="speedbarf"></div></div>
     <div class="row">
       <div class="stat"><div class="lbl">Time</div><div class="v num" id="time">0:00.0</div></div>
@@ -2379,6 +2379,7 @@ function updateSkier(dt, t) {
 ---------------------------------------------------------------------------- */
 const el = {
   speed: document.getElementById('speed'),
+  speedval: document.getElementById('speedval'),
   bar: document.getElementById('speedbarf'),
   time: document.getElementById('time'),
   vert: document.getElementById('vert'),
@@ -2393,7 +2394,15 @@ const el = {
 const pauseMsgEl = document.getElementById('pausemsg');
 let puTimer = 0;
 function popup(main, sub, color) {
-  el.pu.innerHTML = main + (sub ? '<span class="sub">' + sub + '</span>' : '');
+  // Built as nodes, not markup: `main` carries trail names straight from the
+  // profile table, and this is the one place run text reaches the DOM.
+  el.pu.textContent = main;
+  if (sub) {
+    const span = document.createElement('span');
+    span.className = 'sub';
+    span.textContent = sub;
+    el.pu.appendChild(span);
+  }
   el.pu.style.color = color || '#ffffff';
   el.pu.classList.remove('show');
   void el.pu.offsetWidth;
@@ -2411,7 +2420,7 @@ function updateHUD(dt) {
   hudAcc += dt;
   if (hudAcc < 0.05) return;
   hudAcc = 0;
-  el.speed.innerHTML = Math.round(kmh) + '<small>KM/H</small>';
+  el.speedval.textContent = Math.round(kmh);
   el.bar.style.width = clamp01(kmh / 190) * 100 + '%';
   el.time.textContent = fmtTime(s.time);
   el.vert.textContent = Math.max(0, Math.round(s.startY - s.pos.y)) + ' m';

@@ -85,29 +85,41 @@ test("the game can be started without a pointer", () => {
  * unless next.config.ts says otherwise. Deploying the sandbox without the
  * header produced "Could not load the 3D engine" for every player.
  */
-test("the iframe sandbox and the /drop-in CORS header stay in step", () => {
+test("if the engine frame is ever sandboxed, the CORS header comes with it", () => {
   const frame = readFileSync(path.join(root, "components/drop-in/DropInFrame.tsx"), "utf8");
   const config = readFileSync(path.join(root, "next.config.ts"), "utf8");
 
-  // Read the attribute itself — the surrounding comment mentions
+  // Read the attribute itself — the surrounding comment discusses
   // allow-same-origin, so a whole-file match would be meaningless.
   const attr = frame.match(/sandbox="([^"]*)"/);
-  assert.ok(attr, "DropInFrame should set a sandbox attribute on the iframe");
-  const tokens = attr[1].split(/\s+/).filter(Boolean);
-  assert.ok(tokens.includes("allow-scripts"), "the engine needs allow-scripts");
-  assert.ok(
-    !tokens.includes("allow-same-origin"),
-    "allow-same-origin alongside allow-scripts is not a sandbox at all",
-  );
+  if (!attr) return; // not sandboxed: the module import is a plain same-origin fetch.
 
-  const allowsCors =
-    /source:\s*["']\/drop-in\/:path\*["']/.test(config) &&
-    /Access-Control-Allow-Origin/.test(config);
+  const tokens = attr[1].split(/\s+/).filter(Boolean);
+  if (tokens.includes("allow-same-origin")) return; // no opaque origin, no CORS problem.
+
+  // Opaque origin: the engine's own relative import becomes a credential-less
+  // cross-origin request. It needs CORS to load at all — and note it will still
+  // fail behind any auth wall (Vercel deployment protection), because
+  // credentials:"same-origin" sends nothing from a null origin.
   assert.ok(
-    allowsCors,
-    "next.config.ts must send Access-Control-Allow-Origin for /drop-in/* — " +
-      "without it the sandboxed engine cannot import its own three.module.js",
+    /source:\s*["']\/drop-in\/:path\*["']/.test(config) &&
+      /Access-Control-Allow-Origin/.test(config),
+    "a sandboxed engine needs Access-Control-Allow-Origin on /drop-in/* or it " +
+      "cannot import its own three.module.js",
   );
+});
+
+/**
+ * The compensating control now that the frame is not sandboxed. The engine
+ * takes exactly one input — the ?resort= slug — and it must never reach a sink
+ * that can execute. Keep it that way.
+ */
+test("the engine has no script-injection sinks", () => {
+  const body = engine.slice(engine.indexOf("<script type=\"module\">"));
+  for (const sink of ["innerHTML", "outerHTML", "eval(", "document.write", "insertAdjacentHTML"]) {
+    assert.ok(!body.includes(sink), `engine should not use ${sink} — it renders untrusted slug text`);
+  }
+  assert.ok(!/new Function\s*\(/.test(body), "engine should not construct functions from strings");
 });
 
 test("the engine reports why it gave up, so failures are countable", () => {
