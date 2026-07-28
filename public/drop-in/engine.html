@@ -451,7 +451,7 @@ const PROFILE = Object.prototype.hasOwnProperty.call(RESORT_PROFILES, RESORT_SLU
 
 /** Fail safe: an unknown slug never guesses a mountain, and never pays for the
  *  Three.js download. It shows a plain message and stops the module. */
-function fatal(message) {
+function fatal(message, code) {
   const err = document.getElementById('err');
   const start = document.getElementById('start');
   if (start) start.style.display = 'none';
@@ -459,13 +459,26 @@ function fatal(message) {
     err.style.display = 'flex';
     document.getElementById('errmsg').textContent = message;
   }
+  // Tell the host, so it can drop its loading poster and — more usefully —
+  // count how often real players can't run this at all. A canvas game has a
+  // long tail of failure (old GPUs, blocked assets, exhausted contexts) that is
+  // otherwise completely invisible from the outside.
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage(
+        { type: 'peakcam:drop-in-error', code: code || 'unknown', resort: RESORT_SLUG },
+        '*'
+      );
+    }
+  } catch (e) { /* not framed */ }
 }
 
 if (!PROFILE) {
   fatal(
     RESORT_SLUG
       ? 'Drop In is not available for this resort yet. It is currently a pilot at Portillo, Breckenridge and Heavenly.'
-      : 'No resort was specified. Drop In is a pilot at Portillo, Breckenridge and Heavenly.'
+      : 'No resort was specified. Drop In is a pilot at Portillo, Breckenridge and Heavenly.',
+    RESORT_SLUG ? 'unsupported-resort' : 'no-resort'
   );
   throw new Error('drop-in: unsupported resort "' + RESORT_SLUG + '"');
 }
@@ -538,7 +551,7 @@ let THREE = null;
 try {
   THREE = await import('./three.module.js');
 } catch (e) {
-  fatal('Could not load the 3D engine. Reload the page to try again.');
+  fatal('Could not load the 3D engine. Reload the page to try again.', 'engine-load-failed');
   throw e;
 }
 
@@ -715,7 +728,7 @@ let renderer;
 try {
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 } catch (e) {
-  fatal('This browser could not start WebGL, so Drop In can’t run here. Try another browser, or close some tabs and reload.');
+  fatal('This browser could not start WebGL, so Drop In can’t run here. Try another browser, or close some tabs and reload.', 'webgl-unavailable');
   throw e;
 }
 renderer.outputColorSpace = THREE.SRGBColorSpace;

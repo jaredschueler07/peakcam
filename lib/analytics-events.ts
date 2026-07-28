@@ -12,6 +12,7 @@ export const EVENTS = {
   CONDITION_VOTED: "condition_voted",
   DROP_IN_OPENED: "drop_in_opened",
   DROP_IN_STARTED: "drop_in_started",
+  DROP_IN_FAILED: "drop_in_failed",
 } as const;
 
 export type EventName = (typeof EVENTS)[keyof typeof EVENTS];

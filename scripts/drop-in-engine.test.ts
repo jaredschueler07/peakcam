@@ -76,6 +76,47 @@ test("the game can be started without a pointer", () => {
   );
 });
 
+/**
+ * These two settings are load-bearing for each other and live in different
+ * files, which is exactly how this broke once already: sandboxing the frame
+ * without allow-same-origin gives the engine an opaque origin, and module
+ * scripts are always fetched in CORS mode — so the engine's own relative
+ * `import('./three.module.js')` arrives as `Origin: null` and is blocked
+ * unless next.config.ts says otherwise. Deploying the sandbox without the
+ * header produced "Could not load the 3D engine" for every player.
+ */
+test("the iframe sandbox and the /drop-in CORS header stay in step", () => {
+  const frame = readFileSync(path.join(root, "components/drop-in/DropInFrame.tsx"), "utf8");
+  const config = readFileSync(path.join(root, "next.config.ts"), "utf8");
+
+  // Read the attribute itself — the surrounding comment mentions
+  // allow-same-origin, so a whole-file match would be meaningless.
+  const attr = frame.match(/sandbox="([^"]*)"/);
+  assert.ok(attr, "DropInFrame should set a sandbox attribute on the iframe");
+  const tokens = attr[1].split(/\s+/).filter(Boolean);
+  assert.ok(tokens.includes("allow-scripts"), "the engine needs allow-scripts");
+  assert.ok(
+    !tokens.includes("allow-same-origin"),
+    "allow-same-origin alongside allow-scripts is not a sandbox at all",
+  );
+
+  const allowsCors =
+    /source:\s*["']\/drop-in\/:path\*["']/.test(config) &&
+    /Access-Control-Allow-Origin/.test(config);
+  assert.ok(
+    allowsCors,
+    "next.config.ts must send Access-Control-Allow-Origin for /drop-in/* — " +
+      "without it the sandboxed engine cannot import its own three.module.js",
+  );
+});
+
+test("the engine reports why it gave up, so failures are countable", () => {
+  for (const code of ["unsupported-resort", "engine-load-failed", "webgl-unavailable"]) {
+    assert.ok(engine.includes(`'${code}'`), `engine should emit the ${code} failure code`);
+  }
+  assert.ok(engine.includes("peakcam:drop-in-error"), "engine should post a failure message to the host");
+});
+
 test("the engine keeps itself out of the search index", () => {
   assert.match(engine, /<meta name="robots" content="noindex/, "engine.html must be noindex");
 });

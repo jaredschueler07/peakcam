@@ -56,6 +56,18 @@ export default function DropInFrame({ profile, gameUrl }: DropInFrameProps) {
         return;
       }
 
+      // The engine gave up (no WebGL, assets blocked, bad slug). Clear the
+      // poster so its own explanation is visible, and count it: a canvas game
+      // fails for a long tail of reasons that are invisible from out here.
+      if (data.type === "peakcam:drop-in-error") {
+        setLoaded(true);
+        track(EVENTS.DROP_IN_FAILED, {
+          resort: profile.slug,
+          code: typeof (data as { code?: unknown }).code === "string" ? (data as { code: string }).code : "unknown",
+        });
+        return;
+      }
+
       // Only counted once the player actually clicks in; mounting just means
       // somebody followed a link.
       if (data.type !== "peakcam:drop-in-started") return;
