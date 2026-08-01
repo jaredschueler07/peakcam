@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "slug": "heavenly",
+  "center": [
+    38.9404,
+    -119.912
+  ],
+  "sizeM": 6144,
+  "grid": 1024,
+  "minZ": 1900.2,
+  "maxZ": 3065.4,
+  "quantum": 0.1,
+  "source": "terrarium",
+  "sourceZoom": 14,
+  "orientation": "row-major; row 0 = north edge, col 0 = west edge; x east, y north, both in metres from center",
+  "bakedAt": "2026-08-01T18:25:30.747Z"
+}
