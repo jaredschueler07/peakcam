@@ -16,8 +16,10 @@
  *   npx tsx scripts/bake-resort.ts all --skip-trails     # DEM only
  *
  * Outputs (public/game/terrain/):
- *   <slug>.height.u16       raw little-endian uint16, row-major N→S, W→E
- *   <slug>.height.u16.br    the same bytes, brotli quality 11 (Vercel serves it)
+ *   <slug>.height.u16       raw little-endian uint16, row-major N→S, W→E —
+ *                           a local intermediate, gitignored
+ *   <slug>.height.u16.br    the same bytes, brotli quality 11; this is the
+ *                           committed source of truth for the heightfield
  *   <slug>.height.png       16-bit grayscale PNG — inspection artifact only
  *   <slug>.meta.json        georeference + decode constants
  *   <slug>.trails.json(.br) delta-encoded run/lift centrelines
@@ -606,17 +608,23 @@ function writeFiles(files: BakedFile[]): void {
 
 const sha256 = (b: Buffer) => crypto.createHash("sha256").update(b).digest("hex");
 
+/** Raw heightfields are gitignored intermediates — absence is not a failure. */
+const isCommitted = (name: string) => !name.endsWith(".height.u16");
+
 /**
  * Compare a fresh bake against the committed files. `bakedAt` is expected to
  * differ, so meta files are compared with that field normalised; everything
- * else must be byte-identical.
+ * else must be byte-identical. The raw `.u16` is only compared when a local
+ * bake left one on disk — an identical `.u16.br` already proves the bytes
+ * match, since brotli here is deterministic.
  */
 function verifyFiles(files: BakedFile[]): { name: string; reason: string }[] {
   const diffs: { name: string; reason: string }[] = [];
   for (const f of files) {
     const p = path.join(OUT_DIR, f.name);
     if (!fs.existsSync(p)) {
-      diffs.push({ name: f.name, reason: "missing on disk" });
+      if (isCommitted(f.name)) diffs.push({ name: f.name, reason: "missing on disk" });
+      else console.log(`  · ${f.name} not present locally (gitignored intermediate) — covered by the .br`);
       continue;
     }
     const onDisk = fs.readFileSync(p);

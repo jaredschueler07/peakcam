@@ -7,7 +7,7 @@ committed bake against upstream with `--verify`.
 
 | File | Contents |
 |---|---|
-| `<slug>.height.u16` (+ `.br`) | 1024×1024 uint16 heightfield, little-endian, row-major (row 0 = north edge, col 0 = west edge); `elevation = minZ + code × quantum` |
+| `<slug>.height.u16.br` | 1024×1024 uint16 heightfield, little-endian, row-major (row 0 = north edge, col 0 = west edge); `elevation = minZ + code × quantum`. Brotli-compressed — the raw `.u16` the bake writes beside it is a gitignored local intermediate |
 | `<slug>.height.png` | The same codes as a 16-bit grayscale PNG — an inspection artifact, not loaded at runtime (browser canvas readback is 8-bit and would destroy the precision) |
 | `<slug>.meta.json` | Georeference and decode constants |
 | `<slug>.trails.json` (+ `.br`) | Delta-encoded ski-run and lift centrelines in local metres |

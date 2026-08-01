@@ -9,12 +9,16 @@
  *   npx tsx scripts/validate-game-assets.ts            # all resorts
  *   npx tsx scripts/validate-game-assets.ts breckenridge
  *
+ * The heightfield is read from the committed `.u16.br` sidecar: the raw `.u16`
+ * is a gitignored bake intermediate, so the compressed file is the source of
+ * truth. When a raw file does happen to be lying around from a local bake it is
+ * cross-checked against the decompressed bytes as a bonus.
+ *
  * Checks per resort:
  *   - meta.json matches the schema and the configured extents
- *   - .u16 byte length matches grid², decodes without throwing
+ *   - .u16.br decompresses, byte length matches grid², decodes without throwing
  *   - decoded min/max are inside the elevation band the resort plausibly spans
  *   - corner and centre elevations are finite and inside [minZ, maxZ]
- *   - the .br sidecar decompresses to exactly the .u16 bytes
  *   - the PNG16 artifact decodes to the same uint16 codes
  *   - trails JSON parses, delta-decodes, and every point sits inside the box
  *   - the .br trails sidecar decompresses to exactly the .json bytes
@@ -114,8 +118,9 @@ function validateResort(cfg: ResortBakeConfig): Report {
   const meta = metaRaw as TerrainMeta;
 
   // ── heightfield ────────────────────────────────────────────
-  const u16 = readAsset(`${cfg.slug}.height.u16`);
-  r.check(u16.length === meta.grid * meta.grid * 2, "u16 size matches grid", `${u16.length} bytes`);
+  const br = readAsset(`${cfg.slug}.height.u16.br`);
+  const u16 = zlib.brotliDecompressSync(br);
+  r.check(u16.length === meta.grid * meta.grid * 2, "u16.br decompresses to grid-sized data", `${u16.length} bytes`);
   if (u16.length !== meta.grid * meta.grid * 2) return r;
 
   const field = decodeHeightfield(
@@ -161,8 +166,13 @@ function validateResort(cfg: ResortBakeConfig): Report {
     probes.map(([label, i]) => `${label} ${field.heights[i].toFixed(1)}m`).join(", "),
   );
 
-  const br = readAsset(`${cfg.slug}.height.u16.br`);
-  r.check(zlib.brotliDecompressSync(br).equals(u16), "u16.br decompresses to the u16 bytes");
+  // The raw .u16 is gitignored; check it only when a local bake left one behind.
+  const rawPath = path.join(ASSET_DIR, `${cfg.slug}.height.u16`);
+  if (fs.existsSync(rawPath)) {
+    r.check(fs.readFileSync(rawPath).equals(u16), "local raw .u16 intermediate matches the committed .br");
+  } else {
+    console.log("    · no local raw .u16 intermediate (expected — it is gitignored)");
+  }
   r.check(
     br.length <= PACK_BUDGET_BYTES,
     "u16.br inside the pack budget",
