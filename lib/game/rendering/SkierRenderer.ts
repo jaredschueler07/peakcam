@@ -4,8 +4,11 @@ import type { SimulationState, TerrainSampler, Vec3 } from "../core/types";
 const UP = new THREE.Vector3(0, 1, 0);
 const normal: Vec3 = { x: 0, y: 1, z: 0 };
 
-const material = (color: THREE.ColorRepresentation, roughness = 0.7, metalness = 0, emissive: THREE.ColorRepresentation = 0) =>
-  new THREE.MeshStandardMaterial({ color, roughness, metalness, emissive, emissiveIntensity: emissive ? 0.35 : 0 });
+const material = (color: THREE.ColorRepresentation, roughness = 0.7, metalness = 0, emissive: THREE.ColorRepresentation = 0) => {
+  const result = new THREE.MeshStandardMaterial({ color, roughness, metalness, emissive, emissiveIntensity: emissive ? 0.35 : 0 });
+  result.userData.heightFog = false;
+  return result;
+};
 
 function limb(length: number, radius: number, mat: THREE.Material) {
   const group = new THREE.Group();

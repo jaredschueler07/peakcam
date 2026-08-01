@@ -1,6 +1,9 @@
 import * as THREE from "three";
 import type { ResortGameProfile } from "../config/schema";
 import { mulberry32 } from "../core/rng";
+import type { SnowUniforms } from "./SnowMaterial";
+import type { AtmosphereUniforms } from "./Atmosphere";
+import { visualWeatherPreset } from "./VisualPresets";
 
 export const SUN_DIRECTION = new THREE.Vector3(-0.46, 0.62, -0.64).normalize();
 
@@ -15,6 +18,8 @@ export interface GameScene {
   sunDisc: THREE.Mesh;
   sunGlow: THREE.Mesh;
   peaks: THREE.Group;
+  snowUniforms: SnowUniforms;
+  atmosphereUniforms: AtmosphereUniforms;
 }
 
 function makeRidge(radius: number, height: number, seed: number, low: number, high: number, segments: number) {
@@ -47,25 +52,28 @@ function makeRidge(radius: number, height: number, seed: number, low: number, hi
 }
 
 export function createScene(profile: ResortGameProfile, aspect: number): GameScene {
-  const weather = profile.weather[0], scene = new THREE.Scene();
+  const weather = profile.weather[0], visual = visualWeatherPreset(0), scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(weather.fogCol, weather.fog);
-  const camera = new THREE.PerspectiveCamera(64, aspect, 0.5, 6000);
-  const hemi = new THREE.HemisphereLight(weather.hor, 0x9fb2c8, weather.hemi);
-  const ambient = new THREE.AmbientLight(0xbdd6f0, weather.amb);
-  const sun = new THREE.DirectionalLight(0xfff2dc, weather.sun);
+  const camera = new THREE.PerspectiveCamera(65, aspect, 0.5, 6000);
+  const hemi = new THREE.HemisphereLight(visual.hemiSky, visual.hemiGround, weather.hemi);
+  const ambient = new THREE.AmbientLight(visual.ambientCol, weather.amb);
+  const sun = new THREE.DirectionalLight(visual.sunCol, weather.sun);
   sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); sun.shadow.camera.far = 460;
   sun.shadow.camera.left = -95; sun.shadow.camera.right = 95; sun.shadow.camera.top = 95; sun.shadow.camera.bottom = -95;
   sun.shadow.bias = -0.0009; sun.shadow.normalBias = 0.35;
   scene.add(hemi, ambient, sun, sun.target);
 
   const skyUniforms: Record<string, THREE.IUniform> = {
-    uTop: { value: new THREE.Color(weather.top) }, uHorizon: { value: new THREE.Color(weather.hor) },
-    uSun: { value: new THREE.Color(0xfff3d4) }, uSunDir: { value: SUN_DIRECTION.clone() }, uHaze: { value: weather.haze },
+    uTop: { value: new THREE.Color(weather.top) }, uMid: { value: new THREE.Color(visual.mid) }, uHorizon: { value: new THREE.Color(weather.hor) },
+    uCloud: { value: new THREE.Color(visual.cloud) }, uCloudiness: { value: visual.cloudiness }, uTime: { value: 0 },
+    uSun: { value: new THREE.Color(visual.sunCol) }, uSunDir: { value: SUN_DIRECTION.clone() }, uHaze: { value: weather.haze },
   };
   const sky = new THREE.Mesh(new THREE.SphereGeometry(3400, 32, 20), new THREE.ShaderMaterial({
     uniforms: skyUniforms, side: THREE.BackSide, depthWrite: false, fog: false,
     vertexShader: "varying vec3 vDir; void main(){vDir=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
-    fragmentShader: "uniform vec3 uTop,uHorizon,uSun,uSunDir;uniform float uHaze;varying vec3 vDir;void main(){vec3 d=normalize(vDir);float t=clamp(d.y*.5+.5,0.,1.);vec3 c=mix(uHorizon,uTop,pow(t,.78));float s=max(dot(d,normalize(uSunDir)),0.);c+=uSun*pow(s,480.)*2.4;c+=uSun*pow(s,12.)*.2;c=mix(c,uHorizon,uHaze*pow(1.-t,2.));gl_FragColor=vec4(c,1.);}",
+    fragmentShader: `uniform vec3 uTop,uMid,uHorizon,uCloud,uSun,uSunDir;uniform float uHaze,uCloudiness,uTime;varying vec3 vDir;
+float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+1.),f.x),f.y);}
+void main(){vec3 d=normalize(vDir);float t=clamp(d.y*.5+.5,0.,1.);vec3 c=mix(uHorizon,uMid,smoothstep(.12,.55,t));c=mix(c,uTop,smoothstep(.48,1.,t));vec2 p=normalize(d.xz)*2.5+uTime*vec2(.006,.002);float clouds=n(p*1.7)*.68+n(p*4.1+9.)*.32;float band=smoothstep(.02,.2,d.y)*(1.-smoothstep(.52,.86,d.y));c=mix(c,uCloud,smoothstep(.48,.7,clouds)*band*uCloudiness);float s=max(dot(d,normalize(uSunDir)),0.);c+=uSun*pow(s,180.)*1.7+c*uSun*pow(s,7.)*.08;c=mix(c,uHorizon,uHaze*pow(1.-t,2.));gl_FragColor=vec4(c,1.);}`,
   }));
   sky.renderOrder = -10; sky.frustumCulled = false; scene.add(sky);
   const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(46, 18, 12), new THREE.MeshBasicMaterial({ color: 0xfff6de, fog: false, transparent: true, opacity: 0.95 }));
@@ -77,5 +85,15 @@ export function createScene(profile: ResortGameProfile, aspect: number): GameSce
   const near = new THREE.Mesh(makeRidge(1750, 460 * profile.relief, 31 + ridgeSeed, 0x53749e, 0xd6e9ff, 96), ridgeMaterial());
   far.position.y = 120; near.position.y = 40; far.frustumCulled = near.frustumCulled = false;
   peaks.add(far, near); scene.add(peaks);
-  return { scene, camera, sky, skyUniforms, sun, hemi, ambient, sunDisc, sunGlow, peaks };
+  const snowUniforms: SnowUniforms = {
+    horizon: { value: new THREE.Color(weather.hor) },
+    glint: { value: visual.glint },
+    track: { value: new THREE.Vector4(1e6, 1e6, 1e6, 1e6) },
+  };
+  const atmosphereUniforms: AtmosphereUniforms = {
+    density: { value: weather.fog }, heightFalloff: { value: 0.025 }, referenceHeight: { value: 0 },
+    blue: { value: new THREE.Color(visual.fogBlue) }, warm: { value: new THREE.Color(visual.fogWarm) },
+    sunDirection: { value: SUN_DIRECTION.clone() },
+  };
+  return { scene, camera, sky, skyUniforms, sun, hemi, ambient, sunDisc, sunGlow, peaks, snowUniforms, atmosphereUniforms };
 }

@@ -6,8 +6,14 @@ import { createSimulation } from "../core/simulation";
 import type { TerrainSampler } from "../core/types";
 import { InputManager } from "../input/InputManager";
 import { createProceduralWorld } from "../terrain/obstacles";
-import { AdaptiveResolution } from "./AdaptiveResolution";
+import { CameraController } from "./CameraController";
+import { QualityController, seedQualityRung } from "./QualityController";
 import { GameRenderer, type RendererBackend } from "./Renderer";
+import { buildPosterLut, buildSnowDetailNormal } from "./SnowMaterial";
+import { chromaticAberrationOffset } from "./MotionEffects";
+import { configureSceneMaterials } from "./Renderer";
+import { fogExp2Amount, heightFogAmount, type AtmosphereUniforms } from "./Atmosphere";
+import { SkierRenderer } from "./SkierRenderer";
 import { buildTileGeometry } from "./TerrainRenderer";
 import { sagAt, WorldRenderer } from "./WorldRenderer";
 
@@ -62,14 +68,110 @@ test("ramp dressing uses the same 22m by 10.5m terrain-ramp footprint", () => {
   assert.ok(Math.abs(Math.abs(rails[0].position.x) - 10.5 * 0.86) < 1e-12);
 });
 
-test("adaptive resolution responds only outside the 45/58 fps band and clamps", () => {
-  const adaptive = new AdaptiveResolution();
-  assert.equal(adaptive.observe(44), 0.88);
-  assert.equal(adaptive.observe(52), 0.88);
-  assert.equal(adaptive.observe(59), 0.96);
-  assert.equal(adaptive.observe(59), 1);
-  for (let i = 0; i < 10; i += 1) adaptive.observe(20);
-  assert.equal(adaptive.scale, 0.55);
+test("quality controller walks rungs before pixel scale and never crosses the 0.7 floor", () => {
+  const quality = new QualityController(4);
+  assert.deepEqual(quality.observe(44), { rung: 3, pixelScale: 1, changed: true });
+  quality.observe(44); quality.observe(44); quality.observe(44);
+  assert.equal(quality.rung, 0);
+  assert.equal(quality.observe(44).pixelScale, 0.9);
+  assert.equal(quality.observe(44).pixelScale, 0.8);
+  assert.equal(quality.observe(44).pixelScale, 0.7);
+  assert.equal(quality.observe(44).pixelScale, 0.7);
+  assert.equal(quality.observe(59).rung, 0, "resolution recovers before quality");
+  quality.observe(59); quality.observe(59);
+  assert.equal(quality.pixelScale, 1);
+  assert.equal(quality.observe(59).rung, 1);
+});
+
+test("initial quality rung uses device memory, cores, coarse pointer, and DPR", () => {
+  assert.equal(seedQualityRung({ hardwareConcurrency: 12, deviceMemory: 16, coarsePointer: false, dpr: 1 }), 4);
+  assert.equal(seedQualityRung({ hardwareConcurrency: 8, deviceMemory: 8, coarsePointer: false, dpr: 2 }), 3);
+  assert.equal(seedQualityRung({ hardwareConcurrency: 4, deviceMemory: 4, coarsePointer: true, dpr: 3 }), 1);
+  assert.equal(seedQualityRung({ hardwareConcurrency: 2, deviceMemory: 2, coarsePointer: true, dpr: 3 }), 0);
+});
+
+test("boot-generated poster LUT is 32 cubed and preserves forest and alpenglow accents", () => {
+  const lut = buildPosterLut(32);
+  assert.equal(lut.image.width, 32);
+  assert.equal(lut.image.height, 32);
+  assert.equal(lut.image.depth, 32);
+  const data = lut.image.data as Uint8Array;
+  assert.equal(data.length, 32 ** 3 * 4);
+  assert.ok(data.some((value) => value > 0));
+});
+
+test("boot-generated snow normal is deterministic 256 square sobel data", () => {
+  const a = buildSnowDetailNormal(7), b = buildSnowDetailNormal(7);
+  assert.equal(a.image.width, 256); assert.equal(a.image.height, 256);
+  assert.deepEqual(a.image.data, b.image.data);
+  const data = a.image.data as Uint8Array;
+  assert.ok(data.some((value, index) => index % 4 < 2 && value !== 128));
+});
+
+test("reduced motion removes shake and halves the 65 to 82 FOV ramp", () => {
+  const world = createProceduralWorld(profile, profile.seed);
+  const state = createSimulation(profile, profile.seed);
+  state.vel.x = 58;
+  const reducedCamera = new THREE.PerspectiveCamera(65, 1, 0.5, 1000);
+  const fullCamera = new THREE.PerspectiveCamera(65, 1, 0.5, 1000);
+  const reduced = new CameraController(reducedCamera, state, true);
+  const full = new CameraController(fullCamera, state, false);
+  for (let i = 0; i < 240; i += 1) {
+    reduced.update(state, world.terrain, 1 / 120, 0);
+    full.update(state, world.terrain, 1 / 120, 0);
+  }
+  assert.ok(Math.abs(reducedCamera.fov - 73.5) < 0.2);
+  assert.ok(Math.abs(fullCamera.fov - 82) < 0.2);
+  assert.equal(reduced.speedUniform.value, full.speedUniform.value);
+  assert.equal(reduced.motionAmplitude, 0);
+  assert.ok(full.motionAmplitude > 0);
+});
+
+test("reduced motion disables chromatic aberration at every speed", () => {
+  assert.deepEqual(chromaticAberrationOffset(1, true), [0, 0]);
+  assert.deepEqual(chromaticAberrationOffset(0, false), [0, 0]);
+  const [x, y] = chromaticAberrationOffset(1, false);
+  assert.ok(x > 0 && y > 0 && x < 0.002 && y < x);
+});
+
+test("every preset's height fog matches v1 FogExp2 at player altitude and ignores absolute resort elevation", () => {
+  for (const resort of Object.values(DROP_IN_GAME_PROFILES)) for (const weather of resort.weather) for (const distance of [25, 100, 400]) {
+    const expected = 1 - Math.exp(-((weather.fog * distance) ** 2));
+    assert.ok(Math.abs(fogExp2Amount(weather.fog, distance) - expected) < 1e-12, `${resort.slug} ${weather.name}`);
+    assert.equal(heightFogAmount(weather.fog, distance, 100, 100, 0.025), expected);
+    assert.equal(heightFogAmount(weather.fog, distance, 3100, 3100, 0.025), expected);
+  }
+});
+
+test("shared scene materials receive fog and CSM hooks once while skier colors opt out", () => {
+  const scene = new THREE.Scene();
+  const shared = new THREE.MeshStandardMaterial();
+  const skier = new THREE.MeshStandardMaterial(); skier.userData.heightFog = false;
+  const terrainA = new THREE.Mesh(new THREE.PlaneGeometry(), shared); terrainA.receiveShadow = true;
+  const terrainB = new THREE.Mesh(new THREE.PlaneGeometry(), shared); terrainB.receiveShadow = true;
+  scene.add(terrainA, terrainB, new THREE.Mesh(new THREE.BoxGeometry(), skier));
+  let csmSetups = 0;
+  const uniforms: AtmosphereUniforms = {
+    density: { value: 0.002 }, heightFalloff: { value: 0.025 }, referenceHeight: { value: 3000 },
+    blue: { value: new THREE.Color() }, warm: { value: new THREE.Color() }, sunDirection: { value: new THREE.Vector3(0, 1, 0) },
+  };
+  configureSceneMaterials(scene, { setupMaterial() { csmSetups += 1; } }, uniforms);
+  assert.equal(csmSetups, 1);
+  const shader = { uniforms: {}, vertexShader: "#include <common>\n#include <worldpos_vertex>", fragmentShader: "#include <common>\n#include <fog_fragment>" } as THREE.WebGLProgramParametersWithUniforms;
+  shared.onBeforeCompile(shader, {} as THREE.WebGLRenderer);
+  assert.equal(shader.vertexShader.match(/varying vec3 vAtmosphereWorldPosition/g)?.length, 1);
+  assert.equal(skier.customProgramCacheKey().includes("height-fog"), false);
+
+  const skierScene = new THREE.Scene(); new SkierRenderer(skierScene);
+  const skierColors = new Set<number>();
+  skierScene.traverse((object) => {
+    const skierMesh = object as THREE.Mesh;
+    if (!(skierMesh.material instanceof THREE.MeshStandardMaterial)) return;
+    assert.equal(skierMesh.material.userData.heightFog, false);
+    skierColors.add(skierMesh.material.color.getHex());
+  });
+  assert.ok(skierColors.has(0x1b6fe0), "blue jacket remains saturated");
+  assert.ok(skierColors.has(0xff8b2e), "orange skis remain saturated");
 });
 
 test("weather and lift actions are rising-edge input actions", () => {

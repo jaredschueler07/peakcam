@@ -21,5 +21,6 @@ test("EVENTS has the required product event names", () => {
     DROP_IN_POINTER_LOCK_RESULT: "drop_in_pointer_lock_result",
     DROP_IN_FAILED: "drop_in_failed",
     DROP_IN_TERRAIN_FALLBACK: "drop_in_terrain_fallback",
+    DROP_IN_PERFORMANCE: "drop_in_performance",
   });
 });
