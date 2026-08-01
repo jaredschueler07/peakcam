@@ -1,6 +1,7 @@
 import type { ResortGameProfile } from "../config/schema";
 import { FIXED_DT, MAX_FRAME_DT, MAX_STEPS_PER_FRAME } from "../core/clock";
 import { createSimulation, stepSimulation } from "../core/simulation";
+import { beginLiftRide } from "../core/run-lifecycle";
 import type { SimulationState, SimulationWorld } from "../core/types";
 import { GamepadAdapter } from "../input/GamepadAdapter";
 import { InputManager } from "../input/InputManager";
@@ -23,6 +24,7 @@ export class GameRuntime {
   readonly world: SimulationWorld;
   readonly input: InputManager;
   readonly touch: TouchAdapter;
+  readonly sceneBuildMs: number;
   private readonly renderer: GameRenderer;
   private readonly keyboard: KeyboardAdapter;
   private readonly pointerDrag: PointerDragAdapter;
@@ -47,7 +49,9 @@ export class GameRuntime {
     this.input = new InputManager((scheme) => {
       if (!this.activated) { this.activated = true; analytics.controlActivated(scheme); }
     });
+    const sceneStartedAt = performance.now();
     this.renderer = new GameRenderer(canvas, profile, this.world, this.state);
+    this.sceneBuildMs = performance.now() - sceneStartedAt;
     this.keyboard = new KeyboardAdapter(this.input);
     this.pointerDrag = new PointerDragAdapter(canvas, this.input);
     this.pointerLock = new PointerLockAdapter(canvas, this.input, { onResult: (result) => {
@@ -86,6 +90,9 @@ export class GameRuntime {
     if (this.input.consumePausePressed()) {
       if (this.paused) this.resume(); else this.pause();
     }
+    if (this.input.consumeLiftPressed() && this.state.liftRide <= 0) beginLiftRide(this.state);
+    const weather = this.input.consumeWeatherPressed();
+    if (weather !== null) this.renderer.setWeather(weather);
     if (!this.paused) {
       this.accumulator += frameDt;
       let steps = 0;

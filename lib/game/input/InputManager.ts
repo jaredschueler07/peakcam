@@ -75,6 +75,16 @@ export class InputManager {
     return pressed;
   }
 
+  consumeLiftPressed(): boolean { return this.pending.delete("lift"); }
+
+  consumeWeatherPressed(): number | null {
+    if (this.pending.delete("weather1")) return 0;
+    if (this.pending.delete("weather2")) return 1;
+    if (this.pending.delete("weather3")) return 2;
+    if (this.pending.delete("weatherCycle")) return -1;
+    return null;
+  }
+
   clearHeld(): void {
     this.analog.clear();
     this.digitalSteer.clear();
@@ -82,4 +92,3 @@ export class InputManager {
     this.pending.clear();
   }
 }
-

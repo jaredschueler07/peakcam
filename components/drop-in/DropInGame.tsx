@@ -63,7 +63,11 @@ export default function DropInGame({ profile }: { profile: ResortGameProfile }) 
         });
         if (cancelled) { created.dispose(); return; }
         runtimeRef.current = created; setRuntime(created); setPhase("playing");
-        track(EVENTS.DROP_IN_READY, { resort: profile.slug, engine: "v2", runtime_load_ms: Math.round(performance.now() - startedAt) });
+        track(EVENTS.DROP_IN_READY, {
+          resort: profile.slug, engine: "v2",
+          runtime_load_ms: Math.round(performance.now() - startedAt),
+          asset_load_ms: Math.round(created.sceneBuildMs),
+        });
         track(EVENTS.DROP_IN_STARTED, { resort: profile.slug, engine: "v2", mode: "free_ride" });
       } catch (reason) {
         if (cancelled) return;
