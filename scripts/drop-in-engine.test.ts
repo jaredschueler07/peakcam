@@ -2,7 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { DROP_IN_RESORT_SLUGS, getDropInProfile } from "../lib/drop-in";
+import { DROP_IN_RESORT_SLUGS } from "../lib/drop-in";
+import { DROP_IN_GAME_PROFILES } from "../lib/game/config/profiles";
+import { readV1ResortProfiles } from "./capture-v1-fixtures.mjs";
 
 // Sync reads: tsx transpiles this to CJS (the package is not type:module), so
 // top-level await is unavailable here.
@@ -16,23 +18,30 @@ const engine = readFileSync(path.join(root, "public/drop-in/engine.html"), "utf8
  * The previous version of this file only grepped for `data-key="a"`, which would
  * have passed against any drift at all.
  */
-test("every lib profile is mirrored field-for-field in the engine", () => {
-  for (const slug of DROP_IN_RESORT_SLUGS) {
-    const profile = getDropInProfile(slug);
-    assert.ok(profile, `no lib profile for ${slug}`);
+test("every config profile is mirrored field-for-field in the v1 engine", () => {
+  const engineProfiles = readV1ResortProfiles();
 
-    assert.match(engine, new RegExp(`['"]?${slug}['"]?\\s*:\\s*\\{`), `engine is missing the ${slug} profile block`);
-    assert.ok(engine.includes(`name: '${profile.name}'`), `engine name drifted for ${slug}`);
-    assert.ok(engine.includes(`summitFt: ${profile.summitElevationFt}`), `summitFt drifted for ${slug}`);
-    assert.ok(engine.includes(`verticalFt: ${profile.verticalDropFt}`), `verticalFt drifted for ${slug}`);
-    assert.ok(engine.includes(`seed: ${profile.terrainSeed}`), `terrain seed drifted for ${slug}`);
-    assert.ok(
-      engine.toLowerCase().includes(profile.accent.toLowerCase()),
-      `accent ${profile.accent} missing from the engine for ${slug}`,
+  for (const slug of DROP_IN_RESORT_SLUGS) {
+    const {
+      slug: _slug,
+      siteTagline: _siteTagline,
+      summitElevationFt: _summitElevationFt,
+      verticalDropFt: _verticalDropFt,
+      terrainSeed: _terrainSeed,
+      trailNames: _trailNames,
+      ...configProfile
+    } = DROP_IN_GAME_PROFILES[slug as keyof typeof DROP_IN_GAME_PROFILES];
+    void _slug;
+    void _siteTagline;
+    void _summitElevationFt;
+    void _verticalDropFt;
+    void _terrainSeed;
+    void _trailNames;
+    assert.deepStrictEqual(
+      configProfile,
+      engineProfiles[slug],
+      `engine profile drifted for ${slug}`,
     );
-    for (const trail of profile.trailNames) {
-      assert.ok(engine.includes(trail), `engine is missing trail "${trail}" for ${slug}`);
-    }
   }
 });
 

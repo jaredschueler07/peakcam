@@ -112,7 +112,7 @@ async function fetchActiveResorts(): Promise<ResortContext[]> {
     `${url}/rest/v1/resort_metadata?select=resort_id,liftie_slug,weather_unlocked_id,elevation_base_ft,elevation_summit_ft,vertical_drop_ft,run_count,lift_count,openskistats_id,snodas_grid_x,snodas_grid_y`,
     { headers },
   );
-  let metaByResort = new Map<string, MetadataRow>();
+  const metaByResort = new Map<string, MetadataRow>();
   if (metaResp.ok) {
     const rows: MetadataRow[] = await metaResp.json();
     for (const row of rows) {

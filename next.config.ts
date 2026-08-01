@@ -7,12 +7,9 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // Drop In's engine runs in an iframe sandboxed without allow-same-origin,
-        // so its document has an opaque origin. Module scripts are always fetched
-        // in CORS mode — which means the engine's own `import('./three.module.js')`,
-        // a relative import of a file sitting beside it, reaches the server as a
-        // cross-origin request with `Origin: null` and is blocked without this.
-        // Both files are public static assets, so `*` gives nothing away.
+        // The Drop In iframe is deliberately not sandboxed. Keep CORS permissive
+        // for the public static engine assets during the v2 strangler migration;
+        // this header is removed with engine.html once the iframe is retired.
         source: "/drop-in/:path*",
         headers: [
           { key: "Access-Control-Allow-Origin", value: "*" },
