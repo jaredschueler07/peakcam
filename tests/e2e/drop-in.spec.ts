@@ -24,7 +24,17 @@ async function canvasLuminance(page: import("@playwright/test").Page) {
 test("v2 renders a keyboard start control without an iframe", async ({ page }) => {
   await page.goto(V2_URL);
   await expect(page.getByRole("button", { name: /start descent/i })).toBeVisible();
+  await expect(page.getByTestId("drop-in-conditions-stamp")).toBeVisible();
   await expect(page.locator("iframe")).toHaveCount(0);
+});
+
+test("the HUD audio toggle reflects and changes its pressed state", async ({ page }) => {
+  await page.goto(V2_URL);
+  await page.getByRole("button", { name: /start descent/i }).click();
+  const audio = page.getByRole("button", { name: /mute audio/i });
+  await expect(audio).toHaveAttribute("aria-pressed", "true");
+  await audio.click();
+  await expect(page.getByRole("button", { name: /unmute audio/i })).toHaveAttribute("aria-pressed", "false");
 });
 
 test("the default engine remains the v1 iframe", async ({ page }) => {

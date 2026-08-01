@@ -10,6 +10,7 @@ import { createProceduralWorld } from "../terrain/obstacles";
 import { FIXED_DT, FixedStepClock } from "./clock";
 import { createSimulation, stepSimulation } from "./simulation";
 import type { InputFrame, SimulationState } from "./types";
+import { simulationConfig, type SurfaceKind } from "./config";
 
 const slugs: DropInResortSlug[] = ["ski-portillo", "breckenridge", "heavenly"];
 const EMPTY_INPUT: InputFrame = {
@@ -57,7 +58,7 @@ for (const slug of slugs) {
     const profile = DROP_IN_GAME_PROFILES[slug];
 
     for (const trace of fixture.traces) {
-      const world = createProceduralWorld(profile, profile.seed);
+      const world = createProceduralWorld(profile, profile.seed, simulationConfig("packed"));
       const state = createSimulation(profile, profile.seed);
       let crashCount = 0;
       let wasCrashed = false;
@@ -90,7 +91,7 @@ test("10k simulation steps are identical under three render pacing patterns", ()
     const patterns = [[FIXED_DT], [FIXED_DT * 2], [FIXED_DT * 3, FIXED_DT * 5]];
     const hashes = patterns.map((pattern) => {
       const profile = DROP_IN_GAME_PROFILES.heavenly;
-      const world = createProceduralWorld(profile, profile.seed);
+      const world = createProceduralWorld(profile, profile.seed, simulationConfig("packed"));
       const state = createSimulation(profile, profile.seed);
       const clock = new FixedStepClock();
       let step = 0;
@@ -111,3 +112,23 @@ test("10k simulation steps are identical under three render pacing patterns", ()
     Date.now = originalNow;
   }
 });
+
+for (const surface of ["powder", "packed", "firm", "ice"] as const satisfies readonly SurfaceKind[]) {
+  test(`${surface} surface remains deterministic across render pacing`, () => {
+    const profile = DROP_IN_GAME_PROFILES.heavenly;
+    const hashes = [[FIXED_DT], [FIXED_DT * 2, FIXED_DT * 5]].map((pattern) => {
+      const world = createProceduralWorld(profile, profile.seed, simulationConfig(surface));
+      const state = createSimulation(profile, profile.seed);
+      const clock = new FixedStepClock();
+      let step = 0, frame = 0;
+      while (step < 2_000) {
+        clock.advance(pattern[frame++ % pattern.length], () => {
+          if (step < 2_000) stepSimulation(state, traceInput("slalom-weave", step), FIXED_DT, world);
+          step += 1;
+        });
+      }
+      return stateHash(state);
+    });
+    assert.equal(hashes[0], hashes[1]);
+  });
+}

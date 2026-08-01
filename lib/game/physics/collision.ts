@@ -19,9 +19,11 @@ export function crash(state: SimulationState, reason: "TREE" | "ROCK" | "LANDING
   state.events.comboChanged = true;
 }
 
-export function onLand(state: SimulationState, impactSpeed: number): void {
+export function onLand(state: SimulationState, impactSpeed: number, impactThresholdMultiplier = 1): void {
   state.events.landed = true;
+  state.events.landingKind = impactSpeed < 18 ? "soft" : "hard";
   if (state.airTime > 0.28) {
+    state.events.trickLanded = true;
     const spins = Math.floor(state.spin / TAU);
     const airPoints = Math.round(state.airTime * 130);
     setVec3(forwardScratch, Math.sin(state.yaw), 0, Math.cos(state.yaw));
@@ -30,7 +32,7 @@ export function onLand(state: SimulationState, impactSpeed: number): void {
       ? (normalize(flatScratch), flatScratch.x * forwardScratch.x +
           flatScratch.y * forwardScratch.y + flatScratch.z * forwardScratch.z)
       : 1;
-    const badLanding = align < 0.25 && impactSpeed > 22;
+    const badLanding = align < 0.25 && impactSpeed > 22 * impactThresholdMultiplier;
     if (badLanding && state.invuln <= 0) {
       crash(state, "LANDING");
       return;
@@ -91,9 +93,8 @@ export function checkGates(state: SimulationState, world: SimulationWorld): void
           state.events.gatePassed = true;
         } else if (trailIndex === nearest.i && nearest.on) {
           state.passedGates.add(key);
-          if (state.combo > 1) {
-            state.combo = 1; state.events.comboChanged = true; state.events.gateMissed = true;
-          }
+          if (state.combo > 1) { state.combo = 1; state.events.comboChanged = true; }
+          state.events.gateMissed = true;
         }
       }
     }

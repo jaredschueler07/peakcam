@@ -26,7 +26,13 @@ export class EffectsRenderer {
   private sprayHead = 0; private trackHead = 0; private trackUsed = 0; private trackPrevious: { lx: number; lz: number; rx: number; rz: number } | null = null;
   private quality: QualityRung = 4;
 
-  constructor(scene: THREE.Scene, seed: number, private readonly terrain: TerrainSampler, private readonly reducedMotion: boolean) {
+  constructor(
+    scene: THREE.Scene,
+    seed: number,
+    private readonly terrain: TerrainSampler,
+    private readonly reducedMotion: boolean,
+    private readonly sprayDepthMultiplier = 1,
+  ) {
     this.random = mulberry32(seed ^ 0x8e37a12d);
     this.sprayGeometry.setAttribute("position", new THREE.BufferAttribute(this.sprayPosition, 3)); this.sprayGeometry.setAttribute("aAlpha", new THREE.BufferAttribute(this.sprayAlpha, 1)); this.sprayGeometry.setAttribute("aSize", new THREE.BufferAttribute(this.spraySize, 1));
     const sprayMaterial = new THREE.ShaderMaterial({ uniforms: { uTex: { value: radialTexture() }, uColor: { value: new THREE.Color(0xf7fbff) }, uScale: { value: 620 } }, vertexShader: pointVertex, fragmentShader: pointFragment, transparent: true, depthWrite: false });
@@ -43,7 +49,7 @@ export class EffectsRenderer {
     if (state.events.reset) this.clearTracks();
     const speed = Math.hypot(state.vel.x, state.vel.z);
     if (this.quality > 0 && state.onGround && state.crash <= 0 && speed > 5) {
-      const intensity = Math.min(1, state.carve * 1.5) * Math.min(1, speed / 20), count = Math.min(6, Math.floor(intensity * 7 + (speed > 26 ? 1 : 0)));
+      const intensity = Math.min(1, state.carve * 1.5) * Math.min(1, speed / 20), count = Math.min(8, Math.floor((intensity * 7 + (speed > 26 ? 1 : 0)) * this.sprayDepthMultiplier));
       const fx = Math.sin(state.yaw), fz = Math.cos(state.yaw), rx = fz, rz = -fx, side = -Math.sign(state.lean || 0.001);
       for (let i = 0; i < count; i += 1) { const off = (this.random() - 0.5) * 0.9 + side * 0.35; this.emitSpray(state.pos.x + rx * off - fx * 0.8, state.pos.y + 0.08 + this.random() * 0.25, state.pos.z + rz * off - fz * 0.8, rx * side * (2 + intensity * 9) - fx * speed * 0.16 + (this.random() - 0.5) * 2, 1.4 + this.random() * 3.4 * (0.4 + intensity), rz * side * (2 + intensity * 9) - fz * speed * 0.16 + (this.random() - 0.5) * 2, 1.4 + this.random() * 2.4, 0.45 + this.random() * 0.5); }
     }

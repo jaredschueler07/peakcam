@@ -1,4 +1,5 @@
 import type { ResortGameProfile, ResortTrail } from "../config/schema";
+import type { SimulationConfig } from "./config";
 
 export interface Vec3 { x: number; y: number; z: number }
 
@@ -93,6 +94,7 @@ export interface SimulationWorld {
   readonly profile: ResortGameProfile;
   readonly seed: number;
   readonly terrain: TerrainSampler;
+  readonly config: SimulationConfig;
   readonly chunks: Map<string, Obstacle[]>;
 }
 

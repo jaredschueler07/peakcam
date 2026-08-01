@@ -1,7 +1,10 @@
 export interface SimulationEvents {
+  jumped: boolean;
   crashed: boolean;
   crashReason: "TREE" | "ROCK" | "LANDING" | null;
   landed: boolean;
+  landingKind: "soft" | "hard" | null;
+  trickLanded: boolean;
   gatePassed: boolean;
   gateMissed: boolean;
   scoreDelta: number;
@@ -14,14 +17,16 @@ export interface SimulationEvents {
 
 export function createSimulationEvents(): SimulationEvents {
   return {
-    crashed: false, crashReason: null, landed: false, gatePassed: false,
+    jumped: false, crashed: false, crashReason: null, landed: false,
+    landingKind: null, trickLanded: false, gatePassed: false,
     gateMissed: false, scoreDelta: 0, comboChanged: false, trailChanged: false,
     reset: false, liftFinished: false, finished: false,
   };
 }
 
 export function clearSimulationEvents(events: SimulationEvents): void {
-  events.crashed = false; events.crashReason = null; events.landed = false;
+  events.jumped = false; events.crashed = false; events.crashReason = null; events.landed = false;
+  events.landingKind = null; events.trickLanded = false;
   events.gatePassed = false; events.gateMissed = false; events.scoreDelta = 0;
   events.comboChanged = false; events.trailChanged = false; events.reset = false;
   events.liftFinished = false; events.finished = false;
