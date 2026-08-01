@@ -37,6 +37,7 @@ import { COURSE_VERSION, PHYSICS_VERSION } from "../../config/versions";
 import { decodeGhost, GhostDecodeError, type DecodedGhost } from "../../replay/codec";
 import { MAX_GHOST_BYTES, runSubmissionSchema } from "../run-schema";
 import { resolveCourse } from "../courses";
+import { sanitizeNickname } from "../nickname";
 import { RunTicketError, verifyTicket, type RunTicketPayload, type TicketKeyring } from "../run-ticket";
 import { clientIpFrom, type RateLimiter } from "../rate-limit";
 import type { RunWriter } from "../run-repository";
@@ -79,6 +80,8 @@ export interface RunSubmissionResponseBody {
   trailId: string;
   physicsVersion: number;
   courseVersion: number;
+  /** The nickname as stored — sanitised, so the client renders what others see. */
+  displayName: string | null;
 }
 
 export async function handleSubmitRun(
@@ -191,9 +194,14 @@ export async function handleSubmitRun(
     return jsonError(500, "Could not record this run");
   }
 
+  // Sanitised once and reused, so the row and the response can never disagree
+  // about what the player is called.
+  const displayName = sanitizeNickname(submission.nickname);
+
   const insert = await writer.insertRun({
     resortId,
     userId: ticket.userId ?? userId ?? null,
+    displayName,
     mode: ticket.mode,
     trailId: ticket.trailId,
     timeMs: submission.timeMs,
@@ -233,6 +241,7 @@ export async function handleSubmitRun(
     trailId: ticket.trailId,
     physicsVersion: PHYSICS_VERSION,
     courseVersion: COURSE_VERSION,
+    displayName,
   };
 
   return jsonOk(payload, { status: 201, headers: { "Cache-Control": "no-store" } });

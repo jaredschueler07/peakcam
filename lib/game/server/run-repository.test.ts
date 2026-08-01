@@ -98,6 +98,7 @@ function sampleInsert(overrides: Partial<RunInsert> = {}): RunInsert {
   return {
     resortId: "11111111-2222-4333-8444-555555555555",
     userId: null,
+    displayName: "Powder Hound",
     mode: "time_trial",
     trailId: "peak-8",
     timeMs: 29_900,
@@ -148,6 +149,7 @@ test("an insert maps every field to its migration 015 column", async () => {
   assert.deepEqual(Object.keys(row).sort(), [
     "accepted",
     "course_version",
+    "display_name",
     "finished_at",
     "ghost_data",
     "ghost_keyframes",
@@ -169,6 +171,7 @@ test("an insert maps every field to its migration 015 column", async () => {
   assert.equal(row.ghost_data, "\\x010203");
   assert.equal(row.ghost_sha256, "\\x040506");
   assert.equal(row.rejection_code, null);
+  assert.equal(row.display_name, "Powder Hound");
 });
 
 test("the run_nonce unique violation is reported as a replay, not a generic error", async () => {
@@ -221,6 +224,7 @@ test("the leaderboard query filters on accepted plus the full course tuple", asy
           physics_version: PHYSICS_VERSION,
           course_version: COURSE_VERSION,
           user_id: null,
+          display_name: "Powder Hound",
           finished_at: "2026-07-15T17:29:58Z",
           ghost_keyframes: 300,
         },
@@ -245,6 +249,7 @@ test("the leaderboard query filters on accepted plus the full course tuple", asy
   assert.equal(rows.length, 1);
   assert.equal(rows[0].timeMs, 29_900);
   assert.equal(rows[0].ghostKeyframes, 300);
+  assert.equal(rows[0].displayName, "Powder Hound");
 
   const call = calls[0];
   assert.deepEqual(call.filters, {

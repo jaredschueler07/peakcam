@@ -114,10 +114,10 @@ export async function handleGetLeaderboard(
     score: row.score,
     physicsVersion: row.physicsVersion,
     courseVersion: row.courseVersion,
-    // Migration 015 has no display-name column: `runSubmissionSchema` accepts a
-    // nickname but there is nowhere to put it, and no profiles table to read a
-    // signed-in name from. Null until a follow-up migration adds one.
-    displayName: null,
+    // Sanitised at submission time (lib/game/server/nickname.ts). Null for a
+    // run whose player gave no nickname, including signed-in players until
+    // profile names are wired up.
+    displayName: row.displayName,
     isSelf: userId !== null && row.userId === userId,
     hasGhost: row.ghostKeyframes > 0,
     finishedAt: new Date(row.finishedAt).toISOString(),

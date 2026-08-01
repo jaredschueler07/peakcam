@@ -25,6 +25,13 @@ create table if not exists drop_in_runs (
   resort_id           uuid not null references resorts(id) on delete restrict,
   user_id             uuid references auth.users(id) on delete set null,
 
+  -- Name shown on the board. Sanitised server-side
+  -- (lib/game/server/nickname.ts) before it is stored, so the CHECK is a
+  -- backstop rather than the validation. Null for a run whose player gave no
+  -- nickname — including signed-in players until profile names are wired up.
+  display_name        text
+                      check (display_name is null or char_length(display_name) between 1 and 24),
+
   mode                text not null
                       check (mode in ('time_trial', 'score_attack')),
   trail_id            text not null,
@@ -107,6 +114,8 @@ create policy "Users can read their own rejected runs"
 -- validation_metrics, run_nonce, rejection_code, ghost bytes, or user_id.
 comment on table drop_in_runs is
   'Drop In v2 competitive runs. Inserted only by the server after ticket + replay validation; clients have SELECT only.';
+comment on column drop_in_runs.display_name is
+  'Player-supplied nickname, sanitised by lib/game/server/nickname.ts — the only free-text column that is published.';
 comment on column drop_in_runs.run_nonce is
   'Nonce from the server-issued HMAC run ticket; unique constraint enforces one submission per ticket.';
 comment on column drop_in_runs.ghost_data is

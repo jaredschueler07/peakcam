@@ -106,6 +106,7 @@ function leaderboardRow(overrides: Partial<LeaderboardRunRow> = {}): Leaderboard
     physicsVersion: PHYSICS_VERSION,
     courseVersion: COURSE_VERSION,
     userId: null,
+    displayName: "Powder Hound",
     finishedAt: "2026-07-15T17:29:58.000Z",
     ghostKeyframes: 300,
     ...overrides,
@@ -291,6 +292,7 @@ test("a good run is stored as accepted and echoed back without private fields", 
   assert.deepEqual(Object.keys(body).sort(), [
     "accepted",
     "courseVersion",
+    "displayName",
     "mode",
     "physicsVersion",
     "runId",
@@ -312,6 +314,57 @@ test("a good run is stored as accepted and echoed back without private fields", 
     createHash("sha256").update(fixture.ghostBytes).digest("hex"),
   );
   assert.equal(row.runNonce, verifyTicket(fixture.ticket, fixture.keyring, { now: fixture.nowMs }).nonce);
+});
+
+test("a nickname is sanitised before it is stored, and echoed back as stored", async () => {
+  const fixture = makeRunFixture();
+  const writer = stubWriter();
+
+  const response = await handleSubmitRun(
+    postRequest(runsUrl, { ...submissionBody(fixture), nickname: "  Powder\u200b   Hound  " }),
+    runDeps(writer, fixture.nowMs),
+  );
+
+  assert.equal(writer.inserts[0].displayName, "Powder Hound");
+  assert.equal(
+    (await response.json()).displayName,
+    "Powder Hound",
+    "the client must render the name others will see, not the one it typed",
+  );
+});
+
+test("no nickname, signed in or not, stores null rather than an invented name", async () => {
+  const anonymous = makeRunFixture();
+  const anonWriter = stubWriter();
+  await handleSubmitRun(
+    postRequest(runsUrl, submissionBody(anonymous)),
+    runDeps(anonWriter, anonymous.nowMs),
+  );
+  assert.equal(anonWriter.inserts[0].displayName, null);
+
+  // Profile names are not wired up yet: a signed-in player without a nickname
+  // is still nameless on the board.
+  const signedIn = makeRunFixture({ userId: USER_UUID });
+  const userWriter = stubWriter();
+  await handleSubmitRun(
+    postRequest(runsUrl, submissionBody(signedIn)),
+    runDeps(userWriter, signedIn.nowMs, USER_UUID),
+  );
+  assert.equal(userWriter.inserts[0].displayName, null);
+  assert.equal(userWriter.inserts[0].userId, USER_UUID);
+});
+
+test("a nickname of nothing but invisible characters stores null", async () => {
+  const fixture = makeRunFixture();
+  const writer = stubWriter();
+
+  const response = await handleSubmitRun(
+    postRequest(runsUrl, { ...submissionBody(fixture), nickname: "\u200b\u200b\u200b" }),
+    runDeps(writer, fixture.nowMs),
+  );
+
+  assert.equal(response.status, 201, "an unusable nickname costs the player a name, not the run");
+  assert.equal(writer.inserts[0].displayName, null);
 });
 
 test("a rejected run is still stored, with its code, and reported as not accepted", async () => {
@@ -531,6 +584,7 @@ test("rows are projected to public fields only, with ranks assigned in order", a
 
   const body = await response.json();
   assert.deepEqual(body.rows.map((r: { rank: number }) => r.rank), [1, 2]);
+  assert.equal(body.rows[0].displayName, "Powder Hound");
   for (const row of body.rows) {
     assert.deepEqual(Object.keys(row).sort(), [
       "courseVersion",
@@ -547,6 +601,33 @@ test("rows are projected to public fields only, with ranks assigned in order", a
       "trailId",
     ]);
   }
+});
+
+test("an unnamed run publishes a null display name, not a placeholder", async () => {
+  const trailId = resolveCourseOrThrow().trailId;
+  const reader = stubReader([leaderboardRow({ displayName: null })]);
+
+  const response = await handleGetLeaderboard(
+    new Request(leaderboardUrl({ resort: FIXTURE_RESORT_SLUG, mode: "time_trial", trailId })),
+    { reader: () => reader, currentUserId: async () => null },
+  );
+
+  assert.equal((await response.json()).rows[0].displayName, null);
+});
+
+test("a stored name too long for the public schema fails the projection, not the client", async () => {
+  // Belt and braces: sanitizeNickname caps at 24, the column CHECKs 24, and
+  // publicLeaderboardRowSchema refuses to publish anything longer. If a row
+  // ever slips past the first two, this is the gate that notices.
+  const trailId = resolveCourseOrThrow().trailId;
+  const reader = stubReader([leaderboardRow({ displayName: "x".repeat(25) })]);
+
+  const response = await handleGetLeaderboard(
+    new Request(leaderboardUrl({ resort: FIXTURE_RESORT_SLUG, mode: "time_trial", trailId })),
+    { reader: () => reader, currentUserId: async () => null },
+  );
+
+  assert.equal(response.status, 500);
 });
 
 test("an anonymous board is shared-cacheable; a signed-in one is not", async () => {

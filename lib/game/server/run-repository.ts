@@ -34,6 +34,8 @@ const UNIQUE_VIOLATION = "23505";
 export interface RunInsert {
   resortId: string;
   userId: string | null;
+  /** Sanitised nickname, or `null` for an unnamed run. */
+  displayName: string | null;
   mode: CompetitiveRunMode;
   trailId: string;
   timeMs: number;
@@ -85,6 +87,7 @@ export function createRunWriter(client: SupabaseClient): RunWriter {
         .insert({
           resort_id: run.resortId,
           user_id: run.userId,
+          display_name: run.displayName,
           mode: run.mode,
           trail_id: run.trailId,
           time_ms: run.timeMs,
@@ -142,6 +145,7 @@ export interface LeaderboardRunRow {
   physicsVersion: number;
   courseVersion: number;
   userId: string | null;
+  displayName: string | null;
   finishedAt: string;
   ghostKeyframes: number;
 }
@@ -177,7 +181,7 @@ export function createLeaderboardReader(client: SupabaseClient): LeaderboardRead
       let builder = client
         .from("drop_in_runs")
         .select(
-          "id, mode, trail_id, time_ms, score, physics_version, course_version, user_id, finished_at, ghost_keyframes",
+          "id, mode, trail_id, time_ms, score, physics_version, course_version, user_id, display_name, finished_at, ghost_keyframes",
         )
         // RLS also lets a signed-in caller see their own rejected rows, so the
         // accepted filter is stated rather than assumed.
@@ -208,6 +212,7 @@ export function createLeaderboardReader(client: SupabaseClient): LeaderboardRead
           physicsVersion: row.physics_version as number,
           courseVersion: row.course_version as number,
           userId: (row.user_id as string | null) ?? null,
+          displayName: (row.display_name as string | null) ?? null,
           finishedAt: row.finished_at as string,
           ghostKeyframes: (row.ghost_keyframes as number) ?? 0,
         }),
