@@ -282,7 +282,10 @@ export function bucketIntoPeriods(hourly: HourlyWeather[]): ForecastPeriod[] {
       windSpeed: Math.round(items.reduce((sum, it) => sum + it.windSpeed, 0) / items.length),
       windGust: Math.max(...items.map((it) => it.windSpeed)),
       windDirection: dominantDir,
-      snowInches: items.reduce((sum, it) => sum + it.snowInches, 0),
+      // Re-round after summing: the per-hour values are rounded to 0.1", but
+      // adding them accumulates binary float error (0.3+0.3+0.3 renders as
+      // "0.8999999999999999" without this).
+      snowInches: Math.round(items.reduce((sum, it) => sum + it.snowInches, 0) * 10) / 10,
       precipProbability: Math.max(...items.map((it) => it.precipProbability)),
       shortForecast: representative.shortForecast,
     });
