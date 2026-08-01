@@ -205,7 +205,7 @@ Wikimedia Commons' alpine wind recordings are almost all CC BY-SA.
 
 ### Encoding
 
-`public/game/audio/tools/build-samples.sh` regenerates the whole set from the
+`scripts/build-audio-samples.sh` regenerates the whole set from the
 downloaded masters (which are *not* committed — ~30 MB of WAV, some at 192 kHz).
 Everything lands at 44.1 kHz, Ogg Vorbis `q4` with an AAC `.m4a` twin.
 

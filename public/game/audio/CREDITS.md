@@ -66,7 +66,7 @@ bed (`ProceduralSoundBank`) is what actually carries the physical reactivity:
 
 ## Rebuilding
 
-`tools/build-samples.sh <dir-with-master-wavs>` regenerates every `.ogg`/`.m4a`
+`scripts/build-audio-samples.sh <dir-with-master-wavs>` regenerates every `.ogg`/`.m4a`
 here from the masters. The masters themselves are ~30 MB of WAV (some at 192 kHz)
 and are deliberately not committed; re-download them from the table above.
 Processing decisions are documented in `docs/drop-in-v2/AUDIO.md` §5.
