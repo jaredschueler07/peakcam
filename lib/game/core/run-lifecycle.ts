@@ -44,13 +44,22 @@ export function updateRunLifecycle(
 export function resetSimulationOnTerrain(
   state: SimulationState, terrain: TerrainSampler, z0 = 0,
 ): void {
-  const x0 = trailCenter(terrain.profile.trails[state.selectedTrail], z0);
-  state.pos.x = x0; state.pos.y = terrain.height(x0, z0); state.pos.z = z0;
-  state.vel.x = 0; state.vel.y = 0; state.vel.z = 15;
-  state.yaw = 0; state.onGround = true; state.airTime = 0; state.spin = 0;
+  const realRun = terrain.kind === "real" ? terrain.realRuns?.[state.selectedTrail] : undefined;
+  let x0: number, startZ: number, yaw: number;
+  if (realRun) {
+    const start = realRun.points[0], next = realRun.points[1];
+    x0 = start.x; startZ = start.z; yaw = Math.atan2(next.x - start.x, next.z - start.z);
+  } else {
+    x0 = trailCenter(terrain.profile.trails[state.selectedTrail], z0); startZ = z0; yaw = 0;
+  }
+  state.pos.x = x0; state.pos.y = terrain.height(x0, startZ); state.pos.z = startZ;
+  state.vel.x = Math.sin(yaw) * 15; state.vel.y = 0; state.vel.z = Math.cos(yaw) * 15;
+  state.yaw = yaw; state.onGround = true; state.airTime = 0; state.spin = 0;
   state.crash = 0; state.best = Math.max(state.best, state.score); state.score = 0;
   state.combo = 1; state.comboTimer = 0; state.time = 0; state.startY = state.pos.y;
-  state.invuln = 1; state.distance = 0; state.passedGates.clear();
+  state.invuln = 1; state.distance = 0; state.courseProgress = 0;
+  state.prevCourseProgress = 0; state.finished = false; state.prevX = x0; state.prevZ = startZ;
+  state.passedGates.clear();
   state.events.reset = true;
 }
 
@@ -60,7 +69,8 @@ export function resetSimulation(state: SimulationState, world: SimulationWorld, 
 
 export function cycleTrail(state: SimulationState, world: SimulationWorld): void {
   if (state.liftRide > 0) return;
-  state.selectedTrail = (state.selectedTrail + 1) % world.profile.trails.length;
+  const count = world.terrain.kind === "real" ? world.terrain.realRuns?.length ?? 0 : world.profile.trails.length;
+  state.selectedTrail = (state.selectedTrail + 1) % Math.max(1, count);
   resetSimulation(state, world, 0);
   state.events.trailChanged = true;
 }

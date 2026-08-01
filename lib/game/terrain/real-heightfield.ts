@@ -46,7 +46,8 @@ import {
   type Heightfield, type TerrainMeta, type Trails, type TrailsFile,
 } from "./formats";
 import { fbmWithGradient, type NoiseGradient } from "./noise-grad";
-import { nearestTrail } from "./trails";
+import { buildRealCourse, nearestPointOnRun } from "./real-course";
+import { RAMP_H, RAMP_LEN, RAMP_W } from "./heightfield";
 
 // ─── Options ─────────────────────────────────────────────────
 
@@ -244,6 +245,42 @@ export function createRealTerrain(
     type: lift.type,
     points: drape(lift.points),
   }));
+  const course = buildRealCourse(profile, runs, lifts, seed);
+
+  const ramp = { value: 0, dx: 0, dz: 0 };
+  function sampleRamps(x: number, z: number): void {
+    ramp.value = 0; ramp.dx = 0; ramp.dz = 0;
+    for (const run of course.runs) {
+      for (const feature of run.ramps) {
+        const dx = x - feature.x, dz = z - feature.z;
+        const forwardX = Math.sin(feature.heading), forwardZ = Math.cos(feature.heading);
+        const rightX = Math.cos(feature.heading), rightZ = -Math.sin(feature.heading);
+        const along = dx * forwardX + dz * forwardZ;
+        if (along < 0 || along > RAMP_LEN + 3.5) continue;
+        const across = dx * rightX + dz * rightZ;
+        const absoluteAcross = Math.abs(across);
+        if (absoluteAcross > RAMP_W) continue;
+        const lateralT = clamp01(1 - absoluteAcross / RAMP_W);
+        const lateral = smoothstep(lateralT);
+        const lateralDerivative = 6 * lateralT * (1 - lateralT)
+          * (across === 0 ? 0 : -Math.sign(across) / RAMP_W);
+        let shape: number, shapeDerivative: number;
+        if (along <= RAMP_LEN) {
+          const rise = along / RAMP_LEN;
+          shape = rise * rise;
+          shapeDerivative = 2 * rise / RAMP_LEN;
+        } else {
+          shape = clamp01(1 - (along - RAMP_LEN) / 3.5);
+          shapeDerivative = shape > 0 ? -1 / 3.5 : 0;
+        }
+        ramp.value += RAMP_H * shape * lateral;
+        const alongDerivative = RAMP_H * shapeDerivative * lateral;
+        const acrossDerivative = RAMP_H * shape * lateralDerivative;
+        ramp.dx += alongDerivative * forwardX + acrossDerivative * rightX;
+        ramp.dz += alongDerivative * forwardZ + acrossDerivative * rightZ;
+      }
+    }
+  }
 
   // ─── Corridor index ────────────────────────────────────────
 
@@ -311,7 +348,8 @@ export function createRealTerrain(
     sampleMacro(x, z);
     const macro = gridSample.value;
     sampleDetail(x, z);
-    return macro + detail.value;
+    sampleRamps(x, z);
+    return macro + detail.value + ramp.value;
   }
 
   function normal(x: number, z: number, out: Vec3): Vec3 {
@@ -319,11 +357,12 @@ export function createRealTerrain(
     const macroDx = gridSample.dCol / cellSizeM;
     const macroDz = gridSample.dRow / cellSizeM;
     sampleDetail(x, z);
+    sampleRamps(x, z);
     // Surface y = H(x, z) ⇒ normal ∝ (−∂H/∂x, 1, −∂H/∂z), matching the sign
     // convention of the procedural sampler's finite differences.
-    out.x = -(macroDx + detail.dx);
+    out.x = -(macroDx + detail.dx + ramp.dx);
     out.y = 1;
-    out.z = -(macroDz + detail.dz);
+    out.z = -(macroDz + detail.dz + ramp.dz);
     return normalize(out);
   }
 
@@ -364,17 +403,31 @@ export function createRealTerrain(
     trails,
     runs,
     lifts,
+    realRuns: course.runs,
+    mainLift: course.mainLift,
     height,
     normal,
     macroHeight,
     microDetail,
     trailField: corridorField,
-    // Phase 5.2 keeps the v1 `nearestTrail` (sine corridors from the profile)
-    // so the existing physics, gates and trail-select UI keep working unchanged.
-    // Phase 5.3 replaces it with a selection over `runs`; `nearestRun` is the
-    // real-geometry query available today.
-    nearestTrail: (x: number, z: number, out: NearestTrail) =>
-      nearestTrail(profile.trails, x, z, out),
+    nearestTrail: (x: number, z: number, out: NearestTrail) => {
+      if (course.runs.length === 0) {
+        out.i = -1; out.t = { kind: "procedural", trail: profile.trails[0] };
+        out.d = Infinity; out.dx = 0; out.on = false;
+        return out;
+      }
+      let bestI = 0, bestDistance = Infinity, bestX = 0;
+      for (let i = 0; i < course.runs.length; i += 1) {
+        const hit = nearestPointOnRun(course.runs[i], x, z);
+        if (hit.distance < bestDistance) {
+          bestI = i; bestDistance = hit.distance; bestX = hit.x;
+        }
+      }
+      const run = course.runs[bestI];
+      out.i = bestI; out.t = { kind: "real", run }; out.d = bestDistance;
+      out.dx = x - bestX; out.on = bestDistance <= run.halfWidthM;
+      return out;
+    },
     nearestRun: (x: number, z: number, out: NearestRun = nearestRunScratch) =>
       queryNearestRun(x, z, out),
   };

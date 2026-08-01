@@ -1,7 +1,7 @@
 import type { ResortGameProfile } from "../config/schema";
 import { clamp01, TAU } from "../core/math";
 import { hashInt, mulberry32 } from "../core/rng";
-import type { Obstacle, SimulationWorld, Vec3 } from "../core/types";
+import type { NearestTrail, Obstacle, SimulationWorld, Vec3 } from "../core/types";
 import { createProceduralTerrain } from "./heightfield";
 import { fbm } from "./noise";
 
@@ -12,12 +12,21 @@ export function createProceduralWorld(profile: ResortGameProfile, seed: number):
   return { profile, seed, terrain: createProceduralTerrain(profile, seed), chunks: new Map() };
 }
 
+export function createWorld(
+  profile: ResortGameProfile, seed: number, terrain: SimulationWorld["terrain"],
+): SimulationWorld {
+  return { profile, seed, terrain, chunks: new Map() };
+}
+
 export function getChunk(world: SimulationWorld, cx: number, cz: number): Obstacle[] {
   const key = `${cx}:${cz}`;
   let chunk = world.chunks.get(key);
   if (chunk) return chunk;
   const { profile, terrain } = world;
   const random = mulberry32(hashInt(cx * 7919 + world.seed, cz * 104729 + world.seed));
+  const nearest: NearestTrail = {
+    i: -1, t: { kind: "procedural", trail: profile.trails[0] }, d: Infinity, dx: 0, on: false,
+  };
   chunk = [];
   for (let i = 0; i < 34; i += 1) {
     const x = cx * CHUNK_SIZE + random() * CHUNK_SIZE;
@@ -40,9 +49,14 @@ export function getChunk(world: SimulationWorld, cx: number, cz: number): Obstac
     const s = type === "tree"
       ? (0.72 + random() * 1.05) * profile.forest.treeScale
       : 0.7 + random() * 2.3;
+    const r = type === "tree" ? 1.15 * Math.min(1.6, s) : 1.1 * s;
+    if (terrain.kind === "real") {
+      terrain.nearestTrail(x, z, nearest);
+      if (nearest.t.kind === "real" && nearest.d - r < nearest.t.run.halfWidthM * 1.2) continue;
+    }
     chunk.push({
       x, y, z, s, rot: random() * TAU, type,
-      r: type === "tree" ? 1.15 * Math.min(1.6, s) : 1.1 * s,
+      r,
     });
   }
   world.chunks.set(key, chunk);

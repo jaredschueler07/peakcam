@@ -6,6 +6,9 @@ import { CHUNK_SIZE, getChunk } from "../terrain/obstacles";
 import { RAMP_LEN, RAMP_SPACING, RAMP_W } from "../terrain/heightfield";
 import { hash2 } from "../terrain/noise";
 import { trailCenter } from "../terrain/trails";
+import { pointAtArcLength } from "../terrain/real-course";
+import { createLandmarks } from "./LandmarkRenderer";
+import { TILE_SIZE } from "./TerrainRenderer";
 
 const TOWER_SPACING = 108;
 const matrix = new THREE.Matrix4(), quaternion = new THREE.Quaternion(), position = new THREE.Vector3(), scale = new THREE.Vector3();
@@ -42,6 +45,7 @@ export class WorldRenderer {
   private readonly gates: THREE.Group[] = []; private readonly ramps: THREE.Group[] = [];
   private readonly lift = new THREE.Group(); private readonly towers: THREE.Group[] = []; private readonly chairs: THREE.Group[] = [];
   private readonly cableGeometry = new THREE.BufferGeometry();
+  private readonly landmarks: THREE.Group | null;
   private propX = Infinity; private propZ = Infinity; private furnitureZ = Infinity; private furnitureTimer = 0;
 
   constructor(private readonly scene: THREE.Scene, private readonly profile: ResortGameProfile, private readonly world: SimulationWorld) {
@@ -75,6 +79,8 @@ export class WorldRenderer {
     this.markers = new THREE.InstancedMesh(markerGeometry, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 }), 460);
     this.markers.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.markers.frustumCulled = false; this.markers.castShadow = true;
     scene.add(this.tree, this.rock, this.markers);
+    this.landmarks = world.terrain.kind === "real" ? createLandmarks(profile, world.terrain) : null;
+    if (this.landmarks) scene.add(this.landmarks);
     this.buildGates(); this.buildRamps(); this.buildLift();
   }
 
@@ -127,13 +133,29 @@ export class WorldRenderer {
   }
 
   update(state: SimulationState, dt: number): void {
+    this.updateLandmarks(state.pos.x, state.pos.z);
     this.updateProps(state.pos.x, state.pos.z);
     this.furnitureTimer -= dt;
     if (this.furnitureTimer <= 0 || Math.abs(state.pos.z - this.furnitureZ) > 60) {
       this.furnitureTimer = 0.25; this.furnitureZ = state.pos.z;
-      this.updateMarkers(state.pos.z); this.updateGates(state); this.updateRamps(state.pos.z);
+      this.updateMarkers(state.pos.z); this.updateGates(state); this.updateRamps(state);
     }
     this.updateLift(state.pos.z, state.time);
+  }
+
+  private updateLandmarks(playerX: number, playerZ: number): void {
+    if (!this.landmarks) return;
+    const cx = Math.floor(playerX / TILE_SIZE), cz = Math.floor(playerZ / TILE_SIZE);
+    const minimumX = (cx - 2) * TILE_SIZE, maximumX = (cx + 3) * TILE_SIZE;
+    const minimumZ = (cz - 1) * TILE_SIZE, maximumZ = (cz + 4) * TILE_SIZE;
+    for (const landmark of this.landmarks.children) {
+      const footprint = landmark.userData.terrainFootprint as { halfX: number; halfZ: number } | undefined;
+      if (!footprint) continue;
+      landmark.visible = landmark.position.x - footprint.halfX >= minimumX &&
+        landmark.position.x + footprint.halfX <= maximumX &&
+        landmark.position.z - footprint.halfZ >= minimumZ &&
+        landmark.position.z + footprint.halfZ <= maximumZ;
+    }
   }
 
   private updateProps(x: number, z: number) {
@@ -152,6 +174,25 @@ export class WorldRenderer {
   }
 
   private updateMarkers(playerZ: number) {
+    if (this.world.terrain.kind === "real" && this.world.terrain.realRuns) {
+      let count = 0;
+      const total = this.world.terrain.realRuns.reduce((sum, run) => sum + run.lengthM, 0);
+      const spacing = Math.max(20, total / 220);
+      for (const run of this.world.terrain.realRuns) {
+        for (let distanceM = 0; distanceM <= run.lengthM && count + 1 < 460; distanceM += spacing) {
+          const point = pointAtArcLength(run.points, distanceM);
+          for (const side of [-1, 1]) {
+            const x = point.x + Math.cos(point.heading) * side * run.halfWidthM;
+            const z = point.z - Math.sin(point.heading) * side * run.halfWidthM;
+            quaternion.setFromAxisAngle(axisZ, Math.sin(distanceM * 0.3) * 0.09);
+            matrix.compose(position.set(x, this.world.terrain.height(x, z), z), quaternion, scale.set(1, 1, 1));
+            this.markers.setMatrixAt(count++, matrix);
+          }
+        }
+      }
+      this.markers.count = count; this.markers.instanceMatrix.needsUpdate = true;
+      return;
+    }
     let count = 0;
     const z0 = Math.floor((playerZ - 90) / 20) * 20;
     for (const trail of this.profile.trails) for (let z = z0; z < playerZ + 620 && count < 460; z += 20) for (const side of [-1, 1]) {
@@ -162,6 +203,21 @@ export class WorldRenderer {
   }
 
   private updateGates(state: SimulationState) {
+    if (this.world.terrain.kind === "real" && this.world.terrain.realRuns) {
+      const run = this.world.terrain.realRuns[state.selectedTrail]; let count = 0;
+      for (const gate of run?.gates ?? []) {
+        if (count >= this.gates.length) break;
+        const group = this.gates[count++]; group.visible = true;
+        group.position.set(gate.x, gate.y, gate.z); group.rotation.y = gate.heading;
+        group.userData.left.position.x = -gate.halfWidthM; group.userData.right.position.x = gate.halfWidthM;
+        group.userData.panel.scale.x = gate.halfWidthM * 2;
+        const done = state.passedGates.has(state.selectedTrail * 100003 + gate.key);
+        group.userData.panel.material.opacity = done ? 0.22 : 0.9;
+        group.userData.poleMaterial.emissiveIntensity = done ? 0.02 : 0.16;
+      }
+      for (let i = count; i < this.gates.length; i += 1) this.gates[i].visible = false;
+      return;
+    }
     let count = 0;
     for (let ti = 0; ti < this.profile.trails.length; ti += 1) {
       const trail = this.profile.trails[ti], start = Math.floor((state.pos.z - 40) / GATE_SPACING);
@@ -174,7 +230,23 @@ export class WorldRenderer {
     for (let i = count; i < this.gates.length; i += 1) this.gates[i].visible = false;
   }
 
-  private updateRamps(playerZ: number) {
+  private updateRamps(state: SimulationState) {
+    if (this.world.terrain.kind === "real" && this.world.terrain.realRuns) {
+      const run = this.world.terrain.realRuns[state.selectedTrail] ?? this.world.terrain.realRuns[0];
+      let count = 0;
+      for (const ramp of run?.ramps ?? []) {
+        if (count >= this.ramps.length) break;
+        const end = pointAtArcLength(run.points, Math.min(run.lengthM, ramp.distanceM + RAMP_LEN));
+        const group = this.ramps[count++]; group.visible = true;
+        group.position.set(ramp.x, ramp.y + 0.2, ramp.z); group.rotation.y = ramp.heading;
+        const h = end.y - ramp.y;
+        group.userData.rail.rotation.x = group.userData.rail2.rotation.x = -Math.atan2(h, RAMP_LEN);
+        group.userData.rail.position.y = group.userData.rail2.position.y = h * 0.5;
+      }
+      for (let i = count; i < this.ramps.length; i += 1) this.ramps[i].visible = false;
+      return;
+    }
+    const playerZ = state.pos.z;
     let count = 0;
     for (const trail of this.profile.trails) {
       const first = Math.max(0, Math.floor((playerZ - 60 - trail.ramp) / RAMP_SPACING));
@@ -188,6 +260,30 @@ export class WorldRenderer {
   }
 
   private updateLift(playerZ: number, time: number) {
+    const realLift = this.world.terrain.kind === "real" ? this.world.terrain.mainLift : null;
+    if (realLift) {
+      for (let i = 0; i < this.towers.length; i += 1) {
+        const point = pointAtArcLength(realLift.points, realLift.lengthM * i / (this.towers.length - 1));
+        const tower = this.towers[i]; tower.position.set(point.x, point.y, point.z); tower.rotation.y = point.heading;
+        tower.userData.sheaveL.rotation.y = time * 3.1; tower.userData.sheaveR.rotation.y = -time * 3.1;
+      }
+      const cable = this.cableGeometry.getAttribute("position") as THREE.BufferAttribute; let at = 0;
+      for (const side of [-2, 2]) for (let i = 0; i < 31; i += 1) {
+        for (const index of [i * 2, i * 2 + 2]) {
+          const distanceM = realLift.lengthM * index / 63;
+          const point = pointAtArcLength(realLift.points, distanceM);
+          cable.setXYZ(at++, point.x + Math.cos(point.heading) * side, point.y + 15.5 - sagAt(distanceM, 0), point.z - Math.sin(point.heading) * side);
+        }
+      }
+      cable.needsUpdate = true;
+      for (let i = 0; i < this.chairs.length; i += 1) {
+        const side = i % 2, t = (((time * (side ? -1 : 1) * 4.6) / realLift.lengthM + i * 0.62) % 1 + 1) % 1;
+        const point = pointAtArcLength(realLift.points, realLift.lengthM * t), chair = this.chairs[i];
+        chair.position.set(point.x + Math.cos(point.heading) * (side ? 2 : -2), point.y + 15.5 - sagAt(realLift.lengthM * t, 0), point.z - Math.sin(point.heading) * (side ? 2 : -2));
+        chair.rotation.set(0, point.heading + (side ? Math.PI : 0), Math.sin(time * 1.7 + i) * 0.05);
+      }
+      return;
+    }
     const k0 = Math.floor((playerZ - 140) / TOWER_SPACING), zStart = k0 * TOWER_SPACING, zEnd = (k0 + 8) * TOWER_SPACING;
     for (let i = 0; i < this.towers.length; i += 1) { const z = (k0 + i) * TOWER_SPACING, tower = this.towers[i]; tower.position.set(this.liftX(z), this.world.terrain.height(this.liftX(z), z), z); tower.userData.sheaveL.rotation.y = time * 3.1; tower.userData.sheaveR.rotation.y = -time * 3.1; }
     const cable = this.cableGeometry.getAttribute("position") as THREE.BufferAttribute;

@@ -5,11 +5,13 @@ import { createProceduralTerrain } from "../terrain/heightfield";
 import { cycleTrail, resetSimulation, resetSimulationOnTerrain } from "./run-lifecycle";
 import { tickCombo } from "./scoring";
 import type { SimulationEvents } from "./events";
-import type { InputFrame, SimulationState, SimulationWorld } from "./types";
+import type { InputFrame, SimulationState, SimulationWorld, TerrainSampler } from "./types";
 
-export function createSimulation(profile: ResortGameProfile, seed: number): SimulationState {
+export function createSimulation(
+  profile: ResortGameProfile, seed: number, terrain?: TerrainSampler,
+): SimulationState {
   const state = createSkierState();
-  resetSimulationOnTerrain(state, createProceduralTerrain(profile, seed), 0);
+  resetSimulationOnTerrain(state, terrain ?? createProceduralTerrain(profile, seed), 0);
   state.events.reset = false;
   return state;
 }

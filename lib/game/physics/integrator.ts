@@ -5,6 +5,7 @@ import {
 import { resetSimulation } from "../core/run-lifecycle";
 import type { InputFrame, SimulationState, SimulationWorld, Vec3 } from "../core/types";
 import { trailCenter } from "../terrain/trails";
+import { pointAtArcLength } from "../terrain/real-course";
 import { checkGates, checkObstacleCollision, onLand } from "./collision";
 import { GRAVITY, LIFT_DURATION, LIFT_OFFSET, MAX_SPEED } from "./constants";
 
@@ -30,14 +31,22 @@ export function integrateSkier(
     s.liftRide = Math.max(0, s.liftRide - dt);
     const progress = 1 - s.liftRide / LIFT_DURATION;
     const eased = progress * progress * (3 - 2 * progress);
-    const z = lerp(s.liftFromZ, s.liftToZ, eased);
-    const x = liftX(world, z);
-    s.pos.x = x; s.pos.y = cableY(world, z) - 2.7; s.pos.z = z;
+    const realLift = world.terrain.kind === "real" ? world.terrain.mainLift : null;
+    if (realLift) {
+      const point = pointAtArcLength(realLift.points, realLift.lengthM * eased);
+      s.pos.x = point.x; s.pos.y = point.y + 12.8; s.pos.z = point.z;
+      s.yaw = point.heading + Math.PI;
+    } else {
+      const z = lerp(s.liftFromZ, s.liftToZ, eased);
+      const x = liftX(world, z);
+      s.pos.x = x; s.pos.y = cableY(world, z) - 2.7; s.pos.z = z;
+      s.yaw = Math.PI;
+    }
     s.vel.x = 0; s.vel.y = 0; s.vel.z = 0;
-    s.yaw = Math.PI; s.onGround = false;
+    s.onGround = false;
     if (s.liftRide <= 0) {
       const best = Math.max(s.best, s.score);
-      resetSimulation(s, world, s.liftToZ);
+      resetSimulation(s, world, realLift ? 0 : s.liftToZ);
       s.best = best; s.events.liftFinished = true;
     }
     return;

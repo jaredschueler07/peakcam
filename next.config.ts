@@ -18,6 +18,17 @@ const nextConfig: NextConfig = {
           { key: "X-Robots-Tag", value: "noindex, nofollow" },
         ],
       },
+      {
+        // These files are committed precompressed. The browser fetch stack
+        // transparently decodes Brotli only when the response declares it;
+        // client DecompressionStream support is not portable for Brotli.
+        source: "/game/terrain/:slug.height.u16.br",
+        headers: [
+          { key: "Content-Encoding", value: "br" },
+          { key: "Content-Type", value: "application/octet-stream" },
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
     ];
   },
   async redirects() {

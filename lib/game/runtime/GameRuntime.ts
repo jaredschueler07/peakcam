@@ -2,7 +2,7 @@ import type { ResortGameProfile } from "../config/schema";
 import { FIXED_DT, MAX_FRAME_DT, MAX_STEPS_PER_FRAME } from "../core/clock";
 import { createSimulation, stepSimulation } from "../core/simulation";
 import { beginLiftRide } from "../core/run-lifecycle";
-import type { SimulationState, SimulationWorld } from "../core/types";
+import type { SimulationState, SimulationWorld, TerrainSampler } from "../core/types";
 import { GamepadAdapter } from "../input/GamepadAdapter";
 import { InputManager } from "../input/InputManager";
 import { KeyboardAdapter } from "../input/KeyboardAdapter";
@@ -11,12 +11,13 @@ import { PointerLockAdapter } from "../input/PointerLockAdapter";
 import { TouchAdapter } from "../input/TouchAdapter";
 import type { ControlScheme, InputAdapter } from "../input/types";
 import { GameRenderer } from "../rendering/Renderer";
-import { createProceduralWorld } from "../terrain/obstacles";
+import { createWorld } from "../terrain/obstacles";
 import { UiBridge } from "./UiBridge";
 
 export interface RuntimeAnalytics {
   controlActivated(scheme: ControlScheme): void;
   pointerLock(status: "acquired" | "denied" | "unsupported" | "lost", errorName?: string): void;
+  terrainFallback(errorName: string): void;
 }
 
 export class GameRuntime {
@@ -43,9 +44,12 @@ export class GameRuntime {
     profile: ResortGameProfile,
     readonly ui: UiBridge,
     analytics: RuntimeAnalytics,
+    terrain: TerrainSampler,
+    readonly assetLoadMs = 0,
   ) {
-    this.world = createProceduralWorld(profile, profile.seed);
-    this.state = createSimulation(profile, profile.seed);
+    this.world = createWorld(profile, profile.seed, terrain);
+    this.state = createSimulation(profile, profile.seed, terrain);
+    ui.configureTerrain(terrain);
     this.input = new InputManager((scheme) => {
       if (!this.activated) { this.activated = true; analytics.controlActivated(scheme); }
     });
@@ -102,6 +106,7 @@ export class GameRuntime {
         if (events.landed) this.ui.emit({ type: "landed" });
         if (events.gatePassed) this.ui.emit({ type: "gate-passed" });
         if (events.trailChanged) this.ui.emit({ type: "trail-changed", trailIndex: this.state.selectedTrail });
+        if (events.finished) this.ui.emit({ type: "finished", reason: "finish" });
         this.accumulator -= FIXED_DT; steps += 1;
       }
       if (steps === MAX_STEPS_PER_FRAME) this.accumulator = 0;
