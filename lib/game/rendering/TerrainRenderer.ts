@@ -1,15 +1,87 @@
 import * as THREE from "three";
-import type { SimulationWorld } from "../core/types";
+import { clamp01, smoothstep } from "../core/math";
+import type { SimulationWorld, TerrainSampler } from "../core/types";
+import { fbm, vnoise } from "../terrain/noise";
 
-const TILE_SIZE = 120;
-const RESOLUTION = 20;
-const GRID_RADIUS = 2;
+export const TILE_SIZE = 200;
+export const TILE_RESOLUTION = 50;
+const CELL_SIZE = TILE_SIZE / TILE_RESOLUTION;
+const GRID_SIZE = 5;
+const GRID_HALF = 2;
+const SUN_DIR = new THREE.Vector3(-0.46, 0.62, -0.64).normalize();
+const C_SNOW = new THREE.Color(0.955, 0.975, 1);
+const C_SHADE = new THREE.Color(0.66, 0.76, 0.92);
+const C_ROCK = new THREE.Color(0.29, 0.30, 0.335);
+const C_ROCK2 = new THREE.Color(0.44, 0.43, 0.44);
+const C_GROOM = new THREE.Color(0.90, 0.945, 1);
+const C_ICE = new THREE.Color(0.74, 0.87, 0.97);
+const colorScratch = new THREE.Color();
 
 interface Tile { mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>; x: number; z: number }
 
-function makeGeometry(): THREE.BufferGeometry {
-  const geometry = new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE, RESOLUTION, RESOLUTION);
-  geometry.rotateX(-Math.PI / 2);
+export function buildTileGeometry(terrain: TerrainSampler, ix: number, iz: number): THREE.BufferGeometry {
+  const n = TILE_RESOLUTION + 1;
+  const geometry = new THREE.BufferGeometry();
+  const positions = new Float32Array(n * n * 3);
+  const normals = new Float32Array(n * n * 3);
+  const colors = new Float32Array(n * n * 3);
+  const indices = new Uint32Array(TILE_RESOLUTION * TILE_RESOLUTION * 6);
+  const ox = ix * TILE_SIZE, oz = iz * TILE_SIZE;
+  const paddedSize = TILE_RESOLUTION + 3;
+  const paddedHeights = new Float32Array(paddedSize * paddedSize);
+  for (let j = 0; j < paddedSize; j += 1) {
+    for (let i = 0; i < paddedSize; i += 1) {
+      paddedHeights[j * paddedSize + i] = terrain.height(ox + (i - 1) * CELL_SIZE, oz + (j - 1) * CELL_SIZE);
+    }
+  }
+  let at = 0;
+  for (let j = 0; j < n; j += 1) {
+    const worldZ = oz + j * CELL_SIZE;
+    for (let i = 0; i < n; i += 1) {
+      const worldX = ox + i * CELL_SIZE;
+      const p = (j * n + i) * 3;
+      const sample = (j + 1) * paddedSize + i + 1;
+      const height = paddedHeights[sample];
+      let nx = (paddedHeights[sample - 1] - paddedHeights[sample + 1]) / (2 * CELL_SIZE);
+      let ny = 1;
+      let nz = (paddedHeights[sample - paddedSize] - paddedHeights[sample + paddedSize]) / (2 * CELL_SIZE);
+      const inverseLength = 1 / Math.hypot(nx, ny, nz);
+      nx *= inverseLength; ny *= inverseLength; nz *= inverseLength;
+      positions[p] = i * CELL_SIZE; positions[p + 1] = height; positions[p + 2] = j * CELL_SIZE;
+      normals[p] = nx; normals[p + 1] = ny; normals[p + 2] = nz;
+
+      const steep = clamp01((1 - ny) * 2.55);
+      const groomed = terrain.trailField(worldX, worldZ);
+      const grain = fbm(worldX * 0.021, worldZ * 0.021, 2);
+      const sparkle = vnoise(worldX * 0.55, worldZ * 0.55);
+      colorScratch.copy(C_SNOW);
+      const aspect = clamp01(nx * SUN_DIR.x + nz * SUN_DIR.z + 0.5);
+      colorScratch.lerp(C_SHADE, (1 - aspect) * 0.34 + (1 - ny) * 0.16);
+      colorScratch.lerp(C_ICE, clamp01((grain - 0.62) * 2.2) * 0.35);
+      colorScratch.r += (sparkle - 0.5) * 0.035;
+      colorScratch.g += (sparkle - 0.5) * 0.035;
+      colorScratch.b += (sparkle - 0.5) * 0.02;
+      if (steep > 0.30) colorScratch.lerp(grain > 0.5 ? C_ROCK2 : C_ROCK, smoothstep((steep - 0.30) / 0.42) * 0.94);
+      if (groomed > 0.02) {
+        const cord = 0.5 + 0.5 * Math.sin(worldZ * 1.15 + worldX * 0.06);
+        colorScratch.lerp(C_GROOM, groomed * 0.85);
+        colorScratch.multiplyScalar(1 + (cord - 0.5) * 0.045 * groomed);
+      }
+      colors[p] = colorScratch.r; colors[p + 1] = colorScratch.g; colors[p + 2] = colorScratch.b;
+    }
+  }
+  for (let j = 0; j < TILE_RESOLUTION; j += 1) {
+    for (let i = 0; i < TILE_RESOLUTION; i += 1) {
+      const a = j * n + i, b = a + 1, c = a + n, d = c + 1;
+      indices[at++] = a; indices[at++] = c; indices[at++] = b;
+      indices[at++] = b; indices[at++] = c; indices[at++] = d;
+    }
+  }
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+  geometry.computeBoundingSphere();
   return geometry;
 }
 
@@ -19,16 +91,14 @@ export class TerrainRenderer {
   private centerZ = Infinity;
 
   constructor(private readonly scene: THREE.Scene, private readonly world: SimulationWorld) {
-    for (let z = -GRID_RADIUS; z <= GRID_RADIUS; z += 1) {
-      for (let x = -GRID_RADIUS; x <= GRID_RADIUS; x += 1) {
-        const material = new THREE.MeshStandardMaterial({
-          color: 0xeaf2f4, roughness: 0.92, metalness: 0.02, flatShading: false,
-        });
-        const mesh = new THREE.Mesh(makeGeometry(), material);
+    const material = new THREE.MeshStandardMaterial({
+      vertexColors: true, roughness: 0.86, metalness: 0.02, flatShading: false, dithering: true,
+    });
+    for (let index = 0; index < GRID_SIZE * GRID_SIZE; index += 1) {
+        const mesh = new THREE.Mesh(new THREE.BufferGeometry(), material);
         mesh.receiveShadow = true;
         scene.add(mesh);
         this.tiles.push({ mesh, x: Infinity, z: Infinity });
-      }
     }
   }
 
@@ -36,35 +106,36 @@ export class TerrainRenderer {
     const cx = Math.floor(playerX / TILE_SIZE), cz = Math.floor(playerZ / TILE_SIZE);
     if (cx === this.centerX && cz === this.centerZ) return;
     this.centerX = cx; this.centerZ = cz;
-    let index = 0;
-    for (let dz = -1; dz <= GRID_RADIUS + 1; dz += 1) {
-      for (let dx = -GRID_RADIUS; dx <= GRID_RADIUS; dx += 1) {
-        const tile = this.tiles[index++];
-        this.rebuild(tile, cx + dx, cz + dz);
+    const wanted: Array<[number, number]> = [];
+    for (let dz = -1; dz <= GRID_SIZE - 2; dz += 1) {
+      for (let dx = -GRID_HALF; dx <= GRID_HALF; dx += 1) wanted.push([cx + dx, cz + dz]);
+    }
+    const keep = new Set<number>();
+    const stale: Tile[] = [];
+    for (const tile of this.tiles) {
+      const hit = wanted.findIndex(([x, z]) => x === tile.x && z === tile.z);
+      if (hit >= 0 && !keep.has(hit)) keep.add(hit); else stale.push(tile);
+    }
+    for (const tile of stale) {
+      for (let i = 0; i < wanted.length; i += 1) {
+        if (keep.has(i)) continue;
+        keep.add(i); this.rebuild(tile, wanted[i][0], wanted[i][1]); break;
       }
     }
   }
 
   private rebuild(tile: Tile, ix: number, iz: number): void {
     tile.x = ix; tile.z = iz;
-    const originX = ix * TILE_SIZE, originZ = iz * TILE_SIZE;
-    const positions = tile.mesh.geometry.attributes.position as THREE.BufferAttribute;
-    for (let i = 0; i < positions.count; i += 1) {
-      const worldX = originX + positions.getX(i) + TILE_SIZE / 2;
-      const worldZ = originZ + positions.getZ(i) + TILE_SIZE / 2;
-      positions.setY(i, this.world.terrain.height(worldX, worldZ));
-    }
-    positions.needsUpdate = true;
-    tile.mesh.geometry.computeVertexNormals();
-    tile.mesh.geometry.computeBoundingSphere();
-    tile.mesh.position.set(originX + TILE_SIZE / 2, 0, originZ + TILE_SIZE / 2);
+    tile.mesh.geometry.dispose();
+    tile.mesh.geometry = buildTileGeometry(this.world.terrain, ix, iz);
+    tile.mesh.position.set(ix * TILE_SIZE, 0, iz * TILE_SIZE);
   }
 
   dispose(): void {
     for (const { mesh } of this.tiles) {
-      this.scene.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose();
+      this.scene.remove(mesh); mesh.geometry.dispose();
     }
+    this.tiles[0]?.mesh.material.dispose();
     this.tiles.length = 0;
   }
 }
-

@@ -27,6 +27,9 @@ export class KeyboardAdapter implements InputAdapter {
     if (key === " " || key === "j") this.input.setAction("jump", true);
     if (key === "r") this.input.setAction("restart", true);
     if (key === "t") this.input.setAction("trail", true);
+    if (key === "g") this.input.setAction("lift", true);
+    if (key === "l") this.input.setAction("weatherCycle", true);
+    if (key === "1" || key === "2" || key === "3") this.input.setAction(`weather${key}` as "weather1" | "weather2" | "weather3", true);
     if (key === "escape" || key === "p") this.input.setAction("pause", true);
     this.input.setDigitalSteer("keyboard", Number(this.right) - Number(this.left));
   };
@@ -40,6 +43,9 @@ export class KeyboardAdapter implements InputAdapter {
     if (key === " " || key === "j") this.input.setAction("jump", false);
     if (key === "r") this.input.setAction("restart", false);
     if (key === "t") this.input.setAction("trail", false);
+    if (key === "g") this.input.setAction("lift", false);
+    if (key === "l") this.input.setAction("weatherCycle", false);
+    if (key === "1" || key === "2" || key === "3") this.input.setAction(`weather${key}` as "weather1" | "weather2" | "weather3", false);
     if (key === "escape" || key === "p") this.input.setAction("pause", false);
     this.input.setDigitalSteer("keyboard", Number(this.right) - Number(this.left));
   };
@@ -56,4 +62,3 @@ export class KeyboardAdapter implements InputAdapter {
   clear(): void { this.left = false; this.right = false; this.input.clearHeld(); }
   dispose(): void { this.setActive(false); }
 }
-

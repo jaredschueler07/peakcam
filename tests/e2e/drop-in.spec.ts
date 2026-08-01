@@ -59,7 +59,13 @@ test("pointer-lock rejection never blocks play", async ({ page }) => {
 
 test("navigation cleanly unmounts the runtime without console errors", async ({ page }) => {
   const errors: string[] = [];
-  page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+  page.on("console", (message) => {
+    if (message.type() !== "error") return;
+    // /_vercel/* analytics scripts only exist on Vercel infrastructure; their
+    // 404s when serving a production build locally are environmental noise.
+    if (message.location().url.includes("/_vercel/")) return;
+    errors.push(message.text());
+  });
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(V2_URL);
   await page.getByRole("button", { name: /start descent/i }).click();
