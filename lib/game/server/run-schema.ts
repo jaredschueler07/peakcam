@@ -26,7 +26,7 @@
 import { z } from "zod";
 
 // ─── Bounds ──────────────────────────────────────────────────
-// These mirror the CHECK constraints in supabase/migrations/012_drop_in_runs.sql.
+// These mirror the CHECK constraints in supabase/migrations/015_drop_in_runs.sql.
 // Keep the two in sync: zod rejects politely, Postgres rejects with a 500.
 
 /** 1 s — shorter than any legal descent. */
