@@ -14,7 +14,11 @@ test("EVENTS has the required product event names", () => {
     FAVORITE_REMOVED: "favorite_removed",
     CONDITION_VOTED: "condition_voted",
     DROP_IN_OPENED: "drop_in_opened",
+    DROP_IN_LOAD_STARTED: "drop_in_load_started",
+    DROP_IN_READY: "drop_in_ready",
     DROP_IN_STARTED: "drop_in_started",
+    DROP_IN_CONTROL_ACTIVATED: "drop_in_control_activated",
+    DROP_IN_POINTER_LOCK_RESULT: "drop_in_pointer_lock_result",
     DROP_IN_FAILED: "drop_in_failed",
   });
 });

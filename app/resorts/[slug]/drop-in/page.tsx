@@ -4,8 +4,10 @@ import {
   DROP_IN_RESORT_SLUGS,
   getDropInGameUrl,
   getDropInProfile,
+  DROP_IN_GAME_PROFILES,
 } from "@/lib/drop-in";
 import DropInFrame from "@/components/drop-in/DropInFrame";
+import DropInClientBoundary from "@/components/drop-in/DropInClientBoundary";
 
 const BASE_URL = "https://peakcam.io";
 
@@ -54,21 +56,32 @@ export async function generateMetadata({
 
 export default async function DropInPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ engine?: string | string[] }>;
 }) {
   const { slug } = await params;
   const profile = getDropInProfile(slug);
   const gameUrl = getDropInGameUrl(slug);
 
   // Anything outside the three-resort pilot is a 404, not a default mountain.
+  // Decided before searchParams is awaited: touching searchParams opts the
+  // route into dynamic streaming, and once the shell has flushed notFound()
+  // can no longer set the 404 status code.
   if (!profile || !gameUrl) return notFound();
+
+  const { engine } = await searchParams;
 
   // The layout's global skip link targets #main-content; every other route
   // provides it, and without it "Skip to main content" lands on nothing.
   return (
     <main id="main-content">
-      <DropInFrame profile={profile} gameUrl={gameUrl} />
+      {engine === "v2" ? (
+        <DropInClientBoundary profile={DROP_IN_GAME_PROFILES[slug as keyof typeof DROP_IN_GAME_PROFILES]} />
+      ) : (
+        <DropInFrame profile={profile} gameUrl={gameUrl} />
+      )}
     </main>
   );
 }
