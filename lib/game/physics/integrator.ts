@@ -102,7 +102,7 @@ export function integrateSkier(
     const forwardVelocity = dot(s.vel, forward);
     const rightVelocity = dot(s.vel, right);
     const edge = clamp01(Math.abs(steer));
-    const grip = lerp(4.6, 12, edge) * (1 + brake * 1.4);
+    const grip = lerp(4.6, 12, edge) * (1 + brake * 1.4) * world.config.gripMultiplier;
     const newRightVelocity = rightVelocity * Math.exp(-grip * dt);
     s.carve = damp(s.carve, clamp01(Math.abs(rightVelocity) / 13) * (0.35 + edge * 0.65), 9, dt);
 
@@ -126,6 +126,7 @@ export function integrateSkier(
     } else if (s.jumpCharge > 0) {
       addScaledVector(s.vel, normal, 6.8 + s.jumpCharge * 13);
       s.pos.y += 0.2; s.jumpCharge = 0; s.onGround = false; launched = true;
+      s.events.jumped = true;
       s.airTime = 0; s.spin = 0;
     }
     if (!launched) { s.airTime = 0; s.spin = 0; }
@@ -147,11 +148,12 @@ export function integrateSkier(
     const impact = length(s.vel);
     s.pos.y = groundHeight2; s.onGround = true;
     if (s.vel.y < 0) s.vel.y = 0;
-    if (!launched) onLand(s, impact);
+    if (!launched) onLand(s, impact, world.config.landingImpactThresholdMultiplier);
   }
 
   const velocity = length(s.vel);
-  if (velocity > MAX_SPEED) multiplyScalar(s.vel, MAX_SPEED / velocity);
+  const maxSpeed = MAX_SPEED * world.config.topSpeedMultiplier;
+  if (velocity > maxSpeed) multiplyScalar(s.vel, maxSpeed / velocity);
   s.distance += flatSpeed * dt;
   if (s.invuln > 0) s.invuln -= dt;
   checkObstacleCollision(s, world);

@@ -13,6 +13,9 @@ import type { ControlScheme, InputAdapter } from "../input/types";
 import { GameRenderer, type RenderPerformanceSummary } from "../rendering/Renderer";
 import { createWorld } from "../terrain/obstacles";
 import { UiBridge } from "./UiBridge";
+import type { ConditionsSnapshot } from "../conditions";
+import { simulationConfig } from "../core/config";
+import type { RuntimeAudio } from "./RuntimeAudio";
 
 export interface RuntimeAnalytics {
   controlActivated(scheme: ControlScheme): void;
@@ -46,9 +49,11 @@ export class GameRuntime {
     readonly ui: UiBridge,
     private readonly analytics: RuntimeAnalytics,
     terrain: TerrainSampler,
+    private readonly conditions: ConditionsSnapshot,
+    private readonly audio: RuntimeAudio,
     readonly assetLoadMs = 0,
   ) {
-    this.world = createWorld(profile, profile.seed, terrain);
+    this.world = createWorld(profile, profile.seed, terrain, simulationConfig(conditions.surface));
     this.state = createSimulation(profile, profile.seed, terrain);
     ui.configureTerrain(terrain);
     this.input = new InputManager((scheme) => {
@@ -56,6 +61,7 @@ export class GameRuntime {
     });
     const sceneStartedAt = performance.now();
     this.renderer = new GameRenderer(canvas, profile, this.world, this.state);
+    this.renderer.setWeather(conditions.weatherDefault);
     this.sceneBuildMs = performance.now() - sceneStartedAt;
     this.keyboard = new KeyboardAdapter(this.input);
     this.pointerDrag = new PointerDragAdapter(canvas, this.input);
@@ -96,14 +102,23 @@ export class GameRuntime {
     if (this.input.consumePausePressed()) {
       if (this.paused) this.resume(); else this.pause();
     }
-    if (this.input.consumeLiftPressed() && this.state.liftRide <= 0) beginLiftRide(this.state);
+    if (this.input.consumeLiftPressed() && this.state.liftRide <= 0) {
+      beginLiftRide(this.state); this.audio.playLift();
+    }
     const weather = this.input.consumeWeatherPressed();
-    if (weather !== null) this.renderer.setWeather(weather);
+    if (weather !== null) {
+      this.renderer.setWeather(weather);
+      this.weatherIndex = weather < 0
+        ? (this.weatherIndex + 1) % this.world.profile.weather.length
+        : (weather + this.world.profile.weather.length) % this.world.profile.weather.length;
+      this.audio.playUi("confirm");
+    }
     if (!this.paused) {
       this.accumulator += frameDt;
       let steps = 0;
       while (this.accumulator >= FIXED_DT && steps < MAX_STEPS_PER_FRAME) {
         const events = stepSimulation(this.state, this.input.nextFrame(), FIXED_DT, this.world);
+        this.audio.playSimulationEvents(events);
         if (events.crashed && events.crashReason) this.ui.emit({ type: "crashed", reason: events.crashReason });
         if (events.landed) this.ui.emit({ type: "landed" });
         if (events.gatePassed) this.ui.emit({ type: "gate-passed" });
@@ -112,7 +127,15 @@ export class GameRuntime {
         this.accumulator -= FIXED_DT; steps += 1;
       }
       if (steps === MAX_STEPS_PER_FRAME) this.accumulator = 0;
-      this.ui.publish(this.state, nowMs);
+      if (this.ui.publish(this.state, nowMs)) {
+        const weatherPreset = this.world.profile.weather[this.weatherIndex];
+        this.audio.updateListener({
+          speed: Math.hypot(this.state.vel.x, this.state.vel.z),
+          carve: this.state.carve,
+          onGround: this.state.onGround,
+          liftRide: this.state.liftRide,
+        }, this.conditions.surface, Math.min(1, weatherPreset.wind / 15), nowMs);
+      }
       this.renderer.render(this.state, this.world, frameDt, this.state.crouch, rawFrameMs);
     }
     this.raf = requestAnimationFrame(this.frame);
@@ -123,6 +146,10 @@ export class GameRuntime {
   private onVisibility = () => { if (document.hidden) this.pause(); else this.input.clearHeld(); };
   private onPointerLockGesture = () => { void this.pointerLock.request(); };
 
+  private weatherIndex: number = this.conditions.weatherDefault;
+
+  setAudioEnabled(enabled: boolean): void { this.audio.setEnabled(enabled); }
+
   dispose(): void {
     if (this.disposed) return; this.disposed = true;
     if (this.raf) cancelAnimationFrame(this.raf); this.raf = 0;
@@ -132,6 +159,6 @@ export class GameRuntime {
     this.canvas.removeEventListener("dblclick", this.onPointerLockGesture);
     for (const adapter of this.adapters) adapter.dispose();
     if (document.pointerLockElement === this.canvas) document.exitPointerLock?.();
-    this.input.clearHeld(); this.renderer.dispose(); this.ui.dispose();
+    this.input.clearHeld(); this.renderer.dispose(); this.audio.dispose(); this.ui.dispose();
   }
 }

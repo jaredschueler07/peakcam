@@ -99,7 +99,10 @@ export class GameRenderer {
     this.skier = new SkierRenderer(this.built.scene);
     this.worldRenderer = new WorldRenderer(this.built.scene, profile, world);
     this.reducedMotion = options.reducedMotion ?? (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-    this.effects = new EffectsRenderer(this.built.scene, world.seed, world.terrain, this.reducedMotion);
+    this.effects = new EffectsRenderer(
+      this.built.scene, world.seed, world.terrain, this.reducedMotion,
+      world.config.sprayDepthMultiplier,
+    );
     this.cameraController = new CameraController(this.built.camera, state, this.reducedMotion);
     this.weather = new WeatherRenderer(profile, this.built, this.renderer);
     this.built.atmosphereUniforms.referenceHeight.value = state.pos.y;

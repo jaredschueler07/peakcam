@@ -9,6 +9,7 @@ import { createSimulation, stepSimulation } from "../core/simulation";
 import type { InputFrame } from "../core/types";
 import { createProceduralWorld, getChunk } from "../terrain/obstacles";
 import { MAX_SPEED } from "./constants";
+import { simulationConfig } from "../core/config";
 
 const input = (values: Partial<InputFrame> = {}): InputFrame => ({
   steer: 0, tuck: 0, brake: 0, jumpHeld: false, jumpPressed: false,
@@ -23,6 +24,19 @@ test("physics clamps analog input and never exceeds the 58 m/s speed cap", () =>
   stepSimulation(state, input({ steer: 12, tuck: 4, brake: -3 }), FIXED_DT, world);
   assert.ok(Math.hypot(state.vel.x, state.vel.y, state.vel.z) <= MAX_SPEED);
   assert.ok(Number.isFinite(state.yaw));
+});
+
+test("surface config changes the integrator speed cap without changing packed parity", () => {
+  const profile = DROP_IN_GAME_PROFILES["ski-portillo"];
+  for (const [surface, multiplier] of [["powder", 0.92], ["packed", 1], ["firm", 1.05], ["ice", 1]] as const) {
+    const world = createProceduralWorld(profile, profile.seed, simulationConfig(surface));
+    const state = createSimulation(profile, profile.seed);
+    state.onGround = false;
+    state.pos.y += 100;
+    state.vel.x = 100; state.vel.y = 100; state.vel.z = 100;
+    stepSimulation(state, input(), FIXED_DT, world);
+    assert.ok(Math.abs(Math.hypot(state.vel.x, state.vel.y, state.vel.z) - MAX_SPEED * multiplier) < 1e-10);
+  }
 });
 
 test("holding then releasing jump charges a normal pop and enters air", () => {
@@ -109,4 +123,17 @@ test("clean landings bank airtime while misaligned hard landings crash", () => {
   onLand(bad, 30);
   assert.strictEqual(bad.crash, 1.7);
   assert.strictEqual(bad.events.crashReason, "LANDING");
+});
+
+test("powder raises the bad-landing impact threshold by twenty percent", () => {
+  const profile = DROP_IN_GAME_PROFILES.heavenly;
+  const packed = createSimulation(profile, profile.seed);
+  packed.invuln = 0; packed.airTime = 0.5; packed.vel.z = -25;
+  onLand(packed, 25, simulationConfig("packed").landingImpactThresholdMultiplier);
+  assert.equal(packed.events.crashReason, "LANDING");
+
+  const powder = createSimulation(profile, profile.seed);
+  powder.invuln = 0; powder.airTime = 0.5; powder.vel.z = -25;
+  onLand(powder, 25, simulationConfig("powder").landingImpactThresholdMultiplier);
+  assert.equal(powder.events.crashReason, null);
 });

@@ -8,8 +8,12 @@ import {
 } from "@/lib/drop-in";
 import DropInFrame from "@/components/drop-in/DropInFrame";
 import DropInClientBoundary from "@/components/drop-in/DropInClientBoundary";
+import { getResortBySlug } from "@/lib/supabase";
+import { getWeatherForecast } from "@/lib/weather";
+import { buildConditionsSnapshot } from "@/lib/game/conditions";
 
 const BASE_URL = "https://peakcam.io";
+export const revalidate = 3600;
 
 // The pilot roster is static and tiny — prerender all three.
 export function generateStaticParams() {
@@ -72,16 +76,24 @@ export default async function DropInPage({
   if (!profile || !gameUrl) return notFound();
 
   const { engine } = await searchParams;
+  if (engine !== "v2") {
+    return <main id="main-content"><DropInFrame profile={profile} gameUrl={gameUrl} /></main>;
+  }
+
+  const resort = await getResortBySlug(slug);
+  const forecast = resort ? await getWeatherForecast(resort.lat, resort.lng) : null;
+  const conditions = resort
+    ? buildConditionsSnapshot(resort, resort.snow_report, forecast)
+    : buildConditionsSnapshot({ slug, cond_rating: "good" }, null, null);
 
   // The layout's global skip link targets #main-content; every other route
   // provides it, and without it "Skip to main content" lands on nothing.
   return (
     <main id="main-content">
-      {engine === "v2" ? (
-        <DropInClientBoundary profile={DROP_IN_GAME_PROFILES[slug as keyof typeof DROP_IN_GAME_PROFILES]} />
-      ) : (
-        <DropInFrame profile={profile} gameUrl={gameUrl} />
-      )}
+      <DropInClientBoundary
+        profile={DROP_IN_GAME_PROFILES[slug as keyof typeof DROP_IN_GAME_PROFILES]}
+        conditions={conditions}
+      />
     </main>
   );
 }

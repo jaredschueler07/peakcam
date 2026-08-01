@@ -7,6 +7,8 @@ import { createTerrainSource } from "../terrain/terrain-source";
 import type { TerrainSource } from "../terrain/terrain-source";
 import type { TerrainLoadOptions } from "../rendering/loaders/TerrainAssetLoader";
 import type { RealTerrainAssets } from "../terrain/terrain-source";
+import type { ConditionsSnapshot } from "../conditions";
+import type { RuntimeAudio } from "./RuntimeAudio";
 
 interface RuntimeTerrainLoader {
   load(slug: ResortGameProfile["slug"], options?: TerrainLoadOptions): Promise<RealTerrainAssets>;
@@ -17,6 +19,8 @@ export interface CreateGameOptions {
   profile: ResortGameProfile;
   uiBridge: UiBridge;
   analytics: RuntimeAnalytics;
+  conditions: ConditionsSnapshot;
+  audio: RuntimeAudio;
   signal?: AbortSignal;
 }
 
@@ -50,7 +54,8 @@ export async function createGame(options: CreateGameOptions): Promise<GameRuntim
   );
   const assetLoadMs = performance.now() - startedAt;
   const runtime = new GameRuntime(
-    options.canvas, options.profile, options.uiBridge, options.analytics, source.sampler, assetLoadMs,
+    options.canvas, options.profile, options.uiBridge, options.analytics, source.sampler,
+    options.conditions, options.audio, assetLoadMs,
   );
   runtime.start();
   return runtime;

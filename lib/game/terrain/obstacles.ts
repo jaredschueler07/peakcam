@@ -2,20 +2,24 @@ import type { ResortGameProfile } from "../config/schema";
 import { clamp01, TAU } from "../core/math";
 import { hashInt, mulberry32 } from "../core/rng";
 import type { NearestTrail, Obstacle, SimulationWorld, Vec3 } from "../core/types";
+import { simulationConfig, type SimulationConfig } from "../core/config";
 import { createProceduralTerrain } from "./heightfield";
 import { fbm } from "./noise";
 
 export const CHUNK_SIZE = 120;
 const normalScratch: Vec3 = { x: 0, y: 1, z: 0 };
 
-export function createProceduralWorld(profile: ResortGameProfile, seed: number): SimulationWorld {
-  return { profile, seed, terrain: createProceduralTerrain(profile, seed), chunks: new Map() };
+export function createProceduralWorld(
+  profile: ResortGameProfile, seed: number, config: SimulationConfig = simulationConfig(),
+): SimulationWorld {
+  return { profile, seed, terrain: createProceduralTerrain(profile, seed), config, chunks: new Map() };
 }
 
 export function createWorld(
   profile: ResortGameProfile, seed: number, terrain: SimulationWorld["terrain"],
+  config: SimulationConfig = simulationConfig(),
 ): SimulationWorld {
-  return { profile, seed, terrain, chunks: new Map() };
+  return { profile, seed, terrain, config, chunks: new Map() };
 }
 
 export function getChunk(world: SimulationWorld, cx: number, cz: number): Obstacle[] {
