@@ -1,4 +1,4 @@
--- supabase/migrations/012_drop_in_runs.sql
+-- supabase/migrations/015_drop_in_runs.sql
 -- ─────────────────────────────────────────────────────────────
 -- PeakCam — Drop In v2 competitive runs (`drop_in_runs`)
 --
@@ -8,7 +8,7 @@
 -- file has NOT been applied — running it is a deliberate, manual step.
 --
 -- Numbering note: `012_south_america.sql` already exists. The `012_` prefix
--- here matches the Drop In v2 plan (PLAN.md Phase 8 "Migration 012") and the
+-- here matches the Drop In v2 plan (PLAN.md Phase 8 "Migration 015") and the
 -- architecture report's file layout; duplicate numbers already have precedent
 -- in this directory (004 and 005 each have two files).
 --
