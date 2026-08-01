@@ -131,9 +131,11 @@ is swept on each new voice, so a long run does not accumulate dead nodes.
 
 ---
 
-## 5. Sample layers (Phase 7.2)
+## 5. Sample layers (Phase 7.2 — landed)
 
-`SampleLayers` is complete as structure; **no audio files ship yet.**
+`SampleLayers` is the structure; **ten CC0 recordings now ship** in
+`public/game/audio/`, described by a committed `manifest.json` and read through
+`lib/game/audio/manifest.ts`.
 
 ```ts
 interface SampleManifest {
@@ -156,21 +158,116 @@ cancels in flight; an external signal can be passed in as well — the runtime's
 teardown path should hand it the same abort signal it uses for terrain assets.
 `AudioEngine.loadSampleLayers` crossfades in only if at least one layer decoded.
 
-### Sourcing the samples
+### The shipped layer set
 
-Files land in `public/game/audio/`, streamed `.ogg` with an `.mp3` fallback only if a
-target browser needs it (per the architecture report's asset table). Candidates, both
-usable without attribution friction:
+Five loop beds and five one-shots, all on the **`sfx`** bus. Nothing sits on the
+`music` bus yet: every layer here has a procedural counterpart, so all ten should
+participate in the crossfade duck rather than bypass it. Per-resort ambience and any
+soundtrack (DESIGN §3.5) are the first `music`-bus candidates and are not in this set.
 
-- **Freesound** — filter to the CC0 licence explicitly; per-file licences vary and
-  CC-BY files would put an attribution obligation in the shipped page.
-- **Sonniss GDC Game Audio Bundle** — royalty-free for commercial game use, high
-  quality, large files that will need trimming and re-encoding.
+| Layer | Loop | Gain | s | LUFS | Peak | .ogg | .m4a |
+|---|---|---|---|---|---|---|---|
+| `wind-bed` | ✓ | 0.90 | 10.0 | −18.2 | −9.3 | 145 K | 160 K |
+| `wind-gust` | ✓ | 0.70 | 12.2 | −18.2 | −5.1 | 130 K | 195 K |
+| `carve-packed` | ✓ | 1.25 | 5.0 | −20.7 | −1.3 | 46 K | 62 K |
+| `carve-powder` | ✓ | 1.00 | 9.5 | −19.3 | −6.9 | 91 K | 114 K |
+| `lift-hum` | ✓ | 0.45 | 4.7 | −18.7 | −2.0 | 44 K | 57 K |
+| `jump-whoosh` | | 0.70 | 0.73 | −14.4 | −2.6 | 10 K | 10 K |
+| `land-soft` | | 0.90 | 1.33 | −20.7 | −3.3 | 16 K | 17 K |
+| `crash-impact` | | 1.30 | 1.44 | −25.9 | −3.0 | 17 K | 18 K |
+| `ui-tick` | | 0.60 | 0.74 | −26.0 | −3.0 | 10 K | 10 K |
+| `trick-chime` | | 1.40 | 2.50 | −31.5 | −3.4 | 22 K | 31 K |
 
-Wanted: alpine wind gusts, ski/board edge on hardpack and on ice, powder swish,
-landing thumps, chairlift machinery, sparse per-resort ambience (lift hum at
-Breckenridge, wind at Portillo, birds in Heavenly's pines — DESIGN §3.5). Record the
-source URL and licence for each file alongside the manifest when they land.
+**1.2 MB total**, against a 2.5 MB budget. The two wind beds are stereo; everything
+else is mono, which is what keeps the payload at half the budget — the procedural bed
+is the layer that carries reactivity, so stereo width only earns its bytes on the
+ambience.
+
+Layer names deliberately mirror the vocabulary already in the engine: the loops match
+the `ProceduralSoundBank` beds (wind, edge/carve, lift hum) and the one-shots match
+`AudioEventName` (§4), so a Phase 7.3 wiring layer can map an event to a sample by
+name without a translation table.
+
+### Sourcing
+
+Every file is **CC0 1.0**, from *The Designer's Choice UCS Collection* by Nicholas A.
+Judy, self-published to the Internet Archive. `public/game/audio/CREDITS.md` records
+the archive.org item and in-item path for all ten, plus the three layers that are
+texture substitutes (the carve bed is nails on a plastic tray; the lift hum is an
+escalator; the crash is a body falling on grass) and the sources that were tried and
+rejected.
+
+CC0 was a hard filter, not a preference: a CC-BY file would put a permanent
+attribution obligation into the shipped page, and the collection's own items that
+carried *no* licence field were skipped rather than assumed. Freesound needs an API
+token this environment does not have; Pixabay and Sonniss refuse non-browser clients;
+Wikimedia Commons' alpine wind recordings are almost all CC BY-SA.
+
+### Encoding
+
+`public/game/audio/tools/build-samples.sh` regenerates the whole set from the
+downloaded masters (which are *not* committed — ~30 MB of WAV, some at 192 kHz).
+Everything lands at 44.1 kHz, Ogg Vorbis `q4` with an AAC `.m4a` twin.
+
+Three decisions worth carrying forward:
+
+- **Loops are loudness-matched, one-shots are peak-matched.** The beds get a two-pass
+  linear `loudnorm` to −18 LUFS. One-shots do *not*: EBU R128 integrates over gated
+  400 ms blocks, so on a sub-3 s transient it measures the decay tail more than the
+  hit and lands short samples 5–10 dB too quiet — the first pass put the chime at
+  −31 LUFS and it was inaudible next to the bed. They are normalised to −3 dBFS true
+  peak instead, and relative balance is set by the manifest `gain` column above.
+  That is why the LUFS column looks ragged for the one-shots and tight for the loops;
+  it is the intended result, not drift.
+- **Loop seams are folded, not faded.** Rather than fading a clip in and out (which
+  makes the loop point audible as a dip), the tail is crossfaded back over the head
+  and the result is `(tail × head) ++ middle`. The seam the loop actually plays is a
+  transition the recording already contained.
+- **A peak guard, not a limiter, protects the beds.** `loudnorm` left `carve-packed`
+  touching 0 dBFS, which Vorbis then overshot into clipping. The fix attenuates the
+  whole bed to −2 dBFS; limiting would have flattened the scrape transients that are
+  the only reason that layer reads as an edge.
+
+Homebrew's ffmpeg 8 ships no `libvorbis` (only the experimental native encoder), so
+the Ogg leg goes through `oggenc` from `vorbis-tools`.
+
+### Reading the manifest (`lib/game/audio/manifest.ts`)
+
+`manifest.json` is a **superset** of `SampleManifest`: each layer also carries a
+`fallbackUrl` pointing at the `.m4a` twin. `SampleLayers` has no opinion about codecs
+— it fetches whatever `url` says — so codec choice lives in the loader, and
+`SampleLayers`/`AudioEngine` are untouched by Phase 7.2.
+
+```ts
+const file = await loadSampleManifest();        // null on any failure, never throws
+const manifest = file && toSampleManifest(file); // picks .ogg or .m4a, drops fallbackUrl
+```
+
+`toSampleManifest` defaults to `canPlayOggVorbis()`, which probes
+`canPlayType('audio/ogg; codecs="vorbis"')` and returns `true` when there is no
+`document`, so SSR never bakes a Safari-shaped choice into markup. The zod schema
+pins names to kebab-case, gains to 0..2, and URLs to `/game/audio/*.{ogg,m4a}` — an
+off-origin URL is a validation failure, not a fetch.
+
+`manifest.test.ts` validates the *committed* file against the schema, asserts every
+referenced asset exists on disk, and enforces the byte budgets (150 KB per one-shot,
+400 KB per loop, 2.5 MB total), so an oversized re-encode fails the build.
+
+### Phase 7.3 wiring note
+
+Nothing loads the manifest yet — `GameRuntime` is still untouched. The Phase 7.3 hook
+is: **after the Start gesture has called `engine.init()`**, fire and forget
+
+```ts
+const file = await loadSampleManifest(SAMPLE_MANIFEST_URL, fetch, teardownSignal);
+if (file) await engine.loadSampleLayers(toSampleManifest(file), fetch, teardownSignal);
+```
+
+Order matters — `loadSampleLayers` returns `{ anyLoaded: false }` before `init()`
+because there is no graph to attach to, so calling it eagerly at module scope silently
+does nothing. Pass the same `AbortSignal` the runtime uses for terrain assets; the
+`await` must not gate the first frame, and a `null` file or an all-failed report is a
+non-event that leaves the procedural bed playing.
 
 ---
 
