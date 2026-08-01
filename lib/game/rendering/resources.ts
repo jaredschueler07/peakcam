@@ -12,6 +12,7 @@ export function collectResources(root: THREE.Object3D): { geometries: Set<THREE.
     for (const material of list) {
       materials.add(material);
       for (const value of Object.values(material)) if (value instanceof THREE.Texture) textures.add(value);
+      for (const value of Object.values(material.userData)) if (value instanceof THREE.Texture) textures.add(value);
       if (material instanceof THREE.ShaderMaterial) {
         for (const uniform of Object.values(material.uniforms)) if (uniform.value instanceof THREE.Texture) textures.add(uniform.value);
       }

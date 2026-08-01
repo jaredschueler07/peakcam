@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { clamp01, smoothstep } from "../core/math";
 import type { SimulationWorld, TerrainSampler } from "../core/types";
 import { fbm, vnoise } from "../terrain/noise";
+import { buildSnowDetailNormal, polishSnowMaterial, type SnowUniforms } from "./SnowMaterial";
 
 export const TILE_SIZE = 200;
 export const TILE_RESOLUTION = 50;
@@ -90,10 +91,15 @@ export class TerrainRenderer {
   private centerX = Infinity;
   private centerZ = Infinity;
 
-  constructor(private readonly scene: THREE.Scene, private readonly world: SimulationWorld) {
+  constructor(private readonly scene: THREE.Scene, private readonly world: SimulationWorld, snowUniforms?: SnowUniforms) {
     const material = new THREE.MeshStandardMaterial({
       vertexColors: true, roughness: 0.86, metalness: 0.02, flatShading: false, dithering: true,
     });
+    if (snowUniforms) {
+      const detailNormal = buildSnowDetailNormal(world.seed);
+      material.userData.snowDetail = detailNormal;
+      polishSnowMaterial(material, detailNormal, snowUniforms);
+    }
     for (let index = 0; index < GRID_SIZE * GRID_SIZE; index += 1) {
         const mesh = new THREE.Mesh(new THREE.BufferGeometry(), material);
         mesh.receiveShadow = true;

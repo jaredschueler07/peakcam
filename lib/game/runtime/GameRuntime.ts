@@ -10,7 +10,7 @@ import { PointerDragAdapter } from "../input/PointerDragAdapter";
 import { PointerLockAdapter } from "../input/PointerLockAdapter";
 import { TouchAdapter } from "../input/TouchAdapter";
 import type { ControlScheme, InputAdapter } from "../input/types";
-import { GameRenderer } from "../rendering/Renderer";
+import { GameRenderer, type RenderPerformanceSummary } from "../rendering/Renderer";
 import { createWorld } from "../terrain/obstacles";
 import { UiBridge } from "./UiBridge";
 
@@ -18,6 +18,7 @@ export interface RuntimeAnalytics {
   controlActivated(scheme: ControlScheme): void;
   pointerLock(status: "acquired" | "denied" | "unsupported" | "lost", errorName?: string): void;
   terrainFallback(errorName: string): void;
+  performance(summary: RenderPerformanceSummary): void;
 }
 
 export class GameRuntime {
@@ -43,7 +44,7 @@ export class GameRuntime {
     private readonly canvas: HTMLCanvasElement,
     profile: ResortGameProfile,
     readonly ui: UiBridge,
-    analytics: RuntimeAnalytics,
+    private readonly analytics: RuntimeAnalytics,
     terrain: TerrainSampler,
     readonly assetLoadMs = 0,
   ) {
@@ -88,7 +89,8 @@ export class GameRuntime {
   private frame = (nowMs: number) => {
     this.raf = 0;
     if (this.disposed) return;
-    const frameDt = Math.min(MAX_FRAME_DT, Math.max(0, (nowMs - this.lastMs) / 1000));
+    const rawFrameMs = Math.max(0, nowMs - this.lastMs);
+    const frameDt = Math.min(MAX_FRAME_DT, rawFrameMs / 1000);
     this.lastMs = nowMs;
     this.gamepad.poll();
     if (this.input.consumePausePressed()) {
@@ -106,12 +108,12 @@ export class GameRuntime {
         if (events.landed) this.ui.emit({ type: "landed" });
         if (events.gatePassed) this.ui.emit({ type: "gate-passed" });
         if (events.trailChanged) this.ui.emit({ type: "trail-changed", trailIndex: this.state.selectedTrail });
-        if (events.finished) this.ui.emit({ type: "finished", reason: "finish" });
+        if (events.finished) { this.ui.emit({ type: "finished", reason: "finish" }); this.analytics.performance(this.renderer.takePerformanceSummary()); }
         this.accumulator -= FIXED_DT; steps += 1;
       }
       if (steps === MAX_STEPS_PER_FRAME) this.accumulator = 0;
       this.ui.publish(this.state, nowMs);
-      this.renderer.render(this.state, this.world, frameDt, this.state.crouch);
+      this.renderer.render(this.state, this.world, frameDt, this.state.crouch, rawFrameMs);
     }
     this.raf = requestAnimationFrame(this.frame);
   };

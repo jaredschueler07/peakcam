@@ -63,6 +63,7 @@ export default function DropInGame({ profile }: { profile: ResortGameProfile }) 
             controlActivated: (scheme) => track(EVENTS.DROP_IN_CONTROL_ACTIVATED, { resort: profile.slug, engine: "v2", control_scheme: scheme }),
             pointerLock: (status, errorName) => track(EVENTS.DROP_IN_POINTER_LOCK_RESULT, { resort: profile.slug, engine: "v2", pointer_lock_state: status, failure_code: errorName }),
             terrainFallback: (errorName) => track(EVENTS.DROP_IN_TERRAIN_FALLBACK, { resort: profile.slug, engine: "v2", failure_code: errorName }),
+            performance: (summary) => track(EVENTS.DROP_IN_PERFORMANCE, { resort: profile.slug, engine: "v2", p50_frame_ms: summary.p50FrameMs, p95_frame_ms: summary.p95FrameMs, quality_rung: summary.rung, dpr: summary.dpr, device_tier: summary.tier }),
           },
         });
         if (cancelled) { created.dispose(); return; }

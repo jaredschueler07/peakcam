@@ -30,7 +30,7 @@ test("runtime terrain loading reports analytics and falls back to the parity sam
   console.warn = () => {};
   try {
     const source = await loadTerrainForRuntime(profile, bridge, {
-      controlActivated() {}, pointerLock() {}, terrainFallback: (name) => failures.push(name),
+      controlActivated() {}, pointerLock() {}, terrainFallback: (name) => failures.push(name), performance() {},
     }, { load: async () => { throw new TypeError("offline"); } });
     assert.equal(source.kind, "procedural");
     assert.deepEqual(failures, ["TypeError"]);
@@ -43,7 +43,7 @@ test("the loaded runtime scene drapes and bounds Portillo landmarks against its 
   const profile = DROP_IN_GAME_PROFILES["ski-portillo"];
   const bridge = new UiBridge(profile);
   const source = await loadTerrainForRuntime(profile, bridge, {
-    controlActivated() {}, pointerLock() {}, terrainFallback() {},
+    controlActivated() {}, pointerLock() {}, terrainFallback() {}, performance() {},
   }, { load: async () => portilloAssets() });
   assert.equal(source.kind, "real");
 

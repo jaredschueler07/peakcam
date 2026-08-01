@@ -5,11 +5,35 @@ const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 const damp = (from: number, to: number, lambda: number, dt: number) =>
   from + (to - from) * (1 - Math.exp(-lambda * dt));
 
+function noise1(value: number): number {
+  const cell = Math.floor(value), fraction = value - cell;
+  const smooth = fraction * fraction * (3 - 2 * fraction);
+  const at = (index: number) => {
+    const raw = Math.sin(index * 127.1 + 19.19) * 43758.5453;
+    return (raw - Math.floor(raw)) * 2 - 1;
+  };
+  return THREE.MathUtils.lerp(at(cell), at(cell + 1), smooth);
+}
+
+function criticalSpring(value: number, velocity: number, target: number, frequency: number, dt: number): [number, number] {
+  const omega = Math.PI * 2 * frequency;
+  const f = 1 + 2 * dt * omega;
+  const oo = omega * omega, hoo = dt * oo, hhoo = dt * hoo;
+  const inverse = 1 / (f + hhoo);
+  return [(f * value + dt * velocity + hhoo * target) * inverse, (velocity + hoo * (target - value)) * inverse];
+}
+
 export class CameraController {
   private readonly position = new THREE.Vector3();
   private readonly target = new THREE.Vector3();
   private elapsed = 0;
   private readonly reducedMotion: boolean;
+  private shake = 0;
+  private shakeVelocity = 0;
+  private roll = 0;
+  readonly speedUniform: THREE.IUniform<number> = { value: 0 };
+
+  get motionAmplitude(): number { return this.shake; }
 
   constructor(private readonly camera: THREE.PerspectiveCamera, state: SimulationState, reducedMotion?: boolean) {
     this.reducedMotion = reducedMotion ?? (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
@@ -19,6 +43,8 @@ export class CameraController {
   update(state: SimulationState, terrain: TerrainSampler, dt: number, tuck: number): void {
     this.elapsed += dt;
     const speed = Math.hypot(state.vel.x, state.vel.z);
+    const speed01 = clamp01(speed / 58);
+    this.speedUniform.value = damp(this.speedUniform.value, speed01, 7.5, dt);
     if (state.liftRide > 0) {
       const desiredX = state.pos.x + 6.8, desiredY = state.pos.y + 3.2, desiredZ = state.pos.z + 8.5;
       this.position.x = damp(this.position.x, desiredX, 4.2, dt);
@@ -41,15 +67,20 @@ export class CameraController {
     this.position.y = damp(this.position.y, desiredY, lambda * 1.35, dt);
     this.position.z = damp(this.position.z, desiredZ, lambda, dt);
     this.position.y = Math.max(this.position.y, terrain.height(this.position.x, this.position.z) + 1.8);
-    const shake = this.reducedMotion ? 0 : (state.crash > 0 ? state.crash * 0.06 : clamp01((speed - 34) / 40) * 0.012);
+    const targetShake = this.reducedMotion ? 0 : (state.crash > 0 ? state.crash * 0.06 : this.speedUniform.value * this.speedUniform.value * 0.036);
+    [this.shake, this.shakeVelocity] = criticalSpring(this.shake, this.shakeVelocity, targetShake, 2.2, dt);
     this.camera.position.set(
-      this.position.x + Math.sin(this.elapsed * 31) * shake * 3,
-      this.position.y + Math.cos(this.elapsed * 27) * shake * 3,
-      this.position.z,
+      this.position.x + noise1(this.elapsed * 9.7) * this.shake,
+      this.position.y + noise1(this.elapsed * 11.3 + 43) * this.shake,
+      this.position.z + noise1(this.elapsed * 8.1 + 91) * this.shake * 0.35,
     );
     this.target.set(state.pos.x + forwardX * 8, state.pos.y + 1.6, state.pos.z + forwardZ * 8);
     this.camera.lookAt(this.target);
-    this.camera.fov = damp(this.camera.fov, 62 + clamp01(speed / 62) * 24 + tuck * 3, 4, dt);
+    const fovRamp = this.reducedMotion ? 8.5 : 17;
+    this.camera.fov = damp(this.camera.fov, 65 + this.speedUniform.value * fovRamp, 5.2, dt);
+    const targetRoll = this.reducedMotion ? 0 : THREE.MathUtils.clamp((-state.lean * 0.055 - tuck * state.lean * 0.012) * this.speedUniform.value, -0.065, 0.065);
+    this.roll = damp(this.roll, targetRoll, 9, dt);
+    this.camera.rotateZ(this.roll);
     this.camera.updateProjectionMatrix();
   }
 }

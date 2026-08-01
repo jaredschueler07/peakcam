@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { SimulationState, TerrainSampler } from "../core/types";
 import { mulberry32 } from "../core/rng";
+import type { QualityRung } from "./QualityController";
 
 const SPRAY_MAX = 900, SNOW_MAX = 3600, SNOW_BOX = 130, TRACK_QUADS = 1600;
 const pointVertex = "attribute float aAlpha;attribute float aSize;uniform float uScale;varying float vA;void main(){vA=aAlpha;vec4 mv=modelViewMatrix*vec4(position,1.);gl_PointSize=aSize*uScale/max(1.,-mv.z);gl_Position=projectionMatrix*mv;}";
@@ -23,6 +24,7 @@ export class EffectsRenderer {
   private readonly snowPosition = new Float32Array(SNOW_MAX * 3); private readonly snowAlpha = new Float32Array(SNOW_MAX); private readonly snowSize = new Float32Array(SNOW_MAX); private readonly snowSeed = new Float32Array(SNOW_MAX); private readonly snowGeometry = new THREE.BufferGeometry();
   private readonly trackPosition = new Float32Array(TRACK_QUADS * 18); private readonly trackGeometry = new THREE.BufferGeometry();
   private sprayHead = 0; private trackHead = 0; private trackUsed = 0; private trackPrevious: { lx: number; lz: number; rx: number; rz: number } | null = null;
+  private quality: QualityRung = 4;
 
   constructor(scene: THREE.Scene, seed: number, private readonly terrain: TerrainSampler, private readonly reducedMotion: boolean) {
     this.random = mulberry32(seed ^ 0x8e37a12d);
@@ -40,13 +42,15 @@ export class EffectsRenderer {
   update(state: SimulationState, camera: THREE.Camera, dt: number, snowCount: number, wind: number) {
     if (state.events.reset) this.clearTracks();
     const speed = Math.hypot(state.vel.x, state.vel.z);
-    if (state.onGround && state.crash <= 0 && speed > 5) {
+    if (this.quality > 0 && state.onGround && state.crash <= 0 && speed > 5) {
       const intensity = Math.min(1, state.carve * 1.5) * Math.min(1, speed / 20), count = Math.min(6, Math.floor(intensity * 7 + (speed > 26 ? 1 : 0)));
       const fx = Math.sin(state.yaw), fz = Math.cos(state.yaw), rx = fz, rz = -fx, side = -Math.sign(state.lean || 0.001);
       for (let i = 0; i < count; i += 1) { const off = (this.random() - 0.5) * 0.9 + side * 0.35; this.emitSpray(state.pos.x + rx * off - fx * 0.8, state.pos.y + 0.08 + this.random() * 0.25, state.pos.z + rz * off - fz * 0.8, rx * side * (2 + intensity * 9) - fx * speed * 0.16 + (this.random() - 0.5) * 2, 1.4 + this.random() * 3.4 * (0.4 + intensity), rz * side * (2 + intensity * 9) - fz * speed * 0.16 + (this.random() - 0.5) * 2, 1.4 + this.random() * 2.4, 0.45 + this.random() * 0.5); }
     }
-    this.updateSpray(dt); this.updateSnow(dt, state.time, camera.position, snowCount, wind); this.updateTracks(state);
+    this.updateSpray(dt); this.updateSnow(dt, state.time, camera.position, snowCount * (0.35 + this.quality * 0.1625), wind); this.updateTracks(state);
   }
+
+  setQuality(rung: QualityRung): void { this.quality = rung; }
 
   private emitSpray(x: number, y: number, z: number, vx: number, vy: number, vz: number, size: number, life: number) { const i = this.sprayHead = (this.sprayHead + 1) % SPRAY_MAX, p = i * 3; this.sprayPosition[p] = x; this.sprayPosition[p + 1] = y; this.sprayPosition[p + 2] = z; this.sprayVelocity[p] = vx; this.sprayVelocity[p + 1] = vy; this.sprayVelocity[p + 2] = vz; this.sprayLife[i] = this.sprayMaxLife[i] = life; this.spraySize[i] = size; this.sprayAlpha[i] = 1; }
   private updateSpray(dt: number) { for (let i = 0; i < SPRAY_MAX; i += 1) { if (this.sprayLife[i] <= 0) { this.sprayAlpha[i] = 0; continue; } const p = i * 3; this.sprayLife[i] -= dt; this.sprayVelocity[p + 1] -= 7 * dt; this.sprayVelocity[p] *= 1 - 1.9 * dt; this.sprayVelocity[p + 2] *= 1 - 1.9 * dt; this.sprayPosition[p] += this.sprayVelocity[p] * dt; this.sprayPosition[p + 1] += this.sprayVelocity[p + 1] * dt; this.sprayPosition[p + 2] += this.sprayVelocity[p + 2] * dt; const k = Math.max(0, this.sprayLife[i] / this.sprayMaxLife[i]); this.sprayAlpha[i] = k * k * 0.9; this.spraySize[i] += dt * 2.2; } for (const name of ["position", "aAlpha", "aSize"]) this.sprayGeometry.getAttribute(name).needsUpdate = true; }

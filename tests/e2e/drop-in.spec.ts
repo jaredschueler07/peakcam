@@ -2,6 +2,25 @@ import { expect, test } from "@playwright/test";
 
 const V2_URL = "/resorts/heavenly/drop-in?engine=v2";
 
+async function canvasLuminance(page: import("@playwright/test").Page) {
+  return page.locator("canvas[data-testid='drop-in-canvas']").evaluate(async (canvas: HTMLCanvasElement) => {
+    const image = new Image(); image.src = canvas.toDataURL("image/png"); await image.decode();
+    const width = Math.floor(canvas.width * 0.5), height = Math.floor(canvas.height * 0.5);
+    const scratch = document.createElement("canvas"); scratch.width = width; scratch.height = height;
+    const context = scratch.getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("2D canvas unavailable");
+    context.drawImage(image, canvas.width * 0.25, canvas.height * 0.25, width, height, 0, 0, width, height);
+    const pixels = context.getImageData(0, 0, width, height).data;
+    let sum = 0, sumSquares = 0, count = 0;
+    for (let index = 0; index < pixels.length; index += 4) {
+      const luminance = pixels[index] * 0.2126 + pixels[index + 1] * 0.7152 + pixels[index + 2] * 0.0722;
+      sum += luminance; sumSquares += luminance * luminance; count += 1;
+    }
+    const mean = sum / count;
+    return { mean, stdev: Math.sqrt(Math.max(0, sumSquares / count - mean * mean)) };
+  });
+}
+
 test("v2 renders a keyboard start control without an iframe", async ({ page }) => {
   await page.goto(V2_URL);
   await expect(page.getByRole("button", { name: /start descent/i })).toBeVisible();
@@ -40,6 +59,17 @@ test("keyboard-only start reaches a running canvas with a ticking HUD", async ({
   await heightfieldRequest;
   const first = await page.getByText(/\d+\.\d+s/).first().textContent();
   await expect.poll(async () => page.getByText(/\d+\.\d+s/).first().textContent()).not.toBe(first);
+});
+
+test("gameplay canvas retains terrain contrast and does not wash toward white", async ({ page }) => {
+  await page.goto(V2_URL);
+  await page.getByRole("button", { name: /start descent/i }).click();
+  await expect(page.locator("[data-drop-in-state='running'] canvas[data-testid='drop-in-canvas']")).toBeVisible();
+  await page.waitForTimeout(750);
+  const luminance = await canvasLuminance(page);
+  console.log(`canvas luminance mean=${luminance.mean.toFixed(2)} stdev=${luminance.stdev.toFixed(2)}`);
+  expect(luminance.stdev).toBeGreaterThan(28);
+  expect(luminance.mean).toBeLessThan(190);
 });
 
 test("trail switch cycles to a named real OSM run", async ({ page }) => {
