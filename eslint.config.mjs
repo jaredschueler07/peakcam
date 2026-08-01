@@ -46,6 +46,31 @@ const eslintConfig = defineConfig([
     ],
     rules: { "react/no-unescaped-entities": "off" },
   },
+  {
+    files: [
+      "lib/game/core/**/*.{ts,tsx}",
+      "lib/game/physics/**/*.{ts,tsx}",
+      "lib/game/terrain/**/*.{ts,tsx}",
+      "lib/game/replay/**/*.{ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { group: ["react", "react/*", "react-dom", "react-dom/*"], message: "The deterministic game core cannot depend on React or the DOM." },
+            { group: ["three", "three/*"], message: "Use plain Vec3 values in the deterministic game core." },
+            { group: ["next", "next/*", "posthog-js", "@supabase/*", "node:http", "node:http/*", "node:https", "node:https/*", "node:net", "node:tls", "undici", "axios", "howler", "tone", "standardized-audio-context"], message: "The deterministic game core cannot perform browser, network, audio, or analytics work." },
+          ],
+        },
+      ],
+      "no-restricted-globals": [
+        "error",
+        "window", "document", "navigator", "fetch", "XMLHttpRequest", "WebSocket",
+        "EventSource", "AudioContext", "webkitAudioContext",
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;
