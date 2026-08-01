@@ -28,7 +28,8 @@ export function nearestTrail(
     const distance = Math.abs(dx);
     if (distance < bestDistance) { bestDistance = distance; best = i; bestDx = dx; }
   }
-  out.i = best; out.t = trails[best]; out.d = bestDistance; out.dx = bestDx;
+  out.i = best; out.t = { kind: "procedural", trail: trails[best] };
+  out.d = bestDistance; out.dx = bestDx;
   out.on = bestDistance < trails[best].half * 1.35;
   return out;
 }

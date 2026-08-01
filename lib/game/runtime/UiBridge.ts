@@ -1,6 +1,7 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 import type { ResortGameProfile } from "../config/schema";
 import type { SimulationState } from "../core/types";
+import type { TerrainSampler } from "../core/types";
 
 export type GameStatus = "loading" | "ready" | "running" | "paused" | "results" | "error";
 export type RuntimeEvent =
@@ -25,6 +26,8 @@ export interface HudState {
   crashReason: "TREE" | "ROCK" | "LANDING" | null;
   position: Readonly<{ x: number; z: number }>;
   error: string | null;
+  loadingProgress: number;
+  trailPolyline: readonly Readonly<{ x: number; z: number }>[];
 }
 
 type Listener = (event: RuntimeEvent) => void;
@@ -33,13 +36,16 @@ export class UiBridge {
   readonly store: StoreApi<HudState>;
   private readonly listeners = new Set<Listener>();
   private lastPublishMs = -Infinity;
+  private trailNames: readonly string[];
+  private trailPolylines: ReadonlyArray<readonly Readonly<{ x: number; z: number }>[]> = [];
 
   constructor(private readonly profile: ResortGameProfile) {
+    this.trailNames = profile.trailNames;
     this.store = createStore(() => ({
       status: "loading", speedKmh: 0, elapsedSeconds: 0, verticalFeet: 0,
       altitudeFeet: profile.summitFt, score: 0, best: 0, combo: 1,
       trailIndex: 0, trailName: profile.trails[0].name, crashReason: null,
-      position: { x: 0, z: 0 }, error: null,
+      position: { x: 0, z: 0 }, error: null, loadingProgress: 0, trailPolyline: [],
     }));
   }
 
@@ -56,20 +62,35 @@ export class UiBridge {
       best: state.best,
       combo: state.combo,
       trailIndex: state.selectedTrail,
-      trailName: this.profile.trails[state.selectedTrail]?.name ?? "Free Ride",
+      trailName: this.trailNames[state.selectedTrail] ?? "Free Ride",
+      trailPolyline: this.trailPolylines[state.selectedTrail] ?? [],
       position: { x: state.pos.x, z: state.pos.z },
     });
     return true;
   }
 
   setStatus(status: GameStatus): void { this.store.setState({ status }); }
+  setLoadingProgress(progress: number): void {
+    this.store.setState({ status: "loading", loadingProgress: Math.max(0, Math.min(1, progress)) });
+  }
+  configureTerrain(terrain: TerrainSampler): void {
+    if (terrain.kind === "real" && terrain.realRuns) {
+      this.trailNames = terrain.realRuns.map((run) => run.name);
+      this.trailPolylines = terrain.realRuns.map((run) => run.points.map(({ x, z }) => ({ x, z })));
+      this.store.setState({
+        trailName: this.trailNames[0] ?? "Free Ride",
+        trailPolyline: this.trailPolylines[0] ?? [],
+      });
+    }
+  }
   setPaused(paused: boolean): void { this.setStatus(paused ? "paused" : "running"); }
   setError(error: string): void { this.store.setState({ status: "error", error }); }
   emit(event: RuntimeEvent): void {
     if (event.type === "crashed") this.store.setState({ crashReason: event.reason });
     if (event.type === "trail-changed") this.store.setState({
       trailIndex: event.trailIndex,
-      trailName: this.profile.trails[event.trailIndex]?.name ?? "Free Ride",
+      trailName: this.trailNames[event.trailIndex] ?? "Free Ride",
+      trailPolyline: this.trailPolylines[event.trailIndex] ?? [],
     });
     if (event.type === "finished") this.setStatus("results");
     for (const listener of this.listeners) listener(event);
@@ -80,4 +101,3 @@ export class UiBridge {
   }
   dispose(): void { this.listeners.clear(); }
 }
-

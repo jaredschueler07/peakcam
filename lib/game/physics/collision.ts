@@ -3,6 +3,7 @@ import { addScore, bumpCombo } from "../core/scoring";
 import type { SimulationState, SimulationWorld, Vec3 } from "../core/types";
 import { CHUNK_SIZE, getChunk } from "../terrain/obstacles";
 import { trailCenter } from "../terrain/trails";
+import { nearestPointOnRun } from "../terrain/real-course";
 import { GATE_SPACING } from "./constants";
 
 const forwardScratch: Vec3 = { x: 0, y: 0, z: 0 };
@@ -67,6 +68,10 @@ export function checkObstacleCollision(state: SimulationState, world: Simulation
 }
 
 export function checkGates(state: SimulationState, world: SimulationWorld): void {
+  if (world.terrain.kind === "real" && world.terrain.realRuns) {
+    checkRealGates(state, world);
+    return;
+  }
   const nearest = world.terrain.nearestTrail(state.pos.x, state.pos.z, nearestScratch);
   for (let trailIndex = 0; trailIndex < world.profile.trails.length; trailIndex += 1) {
     const k0 = Math.floor(state.prevZ / GATE_SPACING) - 1;
@@ -92,6 +97,38 @@ export function checkGates(state: SimulationState, world: SimulationWorld): void
         }
       }
     }
+  }
+  state.prevZ = state.pos.z; state.prevX = state.pos.x;
+}
+
+function distanceToMovementSegment(state: SimulationState, x: number, z: number): number {
+  const dx = state.pos.x - state.prevX, dz = state.pos.z - state.prevZ;
+  const lengthSq = dx * dx + dz * dz;
+  const t = lengthSq > 0 ? Math.max(0, Math.min(1,
+    ((x - state.prevX) * dx + (z - state.prevZ) * dz) / lengthSq)) : 0;
+  return Math.hypot(x - (state.prevX + dx * t), z - (state.prevZ + dz * t));
+}
+
+function checkRealGates(state: SimulationState, world: SimulationWorld): void {
+  const run = world.terrain.realRuns?.[state.selectedTrail];
+  if (!run) return;
+  const hit = nearestPointOnRun(run, state.pos.x, state.pos.z);
+  const previous = state.courseProgress;
+  state.prevCourseProgress = previous;
+  state.courseProgress = hit.progressM;
+  for (const gate of run.gates) {
+    const key = state.selectedTrail * 100003 + gate.key;
+    if (state.passedGates.has(key) || previous >= gate.distanceM || hit.progressM < gate.distanceM) continue;
+    state.passedGates.add(key);
+    if (distanceToMovementSegment(state, gate.x, gate.z) <= gate.halfWidthM + 0.7) {
+      bumpCombo(state); addScore(state, 120); state.events.gatePassed = true;
+    } else if (hit.distance <= run.halfWidthM) {
+      if (state.combo > 1) { state.combo = 1; state.events.comboChanged = true; }
+      state.events.gateMissed = true;
+    }
+  }
+  if (!state.finished && hit.progressM >= run.finishM - 2 && hit.distance <= run.halfWidthM) {
+    state.finished = true; state.events.finished = true;
   }
   state.prevZ = state.pos.z; state.prevX = state.pos.x;
 }

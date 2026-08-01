@@ -11,6 +11,8 @@ import {
   type RawRun, type TerrainMeta, type TrailsFile,
 } from "./formats";
 import { fbm } from "./noise";
+import { pointAtArcLength } from "./real-course";
+import { RAMP_LEN } from "./heightfield";
 import { fbmWithGradient, vnoiseWithGradient } from "./noise-grad";
 import {
   createNearestRun, createRealTerrain, CORRIDOR_DAMPING,
@@ -651,4 +653,18 @@ test("all three baked resorts load and sample", () => {
       assert.ok(out.y > 0);
     }
   }
+});
+
+test("real course ramps are physical height features along the selected polyline", () => {
+  const assets = loadBakedAssets("heavenly");
+  const terrain = createRealTerrain(assets.heightfield, assets.meta, assets.trails, {
+    profile: DROP_IN_GAME_PROFILES.heavenly,
+  });
+  const run = terrain.realRuns?.find((candidate) => candidate.ramps.length > 0);
+  assert.ok(run);
+  const ramp = run.ramps[0];
+  const point = pointAtArcLength(run.points, ramp.distanceM + RAMP_LEN / 2);
+  const centre = terrain.height(point.x, point.z);
+  const base = terrain.macroHeight(point.x, point.z) + terrain.microDetail(point.x, point.z);
+  assert.ok(centre > base + 0.1, `ramp added only ${centre - base} m`);
 });

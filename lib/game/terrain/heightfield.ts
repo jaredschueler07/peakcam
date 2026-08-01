@@ -62,7 +62,7 @@ export function createProceduralTerrain(profile: ResortGameProfile, seed: number
   }
 
   return {
-    profile, seed, noiseOffset, height, normal,
+    kind: "procedural", profile, seed, noiseOffset, height, normal,
     trailField: (x, z) => trailField(profile.trails, x, z),
     nearestTrail: (x: number, z: number, out: NearestTrail) =>
       nearestTrail(profile.trails, x, z, out),

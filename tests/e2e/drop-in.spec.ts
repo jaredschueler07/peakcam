@@ -26,6 +26,8 @@ test("an unsupported resort shows not-found and never mounts the game", async ({
 
 test("keyboard-only start reaches a running canvas with a ticking HUD", async ({ page }) => {
   await page.goto(V2_URL);
+  const heightfieldRequest = page.waitForRequest((request) =>
+    request.url().endsWith("/game/terrain/heavenly.height.u16.br"));
   // Enter may land before hydration attaches the poster's key listener —
   // keep pressing until the shell reacts. Still exercises keyboard-only start.
   await expect
@@ -35,8 +37,30 @@ test("keyboard-only start reaches a running canvas with a ticking HUD", async ({
     })
     .not.toBe("poster");
   await expect(page.locator("[data-drop-in-state='running'] canvas[data-testid='drop-in-canvas']")).toBeVisible();
+  await heightfieldRequest;
   const first = await page.getByText(/\d+\.\d+s/).first().textContent();
   await expect.poll(async () => page.getByText(/\d+\.\d+s/).first().textContent()).not.toBe(first);
+});
+
+test("trail switch cycles to a named real OSM run", async ({ page }) => {
+  await page.goto(V2_URL);
+  await page.getByRole("button", { name: /start descent/i }).click();
+  await expect(page.locator("[data-drop-in-state='running']")).toBeVisible();
+  await expect(page.getByText("Gunbarrel", { exact: true })).toBeVisible();
+  await page.keyboard.press("t");
+  await expect(page.getByText("Ridge Run", { exact: true })).toBeVisible();
+});
+
+test("the speedometer is stacked below the Conditions button", async ({ page }) => {
+  await page.goto(V2_URL);
+  await page.getByRole("button", { name: /start descent/i }).click();
+  await expect(page.locator("[data-drop-in-state='running']")).toBeVisible();
+
+  const conditionsBox = await page.getByRole("link", { name: /conditions/i }).boundingBox();
+  const speedometerBox = await page.getByTestId("drop-in-speedometer").boundingBox();
+  expect(conditionsBox).not.toBeNull();
+  expect(speedometerBox).not.toBeNull();
+  expect(speedometerBox!.y).toBeGreaterThanOrEqual(conditionsBox!.y + conditionsBox!.height);
 });
 
 test("pointer-lock rejection never blocks play", async ({ page }) => {
@@ -74,4 +98,3 @@ test("navigation cleanly unmounts the runtime without console errors", async ({ 
   await expect(page.locator("[data-drop-in-state]")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
-

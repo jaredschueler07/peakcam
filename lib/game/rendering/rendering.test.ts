@@ -16,7 +16,7 @@ const profile = DROP_IN_GAME_PROFILES.breckenridge;
 test("terrain tile samples world x/z and carries v1 vertex colors", () => {
   const calls: Array<[number, number]> = [];
   const sampler: TerrainSampler = {
-    profile, seed: 1, noiseOffset: { x: 0, z: 0 },
+    kind: "procedural", profile, seed: 1, noiseOffset: { x: 0, z: 0 },
     height(x, z) { calls.push([x, z]); return x * 0.1 + z * 0.2; },
     normal(_x, _z, out) { out.x = 0; out.y = 1; out.z = 0; return out; },
     trailField(x) { return x === 200 ? 1 : 0; },

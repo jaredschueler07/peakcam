@@ -33,6 +33,7 @@ export default function DropInGame({ profile }: { profile: ResortGameProfile }) 
   const [phase, setPhase] = useState<ShellPhase>("poster");
   const [error, setError] = useState<string | null>(null);
   const [runtime, setRuntime] = useState<GameRuntime | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const bridge = useMemo(() => new UiBridge(profile), [profile]);
 
   useEffect(() => {
@@ -47,6 +48,8 @@ export default function DropInGame({ profile }: { profile: ResortGameProfile }) 
   useEffect(() => {
     if (phase !== "loading") return;
     let cancelled = false;
+    const controller = new AbortController();
+    const unsubscribe = bridge.store.subscribe((state) => setLoadingProgress(state.loadingProgress));
     const startedAt = performance.now();
     void (async () => {
       try {
@@ -55,10 +58,11 @@ export default function DropInGame({ profile }: { profile: ResortGameProfile }) 
         const { createGame } = await import("@/lib/game/runtime/createGame");
         if (cancelled) return;
         const created = await createGame({
-          canvas, profile, uiBridge: bridge,
+          canvas, profile, uiBridge: bridge, signal: controller.signal,
           analytics: {
             controlActivated: (scheme) => track(EVENTS.DROP_IN_CONTROL_ACTIVATED, { resort: profile.slug, engine: "v2", control_scheme: scheme }),
             pointerLock: (status, errorName) => track(EVENTS.DROP_IN_POINTER_LOCK_RESULT, { resort: profile.slug, engine: "v2", pointer_lock_state: status, failure_code: errorName }),
+            terrainFallback: (errorName) => track(EVENTS.DROP_IN_TERRAIN_FALLBACK, { resort: profile.slug, engine: "v2", failure_code: errorName }),
           },
         });
         if (cancelled) { created.dispose(); return; }
@@ -66,7 +70,8 @@ export default function DropInGame({ profile }: { profile: ResortGameProfile }) 
         track(EVENTS.DROP_IN_READY, {
           resort: profile.slug, engine: "v2",
           runtime_load_ms: Math.round(performance.now() - startedAt),
-          asset_load_ms: Math.round(created.sceneBuildMs),
+          asset_load_ms: Math.round(created.assetLoadMs),
+          scene_build_ms: Math.round(created.sceneBuildMs),
         });
         track(EVENTS.DROP_IN_STARTED, { resort: profile.slug, engine: "v2", mode: "free_ride" });
       } catch (reason) {
@@ -76,7 +81,7 @@ export default function DropInGame({ profile }: { profile: ResortGameProfile }) 
         track(EVENTS.DROP_IN_FAILED, { resort: profile.slug, engine: "v2", failure_code: "runtime_init" });
       }
     })();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; controller.abort(); unsubscribe(); };
   }, [bridge, phase, profile]);
 
   const start = () => {
@@ -121,7 +126,7 @@ export default function DropInGame({ profile }: { profile: ResortGameProfile }) 
           </section>
         )}
         {(phase === "loading" || phase === "playing") && <canvas ref={canvasRef} data-testid="drop-in-canvas" className="block h-full w-full touch-none" aria-label={`${profile.name} ski game`} />}
-        {phase === "loading" && <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-ink/50" role="status"><span className="pc-eyebrow rounded-full bg-cream-50 px-4 py-2 text-ink">Building the mountain…</span></div>}
+        {phase === "loading" && <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-ink/50" role="status"><span className="pc-eyebrow rounded-full bg-cream-50 px-4 py-2 text-ink">Loading real mountain… {Math.round(loadingProgress * 100)}%</span></div>}
         {phase === "playing" && runtime && <><DropInHUD store={bridge.store} /><TouchControls adapter={runtime.touch} /><PauseDialog store={bridge.store} onResume={() => runtime.resume()} onRestart={() => runtime.restart()} /><ResultsDialog store={bridge.store} onRestart={() => runtime.restart()} /></>}
         {phase === "error" && <ErrorPoster profile={profile} message={error ?? "Unknown error"} />}
       </div>

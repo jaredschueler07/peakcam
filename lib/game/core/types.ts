@@ -12,18 +12,67 @@ export interface InputFrame {
   trailPressed: boolean;
 }
 
+export type RealRunPoint = Vec3;
+
+export interface RealGate {
+  key: number;
+  distanceM: number;
+  x: number;
+  y: number;
+  z: number;
+  heading: number;
+  halfWidthM: number;
+}
+
+export interface RealRamp {
+  key: number;
+  distanceM: number;
+  x: number;
+  y: number;
+  z: number;
+  heading: number;
+}
+
+export interface RealRun {
+  readonly kind: "real";
+  readonly sourceIndex: number;
+  readonly name: string;
+  readonly difficulty: string | null;
+  readonly halfWidthM: number;
+  readonly points: readonly RealRunPoint[];
+  readonly lengthM: number;
+  readonly finishM: number;
+  readonly gates: readonly RealGate[];
+  readonly ramps: readonly RealRamp[];
+}
+
+export interface RealLift {
+  readonly kind: "real";
+  readonly name: string;
+  readonly type: string;
+  readonly points: readonly RealRunPoint[];
+  readonly lengthM: number;
+}
+
+export type TrailGeometry =
+  | { readonly kind: "procedural"; readonly trail: ResortTrail }
+  | { readonly kind: "real"; readonly run: RealRun };
+
 export interface NearestTrail {
   i: number;
-  t: ResortTrail;
+  t: TrailGeometry;
   d: number;
   dx: number;
   on: boolean;
 }
 
 export interface TerrainSampler {
+  readonly kind: "procedural" | "real";
   readonly profile: ResortGameProfile;
   readonly seed: number;
   readonly noiseOffset: Readonly<{ x: number; z: number }>;
+  readonly realRuns?: readonly RealRun[];
+  readonly mainLift?: RealLift | null;
   height(x: number, z: number): number;
   normal(x: number, z: number, out: Vec3): Vec3;
   trailField(x: number, z: number): number;
@@ -74,6 +123,9 @@ export interface SimulationState {
   distance: number;
   prevZ: number;
   prevX: number;
+  courseProgress: number;
+  prevCourseProgress: number;
+  finished: boolean;
   readonly passedGates: Set<number>;
   readonly events: import("./events").SimulationEvents;
 }
