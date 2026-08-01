@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "slug": "ski-portillo",
+  "center": [
+    -32.842,
+    -70.129
+  ],
+  "sizeM": 4096,
+  "grid": 1024,
+  "minZ": 2327.4,
+  "maxZ": 4156.8,
+  "quantum": 0.1,
+  "source": "terrarium",
+  "sourceZoom": 14,
+  "orientation": "row-major; row 0 = north edge, col 0 = west edge; x east, y north, both in metres from center",
+  "bakedAt": "2026-08-01T18:24:55.936Z"
+}

@@ -63,3 +63,7 @@ scripts/*.log
 .claude/worktrees/
 .worktrees/
 .agent-team/
+
+# Drop In terrain bake: the raw heightfield is a local intermediate — the
+# committed source of truth is the brotli sidecar (public/game/terrain/*.u16.br)
+public/game/terrain/*.height.u16

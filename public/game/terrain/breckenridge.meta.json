@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "slug": "breckenridge",
+  "center": [
+    39.4749,
+    -106.081
+  ],
+  "sizeM": 6144,
+  "grid": 1024,
+  "minZ": 2875.7,
+  "maxZ": 4017.1,
+  "quantum": 0.1,
+  "source": "terrarium",
+  "sourceZoom": 14,
+  "orientation": "row-major; row 0 = north edge, col 0 = west edge; x east, y north, both in metres from center",
+  "bakedAt": "2026-08-01T18:25:15.141Z"
+}
