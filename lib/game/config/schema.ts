@@ -46,6 +46,13 @@ export const resortWeatherSchema = z.object({
   snow: nonNegativeFiniteSchema,
   wind: nonNegativeFiniteSchema,
   haze: z.number().finite().min(0).max(1),
+  /**
+   * Fraction of the height fog removed beyond `FAR_START_M` (`fogCurve.ts`), so distant terrain
+   * keeps contrast instead of saturating to fog colour. Optional and defaulting to 0, which is the
+   * pre-envelope behaviour — that is deliberate for the storm presets, where a horizon that
+   * vanishes is the point.
+   */
+  farRetention: z.number().finite().min(0).max(1).optional(),
   exposure: positiveFiniteSchema,
 });
 

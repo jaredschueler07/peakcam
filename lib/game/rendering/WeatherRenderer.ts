@@ -34,6 +34,9 @@ export class WeatherRenderer {
     this.built.snowUniforms.horizon.value.setHex(weather.hor);
     this.built.snowUniforms.glint.value = visual.glint;
     this.built.atmosphereUniforms.density.value = weather.fog;
+    // Must move with the preset: leaving it stale would keep a bluebird horizon visible
+    // through a whiteout, which is the one weather where it should disappear entirely.
+    this.built.atmosphereUniforms.farRetention.value = weather.farRetention ?? 0;
     this.built.atmosphereUniforms.blue.value.setHex(visual.fogBlue);
     this.built.atmosphereUniforms.warm.value.setHex(visual.fogWarm);
     this.renderer.toneMappingExposure = weather.exposure;

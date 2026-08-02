@@ -50,6 +50,7 @@ export interface AtmosphereUniformSet {
   density: { value: number };
   heightFalloff: { value: number };
   referenceHeight: { value: number };
+  farRetention: { value: number };
   blue: { value: THREE.Color };
   warm: { value: THREE.Color };
   sunDirection: { value: THREE.Vector3 };
@@ -154,10 +155,12 @@ void main(){vec3 d=normalize(vDir);float t=clamp(d.y*.5+.5,0.,1.);vec3 c=mix(uHo
   const atmosphereUniforms: AtmosphereUniformSet = nodes ? nodes.atmosphere.createAtmosphereNodeUniforms({
     // Always explicit: the module's own default density is a placeholder, not this weather preset.
     density: weather.fog, heightFalloff: 0.025, referenceHeight: 0,
+    farRetention: weather.farRetention ?? 0,
     blue: new THREE.Color(visual.fogBlue), warm: new THREE.Color(visual.fogWarm),
     sunDirection: SUN_DIRECTION.clone(),
   }) : {
     density: { value: weather.fog }, heightFalloff: { value: 0.025 }, referenceHeight: { value: 0 },
+    farRetention: { value: weather.farRetention ?? 0 },
     blue: { value: new THREE.Color(visual.fogBlue) }, warm: { value: new THREE.Color(visual.fogWarm) },
     sunDirection: { value: SUN_DIRECTION.clone() },
   } satisfies AtmosphereUniforms;

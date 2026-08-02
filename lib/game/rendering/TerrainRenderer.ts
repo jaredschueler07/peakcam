@@ -2,21 +2,17 @@ import * as THREE from "three";
 import { clamp01, smoothstep } from "../core/math";
 import type { SimulationWorld, TerrainSampler } from "../core/types";
 import { fbm, vnoise } from "../terrain/noise";
+import { GRID_HALF, GRID_SIZE, TILE_SIZE, Z_TILES_BEHIND } from "./nearFieldReach";
 import { buildSnowDetailNormal, polishSnowMaterial, type SnowUniforms } from "./SnowMaterial";
 import type { SnowNodeUniforms } from "./SnowNodeMaterial";
 import type { NodeFactories } from "./nodeFactories";
 
-export const TILE_SIZE = 200;
+// The grid's dimensions live in `nearFieldReach.ts`, which also derives how far a near-field
+// pixel can be from the player — a number `fogCurve.ts` needs to place its long-range envelope
+// outside the near field, and which must therefore not exist as a second copy here.
+export { TILE_SIZE, GRID_SIZE, Z_TILES_BEHIND } from "./nearFieldReach";
 export const TILE_RESOLUTION = 50;
 const CELL_SIZE = TILE_SIZE / TILE_RESOLUTION;
-export const GRID_SIZE = 5;
-const GRID_HALF = 2;
-/**
- * Tile rows kept behind the player. The grid is biased downhill, so this — not
- * GRID_HALF — bounds the near field's guaranteed coverage; `bake-far-field.ts`
- * sizes the far field's inner hole from it.
- */
-export const Z_TILES_BEHIND = 1;
 const SUN_DIR = new THREE.Vector3(-0.46, 0.62, -0.64).normalize();
 const C_SNOW = new THREE.Color(0.955, 0.975, 1);
 const C_SHADE = new THREE.Color(0.66, 0.76, 0.92);

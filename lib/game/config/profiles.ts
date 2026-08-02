@@ -38,8 +38,8 @@ export const DROP_IN_GAME_PROFILES = resortGameProfilesSchema.parse({
       cap: 0xe8eff7,
     },
     weather: [
-      { name: "Bluebird", fog: 0.00135, fogCol: 0xd3e8fb, top: 0x1b56b8, hor: 0xd8ecff, sun: 2.7, hemi: 1.05, amb: 0.3, snow: 300, wind: 2.6, haze: 0.09, exposure: 1.08 },
-      { name: "Viento Blanco", fog: 0.0046, fogCol: 0xcbd7e6, top: 0x7b90ac, hor: 0xd3dde9, sun: 0.9, hemi: 1.5, amb: 0.55, snow: 2500, wind: 9.5, haze: 0.52, exposure: 1 },
+      { name: "Bluebird", fog: 0.00135, fogCol: 0xd3e8fb, top: 0x1b56b8, hor: 0xd8ecff, sun: 2.7, hemi: 1.05, amb: 0.3, snow: 300, wind: 2.6, haze: 0.09, farRetention: 0.5, exposure: 1.08 },
+      { name: "Viento Blanco", fog: 0.0046, fogCol: 0xcbd7e6, top: 0x7b90ac, hor: 0xd3dde9, sun: 0.9, hemi: 1.5, amb: 0.55, snow: 2500, wind: 9.5, haze: 0.52, farRetention: 0.2, exposure: 1 },
       { name: "Whiteout", fog: 0.009, fogCol: 0xe6ecf3, top: 0xb6c4d3, hor: 0xeef3f8, sun: 0.4, hemi: 1.85, amb: 0.82, snow: 3400, wind: 15, haze: 0.88, exposure: 0.98 },
     ],
   },
@@ -75,8 +75,8 @@ export const DROP_IN_GAME_PROFILES = resortGameProfilesSchema.parse({
       cap: 0xdfeaf5,
     },
     weather: [
-      { name: "Bluebird", fog: 0.0017, fogCol: 0xd9edfd, top: 0x2560c4, hor: 0xdef0ff, sun: 2.6, hemi: 1.08, amb: 0.31, snow: 380, wind: 1.8, haze: 0.11, exposure: 1.07 },
-      { name: "Champagne Powder", fog: 0.0039, fogCol: 0xd2dcea, top: 0x8298b4, hor: 0xd8e2ee, sun: 1, hemi: 1.48, amb: 0.54, snow: 2600, wind: 4.2, haze: 0.46, exposure: 1.01 },
+      { name: "Bluebird", fog: 0.0017, fogCol: 0xd9edfd, top: 0x2560c4, hor: 0xdef0ff, sun: 2.6, hemi: 1.08, amb: 0.31, snow: 380, wind: 1.8, haze: 0.11, farRetention: 0.5, exposure: 1.07 },
+      { name: "Champagne Powder", fog: 0.0039, fogCol: 0xd2dcea, top: 0x8298b4, hor: 0xd8e2ee, sun: 1, hemi: 1.48, amb: 0.54, snow: 2600, wind: 4.2, haze: 0.46, farRetention: 0.2, exposure: 1.01 },
       { name: "Ground Blizzard", fog: 0.0084, fogCol: 0xe4ebf3, top: 0xb4c2d2, hor: 0xecf2f8, sun: 0.42, hemi: 1.8, amb: 0.8, snow: 3300, wind: 13.5, haze: 0.86, exposure: 0.99 },
     ],
   },
@@ -112,8 +112,8 @@ export const DROP_IN_GAME_PROFILES = resortGameProfilesSchema.parse({
       cap: 0xe4eef8,
     },
     weather: [
-      { name: "Bluebird", fog: 0.0021, fogCol: 0xdcecfb, top: 0x2f6fc6, hor: 0xe2f0ff, sun: 2.45, hemi: 1.14, amb: 0.34, snow: 440, wind: 1.3, haze: 0.16, exposure: 1.05 },
-      { name: "Sierra Snowfall", fog: 0.0048, fogCol: 0xccd8e8, top: 0x7a8fac, hor: 0xd4dfec, sun: 0.88, hemi: 1.55, amb: 0.58, snow: 3000, wind: 6.2, haze: 0.56, exposure: 1 },
+      { name: "Bluebird", fog: 0.0021, fogCol: 0xdcecfb, top: 0x2f6fc6, hor: 0xe2f0ff, sun: 2.45, hemi: 1.14, amb: 0.34, snow: 440, wind: 1.3, haze: 0.16, farRetention: 0.5, exposure: 1.05 },
+      { name: "Sierra Snowfall", fog: 0.0048, fogCol: 0xccd8e8, top: 0x7a8fac, hor: 0xd4dfec, sun: 0.88, hemi: 1.55, amb: 0.58, snow: 3000, wind: 6.2, haze: 0.56, farRetention: 0.2, exposure: 1 },
       { name: "Lake Whiteout", fog: 0.0088, fogCol: 0xe8edf4, top: 0xbcc8d6, hor: 0xf0f4f9, sun: 0.4, hemi: 1.82, amb: 0.83, snow: 3600, wind: 11, haze: 0.9, exposure: 0.98 },
     ],
   },

@@ -289,7 +289,7 @@ test("shared scene materials receive fog and CSM hooks once while skier colors o
   scene.add(terrainA, terrainB, new THREE.Mesh(new THREE.BoxGeometry(), skier));
   let csmSetups = 0;
   const uniforms: AtmosphereUniforms = {
-    density: { value: 0.002 }, heightFalloff: { value: 0.025 }, referenceHeight: { value: 3000 },
+    density: { value: 0.002 }, heightFalloff: { value: 0.025 }, referenceHeight: { value: 3000 }, farRetention: { value: 0 },
     blue: { value: new THREE.Color() }, warm: { value: new THREE.Color() }, sunDirection: { value: new THREE.Vector3(0, 1, 0) },
   };
   configureSceneMaterials(scene, { setupMaterial() { csmSetups += 1; } }, uniforms);
@@ -709,7 +709,7 @@ test("far-field material takes the same height fog as the near field on WebGL", 
   assert.ok(!(material instanceof THREE.ShaderMaterial), "configureSceneMaterials skips ShaderMaterials");
 
   const uniforms: AtmosphereUniforms = {
-    density: { value: 0.012 }, heightFalloff: { value: 0.025 }, referenceHeight: { value: 0 },
+    density: { value: 0.012 }, heightFalloff: { value: 0.025 }, referenceHeight: { value: 0 }, farRetention: { value: 0 },
     blue: { value: new THREE.Color(0x9fc0e8) }, warm: { value: new THREE.Color(0xffd9a8) },
     sunDirection: { value: new THREE.Vector3(0, 1, 0) },
   };
