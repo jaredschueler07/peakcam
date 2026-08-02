@@ -8,14 +8,39 @@ import type { ConditionsSnapshot } from "@/lib/game/conditions";
 import type { GameRuntime } from "@/lib/game/runtime/GameRuntime";
 import { RuntimeAudio } from "@/lib/game/runtime/RuntimeAudio";
 import { UiBridge } from "@/lib/game/runtime/UiBridge";
-import { EVENTS, track } from "@/lib/analytics-events";
+import { EVENTS, track, whenPostHogReady } from "@/lib/analytics-events";
+import { trackDropIn } from "@/lib/game/analytics/events";
+import {
+  isRunSessionFailure,
+  requestRunSession,
+  type RunSessionTicket,
+} from "@/lib/game/competition/session-client";
+// Pure, crypto-free helpers: the client must derive the same trail id and UTC
+// day the sessions route does, and duplicating either would drift.
+import { trailIdFromName, utcDateStamp } from "@/lib/game/server/courses";
 import DropInErrorBoundary from "./DropInErrorBoundary";
 import DropInHUD from "./hud/DropInHUD";
+import ModeSelect, { type DropInModeChoice } from "./hud/ModeSelect";
 import PauseDialog from "./hud/PauseDialog";
 import ResultsDialog from "./hud/ResultsDialog";
 import TouchControls from "./input/TouchControls";
 
 type ShellPhase = "poster" | "loading" | "playing" | "error";
+
+/**
+ * Everything Task A4 needs to submit the run, resolved before the descent
+ * starts. `ticket` is null for Free Ski and for a competitive run whose ticket
+ * request failed — `offline` distinguishes the two, and an offline run is
+ * played and recorded locally but never submitted.
+ */
+export interface DropInRunSession {
+  mode: DropInModeChoice;
+  trailId: string;
+  ticket: RunSessionTicket | null;
+  offline: boolean;
+}
+
+const OFFLINE_NOTICE = "Leaderboard unavailable — playing offline";
 
 function ErrorPoster({ profile, message }: { profile: ResortGameProfile; message: string }) {
   return (
@@ -46,6 +71,62 @@ export default function DropInGame({ profile, conditions }: {
   const [audioEnabled, setAudioEnabled] = useState(true);
   const bridge = useMemo(() => new UiBridge(profile), [profile]);
 
+  // The server derives legal trail ids from the profile, and a run always drops
+  // in on the first trail, so that is the course we ask a ticket for.
+  const trailId = useMemo(() => trailIdFromName(profile.trails[0].name), [profile]);
+  const [mode, setMode] = useState<DropInModeChoice>("free_ski");
+  const [ticket, setTicket] = useState<RunSessionTicket | null>(null);
+  const [pendingMode, setPendingMode] = useState<DropInModeChoice | null>(null);
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
+  const sessionAbortRef = useRef<AbortController | null>(null);
+  // Read from the load effect and the dialogs, outside the render that set it.
+  const modeRef = useRef<DropInModeChoice>("free_ski");
+
+  const session: DropInRunSession = useMemo(
+    () => ({ mode, trailId, ticket, offline: mode !== "free_ski" && ticket === null }),
+    [mode, trailId, ticket],
+  );
+
+  const dailyCourseName = useMemo(() => {
+    const id = ticket?.mode === "score_attack" ? ticket.trailId : trailId;
+    return profile.trails.find((trail) => trailIdFromName(trail.name) === id)?.name
+      ?? profile.trails[0].name;
+  }, [profile, ticket, trailId]);
+
+  const selectMode = (choice: DropInModeChoice) => {
+    sessionAbortRef.current?.abort();
+    sessionAbortRef.current = null;
+    setMode(choice);
+    modeRef.current = choice;
+    setTicket(null);
+    setSessionNotice(null);
+    setPendingMode(null);
+    // Post-init only: a capture made before posthog.init() is silently dropped.
+    whenPostHogReady(() =>
+      trackDropIn({
+        name: "drop_in_mode_selected",
+        properties: { resort_slug: profile.slug, mode: choice },
+      }),
+    );
+    if (choice === "free_ski") return;
+
+    const controller = new AbortController();
+    sessionAbortRef.current = controller;
+    setPendingMode(choice);
+    void requestRunSession(
+      { resortSlug: profile.slug, mode: choice, trailId },
+      { signal: controller.signal },
+    ).then((result) => {
+      if (controller.signal.aborted) return;
+      sessionAbortRef.current = null;
+      setPendingMode(null);
+      if (!isRunSessionFailure(result)) { setTicket(result); return; }
+      // A dead leaderboard never costs someone their run: keep the mode,
+      // record locally, and say so.
+      if (!result.aborted) setSessionNotice(OFFLINE_NOTICE);
+    });
+  };
+
   useEffect(() => {
     track(EVENTS.DROP_IN_OPENED, { resort: profile.slug, engine: "v2", game_version: "v2" });
   }, [profile.slug]);
@@ -55,6 +136,8 @@ export default function DropInGame({ profile, conditions }: {
   }, []);
 
   useEffect(() => () => {
+    sessionAbortRef.current?.abort();
+    sessionAbortRef.current = null;
     teardownRef.current?.abort();
     teardownRef.current = null;
     runtimeRef.current?.dispose();
@@ -87,6 +170,10 @@ export default function DropInGame({ profile, conditions }: {
           },
         });
         if (cancelled) { created.dispose(); return; }
+        // Arm before the first simulation step: the runtime owns begin timing,
+        // and at t=0 arming starts the recorder immediately. Free Ski never
+        // records.
+        if (modeRef.current !== "free_ski") created.beginCompetitiveRecording();
         runtimeRef.current = created; setRuntime(created); setPhase("playing");
         track(EVENTS.DROP_IN_READY, {
           resort: profile.slug, engine: "v2",
@@ -95,7 +182,8 @@ export default function DropInGame({ profile, conditions }: {
           scene_build_ms: Math.round(created.sceneBuildMs),
         });
         track(EVENTS.DROP_IN_STARTED, {
-          resort: profile.slug, engine: "v2", mode: "free_ride",
+          resort: profile.slug, engine: "v2",
+          mode: modeRef.current === "free_ski" ? "free_ride" : modeRef.current,
           surface: conditions.surface, powder_day: conditions.powderDay,
         });
       } catch (reason) {
@@ -124,6 +212,12 @@ export default function DropInGame({ profile, conditions }: {
     setPhase("loading");
   };
 
+  /** Arm first, then reset: the runtime begins recording at the reset itself. */
+  const restartRun = (active: GameRuntime) => {
+    if (modeRef.current !== "free_ski") active.beginCompetitiveRecording();
+    active.restart();
+  };
+
   const toggleAudio = () => {
     setAudioEnabled((current) => {
       const next = !current;
@@ -143,6 +237,9 @@ export default function DropInGame({ profile, conditions }: {
       if (event.key !== "Enter" || event.repeat) return;
       const target = event.target as HTMLElement | null;
       if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+      // On a focused control, preventDefault() here would swallow the click
+      // Enter is meant to produce — picking a mode would silently start a run.
+      if (target?.closest("button")) return;
       event.preventDefault();
       start();
     };
@@ -153,7 +250,12 @@ export default function DropInGame({ profile, conditions }: {
 
   return (
     <DropInErrorBoundary fallback={(caught) => <ErrorPoster profile={profile} message={caught.message} />}>
-      <div className="fixed inset-0 overflow-hidden bg-ink" data-drop-in-state={phase === "playing" ? "running" : phase}>
+      <div
+        className="fixed inset-0 overflow-hidden bg-ink"
+        data-drop-in-state={phase === "playing" ? "running" : phase}
+        data-drop-in-mode={session.mode}
+        data-drop-in-session={session.ticket ? "ticketed" : session.offline ? "offline" : "local"}
+      >
         <Link href={`/resorts/${profile.slug}`} className="absolute left-3 top-3 z-40 inline-flex items-center gap-2 rounded-full border-[1.5px] border-ink bg-cream-50 px-3.5 py-2 text-xs font-bold uppercase text-ink shadow-stamp-sm">
           <ArrowLeft className="h-4 w-4" aria-hidden /> Conditions
         </Link>
@@ -175,6 +277,14 @@ export default function DropInGame({ profile, conditions }: {
                 </span>
               </div>
               <p className="mx-auto mt-5 max-w-sm text-sm text-bark-dk">Carve with WASD or arrows. Tuck with W, brake with S, jump with Space. Mouse lock is optional.</p>
+              <ModeSelect
+                selected={session.mode}
+                onSelect={selectMode}
+                dailyCourseName={dailyCourseName}
+                dailyDateStamp={utcDateStamp(Date.now())}
+                pending={pendingMode}
+                notice={sessionNotice}
+              />
               <button autoFocus onClick={start} className="mt-7 rounded-full border-[1.5px] border-ink bg-alpen px-8 py-3 font-bold uppercase tracking-wide text-cream-50 shadow-stamp transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink">
                 Start descent
               </button>
@@ -183,7 +293,7 @@ export default function DropInGame({ profile, conditions }: {
         )}
         {(phase === "loading" || phase === "playing") && <canvas ref={canvasRef} data-testid="drop-in-canvas" className="block h-full w-full touch-none" aria-label={`${profile.name} ski game`} />}
         {phase === "loading" && <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-ink/50" role="status"><span className="pc-eyebrow rounded-full bg-cream-50 px-4 py-2 text-ink">Loading real mountain… {Math.round(loadingProgress * 100)}%</span></div>}
-        {phase === "playing" && runtime && <><DropInHUD store={bridge.store} audioEnabled={audioEnabled} onToggleAudio={toggleAudio} /><TouchControls adapter={runtime.touch} /><PauseDialog store={bridge.store} onResume={() => runtime.resume()} onRestart={() => runtime.restart()} /><ResultsDialog store={bridge.store} onRestart={() => runtime.restart()} /></>}
+        {phase === "playing" && runtime && <><DropInHUD store={bridge.store} audioEnabled={audioEnabled} onToggleAudio={toggleAudio} /><TouchControls adapter={runtime.touch} /><PauseDialog store={bridge.store} onResume={() => runtime.resume()} onRestart={() => restartRun(runtime)} /><ResultsDialog store={bridge.store} onRestart={() => restartRun(runtime)} /></>}
         {phase === "error" && <ErrorPoster profile={profile} message={error ?? "Unknown error"} />}
       </div>
     </DropInErrorBoundary>

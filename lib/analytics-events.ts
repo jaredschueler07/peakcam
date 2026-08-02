@@ -64,6 +64,30 @@ function drain() {
   setTimeout(tick, 0);
 }
 
+/**
+ * Defer `task` until posthog-js has initialized, for captures that don't go
+ * through `track` (the Drop In v2 taxonomy in `lib/game/analytics/events.ts`
+ * calls `posthog.capture` directly). Same readiness rule and same give-up
+ * budget as `drain` above — see that comment for why the wait exists.
+ */
+export function whenPostHogReady(task: () => void) {
+  if (typeof window === "undefined") return;
+  if (isLoaded()) {
+    task();
+    return;
+  }
+  let attempts = 0;
+  const tick = () => {
+    if (isLoaded()) {
+      task();
+      return;
+    }
+    if (++attempts > 40) return;
+    setTimeout(tick, 100);
+  };
+  setTimeout(tick, 0);
+}
+
 export function track(event: EventName, properties?: Record<string, unknown>) {
   if (typeof window === "undefined") return;
   if (!isLoaded()) {
