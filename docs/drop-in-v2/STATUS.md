@@ -35,29 +35,48 @@
 
 ## Remaining work (in PLAN.md order)
 
-> Session 2026-08-01/02 (multi-fleet: Opus 5 + Codex gpt-5.6-sol + Grok, Fable 5
-> orchestrating): **Phase 8 COMPLETE** (P8-COMPLETION-PLAN.md tasks A1–A6 + gate:
-> recorder, ghost renderer, modes/tickets, panels, re-sim validator behind
-> `DROP_IN_RESIM`, analytics; 503/503 unit, 18/18 e2e, joint recorder→validator
-> smoke green; merged 0d25122). **P12 Tasks 11–14 merged** (physicsV2 flag-gated,
-> parity-neutral; T15 + feel gate remain). **P11 modules 2/3/4/5/7/9 done**
-> (TSL snow/fog/CSM/post, KTX2, governor — all module-only, review-clean);
-> Tasks 1+8 in flight; Task 6 integration carries an 11-item real-frame
-> checklist (see .superpowers/sdd/P11-P12-PLAN/progress.md). New dev levers:
-> `?gfx=webgl` (prod-allowed), `?e2ecanvas`, `?e2espawn=<m>` (validator-hardened).
-> Latent issue ledgered: `conditionSurface` regex scans narrative prose.
+> Sessions 2026-08-01/02 (multi-fleet: Claude Opus 5 + Codex gpt-5.6-sol + Grok
+> implementing, Fable 5 orchestrating; ~20 SDD tasks, every one through
+> independent review + fix loops, final whole-branch review APPROVED):
+> **Phases 8, 11 (code), and 12 (code) are COMPLETE and merged** at 616/616
+> unit, 21/21 + 17/17 dual-backend e2e, recorder→validator joint smoke green.
+> - **Phase 8**: full competition loop live behind the route — recorder, ghost
+>   racing, Time Trial / Daily Line tickets (HMAC, seed+surface+physicsModel
+>   claims, layered fail-closed guards), submission/leaderboard panels,
+>   re-sim validator behind `DROP_IN_RESIM`, analytics taxonomy.
+> - **Phase 11**: WebGPU is the default renderer where available (three r185
+>   WebGPURenderer + TSL node materials: snow/fog/CSM/post/sky/particles);
+>   WebGL fallback preserved byte-equivalent; bundle split keeps three/webgpu
+>   (647KB) off WebGL sessions (eager 1510→839KB); shader prewarm; thermal
+>   governor (ring-buffered, 60Hz-recoverable); KTX2 infra; heap guard e2e
+>   (<2MB/10s). Five orchestrator browser rounds fixed: LUT colour space,
+>   WGSL sin() NaN at 3km coords, CSM negative-light fade + ×N intensity,
+>   WebGPU point-list particles (instanced quads). SwiftShader-black reality:
+>   e2e default project pins gfx=webgl; `PLAYWRIGHT_WEBGPU=1 --headed` runs
+>   the hardware project.
+> - **Phase 12**: physicsV2 (carve/air/landing/surface) merged flag-off,
+>   parity-proven, golden-fixtured; `?phys=v2` override runs are unsubmittable
+>   by three layers (server 400 while rollout off + entry/restart/remint
+>   config guards). NOTE for playtest: an override run shows the generic
+>   "played offline" notice — that is correct behaviour, not a server bug.
+> - Dev levers (deliberately live in prod, render-only): `?gfx`, `?nopost`,
+>   `?snowdbg`, `?csmdbg`, `?treedbg`, `?e2ecanvas`, `?e2espawn`, `?phys`.
+> - Ledgers with the full deferred/parked backlog: `.superpowers/sdd/*/progress.md`.
 
-1. **Phase 11** — Task 1 (backend seam), Task 6 (WebGPU integration + real-frame
-   checklist), Task 8 (zero-alloc + heap guard), Task 10 (dual-backend gate).
-2. **Phase 12 wrap** — Task 15 (runtime wiring + `?phys=v2`), Jared feel-check gate.
-3. **Phase 10** — device-matrix perf validation (budgets in BUDGETS.md), full CI,
-   accessibility pass, percentage rollout per DESIGN §5 gates, delete v1
-   (engine.html/vendored three/sync script/drift test/CORS header), fix the
-   **pre-existing site-wide soft-404** (notFound() streams HTTP 200 — confirmed on prod,
-   documented in tests/e2e/drop-in.spec.ts).
-3. **Needs Jared**: `DROP_IN_TICKET_KEYS` in Vercel prod env
-   (`npx vercel env add DROP_IN_TICKET_KEYS production`, value `k1:<openssl rand -base64 32>`);
-   fall-line playtest sign-off per resort (Phase 5 gate).
+1. **Phase 10b (rollout)** — CI pipeline, device matrix beyond this Mac Mini,
+   accessibility pass, percentage rollout per DESIGN §5, delete v1, soft-404 fix.
+   BACKLOG (from final review, in ledgers): S1 server-side surface derivation
+   (client-chosen surface affects v1 boards — ROLLOUT GATE); PHYSICS_VERSION→2
+   before v2 default flips; governor limit-cycle latch; tail-ramp banner/rail
+   cosmetics; eslint-ignore vendored basis; [gate]-mock rollout-model assert;
+   e2e sessions-mock tickHz 10→30; override-run poster copy; NodePostProcessing
+   disposal audit gap; conditionSurface narrative-scan design (regex precedence
+   FIXED; design question remains).
+2. **Needs Jared (playtest prerequisites)**: `DROP_IN_TICKET_KEYS` in the Vercel
+   **preview** env (playtest URL) AND production (`npx vercel env add
+   DROP_IN_TICKET_KEYS preview` / `production`, value `k1:<openssl rand -base64 32>`
+   — without it competitive runs silently degrade to offline); then the
+   fall-line + physicsV2 feel playtest (`?phys=v2`) and sign-off.
 
 ## Operating lessons (read before dispatching agents)
 
