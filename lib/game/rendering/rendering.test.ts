@@ -20,6 +20,10 @@ import { SkierRenderer } from "./SkierRenderer";
 import { buildTileGeometry } from "./TerrainRenderer";
 import { rampRise, RAMP_BANNER_H, RAMP_BANNER_Y, RAMP_MAX_RISE, sagAt, WorldRenderer } from "./WorldRenderer";
 import { staticNodeFactories } from "./nodeFactories.fixture";
+import { CAMERA_FAR, createScene } from "./SceneFactory";
+import { FAR_FIELD_INNER_RADIUS_M, FarFieldRenderer } from "./FarFieldRenderer";
+import { resourceCounts } from "./resources";
+import type { DecodedFarField, FarFieldWedge } from "../terrain/far-field-format";
 import { RAMP_LEN } from "../terrain/heightfield";
 import type { RealRun, SimulationWorld, TerrainSampler } from "../core/types";
 
@@ -384,7 +388,12 @@ function disposalPasses(backendKind: "webgpu" | "webgl") {
         texture: () => { disposed.textures += 1; },
       },
     });
+    const beforeFarField = renderer.resources();
+    renderer.attachFarField(farFieldAsset());
     const resources = renderer.resources();
+    // The audit is what catches leaks on route changes, so it has to see the far field too.
+    assert.equal(resources.geometries - beforeFarField.geometries, 16, `${backendKind}: far-field wedges`);
+    assert.equal(resources.materials - beforeFarField.materials, 1, `${backendKind}: far-field material`);
     assert.ok(resources.geometries > 20, `${backendKind}: geometries ${resources.geometries}`);
     assert.ok(resources.materials > 10, `${backendKind}: materials ${resources.materials}`);
     assert.ok(resources.textures >= 2, `${backendKind}: textures ${resources.textures}`);
@@ -603,3 +612,184 @@ function findGhostRoot(renderer: GameRenderer): THREE.Object3D {
   assert.ok(root, "GameRenderer owns a GhostRenderer");
   return root;
 }
+
+// ─── Far field ───────────────────────────────────────────────
+
+/** A minimal but structurally real asset: one quad per wedge, inner rim to horizon. */
+function farFieldAsset(wedgeCount = 16, radiusM = 30_000, elevation = 3000): DecodedFarField {
+  const wedges: FarFieldWedge[] = [];
+  for (let w = 0; w < wedgeCount; w += 1) {
+    const azimuthStartRad = (w * 2 * Math.PI) / wedgeCount;
+    const azimuthEndRad = ((w + 1) * 2 * Math.PI) / wedgeCount;
+    const positions = new Float32Array(12);
+    let at = 0;
+    for (const r of [FAR_FIELD_INNER_RADIUS_M, radiusM]) {
+      for (const az of [azimuthStartRad, azimuthEndRad]) {
+        positions[at] = r * Math.sin(az);
+        positions[at + 1] = elevation;
+        positions[at + 2] = -r * Math.cos(az);
+        at += 3;
+      }
+    }
+    wedges.push({
+      index: w, azimuthStartRad, azimuthEndRad, positions,
+      indices: new Uint32Array([0, 2, 1, 1, 2, 3]), minY: elevation, maxY: elevation,
+    });
+  }
+  return {
+    meta: {
+      formatVersion: 1, slug: "ski-portillo", radiusM, wedgeCount,
+      centre: [-32.842, -70.129], demSource: "test", bakedAt: "2026-08-02T00:00:00.000Z",
+    },
+    wedges,
+  };
+}
+
+/** A frustum for a camera at `y` metres looking along `dir`. */
+function frustumLookingAt(dir: THREE.Vector3, y = 3010): { camera: THREE.PerspectiveCamera; frustum: THREE.Frustum } {
+  const camera = new THREE.PerspectiveCamera(65, 16 / 9, 0.5, CAMERA_FAR);
+  camera.position.set(0, y, 0);
+  camera.lookAt(dir.x, y, dir.z);
+  camera.updateMatrixWorld(true);
+  camera.updateProjectionMatrix();
+  const frustum = new THREE.Frustum().setFromProjectionMatrix(
+    new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse),
+  );
+  return { camera, frustum };
+}
+
+test("the camera far plane reaches past the far field, or none of it would draw", () => {
+  assert.ok(CAMERA_FAR > 30_000, `camera far ${CAMERA_FAR} clips a 30 km far field`);
+  const scene = createScene(profile, 16 / 9, null);
+  assert.equal(scene.camera.far, CAMERA_FAR);
+});
+
+test("far field builds one mesh per wedge, with normals and no shadow participation", () => {
+  const scene = new THREE.Scene();
+  const far = new FarFieldRenderer(scene, farFieldAsset(), { nodes: null });
+  const meshes: THREE.Mesh[] = [];
+  far.group.traverse((o) => { if (o instanceof THREE.Mesh) meshes.push(o); });
+  assert.equal(meshes.length, 16);
+  for (const mesh of meshes) {
+    assert.ok(mesh.geometry.getAttribute("position"));
+    assert.ok(mesh.geometry.getAttribute("normal"), "lighting needs normals the asset does not carry");
+    assert.ok(mesh.geometry.getIndex());
+    // Distant geometry sits far beyond the 460 m shadow cascade — by design.
+    assert.equal(mesh.castShadow, false);
+    assert.equal(mesh.receiveShadow, false);
+    // We cull by wedge ourselves; three's sphere test is useless at this scale.
+    assert.equal(mesh.frustumCulled, false);
+  }
+  far.dispose();
+});
+
+test("the far field does not follow the camera — it is georeferenced, unlike the ridge bands", () => {
+  const scene = new THREE.Scene();
+  const far = new FarFieldRenderer(scene, farFieldAsset(), { nodes: null });
+  assert.deepEqual(far.group.position.toArray(), [0, 0, 0]);
+  far.dispose();
+});
+
+test("far-field material takes the same height fog as the near field on WebGL", () => {
+  const scene = new THREE.Scene();
+  const far = new FarFieldRenderer(scene, farFieldAsset(), { nodes: null });
+  const material = far.material as THREE.Material & { fog?: boolean };
+  // The three conditions configureSceneMaterials requires to fog a material.
+  assert.notEqual(material.fog, false, "fog:false is what made the ridge bands read as a colour step");
+  assert.notEqual(material.userData.heightFog, false);
+  assert.ok(!(material instanceof THREE.ShaderMaterial), "configureSceneMaterials skips ShaderMaterials");
+
+  const uniforms: AtmosphereUniforms = {
+    density: { value: 0.012 }, heightFalloff: { value: 0.025 }, referenceHeight: { value: 0 },
+    blue: { value: new THREE.Color(0x9fc0e8) }, warm: { value: new THREE.Color(0xffd9a8) },
+    sunDirection: { value: new THREE.Vector3(0, 1, 0) },
+  };
+  configureSceneMaterials(scene, { setupMaterial() { assert.fail("far field must not join the shadow cascade"); } }, uniforms);
+  assert.equal(material.userData.heightFogConfigured, true, "the far field never got height fog");
+  far.dispose();
+});
+
+test("far-field material is backend gated: node material on WebGPU, classic on WebGL", () => {
+  const webglScene = new THREE.Scene();
+  const webgl = new FarFieldRenderer(webglScene, farFieldAsset(), { nodes: null });
+  assert.ok(webgl.material instanceof THREE.MeshStandardMaterial, "WebGL gets the classic material");
+  webgl.dispose();
+
+  const webgpuScene = new THREE.Scene();
+  const webgpu = new FarFieldRenderer(webgpuScene, farFieldAsset(), { nodes: staticNodeFactories() });
+  assert.ok(!(webgpu.material instanceof THREE.MeshStandardMaterial), "WebGPU must not get the classic material");
+  assert.match(webgpu.material.constructor.name, /Node/, "expected a node material");
+  // Node materials are fogged by scene.fogNode, which skips `fog === false`.
+  assert.notEqual((webgpu.material as THREE.Material & { fog?: boolean }).fog, false);
+  webgpu.dispose();
+});
+
+test("update() hides the wedges behind the camera and shows the ones ahead", () => {
+  const scene = new THREE.Scene();
+  const far = new FarFieldRenderer(scene, farFieldAsset(), { nodes: null });
+  // Azimuth 0 is north = -z; wedge 0 covers [0°, 22.5°), wedge 8 covers [180°, 202.5°).
+  const north = frustumLookingAt(new THREE.Vector3(0, 0, -1));
+  far.update(north.camera.position, north.frustum);
+  assert.equal(far.wedgeVisible(0), true, "the wedge straight ahead must draw");
+  assert.equal(far.wedgeVisible(8), false, "the wedge directly behind must not");
+  assert.ok(far.visibleWedgeCount < 16, `${far.visibleWedgeCount}/16 wedges drawn — culling did nothing`);
+
+  const south = frustumLookingAt(new THREE.Vector3(0, 0, 1));
+  far.update(south.camera.position, south.frustum);
+  assert.equal(far.wedgeVisible(8), true);
+  assert.equal(far.wedgeVisible(0), false);
+  far.dispose();
+});
+
+test("update() only toggles visibility — it never rebuilds geometry and allocates nothing", () => {
+  const scene = new THREE.Scene();
+  const far = new FarFieldRenderer(scene, farFieldAsset(), { nodes: null });
+  const meshes: THREE.Mesh[] = [];
+  far.group.traverse((o) => { if (o instanceof THREE.Mesh) meshes.push(o); });
+  const geometries = meshes.map((m) => m.geometry);
+  const bounds = far.wedgeBounds;
+  const visibility = far.visibility;
+
+  const view = frustumLookingAt(new THREE.Vector3(0, 0, -1));
+  for (let i = 0; i < 50; i += 1) far.update(view.camera.position, view.frustum);
+
+  // Scratch identity is the whole contract: same arrays, same Box3s, same geometries.
+  assert.equal(far.wedgeBounds, bounds, "the bounds array was reallocated");
+  assert.equal(far.visibility, visibility, "the visibility scratch was reallocated");
+  for (let i = 0; i < bounds.length; i += 1) assert.equal(far.wedgeBounds[i], bounds[i], `Box3 ${i} replaced`);
+  const after: THREE.Mesh[] = [];
+  far.group.traverse((o) => { if (o instanceof THREE.Mesh) after.push(o); });
+  assert.deepEqual(after.map((m) => m.geometry), geometries, "update() rebuilt geometry");
+  far.dispose();
+});
+
+test("far field disposes every geometry and material and leaves the scene clean", () => {
+  const scene = new THREE.Scene();
+  const before = resourceCounts(scene);
+  const far = new FarFieldRenderer(scene, farFieldAsset(), { nodes: null });
+  const attached = resourceCounts(scene);
+  assert.equal(attached.geometries - before.geometries, 16);
+  assert.equal(attached.materials - before.materials, 1, "one shared material across the wedges");
+
+  const disposedGeometries = new Set<THREE.BufferGeometry>();
+  far.group.traverse((o) => {
+    if (o instanceof THREE.Mesh) o.geometry.addEventListener("dispose", () => disposedGeometries.add(o.geometry));
+  });
+  far.dispose();
+  assert.equal(disposedGeometries.size, 16);
+  assert.deepEqual(resourceCounts(scene), before, "the far field left resources behind");
+  assert.equal(far.group.parent, null);
+});
+
+test("the procedural ridge bands stay as the fallback and hide only once a real far field attaches", () => {
+  const built = createScene(profile, 16 / 9, null);
+  const ridges: THREE.Mesh[] = [];
+  built.peaks.traverse((o) => { if (o instanceof THREE.Mesh) ridges.push(o); });
+  assert.equal(ridges.length, 2, "the fallback horizon must survive for resorts with no baked asset");
+  assert.ok(ridges.every((r) => r.visible), "ridges are visible until a far field replaces them");
+
+  const far = new FarFieldRenderer(built.scene, farFieldAsset(), { nodes: null, fallback: built.peaks });
+  assert.equal(built.peaks.visible, false, "the ridge bands must hide behind a real far field");
+  far.dispose();
+  assert.equal(built.peaks.visible, true, "disposing the far field restores the fallback horizon");
+});

@@ -14,6 +14,8 @@ import { SkierRenderer } from "./SkierRenderer";
 import { TerrainRenderer } from "./TerrainRenderer";
 import { WeatherRenderer } from "./WeatherRenderer";
 import { WorldRenderer } from "./WorldRenderer";
+import { FarFieldRenderer } from "./FarFieldRenderer";
+import type { DecodedFarField } from "../terrain/far-field-format";
 import { QualityController, seedQualityRung, type DeviceQualitySignals, type QualityRung } from "./QualityController";
 import type { PostProcessing } from "./PostProcessing";
 import type { NodePostProcessing } from "./NodePostProcessing";
@@ -133,6 +135,11 @@ export class GameRenderer {
   private readonly skier: SkierRenderer;
   private readonly ghost: GhostRenderer;
   private readonly worldRenderer: WorldRenderer;
+  /** Attached once the baked asset resolves; null on a missing or corrupt one. */
+  private farField: FarFieldRenderer | null = null;
+  private readonly farFieldFrustum = new THREE.Frustum();
+  private readonly farFieldMatrix = new THREE.Matrix4();
+  private readonly nodes: NodeFactories | null;
   private readonly effects: EffectsRenderer;
   private readonly cameraController: CameraController;
   private readonly weather: WeatherRenderer;
@@ -191,6 +198,7 @@ export class GameRenderer {
     // `nodes` is the one backend switch the scene needs: it is non-null exactly on WebGPU, and
     // carries the node-material factories that only that path fetches.
     const nodes = this.renderer.backendKind === "webgpu" ? options.nodeFactories ?? null : null;
+    this.nodes = nodes;
     if (this.renderer.backendKind === "webgpu" && !nodes) {
       throw new Error("[Drop In] A WebGPU backend needs nodeFactories; await loadNodeFactories() before constructing GameRenderer.");
     }
@@ -381,6 +389,13 @@ export class GameRenderer {
     }
     this.terrain.update(state.pos.x, state.pos.z); this.worldRenderer.update(state, dt); this.skier.update(state, world.terrain, dt); this.ghost.update(state.time, world.terrain);
     this.cameraController.update(state, world.terrain, dt, tuck);
+    if (this.farField) {
+      // Scratch matrix and frustum, reused: the cull is 16 box tests and zero allocation.
+      this.built.camera.updateMatrixWorld();
+      this.farFieldMatrix.multiplyMatrices(this.built.camera.projectionMatrix, this.built.camera.matrixWorldInverse);
+      this.farFieldFrustum.setFromProjectionMatrix(this.farFieldMatrix);
+      this.farField.update(this.built.camera.position, this.farFieldFrustum);
+    }
     this.effects.update(state, this.built.camera, dt, this.weather.current.snow, this.weather.current.wind);
     this.built.atmosphereUniforms.referenceHeight.value = state.pos.y;
     this.built.skyUniforms.uTime.value += dt;
@@ -402,6 +417,30 @@ export class GameRenderer {
 
   takePerformanceSummary(): RenderPerformanceSummary { const summary = this.performanceSummary(); this.frameTimes.length = 0; return summary; }
 
+  /**
+   * Swap the procedural ridge bands for the baked far field. Called once the asset resolves, which
+   * is necessarily *after* the constructor ran `configureSceneMaterials` — hence `configureMaterial`,
+   * which gives this one material the same height fog the rest of the scene already has. Without it
+   * the seam between near and far field reads as a colour step.
+   *
+   * Passing nothing is a no-op by construction: a resort with no asset simply keeps the ridge bands.
+   */
+  attachFarField(asset: DecodedFarField): void {
+    if (this.disposed) return;
+    this.farField?.dispose();
+    this.farField = new FarFieldRenderer(this.built.scene, asset, {
+      nodes: this.nodes,
+      fallback: this.built.peaks,
+      configureMaterial: (material) => {
+        // WebGPU fogs from `scene.fogNode`, which needs nothing per material.
+        if (this.renderer.backendKind === "webgpu") return;
+        addHeightFog(material, this.built.atmosphereUniforms as Parameters<typeof addHeightFog>[1]);
+      },
+    });
+  }
+
+  get farFieldWedgesDrawn(): number { return this.farField?.visibleWedgeCount ?? 0; }
+
   resources(): ResourceCounts { return resourceCounts(this.built.scene); }
 
   private onContextLost = (event: Event) => { event.preventDefault(); this.contextLost = true; };
@@ -412,6 +451,10 @@ export class GameRenderer {
     this.canvas.removeEventListener("webglcontextlost", this.onContextLost as EventListener, false);
     this.canvas.removeEventListener("webglcontextrestored", this.onContextRestored as EventListener, false);
     this.post?.dispose(); this.post = null; this.csm.dispose(); this.ghost.setGhost(null);
+    // Deliberately NOT farField.dispose(): its meshes are in the scene graph, so
+    // `disposeObjectTree` releases them *and* reports them to the disposal audit. Disposing here
+    // first would detach them silently and make the audit under-count.
+    this.farField = null;
     disposeObjectTree(this.built.scene, this.options.disposalAudit); this.renderer.renderLists?.dispose(); this.renderer.dispose(); this.renderer.forceContextLoss?.();
   }
 }

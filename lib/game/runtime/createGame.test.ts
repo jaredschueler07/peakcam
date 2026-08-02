@@ -13,6 +13,9 @@ import { UiBridge } from "./UiBridge";
 import { loadTerrainForRuntime, selectRendererBackend } from "./createGame";
 import { warmUpAndStart } from "./GameRuntime";
 import type { createRendererBackend } from "../rendering/backend";
+import { attachFarFieldWhenReady, type CreateGameOptions } from "./createGame";
+import { RESORT_BAKE_CONFIGS } from "../terrain/resorts";
+import type { DecodedFarField } from "../terrain/far-field-format";
 
 function portilloAssets() {
   const directory = path.join(process.cwd(), "public/game/terrain");
@@ -145,4 +148,49 @@ test("a pre-warm failure still starts the run", async () => {
   }
   assert.equal(started, true, "nobody is stranded on the loading screen");
   assert.deepEqual(progress, [0.95, 1]);
+});
+
+// ─── Far field ───────────────────────────────────────────────
+
+const farFieldProfile = { slug: "ski-portillo" } as CreateGameOptions["profile"];
+
+test("the far field attaches when it loads", async () => {
+  const asset = { meta: {}, wedges: [] } as unknown as DecodedFarField;
+  const attached: unknown[] = [];
+  const seen: Array<{ centre: [number, number]; radiusM: number }> = [];
+  await attachFarFieldWhenReady(
+    { attachFarField: (a) => attached.push(a) },
+    { profile: farFieldProfile },
+    { load: async (_slug, o) => { seen.push(o.expect); return asset; } },
+  );
+  assert.deepEqual(attached, [asset]);
+  // The asset is validated against the resort it claims, so it cannot render Heavenly at Portillo.
+  assert.equal(seen[0].radiusM, 30_000);
+  assert.deepEqual(seen[0].centre, RESORT_BAKE_CONFIGS["ski-portillo"].center);
+});
+
+test("a far field that fails to load leaves the run untouched", async () => {
+  let attachedCount = 0;
+  // null (missing/corrupt/wrong resort) and a rejection are both survivable.
+  await attachFarFieldWhenReady(
+    { attachFarField: () => { attachedCount += 1; } },
+    { profile: farFieldProfile },
+    { load: async () => null },
+  );
+  await attachFarFieldWhenReady(
+    { attachFarField: () => { attachedCount += 1; } },
+    { profile: farFieldProfile },
+    { load: async () => { throw new Error("network down"); } },
+  );
+  assert.equal(attachedCount, 0, "nothing should attach, and nothing should throw");
+});
+
+test("a resort with no bake config never asks for a far field", async () => {
+  let requested = 0;
+  await attachFarFieldWhenReady(
+    { attachFarField: () => assert.fail("must not attach") },
+    { profile: { slug: "not-a-pilot-resort" } as unknown as CreateGameOptions["profile"] },
+    { load: async () => { requested += 1; return null; } },
+  );
+  assert.equal(requested, 0);
 });
