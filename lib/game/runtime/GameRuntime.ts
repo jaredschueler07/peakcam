@@ -211,6 +211,9 @@ export class GameRuntime {
    */
   setGhost(ghost: DecodedGhost | null): void { this.renderer.setGhost(ghost); }
 
+  /** Which renderer backend the run is actually using. */
+  get backendKind(): "webgpu" | "webgl" { return this.renderer.backendKind; }
+
   takeFinishedRun(): { samples: GhostSample[]; encoded: Uint8Array } | null {
     const run = this.finishedRun;
     this.finishedRun = null;

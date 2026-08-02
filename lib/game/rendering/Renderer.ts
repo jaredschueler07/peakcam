@@ -282,6 +282,9 @@ export class GameRenderer {
     this.built.snowUniforms.glint.value = topRung ? visualWeatherPreset(this.weather.index).glint : 0;
   }
 
+  /** Which backend actually initialised — surfaced to the DOM so e2e can assert the matrix. */
+  get backendKind(): "webgpu" | "webgl" { return this.renderer.backendKind; }
+
   /** Attach a decoded replay to render alongside the live skier, or `null` to clear it. */
   setGhost(ghost: DecodedGhost | null): void { this.ghost.setGhost(ghost); }
 
@@ -297,7 +300,12 @@ export class GameRenderer {
         this.adaptTime = 0;
         // The governor replaces the twitchy observe(fps) ladder: sharing `rung` with both live
         // would let the fast path undo a governor step inside a single tick.
-        const budgetMs = this.mobile ? 1000 / 45 : 1000 / 58;
+        // 45fps, not the plan's 58fps for desktop: the governor steps down whenever p75 exceeds
+        // the budget, so a 58fps budget would treat an ordinary vsync-locked 60Hz display (16.7ms,
+        // and above 17.2ms on any jitter) as distress and walk the ladder down to rung 0 — which
+        // switches the whole poster chain off. 45fps preserves the step-down point the legacy
+        // observe(fps) used.
+        const budgetMs = 1000 / 45;
         const from = this.quality.rung;
         const quality = this.quality.observeFrameTimes(this.windowedP75(), budgetMs, this.elapsed);
         if (quality.changed) {

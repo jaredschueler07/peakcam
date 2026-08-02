@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import * as THREE from "three";
 import type { Renderer } from "three/webgpu";
-import { NodeUpdateType } from "three/webgpu";
+import { ColorSpaceNode, NodeUpdateType } from "three/webgpu";
 import { chromaticAberrationOffset } from "./MotionEffects";
 import { NodePostProcessing, postChainPolicy } from "./NodePostProcessing";
 import { PostProcessing } from "./PostProcessing";
@@ -14,6 +14,19 @@ class StubImage {
   onload: (() => void) | null = null;
 }
 (globalThis as { Image?: unknown }).Image ??= StubImage;
+
+type Traversable = { getChildren?: () => Iterable<Traversable> };
+
+function collectNodes(root: unknown): Set<unknown> {
+  const seen = new Set<unknown>();
+  const walk = (node: Traversable | null) => {
+    if (!node || seen.has(node) || typeof node.getChildren !== "function") return;
+    seen.add(node);
+    for (const child of node.getChildren()) walk(child);
+  };
+  walk(root as Traversable | null);
+  return seen;
+}
 
 function stubRenderer() {
   const calls = { render: 0 };
@@ -177,4 +190,24 @@ test("dispose releases the LUT and the pipeline", () => {
   post.lut.addEventListener("dispose", () => { lutDisposed = true; });
   post.dispose();
   assert.equal(lutDisposed, true);
+});
+
+test("the poster LUT is fed sRGB, the way postprocessing's LUT3DEffect was", () => {
+  // LUT3DEffect declares `inputColorSpace = SRGBColorSpace`, so the effect framework encoded the
+  // linear working buffer around it. Feeding the same cube linear values washes the frame out.
+  const { post } = build();
+  const spaces: string[][] = [];
+  for (const node of collectNodes(post.pipeline.outputNode)) {
+    if (!(node instanceof ColorSpaceNode)) continue;
+    const { source, target } = node as unknown as { source: string; target: string };
+    spaces.push([source, target]);
+  }
+  assert.ok(
+    spaces.some(([, target]) => target === THREE.SRGBColorSpace),
+    "the chain encodes to sRGB before the lookup",
+  );
+  assert.ok(
+    spaces.some(([source]) => source === THREE.SRGBColorSpace),
+    "and decodes back afterwards",
+  );
 });

@@ -100,6 +100,9 @@ export default function DropInGame({ profile, conditions }: {
   const [error, setError] = useState<string | null>(null);
   const [runtime, setRuntime] = useState<GameRuntime | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
+  // Which renderer actually initialised. The e2e matrix asserts against this rather than guessing
+  // from navigator.gpu, because a browser can advertise WebGPU and still fall back.
+  const [gfxBackend, setGfxBackend] = useState<"webgpu" | "webgl" | "pending">("pending");
   const [audioEnabled, setAudioEnabled] = useState(true);
   const bridge = useMemo(() => new UiBridge(profile), [profile]);
 
@@ -324,6 +327,7 @@ export default function DropInGame({ profile, conditions }: {
           },
         });
         if (cancelled) { created.dispose(); return; }
+        setGfxBackend(created.backendKind);
         // Arm before the first simulation step: the runtime owns begin timing,
         // and at t=0 arming starts the recorder immediately. Free Ski never
         // records.
@@ -455,6 +459,7 @@ export default function DropInGame({ profile, conditions }: {
         data-drop-in-mode={session.mode}
         data-drop-in-session={sessionStateAttribute}
         data-drop-in-ticket={ticketState.status}
+        data-drop-in-gfx={gfxBackend}
       >
         <Link href={`/resorts/${profile.slug}`} className="absolute left-3 top-3 z-40 inline-flex items-center gap-2 rounded-full border-[1.5px] border-ink bg-cream-50 px-3.5 py-2 text-xs font-bold uppercase text-ink shadow-stamp-sm">
           <ArrowLeft className="h-4 w-4" aria-hidden /> Conditions

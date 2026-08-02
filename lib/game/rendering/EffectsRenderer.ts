@@ -2,14 +2,14 @@ import * as THREE from "three";
 import type { SimulationState, TerrainSampler } from "../core/types";
 import { mulberry32 } from "../core/rng";
 import type { QualityRung } from "./QualityController";
-import { createParticleNodeMaterial, radialParticleTexture } from "./ParticleNodeMaterial";
+import { createParticleNodeMaterial, createParticleSpriteGeometry, PARTICLE_CENTRE, radialParticleTexture } from "./ParticleNodeMaterial";
 import type { RendererBackendKind } from "./backend";
 
 const SPRAY_MAX = 900, SNOW_MAX = 3600, SNOW_BOX = 130, TRACK_QUADS = 1600;
 const pointVertex = "attribute float aAlpha;attribute float aSize;uniform float uScale;varying float vA;void main(){vA=aAlpha;vec4 mv=modelViewMatrix*vec4(position,1.);gl_PointSize=aSize*uScale/max(1.,-mv.z);gl_Position=projectionMatrix*mv;}";
 const pointFragment = "uniform sampler2D uTex;uniform vec3 uColor;varying float vA;void main(){vec4 t=texture2D(uTex,gl_PointCoord);float a=t.a*vA;if(a<.012)discard;gl_FragColor=vec4(uColor,a);}";
 /** Preallocated attribute name list — `for (const name of [...])` would allocate every spray update. */
-const SPRAY_ATTRS = ["position", "aAlpha", "aSize"] as const;
+const SPRAY_ATTRS = ["position", "aAlpha", "aSize"];
 
 function radialTexture(): THREE.DataTexture {
   const size = 32, data = new Uint8Array(size * size * 4);
@@ -24,19 +24,41 @@ export class EffectsRenderer {
   private readonly random: () => number;
   private readonly sprayPosition = new Float32Array(SPRAY_MAX * 3); private readonly sprayVelocity = new Float32Array(SPRAY_MAX * 3);
   private readonly sprayLife = new Float32Array(SPRAY_MAX); private readonly sprayMaxLife = new Float32Array(SPRAY_MAX);
-  private readonly sprayAlpha = new Float32Array(SPRAY_MAX); private readonly spraySize = new Float32Array(SPRAY_MAX); private readonly sprayGeometry = new THREE.BufferGeometry();
-  private readonly snowPosition = new Float32Array(SNOW_MAX * 3); private readonly snowAlpha = new Float32Array(SNOW_MAX); private readonly snowSize = new Float32Array(SNOW_MAX); private readonly snowSeed = new Float32Array(SNOW_MAX); private readonly snowGeometry = new THREE.BufferGeometry();
+  private readonly sprayAlpha = new Float32Array(SPRAY_MAX); private readonly spraySize = new Float32Array(SPRAY_MAX); private readonly sprayGeometry: THREE.BufferGeometry;
+  private readonly snowPosition = new Float32Array(SNOW_MAX * 3); private readonly snowAlpha = new Float32Array(SNOW_MAX); private readonly snowSize = new Float32Array(SNOW_MAX); private readonly snowSeed = new Float32Array(SNOW_MAX); private readonly snowGeometry: THREE.BufferGeometry;
   private readonly trackPosition = new Float32Array(TRACK_QUADS * 18); private readonly trackGeometry = new THREE.BufferGeometry();
   private sprayHead = 0; private trackHead = 0; private trackUsed = 0;
   /** Scalar track ring — avoids allocating a `{lx,lz,rx,rz}` object every ground frame. */
   private trackHasPrevious = false;
   private prevLx = 0; private prevLz = 0; private prevRx = 0; private prevRz = 0;
   private quality: QualityRung = 4;
+  /** Attribute names to re-upload each frame; the centre attribute is renamed on the node path. */
+  private readonly sprayAttrs: string[];
 
   /**
-   * Both point clouds share one shader. The WebGPU backend cannot compile the raw `ShaderMaterial`,
-   * so it gets the TSL port; `sizeNode`/`opacityNode` carry the same arithmetic the GLSL did.
+   * WebGPU renders `THREE.Points` as one-pixel `point-list` primitives, so the particles have to be
+   * instanced quads there. Both variants read the same simulation arrays; only the attribute
+   * carrying the particle centre is named differently, because the sprite path claims `position`.
    */
+  private particleGeometry(centre: Float32Array, alpha: Float32Array, size: Float32Array): THREE.BufferGeometry {
+    if (this.backendKind === "webgpu") return createParticleSpriteGeometry(centre, alpha, size);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(centre, 3));
+    geometry.setAttribute("aAlpha", new THREE.BufferAttribute(alpha, 1));
+    geometry.setAttribute("aSize", new THREE.BufferAttribute(size, 1));
+    return geometry;
+  }
+
+  private particleCloud(geometry: THREE.BufferGeometry, material: THREE.Material): THREE.Object3D {
+    return this.backendKind === "webgpu" ? new THREE.Mesh(geometry, material) : new THREE.Points(geometry, material);
+  }
+
+  /** How many particles are drawn — instance count for quads, draw range for points. */
+  private setVisibleParticles(geometry: THREE.BufferGeometry, count: number): void {
+    if (this.backendKind === "webgpu") (geometry as THREE.InstancedBufferGeometry).instanceCount = count;
+    else geometry.setDrawRange(0, count);
+  }
+
   private pointMaterial(color: number, scale: number): THREE.Material {
     if (this.backendKind === "webgpu") return createParticleNodeMaterial(radialParticleTexture(), new THREE.Color(color), scale);
     return new THREE.ShaderMaterial({
@@ -54,13 +76,14 @@ export class EffectsRenderer {
     private readonly backendKind: RendererBackendKind = "webgl",
   ) {
     this.random = mulberry32(seed ^ 0x8e37a12d);
-    this.sprayGeometry.setAttribute("position", new THREE.BufferAttribute(this.sprayPosition, 3)); this.sprayGeometry.setAttribute("aAlpha", new THREE.BufferAttribute(this.sprayAlpha, 1)); this.sprayGeometry.setAttribute("aSize", new THREE.BufferAttribute(this.spraySize, 1));
+    this.sprayAttrs = [backendKind === "webgpu" ? PARTICLE_CENTRE : SPRAY_ATTRS[0], SPRAY_ATTRS[1], SPRAY_ATTRS[2]];
+    this.sprayGeometry = this.particleGeometry(this.sprayPosition, this.sprayAlpha, this.spraySize);
     const sprayMaterial = this.pointMaterial(0xf7fbff, 620);
-    const spray = new THREE.Points(this.sprayGeometry, sprayMaterial); spray.frustumCulled = false; scene.add(spray);
+    const spray = this.particleCloud(this.sprayGeometry, sprayMaterial); spray.frustumCulled = false; scene.add(spray);
     for (let i = 0; i < SNOW_MAX; i += 1) { this.snowPosition[i * 3] = (this.random() - 0.5) * SNOW_BOX; this.snowPosition[i * 3 + 1] = this.random() * SNOW_BOX * 0.7; this.snowPosition[i * 3 + 2] = (this.random() - 0.5) * SNOW_BOX; this.snowAlpha[i] = 0.55 + this.random() * 0.45; this.snowSize[i] = 0.5 + this.random() * 1.5; this.snowSeed[i] = this.random() * Math.PI * 2; }
-    this.snowGeometry.setAttribute("position", new THREE.BufferAttribute(this.snowPosition, 3)); this.snowGeometry.setAttribute("aAlpha", new THREE.BufferAttribute(this.snowAlpha, 1)); this.snowGeometry.setAttribute("aSize", new THREE.BufferAttribute(this.snowSize, 1));
+    this.snowGeometry = this.particleGeometry(this.snowPosition, this.snowAlpha, this.snowSize);
     const snowMaterial = this.pointMaterial(0xffffff, 240);
-    const snowfall = new THREE.Points(this.snowGeometry, snowMaterial); snowfall.frustumCulled = false; scene.add(snowfall);
+    const snowfall = this.particleCloud(this.snowGeometry, snowMaterial); snowfall.frustumCulled = false; scene.add(snowfall);
     this.trackGeometry.setAttribute("position", new THREE.BufferAttribute(this.trackPosition, 3)); this.trackGeometry.setDrawRange(0, 0);
     const tracks = new THREE.Mesh(this.trackGeometry, new THREE.MeshBasicMaterial({ color: 0x9fb8d6, transparent: true, opacity: 0.42, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -3 })); tracks.frustumCulled = false; tracks.renderOrder = 1; scene.add(tracks);
   }
@@ -100,9 +123,9 @@ export class EffectsRenderer {
       this.sprayAlpha[i] = k * k * 0.9;
       this.spraySize[i] += dt * 2.2;
     }
-    for (let a = 0; a < SPRAY_ATTRS.length; a += 1) this.sprayGeometry.getAttribute(SPRAY_ATTRS[a]).needsUpdate = true;
+    for (let a = 0; a < this.sprayAttrs.length; a += 1) this.sprayGeometry.getAttribute(this.sprayAttrs[a]).needsUpdate = true;
   }
-  private updateSnow(dt: number, time: number, camera: THREE.Vector3, requested: number, wind: number) { const count = Math.min(this.reducedMotion ? 320 : SNOW_MAX, requested | 0), half = SNOW_BOX * 0.5; this.snowGeometry.setDrawRange(0, count); for (let i = 0; i < count; i += 1) { const p = i * 3; this.snowPosition[p + 1] -= (5.5 + this.snowSize[i] * 3.2) * dt; this.snowPosition[p] += Math.sin(time * 0.9 + this.snowSeed[i]) * 3.4 * dt + wind * dt; this.snowPosition[p + 2] += Math.cos(time * 0.7 + this.snowSeed[i]) * 2.2 * dt; const dx = this.snowPosition[p] - camera.x, dy = this.snowPosition[p + 1] - camera.y, dz = this.snowPosition[p + 2] - camera.z; if (dx > half) this.snowPosition[p] -= SNOW_BOX; else if (dx < -half) this.snowPosition[p] += SNOW_BOX; if (dz > half) this.snowPosition[p + 2] -= SNOW_BOX; else if (dz < -half) this.snowPosition[p + 2] += SNOW_BOX; if (dy < -20) this.snowPosition[p + 1] += SNOW_BOX * 0.8; else if (dy > SNOW_BOX * 0.7) this.snowPosition[p + 1] -= SNOW_BOX * 0.8; } this.snowGeometry.getAttribute("position").needsUpdate = true; }
+  private updateSnow(dt: number, time: number, camera: THREE.Vector3, requested: number, wind: number) { const count = Math.min(this.reducedMotion ? 320 : SNOW_MAX, requested | 0), half = SNOW_BOX * 0.5; this.setVisibleParticles(this.snowGeometry, count); for (let i = 0; i < count; i += 1) { const p = i * 3; this.snowPosition[p + 1] -= (5.5 + this.snowSize[i] * 3.2) * dt; this.snowPosition[p] += Math.sin(time * 0.9 + this.snowSeed[i]) * 3.4 * dt + wind * dt; this.snowPosition[p + 2] += Math.cos(time * 0.7 + this.snowSeed[i]) * 2.2 * dt; const dx = this.snowPosition[p] - camera.x, dy = this.snowPosition[p + 1] - camera.y, dz = this.snowPosition[p + 2] - camera.z; if (dx > half) this.snowPosition[p] -= SNOW_BOX; else if (dx < -half) this.snowPosition[p] += SNOW_BOX; if (dz > half) this.snowPosition[p + 2] -= SNOW_BOX; else if (dz < -half) this.snowPosition[p + 2] += SNOW_BOX; if (dy < -20) this.snowPosition[p + 1] += SNOW_BOX * 0.8; else if (dy > SNOW_BOX * 0.7) this.snowPosition[p + 1] -= SNOW_BOX * 0.8; } this.snowGeometry.getAttribute(this.sprayAttrs[0]).needsUpdate = true; }
   private updateTracks(state: SimulationState) {
     if (!state.onGround || state.crash > 0) { this.trackHasPrevious = false; return; }
     const fx = Math.sin(state.yaw), fz = Math.cos(state.yaw), rx = fz, rz = -fx, width = 0.42;

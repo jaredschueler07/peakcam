@@ -27,6 +27,39 @@ export function radialParticleTexture(): THREE.DataTexture {
 }
 
 /**
+ * The instanced particle centre. It cannot be called `position`: `PointsNodeMaterial`'s sprite path
+ * reads `positionGeometry.xy` as the quad corner offset, so `position` belongs to the unit quad.
+ */
+export const PARTICLE_CENTRE = "aCentre";
+
+const QUAD_CORNERS = [-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0];
+const QUAD_UVS = [0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1];
+
+/**
+ * WebGPU's `point-list` topology rasterises exactly one pixel and WGSL has no point size, so a
+ * `THREE.Points` cloud is invisible there no matter what `sizeNode` says. Particles therefore
+ * become instanced quads, which is the branch of `PointsNodeMaterial.setupVertex` that actually
+ * honours `sizeNode` (`builder.object.isPoints` must be false to reach `setupVertexSprite`).
+ *
+ * The instanced attributes alias the very same `Float32Array`s the WebGL geometry uses, so the
+ * per-frame simulation in `EffectsRenderer` is untouched.
+ */
+export function createParticleSpriteGeometry(
+  centre: Float32Array,
+  alpha: Float32Array,
+  size: Float32Array,
+): THREE.InstancedBufferGeometry {
+  const geometry = new THREE.InstancedBufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(QUAD_CORNERS, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(QUAD_UVS, 2));
+  geometry.setAttribute(PARTICLE_CENTRE, new THREE.InstancedBufferAttribute(centre, 3));
+  geometry.setAttribute("aAlpha", new THREE.InstancedBufferAttribute(alpha, 1));
+  geometry.setAttribute("aSize", new THREE.InstancedBufferAttribute(size, 1));
+  geometry.instanceCount = alpha.length;
+  return geometry;
+}
+
+/**
  * TSL port of the shared point-sprite `ShaderMaterial` in `EffectsRenderer`, which the WebGPU
  * backend cannot compile. The GLSL was:
  *
@@ -37,7 +70,10 @@ export function radialParticleTexture(): THREE.DataTexture {
 export function createParticleNodeMaterial(map: THREE.Texture, color: THREE.Color, scale: number): PointsNodeMaterial {
   const material = new PointsNodeMaterial();
 
-  // gl_PointSize is in framebuffer pixels; PointsNodeMaterial multiplies sizeNode by screenDPR to
+  // Each instance is placed by its centre; positionGeometry.xy stays free as the quad corner.
+  material.positionNode = attribute(PARTICLE_CENTRE, "vec3");
+
+  // gl_PointSize is in framebuffer pixels; the sprite path multiplies sizeNode by screenDPR to
   // convert from logical pixels, so divide it back out to land on the same on-screen size.
   const attenuated = floatAttribute("aSize").mul(uniform(scale)).div(max(positionView.z.negate(), 1));
   material.sizeNode = attenuated.div(screenDPR);

@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { NodeUpdateType, RenderPipeline } from "three/webgpu";
 import type { Node, Renderer, UniformNode } from "three/webgpu";
-import { convertToTexture, float, mix, pass, renderOutput, screenUV, smoothstep, texture3D, uniform, vec2, vec4 } from "three/tsl";
+import { colorSpaceToWorking, convertToTexture, float, mix, pass, renderOutput, screenUV, smoothstep, texture3D, uniform, vec2, vec4, workingToColorSpace } from "three/tsl";
 import { bloom } from "three/addons/tsl/display/BloomNode.js";
 import { fxaa } from "three/addons/tsl/display/FXAANode.js";
 import { smaa } from "three/addons/tsl/display/SMAANode.js";
@@ -107,7 +107,12 @@ export class NodePostProcessing {
     const lit = asVec4(this.bloomNode).mul(this.uniforms.bloom);
     const bloomed = vec4(aberrated.add(lit).sub(aberrated.mul(lit)).rgb, aberrated.a);
 
-    const graded = asVec4(lut3D(bloomed, texture3D(this.lut), LUT_SIZE, this.uniforms.chain));
+    // `postprocessing`'s LUT3DEffect declares `inputColorSpace = SRGBColorSpace`, so the effect
+    // framework encoded the linear working buffer to sRGB around it. Feeding the same cube linear
+    // values washes the whole frame out, so do the same round trip here.
+    const encoded = asVec4(workingToColorSpace(bloomed, THREE.SRGBColorSpace));
+    const lut = asVec4(lut3D(encoded, texture3D(this.lut), LUT_SIZE, this.uniforms.chain));
+    const graded = asVec4(colorSpaceToWorking(lut, THREE.SRGBColorSpace));
     const shaded = vec4(graded.rgb.mul(vignetteFactor(this.uniforms)), graded.a);
 
     // SMAA wants linear input and FXAA wants sRGB, so each sits on its own side of renderOutput.

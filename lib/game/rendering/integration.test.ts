@@ -9,6 +9,7 @@ import { applyNodeFogOptOuts, GameRenderer, type QualityChangeEvent, type Render
 import { createScene } from "./SceneFactory";
 import { CsmShadowsNode } from "./CsmShadowsNode";
 import { EffectsRenderer } from "./EffectsRenderer";
+import { PARTICLE_CENTRE } from "./ParticleNodeMaterial";
 
 // SMAANode decodes its lookup atlases through `new Image()`, which Node lacks. The post chain is
 // imported lazily by the renderer, so without this the WebGPU path warns and drops post.
@@ -117,20 +118,43 @@ test("the renderer wires the ghost and skier out of the scene fog on the node pa
   renderer.dispose();
 });
 
-test("the WebGPU renderer builds the node terrain, particles and cascaded shadows", () => {
+test("the WebGPU renderer builds the node terrain and cascaded shadows", () => {
   const { renderer } = buildRenderer(new FakeBackend("webgpu"));
-  const internals = renderer as unknown as { built: { scene: THREE.Scene }; csm: unknown };
-
+  const internals = renderer as unknown as { csm: unknown };
   assert.ok(internals.csm instanceof CsmShadowsNode, "shadows come from CSMShadowNode");
+  renderer.dispose();
+});
 
-  let points = 0;
-  internals.built.scene.traverse((object) => {
-    if ((object as THREE.Points).isPoints) {
-      points += 1;
-      assert.ok((object as THREE.Points).material instanceof PointsNodeMaterial, "spray and snowfall are node sprites");
-    }
+test("particles are instanced quads on WebGPU, because point-list cannot size a point", () => {
+  const { renderer } = buildRenderer(new FakeBackend("webgpu"));
+  const scene = (renderer as unknown as { built: { scene: THREE.Scene } }).built.scene;
+
+  const clouds: THREE.Mesh[] = [];
+  scene.traverse((object) => {
+    const mesh = object as THREE.Mesh;
+    if (mesh.material instanceof PointsNodeMaterial) clouds.push(mesh);
   });
-  assert.equal(points, 2, "spray and snowfall");
+
+  assert.equal(clouds.length, 2, "spray and snowfall");
+  for (const cloud of clouds) {
+    assert.equal((cloud as unknown as { isPoints?: boolean }).isPoints, undefined,
+      "a THREE.Points would take the point-list path and rasterise one pixel per particle");
+    const geometry = cloud.geometry as THREE.InstancedBufferGeometry;
+    assert.equal(geometry.isInstancedBufferGeometry, true);
+    // positionGeometry.xy is the quad corner, so the particle centre needs its own attribute.
+    assert.ok(geometry.getAttribute(PARTICLE_CENTRE), "the centre rides on an instanced attribute");
+    assert.ok(geometry.getAttribute("uv"), "and the quad carries the UVs the sprite samples");
+    assert.equal(geometry.getAttribute("position").count, 6, "two triangles");
+  }
+  renderer.dispose();
+});
+
+test("the WebGL path keeps its THREE.Points clouds", () => {
+  const { renderer } = buildRenderer(new FakeBackend("webgl"));
+  const scene = (renderer as unknown as { built: { scene: THREE.Scene } }).built.scene;
+  let points = 0;
+  scene.traverse((object) => { if ((object as THREE.Points).isPoints) points += 1; });
+  assert.equal(points, 2, "gl_PointSize still works there");
   renderer.dispose();
 });
 
@@ -172,6 +196,21 @@ test("the governor drives the adapt tick and reports the rung it came from", () 
 
   assert.equal(quality.rung, 3, "one rung, not a cascade of them");
   assert.deepEqual(events, [{ reason: "governor", from: 4, to: 3 }]);
+  renderer.dispose();
+});
+
+test("a healthy 60Hz display never loses quality to the governor", () => {
+  const events: QualityChangeEvent[] = [];
+  const { renderer, world, state } = buildRenderer(new FakeBackend("webgpu"), (event) => events.push(event));
+  const quality = (renderer as unknown as { quality: { rung: number } }).quality;
+  quality.rung = 4;
+
+  // A vsync-locked 60Hz display, with the jitter a real browser produces. Under a 58fps budget
+  // this walked all the way to rung 0, taking the LUT, bloom and vignette with it.
+  for (let i = 0; i < 1500; i += 1) renderer.render(state, world, 1 / 60, 0, i % 3 === 0 ? 17.6 : 16.5);
+
+  assert.equal(quality.rung, 4, "60fps is not distress");
+  assert.deepEqual(events, []);
   renderer.dispose();
 });
 
