@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 
 type TranslateOptions = {
   /** Geographic bounds `[west, south, east, north]`. */
@@ -9,6 +9,12 @@ type GdalInfo = {
   width: number;
   height: number;
   epsg: number | null;
+};
+
+export type WarpGrid = {
+  bounds: { west: number; south: number; east: number; north: number };
+  width: number;
+  height: number;
 };
 
 function run(command: string, args: string[]): Promise<string> {
@@ -31,20 +37,20 @@ export function vrtArgs(inputs: string[], out: string): string[] {
   return [out, ...inputs];
 }
 
-export function warpArgs(input: string, out: string, epsg: number, resM: number): string[] {
-  return [
+export function warpArgs(input: string, out: string, epsg: number, resM: number, grid?: WarpGrid): string[] {
+  const args = [
     "-t_srs",
     `EPSG:${epsg}`,
-    "-tr",
-    String(resM),
-    String(resM),
-    "-r",
-    "bilinear",
-    "-of",
-    "GTiff",
-    input,
-    out,
   ];
+  if (grid) {
+    const { west, south, east, north } = grid.bounds;
+    args.push("-te", String(west), String(south), String(east), String(north));
+    args.push("-ts", String(grid.width), String(grid.height));
+  } else {
+    args.push("-tr", String(resM), String(resM));
+  }
+  args.push("-r", "bilinear", "-of", "GTiff", input, out);
+  return args;
 }
 
 export async function gdalAvailable(): Promise<boolean> {
@@ -66,8 +72,41 @@ export async function warpToUtm(
   out: string,
   epsg: number,
   resolutionM: number,
+  grid?: WarpGrid,
 ): Promise<void> {
-  await run("gdalwarp", warpArgs(input, out, epsg, resolutionM));
+  await run("gdalwarp", warpArgs(input, out, epsg, resolutionM, grid));
+}
+
+/** Transform one XY coordinate with GDAL/PROJ, returning projected XY. */
+export function transformPoint(
+  x: number,
+  y: number,
+  sourceEpsg: number,
+  targetEpsg: number,
+): Promise<[number, number]> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("gdaltransform", ["-s_srs", `EPSG:${sourceEpsg}`, "-t_srs", `EPSG:${targetEpsg}`], {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk) => (stdout += chunk));
+    child.stderr.setEncoding("utf8").on("data", (chunk) => (stderr += chunk));
+    child.on("error", (error) => reject(error));
+    child.on("close", (code) => {
+      if (code !== 0) {
+        reject(new Error(`gdaltransform failed: ${stderr.trim() || `exit ${code}`}`));
+        return;
+      }
+      const values = stdout.trim().split(/\s+/).map(Number);
+      if (values.length < 2 || !Number.isFinite(values[0]) || !Number.isFinite(values[1])) {
+        reject(new Error(`gdaltransform returned invalid coordinates: ${stdout.trim()}`));
+        return;
+      }
+      resolve([values[0], values[1]]);
+    });
+    child.stdin.end(`${x} ${y}\n`);
+  });
 }
 
 export async function translateToTiff(

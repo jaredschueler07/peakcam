@@ -32,18 +32,18 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import crypto from "node:crypto";
 import zlib from "node:zlib";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 import { PNG } from "pngjs";
-import { fromUrl } from "geotiff";
+import { fromFile } from "geotiff";
 import {
   HEIGHTFIELD_ORIENTATION,
   encodeDelta,
   quantizeHeight,
   type TerrainMeta,
-  type TerrainSource,
   type TrailsFile,
   type RawRun,
   type RawLift,
@@ -58,6 +58,14 @@ import {
   mPerDegLon,
   type ResortBakeConfig,
 } from "@/lib/game/terrain/resorts";
+import { buildVrt, transformPoint, warpToUtm } from "./dem/gdal";
+import { utmZoneFor } from "./dem/utm";
+import {
+  fetch3depTiles,
+  resolveDemSource,
+  type DemSource,
+  type UtmBounds,
+} from "./dem/sources";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -219,77 +227,93 @@ function sampleTerrarium(t: TerrariumTiles, lat: number, lon: number): number {
   return (h00 * (1 - ax) + h10 * ax) * (1 - ay) + (h01 * (1 - ax) + h11 * ax) * ay;
 }
 
-// ─── Copernicus GLO-30 sampling (single windowed read) ───────
+// ─── Heightfield bake ────────────────────────────────────────
 
-interface CopernicusWindow {
-  values: Float32Array;
-  width: number;
-  height: number;
-  /** Geographic bounds of the window `[west, south, east, north]`. */
-  bbox: [number, number, number, number];
-  resX: number;
-  resY: number;
-}
+export type ProjectedRasterBounds = UtmBounds;
 
 /**
- * One `readRasters({window})` for the whole box — per-sample reads are orders
- * of magnitude slower (terrain-report gotcha #3).
+ * GDAL bounds are pixel-edge bounds. Expanding the desired centre span by
+ * half a cell at each edge makes first-to-last pixel centres span `sizeM`.
  */
-async function readCopernicusWindow(cfg: ResortBakeConfig): Promise<CopernicusWindow> {
-  if (!cfg.copernicusTile) throw new Error(`${cfg.slug} has no Copernicus tile configured`);
-  const name = `Copernicus_DSM_COG_10_${cfg.copernicusTile}_DEM`;
-  const url = `${COPERNICUS_URL}/${name}/${name}.tif`;
-  const tiff = await fromUrl(url);
-  const img = await tiff.getImage();
-  const bb = img.getBoundingBox() as [number, number, number, number]; // west,south,east,north
-  const W = img.getWidth();
-  const H = img.getHeight();
-  const resX = (bb[2] - bb[0]) / W;
-  const resY = (bb[3] - bb[1]) / H;
-
-  const [cLat, cLon] = cfg.center;
-  const half = cfg.sizeM / 2;
-  // Two extra pixels of margin so bilinear taps at the box edge stay inside.
-  const marginDeg = 2 * Math.max(resX, resY);
-  const lonW = cLon - half / mPerDegLon(cLat) - marginDeg;
-  const lonE = cLon + half / mPerDegLon(cLat) + marginDeg;
-  const latS = cLat - half / M_PER_DEG_LAT - marginDeg;
-  const latN = cLat + half / M_PER_DEG_LAT + marginDeg;
-
-  const x0 = Math.max(0, Math.floor((lonW - bb[0]) / resX));
-  const x1 = Math.min(W, Math.ceil((lonE - bb[0]) / resX));
-  const y0 = Math.max(0, Math.floor((bb[3] - latN) / resY));
-  const y1 = Math.min(H, Math.ceil((bb[3] - latS) / resY));
-
-  const rasters = await img.readRasters({ window: [x0, y0, x1, y1] });
-  const values = Float32Array.from(rasters[0] as ArrayLike<number>);
-  console.log(`  read Copernicus window ${rasters.width}x${rasters.height} from ${name}`);
+export function projectedRasterBounds(
+  centerUtm: readonly [number, number],
+  sizeM: number,
+  grid: number,
+): ProjectedRasterBounds {
+  if (grid < 2) throw new Error("projected raster grid must contain at least two samples per edge");
+  const cellSizeM = sizeM / (grid - 1);
+  const outerSizeM = sizeM + cellSizeM;
   return {
-    values,
-    width: rasters.width,
-    height: rasters.height,
-    bbox: [bb[0] + x0 * resX, bb[3] - y1 * resY, bb[0] + x1 * resX, bb[3] - y0 * resY],
-    resX,
-    resY,
+    west: centerUtm[0] - outerSizeM / 2,
+    south: centerUtm[1] - outerSizeM / 2,
+    east: centerUtm[0] + outerSizeM / 2,
+    north: centerUtm[1] + outerSizeM / 2,
   };
 }
 
-function sampleCopernicus(w: CopernicusWindow, lat: number, lon: number): number {
-  const fx = (lon - w.bbox[0]) / w.resX - 0.5;
-  const fy = (w.bbox[3] - lat) / w.resY - 0.5;
-  const x0 = Math.max(0, Math.min(w.width - 1, Math.floor(fx)));
-  const y0 = Math.max(0, Math.min(w.height - 1, Math.floor(fy)));
-  const x1 = Math.min(w.width - 1, x0 + 1);
-  const y1 = Math.min(w.height - 1, y0 + 1);
-  const ax = fx - x0;
-  const ay = fy - y0;
-  const g = (x: number, y: number) => w.values[y * w.width + x];
-  return (
-    (g(x0, y0) * (1 - ax) + g(x1, y0) * ax) * (1 - ay) + (g(x0, y1) * (1 - ax) + g(x1, y1) * ax) * ay
-  );
+/** Load a projected raster once, then sample its natural north-to-south rows directly. */
+export async function sampleFromWarpedTiff(
+  tiffPath: string,
+): Promise<(row: number, col: number) => number> {
+  const tiff = await fromFile(tiffPath);
+  const image = await tiff.getImage();
+  const width = image.getWidth();
+  const height = image.getHeight();
+  const rasters = await image.readRasters();
+  const values = rasters[0] as ArrayLike<number>;
+  return (row: number, col: number): number => {
+    if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || col < 0 || row >= height || col >= width) {
+      throw new RangeError(`sample (${row}, ${col}) is outside ${width}x${height} warped raster`);
+    }
+    return values[row * width + col];
+  };
 }
 
-// ─── Heightfield bake ────────────────────────────────────────
+export function terrainProvenance(
+  demSource: DemSource,
+  epsg: number | null,
+): Pick<TerrainMeta, "demSource" | "epsg" | "sourceResolutionM"> {
+  const sourceResolutionM = demSource.kind === "3dep" ? 1 : demSource.kind === "copernicus" ? 30 : 0;
+  return { demSource, epsg, sourceResolutionM };
+}
+
+async function projectedSampler(
+  cfg: ResortBakeConfig,
+  demSource: Exclude<DemSource, { kind: "terrarium" }>,
+): Promise<{ sample: (row: number, col: number) => number; epsg: number }> {
+  const epsg = utmZoneFor(cfg.center[0], cfg.center[1]).epsg;
+  const centerUtm = await transformPoint(cfg.center[1], cfg.center[0], 4326, epsg);
+  const bounds = projectedRasterBounds(centerUtm, cfg.sizeM, GRID);
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), `peakcam-${cfg.slug}-warp-`));
+  const vrtPath = path.join(workDir, "source.vrt");
+  const warpedPath = path.join(workDir, "warped.tif");
+  try {
+    let inputs: string[];
+    if (demSource.kind === "3dep") {
+      const cacheRoot = process.env.PEAKCAM_DEM_CACHE || path.join(os.tmpdir(), "peakcam-dem-cache");
+      inputs = await fetch3depTiles(
+        demSource.project,
+        bounds,
+        path.join(cacheRoot, demSource.project),
+      );
+    } else {
+      const name = `Copernicus_DSM_COG_10_${demSource.tile}_DEM`;
+      inputs = [`/vsicurl/${COPERNICUS_URL}/${name}/${name}.tif`];
+    }
+    await buildVrt(inputs, vrtPath);
+    const cellSizeM = cfg.sizeM / (GRID - 1);
+    await warpToUtm(vrtPath, warpedPath, epsg, cellSizeM, {
+      bounds,
+      width: GRID,
+      height: GRID,
+    });
+    const sample = await sampleFromWarpedTiff(warpedPath);
+    return { sample, epsg };
+  } finally {
+    // sampleFromWarpedTiff materializes the band, so the intermediates are no longer needed.
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
+}
 
 export interface BakedFile {
   name: string;
@@ -317,7 +341,7 @@ export function emitKtx2Texture(sourceName: string, encoded: Buffer): BakedFile 
 
 async function bakeHeightfield(
   cfg: ResortBakeConfig,
-  source: TerrainSource,
+  demSource: DemSource,
   zoom: number,
 ): Promise<BakedFile[]> {
   const [cLat, cLon] = cfg.center;
@@ -326,24 +350,26 @@ async function bakeHeightfield(
   const mLat = M_PER_DEG_LAT;
   const mLon = mPerDegLon(cLat);
 
+  let epsg: number | null = null;
+  const projected = demSource.kind === "terrarium" ? null : await projectedSampler(cfg, demSource);
+  if (projected) epsg = projected.epsg;
   const sample =
-    source === "terrarium"
+    demSource.kind === "terrarium"
       ? await (async () => {
           const tiles = await prefetchTerrariumTiles(cfg, zoom);
-          return (lat: number, lon: number) => sampleTerrarium(tiles, lat, lon);
+          return (row: number, col: number) => {
+            const lat = cLat + (half - row * cell) / mLat;
+            const lon = cLon + (col * cell - half) / mLon;
+            return sampleTerrarium(tiles, lat, lon);
+          };
         })()
-      : await (async () => {
-          const win = await readCopernicusWindow(cfg);
-          return (lat: number, lon: number) => sampleCopernicus(win, lat, lon);
-        })();
+      : projected!.sample;
 
   const raw = new Float64Array(GRID * GRID);
   for (let row = 0; row < GRID; row++) {
     // row 0 = north edge, col 0 = west edge (see formats.ts orientation contract)
-    const lat = cLat + (half - row * cell) / mLat;
     for (let col = 0; col < GRID; col++) {
-      const lon = cLon + (col * cell - half) / mLon;
-      raw[row * GRID + col] = sample(lat, lon);
+      raw[row * GRID + col] = sample(row, col);
     }
   }
 
@@ -389,8 +415,9 @@ async function bakeHeightfield(
     minZ,
     maxZ,
     quantum: QUANTUM,
-    source,
-    sourceZoom: source === "terrarium" ? zoom : null,
+    source: demSource.kind,
+    sourceZoom: demSource.kind === "terrarium" ? zoom : null,
+    ...terrainProvenance(demSource, epsg),
     orientation: HEIGHTFIELD_ORIENTATION,
     bakedAt: new Date().toISOString(),
   };
@@ -609,13 +636,13 @@ function bakeTrails(cfg: ResortBakeConfig, elements: OverpassWay[]): BakedFile[]
 // ─── Orchestration ───────────────────────────────────────────
 
 export interface BakeOptions {
-  source: TerrainSource;
+  source: DemSource;
   zoom: number;
   skipTrails: boolean;
 }
 
 export async function bakeResort(cfg: ResortBakeConfig, opts: BakeOptions): Promise<BakedFile[]> {
-  console.log(`\n▸ ${cfg.name} (${cfg.slug}) — ${opts.source}`);
+  console.log(`\n▸ ${cfg.name} (${cfg.slug}) — ${opts.source.kind}`);
   const files = await bakeHeightfield(cfg, opts.source, opts.zoom);
   if (!opts.skipTrails) {
     files.push(...bakeTrails(cfg, await fetchOverpass(cfg)));
@@ -680,14 +707,14 @@ async function main(): Promise<void> {
   const target = args.find((a) => !a.startsWith("--"));
   const verify = args.includes("--verify");
   const skipTrails = args.includes("--skip-trails");
-  const sourceArg = args.find((a) => a.startsWith("--source="))?.split("=")[1] ?? "terrarium";
+  const sourceArg = args.find((a) => a.startsWith("--source="))?.split("=")[1] ?? "designed";
 
   if (!target || (target !== "all" && !RESORT_BAKE_CONFIGS[target])) {
-    console.error(`Usage: npx tsx scripts/bake-resort.ts <${RESORT_SLUGS.join("|")}|all> [--verify] [--source=terrarium|copernicus] [--skip-trails]`);
+    console.error(`Usage: npx tsx scripts/bake-resort.ts <${RESORT_SLUGS.join("|")}|all> [--verify] [--source=designed|terrarium|copernicus] [--skip-trails]`);
     process.exit(1);
   }
-  if (sourceArg !== "terrarium" && sourceArg !== "copernicus") {
-    console.error(`Unknown --source=${sourceArg} (expected terrarium or copernicus)`);
+  if (sourceArg !== "designed" && sourceArg !== "terrarium" && sourceArg !== "copernicus") {
+    console.error(`Unknown --source=${sourceArg} (expected designed, terrarium, or copernicus)`);
     process.exit(1);
   }
 
@@ -696,8 +723,11 @@ async function main(): Promise<void> {
 
   for (const [i, slug] of slugs.entries()) {
     const cfg = RESORT_BAKE_CONFIGS[slug];
-    const source: TerrainSource =
-      sourceArg === "copernicus" && cfg.copernicusTile ? "copernicus" : "terrarium";
+    const source: DemSource = sourceArg === "designed"
+      ? resolveDemSource(cfg)
+      : sourceArg === "copernicus" && cfg.copernicusTile
+        ? { kind: "copernicus", tile: cfg.copernicusTile }
+        : { kind: "terrarium" };
     if (sourceArg === "copernicus" && !cfg.copernicusTile) {
       console.warn(`  ! ${slug} has no Copernicus tile configured; falling back to terrarium`);
     }

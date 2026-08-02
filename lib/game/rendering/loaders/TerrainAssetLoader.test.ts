@@ -6,6 +6,7 @@ import { TerrainAssetLoader } from "./TerrainAssetLoader";
 const meta: TerrainMeta = {
   version: 1, slug: "heavenly", center: [38.9404, -119.912], sizeM: 16, grid: 2,
   minZ: 1900, maxZ: 1901, quantum: 0.1, source: "terrarium", sourceZoom: 14,
+  demSource: { kind: "terrarium" }, epsg: null, sourceResolutionM: 7,
   orientation: HEIGHTFIELD_ORIENTATION, bakedAt: "2026-08-01T00:00:00.000Z",
 };
 const trails: TrailsFile = {

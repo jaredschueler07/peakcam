@@ -54,6 +54,9 @@ function metaFor(grid: number, sizeM: number, minZ: number, maxZ: number): Terra
     quantum: QUANTUM,
     source: "terrarium",
     sourceZoom: 14,
+    demSource: { kind: "terrarium" },
+    epsg: null,
+    sourceResolutionM: 7,
     orientation: HEIGHTFIELD_ORIENTATION,
     bakedAt: "2026-08-01T00:00:00.000Z",
   };
