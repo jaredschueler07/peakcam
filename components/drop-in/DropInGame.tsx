@@ -26,7 +26,7 @@ import {
 } from "@/lib/game/competition/ticket-lifecycle";
 import type { CompetitiveRunMode } from "@/lib/game/config/modes";
 import type { DecodedGhost } from "@/lib/game/replay/codec";
-import { resolveRuntimePhysicsModel } from "@/lib/game/runtime/physics-selection";
+import { physicsModelForSessionRequest, resolveRuntimePhysicsModel } from "@/lib/game/runtime/physics-selection";
 // Shared with the sessions route, which must derive the same ids. Imported from
 // config/ rather than server/ so the browser bundle skips profiles + bake configs.
 import { trailIdFromName } from "@/lib/game/config/course-ids";
@@ -152,7 +152,13 @@ export default function DropInGame({ profile, conditions }: {
     applyTicketState({ status: "requesting" });
 
     void requestRunSession(
-      { resortSlug: profile.slug, mode: choice, trailId, surface: conditions.surface, physicsModel },
+      {
+        resortSlug: profile.slug,
+        mode: choice,
+        trailId,
+        surface: conditions.surface,
+        physicsModel: physicsModelForSessionRequest(conditions),
+      },
       { signal: controller.signal },
     ).then((result) => {
       if (controller.signal.aborted) return;

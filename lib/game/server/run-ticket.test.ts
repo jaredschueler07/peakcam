@@ -227,6 +227,27 @@ test("rejects a correctly signed payload missing only physicsModel", () => {
   assert.equal(err.code, "malformed");
 });
 
+test("rejects a correctly signed payload missing only surface", () => {
+  const ring = keyring();
+  const { surface: _surface, ...claimsWithoutSurface } = CLAIMS;
+  const header = Buffer.from(
+    JSON.stringify({ alg: TICKET_ALG, typ: TICKET_TYPE, kid: "k1" }),
+    "utf8",
+  ).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({
+    ...claimsWithoutSurface,
+    nonce: "n",
+    iat: NOW,
+    exp: NOW + TTL,
+  }), "utf8").toString("base64url");
+  const sig = createHmac("sha256", ring.active.key)
+    .update(`${header}.${payload}`, "utf8")
+    .digest("base64url");
+
+  const err = ticketError(() => verifyTicket(`${header}.${payload}.${sig}`, ring, { now: NOW }));
+  assert.equal(err.code, "malformed");
+});
+
 test("issueTicket refuses an unusable ttl or key", () => {
   const ring = keyring();
   const base = activeKeyOf(ring);

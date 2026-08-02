@@ -12,6 +12,11 @@ export function resolveRuntimePhysicsModel(
   return new URLSearchParams(search).get("phys") === "v2" ? "v2" : configured;
 }
 
+/** Session tickets always describe the rollout world, never the URL override. */
+export function physicsModelForSessionRequest(conditions: { physicsModel: PhysicsModel }): PhysicsModel {
+  return conditions.physicsModel;
+}
+
 export function simulationConfigForConditions(
   conditions: { surface: SurfaceKind; physicsModel: PhysicsModel },
   physicsModel: PhysicsModel = conditions.physicsModel,

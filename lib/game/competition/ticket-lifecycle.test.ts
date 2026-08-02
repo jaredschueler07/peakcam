@@ -14,6 +14,7 @@ import {
   usableTicket,
   type TicketState,
 } from "./ticket-lifecycle";
+import { physicsModelForSessionRequest } from "../runtime/physics-selection";
 
 const NOW = 1_754_000_000_000;
 
@@ -125,6 +126,7 @@ test("?phys=v2 override is unsubmittable unless its ticket declares physicsModel
   // The URL override changes the world only; ticket requests stay on the
   // rollout model, so a v1 ticket must fail closed here.
   assert.equal(ticketForWorld(ready(), fresh.seed, { surface: "packed", physicsModel: "v2" }, NOW), null);
+  assert.equal(physicsModelForSessionRequest({ physicsModel: "v1" }), "v1");
   const v2 = { ...fresh, physicsModel: "v2" as const };
   const state = ticketReducer(NO_TICKET, { type: "received", ticket: v2 });
   assert.equal(ticketForWorld(state, fresh.seed, { surface: "packed", physicsModel: "v2" }, NOW), v2);

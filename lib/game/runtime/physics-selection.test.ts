@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { resolveRuntimePhysicsModel, simulationConfigForConditions } from "./physics-selection";
+import {
+  physicsModelForSessionRequest,
+  resolveRuntimePhysicsModel,
+  simulationConfigForConditions,
+} from "./physics-selection";
 
 test("runtime physics uses the configured model when no override is present", () => {
   assert.equal(resolveRuntimePhysicsModel("v1", ""), "v1");
@@ -22,4 +26,10 @@ test("runtime config combines the live surface with the selected model", () => {
   assert.equal(config.surface, "ice");
   assert.equal(config.physicsModel, "v2");
   assert.equal(config.gripMultiplier, 0.7);
+});
+
+test("session tickets use the rollout model even when the runtime override resolves v2", () => {
+  const conditions = { surface: "packed" as const, physicsModel: "v1" as const };
+  assert.equal(resolveRuntimePhysicsModel(conditions.physicsModel, "?phys=v2"), "v2");
+  assert.equal(physicsModelForSessionRequest(conditions), "v1");
 });
