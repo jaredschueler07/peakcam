@@ -316,9 +316,18 @@ test("weather and lift actions are rising-edge input actions", () => {
   assert.equal(input.consumeLiftPressed(), false);
 });
 
+/**
+ * The two flavours are not interchangeable, and pretending they were is what let a WebGL-only call
+ * ship on the WebGPU default. `renderLists`, `forceContextLoss` and `resetState` are WebGLRenderer
+ * APIs: `WebGPURenderer` (three 0.185.1) exposes none of them — it keeps a private `_renderLists`
+ * that its own `dispose()` tears down. A fake that stubs them on both flavours makes the disposal
+ * audit pass while production crashes on unmount, so the WebGPU fake must omit them.
+ */
 class FakeBackend implements RendererBackend {
   readonly domElement = {} as HTMLCanvasElement;
-  readonly renderLists = { dispose: () => { this.renderListsDisposed += 1; } };
+  readonly renderLists?: { dispose(): void };
+  readonly forceContextLoss?: () => void;
+  readonly resetState?: () => void;
   renderListsDisposed = 0;
   disposed = 0;
   contextsLost = 0;
@@ -332,8 +341,13 @@ class FakeBackend implements RendererBackend {
   setClearColor() {}
   render() {}
   dispose() { this.disposed += 1; }
-  forceContextLoss() { this.contextsLost += 1; }
-  constructor(readonly backendKind: "webgpu" | "webgl" = "webgl") {}
+  constructor(readonly backendKind: "webgpu" | "webgl" = "webgl") {
+    if (backendKind === "webgl") {
+      this.renderLists = { dispose: () => { this.renderListsDisposed += 1; } };
+      this.forceContextLoss = () => { this.contextsLost += 1; };
+      this.resetState = () => {};
+    }
+  }
 }
 
 /**
@@ -353,6 +367,13 @@ function disposalPasses(backendKind: "webgpu" | "webgl") {
   let counts: ResourceCounts | null = null;
   for (let pass = 0; pass < 10; pass += 1) {
     const backend = new FakeBackend(backendKind);
+    // Guards the fake itself: if a WebGL-only stub ever creeps back onto the WebGPU flavour, the
+    // audit below silently stops covering the backend the default production path actually uses.
+    if (backendKind === "webgpu") {
+      assert.equal(backend.renderLists, undefined, "the WebGPU fake must model a backend without renderLists");
+      assert.equal(backend.forceContextLoss, undefined, "…nor forceContextLoss");
+      assert.equal(backend.resetState, undefined, "…nor resetState");
+    }
     const disposed = { geometries: 0, materials: 0, textures: 0 };
     const renderer = new GameRenderer(canvas, profile, world, state, {
       backend, devicePixelRatio: 1, reducedMotion: true,
@@ -371,8 +392,11 @@ function disposalPasses(backendKind: "webgpu" | "webgl") {
     assert.deepEqual(disposed, resources, `${backendKind}: every collected resource is disposed`);
     assert.deepEqual(renderer.resources(), { geometries: 0, materials: 0, textures: 0 });
     assert.equal(backend.disposed, 1);
-    assert.equal(backend.renderListsDisposed, 1);
-    assert.equal(backend.contextsLost, 1);
+    // The WebGL-only teardown must still run in full on WebGL, and must simply be skipped — not
+    // crash — on WebGPU, whose own `dispose()` already releases its private render lists.
+    const webglOnly = backendKind === "webgl" ? 1 : 0;
+    assert.equal(backend.renderListsDisposed, webglOnly, `${backendKind}: renderLists.dispose()`);
+    assert.equal(backend.contextsLost, webglOnly, `${backendKind}: forceContextLoss()`);
     counts ??= resources;
     assert.deepEqual(resources, counts, `${backendKind}: pass ${pass} rebuilds the same scene`);
   }
@@ -382,6 +406,25 @@ function disposalPasses(backendKind: "webgpu" | "webgl") {
 test("PostProcessing remains enabled when no backend is injected", () => {
   assert.equal(shouldInitializePostProcessing({}), true);
   assert.equal(shouldInitializePostProcessing({ backend: new FakeBackend() }), false);
+});
+
+/**
+ * Regression: `dispose()` called `this.renderer.renderLists.dispose()` unconditionally. That is a
+ * WebGLRenderer API, so once WebGPU became the default backend every user on a WebGPU browser hit
+ * "Cannot read properties of undefined (reading 'dispose')" the moment React unmounted the game —
+ * i.e. on the in-game Conditions back link.
+ */
+test("disposing a WebGPU backend does not touch WebGL-only teardown APIs", () => {
+  const world = createProceduralWorld(profile, profile.seed);
+  const state = createSimulation(profile, profile.seed);
+  const canvas = { clientWidth: 800, clientHeight: 600, addEventListener() {}, removeEventListener() {} } as unknown as HTMLCanvasElement;
+  const backend = new FakeBackend("webgpu");
+  const renderer = new GameRenderer(canvas, profile, world, state, {
+    backend, devicePixelRatio: 1, reducedMotion: true, nodeFactories: staticNodeFactories(),
+  });
+  renderer.dispose();
+  assert.equal(backend.disposed, 1, "the backend's own dispose() still runs");
+  assert.deepEqual(renderer.resources(), { geometries: 0, materials: 0, textures: 0 });
 });
 
 test("mount/unmount ten times disposes every scene resource and context (WebGL)", () => {
