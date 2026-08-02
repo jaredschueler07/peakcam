@@ -18,6 +18,20 @@ export function resolveBackendKind(
   return new URLSearchParams(search).get("gfx") === "webgl" ? "webgl" : "webgpu";
 }
 
+/**
+ * Compile-time guard for the cast below. `createRendererBackend` has to widen a `WebGPURenderer`
+ * into `RendererBackend`, and the `as unknown as` it once used checked nothing — that is how
+ * `renderLists` (a WebGLRenderer-only API) sat in the interface as *required* while the real WebGPU
+ * renderer lacked it, and why an unconditional `renderLists.dispose()` crashed every WebGPU user on
+ * unmount rather than failing the build. This assignment type-checks the renderer against every
+ * member except the `backendKind` tag we synthesise, so declaring a member that WebGPURenderer does
+ * not have is now a `tsc` error here instead of a runtime crash there.
+ */
+type WebGPURendererType = InstanceType<typeof import("three/webgpu").WebGPURenderer>;
+type BackendContract = Omit<RendererBackend, "backendKind">;
+const _webgpuSatisfiesBackend: (renderer: WebGPURendererType) => BackendContract = (renderer) => renderer;
+void _webgpuSatisfiesBackend;
+
 export async function createRendererBackend(
   canvas: HTMLCanvasElement,
   kind: RendererBackendKind,

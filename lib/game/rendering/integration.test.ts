@@ -24,7 +24,8 @@ const NODES = staticNodeFactories();
 class FakeBackend implements RendererBackend {
   compiled = 0;
   rendered = 0;
-  readonly renderLists = { dispose: () => {} };
+  // No `renderLists` on purpose: this fake defaults to the WebGPU backend, and `WebGPURenderer`
+  // has no such property. Stubbing it here would hide unconditional WebGL-only teardown calls.
   readonly shadowMap = { enabled: false, type: THREE.PCFShadowMap };
   outputColorSpace = THREE.SRGBColorSpace;
   toneMapping = THREE.NoToneMapping;

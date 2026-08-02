@@ -491,7 +491,14 @@ test("pointer-lock rejection never blocks play", async ({ page }) => {
   await expect(page.locator("[data-drop-in-state='running']")).toBeVisible();
 });
 
-test("navigation cleanly unmounts the runtime without console errors", async ({ page }) => {
+/**
+ * This must be the in-game "Conditions" back link, not `page.goto`. That link is a Next.js
+ * `<Link>`, so it is a client-side route change: React unmounts `DropInGame` and runs its cleanup
+ * effect, which is the only thing that calls `GameRuntime.dispose()` → `GameRenderer.dispose()`.
+ * A `page.goto` tears down the JS context instead, so the unmount effect never runs at all — which
+ * is exactly why this spec stayed green while every WebGPU user crashed on that link in production.
+ */
+test("leaving the game by the in-app Conditions link unmounts the runtime without console errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (message) => {
     if (message.type() !== "error") return;
@@ -504,7 +511,12 @@ test("navigation cleanly unmounts the runtime without console errors", async ({ 
   await page.goto(dropInUrl(V2_URL));
   await page.getByRole("button", { name: /start descent/i }).click();
   await expect(page.locator("[data-drop-in-state='running'] canvas[data-testid='drop-in-canvas']")).toBeVisible();
-  await page.goto("/resorts/heavenly");
+
+  await page.getByRole("link", { name: /conditions/i }).click();
+  await expect(page).toHaveURL(/\/resorts\/heavenly$/);
   await expect(page.locator("[data-drop-in-state]")).toHaveCount(0);
+  // The dispose path runs inside the unmount effect; give a beat for anything it throws
+  // asynchronously to surface as a pageerror before asserting.
+  await page.waitForTimeout(500);
   expect(errors).toEqual([]);
 });

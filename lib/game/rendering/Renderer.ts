@@ -37,7 +37,12 @@ export interface RendererBackend {
   toneMapping: THREE.ToneMapping;
   toneMappingExposure: number;
   readonly shadowMap: { enabled: boolean; type: THREE.ShadowMapType };
-  readonly renderLists: { dispose(): void };
+  /**
+   * WebGLRenderer only. `WebGPURenderer` (three 0.185.1) keeps its render lists private as
+   * `_renderLists` and disposes them inside its own `dispose()`, so this is absent there and every
+   * call site must guard it. Declaring it required is what let an unconditional call ship.
+   */
+  readonly renderLists?: { dispose(): void };
   setPixelRatio(value: number): void;
   setSize(width: number, height: number, updateStyle?: boolean): void;
   setClearColor(color: THREE.ColorRepresentation, alpha?: number): void;
@@ -400,6 +405,6 @@ export class GameRenderer {
     this.canvas.removeEventListener("webglcontextlost", this.onContextLost as EventListener, false);
     this.canvas.removeEventListener("webglcontextrestored", this.onContextRestored as EventListener, false);
     this.post?.dispose(); this.post = null; this.csm.dispose(); this.ghost.setGhost(null);
-    disposeObjectTree(this.built.scene, this.options.disposalAudit); this.renderer.renderLists.dispose(); this.renderer.dispose(); this.renderer.forceContextLoss?.();
+    disposeObjectTree(this.built.scene, this.options.disposalAudit); this.renderer.renderLists?.dispose(); this.renderer.dispose(); this.renderer.forceContextLoss?.();
   }
 }
