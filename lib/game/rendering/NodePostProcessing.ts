@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { NodeUpdateType, RenderPipeline } from "three/webgpu";
 import type { Node, Renderer, UniformNode } from "three/webgpu";
-import { float, mix, pass, renderOutput, screenUV, smoothstep, texture3D, uniform, vec2, vec4 } from "three/tsl";
+import { convertToTexture, float, mix, pass, renderOutput, screenUV, smoothstep, texture3D, uniform, vec2, vec4 } from "three/tsl";
 import { bloom } from "three/addons/tsl/display/BloomNode.js";
 import { fxaa } from "three/addons/tsl/display/FXAANode.js";
 import { smaa } from "three/addons/tsl/display/SMAANode.js";
@@ -12,6 +12,7 @@ import { chromaticAberrationOffset } from "./MotionEffects";
 
 const LUT_SIZE = 32;
 const BLOOM_STRENGTH = 0.5;
+/** `postprocessing`'s BloomEffect defaulted to 0.85; the side-by-side in Task 6 settles this. */
 const BLOOM_RADIUS = 0.8;
 const BLOOM_THRESHOLD = 0.85;
 const VIGNETTE_OFFSET = 0.35;
@@ -85,6 +86,9 @@ export class NodePostProcessing {
     aspect: uniform(1),
   };
   readonly bloomNode: ReturnType<typeof bloom>;
+  /** The single render target the graded chain lands in — both the AA input and the blend base. */
+  readonly aaInput: Vec4;
+  readonly aaNode: ReturnType<typeof smaa> | ReturnType<typeof fxaa>;
   private policy = postChainPolicy(4, false);
 
   constructor(
@@ -107,12 +111,18 @@ export class NodePostProcessing {
     const shaded = vec4(graded.rgb.mul(vignetteFactor(this.uniforms)), graded.a);
 
     // SMAA wants linear input and FXAA wants sRGB, so each sits on its own side of renderOutput.
+    // The AA nodes wrap their input in convertToTexture(). Hoisting that render target out and
+    // using it as the blend base too means the graded chain above is evaluated once, not once
+    // inside the AA target and again inline. convertToTexture() is a no-op on a texture node.
     let output: Vec4;
     if (antialias === "smaa") {
-      output = asVec4(renderOutput(this.blend(shaded, asVec4(smaa(shaded)))));
+      this.aaInput = asVec4(convertToTexture(shaded));
+      this.aaNode = smaa(this.aaInput);
+      output = asVec4(renderOutput(this.blend(this.aaInput, asVec4(this.aaNode))));
     } else {
-      const converted = asVec4(renderOutput(shaded));
-      output = this.blend(converted, asVec4(fxaa(converted)));
+      this.aaInput = asVec4(convertToTexture(renderOutput(shaded)));
+      this.aaNode = fxaa(this.aaInput);
+      output = this.blend(this.aaInput, asVec4(this.aaNode));
     }
 
     this.pipeline = new RenderPipeline(renderer, output);
@@ -135,6 +145,8 @@ export class NodePostProcessing {
   }
 
   render(deltaTime: number): void {
+    // The node frame owns its own timing; the argument is kept only for arity parity with the
+    // WebGL PostProcessing, whose composer.render(dt) drove effect animation.
     void deltaTime;
     const [x, y] = this.policy.chromatic
       ? chromaticAberrationOffset(this.speed.value, this.reducedMotion)

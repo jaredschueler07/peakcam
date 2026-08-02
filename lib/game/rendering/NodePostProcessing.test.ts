@@ -162,6 +162,15 @@ test("either antialiasing node can be selected, and FXAA needs no DOM", () => {
   }
 });
 
+test("the graded chain lands in one render target, shared by the AA input and the blend base", () => {
+  for (const antialias of ["smaa", "fxaa"] as const) {
+    const { post } = build({ antialias });
+    const consumed = (post.aaNode as unknown as { textureNode: unknown }).textureNode;
+    assert.equal(consumed, post.aaInput, `${antialias} antialiases the very node the blend falls back to`);
+    assert.equal((post.aaInput as unknown as { isTextureNode?: boolean }).isTextureNode, true);
+  }
+});
+
 test("dispose releases the LUT and the pipeline", () => {
   const { post } = build();
   let lutDisposed = false;
