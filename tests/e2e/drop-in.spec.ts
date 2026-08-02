@@ -4,6 +4,18 @@ import { GHOST_SAMPLE_HZ } from "../../lib/game/replay/recorder";
 const V2_URL = "/resorts/heavenly/drop-in?engine=v2";
 
 /**
+ * Every drop-in URL goes through here so the backend is pinned per project rather than copied into
+ * each spec. The default (headless) project must use WebGL: headless Chromium serves a SwiftShader
+ * WebGPU adapter that renders the canvas black, so the pixel-reading specs would fail on the
+ * harness rather than the code. `chromium-webgpu` is the headed project that exercises the
+ * production default on real hardware.
+ */
+function dropInUrl(path: string): string {
+  const gfx = test.info().project.name === "chromium-webgpu" ? "webgpu" : "webgl";
+  return path + (path.includes("?") ? "&" : "?") + "gfx=" + gfx;
+}
+
+/**
  * Mean/stdev luminance of the centre quarter of the game canvas.
  *
  * The renderer runs with `preserveDrawingBuffer: false`, so a WebGL drawing
@@ -55,7 +67,7 @@ async function canvasLuminance(page: import("@playwright/test").Page) {
 }
 
 test("v2 renders a keyboard start control without an iframe", async ({ page }) => {
-  await page.goto(V2_URL);
+  await page.goto(dropInUrl(V2_URL));
   await expect(page.getByRole("button", { name: /start descent/i })).toBeVisible();
   const stamp = page.getByTestId("drop-in-conditions-stamp");
   await expect(stamp).toBeVisible();
@@ -66,7 +78,7 @@ test("v2 renders a keyboard start control without an iframe", async ({ page }) =
 });
 
 test("the start poster offers the three run modes, defaulting to Free Ski", async ({ page }) => {
-  await page.goto(V2_URL);
+  await page.goto(dropInUrl(V2_URL));
   const modes = page.getByTestId("drop-in-mode-select");
   await expect(modes).toBeVisible();
   await expect(modes.getByRole("radio", { name: /free ski/i })).toHaveAttribute("aria-checked", "true");
@@ -81,7 +93,7 @@ test("the start poster offers the three run modes, defaulting to Free Ski", asyn
 test("Free Ski starts a run without ever calling the sessions API", async ({ page }) => {
   let sessionCalls = 0;
   await page.route("**/api/drop-in/sessions", (route) => { sessionCalls += 1; return route.abort(); });
-  await page.goto(V2_URL);
+  await page.goto(dropInUrl(V2_URL));
   await page.getByRole("radio", { name: /free ski/i }).click();
   await page.getByRole("button", { name: /start descent/i }).click();
   await expect(page.locator("[data-drop-in-state='running']")).toBeVisible();
@@ -108,7 +120,7 @@ test("a ticketed competitive run starts and reports itself submittable", async (
       }),
     });
   });
-  await page.goto(V2_URL);
+  await page.goto(dropInUrl(V2_URL));
   await page.getByRole("radio", { name: /daily line/i }).click();
   await expect(page.locator("[data-drop-in-session='ticketed']")).toHaveCount(1);
   await page.getByRole("button", { name: /start descent/i }).click();
@@ -152,7 +164,7 @@ test("a run started before its ticket arrives stays offline, and never claims to
     });
   });
 
-  await page.goto(V2_URL);
+  await page.goto(dropInUrl(V2_URL));
   await page.getByRole("radio", { name: /time trial/i }).click();
   await ticketRequested;
   const shell = page.locator("[data-drop-in-state]");
@@ -177,7 +189,7 @@ test("a run started before its ticket arrives stays offline, and never claims to
 test("a failed session request degrades to offline play instead of blocking the run", async ({ page }) => {
   await page.route("**/api/drop-in/sessions", (route) =>
     route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "nope" }) }));
-  await page.goto(V2_URL);
+  await page.goto(dropInUrl(V2_URL));
   await page.getByRole("radio", { name: /time trial/i }).click();
   await expect(page.getByTestId("drop-in-session-notice")).toContainText(/playing offline/i);
   await page.getByRole("button", { name: /start descent/i }).click();
@@ -186,7 +198,7 @@ test("a failed session request degrades to offline play instead of blocking the 
 });
 
 test("the HUD audio toggle reflects and changes its pressed state", async ({ page }) => {
-  await page.goto(V2_URL);
+  await page.goto(dropInUrl(V2_URL));
   await page.getByRole("button", { name: /start descent/i }).click();
   const audio = page.getByRole("button", { name: /mute audio/i });
   await expect(audio).toHaveAttribute("aria-pressed", "true");
@@ -272,7 +284,7 @@ test("[gate] play → submit → board: a finished run posts and appears on the 
   // physics, producing real recorder samples. Nothing about the finish is
   // faked, and the resulting ghost is refused by the server validator's
   // start-zone and minimum-distance checks.
-  await page.goto("/resorts/ski-portillo/drop-in?engine=v2&e2espawn=-40");
+  await page.goto(dropInUrl("/resorts/ski-portillo/drop-in?engine=v2&e2espawn=-40"));
   await page.getByRole("radio", { name: /time trial/i }).click();
 
   const shell = page.locator("[data-drop-in-state]");
@@ -329,7 +341,7 @@ test("an unsupported resort shows not-found and never mounts the game", async ({
 });
 
 test("keyboard-only start reaches a running canvas with a ticking HUD", async ({ page }) => {
-  await page.goto(V2_URL);
+  await page.goto(dropInUrl(V2_URL));
   const heightfieldRequest = page.waitForRequest((request) =>
     request.url().endsWith("/game/terrain/heavenly.height.u16.br"));
   // Enter may land before hydration attaches the poster's key listener —
@@ -360,6 +372,16 @@ test("keyboard-only start reaches a running canvas with a ticking HUD", async ({
  * and set with headroom — they are not design targets. A real washout collapses
  * stdev toward single digits, far below even the loosest floor here.
  * Re-measure before tightening; do not tune these to make a red test green.
+ *
+ * RE-MEASURED after the P11 Task 6 CSM fixes (5 runs, default project, WebGL):
+ * portillo 186.1-187.0 / 26.8-28.6 · breckenridge 186.7-189.3 / 21.6-24.9 ·
+ * heavenly 208.7-209.3 / 33.8-34.4. Every value is within ~1 of the figures
+ * below, so no threshold moved: the CSM change is WebGPU-only (`Renderer` keeps
+ * the untouched `CsmShadows` on WebGL), and this project pins `?gfx=webgl`.
+ *
+ * Note for whoever touches these next: breckenridge's stdev is BIMODAL across
+ * runs (~24.9 or ~21.6 depending on which frame the 750ms wait lands on), and
+ * the low mode clears the floor by only 0.6. That is the flakiest budget here.
  */
 const LUMINANCE_BUDGETS = [
   // measured mean / stdev at this sample point: 186.6 / 27.6
@@ -374,7 +396,7 @@ for (const { slug, maxMean, minStdev } of LUMINANCE_BUDGETS) {
   test(`gameplay canvas retains terrain contrast and does not wash toward white (${slug})`, async ({ page }) => {
     // ?e2ecanvas keeps the WebGL drawing buffer readable; without it the sample
     // below reads all-zeros regardless of what is on screen.
-    await page.goto(`/resorts/${slug}/drop-in?engine=v2&e2ecanvas`);
+    await page.goto(dropInUrl(`/resorts/${slug}/drop-in?engine=v2&e2ecanvas`));
     await page.getByRole("button", { name: /start descent/i }).click();
     await expect(page.locator("[data-drop-in-state='running'] canvas[data-testid='drop-in-canvas']")).toBeVisible();
     await page.waitForTimeout(750);
@@ -386,7 +408,7 @@ for (const { slug, maxMean, minStdev } of LUMINANCE_BUDGETS) {
 }
 
 test("trail switch cycles to a named real OSM run", async ({ page }) => {
-  await page.goto(V2_URL);
+  await page.goto(dropInUrl(V2_URL));
   await page.getByRole("button", { name: /start descent/i }).click();
   await expect(page.locator("[data-drop-in-state='running']")).toBeVisible();
   await expect(page.getByText("Gunbarrel", { exact: true })).toBeVisible();
@@ -395,7 +417,7 @@ test("trail switch cycles to a named real OSM run", async ({ page }) => {
 });
 
 test("the speedometer is stacked below the Conditions button", async ({ page }) => {
-  await page.goto(V2_URL);
+  await page.goto(dropInUrl(V2_URL));
   await page.getByRole("button", { name: /start descent/i }).click();
   await expect(page.locator("[data-drop-in-state='running']")).toBeVisible();
 
@@ -413,7 +435,7 @@ test("pointer-lock rejection never blocks play", async ({ page }) => {
       value: () => Promise.reject(new DOMException("forced", "NotAllowedError")),
     });
   });
-  await page.goto(V2_URL);
+  await page.goto(dropInUrl(V2_URL));
   await page.getByRole("button", { name: /start descent/i }).click();
   const canvas = page.locator("[data-drop-in-state='running'] canvas[data-testid='drop-in-canvas']");
   await expect(canvas).toBeVisible();
@@ -434,7 +456,7 @@ test("navigation cleanly unmounts the runtime without console errors", async ({ 
     errors.push(message.text());
   });
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto(V2_URL);
+  await page.goto(dropInUrl(V2_URL));
   await page.getByRole("button", { name: /start descent/i }).click();
   await expect(page.locator("[data-drop-in-state='running'] canvas[data-testid='drop-in-canvas']")).toBeVisible();
   await page.goto("/resorts/heavenly");
