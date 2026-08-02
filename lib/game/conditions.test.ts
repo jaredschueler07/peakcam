@@ -26,6 +26,29 @@ const snowForecast = [{
   windGust: 24, precipProbability: 80, feelsLike: 14,
 }] satisfies WeatherPeriod[];
 
+test("words merely containing ice do not select ice physics", () => {
+  // `/\bicy|ice\b/i` parses as `(\bicy)|(ice\b)`, so any word ENDING in "ice"
+  // matched: "nice groomers" chose the ice integrator. Alternation needs the
+  // group for the word boundaries to bind to both branches.
+  for (const conditions of ["nice groomers", "twice-groomed", "lift service excellent"]) {
+    assert.equal(
+      buildConditionsSnapshot(resort, { ...report, conditions }).surface,
+      "packed",
+      `${conditions} must not select ice`,
+    );
+  }
+});
+
+test("genuine ice wording still selects ice physics", () => {
+  for (const conditions of ["icy patches", "boilerplate ice", "Machine groomed, icy"]) {
+    assert.equal(
+      buildConditionsSnapshot(resort, { ...report, conditions }).surface,
+      "ice",
+      `${conditions} must select ice`,
+    );
+  }
+});
+
 test("the overloaded conditions string is split, never rendered raw", () => {
   // `snow_reports.conditions` is "tag1,tag2||narrative" (CLAUDE.md). The poster
   // was printing it whole, so Heavenly read "BLUEBIRD||EXPECT CLEAR BLUEBIRD

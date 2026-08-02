@@ -19,6 +19,7 @@ import {
   NO_TICKET,
   needsRemint,
   resolveRunSeed,
+  ticketForConfig,
   ticketForWorld,
   ticketReducer,
   usableTicket,
@@ -374,9 +375,19 @@ export default function DropInGame({ profile, conditions }: {
     // one that arrives later cannot retroactively describe this run. A request
     // still in flight (or an expired ticket) therefore starts offline rather
     // than making the player wait — the run is recorded, just not submitted.
+    //
+    // Checked against the config this world will actually use, not just
+    // readiness. Under `?phys=v2` with the rollout off the server mints a v1
+    // ticket while the runtime builds a v2 world, and freezing on readiness
+    // alone submitted that v2 run to the v1 board. No world exists yet, so
+    // there is no seed to compare — that check lands on the restart path.
     const frozen = modeRef.current === "free_ski"
       ? null
-      : usableTicket(ticketStateRef.current, Date.now());
+      : ticketForConfig(
+          ticketStateRef.current,
+          { surface: conditions.surface, physicsModel },
+          Date.now(),
+        );
     freezeRunTicket(frozen);
     if (modeRef.current !== "free_ski" && !frozen) setSessionNotice(OFFLINE_NOTICE);
     const controller = new AbortController();

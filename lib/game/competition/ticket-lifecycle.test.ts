@@ -9,7 +9,9 @@ import {
   NO_TICKET,
   needsRemint,
   resolveRunSeed,
+  ticketForConfig,
   ticketForWorld,
+  ticketMatchesConfig,
   ticketReducer,
   usableTicket,
   type TicketState,
@@ -99,6 +101,41 @@ test("clearing returns to the no-ticket state, which never needs a re-mint", () 
   const state = ticketReducer(ready(), { type: "cleared" });
   assert.equal(state, NO_TICKET);
   assert.equal(needsRemint(NO_TICKET, NOW), false, "Free Ski must never trigger a session request");
+});
+
+// ── ticketForConfig: the ENTRY path, before any world exists ────────────────
+
+test("the entry path refuses a ticket whose physics model is not the one about to run", () => {
+  // The playtest bug: with ?phys=v2 and the rollout off, the server correctly
+  // mints a v1 ticket (tickets describe the rollout world, never the URL
+  // override) while the runtime builds a v2 world. Freezing on readiness alone
+  // posted a v2 run to the v1 board. start() has no runSeed yet — the world is
+  // not built — so the guard has to be seed-independent.
+  const v1Ticket = ready();
+  assert.equal(ticketForConfig(v1Ticket, { surface: "packed", physicsModel: "v2" }, NOW), null);
+  assert.equal(ticketForConfig(v1Ticket, { surface: "packed", physicsModel: "v1" }, NOW), fresh);
+});
+
+test("the entry path refuses a ticket minted for a different surface", () => {
+  const state = ready();
+  assert.equal(ticketForConfig(state, { surface: "ice", physicsModel: "v1" }, NOW), null);
+  assert.equal(ticketForConfig(state, { surface: "powder", physicsModel: "v1" }, NOW), null);
+});
+
+test("the entry path still honours readiness, spend and expiry", () => {
+  const config = { surface: "packed", physicsModel: "v1" } as const;
+  assert.equal(ticketForConfig(NO_TICKET, config, NOW), null);
+  assert.equal(ticketForConfig(ticketReducer(NO_TICKET, { type: "request" }), config, NOW), null);
+  assert.equal(ticketForConfig(ticketReducer(ready(), { type: "submitted" }), config, NOW), null);
+
+  const expired = ticketReducer(NO_TICKET, { type: "received", ticket: ticketAt(NOW - 1) });
+  assert.equal(ticketForConfig(expired, config, NOW), null);
+});
+
+test("ticketMatchesConfig compares both axes and nothing else", () => {
+  assert.equal(ticketMatchesConfig(fresh, { surface: "packed", physicsModel: "v1" }), true);
+  assert.equal(ticketMatchesConfig(fresh, { surface: "packed", physicsModel: "v2" }), false);
+  assert.equal(ticketMatchesConfig(fresh, { surface: "ice", physicsModel: "v1" }), false);
 });
 
 // ── ticketForWorld: a ticket is only usable for the world actually running ──

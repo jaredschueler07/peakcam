@@ -250,8 +250,14 @@ test("[gate] play → submit → board: a finished run posts and appears on the 
   const NICKNAME = "GateBot";
   let submittedBody: Record<string, unknown> | null = null;
 
-  await page.route("**/api/drop-in/sessions", (route) =>
-    route.fulfill({
+  await page.route("**/api/drop-in/sessions", (route) => {
+    // Echo the requested surface/physicsModel rather than hardcoding them. The
+    // entry guard now refuses a ticket that does not match the config the world
+    // will be built from, so a hardcoded "packed" would turn this spec red the
+    // day Portillo's live conditions report poor or icy — a false gate failure
+    // about the weather, not about play→submit→board.
+    const requested = JSON.parse(route.request().postData() ?? "{}");
+    return route.fulfill({
       status: 201,
       contentType: "application/json",
       body: JSON.stringify({
@@ -260,14 +266,15 @@ test("[gate] play → submit → board: a finished run posts and appears on the 
         resortSlug: "ski-portillo",
         mode: "time_trial",
         trailId: "roca-jack",
-        surface: "packed",
-        physicsModel: "v1",
+        surface: requested.surface,
+        physicsModel: requested.physicsModel,
         physicsVersion: 1,
         courseVersion: 1,
         tickHz: 10,
         expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
       }),
-    }));
+    });
+  });
 
   await page.route("**/api/drop-in/runs", (route) => {
     submittedBody = JSON.parse(route.request().postData() ?? "{}");

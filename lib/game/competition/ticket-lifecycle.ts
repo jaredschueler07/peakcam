@@ -84,6 +84,45 @@ export function needsRemint(state: TicketState, nowMs: number): boolean {
 }
 
 /**
+ * Does this ticket describe the same physics the run will use?
+ *
+ * Both axes matter and neither is redundant. `surface` picks the friction and
+ * carve constants; `physicsModel` picks the whole integrator (v1 vs v2). A run
+ * scored under one and submitted against a board built for the other is not
+ * comparable, which is why the server keys leaderboards on both.
+ */
+export function ticketMatchesConfig(
+  ticket: RunSessionTicket,
+  config: Pick<SimulationConfig, "surface" | "physicsModel">,
+): boolean {
+  return ticket.surface === config.surface && ticket.physicsModel === config.physicsModel;
+}
+
+/**
+ * The ticket a run may START on, checked against the config the world is about
+ * to be built from.
+ *
+ * Seed-independent by necessity: at `start()` the world does not exist yet, so
+ * there is no `runSeed` to compare — the seed is *derived* from this ticket a
+ * moment later (see {@link resolveRunSeed}). Everything else is checked now.
+ *
+ * This closes the entry-path hole behind the `?phys=v2` override: tickets
+ * always describe the rollout world, so with the rollout off the server mints
+ * v1 while the runtime builds v2. Freezing on readiness alone posted a v2 run
+ * to the v1 board. A mismatch here means offline play on the profile seed,
+ * which is the intended outcome — the override is for trying v2, not for
+ * scoring on it.
+ */
+export function ticketForConfig(
+  state: TicketState,
+  config: Pick<SimulationConfig, "surface" | "physicsModel">,
+  nowMs: number,
+): RunSessionTicket | null {
+  const ticket = usableTicket(state, nowMs);
+  return ticket && ticketMatchesConfig(ticket, config) ? ticket : null;
+}
+
+/**
  * The ticket that may be attached to the run **currently being skied**, or
  * `null`.
  *
@@ -104,13 +143,9 @@ export function ticketForWorld(
   nowMs: number,
 ): RunSessionTicket | null {
   if (runSeed === null || runSeed === undefined) return null;
-  const ticket = usableTicket(state, nowMs);
-  return ticket &&
-    ticket.seed === runSeed &&
-    ticket.surface === config.surface &&
-    ticket.physicsModel === config.physicsModel
-    ? ticket
-    : null;
+  // Same rules as the entry path, plus the seed of the world already running.
+  const ticket = ticketForConfig(state, config, nowMs);
+  return ticket && ticket.seed === runSeed ? ticket : null;
 }
 
 /**
