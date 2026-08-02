@@ -42,9 +42,12 @@ const CSP_DIRECTIVES = [
   // canvas-derived imagery.
   "img-src 'self' data: blob: https:",
 
-  // XHR/fetch/WebSocket targets: Supabase (REST + auth + realtime), PostHog,
-  // map tile + weather + radar APIs, and Vercel's analytics collectors.
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://us.i.posthog.com https://us-assets.i.posthog.com https://api.maptiler.com https://*.basemaps.cartocdn.com https://api.rainviewer.com https://api.weather.gov https://api.open-meteo.com https://gibs.earthdata.nasa.gov https://vitals.vercel-insights.com https://va.vercel-scripts.com",
+  // XHR/fetch/WebSocket/sendBeacon targets: Supabase (REST + auth + realtime),
+  // PostHog, map tile + weather + radar APIs, and Vercel's analytics
+  // collectors. www.facebook.com is where the Meta Pixel POSTs its /tr beacons
+  // — a different origin from connect.facebook.net, which only serves the
+  // script and belongs in script-src.
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://us.i.posthog.com https://us-assets.i.posthog.com https://api.maptiler.com https://*.basemaps.cartocdn.com https://api.rainviewer.com https://api.weather.gov https://api.open-meteo.com https://gibs.earthdata.nasa.gov https://vitals.vercel-insights.com https://va.vercel-scripts.com https://www.facebook.com",
 
   // Cam embeds (YouTube + arbitrary operator iframes) — see the note above.
   "frame-src https:",
@@ -96,12 +99,15 @@ const securityHeaders = [
     value: "strict-origin-when-cross-origin",
   },
   {
-    // No code path calls getUserMedia or the Geolocation API (grepped: the only
-    // hit is a comment in lib/map-utils.ts saying the season default is
-    // deliberately not geolocation-based). Denying them site-wide also denies
-    // them to every embedded cam iframe.
+    // Camera and microphone are denied outright — nothing in the app calls
+    // getUserMedia. Geolocation is `(self)`, NOT `()`: MapView.tsx:471 renders
+    // MapLibre's <GeolocateControl> on both map surfaces, and a bare `()`
+    // makes that button throw PositionError code 1 ("disabled by permissions
+    // policy") in production. `(self)` keeps the "find me" button working
+    // while still denying geolocation to every cross-origin cam iframe, which
+    // is the part worth having.
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=()",
+    value: "camera=(), microphone=(), geolocation=(self)",
   },
   {
     // Vercel serves this site over HTTPS only. HSTS is the compensating control

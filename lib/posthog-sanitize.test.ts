@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { redactSensitiveUrl, sanitizeAnalyticsProperties } from "./posthog-sanitize";
+import {
+  redactSensitiveUrl,
+  sanitizeAnalyticsProperties,
+  sanitizeCaptureEvent,
+} from "./posthog-sanitize";
 
 const TOKEN = "a".repeat(64);
 
@@ -64,6 +68,42 @@ test("sanitizes every string property, not just $current_url", () => {
   assert.strictEqual(sanitized.$pathname, "/alerts/manage");
   assert.strictEqual(sanitized.resort_count, 3);
   assert.deepStrictEqual(sanitized.nested, { untouched: true });
+});
+
+test("redacts the Supabase OTP token_hash", () => {
+  assert.strictEqual(
+    redactSensitiveUrl("https://www.peakcam.io/auth/confirm?token_hash=pkce_abc&type=email"),
+    "https://www.peakcam.io/auth/confirm?token_hash=[redacted]&type=email"
+  );
+});
+
+test("the before_send hook redacts an event's properties and never drops it", () => {
+  const event = {
+    event: "$pageview",
+    properties: {
+      $current_url: `https://www.peakcam.io/alerts/manage?token=${TOKEN}`,
+      $lib: "web",
+    },
+  };
+  const out = sanitizeCaptureEvent(event);
+
+  assert.ok(out, "the event must be returned, not dropped");
+  assert.strictEqual(out.event, "$pageview");
+  assert.strictEqual(
+    out.properties.$current_url,
+    "https://www.peakcam.io/alerts/manage?token=[redacted]"
+  );
+  assert.strictEqual(out.properties.$lib, "web");
+  // the caller's object is left alone
+  assert.strictEqual(event.properties.$current_url, `https://www.peakcam.io/alerts/manage?token=${TOKEN}`);
+});
+
+test("the before_send hook tolerates a null event and a propertyless event", () => {
+  assert.strictEqual(sanitizeCaptureEvent(null), null);
+  const bare: { event: string; properties?: Record<string, unknown> } = {
+    event: "$pageleave",
+  };
+  assert.strictEqual(sanitizeCaptureEvent(bare), bare);
 });
 
 test("does not mutate the properties object it is given", () => {

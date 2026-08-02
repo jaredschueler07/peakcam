@@ -13,6 +13,8 @@
 export const SENSITIVE_URL_PARAMS = new Set([
   "token",
   "manage_token",
+  // Supabase one-time-password / email-confirmation links carry token_hash.
+  "token_hash",
   "code",
   "access_token",
   "refresh_token",
@@ -69,7 +71,7 @@ export function redactSensitiveUrl(url: string): string {
 }
 
 /**
- * PostHog `sanitize_properties` hook. Every string-valued property is passed
+ * Property-bag sanitizer. Every string-valued property is passed
  * through {@link redactSensitiveUrl} rather than an allow-list of known URL
  * property names, because PostHog adds URL-bearing properties over time
  * ($current_url, $pathname, $referrer, $initial_*, session-replay entry URLs)
@@ -84,4 +86,28 @@ export function sanitizeAnalyticsProperties(
     if (typeof value === "string") out[key] = redactSensitiveUrl(value);
   }
   return out;
+}
+
+/**
+ * PostHog `before_send` hook — sanitizes an event's whole property bag on its
+ * way out, covering the events PostHog captures on its own (autocapture,
+ * $pageleave, web vitals) as well as this app's explicit `capture` calls.
+ *
+ * `before_send` rather than `sanitize_properties`: the latter is deprecated in
+ * posthog-js 1.362.0. It still works, but it logs a console.error on every
+ * captured event, and a future version dropping it would silently stop
+ * redacting automatic events while the explicit redaction in lib/posthog.tsx
+ * kept working — a failure with no visible symptom.
+ *
+ * Returns the event (never null) so no event is dropped; only redacted.
+ */
+export function sanitizeCaptureEvent<
+  E extends { properties?: Record<string, unknown> } | null,
+>(event: E): E {
+  if (!event?.properties) return event;
+  return {
+    ...event,
+    properties: sanitizeAnalyticsProperties(event.properties),
+    // The spread widens the type past E's constraint; the shape is unchanged.
+  } as E;
 }

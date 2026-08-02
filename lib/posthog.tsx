@@ -4,7 +4,7 @@ import posthog from "posthog-js";
 import { PostHogProvider as PHProvider } from "posthog-js/react";
 import { useEffect, Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { redactSensitiveUrl, sanitizeAnalyticsProperties } from "./posthog-sanitize";
+import { redactSensitiveUrl, sanitizeCaptureEvent } from "./posthog-sanitize";
 
 const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com";
@@ -45,8 +45,10 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       persistence: "localStorage+cookie",
       // Strips alert manage_tokens and Supabase auth codes out of every
       // captured property, including the URL properties PostHog attaches
-      // automatically (autocapture, pageleave, session replay).
-      sanitize_properties: sanitizeAnalyticsProperties,
+      // automatically (autocapture, pageleave, web vitals). `before_send`
+      // rather than the deprecated `sanitize_properties` — see the note on
+      // sanitizeCaptureEvent.
+      before_send: sanitizeCaptureEvent,
     });
   }, []);
 
