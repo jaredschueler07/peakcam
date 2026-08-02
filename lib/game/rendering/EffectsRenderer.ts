@@ -2,6 +2,8 @@ import * as THREE from "three";
 import type { SimulationState, TerrainSampler } from "../core/types";
 import { mulberry32 } from "../core/rng";
 import type { QualityRung } from "./QualityController";
+import { createParticleNodeMaterial, radialParticleTexture } from "./ParticleNodeMaterial";
+import type { RendererBackendKind } from "./backend";
 
 const SPRAY_MAX = 900, SNOW_MAX = 3600, SNOW_BOX = 130, TRACK_QUADS = 1600;
 const pointVertex = "attribute float aAlpha;attribute float aSize;uniform float uScale;varying float vA;void main(){vA=aAlpha;vec4 mv=modelViewMatrix*vec4(position,1.);gl_PointSize=aSize*uScale/max(1.,-mv.z);gl_Position=projectionMatrix*mv;}";
@@ -31,20 +33,33 @@ export class EffectsRenderer {
   private prevLx = 0; private prevLz = 0; private prevRx = 0; private prevRz = 0;
   private quality: QualityRung = 4;
 
+  /**
+   * Both point clouds share one shader. The WebGPU backend cannot compile the raw `ShaderMaterial`,
+   * so it gets the TSL port; `sizeNode`/`opacityNode` carry the same arithmetic the GLSL did.
+   */
+  private pointMaterial(color: number, scale: number): THREE.Material {
+    if (this.backendKind === "webgpu") return createParticleNodeMaterial(radialParticleTexture(), new THREE.Color(color), scale);
+    return new THREE.ShaderMaterial({
+      uniforms: { uTex: { value: radialTexture() }, uColor: { value: new THREE.Color(color) }, uScale: { value: scale } },
+      vertexShader: pointVertex, fragmentShader: pointFragment, transparent: true, depthWrite: false,
+    });
+  }
+
   constructor(
     scene: THREE.Scene,
     seed: number,
     private readonly terrain: TerrainSampler,
     private readonly reducedMotion: boolean,
     private readonly sprayDepthMultiplier = 1,
+    private readonly backendKind: RendererBackendKind = "webgl",
   ) {
     this.random = mulberry32(seed ^ 0x8e37a12d);
     this.sprayGeometry.setAttribute("position", new THREE.BufferAttribute(this.sprayPosition, 3)); this.sprayGeometry.setAttribute("aAlpha", new THREE.BufferAttribute(this.sprayAlpha, 1)); this.sprayGeometry.setAttribute("aSize", new THREE.BufferAttribute(this.spraySize, 1));
-    const sprayMaterial = new THREE.ShaderMaterial({ uniforms: { uTex: { value: radialTexture() }, uColor: { value: new THREE.Color(0xf7fbff) }, uScale: { value: 620 } }, vertexShader: pointVertex, fragmentShader: pointFragment, transparent: true, depthWrite: false });
+    const sprayMaterial = this.pointMaterial(0xf7fbff, 620);
     const spray = new THREE.Points(this.sprayGeometry, sprayMaterial); spray.frustumCulled = false; scene.add(spray);
     for (let i = 0; i < SNOW_MAX; i += 1) { this.snowPosition[i * 3] = (this.random() - 0.5) * SNOW_BOX; this.snowPosition[i * 3 + 1] = this.random() * SNOW_BOX * 0.7; this.snowPosition[i * 3 + 2] = (this.random() - 0.5) * SNOW_BOX; this.snowAlpha[i] = 0.55 + this.random() * 0.45; this.snowSize[i] = 0.5 + this.random() * 1.5; this.snowSeed[i] = this.random() * Math.PI * 2; }
     this.snowGeometry.setAttribute("position", new THREE.BufferAttribute(this.snowPosition, 3)); this.snowGeometry.setAttribute("aAlpha", new THREE.BufferAttribute(this.snowAlpha, 1)); this.snowGeometry.setAttribute("aSize", new THREE.BufferAttribute(this.snowSize, 1));
-    const snowMaterial = new THREE.ShaderMaterial({ uniforms: { uTex: { value: radialTexture() }, uColor: { value: new THREE.Color(0xffffff) }, uScale: { value: 240 } }, vertexShader: pointVertex, fragmentShader: pointFragment, transparent: true, depthWrite: false });
+    const snowMaterial = this.pointMaterial(0xffffff, 240);
     const snowfall = new THREE.Points(this.snowGeometry, snowMaterial); snowfall.frustumCulled = false; scene.add(snowfall);
     this.trackGeometry.setAttribute("position", new THREE.BufferAttribute(this.trackPosition, 3)); this.trackGeometry.setDrawRange(0, 0);
     const tracks = new THREE.Mesh(this.trackGeometry, new THREE.MeshBasicMaterial({ color: 0x9fb8d6, transparent: true, opacity: 0.42, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -3 })); tracks.frustumCulled = false; tracks.renderOrder = 1; scene.add(tracks);
@@ -58,10 +73,16 @@ export class EffectsRenderer {
       const fx = Math.sin(state.yaw), fz = Math.cos(state.yaw), rx = fz, rz = -fx, side = -Math.sign(state.lean || 0.001);
       for (let i = 0; i < count; i += 1) { const off = (this.random() - 0.5) * 0.9 + side * 0.35; this.emitSpray(state.pos.x + rx * off - fx * 0.8, state.pos.y + 0.08 + this.random() * 0.25, state.pos.z + rz * off - fz * 0.8, rx * side * (2 + intensity * 9) - fx * speed * 0.16 + (this.random() - 0.5) * 2, 1.4 + this.random() * 3.4 * (0.4 + intensity), rz * side * (2 + intensity * 9) - fz * speed * 0.16 + (this.random() - 0.5) * 2, 1.4 + this.random() * 2.4, 0.45 + this.random() * 0.5); }
     }
-    this.updateSpray(dt); this.updateSnow(dt, state.time, camera.position, snowCount * (0.35 + this.quality * 0.1625), wind); this.updateTracks(state);
+    this.updateSpray(dt); this.updateSnow(dt, state.time, camera.position, snowCount * (0.35 + this.quality * 0.1625) * this.densityScale(), wind); this.updateTracks(state);
   }
 
   setQuality(rung: QualityRung): void { this.quality = rung; }
+
+  /**
+   * The top rung buys a denser snowfall, but only on the node pipeline: the WebGL chain reaches
+   * rung 4 on weaker hardware, where the extra particles are the wrong thing to spend the frame on.
+   */
+  densityScale(): number { return this.backendKind === "webgpu" && this.quality >= 4 ? 1.25 : 1; }
 
   private emitSpray(x: number, y: number, z: number, vx: number, vy: number, vz: number, size: number, life: number) { const i = this.sprayHead = (this.sprayHead + 1) % SPRAY_MAX, p = i * 3; this.sprayPosition[p] = x; this.sprayPosition[p + 1] = y; this.sprayPosition[p + 2] = z; this.sprayVelocity[p] = vx; this.sprayVelocity[p + 1] = vy; this.sprayVelocity[p + 2] = vz; this.sprayLife[i] = this.sprayMaxLife[i] = life; this.spraySize[i] = size; this.sprayAlpha[i] = 1; }
   private updateSpray(dt: number) {

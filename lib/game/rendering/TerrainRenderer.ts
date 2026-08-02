@@ -3,6 +3,8 @@ import { clamp01, smoothstep } from "../core/math";
 import type { SimulationWorld, TerrainSampler } from "../core/types";
 import { fbm, vnoise } from "../terrain/noise";
 import { buildSnowDetailNormal, polishSnowMaterial, type SnowUniforms } from "./SnowMaterial";
+import { createSnowNodeMaterial, type SnowNodeUniforms } from "./SnowNodeMaterial";
+import type { RendererBackendKind } from "./backend";
 
 export const TILE_SIZE = 200;
 export const TILE_RESOLUTION = 50;
@@ -18,7 +20,7 @@ const C_GROOM = new THREE.Color(0.90, 0.945, 1);
 const C_ICE = new THREE.Color(0.74, 0.87, 0.97);
 const colorScratch = new THREE.Color();
 
-interface Tile { mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>; x: number; z: number }
+interface Tile { mesh: THREE.Mesh<THREE.BufferGeometry, THREE.Material>; x: number; z: number }
 
 export function buildTileGeometry(terrain: TerrainSampler, ix: number, iz: number): THREE.BufferGeometry {
   const n = TILE_RESOLUTION + 1;
@@ -91,14 +93,22 @@ export class TerrainRenderer {
   private centerX = Infinity;
   private centerZ = Infinity;
 
-  constructor(private readonly scene: THREE.Scene, private readonly world: SimulationWorld, snowUniforms?: SnowUniforms) {
-    const material = new THREE.MeshStandardMaterial({
-      vertexColors: true, roughness: 0.86, metalness: 0.02, flatShading: false, dithering: true,
-    });
-    if (snowUniforms) {
+  constructor(
+    private readonly scene: THREE.Scene,
+    private readonly world: SimulationWorld,
+    snowUniforms?: SnowUniforms | SnowNodeUniforms,
+    backendKind: RendererBackendKind = "webgl",
+  ) {
+    // The node material is built from the same constants; only the shading language differs.
+    const material: THREE.Material = snowUniforms && backendKind === "webgpu"
+      ? createSnowNodeMaterial(buildSnowDetailNormal(world.seed), snowUniforms as SnowNodeUniforms)
+      : new THREE.MeshStandardMaterial({
+        vertexColors: true, roughness: 0.86, metalness: 0.02, flatShading: false, dithering: true,
+      });
+    if (snowUniforms && backendKind !== "webgpu") {
       const detailNormal = buildSnowDetailNormal(world.seed);
       material.userData.snowDetail = detailNormal;
-      polishSnowMaterial(material, detailNormal, snowUniforms);
+      polishSnowMaterial(material as THREE.MeshStandardMaterial, detailNormal, snowUniforms as SnowUniforms);
     }
     for (let index = 0; index < GRID_SIZE * GRID_SIZE; index += 1) {
         const mesh = new THREE.Mesh(new THREE.BufferGeometry(), material);

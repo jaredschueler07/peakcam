@@ -10,7 +10,9 @@ import type { TerrainMeta, TrailsFile } from "../terrain/formats";
 import { createWorld } from "../terrain/obstacles";
 import { WorldRenderer } from "../rendering/WorldRenderer";
 import { UiBridge } from "./UiBridge";
-import { loadTerrainForRuntime } from "./createGame";
+import { loadTerrainForRuntime, selectRendererBackend } from "./createGame";
+import { warmUpAndStart } from "./GameRuntime";
+import type { createRendererBackend } from "../rendering/backend";
 
 function portilloAssets() {
   const directory = path.join(process.cwd(), "public/game/terrain");
@@ -68,4 +70,79 @@ test("the loaded runtime scene drapes and bounds Portillo landmarks against its 
   state.pos.z = -700;
   renderer.update(state, 0);
   assert.equal(hotel.visible, true, "grounded hotel appears once its terrain is in the streaming window");
+});
+
+test("the renderer backend defaults to WebGPU and falls back to the legacy WebGL path", async () => {
+  const canvas = {} as HTMLCanvasElement;
+  const created: string[] = [];
+  const create = async (_canvas: HTMLCanvasElement, kind: "webgpu" | "webgl") => {
+    created.push(kind);
+    return { backendKind: kind } as unknown as Awaited<ReturnType<typeof createRendererBackend>>;
+  };
+
+  // No override: WebGPU wherever the browser has it...
+  assert.equal((await selectRendererBackend(canvas, "", true, create))?.backendKind, "webgpu");
+  // ...and `undefined` otherwise, which is what makes GameRenderer build its own WebGLRenderer.
+  assert.equal(await selectRendererBackend(canvas, "", false, create), undefined);
+
+  // ?gfx=webgl pins the legacy path even on a WebGPU browser.
+  assert.equal(await selectRendererBackend(canvas, "?gfx=webgl", true, create), undefined);
+  // ?gfx=webgpu asks for WebGPU, and cannot conjure it where the browser has none.
+  assert.equal((await selectRendererBackend(canvas, "?gfx=webgpu", true, create))?.backendKind, "webgpu");
+  assert.equal(await selectRendererBackend(canvas, "?gfx=webgpu", false, create), undefined);
+
+  assert.deepEqual(created, ["webgpu", "webgpu"], "the WebGL rows never build a backend at all");
+});
+
+test("a WebGPU backend that fails to initialise falls back instead of failing the run", async () => {
+  const originalWarn = console.warn;
+  console.warn = () => {};
+  try {
+    const backend = await selectRendererBackend({} as HTMLCanvasElement, "", true, async () => {
+      throw new Error("no adapter");
+    });
+    assert.equal(backend, undefined, "the run continues on WebGL");
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test("the loading bar holds at 95% until the shaders are warm, then the loop starts", async () => {
+  const progress: number[] = [];
+  const order: string[] = [];
+  let releasePrewarm: () => void = () => {};
+  const prewarmed = new Promise<void>((resolve) => { releasePrewarm = resolve; });
+
+  const running = warmUpAndStart(
+    { setLoadingProgress: (value) => progress.push(value) },
+    { prewarm: async () => { order.push("prewarm"); await prewarmed; } },
+    () => order.push("start"),
+  );
+
+  assert.deepEqual(progress, [0.95], "the bar parks at 95% while compiling");
+  assert.deepEqual(order, ["prewarm"], "and the loop has not started yet");
+
+  releasePrewarm();
+  await running;
+
+  assert.deepEqual(progress, [0.95, 1]);
+  assert.deepEqual(order, ["prewarm", "start"], "the first frame comes after the compile");
+});
+
+test("a pre-warm failure still starts the run", async () => {
+  const progress: number[] = [];
+  const originalWarn = console.warn;
+  console.warn = () => {};
+  let started = false;
+  try {
+    await warmUpAndStart(
+      { setLoadingProgress: (value) => progress.push(value) },
+      { prewarm: async () => { throw new Error("device lost during compile"); } },
+      () => { started = true; },
+    );
+  } finally {
+    console.warn = originalWarn;
+  }
+  assert.equal(started, true, "nobody is stranded on the loading screen");
+  assert.deepEqual(progress, [0.95, 1]);
 });

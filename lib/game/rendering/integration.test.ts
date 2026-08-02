@@ -1,0 +1,241 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import * as THREE from "three";
+import { MeshBasicNodeMaterial, PointsNodeMaterial } from "three/webgpu";
+import { DROP_IN_GAME_PROFILES } from "../config/profiles";
+import { createSimulation } from "../core/simulation";
+import { createProceduralWorld } from "../terrain/obstacles";
+import { applyNodeFogOptOuts, GameRenderer, type QualityChangeEvent, type RendererBackend } from "./Renderer";
+import { createScene } from "./SceneFactory";
+import { CsmShadowsNode } from "./CsmShadowsNode";
+import { EffectsRenderer } from "./EffectsRenderer";
+
+// SMAANode decodes its lookup atlases through `new Image()`, which Node lacks. The post chain is
+// imported lazily by the renderer, so without this the WebGPU path warns and drops post.
+class StubImage { src = ""; onload: (() => void) | null = null; }
+(globalThis as { Image?: unknown }).Image ??= StubImage;
+
+const profile = DROP_IN_GAME_PROFILES["ski-portillo"];
+
+class FakeBackend implements RendererBackend {
+  compiled = 0;
+  rendered = 0;
+  readonly renderLists = { dispose: () => {} };
+  readonly shadowMap = { enabled: false, type: THREE.PCFShadowMap };
+  outputColorSpace = THREE.SRGBColorSpace;
+  toneMapping = THREE.NoToneMapping;
+  toneMappingExposure = 1;
+  pixelRatio = 1;
+  constructor(readonly backendKind: "webgpu" | "webgl" = "webgpu") {}
+  setPixelRatio(value: number) { this.pixelRatio = value; }
+  setSize() {}
+  setClearColor() {}
+  render() { this.rendered += 1; }
+  async compileAsync() { this.compiled += 1; }
+  dispose() {}
+}
+
+function fakeCanvas() {
+  return { clientWidth: 800, clientHeight: 600, addEventListener() {}, removeEventListener() {} } as unknown as HTMLCanvasElement;
+}
+
+function buildRenderer(backend: RendererBackend, onQualityChange?: (event: QualityChangeEvent) => void) {
+  const world = createProceduralWorld(profile, profile.seed);
+  const state = createSimulation(profile, profile.seed);
+  const renderer = new GameRenderer(fakeCanvas(), profile, world, state, {
+    backend, devicePixelRatio: 1, reducedMotion: true, onQualityChange,
+  });
+  return { renderer, world, state };
+}
+
+test("the WebGPU scene is built entirely from node materials and a scene-level fog node", () => {
+  const built = createScene(profile, 1.6, "webgpu");
+
+  assert.ok(built.sky.material instanceof MeshBasicNodeMaterial, "the sky ShaderMaterial is ported");
+  assert.equal((built.sky.material as THREE.Material & { fog?: boolean }).fog, false);
+  assert.ok((built.scene as THREE.Scene & { fogNode?: unknown }).fogNode, "height fog is installed on the scene");
+
+  // The fog uniforms must carry this preset's density, not the module's placeholder default.
+  assert.equal(built.atmosphereUniforms.density.value, profile.weather[0].fog);
+  assert.equal(built.atmosphereUniforms.heightFalloff.value, 0.025);
+  assert.equal(built.snowUniforms.horizon.value.getHex(), profile.weather[0].hor);
+});
+
+test("the WebGL scene is untouched by the port", () => {
+  const built = createScene(profile, 1.6, "webgl");
+  assert.ok(built.sky.material instanceof THREE.ShaderMaterial);
+  assert.equal((built.scene as THREE.Scene & { fogNode?: unknown }).fogNode, undefined);
+  assert.ok(built.scene.fog instanceof THREE.FogExp2, "the WebGL path keeps its FogExp2");
+});
+
+test("both backends expose the same uniform shape, so the per-frame writes need no branch", () => {
+  for (const kind of ["webgl", "webgpu"] as const) {
+    const built = createScene(profile, 1.6, kind);
+    built.snowUniforms.glint.value = 0.5;
+    built.snowUniforms.track.value.set(1, 2, 3, 4);
+    built.snowUniforms.horizon.value.setHex(0x123456);
+    built.atmosphereUniforms.referenceHeight.value = 812;
+    built.skyUniforms.uTime.value += 0.25;
+    built.skyUniforms.uCloudiness.value = 0.9;
+    assert.equal(built.snowUniforms.glint.value, 0.5, `${kind} glint`);
+    assert.deepEqual(built.snowUniforms.track.value.toArray(), [1, 2, 3, 4], `${kind} track`);
+    assert.equal(built.snowUniforms.horizon.value.getHex(), 0x123456, `${kind} horizon`);
+    assert.equal(built.atmosphereUniforms.referenceHeight.value, 812, `${kind} reference height`);
+    assert.equal(built.skyUniforms.uTime.value, 0.25, `${kind} sky time`);
+    assert.equal(built.skyUniforms.uCloudiness.value, 0.9, `${kind} cloudiness`);
+  }
+});
+
+test("the height-fog opt-out survives the move to scene-level fog", () => {
+  const scene = new THREE.Scene();
+  const skier = new THREE.MeshStandardMaterial();
+  skier.userData.heightFog = false;
+  const terrain = new THREE.MeshStandardMaterial();
+  scene.add(new THREE.Mesh(new THREE.BoxGeometry(), skier), new THREE.Mesh(new THREE.PlaneGeometry(), terrain));
+
+  const opted = applyNodeFogOptOuts(scene);
+
+  assert.deepEqual(opted, [skier], "only the flagged material opts out");
+  assert.equal(skier.fog, false, "scene.fogNode skips it now that material.fog is false");
+  assert.equal(terrain.fog, true, "everything else still fogs");
+});
+
+test("the renderer wires the ghost and skier out of the scene fog on the node path", () => {
+  const { renderer } = buildRenderer(new FakeBackend("webgpu"));
+  const scene = (renderer as unknown as { built: { scene: THREE.Scene } }).built.scene;
+  let checked = 0;
+  scene.traverse((object) => {
+    const mesh = object as THREE.Mesh;
+    const list = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
+    for (const material of list) {
+      if (material.userData.heightFog !== false) continue;
+      checked += 1;
+      assert.equal((material as THREE.Material & { fog?: boolean }).fog, false);
+    }
+  });
+  assert.ok(checked > 0, "the skier and ghost materials are present and opted out");
+  renderer.dispose();
+});
+
+test("the WebGPU renderer builds the node terrain, particles and cascaded shadows", () => {
+  const { renderer } = buildRenderer(new FakeBackend("webgpu"));
+  const internals = renderer as unknown as { built: { scene: THREE.Scene }; csm: unknown };
+
+  assert.ok(internals.csm instanceof CsmShadowsNode, "shadows come from CSMShadowNode");
+
+  let points = 0;
+  internals.built.scene.traverse((object) => {
+    if ((object as THREE.Points).isPoints) {
+      points += 1;
+      assert.ok((object as THREE.Points).material instanceof PointsNodeMaterial, "spray and snowfall are node sprites");
+    }
+  });
+  assert.equal(points, 2, "spray and snowfall");
+  renderer.dispose();
+});
+
+test("pre-warm compiles the seeded rung and the top rung, then restores the rung", async () => {
+  const backend = new FakeBackend("webgpu");
+  const { renderer } = buildRenderer(backend);
+  const quality = (renderer as unknown as { quality: { rung: number } }).quality;
+  const seeded = quality.rung;
+
+  await renderer.prewarm();
+
+  assert.equal(backend.compiled, seeded === 4 ? 1 : 2, "one compile per distinct rung");
+  assert.equal(quality.rung, seeded, "the seeded rung is restored");
+  renderer.dispose();
+});
+
+test("pre-warm is safe on a backend without compileAsync", async () => {
+  const complete: Record<string, unknown> = { ...new FakeBackend("webgl") };
+  delete complete.compileAsync;
+  const withoutCompile = complete;
+  const backend = Object.assign(Object.create(null), withoutCompile, {
+    setPixelRatio() {}, setSize() {}, setClearColor() {}, render() {}, dispose() {},
+  }) as RendererBackend;
+  assert.equal(backend.compileAsync, undefined);
+  const { renderer } = buildRenderer(backend);
+  await renderer.prewarm();
+  renderer.dispose();
+});
+
+test("the governor drives the adapt tick and reports the rung it came from", () => {
+  const events: QualityChangeEvent[] = [];
+  const { renderer, world, state } = buildRenderer(new FakeBackend("webgpu"), (event) => events.push(event));
+  const quality = (renderer as unknown as { quality: { rung: number } }).quality;
+  quality.rung = 4;
+
+  // Ten seconds of 40ms frames: over the desktop budget, past the 5s dwell, and short of the
+  // 5s spacing that would allow a second step.
+  for (let i = 0; i < 250; i += 1) renderer.render(state, world, 0.04, 0, 40);
+
+  assert.equal(quality.rung, 3, "one rung, not a cascade of them");
+  assert.deepEqual(events, [{ reason: "governor", from: 4, to: 3 }]);
+  renderer.dispose();
+});
+
+test("a brief spike does not cost a rung", () => {
+  const events: QualityChangeEvent[] = [];
+  const { renderer, world, state } = buildRenderer(new FakeBackend("webgpu"), (event) => events.push(event));
+  const quality = (renderer as unknown as { quality: { rung: number } }).quality;
+  quality.rung = 4;
+
+  for (let i = 0; i < 75; i += 1) renderer.render(state, world, 0.04, 0, i < 25 ? 40 : 8);
+
+  assert.equal(quality.rung, 4);
+  assert.deepEqual(events, []);
+  renderer.dispose();
+});
+
+test("the top rung spends its headroom on glint and denser snow only on the node path", () => {
+  for (const kind of ["webgpu", "webgl"] as const) {
+    const { renderer } = buildRenderer(new FakeBackend(kind));
+    const internals = renderer as unknown as {
+      quality: { rung: number };
+      built: { snowUniforms: { glint: { value: number } } };
+      applyQuality(rung: number): void;
+      effects: EffectsRenderer;
+    };
+
+    internals.applyQuality(4);
+    const glintAtTop = internals.built.snowUniforms.glint.value;
+    const densityAtTop = internals.effects.densityScale();
+    internals.applyQuality(3);
+
+    if (kind === "webgpu") {
+      assert.ok(glintAtTop > 0, "WebGPU rung 4 turns the glint on");
+      assert.equal(densityAtTop, 1.25, "and thickens the snowfall");
+    } else {
+      assert.equal(glintAtTop, 0, "WebGL rung 4 stays on the cheaper frame");
+      assert.equal(densityAtTop, 1);
+    }
+    assert.equal(internals.built.snowUniforms.glint.value, 0, "and every lower rung is dark");
+    renderer.dispose();
+  }
+});
+
+test("a lost WebGPU device stops the render loop the way a lost WebGL context does", async () => {
+  let loseDevice: (info: { reason: string }) => void = () => {};
+  const backend = Object.assign(new FakeBackend("webgpu"), {
+    backend: { device: { lost: new Promise<{ reason: string }>((resolve) => { loseDevice = resolve; }) } },
+  });
+  const { renderer, world, state } = buildRenderer(backend);
+
+  renderer.render(state, world, 1 / 60, 0);
+  const before = backend.rendered;
+  assert.ok(before > 0, "rendering before the loss");
+
+  const originalWarn = console.warn;
+  console.warn = () => {};
+  try {
+    loseDevice({ reason: "destroyed" });
+    await new Promise((resolve) => setImmediate(resolve));
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  renderer.render(state, world, 1 / 60, 0);
+  assert.equal(backend.rendered, before, "no frames are drawn into a dead device");
+  renderer.dispose();
+});

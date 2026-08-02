@@ -9,7 +9,8 @@ import type { TerrainLoadOptions } from "../rendering/loaders/TerrainAssetLoader
 import type { RealTerrainAssets } from "../terrain/terrain-source";
 import type { ConditionsSnapshot } from "../conditions";
 import type { RuntimeAudio } from "./RuntimeAudio";
-import { createRendererBackend, resolveBackendOverride } from "../rendering/backend";
+import { createRendererBackend, resolveBackendKind } from "../rendering/backend";
+import type { RendererBackend } from "../rendering/Renderer";
 
 interface RuntimeTerrainLoader {
   load(slug: ResortGameProfile["slug"], options?: TerrainLoadOptions): Promise<RealTerrainAssets>;
@@ -67,15 +68,33 @@ export async function createGame(options: CreateGameOptions): Promise<GameRuntim
     options.profile, options.uiBridge, options.analytics, new TerrainAssetLoader(), options.signal,
   );
   const assetLoadMs = performance.now() - startedAt;
-  const override = resolveBackendOverride(
-    typeof location === "undefined" ? "" : location.search,
-    typeof navigator !== "undefined" && "gpu" in navigator,
-  );
-  const backend = override === null ? undefined : await createRendererBackend(options.canvas, override);
+  const backend = await selectRendererBackend(options.canvas);
   const runtime = new GameRuntime(
     options.canvas, options.profile, options.uiBridge, options.analytics, source.sampler,
     options.conditions, options.audio, assetLoadMs, options.seed, options.spawnArcM, backend,
   );
-  runtime.start();
+  void runtime.startWhenWarm();
   return runtime;
+}
+
+/**
+ * WebGPU is the default wherever the browser has it; everything else falls back to the legacy
+ * `WebGLRenderer` that `GameRenderer` builds when no backend is injected, because the fallback
+ * keeps the GLSL materials (`polishSnowMaterial`, the sky `ShaderMaterial`, `addHeightFog`) that
+ * only a WebGL context can compile. `?gfx=webgl` forces that path; `?gfx=webgpu` is a no-op where
+ * WebGPU is already the default and cannot conjure it where the browser lacks it.
+ */
+export async function selectRendererBackend(
+  canvas: HTMLCanvasElement,
+  search = typeof location === "undefined" ? "" : location.search,
+  hasWebGPU = typeof navigator !== "undefined" && "gpu" in navigator,
+  create = createRendererBackend,
+): Promise<RendererBackend | undefined> {
+  if (resolveBackendKind(search, hasWebGPU) !== "webgpu") return undefined;
+  try {
+    return await create(canvas, "webgpu");
+  } catch (reason) {
+    console.warn("[Drop In] WebGPU backend failed to initialise; falling back to WebGL.", reason);
+    return undefined;
+  }
 }
