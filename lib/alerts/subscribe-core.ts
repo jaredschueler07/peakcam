@@ -1,6 +1,15 @@
 // ─────────────────────────────────────────────────────────────
 // POST /api/alerts/subscribe — decision logic.
 //
+// Email failures below are logged with full EmailSendError detail (kind,
+// Resend error name, message) rather than the bare Error — see lib/email.ts,
+// which now throws instead of silently discarding a Resend {error} result.
+// The response body stays identical on success regardless of whether the
+// mail actually sent: welcome/manage-link mail is best-effort against an
+// already-persisted subscription, and — per the enumeration-safety note
+// below — the two branches must return byte-identical bodies, so a mail
+// failure cannot be surfaced there without reopening that hole.
+//
 // Extracted from the route handler so both branches (new address vs. address
 // that is already subscribed) can be tested without a database.
 //
@@ -16,6 +25,15 @@
 // Both branches return the identical body, so the endpoint cannot be used to
 // test whether an address is subscribed (account enumeration).
 // ─────────────────────────────────────────────────────────────
+
+import { EmailSendError } from "@/lib/email";
+
+/** Formats a thrown email failure the same way across every catch below. */
+function describeEmailError(err: unknown): string {
+  return err instanceof EmailSendError
+    ? `${err.kind}${err.resendErrorName ? `:${err.resendErrorName}` : ""} — ${err.message}`
+    : String(err);
+}
 
 export interface Subscriber {
   id: string;
@@ -130,7 +148,10 @@ export async function handleSubscribe(
         manageToken: subscriber.manage_token,
       });
     } catch (err) {
-      deps.logError("[alerts/subscribe] manage-link email failed:", err);
+      deps.logError(
+        `[alerts/subscribe] manage-link email to ${subscriber.email} FAILED —`,
+        describeEmailError(err)
+      );
     }
     return SUCCESS;
   }
@@ -167,7 +188,10 @@ export async function handleSubscribe(
       resortNames: validResorts.map((r) => r.name),
     });
   } catch (err) {
-    deps.logError("[alerts/subscribe] welcome email failed:", err);
+    deps.logError(
+      `[alerts/subscribe] welcome email to ${subscriber.email} FAILED —`,
+      describeEmailError(err)
+    );
   }
 
   return SUCCESS;

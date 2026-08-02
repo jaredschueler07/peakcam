@@ -1,28 +1,195 @@
 import { Resend } from "resend";
-
-// Lazy init so the module can be imported at build time without the key set
-function getResend() {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) throw new Error("RESEND_API_KEY is not set");
-  return new Resend(key);
-}
+import type { CreateEmailOptions, CreateEmailResponse } from "resend";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://peakcam.io";
 const FROM = "PeakCam Alerts <alerts@peakcam.io>";
 
+// ─── Sending core ─────────────────────────────────────────────────────────────
+//
+// The Resend SDK does NOT throw on API errors — it resolves `{ data, error }`.
+// Every send therefore has to inspect `error`, or a dead key / unverified
+// domain / rate limit is indistinguishable from a delivered email.
+
+/** The slice of the Resend client we use — lets tests inject a fake. */
+export interface EmailClient {
+  emails: { send(payload: CreateEmailOptions): Promise<CreateEmailResponse> };
+}
+
+export type EmailFailureKind = "missing_key" | "malformed_key" | "api_error";
+
+export interface EmailFailure {
+  kind: EmailFailureKind;
+  /** Resend error code (`validation_error`, `invalid_api_key`, …) when kind is api_error. */
+  name?: string;
+  message: string;
+  statusCode?: number | null;
+}
+
+export type EmailResult =
+  | { ok: true; id: string | undefined; error?: undefined }
+  | { ok: false; id?: undefined; error: EmailFailure };
+
+export class EmailSendError extends Error {
+  readonly kind: EmailFailureKind;
+  readonly emailType: string;
+  readonly to: string;
+  readonly resendErrorName?: string;
+  readonly statusCode?: number | null;
+
+  constructor(emailType: string, to: string, failure: EmailFailure) {
+    super(`${emailType} email to ${to} failed: ${failure.name ?? failure.kind}: ${failure.message}`);
+    this.name = "EmailSendError";
+    this.kind = failure.kind;
+    this.emailType = emailType;
+    this.to = to;
+    this.resendErrorName = failure.name;
+    this.statusCode = failure.statusCode;
+  }
+}
+
+/**
+ * Local, network-free validation of the API key's shape. Distinguishes the two
+ * failure modes we can detect without a round trip; the third (a well-formed
+ * key the API rejects) can only surface on a real send.
+ */
+export function checkResendApiKey(key: string | undefined): {
+  ok: boolean;
+  problem: "missing" | "malformed" | null;
+  message?: string;
+} {
+  const trimmed = key?.trim();
+  if (!trimmed) {
+    return {
+      ok: false,
+      problem: "missing",
+      message: "RESEND_API_KEY is not set — no transactional email can be sent.",
+    };
+  }
+  if (!trimmed.startsWith("re_") || trimmed.length < 10) {
+    return {
+      ok: false,
+      problem: "malformed",
+      message:
+        `RESEND_API_KEY does not look like a Resend key (expected a re_ prefix, got ${trimmed.length} chars ` +
+        `starting "${trimmed.slice(0, 3)}") — check the value in the Vercel project env.`,
+    };
+  }
+  return { ok: true, problem: null };
+}
+
+/** Test seam: inject a fake client for the module-level send paths. */
+let clientOverride: EmailClient | null = null;
+export function setEmailClientForTests(client: EmailClient | null): void {
+  clientOverride = client;
+}
+
+function resolveClient(explicit?: EmailClient): EmailClient | EmailFailure {
+  if (explicit) return explicit;
+  if (clientOverride) return clientOverride;
+  const key = checkResendApiKey(process.env.RESEND_API_KEY);
+  if (!key.ok) {
+    return { kind: key.problem === "missing" ? "missing_key" : "malformed_key", message: key.message! };
+  }
+  return new Resend(process.env.RESEND_API_KEY!.trim()) as unknown as EmailClient;
+}
+
+/** Best-guess remediation hint, keyed off the Resend error code. */
+function likelyCause(name: string, message: string): string {
+  if (/domain is not verified/i.test(message)) {
+    return `the sending domain in FROM (${FROM}) is not verified in Resend — add and verify it, or send from a verified subdomain`;
+  }
+  switch (name) {
+    case "missing_api_key":
+    case "invalid_api_key":
+      return "RESEND_API_KEY is not a key Resend recognises — check the value in the Vercel project env";
+    case "restricted_api_key":
+      return "the API key exists but lacks sending permission — issue a full-access or sending key";
+    case "invalid_from_address":
+      return `the FROM address (${FROM}) is not usable with this account`;
+    case "rate_limit_exceeded":
+    case "daily_quota_exceeded":
+    case "monthly_quota_exceeded":
+      return "the Resend account is over quota / rate limited — this send was dropped";
+    case "validation_error":
+      return "Resend rejected the request payload (address or fields)";
+    default:
+      return "see the Resend error message above";
+  }
+}
+
+/**
+ * Send one email and classify the outcome. Never throws for delivery problems —
+ * it returns them, and always logs them under the stable `[email]` prefix so a
+ * broken key is greppable in Vercel logs even if a caller ignores the result.
+ */
+export async function sendEmail(
+  opts: {
+    emailType: string;
+    to: string;
+    payload: Omit<CreateEmailOptions, "from" | "to">;
+    /** Log-line prefix, so each subsystem's failures stay greppable. */
+    logPrefix?: string;
+  },
+  client?: EmailClient
+): Promise<EmailResult> {
+  const tag = `[${opts.logPrefix ?? "email"}]`;
+  const resolved = resolveClient(client);
+  if (!("emails" in resolved)) {
+    console.error(`${tag} ${opts.emailType} to ${opts.to} not sent — ${resolved.message}`);
+    return { ok: false, error: resolved };
+  }
+
+  let response: CreateEmailResponse;
+  try {
+    response = await resolved.emails.send({
+      ...opts.payload,
+      from: FROM,
+      to: opts.to,
+    } as CreateEmailOptions);
+  } catch (err) {
+    // Network/transport failure — the SDK does throw for these.
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`${tag} ${opts.emailType} to ${opts.to} failed (transport): ${message}`);
+    return { ok: false, error: { kind: "api_error", name: "transport_error", message } };
+  }
+
+  if (response.error) {
+    const { name, message, statusCode } = response.error;
+    console.error(
+      `${tag} ${opts.emailType} to ${opts.to} FAILED — ${name}` +
+        `${statusCode ? ` (HTTP ${statusCode})` : ""}: ${message} — likely cause: ${likelyCause(name, message)}`
+    );
+    return { ok: false, error: { kind: "api_error", name, message, statusCode } };
+  }
+
+  return { ok: true, id: response.data?.id };
+}
+
+async function sendOrThrow(
+  emailType: string,
+  to: string,
+  payload: Omit<CreateEmailOptions, "from" | "to">,
+  client?: EmailClient
+): Promise<void> {
+  const result = await sendEmail({ emailType, to, payload }, client);
+  if (!result.ok) throw new EmailSendError(emailType, to, result.error);
+}
+
 // ─── Welcome email ────────────────────────────────────────────────────────────
 
-export async function sendWelcomeEmail(params: {
-  email: string;
-  manageToken: string;
-  resortNames: string[];
-}) {
+/** Throws {@link EmailSendError} if the mail was not accepted by Resend. */
+export async function sendWelcomeEmail(
+  params: {
+    email: string;
+    manageToken: string;
+    resortNames: string[];
+  },
+  client?: EmailClient
+) {
   const manageUrl = `${SITE_URL}/alerts/manage?token=${params.manageToken}`;
   const resortList = params.resortNames.map((n) => `<li>${n}</li>`).join("");
 
-  await getResend().emails.send({
-    from: FROM,
-    to: params.email,
+  await sendOrThrow("welcome", params.email, {
     subject: "Powder alerts activated — PeakCam",
     html: buildEmailHtml({
       preheader: `You'll be notified when your resorts get fresh snow.`,
@@ -36,7 +203,7 @@ export async function sendWelcomeEmail(params: {
       ctaLabel: "Manage your alerts",
       manageUrl,
     }),
-  });
+  }, client);
 }
 
 // ─── Existing-subscriber manage link ──────────────────────────────────────────
@@ -47,15 +214,17 @@ export async function sendWelcomeEmail(params: {
 // not echo back the resorts the caller asked for — that request may not have
 // come from the subscriber.
 
-export async function sendManageLinkEmail(params: {
-  email: string;
-  manageToken: string;
-}) {
+/** Throws {@link EmailSendError} if the mail was not accepted by Resend. */
+export async function sendManageLinkEmail(
+  params: {
+    email: string;
+    manageToken: string;
+  },
+  client?: EmailClient
+) {
   const manageUrl = `${SITE_URL}/alerts/manage?token=${params.manageToken}`;
 
-  await getResend().emails.send({
-    from: FROM,
-    to: params.email,
+  await sendOrThrow("manage_link", params.email, {
     subject: "Your PeakCam powder alerts",
     html: buildEmailHtml({
       preheader: "You're already subscribed — here's your link to change what you follow.",
@@ -71,16 +240,20 @@ export async function sendManageLinkEmail(params: {
       ctaLabel: "Manage your alerts",
       manageUrl,
     }),
-  });
+  }, client);
 }
 
 // ─── Powder alert email ───────────────────────────────────────────────────────
 
-export async function sendPowderAlertEmail(params: {
-  email: string;
-  manageToken: string;
-  alerts: Array<{ resortName: string; slug: string; newSnow: number; threshold: number }>;
-}) {
+/** Throws {@link EmailSendError} if the mail was not accepted by Resend. */
+export async function sendPowderAlertEmail(
+  params: {
+    email: string;
+    manageToken: string;
+    alerts: Array<{ resortName: string; slug: string; newSnow: number; threshold: number }>;
+  },
+  client?: EmailClient
+) {
   const manageUrl = `${SITE_URL}/alerts/manage?token=${params.manageToken}`;
 
   const topResort = params.alerts[0];
@@ -109,9 +282,7 @@ export async function sendPowderAlertEmail(params: {
     )
     .join("");
 
-  await getResend().emails.send({
-    from: FROM,
-    to: params.email,
+  await sendOrThrow("powder_alert", params.email, {
     subject,
     html: buildEmailHtml({
       preheader: `${topResort.newSnow}" of fresh snow at ${topResort.resortName}${params.alerts.length > 1 ? ` and ${params.alerts.length - 1} more` : ""}.`,
@@ -125,7 +296,7 @@ export async function sendPowderAlertEmail(params: {
       ctaLabel: `Check conditions at ${topResort.resortName}`,
       manageUrl,
     }),
-  });
+  }, client);
 }
 
 // ─── HTML shell ───────────────────────────────────────────────────────────────
