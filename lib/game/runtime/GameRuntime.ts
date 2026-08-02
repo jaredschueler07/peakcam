@@ -1,4 +1,5 @@
 import type { ResortGameProfile } from "../config/schema";
+import { COURSE_VERSION, PHYSICS_VERSION } from "../config/versions";
 import { FIXED_DT, MAX_FRAME_DT, MAX_STEPS_PER_FRAME } from "../core/clock";
 import { createSimulation, stepSimulation } from "../core/simulation";
 import { beginLiftRide } from "../core/run-lifecycle";
@@ -16,6 +17,60 @@ import { UiBridge } from "./UiBridge";
 import type { ConditionsSnapshot } from "../conditions";
 import { simulationConfig } from "../core/config";
 import type { RuntimeAudio } from "./RuntimeAudio";
+import { encodeGhost, type GhostSample } from "../replay/codec";
+import { GHOST_SAMPLE_HZ, GhostRecorder } from "../replay/recorder";
+
+interface FinishedRunRecording {
+  samples: GhostSample[];
+  encoded: Uint8Array;
+}
+
+interface RecordingRecorder {
+  readonly recording: boolean;
+  begin(nowSimTime: number): void;
+  finish(): unknown;
+}
+
+/** Owns the armed-versus-active boundary at simulation reset time. */
+export class CompetitiveRecordingArm {
+  pending = false;
+
+  arm(stateTime: number, begin: (nowSimTime: number) => void): void {
+    this.pending = true;
+    if (stateTime === 0) {
+      begin(0);
+      this.pending = false;
+    }
+  }
+
+  onReset(
+    stateTime: number,
+    recorder: RecordingRecorder,
+    liftFinished = false,
+  ): "started" | "discarded" | "lift-discarded" | "ignored" {
+    if (liftFinished) {
+      if (recorder.recording) recorder.finish();
+      // A lift drop is not a run start; wait for the next genuine restart reset.
+      this.pending = true;
+      return "lift-discarded";
+    }
+    if (this.pending) {
+      if (stateTime !== 0) console.warn("[drop-in] competitive recorder reset did not land at state.time 0", stateTime);
+      recorder.begin(stateTime);
+      this.pending = false;
+      return "started";
+    }
+    if (recorder.recording) {
+      recorder.finish();
+      // This reset is already the next run's start: discard, then begin immediately.
+      recorder.begin(stateTime);
+      // The active recorder is now the armed run; a later reset repeats this branch.
+      this.pending = false;
+      return "discarded";
+    }
+    return "ignored";
+  }
+}
 
 export interface RuntimeAnalytics {
   controlActivated(scheme: ControlScheme): void;
@@ -42,6 +97,9 @@ export class GameRuntime {
   private paused = false;
   private disposed = false;
   private activated = false;
+  private readonly ghostRecorder = new GhostRecorder();
+  private readonly recordingArm = new CompetitiveRecordingArm();
+  private finishedRun: FinishedRunRecording | null = null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -92,6 +150,22 @@ export class GameRuntime {
   }
   restart(): void { this.input.setAction("restart", true); this.input.setAction("restart", false); this.resume(); }
 
+  beginCompetitiveRecording(): void {
+    this.finishedRun = null;
+    this.ui.setRunRecordingAvailable(false);
+    this.recordingArm.arm(this.state.time, (nowSimTime) => {
+      this.ghostRecorder.begin(nowSimTime);
+      this.ghostRecorder.sample(this.state, nowSimTime);
+    });
+  }
+
+  takeFinishedRun(): { samples: GhostSample[]; encoded: Uint8Array } | null {
+    const run = this.finishedRun;
+    this.finishedRun = null;
+    this.ui.setRunRecordingAvailable(false);
+    return run;
+  }
+
   private frame = (nowMs: number) => {
     this.raf = 0;
     if (this.disposed) return;
@@ -119,6 +193,34 @@ export class GameRuntime {
       while (this.accumulator >= FIXED_DT && steps < MAX_STEPS_PER_FRAME) {
         const events = stepSimulation(this.state, this.input.nextFrame(), FIXED_DT, this.world);
         this.audio.playSimulationEvents(events);
+        if (events.reset) {
+          const resetAction = this.recordingArm.onReset(this.state.time, this.ghostRecorder, events.liftFinished);
+          if (resetAction === "started" || resetAction === "discarded") {
+            this.ghostRecorder.sample(this.state, this.state.time);
+          }
+          if (resetAction === "discarded" || resetAction === "lift-discarded") {
+            this.finishedRun = null;
+            this.ui.setRunRecordingAvailable(false);
+          }
+        } else if (this.ghostRecorder.recording) {
+          this.ghostRecorder.sample(this.state, this.state.time);
+          if (this.state.finished) {
+            const samples = this.ghostRecorder.finish();
+            if (samples) {
+              this.finishedRun = {
+                samples,
+                encoded: encodeGhost(samples, {
+                  physicsVersion: PHYSICS_VERSION,
+                  courseVersion: COURSE_VERSION,
+                  sampleHz: GHOST_SAMPLE_HZ,
+                  seed: this.world.seed,
+                  originYCm: Math.round(this.state.startY * 100),
+                }),
+              };
+              this.ui.setRunRecordingAvailable(true);
+            }
+          }
+        }
         if (events.crashed && events.crashReason) this.ui.emit({ type: "crashed", reason: events.crashReason });
         if (events.landed) this.ui.emit({ type: "landed" });
         if (events.gatePassed) this.ui.emit({ type: "gate-passed" });

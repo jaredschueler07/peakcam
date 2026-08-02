@@ -28,6 +28,7 @@ export interface HudState {
   error: string | null;
   loadingProgress: number;
   trailPolyline: readonly Readonly<{ x: number; z: number }>[];
+  runRecording: boolean;
 }
 
 type Listener = (event: RuntimeEvent) => void;
@@ -46,6 +47,7 @@ export class UiBridge {
       altitudeFeet: profile.summitFt, score: 0, best: 0, combo: 1,
       trailIndex: 0, trailName: profile.trails[0].name, crashReason: null,
       position: { x: 0, z: 0 }, error: null, loadingProgress: 0, trailPolyline: [],
+      runRecording: false,
     }));
   }
 
@@ -84,6 +86,7 @@ export class UiBridge {
     }
   }
   setPaused(paused: boolean): void { this.setStatus(paused ? "paused" : "running"); }
+  setRunRecordingAvailable(available: boolean): void { this.store.setState({ runRecording: available }); }
   setError(error: string): void { this.store.setState({ status: "error", error }); }
   emit(event: RuntimeEvent): void {
     if (event.type === "crashed") this.store.setState({ crashReason: event.reason });
