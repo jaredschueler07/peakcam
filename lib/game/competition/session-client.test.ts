@@ -6,7 +6,21 @@ import {
   isRunSessionFailure,
   requestRunSession,
   type RunSessionResult,
+  type RunSessionTicket,
 } from "./session-client";
+// Test-only import. `session-client.ts` must NOT import this (node:crypto +
+// signing secret); the test file is never bundled, so it is the right place to
+// prove the hand-mirrored client type still matches the server's response.
+import type { SessionResponseBody } from "../server/handlers/sessions";
+
+// ── Compile-time contract: the two types must be mutually assignable ─────────
+// If the route adds, drops, or retypes a field, one of these fails `tsc` — a
+// build error rather than a field that silently arrives as undefined.
+type Extends<A, B> = A extends B ? true : false;
+const _clientMatchesServer: Extends<RunSessionTicket, SessionResponseBody> = true;
+const _serverMatchesClient: Extends<SessionResponseBody, RunSessionTicket> = true;
+void _clientMatchesServer;
+void _serverMatchesClient;
 
 const OK_BODY = {
   ticket: "hdr.payload.sig",

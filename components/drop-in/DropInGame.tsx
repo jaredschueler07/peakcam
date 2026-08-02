@@ -15,9 +15,18 @@ import {
   requestRunSession,
   type RunSessionTicket,
 } from "@/lib/game/competition/session-client";
-// Pure, crypto-free helpers: the client must derive the same trail id and UTC
-// day the sessions route does, and duplicating either would drift.
-import { trailIdFromName, utcDateStamp } from "@/lib/game/server/courses";
+import {
+  NO_TICKET,
+  needsRemint,
+  resolveRunSeed,
+  ticketReducer,
+  usableTicket,
+  type TicketState,
+} from "@/lib/game/competition/ticket-lifecycle";
+import type { CompetitiveRunMode } from "@/lib/game/config/modes";
+// Shared with the sessions route, which must derive the same ids. Imported from
+// config/ rather than server/ so the browser bundle skips profiles + bake configs.
+import { trailIdFromName, utcDateStamp } from "@/lib/game/config/course-ids";
 import DropInErrorBoundary from "./DropInErrorBoundary";
 import DropInHUD from "./hud/DropInHUD";
 import ModeSelect, { type DropInModeChoice } from "./hud/ModeSelect";
@@ -28,16 +37,23 @@ import TouchControls from "./input/TouchControls";
 type ShellPhase = "poster" | "loading" | "playing" | "error";
 
 /**
- * Everything Task A4 needs to submit the run, resolved before the descent
- * starts. `ticket` is null for Free Ski and for a competitive run whose ticket
- * request failed — `offline` distinguishes the two, and an offline run is
- * played and recorded locally but never submitted.
+ * Everything Task A4 needs to submit the run.
+ *
+ * `ticket` is frozen when the descent starts and is the ticket whose seed the
+ * world was actually built from — submitting anything else is a `seed_mismatch`
+ * rejection. It is null for Free Ski and for competitive play that fell back to
+ * offline, so **A4's rule is simply: submit iff `ticket !== null`**.
+ *
+ * After a successful submission A4 must call `markSubmitted()`. The nonce is
+ * one-time-use, so that call is what tells the shell to re-mint before the next
+ * run instead of replaying a spent ticket into a 409.
  */
 export interface DropInRunSession {
   mode: DropInModeChoice;
   trailId: string;
   ticket: RunSessionTicket | null;
   offline: boolean;
+  markSubmitted(): void;
 }
 
 const OFFLINE_NOTICE = "Leaderboard unavailable — playing offline";
@@ -75,32 +91,120 @@ export default function DropInGame({ profile, conditions }: {
   // in on the first trail, so that is the course we ask a ticket for.
   const trailId = useMemo(() => trailIdFromName(profile.trails[0].name), [profile]);
   const [mode, setMode] = useState<DropInModeChoice>("free_ski");
-  const [ticket, setTicket] = useState<RunSessionTicket | null>(null);
-  const [pendingMode, setPendingMode] = useState<DropInModeChoice | null>(null);
+  const [ticketState, setTicketState] = useState<TicketState>(NO_TICKET);
+  /** The ticket this descent was actually seeded from; frozen at start. */
+  const [runTicket, setRunTicket] = useState<RunSessionTicket | null>(null);
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   const sessionAbortRef = useRef<AbortController | null>(null);
-  // Read from the load effect and the dialogs, outside the render that set it.
+  // Read from the load effect and the dialogs, outside the render that set them.
   const modeRef = useRef<DropInModeChoice>("free_ski");
+  const ticketStateRef = useRef<TicketState>(NO_TICKET);
+  const runTicketRef = useRef<RunSessionTicket | null>(null);
+
+  const applyTicketState = (next: TicketState) => {
+    ticketStateRef.current = next;
+    setTicketState(next);
+  };
+
+  const freezeRunTicket = (ticket: RunSessionTicket | null) => {
+    runTicketRef.current = ticket;
+    setRunTicket(ticket);
+  };
+
+  /**
+   * Ask for a ticket. Always non-blocking: play never waits on this, and a
+   * failure degrades to offline rather than stopping the run.
+   *
+   * `duringPlay` re-mints for a run already underway (restart after a
+   * submission, or an expired ticket). The world is not rebuilt by a restart,
+   * so a re-minted ticket is only usable if its seed still matches the world we
+   * are skiing — across a UTC-day rollover the Daily Line seed moves, and that
+   * run has to finish offline.
+   */
+  const mintTicket = (choice: CompetitiveRunMode, duringPlay = false) => {
+    sessionAbortRef.current?.abort();
+    const controller = new AbortController();
+    sessionAbortRef.current = controller;
+    applyTicketState({ status: "requesting" });
+
+    void requestRunSession(
+      { resortSlug: profile.slug, mode: choice, trailId },
+      { signal: controller.signal },
+    ).then((result) => {
+      if (controller.signal.aborted) return;
+      sessionAbortRef.current = null;
+
+      if (isRunSessionFailure(result)) {
+        // An abort is our own cancellation; it is not worth a notice.
+        if (result.aborted) return;
+        applyTicketState({ status: "offline" });
+        if (duringPlay) freezeRunTicket(null);
+        setSessionNotice(OFFLINE_NOTICE);
+        return;
+      }
+
+      const activeSeed = runtimeRef.current?.runSeed;
+      if (duringPlay && activeSeed !== undefined && result.seed !== activeSeed) {
+        applyTicketState({ status: "offline" });
+        freezeRunTicket(null);
+        setSessionNotice(OFFLINE_NOTICE);
+        return;
+      }
+
+      applyTicketState({ status: "ready", ticket: result });
+      setSessionNotice(null);
+      if (duringPlay) freezeRunTicket(result);
+    });
+  };
 
   const session: DropInRunSession = useMemo(
-    () => ({ mode, trailId, ticket, offline: mode !== "free_ski" && ticket === null }),
-    [mode, trailId, ticket],
+    () => ({
+      mode,
+      trailId,
+      ticket: runTicket,
+      offline: mode !== "free_ski" && runTicket === null,
+      markSubmitted: () => {
+        applyTicketState(ticketReducer(ticketStateRef.current, { type: "submitted" }));
+        // Clearing the frozen ticket makes "submit iff ticket !== null"
+        // self-limiting: a spent nonce can no longer be submitted twice.
+        freezeRunTicket(null);
+      },
+    }),
+    [mode, trailId, runTicket],
   );
 
+  /**
+   * `local` Free Ski · `pending` ticket in flight · `ticketed` submittable ·
+   * `offline` competitive but unsubmittable. An in-flight request must not read
+   * as `offline` — nothing has failed yet.
+   */
+  const sessionStateAttribute = mode === "free_ski"
+    ? "local"
+    : ticketState.status === "requesting"
+      ? "pending"
+      : session.ticket || ticketState.status === "ready"
+        ? "ticketed"
+        : "offline";
+
   const dailyCourseName = useMemo(() => {
-    const id = ticket?.mode === "score_attack" ? ticket.trailId : trailId;
+    const held = ticketState.status === "ready" ? ticketState.ticket : null;
+    const id = held?.mode === "score_attack" ? held.trailId : trailId;
     return profile.trails.find((trail) => trailIdFromName(trail.name) === id)?.name
       ?? profile.trails[0].name;
-  }, [profile, ticket, trailId]);
+  }, [profile, ticketState, trailId]);
 
   const selectMode = (choice: DropInModeChoice) => {
+    // Re-picking the mode you already hold a live ticket for would throw that
+    // ticket away and spend another of the 20-per-5-minutes rate limit.
+    const unchanged = choice === modeRef.current
+      && (choice === "free_ski" || usableTicket(ticketStateRef.current, Date.now()) !== null);
+    if (unchanged) return;
+
     sessionAbortRef.current?.abort();
     sessionAbortRef.current = null;
     setMode(choice);
     modeRef.current = choice;
-    setTicket(null);
     setSessionNotice(null);
-    setPendingMode(null);
     // Post-init only: a capture made before posthog.init() is silently dropped.
     whenPostHogReady(() =>
       trackDropIn({
@@ -108,23 +212,12 @@ export default function DropInGame({ profile, conditions }: {
         properties: { resort_slug: profile.slug, mode: choice },
       }),
     );
-    if (choice === "free_ski") return;
 
-    const controller = new AbortController();
-    sessionAbortRef.current = controller;
-    setPendingMode(choice);
-    void requestRunSession(
-      { resortSlug: profile.slug, mode: choice, trailId },
-      { signal: controller.signal },
-    ).then((result) => {
-      if (controller.signal.aborted) return;
-      sessionAbortRef.current = null;
-      setPendingMode(null);
-      if (!isRunSessionFailure(result)) { setTicket(result); return; }
-      // A dead leaderboard never costs someone their run: keep the mode,
-      // record locally, and say so.
-      if (!result.aborted) setSessionNotice(OFFLINE_NOTICE);
-    });
+    if (choice === "free_ski") {
+      applyTicketState(NO_TICKET);
+      return;
+    }
+    mintTicket(choice);
   };
 
   useEffect(() => {
@@ -162,6 +255,9 @@ export default function DropInGame({ profile, conditions }: {
         if (cancelled) return;
         const created = await createGame({
           canvas, profile, uiBridge: bridge, signal: controller.signal, conditions, audio,
+          // The ghost header carries world.seed; it must equal the ticket seed
+          // or the server rejects the submission with seed_mismatch.
+          seed: resolveRunSeed(runTicketRef.current, profile.seed),
           analytics: {
             controlActivated: (scheme) => track(EVENTS.DROP_IN_CONTROL_ACTIVATED, { resort: profile.slug, engine: "v2", control_scheme: scheme }),
             pointerLock: (status, errorName) => track(EVENTS.DROP_IN_POINTER_LOCK_RESULT, { resort: profile.slug, engine: "v2", pointer_lock_state: status, failure_code: errorName }),
@@ -199,6 +295,15 @@ export default function DropInGame({ profile, conditions }: {
 
   const start = () => {
     if (teardownRef.current) return;
+    // Freeze the ticket now: the world is about to be built from its seed, and
+    // one that arrives later cannot retroactively describe this run. A request
+    // still in flight (or an expired ticket) therefore starts offline rather
+    // than making the player wait — the run is recorded, just not submitted.
+    const frozen = modeRef.current === "free_ski"
+      ? null
+      : usableTicket(ticketStateRef.current, Date.now());
+    freezeRunTicket(frozen);
+    if (modeRef.current !== "free_ski" && !frozen) setSessionNotice(OFFLINE_NOTICE);
     const controller = new AbortController();
     const enabled = localStorage.getItem(AUDIO_STORAGE_KEY) !== "off";
     const audio = new RuntimeAudio();
@@ -214,7 +319,19 @@ export default function DropInGame({ profile, conditions }: {
 
   /** Arm first, then reset: the runtime begins recording at the reset itself. */
   const restartRun = (active: GameRuntime) => {
-    if (modeRef.current !== "free_ski") active.beginCompetitiveRecording();
+    const choice = modeRef.current;
+    if (choice !== "free_ski") {
+      // Only a spent or expired ticket is re-minted. A run that was never
+      // submitted keeps its ticket, so restart-heavy play does not farm the
+      // sessions rate limit. The re-mint is in flight while the run proceeds.
+      if (needsRemint(ticketStateRef.current, Date.now())) {
+        freezeRunTicket(null);
+        mintTicket(choice, true);
+      } else {
+        freezeRunTicket(usableTicket(ticketStateRef.current, Date.now()));
+      }
+      active.beginCompetitiveRecording();
+    }
     active.restart();
   };
 
@@ -254,7 +371,7 @@ export default function DropInGame({ profile, conditions }: {
         className="fixed inset-0 overflow-hidden bg-ink"
         data-drop-in-state={phase === "playing" ? "running" : phase}
         data-drop-in-mode={session.mode}
-        data-drop-in-session={session.ticket ? "ticketed" : session.offline ? "offline" : "local"}
+        data-drop-in-session={sessionStateAttribute}
       >
         <Link href={`/resorts/${profile.slug}`} className="absolute left-3 top-3 z-40 inline-flex items-center gap-2 rounded-full border-[1.5px] border-ink bg-cream-50 px-3.5 py-2 text-xs font-bold uppercase text-ink shadow-stamp-sm">
           <ArrowLeft className="h-4 w-4" aria-hidden /> Conditions
@@ -282,7 +399,7 @@ export default function DropInGame({ profile, conditions }: {
                 onSelect={selectMode}
                 dailyCourseName={dailyCourseName}
                 dailyDateStamp={utcDateStamp(Date.now())}
-                pending={pendingMode}
+                pending={ticketState.status === "requesting" ? session.mode : null}
                 notice={sessionNotice}
               />
               <button autoFocus onClick={start} className="mt-7 rounded-full border-[1.5px] border-ink bg-alpen px-8 py-3 font-bold uppercase tracking-wide text-cream-50 shadow-stamp transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink">

@@ -110,9 +110,11 @@ export class GameRuntime {
     private readonly conditions: ConditionsSnapshot,
     private readonly audio: RuntimeAudio,
     readonly assetLoadMs = 0,
+    /** Ticket seed for a competitive run; the profile seed otherwise. */
+    readonly runSeed: number = profile.seed,
   ) {
-    this.world = createWorld(profile, profile.seed, terrain, simulationConfig(conditions.surface));
-    this.state = createSimulation(profile, profile.seed, terrain);
+    this.world = createWorld(profile, runSeed, terrain, simulationConfig(conditions.surface));
+    this.state = createSimulation(profile, runSeed, terrain);
     ui.configureTerrain(terrain);
     this.input = new InputManager((scheme) => {
       if (!this.activated) { this.activated = true; analytics.controlActivated(scheme); }

@@ -88,7 +88,12 @@ export default function ModeSelect({
                 </span>
               )}
               {pending === card.mode && (
-                <span className="mt-2 block font-mono text-[10px] uppercase tracking-[0.12em]">
+                <span
+                  role="status"
+                  aria-live="polite"
+                  data-testid="drop-in-session-pending"
+                  className="mt-2 block font-mono text-[10px] uppercase tracking-[0.12em]"
+                >
                   Reserving run…
                 </span>
               )}

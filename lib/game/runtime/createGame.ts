@@ -22,6 +22,14 @@ export interface CreateGameOptions {
   conditions: ConditionsSnapshot;
   audio: RuntimeAudio;
   signal?: AbortSignal;
+  /**
+   * World seed for this run. Competitive runs MUST pass the seed from their
+   * server-issued ticket: the ghost header carries `world.seed`, and the
+   * validator rejects any run whose seed differs from the ticket's
+   * (`validate-run.ts` → `seed_mismatch`). Free Ski and offline runs omit it
+   * and get the profile seed.
+   */
+  seed?: number;
 }
 
 export async function loadTerrainForRuntime(
@@ -55,7 +63,7 @@ export async function createGame(options: CreateGameOptions): Promise<GameRuntim
   const assetLoadMs = performance.now() - startedAt;
   const runtime = new GameRuntime(
     options.canvas, options.profile, options.uiBridge, options.analytics, source.sampler,
-    options.conditions, options.audio, assetLoadMs,
+    options.conditions, options.audio, assetLoadMs, options.seed,
   );
   runtime.start();
   return runtime;

@@ -28,6 +28,67 @@ test("v2 renders a keyboard start control without an iframe", async ({ page }) =
   await expect(page.locator("iframe")).toHaveCount(0);
 });
 
+test("the start poster offers the three run modes, defaulting to Free Ski", async ({ page }) => {
+  await page.goto(V2_URL);
+  const modes = page.getByTestId("drop-in-mode-select");
+  await expect(modes).toBeVisible();
+  await expect(modes.getByRole("radio", { name: /free ski/i })).toHaveAttribute("aria-checked", "true");
+  await expect(modes.getByRole("radio", { name: /time trial/i })).toHaveAttribute("aria-checked", "false");
+  await expect(modes.getByRole("radio", { name: /daily line/i })).toHaveAttribute("aria-checked", "false");
+  // The Daily Line card names the course it rotates to today.
+  await expect(page.getByTestId("daily-line-course")).toContainText(/\d{4}-\d{2}-\d{2}/);
+});
+
+test("Free Ski starts a run without ever calling the sessions API", async ({ page }) => {
+  let sessionCalls = 0;
+  await page.route("**/api/drop-in/sessions", (route) => { sessionCalls += 1; return route.abort(); });
+  await page.goto(V2_URL);
+  await page.getByRole("radio", { name: /free ski/i }).click();
+  await page.getByRole("button", { name: /start descent/i }).click();
+  await expect(page.locator("[data-drop-in-state='running']")).toBeVisible();
+  await expect(page.locator("[data-drop-in-session='local']")).toHaveCount(1);
+  expect(sessionCalls).toBe(0);
+});
+
+test("a ticketed competitive run starts and reports itself submittable", async ({ page }) => {
+  await page.route("**/api/drop-in/sessions", async (route) => {
+    const body = JSON.parse(route.request().postData() ?? "{}");
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ticket: "hdr.payload.sig",
+        seed: 987654321,
+        resortSlug: body.resortSlug,
+        mode: body.mode,
+        trailId: body.trailId,
+        physicsVersion: 1,
+        courseVersion: 1,
+        tickHz: 10,
+        expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+      }),
+    });
+  });
+  await page.goto(V2_URL);
+  await page.getByRole("radio", { name: /daily line/i }).click();
+  await expect(page.locator("[data-drop-in-session='ticketed']")).toHaveCount(1);
+  await page.getByRole("button", { name: /start descent/i }).click();
+  await expect(page.locator("[data-drop-in-state='running']")).toBeVisible();
+  await expect(page.locator("[data-drop-in-session='ticketed'][data-drop-in-mode='score_attack']")).toHaveCount(1);
+  await expect(page.getByTestId("drop-in-session-notice")).toHaveCount(0);
+});
+
+test("a failed session request degrades to offline play instead of blocking the run", async ({ page }) => {
+  await page.route("**/api/drop-in/sessions", (route) =>
+    route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "nope" }) }));
+  await page.goto(V2_URL);
+  await page.getByRole("radio", { name: /time trial/i }).click();
+  await expect(page.getByTestId("drop-in-session-notice")).toContainText(/playing offline/i);
+  await page.getByRole("button", { name: /start descent/i }).click();
+  await expect(page.locator("[data-drop-in-state='running']")).toBeVisible();
+  await expect(page.locator("[data-drop-in-session='offline'][data-drop-in-mode='time_trial']")).toHaveCount(1);
+});
+
 test("the HUD audio toggle reflects and changes its pressed state", async ({ page }) => {
   await page.goto(V2_URL);
   await page.getByRole("button", { name: /start descent/i }).click();
