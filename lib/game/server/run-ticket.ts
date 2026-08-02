@@ -27,6 +27,7 @@
  */
 
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import type { PhysicsModel, SurfaceKind } from "../core/config";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -42,6 +43,8 @@ export interface RunTicketClaims {
   mode: "time_trial" | "score_attack";
   trailId: string;
   seed: number;
+  surface: SurfaceKind;
+  physicsModel: PhysicsModel;
   physicsVersion: number;
   courseVersion: number;
   /** Supabase `auth.users.id` when the run was started signed-in. */
@@ -230,6 +233,8 @@ function isTicketPayload(value: unknown): value is RunTicketPayload {
     (p.mode === "time_trial" || p.mode === "score_attack") &&
     typeof p.trailId === "string" &&
     Number.isFinite(p.seed) &&
+    (p.surface === "powder" || p.surface === "packed" || p.surface === "firm" || p.surface === "ice") &&
+    (p.physicsModel === "v1" || p.physicsModel === "v2") &&
     Number.isFinite(p.physicsVersion) &&
     Number.isFinite(p.courseVersion) &&
     Number.isFinite(p.iat) &&

@@ -18,6 +18,7 @@
 import { z } from "zod";
 
 import { COURSE_VERSION, PHYSICS_VERSION } from "../../config/versions";
+import type { PhysicsModel, SurfaceKind } from "../../core/config";
 import { GHOST_SAMPLE_HZ } from "../../replay/recorder";
 import { competitiveRunModeSchema } from "../run-schema";
 import { courseSeed, resolveCourse, utcDateStamp } from "../courses";
@@ -38,6 +39,8 @@ export const sessionRequestSchema = z
     resortSlug: z.string().min(1).max(64),
     mode: competitiveRunModeSchema,
     trailId: z.string().min(1).max(64),
+    surface: z.enum(["powder", "packed", "firm", "ice"]).default("packed"),
+    physicsModel: z.enum(["v1", "v2"]).default("v1"),
   })
   .strict();
 
@@ -56,6 +59,8 @@ export interface SessionResponseBody {
   resortSlug: string;
   mode: "time_trial" | "score_attack";
   trailId: string;
+  surface: SurfaceKind;
+  physicsModel: PhysicsModel;
   physicsVersion: number;
   courseVersion: number;
   tickHz: number;
@@ -97,7 +102,7 @@ export async function handleCreateSession(
     });
   }
 
-  const { resortSlug, mode, trailId } = parsed.data;
+  const { resortSlug, mode, trailId, surface, physicsModel } = parsed.data;
   const course = resolveCourse(resortSlug, trailId);
   if (!course) {
     return jsonError(404, "Unknown resort or trail");
@@ -122,6 +127,8 @@ export async function handleCreateSession(
       mode,
       trailId,
       seed,
+      surface,
+      physicsModel,
       physicsVersion: PHYSICS_VERSION,
       courseVersion: COURSE_VERSION,
       userId,
@@ -135,6 +142,8 @@ export async function handleCreateSession(
     resortSlug,
     mode,
     trailId,
+    surface,
+    physicsModel,
     physicsVersion: PHYSICS_VERSION,
     courseVersion: COURSE_VERSION,
     tickHz: GHOST_TICK_HZ,

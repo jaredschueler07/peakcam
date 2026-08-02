@@ -217,8 +217,12 @@ export const MAX_SAMPLE_GAP_MULTIPLE = 4;
  */
 export const MIN_AVG_GAP_RATIO = 1;
 
-/** Packed-surface config used when the resim flag is on (hoisted once). */
-const PACKED_SIM_CONFIG = simulationConfig("packed");
+/** Rebuild the signed model selection server-side; never infer it from the client ghost. */
+export function simulationConfigForTicket(
+  ticket: Pick<RunTicketPayload, "surface" | "physicsModel">,
+): SimulationConfig {
+  return simulationConfig(ticket.surface, ticket.physicsModel);
+}
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -570,7 +574,7 @@ export function validateRun(input: RunValidationInput): RunValidationResult {
 
   // ── Optional re-simulation gate (A5) ──
   if (process.env[DROP_IN_RESIM_ENV] === "1") {
-    const verdict = resimulateGhost(ghost, course, PACKED_SIM_CONFIG);
+    const verdict = resimulateGhost(ghost, course, simulationConfigForTicket(ticket));
     if (!verdict.accepted) {
       return fail(verdict.code, verdict.detail);
     }

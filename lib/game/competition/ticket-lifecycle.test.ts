@@ -28,6 +28,8 @@ function ticketAt(expiresAtMs: number, seed = 4242): RunSessionTicket {
     resortSlug: "ski-portillo",
     mode: "time_trial",
     trailId: "roca-jack",
+    surface: "packed",
+    physicsModel: "v1",
     physicsVersion: 1,
     courseVersion: 1,
     tickHz: 10,
@@ -100,31 +102,42 @@ test("clearing returns to the no-ticket state, which never needs a re-mint", () 
 
 // ── ticketForWorld: a ticket is only usable for the world actually running ──
 
-test("a ticket whose seed matches the running world can be frozen onto the run", () => {
+test("a ticket whose seed and physics model match the running world can be frozen onto the run", () => {
   const state = ready();
-  assert.equal(ticketForWorld(state, fresh.seed, NOW), fresh);
+  assert.equal(ticketForWorld(state, fresh.seed, { surface: "packed", physicsModel: "v1" }, NOW), fresh);
 });
 
 test("a re-minted ticket from a UTC-day rollover is refused rather than submitted", () => {
   // The Daily Line seed rotates at midnight UTC, but a restart does not rebuild
   // the world — so the new ticket describes a course this run is not skiing.
   const rolled = ticketReducer(NO_TICKET, { type: "received", ticket: ticketAt(NOW + 60_000, 111) });
-  assert.equal(ticketForWorld(rolled, 222, NOW), null);
+  assert.equal(ticketForWorld(rolled, 222, { surface: "packed", physicsModel: "v1" }, NOW), null);
   assert.equal(usableTicket(rolled, NOW)?.seed, 111, "the ticket itself is still valid, just not for this world");
 });
 
 test("ticketForWorld fails closed when the running world's seed is unknown", () => {
   const state = ready();
-  assert.equal(ticketForWorld(state, null, NOW), null);
-  assert.equal(ticketForWorld(state, undefined, NOW), null);
+  assert.equal(ticketForWorld(state, null, { surface: "packed", physicsModel: "v1" }, NOW), null);
+  assert.equal(ticketForWorld(state, undefined, { surface: "packed", physicsModel: "v1" }, NOW), null);
+});
+
+test("a v2 world is unsubmittable unless its ticket declares physicsModel v2", () => {
+  assert.equal(ticketForWorld(ready(), fresh.seed, { surface: "packed", physicsModel: "v2" }, NOW), null);
+  const v2 = { ...fresh, physicsModel: "v2" as const };
+  const state = ticketReducer(NO_TICKET, { type: "received", ticket: v2 });
+  assert.equal(ticketForWorld(state, fresh.seed, { surface: "packed", physicsModel: "v2" }, NOW), v2);
+});
+
+test("a ticket for a different snow surface is not usable for the running world", () => {
+  assert.equal(ticketForWorld(ready(), fresh.seed, { surface: "ice", physicsModel: "v1" }, NOW), null);
 });
 
 test("ticketForWorld still honours spend and expiry", () => {
   const spent = ticketReducer(ready(), { type: "submitted" });
-  assert.equal(ticketForWorld(spent, fresh.seed, NOW), null);
+  assert.equal(ticketForWorld(spent, fresh.seed, { surface: "packed", physicsModel: "v1" }, NOW), null);
 
   const expired = ticketReducer(NO_TICKET, { type: "received", ticket: ticketAt(NOW - 1, fresh.seed) });
-  assert.equal(ticketForWorld(expired, fresh.seed, NOW), null);
+  assert.equal(ticketForWorld(expired, fresh.seed, { surface: "packed", physicsModel: "v1" }, NOW), null);
 });
 
 // ── C1: the ticket seed must reach the simulated world ──────────────────────

@@ -28,6 +28,8 @@ const OK_BODY = {
   resortSlug: "ski-portillo",
   mode: "time_trial",
   trailId: "roca-jack",
+  surface: "ice",
+  physicsModel: "v2",
   physicsVersion: 1,
   courseVersion: 1,
   tickHz: 10,
@@ -45,7 +47,7 @@ function ticketOf(result: RunSessionResult) {
 
 test("a 201 response is parsed into a ticket", async () => {
   const result = await requestRunSession(
-    { resortSlug: "ski-portillo", mode: "time_trial", trailId: "roca-jack" },
+    { resortSlug: "ski-portillo", mode: "time_trial", trailId: "roca-jack", surface: "ice", physicsModel: "v2" },
     { fetchImpl: jsonFetch(OK_BODY) },
   );
   assert.deepEqual(ticketOf(result), OK_BODY);
@@ -59,7 +61,7 @@ test("the request posts JSON to the sessions endpoint with no-store", async () =
   }) as unknown as typeof fetch;
 
   await requestRunSession(
-    { resortSlug: "breckenridge", mode: "score_attack", trailId: "peak-8" },
+    { resortSlug: "breckenridge", mode: "score_attack", trailId: "peak-8", surface: "ice", physicsModel: "v2" },
     { fetchImpl: spy },
   );
 
@@ -73,12 +75,14 @@ test("the request posts JSON to the sessions endpoint with no-store", async () =
     resortSlug: "breckenridge",
     mode: "score_attack",
     trailId: "peak-8",
+    surface: "ice",
+    physicsModel: "v2",
   });
 });
 
 test("a server error body surfaces its message, not an exception", async () => {
   const result = await requestRunSession(
-    { resortSlug: "ski-portillo", mode: "time_trial", trailId: "nope" },
+    { resortSlug: "ski-portillo", mode: "time_trial", trailId: "nope", surface: "packed", physicsModel: "v1" },
     { fetchImpl: jsonFetch({ error: "Unknown resort or trail" }, 404) },
   );
   assert.ok(isRunSessionFailure(result));
@@ -89,7 +93,7 @@ test("a server error body surfaces its message, not an exception", async () => {
 test("an error status with an unreadable body still fails cleanly", async () => {
   const broken = (async () => new Response("<html>502</html>", { status: 502 })) as unknown as typeof fetch;
   const result = await requestRunSession(
-    { resortSlug: "ski-portillo", mode: "time_trial", trailId: "roca-jack" },
+    { resortSlug: "ski-portillo", mode: "time_trial", trailId: "roca-jack", surface: "packed", physicsModel: "v1" },
     { fetchImpl: broken },
   );
   assert.ok(isRunSessionFailure(result));
@@ -98,7 +102,7 @@ test("an error status with an unreadable body still fails cleanly", async () => 
 
 test("a 2xx body that does not match the ticket schema is a failure, not a bad ticket", async () => {
   const result = await requestRunSession(
-    { resortSlug: "ski-portillo", mode: "time_trial", trailId: "roca-jack" },
+    { resortSlug: "ski-portillo", mode: "time_trial", trailId: "roca-jack", surface: "packed", physicsModel: "v1" },
     { fetchImpl: jsonFetch({ ...OK_BODY, seed: "not-a-number" }) },
   );
   assert.ok(isRunSessionFailure(result));
@@ -107,7 +111,7 @@ test("a 2xx body that does not match the ticket schema is a failure, not a bad t
 
 test("a mode outside the competitive enum is rejected by the client parser", async () => {
   const result = await requestRunSession(
-    { resortSlug: "ski-portillo", mode: "time_trial", trailId: "roca-jack" },
+    { resortSlug: "ski-portillo", mode: "time_trial", trailId: "roca-jack", surface: "packed", physicsModel: "v1" },
     { fetchImpl: jsonFetch({ ...OK_BODY, mode: "free_ski" }) },
   );
   assert.ok(isRunSessionFailure(result));
@@ -118,7 +122,7 @@ test("a network rejection is reported as offline, never thrown", async () => {
     throw new TypeError("Failed to fetch");
   }) as unknown as typeof fetch;
   const result = await requestRunSession(
-    { resortSlug: "heavenly", mode: "time_trial", trailId: "gunbarrel" },
+    { resortSlug: "heavenly", mode: "time_trial", trailId: "gunbarrel", surface: "packed", physicsModel: "v1" },
     { fetchImpl: offline },
   );
   assert.ok(isRunSessionFailure(result));
@@ -133,7 +137,7 @@ test("an aborted request resolves to a flagged failure the caller can ignore", a
     })) as unknown as typeof fetch;
 
   const pending = requestRunSession(
-    { resortSlug: "heavenly", mode: "time_trial", trailId: "gunbarrel" },
+    { resortSlug: "heavenly", mode: "time_trial", trailId: "gunbarrel", surface: "packed", physicsModel: "v1" },
     { fetchImpl: hang, signal: controller.signal },
   );
   controller.abort();
@@ -151,7 +155,7 @@ test("a signal already aborted short-circuits without calling fetch", async () =
   }) as unknown as typeof fetch;
 
   const result = await requestRunSession(
-    { resortSlug: "heavenly", mode: "time_trial", trailId: "gunbarrel" },
+    { resortSlug: "heavenly", mode: "time_trial", trailId: "gunbarrel", surface: "packed", physicsModel: "v1" },
     { fetchImpl: spy, signal: AbortSignal.abort() },
   );
   assert.equal(calls, 0);

@@ -112,6 +112,27 @@ test("Free Ski starts a run without ever calling the sessions API", async ({ pag
   expect(sessionCalls).toBe(0);
 });
 
+test("phys=v2 boots, advances the HUD, and stays out of a crash loop", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  await page.goto(dropInUrl(`${V2_URL}&phys=v2`));
+  await page.getByRole("button", { name: /start descent/i }).click();
+
+  const shell = page.locator("[data-drop-in-state='running'][data-drop-in-physics='v2']");
+  await expect(shell).toBeVisible();
+  await page.keyboard.down("ArrowUp");
+  await expect.poll(async () => {
+    const value = await page.getByTestId("drop-in-speedometer").locator("span").first().textContent();
+    return Number(value);
+  }).toBeGreaterThan(0);
+  await page.keyboard.up("ArrowUp");
+
+  await page.waitForTimeout(750);
+  await expect(shell).toBeVisible();
+  expect(pageErrors).toEqual([]);
+});
+
 test("a ticketed competitive run starts and reports itself submittable", async ({ page }) => {
   await page.route("**/api/drop-in/sessions", async (route) => {
     const body = JSON.parse(route.request().postData() ?? "{}");
@@ -124,6 +145,8 @@ test("a ticketed competitive run starts and reports itself submittable", async (
         resortSlug: body.resortSlug,
         mode: body.mode,
         trailId: body.trailId,
+        surface: body.surface,
+        physicsModel: body.physicsModel,
         physicsVersion: 1,
         courseVersion: 1,
         tickHz: 10,
@@ -167,6 +190,8 @@ test("a run started before its ticket arrives stays offline, and never claims to
         resortSlug: "heavenly",
         mode: "time_trial",
         trailId: "gunbarrel",
+        surface: "packed",
+        physicsModel: "v1",
         physicsVersion: 1,
         courseVersion: 1,
         tickHz: 10,
@@ -235,6 +260,8 @@ test("[gate] play → submit → board: a finished run posts and appears on the 
         resortSlug: "ski-portillo",
         mode: "time_trial",
         trailId: "roca-jack",
+        surface: "packed",
+        physicsModel: "v1",
         physicsVersion: 1,
         courseVersion: 1,
         tickHz: 10,

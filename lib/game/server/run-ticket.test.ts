@@ -23,6 +23,8 @@ const CLAIMS: RunTicketClaims = {
   mode: "time_trial",
   trailId: "roca-jack",
   seed: 1337,
+  surface: "ice",
+  physicsModel: "v2",
   physicsVersion: 3,
   courseVersion: 20260801,
 };

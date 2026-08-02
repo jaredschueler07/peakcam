@@ -23,6 +23,7 @@
  */
 
 import type { RunSessionTicket } from "./session-client";
+import type { SimulationConfig } from "../core/config";
 
 export type TicketState =
   | { status: "none" }
@@ -86,8 +87,8 @@ export function needsRemint(state: TicketState, nowMs: number): boolean {
  * The ticket that may be attached to the run **currently being skied**, or
  * `null`.
  *
- * Stricter than {@link usableTicket} by one rule: the ticket's seed must equal
- * the seed the running world was built from. A restart resets the simulation
+ * Stricter than {@link usableTicket}: the ticket's seed, snow surface, and
+ * physics model must equal the running world's config. A restart resets the simulation
  * but does not rebuild the world, so a ticket minted afterwards can describe a
  * different course — the Daily Line seed rotates at midnight UTC, and a session
  * spanning that boundary would otherwise submit a run against a course it never
@@ -99,11 +100,17 @@ export function needsRemint(state: TicketState, nowMs: number): boolean {
 export function ticketForWorld(
   state: TicketState,
   runSeed: number | null | undefined,
+  config: Pick<SimulationConfig, "surface" | "physicsModel">,
   nowMs: number,
 ): RunSessionTicket | null {
   if (runSeed === null || runSeed === undefined) return null;
   const ticket = usableTicket(state, nowMs);
-  return ticket && ticket.seed === runSeed ? ticket : null;
+  return ticket &&
+    ticket.seed === runSeed &&
+    ticket.surface === config.surface &&
+    ticket.physicsModel === config.physicsModel
+    ? ticket
+    : null;
 }
 
 /**
