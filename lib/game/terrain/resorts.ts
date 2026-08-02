@@ -11,6 +11,8 @@
  *   - Overpass bboxes and elevation bands: report §2
  */
 
+import type { DemSource } from "../../../scripts/dem/sources";
+
 export interface ResortBakeConfig {
   slug: string;
   name: string;
@@ -28,6 +30,8 @@ export interface ResortBakeConfig {
    * exceed this — validation only checks for plausible overlap.
    */
   elevationBand: [number, number];
+  /** Explicit DEM selected by the visual design; never inferred from location. */
+  demSource: DemSource;
   /** Copernicus GLO-30 1°×1° tile id, when the COG path is supported here. */
   copernicusTile?: string;
 }
@@ -51,6 +55,7 @@ export const RESORT_BAKE_CONFIGS: Record<string, ResortBakeConfig> = {
     bbox: [-32.9, -70.22, -32.76, -70.04],
     convention: "europe",
     elevationBand: [2577, 3349],
+    demSource: { kind: "copernicus", tile: "S33_00_W071_00" },
     copernicusTile: "S33_00_W071_00",
   },
   breckenridge: {
@@ -61,6 +66,7 @@ export const RESORT_BAKE_CONFIGS: Record<string, ResortBakeConfig> = {
     bbox: [39.42, -106.15, 39.53, -106.01],
     convention: "north_america",
     elevationBand: [2917, 3910],
+    demSource: { kind: "3dep", project: "CO_Central_and_WesternCO_2016_A16" },
   },
   heavenly: {
     slug: "heavenly",
@@ -70,6 +76,7 @@ export const RESORT_BAKE_CONFIGS: Record<string, ResortBakeConfig> = {
     bbox: [38.89, -120.02, 38.97, -119.88],
     convention: "north_america",
     elevationBand: [2025, 3052],
+    demSource: { kind: "3dep", project: "CA_SierraNevada_B22" },
   },
 };
 

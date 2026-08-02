@@ -146,6 +146,9 @@ interface TerrariumTiles {
  * (terrain-report gotcha #4 — clamping at x=255 leaves a ridge every 256 px).
  */
 async function prefetchTerrariumTiles(cfg: ResortBakeConfig, z: number): Promise<TerrariumTiles> {
+  console.warn(
+    "  ! Terrarium fallback selected: its mixed-source dataset attaches CC-BY attribution obligations to this bake",
+  );
   const [cLat, cLon] = cfg.center;
   const half = cfg.sizeM / 2;
   const latN = cLat + half / M_PER_DEG_LAT;
