@@ -706,7 +706,10 @@ app.get('/api/claude/discover', (req, res) => {
 // ── Permission Approval System ────────────────────────────────────────────────
 //
 // Surfaces Claude Code permission prompts in the dashboard UI so they can be
-// approved or denied remotely (e.g. from a phone browser).
+// approved or denied remotely (e.g. from a phone browser). Note that the server
+// binds 127.0.0.1 only (see the listen call at the bottom of this file), so
+// "remotely" now means over an SSH tunnel — `ssh -L 3333:127.0.0.1:3333 <host>`
+// — not by pointing a phone at the Mac's LAN address.
 //
 // Detection:   Scans captured stdout/stderr of dashboard-managed sessions for
 //              permission prompt patterns. External sessions (started outside

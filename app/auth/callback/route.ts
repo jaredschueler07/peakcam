@@ -16,7 +16,12 @@ export async function GET(request: NextRequest) {
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      return NextResponse.redirect(new URL(next, origin));
+      // safeNext() already guarantees a same-origin relative path; re-check the
+      // resolved target here so the invariant is enforced at the sink that
+      // depends on it, not six lines away. The URL parser strips characters
+      // (tab/LF/CR) that a purely lexical check can miss.
+      const target = new URL(next, origin);
+      return NextResponse.redirect(target.origin === origin ? target : new URL("/", origin));
     }
   }
 
