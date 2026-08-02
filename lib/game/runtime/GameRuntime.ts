@@ -12,7 +12,7 @@ import { PointerDragAdapter } from "../input/PointerDragAdapter";
 import { PointerLockAdapter } from "../input/PointerLockAdapter";
 import { TouchAdapter } from "../input/TouchAdapter";
 import type { ControlScheme, InputAdapter } from "../input/types";
-import { GameRenderer, type RenderPerformanceSummary } from "../rendering/Renderer";
+import { GameRenderer, type RendererBackend, type RenderPerformanceSummary } from "../rendering/Renderer";
 import { createWorld } from "../terrain/obstacles";
 import { UiBridge } from "./UiBridge";
 import type { ConditionsSnapshot } from "../conditions";
@@ -115,6 +115,8 @@ export class GameRuntime {
     readonly runSeed: number = profile.seed,
     /** Test-only start offset along the course; see `spawnOnRunAtArcLength`. */
     spawnArcM?: number,
+    /** Prepared async renderer backend; omitted only by legacy direct-construction tests. */
+    backend?: RendererBackend,
   ) {
     this.world = createWorld(profile, runSeed, terrain, simulationConfig(conditions.surface));
     this.state = createSimulation(profile, runSeed, terrain);
@@ -128,7 +130,7 @@ export class GameRuntime {
       if (!this.activated) { this.activated = true; analytics.controlActivated(scheme); }
     });
     const sceneStartedAt = performance.now();
-    this.renderer = new GameRenderer(canvas, profile, this.world, this.state);
+    this.renderer = new GameRenderer(canvas, profile, this.world, this.state, { backend });
     this.renderer.setWeather(conditions.weatherDefault);
     this.sceneBuildMs = performance.now() - sceneStartedAt;
     this.keyboard = new KeyboardAdapter(this.input);
