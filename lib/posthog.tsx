@@ -4,6 +4,7 @@ import posthog from "posthog-js";
 import { PostHogProvider as PHProvider } from "posthog-js/react";
 import { useEffect, Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import { redactSensitiveUrl, sanitizeAnalyticsProperties } from "./posthog-sanitize";
 
 const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com";
@@ -15,7 +16,12 @@ function PageViewTracker() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    posthog.capture("$pageview", { $current_url: window.location.href });
+    // Redacted here as well as in sanitize_properties: this is the one call
+    // site that hands PostHog a URL explicitly, so it should not depend on the
+    // init hook still being wired up.
+    posthog.capture("$pageview", {
+      $current_url: redactSensitiveUrl(window.location.href),
+    });
   }, [pathname, searchParams]);
 
   return null;
@@ -37,6 +43,10 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       capture_pageview: false, // handled manually via PageViewTracker
       capture_pageleave: true,
       persistence: "localStorage+cookie",
+      // Strips alert manage_tokens and Supabase auth codes out of every
+      // captured property, including the URL properties PostHog attaches
+      // automatically (autocapture, pageleave, session replay).
+      sanitize_properties: sanitizeAnalyticsProperties,
     });
   }, []);
 
