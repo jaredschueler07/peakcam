@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sendWelcomeEmail } from "@/lib/email";
+import { EmailSendError, sendWelcomeEmail } from "@/lib/email";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -85,7 +85,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Failed to save preferences" }, { status: 500 });
   }
 
-  // Send welcome email (non-blocking — don't fail the request if email fails)
+  // Send welcome email. The subscription is already saved, so a mail failure
+  // must not 500 the request — but it must be recorded, not swallowed.
+  let welcomeEmail: "sent" | "failed" = "sent";
   try {
     await sendWelcomeEmail({
       email: subscriber.email,
@@ -93,8 +95,19 @@ export async function POST(request: NextRequest) {
       resortNames: validResorts.map((r) => r.name),
     });
   } catch (err) {
-    console.error("[alerts/subscribe] welcome email failed:", err);
+    welcomeEmail = "failed";
+    const detail =
+      err instanceof EmailSendError
+        ? `${err.kind}${err.resendErrorName ? `:${err.resendErrorName}` : ""} — ${err.message}`
+        : String(err);
+    console.error(
+      `[alerts/subscribe] welcome email to ${subscriber.email} FAILED — ${detail}`
+    );
   }
 
-  return NextResponse.json({ ok: true, resort_count: validResorts.length });
+  return NextResponse.json({
+    ok: true,
+    resort_count: validResorts.length,
+    welcome_email: welcomeEmail,
+  });
 }

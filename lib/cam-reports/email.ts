@@ -9,12 +9,11 @@
 //   unaffected; this is just to stop us from burning Resend quota during a
 //   bot flood on a warm serverless instance.
 
-import { Resend } from "resend";
+import { checkResendApiKey, sendEmail, type EmailClient } from "@/lib/email";
 import type { CamReportReason } from "@/lib/types";
 
 const SUPABASE_PROJECT = "owsxnogvufankayfwczl";
 const FALLBACK_ADMIN_EMAIL = "jaredschuelerspotify@gmail.com";
-const FROM = "PeakCam Alerts <alerts@peakcam.io>";
 const MAX_REPORTS_PER_10M = 20;
 const PAUSE_MS = 60 * 60 * 1000;     // 60 min
 const WINDOW_MS = 10 * 60 * 1000;    // 10 min
@@ -23,12 +22,6 @@ const WINDOW_MS = 10 * 60 * 1000;    // 10 min
 // on the same warm Lambda instance. Resets on cold start, which is fine.
 const recentSendTimestamps: number[] = [];
 let emailPausedUntil = 0;
-
-function getResend(): Resend | null {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) return null;
-  return new Resend(key);
-}
 
 function recipient(): string {
   return (
@@ -113,29 +106,35 @@ function volumeGuardPermits(now: number): boolean {
   return true;
 }
 
-export async function sendCamReportEmail(input: CamReportEmailInput): Promise<void> {
+/**
+ * Fire-and-forget by design: a failed admin notification must never fail the
+ * user's cam report (already persisted). Failures are logged under
+ * `[cam-reports]`, never thrown.
+ */
+export async function sendCamReportEmail(
+  input: CamReportEmailInput,
+  client?: EmailClient,
+): Promise<void> {
   const now = Date.now();
   if (!volumeGuardPermits(now)) return;
 
-  const client = getResend();
   if (!client) {
-    console.warn("[cam-reports] RESEND_API_KEY not set; skipping email");
-    return;
+    const key = checkResendApiKey(process.env.RESEND_API_KEY);
+    if (!key.ok) {
+      console.warn(`[cam-reports] not sending: ${key.message}`);
+      return;
+    }
   }
 
   recentSendTimestamps.push(now);
 
-  const subject = buildSubject(input);
-  const text = buildBody(input);
-
-  try {
-    await client.emails.send({
-      from: FROM,
+  await sendEmail(
+    {
+      emailType: "cam_report",
       to: recipient(),
-      subject,
-      text,
-    });
-  } catch (err) {
-    console.error("[cam-reports] Resend send failed:", err);
-  }
+      logPrefix: "cam-reports",
+      payload: { subject: buildSubject(input), text: buildBody(input) },
+    },
+    client,
+  );
 }

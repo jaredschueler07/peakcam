@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sendPowderAlertEmail } from "@/lib/email";
+import { EmailSendError, sendPowderAlertEmail } from "@/lib/email";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -59,7 +59,13 @@ async function handleTrigger(request: NextRequest) {
   const prefs: AlertPreference[] = await prefsResp.json();
 
   if (prefs.length === 0) {
-    return NextResponse.json({ ok: true, sent: 0, message: "No active subscriptions" });
+    return NextResponse.json({
+      ok: true,
+      attempted: 0,
+      sent: 0,
+      failed: 0,
+      message: "No active subscriptions",
+    });
   }
 
   // 2. Load latest snow reports for all relevant resort IDs
@@ -110,12 +116,22 @@ async function handleTrigger(request: NextRequest) {
   }
 
   if (bySubscriber.size === 0) {
-    return NextResponse.json({ ok: true, sent: 0, message: "No thresholds exceeded" });
+    return NextResponse.json({
+      ok: true,
+      attempted: 0,
+      sent: 0,
+      failed: 0,
+      message: "No thresholds exceeded",
+    });
   }
 
   // 4. Send emails and log
+  const attempted = bySubscriber.size;
   let sent = 0;
   let failed = 0;
+  // Distinct failure reasons, surfaced in the response so a dead API key shows
+  // up in the cron result itself instead of only in the logs.
+  const errors = new Set<string>();
 
   for (const [subscriberId, { subscriber, alerts }] of bySubscriber) {
     try {
@@ -143,11 +159,30 @@ async function handleTrigger(request: NextRequest) {
     } catch (err) {
       console.error(`[alerts/trigger] Failed to send to ${subscriber.email}:`, err);
       failed++;
+      if (err instanceof EmailSendError) {
+        errors.add(`${err.kind}${err.resendErrorName ? `:${err.resendErrorName}` : ""}`);
+      } else {
+        errors.add(err instanceof Error ? err.name : "unknown_error");
+      }
     }
   }
 
-  console.log(`[alerts/trigger] Done — ${sent} emails sent, ${failed} failed`);
-  return NextResponse.json({ ok: true, sent, failed });
+  const summary = {
+    ok: failed === 0,
+    attempted,
+    sent,
+    failed,
+    ...(errors.size > 0 ? { errors: [...errors] } : {}),
+  };
+
+  console.log(
+    `[alerts/trigger] Done — ${sent}/${attempted} emails sent, ${failed} failed` +
+      (errors.size > 0 ? ` (${[...errors].join(", ")})` : "")
+  );
+
+  // Any failure is reported as a failed cron run — otherwise a broken key stays
+  // invisible until someone reads the logs.
+  return NextResponse.json(summary, { status: failed > 0 ? 500 : 200 });
 }
 
 // GET — Vercel Cron invokes routes via GET
