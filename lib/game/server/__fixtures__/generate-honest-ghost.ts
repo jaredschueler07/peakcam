@@ -9,6 +9,7 @@
  *   - honest-ghost.pcgh / .json          (braked crawl — default)
  *   - honest-ghost-neutral.pcgh / .json  (neutral input)
  *   - honest-ghost-full-tuck.pcgh / .json
+ *   - honest-ghost-jump.pcgh / .json     (jumpHeld pulses → real POSE_AIRBORNE)
  *
  * Not imported by production code.
  */
@@ -44,7 +45,7 @@ import {
 export const HONEST_SAMPLE_EVERY = 4;
 export const HONEST_SAMPLE_HZ = FIXED_HZ / HONEST_SAMPLE_EVERY;
 
-export type HonestTapeKind = "braked" | "neutral" | "full-tuck";
+export type HonestTapeKind = "braked" | "neutral" | "full-tuck" | "jump";
 
 const EMPTY: InputFrame = {
   steer: 0,
@@ -56,6 +57,19 @@ const EMPTY: InputFrame = {
   trailPressed: false,
 };
 
+/**
+ * Jump charge windows (physics steps). Integrator launches on RELEASE of
+ * jumpHeld after charge builds (`jumpCharge` up to 0.4 s ≈ 48 steps), so each
+ * window holds then releases for a real airborne stretch.
+ * Longest honest airborne stretch in the committed jump fixture is far under
+ * the 4 s validator cap (see honest-ghost-jump.json longestAirborneSeconds).
+ */
+const JUMP_CHARGE_WINDOWS: ReadonlyArray<readonly [number, number]> = [
+  [600, 660],
+  [1400, 1460],
+  [2200, 2260],
+];
+
 function tapeFor(kind: HonestTapeKind, step: number): InputFrame {
   if (kind === "neutral") {
     // Near-zero input — coast the fall line with a tiny steer to stay oriented.
@@ -66,6 +80,18 @@ function tapeFor(kind: HonestTapeKind, step: number): InputFrame {
       ...EMPTY,
       tuck: step > 60 ? 1 : 0,
       steer: Math.sin(step / 500) * 0.08,
+    };
+  }
+  if (kind === "jump") {
+    // Charge jumpHeld for ~0.5 s then release → onGround===false + real offset.
+    const charging = JUMP_CHARGE_WINDOWS.some(([a, b]) => step >= a && step < b);
+    const chargeStart = JUMP_CHARGE_WINDOWS.some(([a]) => step === a);
+    return {
+      ...EMPTY,
+      tuck: step > 100 ? 0.55 : 0,
+      steer: Math.sin(step / 400) * 0.1,
+      jumpHeld: charging,
+      jumpPressed: chargeStart,
     };
   }
   // Braked crawl: light tuck/brake stays well inside envelopes.
@@ -101,7 +127,8 @@ export function generateHonestSamples(kind: HonestTapeKind = "braked"): GhostSam
 
   const needDz = Math.abs(course.finishZ - course.startZ) + 5;
   const raw: GhostSample[] = [];
-  const maxSteps = kind === "full-tuck" ? 25_000 : kind === "neutral" ? 35_000 : 40_000;
+  const maxSteps =
+    kind === "full-tuck" ? 25_000 : kind === "jump" ? 30_000 : kind === "neutral" ? 35_000 : 40_000;
 
   for (let step = 0; step < maxSteps; step++) {
     const input = tapeFor(kind, step);
@@ -192,11 +219,27 @@ function fixtureStem(kind: HonestTapeKind): string {
   return `honest-ghost-${kind}`;
 }
 
+function longestAirborneSamples(samples: readonly GhostSample[]): number {
+  let best = 0;
+  let run = 0;
+  for (const s of samples) {
+    if (s.poseFlags & POSE_AIRBORNE) {
+      run += 1;
+      best = Math.max(best, run);
+    } else {
+      run = 0;
+    }
+  }
+  return best;
+}
+
 function writeFixture(kind: HonestTapeKind, dir: string): void {
   const { samples, bytes, sampleHz, seed } = encodeHonestGhost(kind);
   const stem = fixtureStem(kind);
   const pcghPath = path.join(dir, `${stem}.pcgh`);
   const jsonPath = path.join(dir, `${stem}.json`);
+  const maxAir = longestAirborneSamples(samples);
+  const airCount = samples.filter((s) => s.poseFlags & POSE_AIRBORNE).length;
   writeFileSync(pcghPath, bytes);
   writeFileSync(
     jsonPath,
@@ -216,6 +259,11 @@ function writeFixture(kind: HonestTapeKind, dir: string): void {
         firstTick: samples[0].tick,
         lastTick: samples[samples.length - 1].tick,
         maxSpeedCms: Math.max(...samples.map((s) => s.speedCms)),
+        airborneSamples: airCount,
+        // Longest continuous airborne stretch (samples). Validator caps at
+        // MAX_AIRBORNE_SECONDS * sampleHz (4s); honest jump is well under that.
+        longestAirborneSamples: maxAir,
+        longestAirborneSeconds: maxAir / sampleHz,
         ghostBase64: Buffer.from(bytes).toString("base64"),
       },
       null,
@@ -223,7 +271,8 @@ function writeFixture(kind: HonestTapeKind, dir: string): void {
     ) + "\n",
   );
   console.log(
-    `wrote ${pcghPath} (${bytes.byteLength} B, ${samples.length} keyframes @ ${sampleHz} Hz, kind=${kind})`,
+    `wrote ${pcghPath} (${bytes.byteLength} B, ${samples.length} keyframes @ ${sampleHz} Hz, ` +
+      `kind=${kind}, airborne=${airCount}, maxAirStretch=${maxAir})`,
   );
 }
 
@@ -236,7 +285,7 @@ const isMain =
 
 if (isMain) {
   const dir = path.dirname(fileURLToPath(import.meta.url));
-  for (const kind of ["braked", "neutral", "full-tuck"] as const) {
+  for (const kind of ["braked", "neutral", "full-tuck", "jump"] as const) {
     writeFixture(kind, dir);
   }
 }

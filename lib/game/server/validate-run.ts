@@ -141,12 +141,32 @@ export const MAX_RUN_SPEED_CMS = 6_000;
 /**
  * 60 m/s² ≈ 6 g. Raised from 25 m/s² (A5 fix round 1): honest braked p95 ≈
  * 2520 cm/s²; honest full-tuck grounded peaks ≈ 5250 cm/s² on packed
- * procedural. Landings/crashes are pose-gated (see {@link isAirborneOrCrashed})
- * so this bound only covers on-snow segments. Still rejects 3×+ cheats.
+ * procedural. Airborne segments use {@link AIRBORNE_ACCEL_MULT}× this bound;
+ * crashed samples still skip the check entirely (landing impulses).
  */
 export const MAX_ACCEL_CMS2 = 6_000;
 /** 80 m/s² of deceleration — a crash into a tree is allowed to be violent. */
 export const MAX_DECEL_CMS2 = 8_000;
+/**
+ * Airborne accel/decel multiplier (gravity + drag reality, not free pass).
+ * Spoofed all-airborne ghosts no longer disable the envelope class.
+ */
+export const AIRBORNE_ACCEL_MULT = 3;
+/**
+ * Minimum |groundOffsetCm| required to claim {@link POSE_AIRBORNE}.
+ * Codec `groundOffsetCm` is skier Y relative to sampled terrain — the pure-sim
+ * recorder writes it as `(pos.y - terrain.height) * 100`. Claiming airborne
+ * while sitting on the snow (offset ≈ 0, as in the braked fixture) is a pose
+ * spoof. Threshold sits above quantisation (~1 cm) but under honest jump
+ * edge frames (jump fixture min offset ≈ 7 cm).
+ */
+export const AIRBORNE_MIN_GROUND_OFFSET_CM = 5;
+/**
+ * Max continuous airborne duration in seconds. Honest Drop In airtime is short
+ * (jump fixture longest stretch is well under this; see generate-honest-ghost
+ * jump tape). Longer = held-airborne pose spoof.
+ */
+export const MAX_AIRBORNE_SECONDS = 4;
 /** Slack on the per-step displacement bound, absorbing quantisation. */
 export const TELEPORT_SLACK_CM = 100;
 /** How far outside the baked box a keyframe may sit before it is a fabrication. */
@@ -259,8 +279,107 @@ export function expectedSampleGapTicks(sampleHz: number): number {
   return FIXED_HZ / sampleHz;
 }
 
-function isAirborneOrCrashed(sample: GhostSample): boolean {
-  return (sample.poseFlags & (POSE_AIRBORNE | POSE_CRASHED)) !== 0;
+function isAirborne(sample: GhostSample): boolean {
+  return (sample.poseFlags & POSE_AIRBORNE) !== 0;
+}
+
+function isCrashed(sample: GhostSample): boolean {
+  return (sample.poseFlags & POSE_CRASHED) !== 0;
+}
+
+/**
+ * Accel/decel envelope for a segment. `null` = skip (crash endpoints).
+ * Airborne uses a looser bound; grounded uses the base envelope.
+ * poseFlags is untrusted client input — callers must run
+ * {@link checkPoseIntegrity} first.
+ */
+function segmentAccelLimitCms2(prev: GhostSample, next: GhostSample): number | null {
+  if (isCrashed(prev) || isCrashed(next)) return null;
+  if (isAirborne(prev) || isAirborne(next)) return MAX_ACCEL_CMS2 * AIRBORNE_ACCEL_MULT;
+  return MAX_ACCEL_CMS2;
+}
+
+function segmentDecelLimitCms2(prev: GhostSample, next: GhostSample): number | null {
+  if (isCrashed(prev) || isCrashed(next)) return null;
+  if (isAirborne(prev) || isAirborne(next)) return MAX_DECEL_CMS2 * AIRBORNE_ACCEL_MULT;
+  return MAX_DECEL_CMS2;
+}
+
+/**
+ * Pose integrity over the full sample list.
+ * 1. POSE_AIRBORNE requires |groundOffsetCm| ≥ {@link AIRBORNE_MIN_GROUND_OFFSET_CM}
+ *    (codec terrain-relative height — no DEM load needed on the submit path).
+ * 2. Continuous airborne longer than {@link MAX_AIRBORNE_SECONDS} is rejected.
+ */
+function checkPoseIntegrity(
+  samples: readonly GhostSample[],
+  sampleHz: number,
+): { ok: true } | { ok: false; code: RejectionCode; detail: string } {
+  const maxAirborneSamples = Math.max(1, Math.ceil(MAX_AIRBORNE_SECONDS * sampleHz));
+  // Longest continuous airborne stretch allowed before rejection. Honest jump
+  // fixture peaks well under this (see honest-ghost-jump; generator comment).
+  let run = 0;
+  for (let i = 0; i < samples.length; i++) {
+    const s = samples[i];
+    if (isAirborne(s)) {
+      if (Math.abs(s.groundOffsetCm) < AIRBORNE_MIN_GROUND_OFFSET_CM) {
+        return {
+          ok: false,
+          code: "impossible_acceleration",
+          detail:
+            `keyframe ${i} claims POSE_AIRBORNE with groundOffsetCm=${s.groundOffsetCm} ` +
+            `(need |offset| ≥ ${AIRBORNE_MIN_GROUND_OFFSET_CM}cm above terrain)`,
+        };
+      }
+      run += 1;
+      if (run > maxAirborneSamples) {
+        return {
+          ok: false,
+          code: "impossible_acceleration",
+          detail:
+            `continuous airborne stretch of ${run} samples exceeds ` +
+            `${MAX_AIRBORNE_SECONDS}s cap (${maxAirborneSamples} samples at ${sampleHz} Hz)`,
+        };
+      }
+    } else {
+      run = 0;
+    }
+  }
+  return { ok: true };
+}
+
+function checkSegmentAccel(
+  prev: GhostSample,
+  next: GhostSample,
+  dtSeconds: number,
+  keyframeIndex: number,
+  quantSlack: boolean,
+): { ok: true } | { ok: false; code: RejectionCode; detail: string } {
+  const accelLimit = segmentAccelLimitCms2(prev, next);
+  const decelLimit = segmentDecelLimitCms2(prev, next);
+  if (accelLimit === null || decelLimit === null) return { ok: true };
+
+  const quant = quantSlack && dtSeconds > 0 ? 2 / dtSeconds : 0;
+  const accel = (next.speedCms - prev.speedCms) / dtSeconds;
+  if (accel > accelLimit + quant) {
+    return {
+      ok: false,
+      code: "impossible_acceleration",
+      detail:
+        `keyframe ${keyframeIndex} accelerates at ${Math.round(accel)}cm/s² ` +
+        `(max ${accelLimit}${quant ? ` + quant ${Math.round(quant)}` : ""})`,
+    };
+  }
+  if (-accel > decelLimit + quant) {
+    return {
+      ok: false,
+      code: "impossible_acceleration",
+      detail:
+        `keyframe ${keyframeIndex} decelerates at ${Math.round(-accel)}cm/s² ` +
+        `(max ${decelLimit}${quant ? ` + quant ${Math.round(quant)}` : ""})`,
+    };
+  }
+  return { ok: true };
 }
 
 // ─── Validation ──────────────────────────────────────────────
@@ -377,6 +496,11 @@ export function validateRun(input: RunValidationInput): RunValidationResult {
     );
   }
 
+  // poseFlags is client-controlled: ground-offset cross-check + airtime cap
+  // before any accel envelope trust of the airborne bit.
+  const pose = checkPoseIntegrity(samples, meta.sampleHz);
+  if (!pose.ok) return fail(pose.code, pose.detail);
+
   for (let i = 1; i < samples.length; i++) {
     const dtSeconds = (samples[i].tick - samples[i - 1].tick) / FIXED_HZ;
     const stepCm = planarDistanceCm(samples[i - 1], samples[i]);
@@ -389,24 +513,8 @@ export function validateRun(input: RunValidationInput): RunValidationResult {
       );
     }
 
-    // Landing impulses alias at 30 Hz; skip accel/decel when either endpoint is
-    // airborne or crashed (poseFlags from the honest recorder).
-    if (!isAirborneOrCrashed(samples[i - 1]) && !isAirborneOrCrashed(samples[i])) {
-      const deltaSpeed = samples[i].speedCms - samples[i - 1].speedCms;
-      const accel = deltaSpeed / dtSeconds;
-      if (accel > MAX_ACCEL_CMS2) {
-        return fail(
-          "impossible_acceleration",
-          `keyframe ${i} accelerates at ${Math.round(accel)}cm/s² (max ${MAX_ACCEL_CMS2})`,
-        );
-      }
-      if (-accel > MAX_DECEL_CMS2) {
-        return fail(
-          "impossible_acceleration",
-          `keyframe ${i} decelerates at ${Math.round(-accel)}cm/s² (max ${MAX_DECEL_CMS2})`,
-        );
-      }
-    }
+    const accelCheck = checkSegmentAccel(samples[i - 1], samples[i], dtSeconds, i, false);
+    if (!accelCheck.ok) return fail(accelCheck.code, accelCheck.detail);
   }
 
   // ── Finish ──
@@ -528,6 +636,12 @@ export function resimulateGhost(
     };
   }
 
+  // ── Pose integrity (untrusted client poseFlags) ──
+  const pose = checkPoseIntegrity(samples, sampleHz);
+  if (!pose.ok) {
+    return { accepted: false, code: pose.code, detail: `resim ${pose.detail}` };
+  }
+
   // ── Bounds + sweep ──
   const maxAbsCoordCm = (course.halfSizeM + BOUNDS_MARGIN_M) * 100;
 
@@ -575,27 +689,9 @@ export function resimulateGhost(
       };
     }
 
-    if (!isAirborneOrCrashed(prev) && !isAirborneOrCrashed(s)) {
-      const quantAccelSlack = 2 / dtSeconds;
-      const accel = (s.speedCms - prev.speedCms) / dtSeconds;
-      if (accel > MAX_ACCEL_CMS2 + quantAccelSlack) {
-        return {
-          accepted: false,
-          code: "impossible_acceleration",
-          detail:
-            `resim keyframe ${i} accelerates at ${Math.round(accel)}cm/s² ` +
-            `(max ${MAX_ACCEL_CMS2} + quant ${Math.round(quantAccelSlack)})`,
-        };
-      }
-      if (-accel > MAX_DECEL_CMS2 + quantAccelSlack) {
-        return {
-          accepted: false,
-          code: "impossible_acceleration",
-          detail:
-            `resim keyframe ${i} decelerates at ${Math.round(-accel)}cm/s² ` +
-            `(max ${MAX_DECEL_CMS2} + quant ${Math.round(quantAccelSlack)})`,
-        };
-      }
+    const accelCheck = checkSegmentAccel(prev, s, dtSeconds, i, true);
+    if (!accelCheck.ok) {
+      return { accepted: false, code: accelCheck.code, detail: `resim ${accelCheck.detail}` };
     }
 
     const dzCm = s.zCm - prev.zCm;
@@ -695,9 +791,9 @@ function measure(
     maxStepCm = Math.max(maxStepCm, stepCm);
 
     const dtSeconds = (s.tick - samples[i - 1].tick) / FIXED_HZ;
-    // A non-advancing tick is caught as `tick_regression`; guard the division
-    // so metrics stay finite for the rejected row we still want to store.
-    if (dtSeconds > 0 && !isAirborneOrCrashed(samples[i - 1]) && !isAirborneOrCrashed(s)) {
+    // Metrics: skip crash endpoints; include airborne under the looser class
+    // so telemetry still reflects airborne spikes without trusting full skip.
+    if (dtSeconds > 0 && !isCrashed(samples[i - 1]) && !isCrashed(s)) {
       const accel = (s.speedCms - samples[i - 1].speedCms) / dtSeconds;
       maxAccelCms2 = Math.max(maxAccelCms2, accel);
       maxDecelCms2 = Math.max(maxDecelCms2, -accel);

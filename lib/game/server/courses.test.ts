@@ -8,6 +8,7 @@ import { COURSE_VERSION } from "../config/versions";
 import { DROP_IN_GAME_PROFILES } from "../config/profiles";
 import type { DropInResortSlug } from "../config/schema";
 import type { TerrainMeta, TrailsFile } from "../terrain/formats";
+import { buildRealCourse } from "../terrain/real-course";
 import { RESORT_BAKE_CONFIGS } from "../terrain/resorts";
 import { createTerrainSource } from "../terrain/terrain-source";
 import {
@@ -64,8 +65,8 @@ test("every resolved course carries real startZ/finishZ gates", () => {
 });
 
 test("COURSE_GATES match buildRealCourse polylines for all 18 pilot trails", () => {
-  // Positional binding: regenerate start/finish from the committed terrain
-  // assets (same pipeline as the client) and compare every gate by trail index.
+  // Positional binding: call buildRealCourse explicitly (selectRuns + makeRun),
+  // not sampler.realRuns which is an opaque re-export of the same object.
   const dir = path.join(process.cwd(), "public/game/terrain");
   const slugs = Object.keys(DROP_IN_GAME_PROFILES) as DropInResortSlug[];
 
@@ -84,13 +85,20 @@ test("COURSE_GATES match buildRealCourse polylines for all 18 pilot trails", () 
         trails: JSON.parse(readFileSync(path.join(dir, `${slug}.trails.json`), "utf8")) as TrailsFile,
       },
     });
-    const runs = source.sampler.realRuns ?? [];
+    assert.ok(source.real, `${slug}: expected real terrain source`);
+    // Draped inventory → buildRealCourse (selectRuns + downhill/trim).
+    const built = buildRealCourse(
+      profile,
+      source.real.runs,
+      source.real.lifts,
+      profile.terrainSeed,
+    );
     const trailIds = trailIdsForResort(slug);
-    assert.equal(runs.length, 6, `${slug}: expected 6 real runs`);
+    assert.equal(built.runs.length, 6, `${slug}: expected 6 curated runs`);
     assert.equal(trailIds.length, 6, `${slug}: expected 6 trail ids`);
 
     for (let i = 0; i < 6; i++) {
-      const run = runs[i];
+      const run = built.runs[i];
       const trailId = trailIds[i];
       const measured = {
         startZ: Math.round(run.points[0].z * 100) / 100,

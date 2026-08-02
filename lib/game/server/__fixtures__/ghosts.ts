@@ -8,17 +8,24 @@
  *   - honest-ghost.pcgh            braked crawl
  *   - honest-ghost-neutral.pcgh    neutral input
  *   - honest-ghost-full-tuck.pcgh  full tuck
+ *   - honest-ghost-jump.pcgh       jumpHeld pulses (real POSE_AIRBORNE)
  */
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { decodeGhost, encodeGhost, type DecodedGhost, type GhostSample } from "../../replay/codec";
+import {
+  decodeGhost,
+  encodeGhost,
+  POSE_AIRBORNE,
+  type DecodedGhost,
+  type GhostSample,
+} from "../../replay/codec";
 import { resolveCourseOrThrow } from "./run";
 
 const FIXTURE_DIR = path.join(process.cwd(), "lib/game/server/__fixtures__");
 
-export type HonestKind = "braked" | "neutral" | "full-tuck";
+export type HonestKind = "braked" | "neutral" | "full-tuck" | "jump";
 
 export interface HonestGhostFixture {
   ghost: DecodedGhost;
@@ -123,5 +130,19 @@ export function tamperSpeedHack(honest: DecodedGhost): DecodedGhost {
   const samples = honest.samples.map((s, i) =>
     i === mid ? { ...s, speedCms: 20_000 } : s,
   );
+  return reencode({ meta: honest.meta, samples });
+}
+
+/**
+ * Pose spoof: mark every sample airborne without lifting groundOffsetCm.
+ * Pose integrity must reject (POSE_AIRBORNE while sitting on the snow).
+ */
+export function tamperAllAirborneSpoof(honest: DecodedGhost): DecodedGhost {
+  const samples = honest.samples.map((s) => ({
+    ...s,
+    poseFlags: s.poseFlags | POSE_AIRBORNE,
+    // Leave groundOffsetCm unchanged (braked fixture is ~0) so the
+    // ground-offset cross-check fires rather than the airtime-cap alone.
+  }));
   return reencode({ meta: honest.meta, samples });
 }

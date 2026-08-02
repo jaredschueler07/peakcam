@@ -1,10 +1,10 @@
 /**
- * Re-simulation gate (Task A5 + fix round 1).
+ * Re-simulation gate (Task A5 + fix rounds 1–2).
  *
  * - Absolute 120 Hz ticks (`FIXED_HZ`); expected gap = FIXED_HZ / sampleHz.
- * - Honest fixtures (braked, neutral, full-tuck) all accept.
+ * - Honest fixtures (braked, neutral, full-tuck, jump) all accept.
  * - Tick compression (×0.8, ×0.9) rejects; one-dropped-sample still accepts.
- * - Teleport + speed-hack reject.
+ * - Teleport + speed-hack reject; all-airborne pose spoof rejects.
  * - `DROP_IN_RESIM=1` threads resim into validateRun.
  *
  * Nonce *replay* is DB-side — see `run-repository.test.ts:177`. This file only
@@ -16,10 +16,11 @@ import { test } from "node:test";
 
 import { FIXED_HZ } from "../core/clock";
 import { simulationConfig } from "../core/config";
-import { decodeGhost } from "../replay/codec";
+import { decodeGhost, POSE_AIRBORNE } from "../replay/codec";
 import {
   dropOneSample,
   loadHonestGhost,
+  tamperAllAirborneSpoof,
   tamperSpeedHack,
   tamperTeleport,
   tamperTickCompression,
@@ -27,9 +28,11 @@ import {
 } from "./__fixtures__/ghosts";
 import { makeRunFixture } from "./__fixtures__/run";
 import {
+  AIRBORNE_MIN_GROUND_OFFSET_CM,
   DROP_IN_RESIM_ENV,
   expectedSampleGapTicks,
   ghostSpanMsFromTicks,
+  MAX_AIRBORNE_SECONDS,
   resimulateGhost,
   validateRun,
   type ResimVerdict,
@@ -95,7 +98,7 @@ test("honest fixtures use absolute 120Hz ticks with expected sample gap", () => 
 
 // ─── Honest fixtures ─────────────────────────────────────────
 
-for (const kind of ["braked", "neutral", "full-tuck"] as const) {
+for (const kind of ["braked", "neutral", "full-tuck", "jump"] as const) {
   test(`resimulateGhost accepts honest ${kind} fixture`, () => {
     const { ghost, course } = loadHonestGhost(kind);
     const verdict = resimulateGhost(ghost, course, packed);
@@ -108,6 +111,32 @@ for (const kind of ["braked", "neutral", "full-tuck"] as const) {
     assert.equal(result.metrics.startFinishChecked, true);
   });
 }
+
+test("honest jump fixture emits real POSE_AIRBORNE with lift off the snow", () => {
+  const { ghost, sampleHz } = loadHonestGhost("jump");
+  const airborne = ghost.samples.filter((s) => (s.poseFlags & POSE_AIRBORNE) !== 0);
+  assert.ok(airborne.length > 0, "jump fixture must include airborne samples");
+  for (const s of airborne) {
+    assert.ok(
+      Math.abs(s.groundOffsetCm) >= AIRBORNE_MIN_GROUND_OFFSET_CM,
+      `airborne groundOffsetCm=${s.groundOffsetCm} below min ${AIRBORNE_MIN_GROUND_OFFSET_CM}`,
+    );
+  }
+  // Longest continuous airborne stretch must be under the 4s validator cap.
+  // (Honest jump fixture longest stretch is well under MAX_AIRBORNE_SECONDS.)
+  let best = 0;
+  let run = 0;
+  for (const s of ghost.samples) {
+    if (s.poseFlags & POSE_AIRBORNE) {
+      run += 1;
+      best = Math.max(best, run);
+    } else {
+      run = 0;
+    }
+  }
+  const cap = Math.ceil(MAX_AIRBORNE_SECONDS * sampleHz);
+  assert.ok(best > 0 && best <= cap, `longest air stretch ${best} not in (0, ${cap}]`);
+});
 
 test("honest fixture with one dropped sample still passes resim", () => {
   const { ghost, course } = loadHonestGhost("braked");
@@ -146,6 +175,16 @@ test("resimulateGhost rejects a mid-run teleport", () => {
 test("resimulateGhost rejects a speed-hacked sample", () => {
   const { ghost, course } = loadHonestGhost("braked");
   assertRejected(resimulateGhost(tamperSpeedHack(ghost), course, packed), "overspeed");
+});
+
+test("resimulateGhost rejects all-airborne pose spoof of the braked fixture", () => {
+  const { ghost, course } = loadHonestGhost("braked");
+  const spoofed = tamperAllAirborneSpoof(ghost);
+  const verdict = resimulateGhost(spoofed, course, packed);
+  assertRejected(verdict, "impossible_acceleration");
+  if (!verdict.accepted) {
+    assert.match(verdict.detail, /POSE_AIRBORNE|airborne|groundOffset/i);
+  }
 });
 
 // ─── Env flag wiring ─────────────────────────────────────────
