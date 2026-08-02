@@ -17,7 +17,7 @@ import { UiBridge } from "./UiBridge";
 import type { ConditionsSnapshot } from "../conditions";
 import { simulationConfig } from "../core/config";
 import type { RuntimeAudio } from "./RuntimeAudio";
-import { encodeGhost, type GhostSample } from "../replay/codec";
+import { encodeGhost, type DecodedGhost, type GhostSample } from "../replay/codec";
 import { GHOST_SAMPLE_HZ, GhostRecorder } from "../replay/recorder";
 
 interface FinishedRunRecording {
@@ -161,6 +161,13 @@ export class GameRuntime {
       this.ghostRecorder.sample(this.state, nowSimTime);
     });
   }
+
+  /**
+   * Attach a decoded leaderboard replay to race against, or `null` to clear it.
+   * The renderer is private because nothing else outside the loop should reach
+   * it; this is the one thing the shell legitimately drives from a UI action.
+   */
+  setGhost(ghost: DecodedGhost | null): void { this.renderer.setGhost(ghost); }
 
   takeFinishedRun(): { samples: GhostSample[]; encoded: Uint8Array } | null {
     const run = this.finishedRun;
