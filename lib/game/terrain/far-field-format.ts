@@ -141,6 +141,32 @@ export const MAX_STRING_BYTES = 256;
 /** A far field beyond this is not a resort horizon; it is a corrupt header. */
 export const MAX_RADIUS_M = 500_000;
 
+// ─── Asset naming ────────────────────────────────────────────
+//
+// The baker writes these names and the runtime loader fetches them. They lived
+// as separate string literals in `scripts/bake-far-field.ts` and
+// `loaders/FarFieldAssetLoader.ts` and silently drifted apart — the baker emitted
+// `<slug>-far.bin.br` while the loader requested `<slug>.far.bin.br`, a guaranteed
+// 404 that degraded quietly to the procedural ridge bands and so looked, from a
+// browser, exactly like a working fallback. One definition, imported by both.
+
+/** Suffix of the baked asset. Also the tail of the `Content-Encoding: br` route in next.config. */
+export const FAR_FIELD_FILE_SUFFIX = ".far.bin.br";
+/** Suffix of the human-readable sidecar written beside it. */
+export const FAR_FIELD_SIDECAR_SUFFIX = ".far.json";
+/** Public directory the assets are served from, relative to the site root. */
+export const FAR_FIELD_ASSET_DIR = "/game/terrain";
+
+/** Filename the baker must emit for `slug`. */
+export function farFieldAssetFile(slug: string): string {
+  return `${slug}${FAR_FIELD_FILE_SUFFIX}`;
+}
+
+/** URL the runtime loader must fetch for `slug`. */
+export function farFieldAssetUrl(slug: string): string {
+  return `${FAR_FIELD_ASSET_DIR}/${farFieldAssetFile(slug)}`;
+}
+
 // ─── Types ───────────────────────────────────────────────────
 
 /**

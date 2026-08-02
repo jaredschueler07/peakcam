@@ -21,7 +21,9 @@ import { buildTileGeometry } from "./TerrainRenderer";
 import { rampRise, RAMP_BANNER_H, RAMP_BANNER_Y, RAMP_MAX_RISE, sagAt, WorldRenderer } from "./WorldRenderer";
 import { staticNodeFactories } from "./nodeFactories.fixture";
 import { CAMERA_FAR, createScene } from "./SceneFactory";
-import { FAR_FIELD_INNER_RADIUS_M, FarFieldRenderer } from "./FarFieldRenderer";
+import { FAR_FIELD_GROUP_NAME, FAR_FIELD_INNER_RADIUS_M, FarFieldRenderer } from "./FarFieldRenderer";
+import { CSM_FAR_REFERENCE, CsmShadows } from "./CsmShadows";
+import { visualWeatherPreset } from "./VisualPresets";
 import { resourceCounts } from "./resources";
 import type { DecodedFarField, FarFieldWedge } from "../terrain/far-field-format";
 import { RAMP_LEN } from "../terrain/heightfield";
@@ -617,13 +619,14 @@ function findGhostRoot(renderer: GameRenderer): THREE.Object3D {
 
 /** A minimal but structurally real asset: one quad per wedge, inner rim to horizon. */
 function farFieldAsset(wedgeCount = 16, radiusM = 30_000, elevation = 3000): DecodedFarField {
+  const innerM = 50; // off-origin, so each wedge is a real quad rather than a degenerate fan
   const wedges: FarFieldWedge[] = [];
   for (let w = 0; w < wedgeCount; w += 1) {
     const azimuthStartRad = (w * 2 * Math.PI) / wedgeCount;
     const azimuthEndRad = ((w + 1) * 2 * Math.PI) / wedgeCount;
     const positions = new Float32Array(12);
     let at = 0;
-    for (const r of [FAR_FIELD_INNER_RADIUS_M, radiusM]) {
+    for (const r of [innerM, radiusM]) {
       for (const az of [azimuthStartRad, azimuthEndRad]) {
         positions[at] = r * Math.sin(az);
         positions[at + 1] = elevation;
@@ -681,6 +684,12 @@ test("far field builds one mesh per wedge, with normals and no shadow participat
     assert.equal(mesh.frustumCulled, false);
   }
   far.dispose();
+});
+
+test("the renderer's inner radius mirrors the baker's: no hole, because the tiles follow the player", () => {
+  // The near-field tile grid re-centres on the player each frame while the asset is anchored to
+  // the resort, so any resort-centred hole is uncovered the moment the player skis away from it.
+  assert.equal(FAR_FIELD_INNER_RADIUS_M, 0);
 });
 
 test("the far field does not follow the camera — it is georeferenced, unlike the ridge bands", () => {
@@ -792,4 +801,66 @@ test("the procedural ridge bands stay as the fallback and hide only once a real 
   assert.equal(built.peaks.visible, false, "the ridge bands must hide behind a real far field");
   far.dispose();
   assert.equal(built.peaks.visible, true, "disposing the far field restores the fallback horizon");
+});
+
+test("raising the camera far plane for the far field leaves the shadow cascades untouched", () => {
+  // three's CSM expands each cascade by a fade margin of 0.25·z²/(max(camera.far, maxFar) − near),
+  // so CAMERA_FAR going 6,000 → 34,000 would have shrunk it 2.60 m → 0.46 m on desktop WebGL,
+  // where `fade = !mobile` is on. CsmShadows pins what CSM sees; this asserts the boxes match.
+  const boxesFor = (far: number) => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(65, 16 / 9, 0.5, far);
+    camera.updateMatrixWorld(true);
+    const csm = new CsmShadows(camera, scene, false, profile.weather[0], visualWeatherPreset(0));
+    const boxes = csm.cascadeExtents();
+    assert.equal(camera.far, far, "the pin must restore the camera's own far plane");
+    csm.dispose();
+    return boxes;
+  };
+  const legacy = boxesFor(CSM_FAR_REFERENCE);
+  assert.ok(legacy.length >= 3, `expected 3 cascades, got ${legacy.length}`);
+  assert.deepEqual(boxesFor(CAMERA_FAR), legacy, "the far field changed the shadow cascades");
+
+  // The measurement is live, not vacuous: below the reference the pin is a no-op and the fade
+  // margin really does move the boxes, which is exactly the sensitivity being neutralised above.
+  const shallow = boxesFor(2000);
+  assert.notDeepEqual(shallow, legacy, "cascadeExtents does not respond to camera.far at all");
+  const outer = legacy[legacy.length - 1][1] - shallow[shallow.length - 1][1];
+  assert.ok(outer < 0, `a nearer far plane should widen the outer cascade's margin, got ${outer}`);
+});
+
+test("the far field gets height fog on its real, asynchronous attach path", () => {
+  // rendering.test's other fog test drives configureSceneMaterials directly, but in production
+  // the far field attaches long AFTER that sweep, and is fogged only by attachFarField's
+  // configureMaterial callback. That callback is the thing that stops the seam reading as a
+  // colour step, so it is the thing to test.
+  for (const backendKind of ["webgl", "webgpu"] as const) {
+    const world = createProceduralWorld(profile, profile.seed);
+    const state = createSimulation(profile, profile.seed);
+    const canvas = {
+      clientWidth: 800, clientHeight: 600, addEventListener() {}, removeEventListener() {},
+    } as unknown as HTMLCanvasElement;
+    const renderer = new GameRenderer(canvas, profile, world, state, {
+      backend: new FakeBackend(backendKind), devicePixelRatio: 1, reducedMotion: true,
+      nodeFactories: backendKind === "webgpu" ? staticNodeFactories() : null,
+    });
+    renderer.attachFarField(farFieldAsset());
+
+    const group = renderer.scene.getObjectByName(FAR_FIELD_GROUP_NAME);
+    assert.ok(group, `${backendKind}: the far field is not in the scene`);
+    const mesh = group.children[0] as THREE.Mesh;
+    const material = mesh.material as THREE.Material & { fog?: boolean };
+
+    // Both backends: never opt out, or scene.fogNode / addHeightFog skips it entirely.
+    assert.notEqual(material.fog, false, `${backendKind}: far field opted out of fog`);
+    assert.notEqual(material.userData.heightFog, false);
+    if (backendKind === "webgl") {
+      assert.equal(material.userData.heightFogConfigured, true, "WebGL far field never got height fog");
+    } else {
+      // WebGPU fogs from scene.fogNode; the callback must be a no-op, not a second fog path.
+      assert.equal(material.userData.heightFogConfigured, undefined, "WebGPU must not add GLSL fog");
+      assert.ok((renderer.scene as THREE.Scene & { fogNode?: unknown }).fogNode, "scene.fogNode missing");
+    }
+    renderer.dispose();
+  }
 });

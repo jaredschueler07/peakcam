@@ -31,15 +31,17 @@
  * normalised angle, which is crack-free and T-junction-free for any pair of
  * counts — so no power-of-two subdivision levels are needed either.
  *
- * ## The inner hole
+ * ## There is no inner hole
  *
- * The streamed near-field tiles own the middle. §3 assumed that hole was 500 m,
- * but the live tile grid (`TerrainRenderer`) is 5×5 tiles of 200 m biased
- * downhill — `dz` runs from -1 to +3 — so the coverage *guaranteed* for any
- * player position within its own tile is only one tile behind, 200 m. The far
- * field therefore starts at {@link NEAR_FIELD_GUARANTEED_RADIUS_M} minus one
- * cell of overlap, and the 16 m band from there out to 500 m is real geometry
- * rather than the dead band it would be under a 500 m hole. See the report.
+ * §3 reserved the inner 500 m for the streamed near-field tiles. That reservation cannot work:
+ * `TerrainRenderer` re-centres its tile grid on the **player** each frame, while a baked asset is
+ * anchored to the **resort**, so any resort-centred hole is uncovered the moment the player skis
+ * away from the centre. The far field is therefore baked from r = 0 and simply underlies the near
+ * field everywhere, which is what it already did outside the hole.
+ *
+ * The two meshes overlap rather than meeting: the far field is 16 m where the near field is 4 m,
+ * so they interpenetrate on ridges. The renderer biases the far field backwards
+ * (`polygonOffset`) so the near field wins wherever both are drawn.
  *
  * ## Usage
  *
@@ -53,8 +55,8 @@
  * replace the `--dem` adapter; nothing here duplicates it.
  *
  * Outputs (public/game/terrain/):
- *   <slug>-far.bin.br   PCFF bytes, brotli quality 11 — the committed artefact
- *   <slug>-far.json     FarFieldMeta sidecar + bake statistics
+ *   <slug>.far.bin.br   PCFF bytes, brotli quality 11 — the committed artefact
+ *   <slug>.far.json     FarFieldMeta sidecar + bake statistics
  */
 
 import fs from "node:fs";
@@ -65,14 +67,16 @@ import { fileURLToPath } from "node:url";
 import {
   computeWedgeBounds,
   encodeFarField,
+  farFieldAssetFile,
   wedgeQuantisationErrorM,
+  FAR_FIELD_SIDECAR_SUFFIX,
   type FarFieldMeta,
   type FarFieldWedge,
 } from "@/lib/game/terrain/far-field-format";
 import { RESORT_BAKE_CONFIGS } from "@/lib/game/terrain/resorts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, "..");
+export const ROOT = path.resolve(__dirname, "..");
 export const OUT_DIR = path.join(ROOT, "public", "game", "terrain");
 
 // ─── Constants ───────────────────────────────────────────────
@@ -97,12 +101,21 @@ export const FAR_FIELD_RING_BANDS: RingBand[] = [
 export const NEAR_FIELD_GUARANTEED_RADIUS_M = 200;
 
 /**
- * How far the far field reaches back under the near field. One cell is enough:
- * the two meshes need not share vertices, only overlap, so that no sight line
- * can pass between them. Zero overlap leaks sky where the far field's coarse
- * triangles cut below the near field's fine ones.
+ * The far field is baked from r = 0 — there is no hole.
+ *
+ * It used to start just inside the near field's guaranteed coverage, on the reasoning that the
+ * streamed tiles owned the middle. That was wrong, and the reason is a frame-of-reference
+ * mismatch: `TerrainRenderer` re-centres its 5×5 grid on the **player** every frame, while a
+ * baked asset is anchored to the **resort**. The two coincide only at the start gate. Once the
+ * player is a few hundred metres downhill the hole sits behind them, covered by neither mesh —
+ * a real void, invisible so far only because the chase camera faces the other way.
+ *
+ * Filling it costs ~12 extra rings of 16 m cells (a couple of thousand vertices, well inside
+ * budget) and removes a special case: the far field already underlies the near field everywhere
+ * else, so it may as well do so at the origin too. See {@link SEAM_OVERLAP_M} for why that
+ * overlap is safe.
  */
-export const SEAM_OVERLAP_CELLS = 1;
+export const FAR_FIELD_INNER_RADIUS_M = 0;
 
 /** Fail the bake above this, per the plan. Not a warning. */
 export const MAX_COMPRESSED_BYTES = 400 * 1024;
@@ -125,6 +138,29 @@ export const MAX_COMPRESSED_BYTES = 400 * 1024;
  * see the task report. That is a Task 5/7 decision, not one this baker can make.
  */
 export const ARC_CELLS = 1.5;
+
+/**
+ * Placeholder `demSource`. `meta.demSource` is the asset's provenance — it is what
+ * `attributionFor` resolves a licence notice from — so a wrong value is worse than no
+ * value, and the previous per-resort guess ("usgs-3dep-1m") was wrong for every bake
+ * the recommended 3DEP 1/3 arc-second workflow produces. `bakeFarField` throws on it.
+ */
+export const UNSPECIFIED_DEM_SOURCE = "unspecified";
+
+/**
+ * The provenance string recorded in the asset. An explicit `--dem-source=<id>` wins;
+ * otherwise it is derived from the raster actually read, which is honest even when it is
+ * less pretty than a catalogue name.
+ */
+export function resolveDemSource(
+  explicit: string | undefined,
+  raster: { file: string; resolutionM: number },
+): string {
+  const trimmed = explicit?.trim();
+  if (trimmed) return trimmed;
+  const base = path.basename(raster.file).replace(/\.[^.]+$/, "");
+  return `${base}@${Number(raster.resolutionM.toFixed(3))}m`;
+}
 
 /** Guard on the quantisation error the wire format promises (Task 5: 0.229 m). */
 export const MAX_QUANTISATION_ERROR_M = 0.25;
@@ -183,9 +219,13 @@ export function cellSizeAt(r: number, bands: RingBand[]): number {
   return bands[bands.length - 1].cellM;
 }
 
-/** Where the far field starts: inside the near field by {@link SEAM_OVERLAP_CELLS}. */
-export function innerRadiusFor(bands: RingBand[]): number {
-  return NEAR_FIELD_GUARANTEED_RADIUS_M - SEAM_OVERLAP_CELLS * bands[0].cellM;
+/**
+ * Where the far field starts. Zero, everywhere — the parameter is kept so tests can build a
+ * detached far field and prove the seam check still catches it.
+ */
+export function innerRadiusFor(_bands: RingBand[]): number {
+  void _bands;
+  return FAR_FIELD_INNER_RADIUS_M;
 }
 
 /**
@@ -219,6 +259,9 @@ export function segmentsForRing(
   wedgeCount: number,
   atLeast = 0,
 ): number {
+  // The centre ring is one shared vertex, not a segment: every azimuth meets there. The
+  // ring-to-ring stitcher handles a 1-vertex ring as a triangle fan with no special case.
+  if (r <= 0) return 0;
   const arcPerWedge = ((2 * Math.PI) / wedgeCount) * r;
   const wanted = Math.max(1, Math.ceil(arcPerWedge / (cellSizeAt(r, bands) * ARC_CELLS)));
   return Math.max(wanted, atLeast);
@@ -276,7 +319,9 @@ function buildWedge(
     const r = radii[i];
     const s = segments[i];
     for (let j = 0; j <= s; j++) {
-      const az = azimuthStartRad + ((azimuthEndRad - azimuthStartRad) * j) / s;
+      // The centre ring is a single vertex at r = 0, where azimuth is undefined (and `j / s`
+      // would be 0/0). Any bearing puts it at the origin; take the wedge's start.
+      const az = s === 0 ? azimuthStartRad : azimuthStartRad + ((azimuthEndRad - azimuthStartRad) * j) / s;
       // Compass bearing: 0 = north = -z, increasing eastwards = +x.
       const east = r * Math.sin(az);
       const north = r * Math.cos(az);
@@ -336,8 +381,10 @@ export const FAR_FIELD_BAKE_CONFIGS: Record<string, FarFieldBakeConfig> = Object
       radiusM: 30_000,
       wedgeCount: WEDGE_COUNT,
       bands: FAR_FIELD_RING_BANDS,
-      // Overwritten by the CLI from the DEM actually supplied.
-      demSource: r.copernicusTile ? "copernicus-glo30" : "usgs-3dep-1m",
+      // Never a guess: `bakeFarField` refuses this sentinel, so an asset cannot
+      // ship claiming a DEM that was not the one read. The CLI replaces it with
+      // `resolveDemSource()`'s answer for the file actually supplied.
+      demSource: UNSPECIFIED_DEM_SOURCE,
     } satisfies FarFieldBakeConfig,
   ]),
 );
@@ -348,10 +395,11 @@ export const FAR_FIELD_BAKE_CONFIGS: Record<string, FarFieldBakeConfig> = Object
  * over-budget asset is worse than one that fails.
  */
 export function bakeFarField(
-  config: FarFieldBakeConfig,
+  configIn: FarFieldBakeConfig,
   elevation: ElevationSampler,
-  options: { bakedAt?: string; maxCompressedBytes?: number } = {},
+  options: { bakedAt?: string; maxCompressedBytes?: number; demSource?: string } = {},
 ): BakeResult {
+  const config = options.demSource ? { ...configIn, demSource: options.demSource } : configIn;
   const bakedAt = options.bakedAt ?? new Date().toISOString();
   const budget = options.maxCompressedBytes ?? MAX_COMPRESSED_BYTES;
   const wedges = buildWedges(config, elevation);
@@ -368,6 +416,12 @@ export function bakeFarField(
     );
   }
 
+  if (!config.demSource || config.demSource === UNSPECIFIED_DEM_SOURCE) {
+    throw new Error(
+      `${config.slug}: demSource is the asset's provenance and must name the DEM actually read ` +
+        "— pass --dem-source=<id> or let the CLI derive it from the raster",
+    );
+  }
   if (maxQuantisationErrorM > MAX_QUANTISATION_ERROR_M) {
     throw new Error(
       `${config.slug}: worst-wedge quantisation error ${maxQuantisationErrorM.toFixed(4)} m ` +
@@ -508,7 +562,9 @@ export function findPeakNear(
   bearingRad: number,
   distanceM: number,
   toleranceM: number,
-  centreElevationM = 2900,
+  /** Elevation the rise is measured from. Required: a module default silently made every
+   *  resort's landmark gate report angles against Portillo's base. */
+  centreElevationM: number,
 ): PeakHit | null {
   const targetX = distanceM * Math.sin(bearingRad);
   const targetZ = -distanceM * Math.cos(bearingRad);
@@ -549,7 +605,7 @@ export function findPeakNear(
 export async function samplerFromGeoTiff(
   file: string,
   config: Pick<FarFieldBakeConfig, "slug" | "radiusM">,
-): Promise<{ sample: ElevationSampler; description: string }> {
+): Promise<{ sample: ElevationSampler; description: string; resolutionM: number }> {
   const { fromFile } = await import("geotiff");
   const tiff = await fromFile(file);
   const image = await tiff.getImage();
@@ -601,7 +657,39 @@ export async function samplerFromGeoTiff(
   return {
     sample,
     description: `${path.basename(file)} ${width}×${height} @ ${Math.abs(resX)} m`,
+    resolutionM: Math.abs(resX),
   };
+}
+
+/**
+ * Writes the two artefacts. Extracted from `main` so a test can pin the emitted filenames
+ * against the URL `FarFieldAssetLoader` fetches — they were separate literals once and
+ * drifted, which only ever showed up as a silent 404.
+ */
+export function writeFarFieldOutputs(
+  slug: string,
+  config: FarFieldBakeConfig,
+  result: BakeResult,
+): void {
+  fs.writeFileSync(path.join(OUT_DIR, farFieldAssetFile(slug)), result.compressed);
+  fs.writeFileSync(
+    path.join(OUT_DIR, `${slug}${FAR_FIELD_SIDECAR_SUFFIX}`),
+    JSON.stringify(
+      {
+        ...result.meta,
+        innerRadiusM: innerRadiusFor(config.bands),
+        bands: config.bands,
+        vertexCount: result.vertexCount,
+        triangleCount: result.triangleCount,
+        drawnVertexEstimate: result.drawnVertexEstimate,
+        rawBytes: result.bytes.byteLength,
+        compressedBytes: result.compressed.byteLength,
+        maxQuantisationErrorM: result.maxQuantisationErrorM,
+      },
+      null,
+      2,
+    ) + "\n",
+  );
 }
 
 async function main(argv: string[]): Promise<void> {
@@ -609,6 +697,7 @@ async function main(argv: string[]): Promise<void> {
   const target = args.find((a) => !a.startsWith("--"));
   const dem = args.find((a) => a.startsWith("--dem="))?.slice("--dem=".length);
   const demDir = args.find((a) => a.startsWith("--dem-dir="))?.slice("--dem-dir=".length);
+  const demSourceFlag = args.find((a) => a.startsWith("--dem-source="))?.slice("--dem-source=".length);
   const dryRun = args.includes("--dry-run");
 
   if (!target) {
@@ -630,6 +719,13 @@ async function main(argv: string[]): Promise<void> {
     process.exitCode = 1;
     return;
   }
+  if (dem && slugs.length > 1) {
+    // One file cannot be three resorts' DEM. This used to be ignored silently, which
+    // baked every resort from whatever `--dem-dir` defaulted to.
+    console.error("--dem=<file> bakes a single resort; use --dem-dir=<dir> for `all`");
+    process.exitCode = 1;
+    return;
+  }
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
 
@@ -638,8 +734,10 @@ async function main(argv: string[]): Promise<void> {
     const file = dem && slugs.length === 1 ? dem : path.join(demDir ?? ".", `${slug}-far-dem.tif`);
     if (!fs.existsSync(file)) throw new Error(`${slug}: DEM not found at ${file}`);
 
-    const { sample, description } = await samplerFromGeoTiff(file, config);
-    const result = bakeFarField(config, sample);
+    const { sample, description, resolutionM } = await samplerFromGeoTiff(file, config);
+    const result = bakeFarField(config, sample, {
+      demSource: resolveDemSource(demSourceFlag, { file, resolutionM }),
+    });
 
     console.log(`\n${slug}  (${description})`);
     console.log(`  vertices        ${result.vertexCount.toLocaleString()}`);
@@ -651,11 +749,13 @@ async function main(argv: string[]): Promise<void> {
         `(budget ${MAX_COMPRESSED_BYTES / 1024} KB)`,
     );
     console.log(`  quantisation    ${result.maxQuantisationErrorM.toFixed(4)} m worst wedge`);
+    console.log(`  dem source      ${result.meta.demSource}`);
 
     if (slug === "ski-portillo") {
       // Aconcagua: 6,961 m at -32.6533, -70.0109 — ~23.7 km out on a ~28°
       // bearing. If it is missing, the radius or the DEM window is wrong.
-      const peak = findPeakNear(result.wedges, Math.atan2(11_054, 20_970), 23_700, 2500);
+      const centreElevationM = sample(0, 0);
+      const peak = findPeakNear(result.wedges, Math.atan2(11_054, 20_970), 23_700, 2500, centreElevationM);
       if (!peak || peak.elevationM < 6000) {
         throw new Error(
           `ski-portillo: Aconcagua is not in the baked mesh (highest nearby: ` +
@@ -672,27 +772,8 @@ async function main(argv: string[]): Promise<void> {
       console.log("  (dry run — nothing written)");
       continue;
     }
-    fs.writeFileSync(path.join(OUT_DIR, `${slug}-far.bin.br`), result.compressed);
-    fs.writeFileSync(
-      path.join(OUT_DIR, `${slug}-far.json`),
-      JSON.stringify(
-        {
-          ...result.meta,
-          innerRadiusM: innerRadiusFor(config.bands),
-          bands: config.bands,
-          vertexCount: result.vertexCount,
-          triangleCount: result.triangleCount,
-          drawnVertexEstimate: result.drawnVertexEstimate,
-          rawBytes: result.bytes.byteLength,
-          compressedBytes: result.compressed.byteLength,
-          maxQuantisationErrorM: result.maxQuantisationErrorM,
-          dem: description,
-        },
-        null,
-        2,
-      ) + "\n",
-    );
-    console.log(`  → ${slug}-far.bin.br, ${slug}-far.json`);
+    writeFarFieldOutputs(slug, config, result);
+    console.log(`  → ${farFieldAssetFile(slug)}, ${slug}${FAR_FIELD_SIDECAR_SUFFIX}`);
   }
 }
 

@@ -441,6 +441,9 @@ export class GameRenderer {
 
   get farFieldWedgesDrawn(): number { return this.farField?.visibleWedgeCount ?? 0; }
 
+  /** Read-only handle for tests and debugging; the render loop owns everything in it. */
+  get scene(): THREE.Scene { return this.built.scene; }
+
   resources(): ResourceCounts { return resourceCounts(this.built.scene); }
 
   private onContextLost = (event: Event) => { event.preventDefault(); this.contextLost = true; };

@@ -1,17 +1,25 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { test } from "node:test";
 
 import { GRID_SIZE, TILE_SIZE, Z_TILES_BEHIND } from "@/lib/game/rendering/TerrainRenderer";
+import { FarFieldAssetLoader } from "@/lib/game/rendering/loaders/FarFieldAssetLoader";
+import type { FarFieldWedge } from "@/lib/game/terrain/far-field-format";
 import {
   ARC_CELLS,
+  FAR_FIELD_INNER_RADIUS_M,
   FAR_FIELD_RING_BANDS,
   FAR_FIELD_BAKE_CONFIGS,
   MAX_COMPRESSED_BYTES,
+  UNSPECIFIED_DEM_SOURCE,
+  resolveDemSource,
   NEAR_FIELD_GUARANTEED_RADIUS_M,
-  SEAM_OVERLAP_CELLS,
   WEDGE_COUNT,
+  ROOT,
   bakeFarField,
   buildRingRadii,
+  writeFarFieldOutputs,
   buildWedges,
   cellSizeAt,
   findPeakNear,
@@ -24,6 +32,7 @@ import {
 import {
   computeWedgeBounds,
   decodeFarField,
+  farFieldAssetUrl,
   wedgeQuantisationErrorM,
 } from "@/lib/game/terrain/far-field-format";
 
@@ -112,6 +121,10 @@ test("angular segments keep arc length near the cell size and never decrease out
   for (const r of radii) {
     const segments = segmentsForRing(r, FAR_FIELD_RING_BANDS, WEDGE_COUNT, prev);
     assert.ok(segments >= prev, `segments must not decrease outward at r=${r}`);
+    if (r === 0) {
+      assert.equal(segments, 0, "the centre ring is one shared vertex, not a segment");
+      continue;
+    }
     assert.ok(segments >= 1);
     const arc = ((2 * Math.PI) / WEDGE_COUNT) * r / segments;
     assert.ok(
@@ -143,28 +156,48 @@ test("wedge azimuths tile 2π exactly, with no gap and no overlap", () => {
 
 test("adjacent wedges share their boundary vertices exactly, so the seams are watertight", () => {
   const wedges = buildWedges(SMALL, synthElevation());
+  assertWatertight(wedges, 1e-6);
+});
+
+test("the seams survive the wire format — the shipped asset is what has to be watertight", () => {
+  // buildWedges output is exact; what ships is u16-quantised against each wedge's own bounds, and
+  // neighbouring wedges have different bounds, so a shared edge is rounded twice, independently.
+  // That is the seam error a player can actually see, so it is the one worth a budget.
+  const built = bakeFarField(SMALL, synthElevation(), { demSource: "synthetic" });
+  const decoded = decodeFarField(built.bytes);
+  const worst = assertWatertight(decoded.wedges, 0.5);
+  assert.ok(worst > 0, "a quantised round trip cannot be bit-exact; the test is measuring nothing");
+});
+
+/** Largest gap between the shared boundary columns of adjacent wedges, metres. */
+function assertWatertight(wedges: FarFieldWedge[], toleranceM: number): number {
+  let worst = 0;
   for (let w = 0; w < wedges.length; w++) {
     const next = wedges[(w + 1) % wedges.length];
-    // Every vertex of `w` on its end azimuth must exist verbatim in `next`.
-    const edge = verticesOnAzimuth(wedges[w], wedges[w].azimuthEndRad);
-    const neighbour = verticesOnAzimuth(next, next.azimuthStartRad);
+    // Every vertex of `w` on its end azimuth must line up with one in `next`.
+    const edge = verticesOnAzimuth(wedges[w], wedges[w].azimuthEndRad, toleranceM);
+    const neighbour = verticesOnAzimuth(next, next.azimuthStartRad, toleranceM);
     assert.ok(edge.length > 10, `wedge ${w} should have a populated boundary column`);
     assert.equal(edge.length, neighbour.length, `wedge ${w}/${w + 1} boundary column lengths differ`);
     for (let i = 0; i < edge.length; i++) {
       for (let k = 0; k < 3; k++) {
+        const gap = Math.abs(edge[i][k] - neighbour[i][k]);
+        worst = Math.max(worst, gap);
         assert.ok(
-          Math.abs(edge[i][k] - neighbour[i][k]) < 1e-6,
-          `wedge ${w}/${w + 1} boundary vertex ${i} component ${k} differs`,
+          gap <= toleranceM,
+          `wedge ${w}/${w + 1} boundary vertex ${i} component ${k} differs by ${gap} m`,
         );
       }
     }
   }
-});
+  return worst;
+}
 
 /** Vertices whose azimuth equals `az`, sorted by radius. */
 function verticesOnAzimuth(
   wedge: { positions: Float32Array },
   az: number,
+  toleranceM: number,
 ): Array<[number, number, number]> {
   const out: Array<[number, number, number]> = [];
   const wantX = Math.sin(az);
@@ -173,8 +206,10 @@ function verticesOnAzimuth(
     const x = wedge.positions[i];
     const z = wedge.positions[i + 2];
     const r = Math.hypot(x, z);
-    if (r < 1e-9) continue;
-    if (Math.abs(x / r - wantX) < 1e-6 && Math.abs(z / r - wantZ) < 1e-6) {
+    if (r < 1) continue; // the shared centre vertex has no azimuth
+    // Quantisation nudges a boundary vertex off its exact bearing by up to `toleranceM`.
+    const slack = Math.max(1e-6, toleranceM / r);
+    if (Math.abs(x / r - wantX) < slack && Math.abs(z / r - wantZ) < slack) {
       out.push([x, wedge.positions[i + 1], z]);
     }
   }
@@ -226,16 +261,30 @@ test("the near-field extent is derived from the live TerrainRenderer tile grid",
   assert.equal(NEAR_FIELD_GUARANTEED_RADIUS_M, Z_TILES_BEHIND * TILE_SIZE);
 });
 
-test("the inner hole sits inside the near-field extent by the seam overlap", () => {
-  const inner = innerRadiusFor(FAR_FIELD_RING_BANDS);
-  assert.equal(
-    inner,
-    NEAR_FIELD_GUARANTEED_RADIUS_M - SEAM_OVERLAP_CELLS * FAR_FIELD_RING_BANDS[0].cellM,
-  );
-  assert.ok(
-    inner < NEAR_FIELD_GUARANTEED_RADIUS_M,
-    "the far field must start inside the near field's guaranteed coverage",
-  );
+test("there is no inner hole: the far field is baked from the resort centre outwards", () => {
+  assert.equal(innerRadiusFor(FAR_FIELD_RING_BANDS), 0);
+  assert.equal(FAR_FIELD_INNER_RADIUS_M, 0);
+  const radii = buildRingRadii(innerRadiusFor(SMALL.bands), SMALL.radiusM, SMALL.bands);
+  assert.equal(radii[0], 0, "the first ring must be the centre itself");
+});
+
+test("no point the near field can cover is left uncovered by the far field", () => {
+  // The near-field tile grid follows the PLAYER while the asset is anchored to the RESORT, so a
+  // resort-centred hole is uncovered as soon as the player moves. The property that has to hold
+  // is that the far field's surface exists directly beneath every point the player can stand.
+  const elevation = synthElevation();
+  const wedges = buildWedges(SMALL, elevation);
+  const down: [number, number, number] = [0, -1, 0];
+  for (let ai = 0; ai < 32; ai += 1) {
+    const az = (ai / 32) * 2 * Math.PI;
+    // Sweep from the exact centre out past the near field's guaranteed reach.
+    for (const r of [0, 1, 5, 25, 80, 150, NEAR_FIELD_GUARANTEED_RADIUS_M, 400, 600]) {
+      const x = r * Math.sin(az);
+      const z = -r * Math.cos(az);
+      const hit = firstMeshHit(wedges, [x, 12_000, z], down);
+      assert.ok(hit !== null, `no far-field surface under (r=${r}, az=${az.toFixed(2)})`);
+    }
+  }
 });
 
 test("no ray from eye height escapes to the sky through the near/far seam", () => {
@@ -327,7 +376,7 @@ function marchTrueSurface(
 test("bakes every pilot resort inside the size budget and the quantisation budget", () => {
   for (const slug of Object.keys(FAR_FIELD_BAKE_CONFIGS)) {
     const config = FAR_FIELD_BAKE_CONFIGS[slug];
-    const result = bakeFarField(config, synthElevation());
+    const result = bakeFarField(config, synthElevation(), { demSource: "synthetic" });
 
     // Not just "under the gate": u16 position codes are incompressible, so the
     // size is ~6 bytes × vertices and real relief will not shrink it. Keep a
@@ -350,21 +399,21 @@ test("bakes every pilot resort inside the size budget and the quantisation budge
 
 test("a bake round-trips through the wire format with its meta intact", () => {
   const config = FAR_FIELD_BAKE_CONFIGS["ski-portillo"];
-  const result = bakeFarField(config, synthElevation());
+  const result = bakeFarField(config, synthElevation(), { demSource: "synthetic" });
   const decoded = decodeFarField(result.bytes);
 
   assert.equal(decoded.meta.slug, config.slug);
   assert.equal(decoded.meta.radiusM, config.radiusM);
   assert.equal(decoded.meta.wedgeCount, WEDGE_COUNT);
   assert.deepEqual(decoded.meta.centre, config.centre);
-  assert.equal(decoded.meta.demSource, config.demSource);
+  assert.equal(decoded.meta.demSource, "synthetic", "meta records the DEM actually read");
   assert.equal(decoded.wedges.length, WEDGE_COUNT);
   assert.equal(decoded.meta.bakedAt, result.meta.bakedAt);
 });
 
 test("the size gate fails loudly rather than warning", () => {
   assert.throws(
-    () => bakeFarField(SMALL, synthElevation(), { maxCompressedBytes: 1024 }),
+    () => bakeFarField(SMALL, synthElevation(), { maxCompressedBytes: 1024, demSource: "synthetic" }),
     /exceeds the 1024-byte brotli budget/,
     "an over-budget bake must throw, not warn",
   );
@@ -384,7 +433,7 @@ test("finds Aconcagua in a Portillo-shaped mesh at the right bearing and distanc
   const north = 20_970;
   const wedges = buildWedges(config, synthElevation({ east, north, height: 6961 }));
 
-  const peak = findPeakNear(wedges, Math.atan2(east, north), Math.hypot(east, north), 2500);
+  const peak = findPeakNear(wedges, Math.atan2(east, north), Math.hypot(east, north), 2500, 2900);
   assert.ok(peak !== null, "the peak should be present in the baked geometry");
   assert.ok(peak.elevationM > 6500, `peak is only ${peak.elevationM} m`);
   assert.ok(Math.abs(peak.distanceM - 23_700) < 2000, `peak at ${peak.distanceM} m`);
@@ -395,6 +444,79 @@ test("finds Aconcagua in a Portillo-shaped mesh at the right bearing and distanc
 test("findPeakNear reports nothing when the mesh has no peak there", () => {
   const config = FAR_FIELD_BAKE_CONFIGS["ski-portillo"];
   const wedges = buildWedges(config, synthElevation());
-  const peak = findPeakNear(wedges, Math.atan2(11_054, 20_970), 23_700, 2500);
+  const peak = findPeakNear(wedges, Math.atan2(11_054, 20_970), 23_700, 2500, 2900);
   assert.ok(peak === null || peak.elevationM < 6000, "flat relief must not report a 7 km peak");
+});
+
+// ─── The bake output and the runtime fetch must name the same file ──
+
+test("the baked filename, the loader's URL and the next.config brotli route all agree", async () => {
+  const slug = "ski-portillo";
+
+  // 1. What the baker writes. Captured from the real write path, not a restated literal.
+  const written: string[] = [];
+  const realWriteFileSync = fs.writeFileSync;
+  const result = bakeFarField(SMALL, synthElevation(), { demSource: "synthetic" });
+  (fs as { writeFileSync: typeof fs.writeFileSync }).writeFileSync = ((file: string) => {
+    written.push(path.basename(String(file)));
+  }) as typeof fs.writeFileSync;
+  try {
+    writeFarFieldOutputs(slug, SMALL, result);
+  } finally {
+    (fs as { writeFileSync: typeof fs.writeFileSync }).writeFileSync = realWriteFileSync;
+  }
+  assert.ok(written.includes(`${slug}.far.bin.br`), `baker wrote ${written.join(", ")}`);
+
+  // 2. What the runtime asks for.
+  const requested: string[] = [];
+  await new FarFieldAssetLoader(async (input) => {
+    requested.push(String(input));
+    return { ok: false, status: 404 } as unknown as Response;
+  }).load(slug, { expect: { centre: SMALL.centre, radiusM: SMALL.radiusM }, onWarn: () => {} });
+
+  // The defect this pins: the baker emitted `<slug>-far.bin.br` while the loader
+  // fetched `<slug>.far.bin.br`. A 404 degrades silently to the ridge bands, so
+  // the drift was invisible from a browser — it looked like a working fallback.
+  assert.equal(requested[0], farFieldAssetUrl(slug));
+  assert.equal(path.basename(requested[0]), written.find((f) => f.endsWith(".br")));
+
+  // 3. What Next serves it as. Without the `Content-Encoding: br` header the browser
+  // hands the loader compressed bytes and `decodeFarField` rejects them as bad magic.
+  const config = fs.readFileSync(path.join(ROOT, "next.config.ts"), "utf8");
+  const sources = [...config.matchAll(/source:\s*"([^"]+)"/g)].map((m) => m[1]);
+  const matching = sources.filter((source) => source.replace(":slug", slug) === farFieldAssetUrl(slug));
+  assert.equal(matching.length, 1, `no next.config route serves ${farFieldAssetUrl(slug)}; saw ${sources.join(", ")}`);
+  const rule = config.slice(config.indexOf(`source: "${matching[0]}"`));
+  assert.match(rule.slice(0, 400), /Content-Encoding", value: "br"/);
+});
+
+// ─── Provenance ──────────────────────────────────────────────
+
+test("a bake refuses to ship without naming the DEM it actually read", () => {
+  // meta.demSource is the asset's provenance and feeds attributionFor's licence notice, so a
+  // plausible-looking wrong value is worse than a loud failure. Every static config carries the
+  // sentinel; only the CLI, which has seen the raster, can replace it.
+  assert.equal(FAR_FIELD_BAKE_CONFIGS["ski-portillo"].demSource, UNSPECIFIED_DEM_SOURCE);
+  assert.equal(FAR_FIELD_BAKE_CONFIGS["breckenridge"].demSource, UNSPECIFIED_DEM_SOURCE);
+  assert.throws(
+    () => bakeFarField(SMALL, synthElevation(), { demSource: UNSPECIFIED_DEM_SOURCE }),
+    /provenance/,
+  );
+  assert.throws(
+    () => bakeFarField({ ...SMALL, demSource: UNSPECIFIED_DEM_SOURCE }, synthElevation()),
+    /provenance/,
+  );
+});
+
+test("resolveDemSource prefers an explicit id and otherwise describes the raster read", () => {
+  const raster = { file: "/tmp/ski-portillo-far-dem.tif", resolutionM: 10 };
+  assert.equal(resolveDemSource("usgs-3dep-13arcsec", raster), "usgs-3dep-13arcsec");
+  assert.equal(resolveDemSource("  usgs-3dep-13arcsec  ", raster), "usgs-3dep-13arcsec");
+  // No guessing: with no id, describe what was on disk rather than name a catalogue product.
+  assert.equal(resolveDemSource(undefined, raster), "ski-portillo-far-dem@10m");
+  assert.equal(resolveDemSource("", raster), "ski-portillo-far-dem@10m");
+  assert.equal(
+    resolveDemSource(undefined, { file: "a/b/glo30.tif", resolutionM: 30.922 }),
+    "glo30@30.922m",
+  );
 });

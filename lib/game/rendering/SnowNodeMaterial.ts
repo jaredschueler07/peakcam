@@ -169,5 +169,11 @@ export function createFarFieldNodeMaterial(color: THREE.Color): MeshStandardNode
   material.metalness = 0;
   material.flatShading = false;
   material.dithering = true;
+  // The far field is baked from r = 0, so it lies under the near-field tiles rather than meeting
+  // them at a rim. At 16 m against the tiles' 4 m the two surfaces are close enough to fight for
+  // depth; biasing the far field backwards makes the near field win wherever both are drawn.
+  material.polygonOffset = true;
+  material.polygonOffsetFactor = 1;
+  material.polygonOffsetUnits = 1;
   return material;
 }

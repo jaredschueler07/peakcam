@@ -36,8 +36,8 @@ import type { NodeFactories } from "./nodeFactories";
  *
  * ## Shadows
  *
- * None, by design. The cascade's `maxFar` is 460 m and this geometry starts at 184 m and runs to
- * 30 km; `castShadow`/`receiveShadow` are false, which also keeps the material out of
+ * None, by design. The cascade's `maxFar` is 250 m (`CsmShadows`) and this geometry runs from the
+ * resort centre to 30 km; `castShadow`/`receiveShadow` are false, which also keeps the material out of
  * `configureSceneMaterials`' cascade setup. Do not extend the cascades to reach it.
  *
  * ## Per-frame cost
@@ -46,11 +46,19 @@ import type { NodeFactories } from "./nodeFactories";
  * bounds and the visibility scratch built in the constructor (Task 8 regime).
  */
 
-/** Inner radius of the baked mesh, metres — mirrors `innerRadiusFor` in the baker. */
-export const FAR_FIELD_INNER_RADIUS_M = 184;
+/**
+ * Inner radius of the baked mesh, metres. Zero: the far field runs from the resort centre. It
+ * once reserved a hole for the streamed near-field tiles, but those follow the *player* while a
+ * baked asset is anchored to the *resort*, so the hole was uncovered as soon as the player moved.
+ * Mirrors `innerRadiusFor` in the baker.
+ */
+export const FAR_FIELD_INNER_RADIUS_M = 0;
 
 /** Outer radius of the baked mesh, metres — must match the baker and the asset header. */
 export const FAR_FIELD_RADIUS_M = 30_000;
+
+/** Scene-graph name, so tests and debugging can find the far field without reaching into Renderer. */
+export const FAR_FIELD_GROUP_NAME = "far-field";
 
 /** Snow-white, dimmed slightly: distant snowfields read lighter than the near field otherwise. */
 const FAR_FIELD_COLOR = 0xdfe9f5;
@@ -89,6 +97,9 @@ export class FarFieldRenderer {
       ? opts.nodes.snow.createFarFieldNodeMaterial(new THREE.Color(FAR_FIELD_COLOR))
       : new THREE.MeshStandardMaterial({
         color: FAR_FIELD_COLOR, roughness: 1, metalness: 0, flatShading: false, dithering: true,
+        // See createFarFieldNodeMaterial: the far field underlies the near-field tiles from
+        // r = 0 outwards, so it is biased back to keep the finer mesh in front.
+        polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
       });
     opts.configureMaterial?.(this.material);
 
@@ -123,6 +134,7 @@ export class FarFieldRenderer {
     this.group.position.set(0, 0, 0);
     this.group.matrixAutoUpdate = false;
     this.group.updateMatrix();
+    this.group.name = FAR_FIELD_GROUP_NAME;
     scene.add(this.group);
 
     if (opts.fallback) opts.fallback.visible = false;

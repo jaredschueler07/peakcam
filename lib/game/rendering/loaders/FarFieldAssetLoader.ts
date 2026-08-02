@@ -1,6 +1,7 @@
 import type { DropInResortSlug } from "../../config/schema";
 import {
   decodeFarField,
+  farFieldAssetUrl,
   validateFarFieldForResort,
   type DecodedFarField,
 } from "../../terrain/far-field-format";
@@ -47,7 +48,7 @@ export class FarFieldAssetLoader {
     const warn = options.onWarn ?? ((message: string) => console.warn(message));
 
     try {
-      const url = `/game/terrain/${slug}.far.bin.br`;
+      const url = farFieldAssetUrl(slug);
       const response = await this.fetcher(url, { signal: controller.signal });
       if (!response.ok) {
         warn(`[Drop In] no far field for ${slug} (${response.status}); keeping the ridge bands`);
