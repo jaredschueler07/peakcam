@@ -9,8 +9,14 @@ import type { NodeFactories } from "./nodeFactories";
 export const TILE_SIZE = 200;
 export const TILE_RESOLUTION = 50;
 const CELL_SIZE = TILE_SIZE / TILE_RESOLUTION;
-const GRID_SIZE = 5;
+export const GRID_SIZE = 5;
 const GRID_HALF = 2;
+/**
+ * Tile rows kept behind the player. The grid is biased downhill, so this — not
+ * GRID_HALF — bounds the near field's guaranteed coverage; `bake-far-field.ts`
+ * sizes the far field's inner hole from it.
+ */
+export const Z_TILES_BEHIND = 1;
 const SUN_DIR = new THREE.Vector3(-0.46, 0.62, -0.64).normalize();
 const C_SNOW = new THREE.Color(0.955, 0.975, 1);
 const C_SHADE = new THREE.Color(0.66, 0.76, 0.92);
@@ -125,7 +131,7 @@ export class TerrainRenderer {
     if (cx === this.centerX && cz === this.centerZ) return;
     this.centerX = cx; this.centerZ = cz;
     const wanted: Array<[number, number]> = [];
-    for (let dz = -1; dz <= GRID_SIZE - 2; dz += 1) {
+    for (let dz = -Z_TILES_BEHIND; dz <= GRID_SIZE - 1 - Z_TILES_BEHIND; dz += 1) {
       for (let dx = -GRID_HALF; dx <= GRID_HALF; dx += 1) wanted.push([cx + dx, cz + dz]);
     }
     const keep = new Set<number>();

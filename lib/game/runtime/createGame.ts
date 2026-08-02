@@ -3,6 +3,11 @@ import type { ResortGameProfile } from "../config/schema";
 import { GameRuntime, type RuntimeAnalytics } from "./GameRuntime";
 import { UiBridge } from "./UiBridge";
 import { TerrainAssetLoader } from "../rendering/loaders/TerrainAssetLoader";
+import { FarFieldAssetLoader } from "../rendering/loaders/FarFieldAssetLoader";
+import type { FarFieldLoadOptions } from "../rendering/loaders/FarFieldAssetLoader";
+import type { DecodedFarField } from "../terrain/far-field-format";
+import { FAR_FIELD_RADIUS_M } from "../rendering/FarFieldRenderer";
+import { RESORT_BAKE_CONFIGS } from "../terrain/resorts";
 import { createTerrainSource } from "../terrain/terrain-source";
 import type { TerrainSource } from "../terrain/terrain-source";
 import type { TerrainLoadOptions } from "../rendering/loaders/TerrainAssetLoader";
@@ -16,6 +21,11 @@ import type { RendererBackend } from "../rendering/Renderer";
 
 interface RuntimeTerrainLoader {
   load(slug: ResortGameProfile["slug"], options?: TerrainLoadOptions): Promise<RealTerrainAssets>;
+}
+
+/** Structural, like RuntimeTerrainLoader above, so tests need no cast to substitute a fake. */
+interface RuntimeFarFieldLoader {
+  load(slug: ResortGameProfile["slug"], options: FarFieldLoadOptions): Promise<DecodedFarField | null>;
 }
 
 export interface CreateGameOptions {
@@ -82,7 +92,32 @@ export async function createGame(options: CreateGameOptions): Promise<GameRuntim
     nodeFactories,
   );
   void runtime.startWhenWarm();
+  void attachFarFieldWhenReady(runtime, options);
   return runtime;
+}
+
+/**
+ * Loads the baked far field alongside the run rather than before it. Deliberately not awaited:
+ * the horizon is an upgrade over the procedural ridge bands, so making the player wait on it —
+ * or letting it fail the run — would trade something they can see for something they cannot.
+ * Every failure path inside resolves to `null` and simply leaves the ridge bands up.
+ */
+export async function attachFarFieldWhenReady(
+  runtime: Pick<GameRuntime, "attachFarField">,
+  options: Pick<CreateGameOptions, "profile" | "signal">,
+  loader: RuntimeFarFieldLoader = new FarFieldAssetLoader(),
+): Promise<void> {
+  const centre = RESORT_BAKE_CONFIGS[options.profile.slug]?.center;
+  if (!centre) return;
+  try {
+    const asset = await loader.load(options.profile.slug, {
+      signal: options.signal,
+      expect: { centre, radiusM: FAR_FIELD_RADIUS_M },
+    });
+    if (asset && !options.signal?.aborted) runtime.attachFarField(asset);
+  } catch {
+    // Aborted, or the runtime went away mid-flight. The ridge bands are still standing.
+  }
 }
 
 /**

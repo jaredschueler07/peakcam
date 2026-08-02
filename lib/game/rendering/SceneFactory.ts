@@ -10,6 +10,18 @@ import { SNOW_DEBUG, snowDebugMode } from "./debugFlags";
 export const SUN_DIRECTION = new THREE.Vector3(-0.46, 0.62, -0.64).normalize();
 
 /**
+ * Far clipping plane, metres. Was 6000 while the horizon was two procedural ridge bands at 1750 m
+ * and 2900 m; the baked far field reaches 30 km, and geometry past `far` is simply not drawn — so
+ * without this the entire far field would be invisible rather than merely wrong.
+ *
+ * The cost is depth precision: at near 0.5 a 24-bit depth buffer resolves roughly 100 m at 30 km.
+ * That is inside one far-field cell (256-384 m out there), so it should hold, but horizon z-fighting
+ * is the first thing to check in a visual pass — and it would be a WebGL-only artefact, since the
+ * WebGPU path uses a reversed depth buffer.
+ */
+export const CAMERA_FAR = 34_000;
+
+/**
  * Both backends carry the same uniform *shape*: the WebGL path uses `THREE.IUniform` objects and
  * the WebGPU path uses TSL `uniform()` nodes, and both expose `.value`. Renderer and
  * WeatherRenderer are written against these structural types so they need no backend branch.
@@ -94,7 +106,7 @@ function makeRidge(radius: number, height: number, seed: number, low: number, hi
 export function createScene(profile: ResortGameProfile, aspect: number, nodes: NodeFactories | null = null): GameScene {
   const weather = profile.weather[0], visual = visualWeatherPreset(0), scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(weather.fogCol, weather.fog);
-  const camera = new THREE.PerspectiveCamera(65, aspect, 0.5, 6000);
+  const camera = new THREE.PerspectiveCamera(65, aspect, 0.5, CAMERA_FAR);
   const hemi = new THREE.HemisphereLight(visual.hemiSky, visual.hemiGround, weather.hemi);
   const ambient = new THREE.AmbientLight(visual.ambientCol, weather.amb);
   const sun = new THREE.DirectionalLight(visual.sunCol, weather.sun);

@@ -21,6 +21,7 @@ import { simulationConfigForConditions } from "./physics-selection";
 import type { PhysicsModel } from "../core/config";
 import type { RuntimeAudio } from "./RuntimeAudio";
 import { encodeGhost, type DecodedGhost, type GhostSample } from "../replay/codec";
+import type { DecodedFarField } from "../terrain/far-field-format";
 import { GHOST_SAMPLE_HZ, GhostRecorder } from "../replay/recorder";
 
 interface FinishedRunRecording {
@@ -220,6 +221,12 @@ export class GameRuntime {
    * it; this is the one thing the shell legitimately drives from a UI action.
    */
   setGhost(ghost: DecodedGhost | null): void { this.renderer.setGhost(ghost); }
+
+  /**
+   * Swap in the baked far field once it resolves. Optional by design: the run is already under
+   * way on the procedural ridge bands, and a resort without an asset simply never calls this.
+   */
+  attachFarField(asset: DecodedFarField): void { this.renderer.attachFarField(asset); }
 
   /** Which renderer backend the run is actually using. */
   get backendKind(): "webgpu" | "webgl" { return this.renderer.backendKind; }

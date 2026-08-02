@@ -149,3 +149,31 @@ export function createSnowNodeMaterial(
   material.userData.snowOutputNode = (outgoingLight: Vec3) => snowShading(uniforms, outgoingLight, mode);
   return material;
 }
+
+/**
+ * The far field's surface material on the WebGPU path (`FarFieldRenderer.ts`).
+ *
+ * Deliberately plain: at 0.5–30 km the signal is silhouette and aerial perspective, not surface
+ * detail, so this skips the snow shading, the triplanar detail normal and the ski-track uniform
+ * that `createSnowNodeMaterial` carries — all of which cost per-pixel work for something no one
+ * can resolve at that distance.
+ *
+ * What it must *not* skip is the fog. `fog` stays true so `scene.fogNode` reaches it and the
+ * near/far seam matches; `userData.heightFog` is left unset for the same reason on the WebGL
+ * twin. Shadows are irrelevant out here — the cascade's `maxFar` is 460 m.
+ */
+export function createFarFieldNodeMaterial(color: THREE.Color): MeshStandardNodeMaterial {
+  const material = new MeshStandardNodeMaterial();
+  material.color = color;
+  material.roughness = 1;
+  material.metalness = 0;
+  material.flatShading = false;
+  material.dithering = true;
+  // The far field is baked from r = 0, so it lies under the near-field tiles rather than meeting
+  // them at a rim. At 16 m against the tiles' 4 m the two surfaces are close enough to fight for
+  // depth; biasing the far field backwards makes the near field win wherever both are drawn.
+  material.polygonOffset = true;
+  material.polygonOffsetFactor = 1;
+  material.polygonOffsetUnits = 1;
+  return material;
+}
