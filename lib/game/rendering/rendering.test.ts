@@ -18,7 +18,7 @@ import { configureSceneMaterials } from "./Renderer";
 import { fogExp2Amount, heightFogAmount, type AtmosphereUniforms } from "./Atmosphere";
 import { SkierRenderer } from "./SkierRenderer";
 import { buildTileGeometry } from "./TerrainRenderer";
-import { rampRise, RAMP_BANNER_H, RAMP_BANNER_Y, RAMP_MAX_RISE, sagAt, WorldRenderer } from "./WorldRenderer";
+import { rampRise, RAMP_BANNER_H, RAMP_DECK_CLEARANCE, RAMP_MAX_RISE, sagAt, WorldRenderer } from "./WorldRenderer";
 import { staticNodeFactories } from "./nodeFactories.fixture";
 import { CAMERA_FAR, createScene } from "./SceneFactory";
 import { FAR_FIELD_GROUP_NAME, FAR_FIELD_INNER_RADIUS_M, FarFieldRenderer } from "./FarFieldRenderer";
@@ -123,6 +123,8 @@ function syntheticCourse(runM: number, dropM: number, sagM = 0): { world: Simula
   return { world, run };
 }
 
+type RampParts = { rail: THREE.Mesh; rail2: THREE.Mesh; banner: THREE.Mesh; postL: THREE.Mesh; postR: THREE.Mesh };
+
 /** The visible ramp group, plus the ground height directly under it. */
 function placedRamp(world: SimulationWorld) {
   const state = createSimulation(profile, profile.seed);
@@ -131,8 +133,17 @@ function placedRamp(world: SimulationWorld) {
   const group = scene.children.find((child) => child instanceof THREE.Group && child.visible &&
     (child.userData as { rail?: THREE.Mesh }).rail) as THREE.Group;
   assert.ok(group, "the tail ramp is placed");
-  const { rail, rail2, banner } = group.userData as { rail: THREE.Mesh; rail2: THREE.Mesh; banner: THREE.Mesh };
-  return { group, rail, rail2, banner, groundY: world.terrain.height(group.position.x, group.position.z) };
+  // The renderer never renders in tests, so nothing has resolved the group's world matrices yet.
+  scene.updateMatrixWorld(true);
+  const parts = group.userData as RampParts;
+  return { group, ...parts, groundY: world.terrain.height(group.position.x, group.position.z) };
+}
+
+/** World-space axis-aligned extents of a mesh, which is what a screenshot actually shows. */
+function worldBox(mesh: THREE.Mesh) {
+  const box = new THREE.Box3().setFromObject(mesh), size = new THREE.Vector3();
+  box.getSize(size);
+  return { box, size };
 }
 
 test("a cliff-tail ramp renders as a ramp, not a beam hanging over the course", () => {
@@ -162,22 +173,54 @@ test("the ramp deck sits on the drawn terrain, not on the run polyline chord", (
     `deck rides the terrain, got ${group.position.y} for ground ${groundY}`);
 });
 
-test("the ramp banner stays on the deck at every course position", () => {
-  // The reported defect: a 23m-wide navy panel hanging 8-10m over the kicker with nothing holding
-  // it up. Its own offset stacked on top of the chord float, so both halves are pinned here.
-  for (const [runM, dropM, sagM] of [[800, 240, 40], [800, 700, 0], [400, 60, 12], [1200, 300, 25]]) {
-    const { world } = syntheticCourse(runM, dropM, sagM);
-    const { group, banner, groundY } = placedRamp(world);
-    const bannerY = group.position.y + banner.position.y;
-    const deck = groundY;
-    const margin = 0.5;
-    assert.ok(bannerY >= deck && bannerY <= deck + RAMP_BANNER_H + margin,
-      `banner at ${bannerY.toFixed(2)} outside [${deck.toFixed(2)}, ${(deck + RAMP_BANNER_H + margin).toFixed(2)}] for ${runM}/${dropM}/${sagM}`);
-    // And the whole panel, not just its centre, clears the snow without floating over it.
-    assert.ok(bannerY - RAMP_BANNER_H / 2 >= deck, "the panel's bottom edge is above the deck");
-    assert.ok(bannerY + RAMP_BANNER_H / 2 <= deck + RAMP_BANNER_H + margin, "and its top edge is still low");
+/** Courses the banner must survive: a gentle run, the cliff tail, and two mid cases. */
+const BANNER_COURSES: [number, number, number][] = [[800, 240, 40], [800, 700, 0], [400, 60, 12], [1200, 300, 25]];
+
+test("the ramp banner stands as an upright gate panel, not a slab lying on the snow", () => {
+  for (const [runM, dropM, sagM] of BANNER_COURSES) {
+    const label = `${runM}/${dropM}/${sagM}`;
+    const { banner } = placedRamp(syntheticCourse(runM, dropM, sagM).world);
+    const { size } = worldBox(banner);
+    // The discriminator between a standing banner and the reported flat slab. A panel facing down
+    // the fall line has all its area in x-y and no depth; a slab lying on the snow has it in x-z.
+    assert.ok(size.z < 0.2, `banner has no depth when upright, got ${size.z.toFixed(2)}m at ${label}`);
+    assert.ok(Math.abs(size.y - RAMP_BANNER_H) < 1e-6, `banner stands its full height at ${label}`);
+    // Wide enough to read as a gate over a deck whose rails sit at +/-9.03m, never the ~40m slab.
+    assert.ok(size.x > 16 && size.x < 24, `banner spans the deck, got ${size.x.toFixed(2)}m at ${label}`);
   }
-  assert.ok(RAMP_BANNER_Y < 4.2, "the old overhead-arch height is gone");
+});
+
+test("the ramp banner's up-vector stays vertical regardless of the ramp's rise", () => {
+  // The group is yawed by heading and nothing else, so the panel's own +Y must remain world up.
+  // A rise-dependent pitch leaking into the banner — the failure mode this guards — tilts it.
+  for (const [runM, dropM, sagM] of BANNER_COURSES) {
+    const { banner } = placedRamp(syntheticCourse(runM, dropM, sagM).world);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(banner.getWorldQuaternion(new THREE.Quaternion()));
+    assert.ok(up.dot(new THREE.Vector3(0, 1, 0)) > 0.9998,
+      `banner up-vector is vertical, got ${up.toArray().map((v) => v.toFixed(3)).join(",")} at ${runM}/${dropM}/${sagM}`);
+  }
+});
+
+test("the ramp banner is carried overhead by uprights that stand on the deck", () => {
+  for (const [runM, dropM, sagM] of BANNER_COURSES) {
+    const label = `${runM}/${dropM}/${sagM}`;
+    const { banner, postL, postR, groundY } = placedRamp(syntheticCourse(runM, dropM, sagM).world);
+    const deck = groundY + RAMP_DECK_CLEARANCE;
+    const panel = worldBox(banner).box, left = worldBox(postL).box, right = worldBox(postR).box;
+    // Head height: a skier passes under the panel rather than through it, and it never becomes the
+    // detached bar in the sky that the 4.2m no-posts version read as.
+    assert.ok(panel.min.y - deck > 3, `panel clears head height, got ${(panel.min.y - deck).toFixed(2)}m at ${label}`);
+    assert.ok(panel.max.y - deck < 8, `panel stays within gate height, got ${(panel.max.y - deck).toFixed(2)}m at ${label}`);
+    // Posts do the holding up: based on the deck, tall enough to reach the panel's top edge.
+    for (const [name, post] of [["left", left], ["right", right]] as const) {
+      assert.ok(Math.abs(post.min.y - deck) < 1e-6, `${name} post is footed on the deck at ${label}`);
+      assert.ok(post.max.y >= panel.max.y - 1e-6, `${name} post reaches the panel top at ${label}`);
+    }
+    // And they straddle it rather than standing inside the span.
+    assert.ok(left.max.x <= panel.min.x + 0.3 && right.min.x >= panel.max.x - 0.3,
+      `posts straddle the panel at ${label}`);
+    assert.ok(Math.abs(left.min.z - panel.min.z) < 1, `posts share the panel's plane at ${label}`);
+  }
 });
 
 test("gates are draped on the terrain too, not left floating on the chord", () => {

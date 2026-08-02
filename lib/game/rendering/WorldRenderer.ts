@@ -49,16 +49,32 @@ export function mergeParts(parts: Part[]): THREE.BufferGeometry {
  */
 export const RAMP_MAX_RISE = RAMP_LEN * 0.6;
 
-/** Height of the ramp's banner panel, and the gap it leaves above the ramp deck. */
-export const RAMP_BANNER_H = 1.5;
-const RAMP_BANNER_CLEARANCE = 0.25;
+/** How far a ramp group floats above the sampled deck, so the rails rest on the snow rather than in it. */
+export const RAMP_DECK_CLEARANCE = 0.2;
+
+/** Height of the ramp's banner panel. */
+export const RAMP_BANNER_H = 2.2;
 /**
- * Banner centre, in group-local space where y=0 is the ramp deck. It used to sit at 4.2 — an
- * overhead arch, except the panel is 23m wide and has no posts holding it up, so it read as a bar
- * floating in the sky the moment anything put it above the snow. Kept low enough that the whole
- * panel lands inside [deck, deck + RAMP_BANNER_H + margin].
+ * Half-span of the panel and of the uprights that carry it. The rails sit at ±RAMP_W * 0.86, so
+ * this straddles the deck with about a metre to spare on each side.
  */
-export const RAMP_BANNER_Y = RAMP_BANNER_CLEARANCE + RAMP_BANNER_H / 2;
+export const RAMP_BANNER_HALF_SPAN = RAMP_W * 0.95;
+/** Upright height — tall enough that the panel clears a skier's head on the run-in. */
+export const RAMP_BANNER_POST_H = 6;
+/** Gap between the top of the uprights and the top edge of the panel. */
+const RAMP_BANNER_HEADROOM = 0.3;
+/** Down-slope offset of the whole gate: it stands just uphill of the ramp's entry. */
+const RAMP_BANNER_Z = -1.5;
+/**
+ * Panel centre, in group-local space where y=0 is the ramp deck at the entry.
+ *
+ * This has been wrong twice, in opposite directions. It began at 4.2 with nothing holding the
+ * panel up, so a 23m-wide plane read as a bar floating in the sky; the response was to drop it to
+ * ~1.0, which turned it into a 23m x 1.5m ribbon sitting on the snow — the "flat navy slab"
+ * report. Height was never the defect. A panel that wide only reads as a banner when something
+ * visibly carries it, so it is back overhead and now has uprights.
+ */
+export const RAMP_BANNER_Y = RAMP_BANNER_POST_H - RAMP_BANNER_HEADROOM - RAMP_BANNER_H / 2;
 
 /** The rise a ramp's rails are actually built to, clamped to a rail-shaped range. */
 export function rampRise(startY: number, endY: number): number {
@@ -130,16 +146,25 @@ export class WorldRenderer {
   }
 
   private buildRamps() {
+    // Shared across all 12 groups: unlike the gates' poles, nothing here is recoloured per ramp.
+    const postGeometry = new THREE.CylinderGeometry(0.16, 0.22, RAMP_BANNER_POST_H, 6);
+    const postMaterial = new THREE.MeshStandardMaterial({ color: 0x1b2434, roughness: 0.6, metalness: 0.35 });
     for (let i = 0; i < 12; i += 1) {
       const group = new THREE.Group(), railMaterial = new THREE.MeshStandardMaterial({ color: 0xffe08a, roughness: 0.5, emissive: 0xffb020, emissiveIntensity: 0.22 });
       const rail = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, RAMP_LEN), railMaterial), rail2 = rail.clone();
       rail.position.set(-RAMP_W * 0.86, 0, RAMP_LEN * 0.5); rail2.position.set(RAMP_W * 0.86, 0, RAMP_LEN * 0.5);
-      const banner = new THREE.Mesh(new THREE.PlaneGeometry(RAMP_W * 2.2, RAMP_BANNER_H), new THREE.MeshStandardMaterial({ color: 0x0d1524, side: THREE.DoubleSide, emissive: 0x2e6bd0, emissiveIntensity: 0.3 }));
-      // The banner rides at the ramp's entry, which is the group origin for any rise: the rails
-      // are boxes centred at (h/2, RAMP_LEN/2) and pitched about their own centres, so their
-      // uphill ends always land back on y=0, z=0. It therefore needs no rise-dependent transform,
-      // only a deck the group is honestly anchored to — see `updateRamps`.
-      banner.position.set(0, RAMP_BANNER_Y, -1.5); group.add(rail, rail2, banner); group.userData = { rail, rail2, banner }; group.visible = false;
+      const banner = new THREE.Mesh(new THREE.PlaneGeometry(RAMP_BANNER_HALF_SPAN * 2, RAMP_BANNER_H), new THREE.MeshStandardMaterial({ color: 0x0d1524, side: THREE.DoubleSide, emissive: 0x2e6bd0, emissiveIntensity: 0.3 }));
+      const postL = new THREE.Mesh(postGeometry, postMaterial), postR = postL.clone();
+      postL.position.set(-RAMP_BANNER_HALF_SPAN, RAMP_BANNER_POST_H / 2, RAMP_BANNER_Z);
+      postR.position.set(RAMP_BANNER_HALF_SPAN, RAMP_BANNER_POST_H / 2, RAMP_BANNER_Z);
+      postL.castShadow = postR.castShadow = true;
+      // The gate stands at the ramp's entry, which is the group origin for any rise: the rails are
+      // boxes centred at (h/2, RAMP_LEN/2) and pitched about their own centres, so their uphill
+      // ends always land back on y=0, z=0. Panel and posts therefore need no rise-dependent
+      // transform, only a deck the group is honestly anchored to — see `updateRamps`.
+      banner.position.set(0, RAMP_BANNER_Y, RAMP_BANNER_Z);
+      group.add(rail, rail2, postL, postR, banner);
+      group.userData = { rail, rail2, banner, postL, postR }; group.visible = false;
       this.ramps.push(group); this.scene.add(group);
     }
   }
@@ -281,7 +306,7 @@ export class WorldRenderer {
         // that is actually drawn — which floated the whole ramp, banner included, into the sky.
         // The procedural branch below has always sampled the terrain; this now matches it.
         const deckY = this.world.terrain.height(ramp.x, ramp.z);
-        group.position.set(ramp.x, deckY + 0.2, ramp.z); group.rotation.y = ramp.heading;
+        group.position.set(ramp.x, deckY + RAMP_DECK_CLEARANCE, ramp.z); group.rotation.y = ramp.heading;
         const h = rampRise(deckY, this.world.terrain.height(end.x, end.z));
         group.userData.rail.rotation.x = group.userData.rail2.rotation.x = -Math.atan2(h, RAMP_LEN);
         group.userData.rail.position.y = group.userData.rail2.position.y = h * 0.5;
@@ -296,7 +321,7 @@ export class WorldRenderer {
       for (let k = first; k < first + 2 && count < this.ramps.length; k += 1) {
         const z = trail.ramp + k * RAMP_SPACING; if (z < -200 || z > playerZ + 620) continue;
         const x = trailCenter(trail, z + RAMP_LEN * 0.5), group = this.ramps[count++], h = rampRise(this.world.terrain.height(x, z), this.world.terrain.height(x, z + RAMP_LEN));
-        group.visible = true; group.position.set(x, this.world.terrain.height(x, z) + 0.2, z); group.userData.rail.rotation.x = group.userData.rail2.rotation.x = -Math.atan2(h, RAMP_LEN); group.userData.rail.position.y = group.userData.rail2.position.y = h * 0.5;
+        group.visible = true; group.position.set(x, this.world.terrain.height(x, z) + RAMP_DECK_CLEARANCE, z); group.userData.rail.rotation.x = group.userData.rail2.rotation.x = -Math.atan2(h, RAMP_LEN); group.userData.rail.position.y = group.userData.rail2.position.y = h * 0.5;
       }
     }
     for (let i = count; i < this.ramps.length; i += 1) this.ramps[i].visible = false;
