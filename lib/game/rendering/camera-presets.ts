@@ -94,3 +94,15 @@ export function resolveCameraPresetName(value: string | null | undefined): Camer
     ? (value as CameraPresetName)
     : DEFAULT_CAMERA_PRESET;
 }
+
+/**
+ * The furthest the chase camera can sit behind the player, metres — `backBase + backSpeedGain`,
+ * maximised over the presets (cinematic: 20 + 11 = 31).
+ *
+ * `NEAR_FIELD_MAX_REACH_M` is measured from the **player**, but the fog shaders measure from the
+ * **camera**, so the furthest a tile-grid pixel can be from the eye is the sum of the two. The fog
+ * envelope's start has to clear that sum, not just the reach; `fogCurve.test.ts` asserts it.
+ */
+export const MAX_CAMERA_PULLBACK_M = Math.max(
+  ...Object.values(CAMERA_PRESETS).map((preset) => preset.backBase + preset.backSpeedGain),
+);

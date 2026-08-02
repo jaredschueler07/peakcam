@@ -10,6 +10,7 @@ import { pointAtArcLength } from "../terrain/real-course";
 import { treeDebugEnabled } from "./debugFlags";
 import { createLandmarks } from "./LandmarkRenderer";
 import { TILE_SIZE } from "./TerrainRenderer";
+import { GRID_HALF, GRID_SIZE, Z_TILES_BEHIND } from "./nearFieldReach";
 
 const TOWER_SPACING = 108;
 const matrix = new THREE.Matrix4(), quaternion = new THREE.Quaternion(), position = new THREE.Vector3(), scale = new THREE.Vector3();
@@ -182,8 +183,10 @@ export class WorldRenderer {
   private updateLandmarks(playerX: number, playerZ: number): void {
     if (!this.landmarks) return;
     const cx = Math.floor(playerX / TILE_SIZE), cz = Math.floor(playerZ / TILE_SIZE);
-    const minimumX = (cx - 2) * TILE_SIZE, maximumX = (cx + 3) * TILE_SIZE;
-    const minimumZ = (cz - 1) * TILE_SIZE, maximumZ = (cz + 4) * TILE_SIZE;
+    // Derived from the grid, not transcribed: these must track TerrainRenderer's tile window or
+    // landmarks cull against a box the terrain no longer draws.
+    const minimumX = (cx - GRID_HALF) * TILE_SIZE, maximumX = (cx + GRID_HALF + 1) * TILE_SIZE;
+    const minimumZ = (cz - Z_TILES_BEHIND) * TILE_SIZE, maximumZ = (cz + GRID_SIZE - Z_TILES_BEHIND) * TILE_SIZE;
     for (const landmark of this.landmarks.children) {
       const footprint = landmark.userData.terrainFootprint as { halfX: number; halfZ: number } | undefined;
       if (!footprint) continue;
