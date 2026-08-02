@@ -3,8 +3,8 @@ import { clamp01, smoothstep } from "../core/math";
 import type { SimulationWorld, TerrainSampler } from "../core/types";
 import { fbm, vnoise } from "../terrain/noise";
 import { buildSnowDetailNormal, polishSnowMaterial, type SnowUniforms } from "./SnowMaterial";
-import { createSnowNodeMaterial, type SnowNodeUniforms } from "./SnowNodeMaterial";
-import type { RendererBackendKind } from "./backend";
+import type { SnowNodeUniforms } from "./SnowNodeMaterial";
+import type { NodeFactories } from "./nodeFactories";
 
 export const TILE_SIZE = 200;
 export const TILE_RESOLUTION = 50;
@@ -97,16 +97,17 @@ export class TerrainRenderer {
     private readonly scene: THREE.Scene,
     private readonly world: SimulationWorld,
     snowUniforms?: SnowUniforms | SnowNodeUniforms,
-    backendKind: RendererBackendKind = "webgl",
+    /** Present exactly on the WebGPU path; see `nodeFactories`. */
+    nodes: NodeFactories | null = null,
     snowDebug = 0,
   ) {
     // The node material is built from the same constants; only the shading language differs.
-    const material: THREE.Material = snowUniforms && backendKind === "webgpu"
-      ? createSnowNodeMaterial(buildSnowDetailNormal(world.seed), snowUniforms as SnowNodeUniforms, snowDebug)
+    const material: THREE.Material = snowUniforms && nodes
+      ? nodes.snow.createSnowNodeMaterial(buildSnowDetailNormal(world.seed), snowUniforms as SnowNodeUniforms, snowDebug)
       : new THREE.MeshStandardMaterial({
         vertexColors: true, roughness: 0.86, metalness: 0.02, flatShading: false, dithering: true,
       });
-    if (snowUniforms && backendKind !== "webgpu") {
+    if (snowUniforms && !nodes) {
       const detailNormal = buildSnowDetailNormal(world.seed);
       material.userData.snowDetail = detailNormal;
       polishSnowMaterial(material as THREE.MeshStandardMaterial, detailNormal, snowUniforms as SnowUniforms);

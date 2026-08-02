@@ -38,6 +38,33 @@ export function mergeParts(parts: Part[]): THREE.BufferGeometry {
   output.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3)); output.computeBoundingSphere(); return output;
 }
 
+/**
+ * Ceiling on how far a ramp's rail may rise or fall across its 22m run.
+ *
+ * A real course is a simplified polyline, so one tail segment can cut straight across a cliff
+ * band. Sampling 22m further along such a segment reports a drop of tens of metres, and the rail
+ * — pitched by `atan2(h, RAMP_LEN)` and centred at `h * 0.5` — then renders as a giant beam
+ * hanging in the air above terrain that never falls that fast. 0.6 x RAMP_LEN caps the pitch at
+ * ~31 degrees, steeper than any groomed jump and still unmistakably a ramp.
+ */
+export const RAMP_MAX_RISE = RAMP_LEN * 0.6;
+
+/** Height of the ramp's banner panel, and the gap it leaves above the ramp deck. */
+export const RAMP_BANNER_H = 1.5;
+const RAMP_BANNER_CLEARANCE = 0.25;
+/**
+ * Banner centre, in group-local space where y=0 is the ramp deck. It used to sit at 4.2 — an
+ * overhead arch, except the panel is 23m wide and has no posts holding it up, so it read as a bar
+ * floating in the sky the moment anything put it above the snow. Kept low enough that the whole
+ * panel lands inside [deck, deck + RAMP_BANNER_H + margin].
+ */
+export const RAMP_BANNER_Y = RAMP_BANNER_CLEARANCE + RAMP_BANNER_H / 2;
+
+/** The rise a ramp's rails are actually built to, clamped to a rail-shaped range. */
+export function rampRise(startY: number, endY: number): number {
+  return Math.max(-RAMP_MAX_RISE, Math.min(RAMP_MAX_RISE, endY - startY));
+}
+
 export function sagAt(z: number, zStart: number): number {
   const u = ((z - zStart) % TOWER_SPACING) / TOWER_SPACING;
   return Math.sin(u * Math.PI) * 2.2;
@@ -107,8 +134,12 @@ export class WorldRenderer {
       const group = new THREE.Group(), railMaterial = new THREE.MeshStandardMaterial({ color: 0xffe08a, roughness: 0.5, emissive: 0xffb020, emissiveIntensity: 0.22 });
       const rail = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, RAMP_LEN), railMaterial), rail2 = rail.clone();
       rail.position.set(-RAMP_W * 0.86, 0, RAMP_LEN * 0.5); rail2.position.set(RAMP_W * 0.86, 0, RAMP_LEN * 0.5);
-      const banner = new THREE.Mesh(new THREE.PlaneGeometry(RAMP_W * 2.2, 1.5), new THREE.MeshStandardMaterial({ color: 0x0d1524, side: THREE.DoubleSide, emissive: 0x2e6bd0, emissiveIntensity: 0.3 }));
-      banner.position.set(0, 4.2, -1.5); group.add(rail, rail2, banner); group.userData = { rail, rail2 }; group.visible = false;
+      const banner = new THREE.Mesh(new THREE.PlaneGeometry(RAMP_W * 2.2, RAMP_BANNER_H), new THREE.MeshStandardMaterial({ color: 0x0d1524, side: THREE.DoubleSide, emissive: 0x2e6bd0, emissiveIntensity: 0.3 }));
+      // The banner rides at the ramp's entry, which is the group origin for any rise: the rails
+      // are boxes centred at (h/2, RAMP_LEN/2) and pitched about their own centres, so their
+      // uphill ends always land back on y=0, z=0. It therefore needs no rise-dependent transform,
+      // only a deck the group is honestly anchored to — see `updateRamps`.
+      banner.position.set(0, RAMP_BANNER_Y, -1.5); group.add(rail, rail2, banner); group.userData = { rail, rail2, banner }; group.visible = false;
       this.ramps.push(group); this.scene.add(group);
     }
   }
@@ -213,7 +244,9 @@ export class WorldRenderer {
       for (const gate of run?.gates ?? []) {
         if (count >= this.gates.length) break;
         const group = this.gates[count++]; group.visible = true;
-        group.position.set(gate.x, gate.y, gate.z); group.rotation.y = gate.heading;
+        // Terrain, not `gate.y`, for the same reason the ramps use it: the chord between polyline
+        // vertices measured up to 17.5m off the drawn heightfield on Roca Jack.
+        group.position.set(gate.x, this.world.terrain.height(gate.x, gate.z), gate.z); group.rotation.y = gate.heading;
         group.userData.left.position.x = -gate.halfWidthM; group.userData.right.position.x = gate.halfWidthM;
         group.userData.panel.scale.x = gate.halfWidthM * 2;
         const done = state.passedGates.has(state.selectedTrail * 100003 + gate.key);
@@ -243,8 +276,13 @@ export class WorldRenderer {
         if (count >= this.ramps.length) break;
         const end = pointAtArcLength(run.points, Math.min(run.lengthM, ramp.distanceM + RAMP_LEN), arcScratch);
         const group = this.ramps[count++]; group.visible = true;
-        group.position.set(ramp.x, ramp.y + 0.2, ramp.z); group.rotation.y = ramp.heading;
-        const h = end.y - ramp.y;
+        // Deck height comes from the heightfield, never from `ramp.y`. A run polyline is a chord
+        // between simplified vertices, so on Portillo's Roca Jack it runs 5.5-9.9m above the snow
+        // that is actually drawn — which floated the whole ramp, banner included, into the sky.
+        // The procedural branch below has always sampled the terrain; this now matches it.
+        const deckY = this.world.terrain.height(ramp.x, ramp.z);
+        group.position.set(ramp.x, deckY + 0.2, ramp.z); group.rotation.y = ramp.heading;
+        const h = rampRise(deckY, this.world.terrain.height(end.x, end.z));
         group.userData.rail.rotation.x = group.userData.rail2.rotation.x = -Math.atan2(h, RAMP_LEN);
         group.userData.rail.position.y = group.userData.rail2.position.y = h * 0.5;
       }
@@ -257,7 +295,7 @@ export class WorldRenderer {
       const first = Math.max(0, Math.floor((playerZ - 60 - trail.ramp) / RAMP_SPACING));
       for (let k = first; k < first + 2 && count < this.ramps.length; k += 1) {
         const z = trail.ramp + k * RAMP_SPACING; if (z < -200 || z > playerZ + 620) continue;
-        const x = trailCenter(trail, z + RAMP_LEN * 0.5), group = this.ramps[count++], h = this.world.terrain.height(x, z + RAMP_LEN) - this.world.terrain.height(x, z);
+        const x = trailCenter(trail, z + RAMP_LEN * 0.5), group = this.ramps[count++], h = rampRise(this.world.terrain.height(x, z), this.world.terrain.height(x, z + RAMP_LEN));
         group.visible = true; group.position.set(x, this.world.terrain.height(x, z) + 0.2, z); group.userData.rail.rotation.x = group.userData.rail2.rotation.x = -Math.atan2(h, RAMP_LEN); group.userData.rail.position.y = group.userData.rail2.position.y = h * 0.5;
       }
     }

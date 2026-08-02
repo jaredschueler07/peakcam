@@ -27,6 +27,28 @@ devices unless a gate states otherwise.
   brotli-compressed.
 - Each baked resort terrain/trail pack must be at most 1.5 MB brotli-compressed.
 
+## Renderer payload split
+
+The node-material pipeline — `SkyNodeMaterial`, `SnowNodeMaterial`, `AtmosphereNode`,
+`ParticleNodeMaterial`, `CsmShadowsNode`, `NodePostProcessing` — sits behind one dynamic
+boundary, `lib/game/rendering/nodeFactories.ts`. Every one of those modules reaches
+`three/webgpu` (`three/tsl` and `three/addons/csm/CSMShadowNode.js` both re-export from it), so
+importing any of them statically put 647 KB of minified WebGPU renderer into the chunk group that
+`createGame`'s dynamic import fetches — on every session, WebGL included.
+
+Routing them through `loadNodeFactories()`, which `createGame` awaits only after a WebGPU device
+is confirmed, took that eager group from **1510.3 KB to 839.0 KB raw (328.4 KB to 179.8 KB
+brotli)**. `nodeFactories.test.ts` enforces the rule the split rests on: outside those modules,
+nothing may import `three/webgpu`, `three/tsl`, `CSMShadowNode.js`, or a node-material module at
+value level. `import type` is erased and stays free.
+
+**The `postprocessing` package (6.39.4) stays.** It is the WebGL path's whole post chain —
+`EffectComposer`, bloom, SMAA, the 3D LUT, vignette and chromatic aberration in
+`lib/game/rendering/PostProcessing.ts` — and `NodePostProcessing` replaces it only on WebGPU.
+Removing it is a rollout-end task: it becomes dead the moment the WebGL fallback is dropped, and
+not one moment sooner. `PostProcessing.ts` is already behind a dynamic import, so it costs a
+lazy chunk rather than eager bytes in the meantime.
+
 ## KTX2 asset inventory
 
 Task 7 inventory found no eligible file textures: excluding `public/game/terrain`

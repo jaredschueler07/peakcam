@@ -5,7 +5,7 @@ import type { DecodedGhost } from "../replay/codec";
 import { CameraController } from "./CameraController";
 import { addHeightFog } from "./Atmosphere";
 import { CsmShadows } from "./CsmShadows";
-import { CsmShadowsNode, type ShadowSystem } from "./CsmShadowsNode";
+import type { ShadowSystem } from "./CsmShadowsNode";
 import { EffectsRenderer } from "./EffectsRenderer";
 import { GhostRenderer } from "./GhostRenderer";
 import { disposeObjectTree, resourceCounts, type DisposalAudit, type ResourceCounts } from "./resources";
@@ -17,6 +17,7 @@ import { WorldRenderer } from "./WorldRenderer";
 import { QualityController, seedQualityRung, type DeviceQualitySignals, type QualityRung } from "./QualityController";
 import type { PostProcessing } from "./PostProcessing";
 import type { NodePostProcessing } from "./NodePostProcessing";
+import type { NodeFactories } from "./nodeFactories";
 import { visualWeatherPreset } from "./VisualPresets";
 import { postBypassEnabled, snowDebugMode } from "./debugFlags";
 
@@ -60,6 +61,11 @@ interface RendererOptions {
   disposalAudit?: DisposalAudit;
   qualitySignals?: DeviceQualitySignals;
   onQualityChange?(event: QualityChangeEvent): void;
+  /**
+   * The node pipeline, resolved by `loadNodeFactories()`. Required whenever `backend.backendKind`
+   * is `"webgpu"` — a WebGPU device cannot compile the GLSL materials the WebGL path builds.
+   */
+  nodeFactories?: NodeFactories | null;
   /** Test seam: shortens the pre-warm budget so a hung compile can be exercised quickly. */
   prewarmTimeoutMs?: number;
 }
@@ -141,7 +147,7 @@ export class GameRenderer {
   private readonly p75Window = new Float64Array(240);
   private readonly bypassPost: boolean;
   private readonly maxDpr: number;
-  private width = 1; private height = 1; private fpsTime = 0; private fpsFrames = 0; private adaptTime = 0;
+  private width = 1; private height = 1; private adaptTime = 0;
   private elapsed = 0;
   private contextLost = false; private disposed = false;
 
@@ -173,24 +179,28 @@ export class GameRenderer {
     const signals = options.qualitySignals ?? { hardwareConcurrency: navigatorLike?.hardwareConcurrency, deviceMemory: navigatorLike?.deviceMemory, coarsePointer: typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches, dpr: this.maxDpr };
     this.mobile = signals.coarsePointer;
     this.quality = new QualityController(seedQualityRung(signals));
-    const backendKind = this.renderer.backendKind;
     const snowDebug = snowDebugMode();
-    const nodes = backendKind === "webgpu";
-    this.built = createScene(profile, Math.max(1, canvas.clientWidth) / Math.max(1, canvas.clientHeight), backendKind);
-    this.terrain = new TerrainRenderer(this.built.scene, world, this.built.snowUniforms, backendKind, snowDebug);
+    // `nodes` is the one backend switch the scene needs: it is non-null exactly on WebGPU, and
+    // carries the node-material factories that only that path fetches.
+    const nodes = this.renderer.backendKind === "webgpu" ? options.nodeFactories ?? null : null;
+    if (this.renderer.backendKind === "webgpu" && !nodes) {
+      throw new Error("[Drop In] A WebGPU backend needs nodeFactories; await loadNodeFactories() before constructing GameRenderer.");
+    }
+    this.built = createScene(profile, Math.max(1, canvas.clientWidth) / Math.max(1, canvas.clientHeight), nodes);
+    this.terrain = new TerrainRenderer(this.built.scene, world, this.built.snowUniforms, nodes, snowDebug);
     this.skier = new SkierRenderer(this.built.scene);
     this.ghost = new GhostRenderer(this.built.scene);
     this.worldRenderer = new WorldRenderer(this.built.scene, profile, world);
     this.reducedMotion = options.reducedMotion ?? (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
     this.effects = new EffectsRenderer(
       this.built.scene, world.seed, world.terrain, this.reducedMotion,
-      world.config.sprayDepthMultiplier, backendKind,
+      world.config.sprayDepthMultiplier, nodes,
     );
     this.cameraController = new CameraController(this.built.camera, state, this.reducedMotion);
     this.weather = new WeatherRenderer(profile, this.built, this.renderer);
     this.built.atmosphereUniforms.referenceHeight.value = state.pos.y;
     this.csm = nodes
-      ? new CsmShadowsNode(this.built.camera, this.built.scene, this.mobile, this.weather.current, visualWeatherPreset(this.weather.index))
+      ? new nodes.csm.CsmShadowsNode(this.built.camera, this.built.scene, this.mobile, this.weather.current, visualWeatherPreset(this.weather.index))
       : new CsmShadows(this.built.camera, this.built.scene, this.mobile, this.weather.current, visualWeatherPreset(this.weather.index));
     this.built.sun.visible = false;
     // The node path shades fog and shadows from the scene graph, so the only per-material work
@@ -207,11 +217,10 @@ export class GameRenderer {
   }
 
   /**
-   * Both chains are dynamically imported, which defers *evaluating* the unused one and keeps it off
-   * the critical path — but it does not keep it out of the bundle. `SceneFactory`, `TerrainRenderer`
-   * and `CsmShadowsNode` all import `three/webgpu` statically, so both backends ship either way.
-   * Making the split real needs the node modules behind a single dynamic boundary; ledgered for
-   * Task 10. `render()` falls back to a direct render until the promise lands.
+   * Both chains are dynamically imported, and since the node materials moved behind
+   * `loadNodeFactories()` the split is real: a WebGL session never fetches `three/webgpu`, and
+   * `NodePostProcessing` lands in that same node chunk. `render()` falls back to a direct render
+   * until the promise lands.
    */
   private async initializePost(): Promise<void> {
     try {
@@ -330,30 +339,32 @@ export class GameRenderer {
 
   render(state: SimulationState, world: SimulationWorld, dt: number, tuck: number, frameMs = dt * 1000): void {
     if (this.disposed || this.contextLost) return;
-    this.fpsTime += dt; this.fpsFrames += 1; this.adaptTime += dt; this.elapsed += dt;
+    this.adaptTime += dt; this.elapsed += dt;
     if (frameMs > 0) {
       if (this.frameTimes.length < 36_000) this.frameTimes.push(frameMs);
       this.governorRing[this.governorSamples % this.governorRing.length] = frameMs;
       this.governorSamples += 1;
     }
-    if (this.fpsTime >= 0.5) {
-      this.fpsFrames = 0; this.fpsTime = 0;
-      if (this.adaptTime >= 1.4) {
-        this.adaptTime = 0;
-        // The governor replaces the twitchy observe(fps) ladder: sharing `rung` with both live
-        // would let the fast path undo a governor step inside a single tick.
-        // 45fps, not the plan's 58fps for desktop: the governor steps down whenever p75 exceeds
-        // the budget, so a 58fps budget would treat an ordinary vsync-locked 60Hz display (16.7ms,
-        // and above 17.2ms on any jitter) as distress and walk the ladder down to rung 0 — which
-        // switches the whole poster chain off. 45fps preserves the step-down point the legacy
-        // observe(fps) used.
-        const budgetMs = 1000 / 45;
-        const from = this.quality.rung;
-        const quality = this.quality.observeFrameTimes(this.windowedP75(), budgetMs, this.elapsed);
-        if (quality.changed) {
-          this.applyQuality(quality.rung); this.applySize();
-          if (quality.rung !== from) this.options.onQualityChange?.({ reason: "governor", from, to: quality.rung });
-        }
+    // One gate, not two: this used to sit inside a 0.5s fps-counter tick left over from the
+    // observe(fps) ladder, whose counters nothing read once the governor replaced it — and whose
+    // only surviving effect was to round the adapt period up to 1.5s.
+    if (this.adaptTime >= 1.4) {
+      this.adaptTime = 0;
+      // The governor replaces the twitchy observe(fps) ladder: sharing `rung` with both live
+      // would let the fast path undo a governor step inside a single tick.
+      // 45fps, not the plan's 58fps for desktop: the governor steps down whenever p75 exceeds
+      // the budget, so a 58fps budget would treat an ordinary vsync-locked 60Hz display (16.7ms,
+      // and above 17.2ms on any jitter) as distress and walk the ladder down to rung 0 — which
+      // switches the whole poster chain off. 45fps preserves the step-down point the legacy
+      // observe(fps) used.
+      const budgetMs = 1000 / 45;
+      const from = this.quality.rung;
+      const quality = this.quality.observeFrameTimes(this.windowedP75(), budgetMs, this.elapsed);
+      if (quality.changed) {
+        this.applyQuality(quality.rung); this.applySize();
+        // Not redundant with `changed`: at rung 0 the governor trades pixel scale instead of a
+        // rung, and that step must resize without reporting a quality change that never happened.
+        if (quality.rung !== from) this.options.onQualityChange?.({ reason: "governor", from, to: quality.rung });
       }
     }
     this.terrain.update(state.pos.x, state.pos.z); this.worldRenderer.update(state, dt); this.skier.update(state, world.terrain, dt); this.ghost.update(state.time, world.terrain);

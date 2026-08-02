@@ -2,15 +2,14 @@ import type { RendererBackend } from "./Renderer";
 
 export type RendererBackendKind = "webgpu" | "webgl";
 
-export function resolveBackendOverride(
-  search: string,
-  hasWebGPU: boolean,
-): RendererBackendKind | null {
-  const requested = new URLSearchParams(search).get("gfx");
-  if (requested !== "webgpu" && requested !== "webgl") return null;
-  return requested === "webgpu" && hasWebGPU ? "webgpu" : "webgl";
-}
-
+/**
+ * The one decision function for which backend a session gets. WebGPU wherever the browser has it;
+ * `?gfx=webgl` forces the fallback, and `?gfx=webgpu` cannot conjure an adapter that is not there.
+ *
+ * Task 6 flipped the default to WebGPU, which retired its predecessor `resolveBackendOverride` —
+ * that one returned `null` for "no override, keep the legacy WebGL path", a distinction with no
+ * meaning once WebGPU became the default rather than the opt-in.
+ */
 export function resolveBackendKind(
   search: string,
   hasWebGPU: boolean,

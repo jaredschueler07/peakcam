@@ -1,12 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { QualityController } from "./QualityController";
+import { QualityController, recoveryThresholdMs } from "./QualityController";
 
 const BUDGET = 1000 / 45;
 const OVER = BUDGET + 4;
 const UNDER = BUDGET * 0.6;
-const OK = BUDGET * 0.85;
+/** Inside the hysteresis band: under budget, but not far enough under to count as headroom. */
+const OK = BUDGET * 0.95;
+/** A vsync-locked 60Hz frame — the case the old 0.7x recovery threshold could never clear. */
+const VSYNC_60 = 1000 / 60;
 
 /** Feed the governor a steady p75 from `from` to `to` seconds inclusive, one sample per second. */
 function feed(quality: QualityController, p75Ms: number, from: number, to: number) {
@@ -31,7 +34,7 @@ test("a 4s spike does nothing", () => {
   assert.equal(feed(quality, OVER, 5, 8).rung, 3, "the over-budget clock restarted after the spike ended");
 });
 
-test("recovery below 0.7x budget for 20s steps the rung back up", () => {
+test("recovery below the headroom threshold for 20s steps the rung back up", () => {
   const quality = new QualityController(2);
   assert.equal(feed(quality, UNDER, 0, 19).rung, 2, "no step up before 20s of headroom");
   assert.deepEqual(quality.observeFrameTimes(UNDER, BUDGET, 20), { rung: 3, pixelScale: 1, changed: true });
@@ -39,9 +42,33 @@ test("recovery below 0.7x budget for 20s steps the rung back up", () => {
   assert.equal(quality.observeFrameTimes(UNDER, BUDGET, 40).rung, 4);
 });
 
-test("frame times between 0.7x budget and budget hold the rung steady", () => {
+test("frame times inside the hysteresis band hold the rung steady", () => {
   const quality = new QualityController(2);
   assert.equal(feed(quality, OK, 0, 60).rung, 2);
+});
+
+test("the recovery threshold is the wider of a 10% band and a 2ms margin", () => {
+  // Desktop (45fps) and mobile (30fps) budgets are both large enough for the fractional band.
+  assert.ok(Math.abs(recoveryThresholdMs(1000 / 45) - 20) < 1e-9);
+  assert.ok(Math.abs(recoveryThresholdMs(1000 / 30) - 30) < 1e-9);
+  // Below 20ms of budget, 10% is inside ordinary jitter, so the flat margin takes over.
+  assert.equal(recoveryThresholdMs(10), 8);
+  assert.ok(recoveryThresholdMs(20) === 18, "the two rules meet at a 20ms budget");
+  // And it always leaves a real dead band, so a frame right at budget cannot trigger recovery.
+  for (const budget of [8, 12, 16.6, 20, 22.2, 33.3]) {
+    assert.ok(recoveryThresholdMs(budget) < budget, `${budget}ms budget keeps hysteresis`);
+  }
+});
+
+test("a vsync-locked 60Hz display can climb back after losing a rung to a spike", () => {
+  // The regression this guards: the desktop budget is 22.2ms, so the old 0.7x threshold wanted a
+  // p75 under 15.6ms. Behind 60Hz vsync every healthy frame is 16.7ms, so the ladder only went
+  // down — a device that gave up a rung to a transient spike stayed there for the whole run.
+  const quality = new QualityController(4);
+  feed(quality, OVER, 0, 5);
+  assert.equal(quality.rung, 3, "a sustained spike costs a rung");
+  assert.equal(feed(quality, VSYNC_60, 6, 25).rung, 3, "no step up before 20s of headroom");
+  assert.equal(quality.observeFrameTimes(VSYNC_60, BUDGET, 26).rung, 4, "and then it comes back");
 });
 
 test("a step down resets the recovery clock", () => {

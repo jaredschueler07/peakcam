@@ -8,6 +8,7 @@ import { visualWeatherPreset } from "./VisualPresets";
 import { createSnowNodeMaterial, createSnowNodeUniforms } from "./SnowNodeMaterial";
 import { buildSnowDetailNormal } from "./SnowMaterial";
 import { createScene } from "./SceneFactory";
+import { staticNodeFactories } from "./nodeFactories.fixture";
 import { DROP_IN_GAME_PROFILES } from "../config/profiles";
 
 test("the debug flags parse from a query string and default to off", () => {
@@ -57,14 +58,14 @@ test("snowdbg=5 leaves the scene without a fog node", () => {
   const original = globalThis.location;
   Object.defineProperty(globalThis, "location", { value: { search: "?snowdbg=5" }, configurable: true });
   try {
-    const built = createScene(DROP_IN_GAME_PROFILES["ski-portillo"], 1.6, "webgpu");
+    const built = createScene(DROP_IN_GAME_PROFILES["ski-portillo"], 1.6, staticNodeFactories());
     assert.equal((built.scene as THREE.Scene & { fogNode?: unknown }).fogNode, undefined);
   } finally {
     if (original === undefined) delete (globalThis as { location?: unknown }).location;
     else Object.defineProperty(globalThis, "location", { value: original, configurable: true });
   }
 
-  const built = createScene(DROP_IN_GAME_PROFILES["ski-portillo"], 1.6, "webgpu");
+  const built = createScene(DROP_IN_GAME_PROFILES["ski-portillo"], 1.6, staticNodeFactories());
   assert.ok((built.scene as THREE.Scene & { fogNode?: unknown }).fogNode, "and installs it otherwise");
 });
 

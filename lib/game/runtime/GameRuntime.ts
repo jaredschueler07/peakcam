@@ -13,6 +13,7 @@ import { PointerLockAdapter } from "../input/PointerLockAdapter";
 import { TouchAdapter } from "../input/TouchAdapter";
 import type { ControlScheme, InputAdapter } from "../input/types";
 import { GameRenderer, type RendererBackend, type RenderPerformanceSummary } from "../rendering/Renderer";
+import type { NodeFactories } from "../rendering/nodeFactories";
 import { createWorld } from "../terrain/obstacles";
 import { UiBridge } from "./UiBridge";
 import type { ConditionsSnapshot } from "../conditions";
@@ -142,6 +143,8 @@ export class GameRuntime {
     spawnArcM?: number,
     /** Prepared async renderer backend; omitted only by legacy direct-construction tests. */
     backend?: RendererBackend,
+    /** Node-material pipeline, required alongside a WebGPU backend; see `nodeFactories`. */
+    nodeFactories?: NodeFactories | null,
   ) {
     this.world = createWorld(
       profile,
@@ -160,7 +163,7 @@ export class GameRuntime {
       if (!this.activated) { this.activated = true; analytics.controlActivated(scheme); }
     });
     const sceneStartedAt = performance.now();
-    this.renderer = new GameRenderer(canvas, profile, this.world, this.state, { backend });
+    this.renderer = new GameRenderer(canvas, profile, this.world, this.state, { backend, nodeFactories });
     this.renderer.setWeather(conditions.weatherDefault);
     this.sceneBuildMs = performance.now() - sceneStartedAt;
     this.keyboard = new KeyboardAdapter(this.input);

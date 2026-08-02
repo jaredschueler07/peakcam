@@ -14,7 +14,15 @@ const LUT_SIZE = 32;
 const BLOOM_STRENGTH = 0.5;
 /** `postprocessing`'s BloomEffect defaulted to 0.85; the side-by-side in Task 6 settles this. */
 const BLOOM_RADIUS = 0.8;
-const BLOOM_THRESHOLD = 0.85;
+/**
+ * Luminance a fragment must exceed to bloom. Raised from 0.85 (the `postprocessing` BloomEffect
+ * default the WebGL chain still uses) after the Task 6 CSM fix: with the cascades no longer
+ * triple-counting the key light, the scene sits brighter overall, and spray and snowfall
+ * particles — white sprites over white snow — cleared 0.85 and read as glowing orbs in the
+ * browser-matrix screenshots. 0.9 keeps the bloom on the sun disc and glint, which is what it
+ * was for. Empirical, not derived: revisit against screenshots if the exposure changes again.
+ */
+const BLOOM_THRESHOLD = 0.9;
 const VIGNETTE_OFFSET = 0.35;
 const VIGNETTE_DARKNESS = 0.5;
 /** `postprocessing`'s ChromaticAberrationEffect radial modulation offset. */

@@ -4,7 +4,6 @@ import * as THREE from "three";
 import { DROP_IN_GAME_PROFILES } from "../config/profiles";
 import { FIXED_HZ } from "../core/clock";
 import { createSimulation } from "../core/simulation";
-import type { TerrainSampler } from "../core/types";
 import type { GhostSample } from "../replay/codec";
 import { InputManager } from "../input/InputManager";
 import { createProceduralWorld } from "../terrain/obstacles";
@@ -12,13 +11,17 @@ import { CameraController } from "./CameraController";
 import { QualityController, seedQualityRung } from "./QualityController";
 import { createGhostPose, GhostRenderer, sampleGhostAt } from "./GhostRenderer";
 import { GameRenderer, shouldInitializePostProcessing, type RendererBackend } from "./Renderer";
+import type { ResourceCounts } from "./resources";
 import { buildPosterLut, buildSnowDetailNormal } from "./SnowMaterial";
 import { chromaticAberrationOffset } from "./MotionEffects";
 import { configureSceneMaterials } from "./Renderer";
 import { fogExp2Amount, heightFogAmount, type AtmosphereUniforms } from "./Atmosphere";
 import { SkierRenderer } from "./SkierRenderer";
 import { buildTileGeometry } from "./TerrainRenderer";
-import { sagAt, WorldRenderer } from "./WorldRenderer";
+import { rampRise, RAMP_BANNER_H, RAMP_BANNER_Y, RAMP_MAX_RISE, sagAt, WorldRenderer } from "./WorldRenderer";
+import { staticNodeFactories } from "./nodeFactories.fixture";
+import { RAMP_LEN } from "../terrain/heightfield";
+import type { RealRun, SimulationWorld, TerrainSampler } from "../core/types";
 
 const profile = DROP_IN_GAME_PROFILES.breckenridge;
 
@@ -69,6 +72,121 @@ test("ramp dressing uses the same 22m by 10.5m terrain-ramp footprint", () => {
   assert.ok(rails.length >= 2);
   assert.equal(rails[0].geometry.parameters.depth, 22);
   assert.ok(Math.abs(Math.abs(rails[0].position.x) - 10.5 * 0.86) < 1e-12);
+});
+
+test("a ramp's rise is clamped to a rail-shaped range in both directions", () => {
+  assert.equal(RAMP_MAX_RISE, RAMP_LEN * 0.6);
+  // Ordinary pitches pass through untouched.
+  assert.equal(rampRise(100, 96), -4);
+  assert.equal(rampRise(100, 103.5), 3.5);
+  assert.equal(rampRise(100, 100), 0);
+  // A tail segment cutting across a cliff cannot pitch the rail past ~31 degrees.
+  assert.equal(rampRise(1800, 1600), -RAMP_MAX_RISE);
+  assert.equal(rampRise(1800, 2400), RAMP_MAX_RISE);
+  // Exactly at the bound is still allowed, so the clamp adds no discontinuity of its own.
+  assert.equal(rampRise(0, RAMP_MAX_RISE), RAMP_MAX_RISE);
+});
+
+/**
+ * A two-point run whose single segment drops `dropM` over `runM` — a simplified cliff tail — with
+ * the drawn heightfield sagging `sagM` below that chord in the middle. Real courses do exactly
+ * this: `points` is a simplification, and Portillo's Roca Jack chord runs 5.5-9.9m above the
+ * terrain at its ramps. `chordY` is deliberately the *wrong* height to place furniture at.
+ */
+function syntheticCourse(runM: number, dropM: number, sagM = 0): { world: SimulationWorld; run: RealRun } {
+  const chordY = (z: number) => 2000 - dropM * Math.max(0, Math.min(runM, z)) / runM;
+  // A half-sine sag: zero at both ends, deepest at mid-course, so the chord and the ground agree
+  // exactly where the polyline has vertices and diverge everywhere between them.
+  const sag = (z: number) => sagM * Math.sin(Math.PI * Math.max(0, Math.min(runM, z)) / runM);
+  const at = (distanceM: number) => ({ x: 0, y: chordY(distanceM), z: distanceM, heading: 0 });
+  const run: RealRun = {
+    kind: "real", sourceIndex: 0, name: "Cliff", difficulty: null, halfWidthM: 18,
+    points: [{ x: 0, y: 2000, z: 0 }, { x: 0, y: 2000 - dropM, z: runM }],
+    lengthM: runM, finishM: runM,
+    gates: [{ key: 0, distanceM: runM * 0.5, ...at(runM * 0.5), halfWidthM: 9 }],
+    ramps: [{ key: 0, distanceM: runM - 45, ...at(runM - 45) }],
+  };
+  const terrain: TerrainSampler = {
+    kind: "real", profile, seed: 1, noiseOffset: { x: 0, z: 0 }, realRuns: [run], mainLift: null,
+    height(_x, z) { return chordY(z) - sag(z); },
+    normal(_x, _z, out) { out.x = 0; out.y = 1; out.z = 0; return out; },
+    trailField() { return 0; },
+    nearestTrail(_x, _z, out) { return out; },
+  };
+  const world = { ...createProceduralWorld(profile, profile.seed), terrain } as SimulationWorld;
+  return { world, run };
+}
+
+/** The visible ramp group, plus the ground height directly under it. */
+function placedRamp(world: SimulationWorld) {
+  const state = createSimulation(profile, profile.seed);
+  const scene = new THREE.Scene();
+  new WorldRenderer(scene, profile, world).update(state, 0);
+  const group = scene.children.find((child) => child instanceof THREE.Group && child.visible &&
+    (child.userData as { rail?: THREE.Mesh }).rail) as THREE.Group;
+  assert.ok(group, "the tail ramp is placed");
+  const { rail, rail2, banner } = group.userData as { rail: THREE.Mesh; rail2: THREE.Mesh; banner: THREE.Mesh };
+  return { group, rail, rail2, banner, groundY: world.terrain.height(group.position.x, group.position.z) };
+}
+
+test("a cliff-tail ramp renders as a ramp, not a beam hanging over the course", () => {
+  // 800m of run losing 700m of altitude: 22m along it reads as a ~19m drop, which used to pitch
+  // the rail to 41 degrees and hang its centre 9.6m in the air.
+  const { rail, rail2 } = placedRamp(syntheticCourse(800, 700).world);
+  assert.ok(Math.abs(rail.position.y) <= RAMP_MAX_RISE / 2 + 1e-9, `rail centre stays low, got ${rail.position.y}`);
+  assert.ok(Math.abs(rail.rotation.x) <= Math.atan2(RAMP_MAX_RISE, RAMP_LEN) + 1e-9, `pitch is bounded, got ${rail.rotation.x}`);
+  assert.equal(rail2.rotation.x, rail.rotation.x, "both rails share the pitch");
+  assert.equal(rail2.position.y, rail.position.y);
+});
+
+test("a gentle course leaves the ramp pitch exactly as the terrain dictates", () => {
+  const { rail } = placedRamp(syntheticCourse(800, 80).world);
+  const expected = -80 * RAMP_LEN / 800;
+  assert.ok(Math.abs(rail.position.y - expected / 2) < 1e-6, `unclamped rise survives, got ${rail.position.y}`);
+});
+
+test("the ramp deck sits on the drawn terrain, not on the run polyline chord", () => {
+  // 40m of sag is the pathology at full scale: Portillo's Roca Jack chord measured 5.5m and 9.9m
+  // above the heightfield at its two ramps, which floated the whole group — banner included.
+  const { world, run } = syntheticCourse(800, 240, 40);
+  const { group, groundY } = placedRamp(world);
+  const chordY = run.ramps[0].y;
+  assert.ok(chordY - groundY > 5, `the fixture reproduces a real float, got ${(chordY - groundY).toFixed(2)}m`);
+  assert.ok(Math.abs(group.position.y - (groundY + 0.2)) < 1e-9,
+    `deck rides the terrain, got ${group.position.y} for ground ${groundY}`);
+});
+
+test("the ramp banner stays on the deck at every course position", () => {
+  // The reported defect: a 23m-wide navy panel hanging 8-10m over the kicker with nothing holding
+  // it up. Its own offset stacked on top of the chord float, so both halves are pinned here.
+  for (const [runM, dropM, sagM] of [[800, 240, 40], [800, 700, 0], [400, 60, 12], [1200, 300, 25]]) {
+    const { world } = syntheticCourse(runM, dropM, sagM);
+    const { group, banner, groundY } = placedRamp(world);
+    const bannerY = group.position.y + banner.position.y;
+    const deck = groundY;
+    const margin = 0.5;
+    assert.ok(bannerY >= deck && bannerY <= deck + RAMP_BANNER_H + margin,
+      `banner at ${bannerY.toFixed(2)} outside [${deck.toFixed(2)}, ${(deck + RAMP_BANNER_H + margin).toFixed(2)}] for ${runM}/${dropM}/${sagM}`);
+    // And the whole panel, not just its centre, clears the snow without floating over it.
+    assert.ok(bannerY - RAMP_BANNER_H / 2 >= deck, "the panel's bottom edge is above the deck");
+    assert.ok(bannerY + RAMP_BANNER_H / 2 <= deck + RAMP_BANNER_H + margin, "and its top edge is still low");
+  }
+  assert.ok(RAMP_BANNER_Y < 4.2, "the old overhead-arch height is gone");
+});
+
+test("gates are draped on the terrain too, not left floating on the chord", () => {
+  // Same defect class, and worse in the real data: Roca Jack's gates measured up to 17.5m off.
+  const { world, run } = syntheticCourse(800, 240, 40);
+  const state = createSimulation(profile, profile.seed);
+  const scene = new THREE.Scene();
+  new WorldRenderer(scene, profile, world).update(state, 0);
+  const gate = scene.children.find((child) => child instanceof THREE.Group && child.visible &&
+    (child.userData as { panel?: THREE.Mesh }).panel) as THREE.Group;
+  assert.ok(gate, "the gate is placed");
+  const groundY = world.terrain.height(gate.position.x, gate.position.z);
+  assert.ok(run.gates[0].y - groundY > 5, "the fixture reproduces a real float");
+  assert.ok(Math.abs(gate.position.y - groundY) < 1e-9,
+    `gate rides the terrain, got ${gate.position.y} for ground ${groundY}`);
 });
 
 test("quality controller walks rungs before pixel scale and never crosses the 0.7 floor", () => {
@@ -199,7 +317,6 @@ test("weather and lift actions are rising-edge input actions", () => {
 });
 
 class FakeBackend implements RendererBackend {
-  readonly backendKind = "webgl" as const;
   readonly domElement = {} as HTMLCanvasElement;
   readonly renderLists = { dispose: () => { this.renderListsDisposed += 1; } };
   renderListsDisposed = 0;
@@ -216,25 +333,30 @@ class FakeBackend implements RendererBackend {
   render() {}
   dispose() { this.disposed += 1; }
   forceContextLoss() { this.contextsLost += 1; }
+  constructor(readonly backendKind: "webgpu" | "webgl" = "webgl") {}
 }
 
-test("PostProcessing remains enabled when no backend is injected", () => {
-  assert.equal(shouldInitializePostProcessing({}), true);
-  assert.equal(shouldInitializePostProcessing({ backend: new FakeBackend() }), false);
-});
-
-test("mount/unmount ten times disposes every scene resource and context", () => {
+/**
+ * The disposal audit ran WebGL-only, which left the whole node-material set untested: the sky
+ * `MeshBasicNodeMaterial`, the snow `MeshStandardNodeMaterial` and its detail normal, the two
+ * `PointsNodeMaterial` particle clouds and their radial sprite textures, and the instanced quad
+ * geometries those clouds use instead of point clouds. Each is built by a different factory and
+ * hangs its texture off `userData`, which is the one place `collectResources` can still see it.
+ */
+function disposalPasses(backendKind: "webgpu" | "webgl") {
   const world = createProceduralWorld(profile, profile.seed);
   const state = createSimulation(profile, profile.seed);
   const canvas = {
     clientWidth: 800, clientHeight: 600,
     addEventListener() {}, removeEventListener() {},
   } as unknown as HTMLCanvasElement;
+  let counts: ResourceCounts | null = null;
   for (let pass = 0; pass < 10; pass += 1) {
-    const backend = new FakeBackend();
+    const backend = new FakeBackend(backendKind);
     const disposed = { geometries: 0, materials: 0, textures: 0 };
     const renderer = new GameRenderer(canvas, profile, world, state, {
       backend, devicePixelRatio: 1, reducedMotion: true,
+      nodeFactories: backendKind === "webgpu" ? staticNodeFactories() : null,
       disposalAudit: {
         geometry: () => { disposed.geometries += 1; },
         material: () => { disposed.materials += 1; },
@@ -242,16 +364,63 @@ test("mount/unmount ten times disposes every scene resource and context", () => 
       },
     });
     const resources = renderer.resources();
-    assert.ok(resources.geometries > 20);
-    assert.ok(resources.materials > 10);
-    assert.ok(resources.textures >= 2);
+    assert.ok(resources.geometries > 20, `${backendKind}: geometries ${resources.geometries}`);
+    assert.ok(resources.materials > 10, `${backendKind}: materials ${resources.materials}`);
+    assert.ok(resources.textures >= 2, `${backendKind}: textures ${resources.textures}`);
     renderer.dispose();
-    assert.deepEqual(disposed, resources);
+    assert.deepEqual(disposed, resources, `${backendKind}: every collected resource is disposed`);
     assert.deepEqual(renderer.resources(), { geometries: 0, materials: 0, textures: 0 });
     assert.equal(backend.disposed, 1);
     assert.equal(backend.renderListsDisposed, 1);
     assert.equal(backend.contextsLost, 1);
+    counts ??= resources;
+    assert.deepEqual(resources, counts, `${backendKind}: pass ${pass} rebuilds the same scene`);
   }
+  return counts!;
+}
+
+test("PostProcessing remains enabled when no backend is injected", () => {
+  assert.equal(shouldInitializePostProcessing({}), true);
+  assert.equal(shouldInitializePostProcessing({ backend: new FakeBackend() }), false);
+});
+
+test("mount/unmount ten times disposes every scene resource and context (WebGL)", () => {
+  disposalPasses("webgl");
+});
+
+test("mount/unmount ten times disposes every node-material resource too (WebGPU)", () => {
+  const webgpu = disposalPasses("webgpu");
+  const webgl = disposalPasses("webgl");
+  // The node path swaps materials one-for-one but replaces both THREE.Points clouds with instanced
+  // quad meshes, so it carries the same counts — if a factory ever stops registering its texture on
+  // userData, `collectResources` goes blind to it and this equality is what catches the leak.
+  assert.deepEqual(webgpu, webgl, "the node scene holds the same resource shape as the GLSL one");
+  assert.ok(webgpu.textures >= 3, `sky/snow detail plus both particle sprites, got ${webgpu.textures}`);
+});
+
+test("the WebGPU scene really is built from node materials, so the audit above covers them", () => {
+  const world = createProceduralWorld(profile, profile.seed);
+  const state = createSimulation(profile, profile.seed);
+  const canvas = { clientWidth: 800, clientHeight: 600, addEventListener() {}, removeEventListener() {} } as unknown as HTMLCanvasElement;
+  const renderer = new GameRenderer(canvas, profile, world, state, {
+    backend: new FakeBackend("webgpu"), devicePixelRatio: 1, reducedMotion: true,
+    nodeFactories: staticNodeFactories(),
+  });
+  const scene = (renderer as unknown as { built: { scene: THREE.Scene } }).built.scene;
+  const kinds = new Set<string>();
+  const sprites = new Set<THREE.Texture>();
+  scene.traverse((object) => {
+    const mesh = object as THREE.Mesh;
+    const list = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
+    for (const material of list) {
+      if ((material as THREE.Material & { isNodeMaterial?: boolean }).isNodeMaterial) kinds.add(material.constructor.name);
+      for (const value of Object.values(material.userData)) if (value instanceof THREE.Texture) sprites.add(value);
+    }
+  });
+  assert.deepEqual([...kinds].sort(), ["MeshBasicNodeMaterial", "PointsNodeMaterial", "SnowStandardNodeMaterial"]);
+  assert.equal(sprites.size, 3, "snow detail normal plus a radial sprite per particle cloud");
+  renderer.dispose();
+  assert.deepEqual(renderer.resources(), { geometries: 0, materials: 0, textures: 0 });
 });
 
 // ─── Ghost renderer ──────────────────────────────────────────
