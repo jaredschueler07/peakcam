@@ -38,6 +38,22 @@ export function mergeParts(parts: Part[]): THREE.BufferGeometry {
   output.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3)); output.computeBoundingSphere(); return output;
 }
 
+/**
+ * Ceiling on how far a ramp's rail may rise or fall across its 22m run.
+ *
+ * A real course is a simplified polyline, so one tail segment can cut straight across a cliff
+ * band. Sampling 22m further along such a segment reports a drop of tens of metres, and the rail
+ * — pitched by `atan2(h, RAMP_LEN)` and centred at `h * 0.5` — then renders as a giant beam
+ * hanging in the air above terrain that never falls that fast. 0.6 x RAMP_LEN caps the pitch at
+ * ~31 degrees, steeper than any groomed jump and still unmistakably a ramp.
+ */
+export const RAMP_MAX_RISE = RAMP_LEN * 0.6;
+
+/** The rise a ramp's rails are actually built to, clamped to a rail-shaped range. */
+export function rampRise(startY: number, endY: number): number {
+  return Math.max(-RAMP_MAX_RISE, Math.min(RAMP_MAX_RISE, endY - startY));
+}
+
 export function sagAt(z: number, zStart: number): number {
   const u = ((z - zStart) % TOWER_SPACING) / TOWER_SPACING;
   return Math.sin(u * Math.PI) * 2.2;
@@ -108,7 +124,10 @@ export class WorldRenderer {
       const rail = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, RAMP_LEN), railMaterial), rail2 = rail.clone();
       rail.position.set(-RAMP_W * 0.86, 0, RAMP_LEN * 0.5); rail2.position.set(RAMP_W * 0.86, 0, RAMP_LEN * 0.5);
       const banner = new THREE.Mesh(new THREE.PlaneGeometry(RAMP_W * 2.2, 1.5), new THREE.MeshStandardMaterial({ color: 0x0d1524, side: THREE.DoubleSide, emissive: 0x2e6bd0, emissiveIntensity: 0.3 }));
-      banner.position.set(0, 4.2, -1.5); group.add(rail, rail2, banner); group.userData = { rail, rail2 }; group.visible = false;
+      // The banner rides at the ramp's entry, which is the group origin for any rise: the rails
+      // are boxes centred at (h/2, RAMP_LEN/2) and pitched about their own centres, so their
+      // uphill ends always land back on y=0, z=0. It therefore needs no rise-dependent transform.
+      banner.position.set(0, 4.2, -1.5); group.add(rail, rail2, banner); group.userData = { rail, rail2, banner }; group.visible = false;
       this.ramps.push(group); this.scene.add(group);
     }
   }
@@ -244,7 +263,7 @@ export class WorldRenderer {
         const end = pointAtArcLength(run.points, Math.min(run.lengthM, ramp.distanceM + RAMP_LEN), arcScratch);
         const group = this.ramps[count++]; group.visible = true;
         group.position.set(ramp.x, ramp.y + 0.2, ramp.z); group.rotation.y = ramp.heading;
-        const h = end.y - ramp.y;
+        const h = rampRise(ramp.y, end.y);
         group.userData.rail.rotation.x = group.userData.rail2.rotation.x = -Math.atan2(h, RAMP_LEN);
         group.userData.rail.position.y = group.userData.rail2.position.y = h * 0.5;
       }
@@ -257,7 +276,7 @@ export class WorldRenderer {
       const first = Math.max(0, Math.floor((playerZ - 60 - trail.ramp) / RAMP_SPACING));
       for (let k = first; k < first + 2 && count < this.ramps.length; k += 1) {
         const z = trail.ramp + k * RAMP_SPACING; if (z < -200 || z > playerZ + 620) continue;
-        const x = trailCenter(trail, z + RAMP_LEN * 0.5), group = this.ramps[count++], h = this.world.terrain.height(x, z + RAMP_LEN) - this.world.terrain.height(x, z);
+        const x = trailCenter(trail, z + RAMP_LEN * 0.5), group = this.ramps[count++], h = rampRise(this.world.terrain.height(x, z), this.world.terrain.height(x, z + RAMP_LEN));
         group.visible = true; group.position.set(x, this.world.terrain.height(x, z) + 0.2, z); group.userData.rail.rotation.x = group.userData.rail2.rotation.x = -Math.atan2(h, RAMP_LEN); group.userData.rail.position.y = group.userData.rail2.position.y = h * 0.5;
       }
     }

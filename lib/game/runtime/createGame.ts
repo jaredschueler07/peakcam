@@ -10,6 +10,7 @@ import type { RealTerrainAssets } from "../terrain/terrain-source";
 import type { ConditionsSnapshot } from "../conditions";
 import type { RuntimeAudio } from "./RuntimeAudio";
 import { createRendererBackend, resolveBackendKind } from "../rendering/backend";
+import { loadNodeFactories } from "../rendering/nodeFactories";
 import type { RendererBackend } from "../rendering/Renderer";
 
 interface RuntimeTerrainLoader {
@@ -69,9 +70,13 @@ export async function createGame(options: CreateGameOptions): Promise<GameRuntim
   );
   const assetLoadMs = performance.now() - startedAt;
   const backend = await selectRendererBackend(options.canvas);
+  // The node materials and the 2.1 MB `three/webgpu` behind them are a separate chunk; fetch it
+  // only once this session is known to have actually got a WebGPU device, not merely asked for one.
+  const nodeFactories = backend?.backendKind === "webgpu" ? await loadNodeFactories() : null;
   const runtime = new GameRuntime(
     options.canvas, options.profile, options.uiBridge, options.analytics, source.sampler,
     options.conditions, options.audio, assetLoadMs, options.seed, options.spawnArcM, backend,
+    nodeFactories,
   );
   void runtime.startWhenWarm();
   return runtime;

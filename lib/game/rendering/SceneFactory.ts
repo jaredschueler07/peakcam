@@ -2,11 +2,8 @@ import * as THREE from "three";
 import type { ResortGameProfile } from "../config/schema";
 import { mulberry32 } from "../core/rng";
 import type { SnowUniforms } from "./SnowMaterial";
-import { createSnowNodeUniforms } from "./SnowNodeMaterial";
 import type { AtmosphereUniforms } from "./Atmosphere";
-import { createAtmosphereFog, createAtmosphereNodeUniforms } from "./AtmosphereNode";
-import { createSkyNodeMaterial, createSkyNodeUniforms } from "./SkyNodeMaterial";
-import type { RendererBackendKind } from "./backend";
+import type { NodeFactories } from "./nodeFactories";
 import { visualWeatherPreset } from "./VisualPresets";
 import { SNOW_DEBUG, snowDebugMode } from "./debugFlags";
 
@@ -89,8 +86,12 @@ function makeRidge(radius: number, height: number, seed: number, low: number, hi
   return geometry;
 }
 
-export function createScene(profile: ResortGameProfile, aspect: number, backendKind: RendererBackendKind = "webgl"): GameScene {
-  const nodes = backendKind === "webgpu";
+/**
+ * `nodes` doubles as the backend switch: the WebGPU pipeline is exactly the sessions that resolved
+ * the node-material chunk (`loadNodeFactories()`), and `null` is the WebGL path with its GLSL
+ * `ShaderMaterial` sky and `FogExp2`.
+ */
+export function createScene(profile: ResortGameProfile, aspect: number, nodes: NodeFactories | null = null): GameScene {
   const weather = profile.weather[0], visual = visualWeatherPreset(0), scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(weather.fogCol, weather.fog);
   const camera = new THREE.PerspectiveCamera(65, aspect, 0.5, 6000);
@@ -103,7 +104,7 @@ export function createScene(profile: ResortGameProfile, aspect: number, backendK
   scene.add(hemi, ambient, sun, sun.target);
 
   const skyGeometry = new THREE.SphereGeometry(3400, 32, 20);
-  const skyNodeUniforms = nodes ? createSkyNodeUniforms({
+  const skyNodeUniforms = nodes ? nodes.sky.createSkyNodeUniforms({
     top: new THREE.Color(weather.top), mid: new THREE.Color(visual.mid), horizon: new THREE.Color(weather.hor),
     cloud: new THREE.Color(visual.cloud), cloudiness: visual.cloudiness, sun: new THREE.Color(visual.sunCol),
     sunDir: SUN_DIRECTION.clone(), haze: weather.haze,
@@ -113,8 +114,8 @@ export function createScene(profile: ResortGameProfile, aspect: number, backendK
     uCloud: { value: new THREE.Color(visual.cloud) }, uCloudiness: { value: visual.cloudiness }, uTime: { value: 0 },
     uSun: { value: new THREE.Color(visual.sunCol) }, uSunDir: { value: SUN_DIRECTION.clone() }, uHaze: { value: weather.haze },
   };
-  const sky = skyNodeUniforms
-    ? new THREE.Mesh(skyGeometry, createSkyNodeMaterial(skyNodeUniforms) as THREE.Material)
+  const sky = nodes && skyNodeUniforms
+    ? new THREE.Mesh(skyGeometry, nodes.sky.createSkyNodeMaterial(skyNodeUniforms) as THREE.Material)
     : new THREE.Mesh(skyGeometry, new THREE.ShaderMaterial({
     uniforms: skyUniforms, side: THREE.BackSide, depthWrite: false, fog: false,
     vertexShader: "varying vec3 vDir; void main(){vDir=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
@@ -132,12 +133,12 @@ void main(){vec3 d=normalize(vDir);float t=clamp(d.y*.5+.5,0.,1.);vec3 c=mix(uHo
   const near = new THREE.Mesh(makeRidge(1750, 460 * profile.relief, 31 + ridgeSeed, 0x53749e, 0xd6e9ff, 96), ridgeMaterial());
   far.position.y = 120; near.position.y = 40; far.frustumCulled = near.frustumCulled = false;
   peaks.add(far, near); scene.add(peaks);
-  const snowUniforms: SnowUniformSet = nodes ? createSnowNodeUniforms(new THREE.Color(weather.hor), visual.glint) : {
+  const snowUniforms: SnowUniformSet = nodes ? nodes.snow.createSnowNodeUniforms(new THREE.Color(weather.hor), visual.glint) : {
     horizon: { value: new THREE.Color(weather.hor) },
     glint: { value: visual.glint },
     track: { value: new THREE.Vector4(1e6, 1e6, 1e6, 1e6) },
   } satisfies SnowUniforms;
-  const atmosphereUniforms: AtmosphereUniformSet = nodes ? createAtmosphereNodeUniforms({
+  const atmosphereUniforms: AtmosphereUniformSet = nodes ? nodes.atmosphere.createAtmosphereNodeUniforms({
     // Always explicit: the module's own default density is a placeholder, not this weather preset.
     density: weather.fog, heightFalloff: 0.025, referenceHeight: 0,
     blue: new THREE.Color(visual.fogBlue), warm: new THREE.Color(visual.fogWarm),
@@ -151,7 +152,7 @@ void main(){vec3 d=normalize(vDir);float t=clamp(d.y*.5+.5,0.,1.);vec3 c=mix(uHo
     // An explicit scene.fogNode wins over the FogExp2 three would otherwise derive from scene.fog
     // (NodeManager.getFogNode), so the height fog replaces it rather than stacking with it.
     (scene as THREE.Scene & { fogNode?: unknown }).fogNode =
-      createAtmosphereFog(atmosphereUniforms as Parameters<typeof createAtmosphereFog>[0]);
+      nodes.atmosphere.createAtmosphereFog(atmosphereUniforms as Parameters<NodeFactories["atmosphere"]["createAtmosphereFog"]>[0]);
   }
   return { scene, camera, sky, skyUniforms, sun, hemi, ambient, sunDisc, sunGlow, peaks, snowUniforms, atmosphereUniforms };
 }

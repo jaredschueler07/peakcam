@@ -29,8 +29,27 @@ const STEP_DOWN_DWELL_S = 5;
 const STEP_UP_DWELL_S = 20;
 /** Minimum spacing between governor steps in either direction. */
 const MIN_STEP_INTERVAL_S = 5;
-/** Frame time must sit below this fraction of budget to count as headroom. */
-const RECOVERY_BUDGET_FRACTION = 0.7;
+/** Hysteresis band as a fraction of budget — the wider of this and `RECOVERY_MIN_MARGIN_MS` wins. */
+const RECOVERY_BUDGET_FRACTION = 0.9;
+/** Floor on the hysteresis band, so a small budget still leaves room for ordinary jitter. */
+const RECOVERY_MIN_MARGIN_MS = 2;
+
+/**
+ * The p75 frame time below which the governor counts a device as having headroom.
+ *
+ * This used to be `budget * 0.7`, which made the ladder one-way in practice: the desktop budget is
+ * 22.2ms (45fps), so recovery demanded a p75 under 15.6ms — unreachable behind 60Hz vsync, where
+ * every healthy frame lands at 16.7ms. A device that gave up a rung to a transient spike could
+ * never take it back, and the run finished dimmer than the hardware could afford.
+ *
+ * 0.9 of budget (20.0ms desktop, 30.0ms mobile) clears vsync while keeping a real dead band
+ * between the step-down and step-up thresholds, so the controller still cannot oscillate on
+ * frames that sit right at budget. The 2ms floor covers budgets small enough that 10% would be
+ * inside ordinary frame jitter.
+ */
+export function recoveryThresholdMs(budgetMs: number): number {
+  return Math.min(budgetMs * RECOVERY_BUDGET_FRACTION, budgetMs - RECOVERY_MIN_MARGIN_MS);
+}
 
 export class QualityController {
   pixelScale = 1;
@@ -60,7 +79,7 @@ export class QualityController {
         this.overSince = nowSeconds;
         this.lastStepAt = nowSeconds;
       }
-    } else if (p75Ms < budgetMs * RECOVERY_BUDGET_FRACTION) {
+    } else if (p75Ms < recoveryThresholdMs(budgetMs)) {
       this.overSince = null;
       if (this.underSince === null) this.underSince = nowSeconds;
       if (this.canStep(nowSeconds, this.underSince, STEP_UP_DWELL_S)) {

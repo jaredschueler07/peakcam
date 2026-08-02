@@ -2,13 +2,16 @@ import * as THREE from "three";
 import type { SimulationState, TerrainSampler } from "../core/types";
 import { mulberry32 } from "../core/rng";
 import type { QualityRung } from "./QualityController";
-import { createParticleNodeMaterial, createParticleSpriteGeometry, PARTICLE_CENTRE, radialParticleTexture } from "./ParticleNodeMaterial";
-import type { RendererBackendKind } from "./backend";
+import type { NodeFactories } from "./nodeFactories";
 
 const SPRAY_MAX = 900, SNOW_MAX = 3600, SNOW_BOX = 130, TRACK_QUADS = 1600;
 const pointVertex = "attribute float aAlpha;attribute float aSize;uniform float uScale;varying float vA;void main(){vA=aAlpha;vec4 mv=modelViewMatrix*vec4(position,1.);gl_PointSize=aSize*uScale/max(1.,-mv.z);gl_Position=projectionMatrix*mv;}";
 const pointFragment = "uniform sampler2D uTex;uniform vec3 uColor;varying float vA;void main(){vec4 t=texture2D(uTex,gl_PointCoord);float a=t.a*vA;if(a<.012)discard;gl_FragColor=vec4(uColor,a);}";
-/** Preallocated attribute name list — `for (const name of [...])` would allocate every spray update. */
+/**
+ * Attribute names re-uploaded every spray frame, preallocated because
+ * `for (const name of [...])` would allocate one array per frame. Index 0 is the particle centre,
+ * which the node path renames — see `centreAttr`.
+ */
 const SPRAY_ATTRS = ["position", "aAlpha", "aSize"];
 
 function radialTexture(): THREE.DataTexture {
@@ -32,8 +35,13 @@ export class EffectsRenderer {
   private trackHasPrevious = false;
   private prevLx = 0; private prevLz = 0; private prevRx = 0; private prevRz = 0;
   private quality: QualityRung = 4;
-  /** Attribute names to re-upload each frame; the centre attribute is renamed on the node path. */
+  /** Attribute names to re-upload each frame; `sprayAttrs[0]` is always `centreAttr`. */
   private readonly sprayAttrs: string[];
+  /**
+   * Whichever attribute carries the particle centre on this backend: `position` for the WebGL
+   * point cloud, `aCentre` for the instanced node quads, whose `position` is the quad corner.
+   */
+  private readonly centreAttr: string;
 
   /**
    * WebGPU renders `THREE.Points` as one-pixel `point-list` primitives, so the particles have to be
@@ -41,7 +49,7 @@ export class EffectsRenderer {
    * carrying the particle centre is named differently, because the sprite path claims `position`.
    */
   private particleGeometry(centre: Float32Array, alpha: Float32Array, size: Float32Array): THREE.BufferGeometry {
-    if (this.backendKind === "webgpu") return createParticleSpriteGeometry(centre, alpha, size);
+    if (this.nodes) return this.nodes.particles.createParticleSpriteGeometry(centre, alpha, size);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(centre, 3));
     geometry.setAttribute("aAlpha", new THREE.BufferAttribute(alpha, 1));
@@ -50,17 +58,17 @@ export class EffectsRenderer {
   }
 
   private particleCloud(geometry: THREE.BufferGeometry, material: THREE.Material): THREE.Object3D {
-    return this.backendKind === "webgpu" ? new THREE.Mesh(geometry, material) : new THREE.Points(geometry, material);
+    return this.nodes ? new THREE.Mesh(geometry, material) : new THREE.Points(geometry, material);
   }
 
   /** How many particles are drawn — instance count for quads, draw range for points. */
   private setVisibleParticles(geometry: THREE.BufferGeometry, count: number): void {
-    if (this.backendKind === "webgpu") (geometry as THREE.InstancedBufferGeometry).instanceCount = count;
+    if (this.nodes) (geometry as THREE.InstancedBufferGeometry).instanceCount = count;
     else geometry.setDrawRange(0, count);
   }
 
   private pointMaterial(color: number, scale: number): THREE.Material {
-    if (this.backendKind === "webgpu") return createParticleNodeMaterial(radialParticleTexture(), new THREE.Color(color), scale);
+    if (this.nodes) return this.nodes.particles.createParticleNodeMaterial(this.nodes.particles.radialParticleTexture(), new THREE.Color(color), scale);
     return new THREE.ShaderMaterial({
       uniforms: { uTex: { value: radialTexture() }, uColor: { value: new THREE.Color(color) }, uScale: { value: scale } },
       vertexShader: pointVertex, fragmentShader: pointFragment, transparent: true, depthWrite: false,
@@ -73,10 +81,12 @@ export class EffectsRenderer {
     private readonly terrain: TerrainSampler,
     private readonly reducedMotion: boolean,
     private readonly sprayDepthMultiplier = 1,
-    private readonly backendKind: RendererBackendKind = "webgl",
+    /** Present exactly on the WebGPU path; see `nodeFactories`. */
+    private readonly nodes: NodeFactories | null = null,
   ) {
     this.random = mulberry32(seed ^ 0x8e37a12d);
-    this.sprayAttrs = [backendKind === "webgpu" ? PARTICLE_CENTRE : SPRAY_ATTRS[0], SPRAY_ATTRS[1], SPRAY_ATTRS[2]];
+    this.centreAttr = nodes ? nodes.particles.PARTICLE_CENTRE : SPRAY_ATTRS[0];
+    this.sprayAttrs = [this.centreAttr, SPRAY_ATTRS[1], SPRAY_ATTRS[2]];
     this.sprayGeometry = this.particleGeometry(this.sprayPosition, this.sprayAlpha, this.spraySize);
     const sprayMaterial = this.pointMaterial(0xf7fbff, 620);
     const spray = this.particleCloud(this.sprayGeometry, sprayMaterial); spray.frustumCulled = false; scene.add(spray);
@@ -105,7 +115,7 @@ export class EffectsRenderer {
    * The top rung buys a denser snowfall, but only on the node pipeline: the WebGL chain reaches
    * rung 4 on weaker hardware, where the extra particles are the wrong thing to spend the frame on.
    */
-  densityScale(): number { return this.backendKind === "webgpu" && this.quality >= 4 ? 1.25 : 1; }
+  densityScale(): number { return this.nodes !== null && this.quality >= 4 ? 1.25 : 1; }
 
   private emitSpray(x: number, y: number, z: number, vx: number, vy: number, vz: number, size: number, life: number) { const i = this.sprayHead = (this.sprayHead + 1) % SPRAY_MAX, p = i * 3; this.sprayPosition[p] = x; this.sprayPosition[p + 1] = y; this.sprayPosition[p + 2] = z; this.sprayVelocity[p] = vx; this.sprayVelocity[p + 1] = vy; this.sprayVelocity[p + 2] = vz; this.sprayLife[i] = this.sprayMaxLife[i] = life; this.spraySize[i] = size; this.sprayAlpha[i] = 1; }
   private updateSpray(dt: number) {
@@ -125,7 +135,7 @@ export class EffectsRenderer {
     }
     for (let a = 0; a < this.sprayAttrs.length; a += 1) this.sprayGeometry.getAttribute(this.sprayAttrs[a]).needsUpdate = true;
   }
-  private updateSnow(dt: number, time: number, camera: THREE.Vector3, requested: number, wind: number) { const count = Math.min(this.reducedMotion ? 320 : SNOW_MAX, requested | 0), half = SNOW_BOX * 0.5; this.setVisibleParticles(this.snowGeometry, count); for (let i = 0; i < count; i += 1) { const p = i * 3; this.snowPosition[p + 1] -= (5.5 + this.snowSize[i] * 3.2) * dt; this.snowPosition[p] += Math.sin(time * 0.9 + this.snowSeed[i]) * 3.4 * dt + wind * dt; this.snowPosition[p + 2] += Math.cos(time * 0.7 + this.snowSeed[i]) * 2.2 * dt; const dx = this.snowPosition[p] - camera.x, dy = this.snowPosition[p + 1] - camera.y, dz = this.snowPosition[p + 2] - camera.z; if (dx > half) this.snowPosition[p] -= SNOW_BOX; else if (dx < -half) this.snowPosition[p] += SNOW_BOX; if (dz > half) this.snowPosition[p + 2] -= SNOW_BOX; else if (dz < -half) this.snowPosition[p + 2] += SNOW_BOX; if (dy < -20) this.snowPosition[p + 1] += SNOW_BOX * 0.8; else if (dy > SNOW_BOX * 0.7) this.snowPosition[p + 1] -= SNOW_BOX * 0.8; } this.snowGeometry.getAttribute(this.sprayAttrs[0]).needsUpdate = true; }
+  private updateSnow(dt: number, time: number, camera: THREE.Vector3, requested: number, wind: number) { const count = Math.min(this.reducedMotion ? 320 : SNOW_MAX, requested | 0), half = SNOW_BOX * 0.5; this.setVisibleParticles(this.snowGeometry, count); for (let i = 0; i < count; i += 1) { const p = i * 3; this.snowPosition[p + 1] -= (5.5 + this.snowSize[i] * 3.2) * dt; this.snowPosition[p] += Math.sin(time * 0.9 + this.snowSeed[i]) * 3.4 * dt + wind * dt; this.snowPosition[p + 2] += Math.cos(time * 0.7 + this.snowSeed[i]) * 2.2 * dt; const dx = this.snowPosition[p] - camera.x, dy = this.snowPosition[p + 1] - camera.y, dz = this.snowPosition[p + 2] - camera.z; if (dx > half) this.snowPosition[p] -= SNOW_BOX; else if (dx < -half) this.snowPosition[p] += SNOW_BOX; if (dz > half) this.snowPosition[p + 2] -= SNOW_BOX; else if (dz < -half) this.snowPosition[p + 2] += SNOW_BOX; if (dy < -20) this.snowPosition[p + 1] += SNOW_BOX * 0.8; else if (dy > SNOW_BOX * 0.7) this.snowPosition[p + 1] -= SNOW_BOX * 0.8; } this.snowGeometry.getAttribute(this.centreAttr).needsUpdate = true; }
   private updateTracks(state: SimulationState) {
     if (!state.onGround || state.crash > 0) { this.trackHasPrevious = false; return; }
     const fx = Math.sin(state.yaw), fz = Math.cos(state.yaw), rx = fz, rz = -fx, width = 0.42;

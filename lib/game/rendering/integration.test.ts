@@ -10,6 +10,7 @@ import { createScene } from "./SceneFactory";
 import { CsmShadowsNode } from "./CsmShadowsNode";
 import { EffectsRenderer } from "./EffectsRenderer";
 import { PARTICLE_CENTRE } from "./ParticleNodeMaterial";
+import { staticNodeFactories } from "./nodeFactories.fixture";
 
 // SMAANode decodes its lookup atlases through `new Image()`, which Node lacks. The post chain is
 // imported lazily by the renderer, so without this the WebGPU path warns and drops post.
@@ -17,6 +18,8 @@ class StubImage { src = ""; onload: (() => void) | null = null; }
 (globalThis as { Image?: unknown }).Image ??= StubImage;
 
 const profile = DROP_IN_GAME_PROFILES["ski-portillo"];
+/** `loadNodeFactories()` is async and these constructors are not; see `nodeFactories.fixture`. */
+const NODES = staticNodeFactories();
 
 class FakeBackend implements RendererBackend {
   compiled = 0;
@@ -44,13 +47,13 @@ function buildRenderer(backend: RendererBackend, onQualityChange?: (event: Quali
   const world = createProceduralWorld(profile, profile.seed);
   const state = createSimulation(profile, profile.seed);
   const renderer = new GameRenderer(fakeCanvas(), profile, world, state, {
-    backend, devicePixelRatio: 1, reducedMotion: true, onQualityChange,
+    backend, devicePixelRatio: 1, reducedMotion: true, onQualityChange, nodeFactories: NODES,
   });
   return { renderer, world, state };
 }
 
 test("the WebGPU scene is built entirely from node materials and a scene-level fog node", () => {
-  const built = createScene(profile, 1.6, "webgpu");
+  const built = createScene(profile, 1.6, NODES);
 
   assert.ok(built.sky.material instanceof MeshBasicNodeMaterial, "the sky ShaderMaterial is ported");
   assert.equal((built.sky.material as THREE.Material & { fog?: boolean }).fog, false);
@@ -63,7 +66,7 @@ test("the WebGPU scene is built entirely from node materials and a scene-level f
 });
 
 test("the WebGL scene is untouched by the port", () => {
-  const built = createScene(profile, 1.6, "webgl");
+  const built = createScene(profile, 1.6, null);
   assert.ok(built.sky.material instanceof THREE.ShaderMaterial);
   assert.equal((built.scene as THREE.Scene & { fogNode?: unknown }).fogNode, undefined);
   assert.ok(built.scene.fog instanceof THREE.FogExp2, "the WebGL path keeps its FogExp2");
@@ -71,7 +74,7 @@ test("the WebGL scene is untouched by the port", () => {
 
 test("both backends expose the same uniform shape, so the per-frame writes need no branch", () => {
   for (const kind of ["webgl", "webgpu"] as const) {
-    const built = createScene(profile, 1.6, kind);
+    const built = createScene(profile, 1.6, kind === "webgpu" ? NODES : null);
     built.snowUniforms.glint.value = 0.5;
     built.snowUniforms.track.value.set(1, 2, 3, 4);
     built.snowUniforms.horizon.value.setHex(0x123456);
@@ -200,7 +203,7 @@ test("a compile that never settles costs a stutter, not the loading screen", asy
   const world = createProceduralWorld(profile, profile.seed);
   const state = createSimulation(profile, profile.seed);
   const renderer = new GameRenderer(fakeCanvas(), profile, world, state, {
-    backend, devicePixelRatio: 1, reducedMotion: true, prewarmTimeoutMs: 10,
+    backend, devicePixelRatio: 1, reducedMotion: true, prewarmTimeoutMs: 10, nodeFactories: NODES,
   });
   const quality = (renderer as unknown as { quality: { rung: number } }).quality;
   quality.rung = 2;
