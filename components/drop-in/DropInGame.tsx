@@ -475,6 +475,14 @@ export default function DropInGame({ profile, conditions }: {
                   <span>Base {conditions.baseDepthIn == null ? "—" : `${conditions.baseDepthIn}″`}</span>
                   <span>24h {conditions.snow24In == null ? "—" : `${conditions.snow24In}″`}</span>
                 </span>
+                {conditions.narrative && (
+                  <span
+                    className="mt-2 block normal-case tracking-normal text-bark"
+                    data-testid="drop-in-conditions-narrative"
+                  >
+                    {conditions.narrative}
+                  </span>
+                )}
               </div>
               <p className="mx-auto mt-5 max-w-sm text-sm text-bark-dk">Carve with WASD or arrows. Tuck with W, brake with S, jump with Space. Mouse lock is optional.</p>
               <ModeSelect

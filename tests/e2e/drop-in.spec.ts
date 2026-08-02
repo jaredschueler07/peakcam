@@ -57,7 +57,11 @@ async function canvasLuminance(page: import("@playwright/test").Page) {
 test("v2 renders a keyboard start control without an iframe", async ({ page }) => {
   await page.goto(V2_URL);
   await expect(page.getByRole("button", { name: /start descent/i })).toBeVisible();
-  await expect(page.getByTestId("drop-in-conditions-stamp")).toBeVisible();
+  const stamp = page.getByTestId("drop-in-conditions-stamp");
+  await expect(stamp).toBeVisible();
+  // `snow_reports.conditions` is "tag1,tag2||narrative"; the poster used to
+  // print it raw, so Heavenly read "BLUEBIRD||EXPECT CLEAR BLUEBIRD SKIES".
+  await expect(stamp).not.toContainText("||");
   await expect(page.locator("iframe")).toHaveCount(0);
 });
 
