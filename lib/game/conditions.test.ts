@@ -25,10 +25,47 @@ const snowForecast = [{
   windGust: 24, precipProbability: 80, feelsLike: 14,
 }] satisfies WeatherPeriod[];
 
+test("the overloaded conditions string is split, never rendered raw", () => {
+  // `snow_reports.conditions` is "tag1,tag2||narrative" (CLAUDE.md). The poster
+  // was printing it whole, so Heavenly read "BLUEBIRD||EXPECT CLEAR BLUEBIRD
+  // SKIES TODAY." — the separator leaking into the UI.
+  const snapshot = buildConditionsSnapshot(resort, {
+    ...report,
+    conditions: "bluebird,packed||Expect clear bluebird skies today.",
+  });
+  assert.equal(snapshot.stamp, "bluebird, packed");
+  assert.equal(snapshot.narrative, "Expect clear bluebird skies today.");
+  assert.ok(!snapshot.stamp.includes("||"), "the separator must never reach the stamp");
+});
+
+test("a conditions string without a separator stays the stamp, with no narrative", () => {
+  const snapshot = buildConditionsSnapshot(resort, { ...report, conditions: "Packed powder" });
+  assert.equal(snapshot.stamp, "Packed powder");
+  assert.equal(snapshot.narrative, null);
+});
+
+test("a narrative with no tags falls back to the rating stamp rather than an empty line", () => {
+  const snapshot = buildConditionsSnapshot(resort, {
+    ...report,
+    conditions: "||Groomers are holding up well.",
+  });
+  assert.equal(snapshot.stamp, "Good conditions");
+  assert.equal(snapshot.narrative, "Groomers are holding up well.");
+});
+
+test("only the first separator splits, so a narrative may contain pipes", () => {
+  const snapshot = buildConditionsSnapshot(resort, {
+    ...report,
+    conditions: "icy||Ice below 8k||watch the traverse",
+  });
+  assert.equal(snapshot.stamp, "icy");
+  assert.equal(snapshot.narrative, "Ice below 8k||watch the traverse");
+});
+
 test("eight inches in 24 hours takes priority and produces the powder-day snapshot", () => {
   assert.deepEqual(buildConditionsSnapshot(resort, { ...report, new_snow_24h: 8 }, null), {
     surface: "powder", weatherDefault: 0, powderDay: true,
-    baseDepthIn: 64, snow24In: 8, stamp: "POWDER DAY",
+    baseDepthIn: 64, snow24In: 8, stamp: "POWDER DAY", narrative: null,
   });
 });
 
@@ -41,20 +78,20 @@ test("poor and explicitly icy conditions map to distinct hard-snow surfaces", ()
 test("NWS snow selects the snowfall preset without changing packed surface", () => {
   assert.deepEqual(buildConditionsSnapshot(resort, report, snowForecast), {
     surface: "packed", weatherDefault: 1, powderDay: false,
-    baseDepthIn: 64, snow24In: 3, stamp: "Packed powder",
+    baseDepthIn: 64, snow24In: 3, stamp: "Packed powder", narrative: null,
   });
 });
 
 test("missing live data uses the deterministic classic fallback", () => {
   assert.deepEqual(buildConditionsSnapshot(resort, null, null), {
     surface: "packed", weatherDefault: 0, powderDay: false,
-    baseDepthIn: null, snow24In: null, stamp: "Classic conditions",
+    baseDepthIn: null, snow24In: null, stamp: "Classic conditions", narrative: null,
   });
 });
 
 test("a forecast-only snapshot still starts in snowfall weather", () => {
   assert.deepEqual(buildConditionsSnapshot(resort, null, snowForecast), {
     surface: "packed", weatherDefault: 1, powderDay: false,
-    baseDepthIn: null, snow24In: null, stamp: "Classic conditions",
+    baseDepthIn: null, snow24In: null, stamp: "Classic conditions", narrative: null,
   });
 });

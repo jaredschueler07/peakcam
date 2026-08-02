@@ -3,6 +3,7 @@ import { COURSE_VERSION, PHYSICS_VERSION } from "../config/versions";
 import { FIXED_DT, MAX_FRAME_DT, MAX_STEPS_PER_FRAME } from "../core/clock";
 import { createSimulation, stepSimulation } from "../core/simulation";
 import { beginLiftRide } from "../core/run-lifecycle";
+import { spawnOnRunAtArcLength } from "../terrain/real-course";
 import type { SimulationState, SimulationWorld, TerrainSampler } from "../core/types";
 import { GamepadAdapter } from "../input/GamepadAdapter";
 import { InputManager } from "../input/InputManager";
@@ -112,9 +113,15 @@ export class GameRuntime {
     readonly assetLoadMs = 0,
     /** Ticket seed for a competitive run; the profile seed otherwise. */
     readonly runSeed: number = profile.seed,
+    /** Test-only start offset along the course; see `spawnOnRunAtArcLength`. */
+    spawnArcM?: number,
   ) {
     this.world = createWorld(profile, runSeed, terrain, simulationConfig(conditions.surface));
     this.state = createSimulation(profile, runSeed, terrain);
+    const spawnRun = terrain.kind === "real" ? terrain.realRuns?.[this.state.selectedTrail] : undefined;
+    if (spawnArcM !== undefined && Number.isFinite(spawnArcM) && spawnRun) {
+      spawnOnRunAtArcLength(this.state, spawnRun, spawnArcM, terrain);
+    }
     this.ghostRecorder = new GhostRecorder(this.world.terrain);
     ui.configureTerrain(terrain);
     this.input = new InputManager((scheme) => {
@@ -138,6 +145,7 @@ export class GameRuntime {
     window.addEventListener("blur", this.onBlur);
     document.addEventListener("visibilitychange", this.onVisibility);
     canvas.addEventListener("dblclick", this.onPointerLockGesture);
+
   }
 
   start(): void {

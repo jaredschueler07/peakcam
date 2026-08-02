@@ -88,7 +88,20 @@ export class GameRenderer {
   private contextLost = false; private disposed = false;
 
   constructor(private readonly canvas: HTMLCanvasElement, profile: ResortGameProfile, world: SimulationWorld, state: SimulationState, private readonly options: RendererOptions = {}) {
-    this.renderer = options.backend ?? new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+    // `?e2ecanvas` keeps the drawing buffer readable after compositing so an
+    // automated check can sample the rendered frame. Without it a WebGL canvas
+    // reads back as all-zeros outside the draw frame, which made the luminance
+    // spec report a black canvas while the scene rendered perfectly.
+    //
+    // Deliberately NOT gated on NODE_ENV, unlike `?nopost` below: the e2e gate
+    // runs against a production build, where a dev-only flag could never fire.
+    // The cost is a slower present path for whoever opts in by typing the
+    // parameter — no data or behaviour changes, and nothing links to it.
+    const preserveDrawingBuffer =
+      typeof location !== "undefined" && new URLSearchParams(location.search).has("e2ecanvas");
+    this.renderer = options.backend ?? new THREE.WebGLRenderer({
+      canvas, antialias: true, powerPreference: "high-performance", preserveDrawingBuffer,
+    });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace; this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.bypassPost = process.env.NODE_ENV !== "production" && typeof location !== "undefined" && new URLSearchParams(location.search).has("nopost");

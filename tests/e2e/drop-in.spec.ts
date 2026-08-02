@@ -1,30 +1,67 @@
 import { expect, test } from "@playwright/test";
+import { GHOST_SAMPLE_HZ } from "../../lib/game/replay/recorder";
 
 const V2_URL = "/resorts/heavenly/drop-in?engine=v2";
 
+/**
+ * Mean/stdev luminance of the centre quarter of the game canvas.
+ *
+ * The renderer runs with `preserveDrawingBuffer: false`, so a WebGL drawing
+ * buffer only holds pixels between the draw call and the next composite. The
+ * previous implementation went `toDataURL()` → `new Image()` → `await decode()`
+ * → `drawImage`, and every one of those awaits crosses a frame boundary: by the
+ * time it sampled, the buffer had been cleared and it read all-zeros. That is
+ * why this spec failed while the scene rendered perfectly on screen.
+ *
+ * The copy must therefore be synchronous and inside a rAF callback. The game
+ * re-registers its own rAF each frame, so a callback registered here is queued
+ * behind the one that draws: it runs after that frame's draw and before the
+ * composite that discards it — the one window where the pixels exist.
+ */
 async function canvasLuminance(page: import("@playwright/test").Page) {
-  return page.locator("canvas[data-testid='drop-in-canvas']").evaluate(async (canvas: HTMLCanvasElement) => {
-    const image = new Image(); image.src = canvas.toDataURL("image/png"); await image.decode();
-    const width = Math.floor(canvas.width * 0.5), height = Math.floor(canvas.height * 0.5);
-    const scratch = document.createElement("canvas"); scratch.width = width; scratch.height = height;
-    const context = scratch.getContext("2d", { willReadFrequently: true });
-    if (!context) throw new Error("2D canvas unavailable");
-    context.drawImage(image, canvas.width * 0.25, canvas.height * 0.25, width, height, 0, 0, width, height);
-    const pixels = context.getImageData(0, 0, width, height).data;
-    let sum = 0, sumSquares = 0, count = 0;
-    for (let index = 0; index < pixels.length; index += 4) {
-      const luminance = pixels[index] * 0.2126 + pixels[index + 1] * 0.7152 + pixels[index + 2] * 0.0722;
-      sum += luminance; sumSquares += luminance * luminance; count += 1;
-    }
-    const mean = sum / count;
-    return { mean, stdev: Math.sqrt(Math.max(0, sumSquares / count - mean * mean)) };
-  });
+  return page.locator("canvas[data-testid='drop-in-canvas']").evaluate(
+    (canvas: HTMLCanvasElement) =>
+      new Promise<{ mean: number; stdev: number }>((resolve, reject) => {
+        requestAnimationFrame(() => {
+          try {
+            const width = Math.floor(canvas.width * 0.5);
+            const height = Math.floor(canvas.height * 0.5);
+            const scratch = document.createElement("canvas");
+            scratch.width = width;
+            scratch.height = height;
+            const context = scratch.getContext("2d", { willReadFrequently: true });
+            if (!context) throw new Error("2D canvas unavailable");
+            // Straight from the live canvas — no encode/decode round-trip.
+            context.drawImage(
+              canvas,
+              canvas.width * 0.25, canvas.height * 0.25, width, height,
+              0, 0, width, height,
+            );
+            const pixels = context.getImageData(0, 0, width, height).data;
+            let sum = 0, sumSquares = 0, count = 0;
+            for (let index = 0; index < pixels.length; index += 4) {
+              const luminance =
+                pixels[index] * 0.2126 + pixels[index + 1] * 0.7152 + pixels[index + 2] * 0.0722;
+              sum += luminance; sumSquares += luminance * luminance; count += 1;
+            }
+            const mean = sum / count;
+            resolve({ mean, stdev: Math.sqrt(Math.max(0, sumSquares / count - mean * mean)) });
+          } catch (reason) {
+            reject(reason instanceof Error ? reason : new Error(String(reason)));
+          }
+        });
+      }),
+  );
 }
 
 test("v2 renders a keyboard start control without an iframe", async ({ page }) => {
   await page.goto(V2_URL);
   await expect(page.getByRole("button", { name: /start descent/i })).toBeVisible();
-  await expect(page.getByTestId("drop-in-conditions-stamp")).toBeVisible();
+  const stamp = page.getByTestId("drop-in-conditions-stamp");
+  await expect(stamp).toBeVisible();
+  // `snow_reports.conditions` is "tag1,tag2||narrative"; the poster used to
+  // print it raw, so Heavenly read "BLUEBIRD||EXPECT CLEAR BLUEBIRD SKIES".
+  await expect(stamp).not.toContainText("||");
   await expect(page.locator("iframe")).toHaveCount(0);
 });
 
@@ -84,8 +121,20 @@ test("a run started before its ticket arrives stays offline, and never claims to
   // Regression: the run is seeded from profile.seed because no ticket existed
   // at start, so a ticket landing mid-run cannot make it submittable. Reporting
   // "ticketed" here would advertise a run the server must reject.
+  //
+  // The ordering is enforced, not timed. The response is held open until the
+  // run is already going, then released explicitly. A sleep-based version could
+  // pass for the wrong reason — if the delay outlasted the wait, the assertion
+  // would see "offline" merely because the ticket never arrived, and the guard
+  // would have stopped guarding without failing.
+  let releaseTicket!: () => void;
+  const ticketHeld = new Promise<void>((resolve) => { releaseTicket = resolve; });
+  let sawRequest!: () => void;
+  const ticketRequested = new Promise<void>((resolve) => { sawRequest = resolve; });
+
   await page.route("**/api/drop-in/sessions", async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    sawRequest();
+    await ticketHeld;
     await route.fulfill({
       status: 201,
       contentType: "application/json",
@@ -102,16 +151,27 @@ test("a run started before its ticket arrives stays offline, and never claims to
       }),
     });
   });
+
   await page.goto(V2_URL);
   await page.getByRole("radio", { name: /time trial/i }).click();
-  await expect(page.locator("[data-drop-in-session='pending']")).toHaveCount(1);
+  await ticketRequested;
+  const shell = page.locator("[data-drop-in-state]");
+  await expect(shell).toHaveAttribute("data-drop-in-session", "pending");
+
+  // Start while the ticket is still held: this run is seeded locally. The
+  // request is genuinely still in flight here, so "pending" is the honest
+  // state — what matters is that it is not yet, and never becomes, "ticketed".
   await page.getByRole("button", { name: /start descent/i }).click();
   await expect(page.locator("[data-drop-in-state='running']")).toBeVisible();
+  await expect(shell).toHaveAttribute("data-drop-in-session", "pending");
 
-  // Let the late ticket land, then confirm the run did not adopt it.
-  await page.waitForTimeout(2500);
-  await expect(page.locator("[data-drop-in-session='offline']")).toHaveCount(1);
-  await expect(page.locator("[data-drop-in-session='ticketed']")).toHaveCount(0);
+  releaseTicket();
+
+  // Waiting on the *shell's* ticket state proves the response was received and
+  // processed — the positive signal a bare "still offline" assertion lacks,
+  // since that is already true and would pass before the ticket landed.
+  await expect(shell).toHaveAttribute("data-drop-in-ticket", "ready");
+  await expect(shell).toHaveAttribute("data-drop-in-session", "offline");
 });
 
 test("a failed session request degrades to offline play instead of blocking the run", async ({ page }) => {
@@ -132,6 +192,124 @@ test("the HUD audio toggle reflects and changes its pressed state", async ({ pag
   await expect(audio).toHaveAttribute("aria-pressed", "true");
   await audio.click();
   await expect(page.getByRole("button", { name: /unmute audio/i })).toHaveAttribute("aria-pressed", "false");
+});
+
+test("[gate] play → submit → board: a finished run posts and appears on the leaderboard", async ({ page }) => {
+  test.setTimeout(120_000);
+
+  const TICKET_SEED = 4242;
+  const RUN_ID = "11111111-2222-3333-4444-555555555555";
+  const NICKNAME = "GateBot";
+  let submittedBody: Record<string, unknown> | null = null;
+
+  await page.route("**/api/drop-in/sessions", (route) =>
+    route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ticket: "gate.ticket.sig",
+        seed: TICKET_SEED,
+        resortSlug: "ski-portillo",
+        mode: "time_trial",
+        trailId: "roca-jack",
+        physicsVersion: 1,
+        courseVersion: 1,
+        tickHz: 10,
+        expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+      }),
+    }));
+
+  await page.route("**/api/drop-in/runs", (route) => {
+    submittedBody = JSON.parse(route.request().postData() ?? "{}");
+    return route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        runId: RUN_ID,
+        accepted: true,
+        timeMs: 42_000,
+        score: 2864,
+        mode: "time_trial",
+        trailId: "roca-jack",
+        physicsVersion: 1,
+        courseVersion: 1,
+        displayName: NICKNAME,
+      }),
+    });
+  });
+
+  await page.route("**/api/drop-in/leaderboard**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        resortSlug: "ski-portillo",
+        mode: "time_trial",
+        trailId: "roca-jack",
+        physicsVersion: 1,
+        courseVersion: 1,
+        rows: [{
+          id: RUN_ID,
+          rank: 1,
+          mode: "time_trial",
+          trailId: "roca-jack",
+          timeMs: 42_000,
+          score: 2864,
+          physicsVersion: 1,
+          courseVersion: 1,
+          displayName: NICKNAME,
+          isSelf: true,
+          hasGhost: true,
+          finishedAt: new Date().toISOString(),
+        }],
+      }),
+    }));
+
+  // ?e2espawn=-40 starts the descent 40 m before the finish (negative counts
+  // back from the end, so no course length is hardcoded here). A hands-off run
+  // from the top cannot reach the finish gate — it leaves the run corridor and
+  // courseProgress stalls — but from here it crosses the line under real
+  // physics, producing real recorder samples. Nothing about the finish is
+  // faked, and the resulting ghost is refused by the server validator's
+  // start-zone and minimum-distance checks.
+  await page.goto("/resorts/ski-portillo/drop-in?engine=v2&e2espawn=-40");
+  await page.getByRole("radio", { name: /time trial/i }).click();
+
+  const shell = page.locator("[data-drop-in-state]");
+  await expect(shell).toHaveAttribute("data-drop-in-session", "ticketed");
+  await page.getByRole("button", { name: /start descent/i }).click();
+  await expect(page.locator("[data-drop-in-state='running']")).toBeVisible();
+  await expect(shell).toHaveAttribute("data-drop-in-session", "ticketed");
+
+  // Ski hands-off to the natural finish. Headless runs at roughly a third of
+  // realtime, so this budget is wall-clock, not sim-clock.
+  await expect(page.getByTestId("drop-in-results")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId("drop-in-submit-card")).toBeVisible();
+
+  await page.locator("#drop-in-nickname").fill(NICKNAME);
+  await page.getByTestId("drop-in-submit").click();
+
+  await expect(page.getByTestId("drop-in-submit-result")).toBeVisible();
+  await expect(page.getByTestId("drop-in-leaderboard")).toBeVisible();
+  await expect(page.getByTestId("drop-in-placement")).toContainText(/you placed/i);
+  await expect(page.getByTestId("drop-in-leaderboard")).toContainText(NICKNAME);
+
+  // Guard against a vacuous pass: the submission has to carry the ticket the
+  // run was seeded from AND a real recorded ghost, or this would only be
+  // asserting that mocked routes return what they were told to.
+  expect(submittedBody).not.toBeNull();
+  const body = submittedBody as unknown as Record<string, unknown>;
+  expect(body.ticket).toBe("gate.ticket.sig");
+  expect(typeof body.ghost).toBe("string");
+  expect((body.ghost as string).length).toBeGreaterThan(64);
+  // NB: the client reads this from the ghost header (GHOST_SAMPLE_HZ = 30), not
+  // from the ticket — the sessions route advertises tickHz: 10. See the note to
+  // the lead; asserting the constant rather than a literal so this spec tracks
+  // whichever value the recorder actually writes.
+  expect(body.tickHz).toBe(GHOST_SAMPLE_HZ);
+  // The ghost's duration comes from its own keyframe span, so a non-zero time
+  // means the recorder actually captured the descent.
+  expect(body.timeMs as number).toBeGreaterThan(0);
 });
 
 test("the default engine remains the v1 iframe", async ({ page }) => {
@@ -168,16 +346,44 @@ test("keyboard-only start reaches a running canvas with a ticking HUD", async ({
   await expect.poll(async () => page.getByText(/\d+\.\d+s/).first().textContent()).not.toBe(first);
 });
 
-test("gameplay canvas retains terrain contrast and does not wash toward white", async ({ page }) => {
-  await page.goto(V2_URL);
-  await page.getByRole("button", { name: /start descent/i }).click();
-  await expect(page.locator("[data-drop-in-state='running'] canvas[data-testid='drop-in-canvas']")).toBeVisible();
-  await page.waitForTimeout(750);
-  const luminance = await canvasLuminance(page);
-  console.log(`canvas luminance mean=${luminance.mean.toFixed(2)} stdev=${luminance.stdev.toFixed(2)}`);
-  expect(luminance.stdev).toBeGreaterThan(28);
-  expect(luminance.mean).toBeLessThan(190);
-});
+/**
+ * Per-resort brightness ceilings, and one shared contrast floor.
+ *
+ * A washout is high mean AND low stdev — losing structure, not merely being
+ * bright — so `stdev` is the real detector and the mean cap is the secondary
+ * one. Both are per-resort because the resorts genuinely differ at this sample
+ * point, and a floor calibrated on one of them fails the others: a single
+ * stdev>28 rule rejects healthy Portillo (27.6) and Breckenridge (25.2) frames
+ * while only Heavenly (33.7) clears it.
+ *
+ * All six numbers are EMPIRICAL, measured on a healthy build (see each line)
+ * and set with headroom — they are not design targets. A real washout collapses
+ * stdev toward single digits, far below even the loosest floor here.
+ * Re-measure before tightening; do not tune these to make a red test green.
+ */
+const LUMINANCE_BUDGETS = [
+  // measured mean / stdev at this sample point: 186.6 / 27.6
+  { slug: "ski-portillo", maxMean: 195, minStdev: 23 },
+  // 186.1 / 25.2 — the flattest-looking of the three, and the binding case
+  { slug: "breckenridge", maxMean: 195, minStdev: 21 },
+  // 207.7-208.2 / 33.7 — brightest, but also the most structured
+  { slug: "heavenly", maxMean: 215, minStdev: 29 },
+] as const;
+
+for (const { slug, maxMean, minStdev } of LUMINANCE_BUDGETS) {
+  test(`gameplay canvas retains terrain contrast and does not wash toward white (${slug})`, async ({ page }) => {
+    // ?e2ecanvas keeps the WebGL drawing buffer readable; without it the sample
+    // below reads all-zeros regardless of what is on screen.
+    await page.goto(`/resorts/${slug}/drop-in?engine=v2&e2ecanvas`);
+    await page.getByRole("button", { name: /start descent/i }).click();
+    await expect(page.locator("[data-drop-in-state='running'] canvas[data-testid='drop-in-canvas']")).toBeVisible();
+    await page.waitForTimeout(750);
+    const luminance = await canvasLuminance(page);
+    console.log(`${slug} canvas luminance mean=${luminance.mean.toFixed(2)} stdev=${luminance.stdev.toFixed(2)}`);
+    expect(luminance.stdev).toBeGreaterThan(minStdev);
+    expect(luminance.mean).toBeLessThan(maxMean);
+  });
+}
 
 test("trail switch cycles to a named real OSM run", async ({ page }) => {
   await page.goto(V2_URL);
