@@ -1,10 +1,24 @@
 import assert from "node:assert/strict";
+import { brotliDecompressSync } from "node:zlib";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { test } from "node:test";
 
 import { COURSE_VERSION } from "../config/versions";
 import { DROP_IN_GAME_PROFILES } from "../config/profiles";
+import type { DropInResortSlug } from "../config/schema";
+import type { TerrainMeta, TrailsFile } from "../terrain/formats";
+import { buildRealCourse } from "../terrain/real-course";
 import { RESORT_BAKE_CONFIGS } from "../terrain/resorts";
-import { courseSeed, resolveCourse, trailIdFromName, trailIdsForResort, utcDateStamp } from "./courses";
+import { createTerrainSource } from "../terrain/terrain-source";
+import {
+  COURSE_GATES,
+  courseSeed,
+  resolveCourse,
+  trailIdFromName,
+  trailIdsForResort,
+  utcDateStamp,
+} from "./courses";
 
 test("trail ids fold diacritics and collapse punctuation", () => {
   assert.equal(trailIdFromName("Kilómetro Lanzado"), "kilometro-lanzado");
@@ -35,6 +49,79 @@ test("a resolved course carries the resort's baked half-extent", () => {
     const course = resolveCourse(slug, trailId);
     assert.ok(course, `${slug}/${trailId} should resolve`);
     assert.equal(course.halfSizeM, RESORT_BAKE_CONFIGS[slug].sizeM / 2);
+  }
+});
+
+test("every resolved course carries real startZ/finishZ gates", () => {
+  for (const slug of Object.keys(DROP_IN_GAME_PROFILES)) {
+    for (const trailId of trailIdsForResort(slug)) {
+      const course = resolveCourse(slug, trailId);
+      assert.ok(course, `${slug}/${trailId} should resolve`);
+      assert.equal(typeof course.startZ, "number", `${slug}/${trailId} missing startZ`);
+      assert.equal(typeof course.finishZ, "number", `${slug}/${trailId} missing finishZ`);
+      assert.notEqual(course.startZ, course.finishZ, `${slug}/${trailId} start equals finish`);
+    }
+  }
+});
+
+test("COURSE_GATES match buildRealCourse polylines for all 18 pilot trails", () => {
+  // Positional binding: call buildRealCourse explicitly (selectRuns + makeRun),
+  // not sampler.realRuns which is an opaque re-export of the same object.
+  const dir = path.join(process.cwd(), "public/game/terrain");
+  const slugs = Object.keys(DROP_IN_GAME_PROFILES) as DropInResortSlug[];
+
+  for (const slug of slugs) {
+    const profile = DROP_IN_GAME_PROFILES[slug];
+    const packed = brotliDecompressSync(readFileSync(path.join(dir, `${slug}.height.u16.br`)));
+    const source = createTerrainSource({
+      profile,
+      mode: "real",
+      assets: {
+        heightfield: packed.buffer.slice(
+          packed.byteOffset,
+          packed.byteOffset + packed.byteLength,
+        ) as ArrayBuffer,
+        meta: JSON.parse(readFileSync(path.join(dir, `${slug}.meta.json`), "utf8")) as TerrainMeta,
+        trails: JSON.parse(readFileSync(path.join(dir, `${slug}.trails.json`), "utf8")) as TrailsFile,
+      },
+    });
+    assert.ok(source.real, `${slug}: expected real terrain source`);
+    // Draped inventory → buildRealCourse (selectRuns + downhill/trim).
+    const built = buildRealCourse(
+      profile,
+      source.real.runs,
+      source.real.lifts,
+      profile.terrainSeed,
+    );
+    const trailIds = trailIdsForResort(slug);
+    assert.equal(built.runs.length, 6, `${slug}: expected 6 curated runs`);
+    assert.equal(trailIds.length, 6, `${slug}: expected 6 trail ids`);
+
+    for (let i = 0; i < 6; i++) {
+      const run = built.runs[i];
+      const trailId = trailIds[i];
+      const measured = {
+        startZ: Math.round(run.points[0].z * 100) / 100,
+        finishZ: Math.round(run.points.at(-1)!.z * 100) / 100,
+      };
+      const table = COURSE_GATES[slug][trailId];
+      assert.ok(table, `${slug}/${trailId} missing from COURSE_GATES`);
+      assert.equal(
+        table.startZ,
+        measured.startZ,
+        `${slug}/${trailId} startZ: table ${table.startZ} ≠ measured ${measured.startZ}`,
+      );
+      assert.equal(
+        table.finishZ,
+        measured.finishZ,
+        `${slug}/${trailId} finishZ: table ${table.finishZ} ≠ measured ${measured.finishZ}`,
+      );
+
+      const course = resolveCourse(slug, trailId);
+      assert.ok(course);
+      assert.equal(course.startZ, measured.startZ);
+      assert.equal(course.finishZ, measured.finishZ);
+    }
   }
 });
 

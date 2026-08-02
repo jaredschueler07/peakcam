@@ -12,6 +12,7 @@
  * not from the fixture drifting into a bound.
  */
 
+import { FIXED_HZ } from "../../core/clock";
 import { encodeGhost, type GhostSample } from "../../replay/codec";
 import { COURSE_VERSION, PHYSICS_VERSION } from "../../config/versions";
 import {
@@ -22,7 +23,7 @@ import {
   type ServerCourse,
 } from "../courses";
 import { issueTicket, parseTicketKeyring, type TicketKeyring } from "../run-ticket";
-import type { RunSubmissionFacts } from "../validate-run";
+import { ghostSpanMsFromTicks, type RunSubmissionFacts } from "../validate-run";
 
 /** A 32-byte secret of one repeated byte — deterministic and long enough. */
 function testSecret(fill: number): string {
@@ -76,33 +77,56 @@ export interface RunFixture {
   keyring: TicketKeyring;
 }
 
+export interface MakeRunSamplesOptions {
+  count?: number;
+  sampleHz?: number;
+  /** Course start Z in metres (defaults to the fixture course gate). */
+  startZ?: number;
+  /** Course finish Z in metres (defaults to the fixture course gate). */
+  finishZ?: number;
+}
+
 /**
- * A 30-second descent: still at the gate, accelerating smoothly to 30 m/s,
- * drifting downhill in +Z with a gentle sinusoidal line in X.
+ * A 30-second descent: still at the gate, accelerating smoothly, interpolating
+ * Z from the course `startZ` to `finishZ` with a gentle sinusoidal line in X.
+ * Positions are chosen so baseline + start/finish gate checks both pass.
  */
-export function makeRunSamples(count = FIXTURE_KEYFRAMES, sampleHz = FIXTURE_SAMPLE_HZ): GhostSample[] {
+export function makeRunSamples(options: MakeRunSamplesOptions = {}): GhostSample[] {
+  const course = resolveCourseOrThrow();
+  const count = options.count ?? FIXTURE_KEYFRAMES;
+  const sampleHz = options.sampleHz ?? FIXTURE_SAMPLE_HZ;
+  const startZCm = Math.round((options.startZ ?? course.startZ) * 100);
+  const finishZCm = Math.round((options.finishZ ?? course.finishZ) * 100);
+  const fallDir = finishZCm >= startZCm ? 1 : -1;
   const samples: GhostSample[] = [];
   const dt = 1 / sampleHz;
-  let xCm = 0;
-  let zCm = -14_000;
+  // Absolute 120 Hz tick index per sample (matches the real recorder).
+  const tickStride = FIXED_HZ / sampleHz;
+  // Smooth ease-in so speed ramps under the accel envelope (peak ≪ 50 m/s).
+  const ease = (t: number): number => t * t * (3 - 2 * t); // smoothstep
 
+  let prevX = 0;
+  let prevZ = startZCm;
   for (let i = 0; i < count; i++) {
-    // 0 → 3000 cm/s (30 m/s) over the run: 10 cm/s per step, far under the
-    // 250 cm/s per step the acceleration bound allows.
-    const speedCms = Math.round((3000 * i) / Math.max(1, count - 1));
+    const t = i / Math.max(1, count - 1);
+    const zCm = Math.round(startZCm + (finishZCm - startZCm) * ease(t));
+    const xCm = Math.round(Math.sin(i / 18) * 12 * t * 40);
+    let speedCms = 0;
     if (i > 0) {
-      zCm += Math.round(speedCms * dt * 0.98);
-      xCm += Math.round(Math.sin(i / 18) * 12);
+      const stepCm = Math.hypot(xCm - prevX, zCm - prevZ);
+      speedCms = Math.round(stepCm / dt);
     }
     samples.push({
-      tick: i,
+      tick: Math.round(i * tickStride),
       xCm,
       zCm,
       groundOffsetCm: 90,
-      yaw: 0.1,
+      yaw: fallDir >= 0 ? 0.1 : Math.PI + 0.1,
       speedCms,
       poseFlags: 0,
     });
+    prevX = xCm;
+    prevZ = zCm;
   }
   return samples;
 }
@@ -122,7 +146,7 @@ export function makeRunFixture(options: RunFixtureOptions = {}): RunFixture {
     utcDateStamp(nowMs),
   );
 
-  const base = makeRunSamples(FIXTURE_KEYFRAMES, sampleHz);
+  const base = makeRunSamples({ count: FIXTURE_KEYFRAMES, sampleHz });
   const samples = options.mutateSamples ? options.mutateSamples(base) : base;
 
   const ghostBytes = encodeGhost(samples, {
@@ -132,7 +156,7 @@ export function makeRunFixture(options: RunFixtureOptions = {}): RunFixture {
     seed: options.ghostMeta?.seed ?? seed,
   });
 
-  const spanMs = ((samples[samples.length - 1].tick - samples[0].tick) / sampleHz) * 1000;
+  const spanMs = ghostSpanMsFromTicks(samples[0].tick, samples[samples.length - 1].tick);
   const startedAt = new Date(nowMs - spanMs - 2_000).toISOString();
   const finishedAt = new Date(nowMs - 2_000).toISOString();
 
