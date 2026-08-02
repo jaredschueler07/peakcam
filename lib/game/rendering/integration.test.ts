@@ -158,6 +158,28 @@ test("the WebGL path keeps its THREE.Points clouds", () => {
   renderer.dispose();
 });
 
+test("the instanced props carry vertex colours identically on both backends", () => {
+  // Trees rendered white on WebGPU. NodeMaterial only multiplies in vertexColor() when
+  // `material.vertexColors === true` AND `geometry.hasAttribute("color")` — otherwise
+  // VertexColorNode falls back to white, which is exactly the symptom. Pin both here so the JS
+  // side is ruled in or out without a GPU.
+  for (const kind of ["webgl", "webgpu"] as const) {
+    const { renderer } = buildRenderer(new FakeBackend(kind));
+    const scene = (renderer as unknown as { built: { scene: THREE.Scene } }).built.scene;
+    let instanced = 0;
+    scene.traverse((object) => {
+      const mesh = object as THREE.InstancedMesh;
+      if (!mesh.isInstancedMesh) return;
+      instanced += 1;
+      const material = mesh.material as THREE.Material & { vertexColors?: boolean };
+      assert.equal(material.vertexColors, true, `${kind}: instanced prop keeps vertexColors`);
+      assert.ok(mesh.geometry.getAttribute("color"), `${kind}: and its geometry carries the colours`);
+    });
+    assert.ok(instanced >= 3, "trees, rocks and markers are instanced");
+    renderer.dispose();
+  }
+});
+
 test("pre-warm compiles the seeded rung and the top rung, then restores the rung", async () => {
   const backend = new FakeBackend("webgpu");
   const { renderer } = buildRenderer(backend);

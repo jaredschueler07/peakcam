@@ -25,6 +25,20 @@ const SUN = vec3(-0.46, 0.62, -0.64);
 const AERIAL = vec3(0.6588, 0.7686, 0.9098);
 const BACKSCATTER = vec3(0.68, 0.86, 0.96);
 
+/**
+ * The glint hash is `fract(sin(dot(p, k)) * 43758.5453)` on floored world position. At a resort
+ * with large absolute coordinates (Heavenly sits ~3km up) `dot(p, k)` reaches ~1e7, and WGSL
+ * leaves `sin()` undefined for arguments that large — Metal returns NaN, which propagates through
+ * the glint into `outgoingLight` and clamps the fragment to black. GLSL ES merely lost precision
+ * there, so this never showed on WebGL.
+ *
+ * Wrapping the position into a 64m cell keeps the argument small and finite. The sparkle pattern
+ * repeats every 64m, which is far beyond the 28-105m band where glints are visible at all, and at
+ * these coordinates the unwrapped pattern was already quantised into nonsense by f32 precision.
+ */
+const HASH_WRAP = 64;
+const wrapForHash = (p: Vec3): Vec3 => p.sub(floor(p.div(HASH_WRAP)).mul(HASH_WRAP));
+
 const snowHash = (p: Vec3): Float => fract(sin(dot(p, vec3(127.1, 311.7, 74.7))).mul(43758.5453));
 
 const snowFlake = (p: Vec3): Vec3 =>
@@ -65,8 +79,8 @@ function snowShading(uniforms: SnowNodeUniforms, outgoingLight: Vec3): Vec3 {
   const wrap = clamp(dot(n, l).add(0.5).div(1.5), 0, 1);
   const rim = pow(float(1).sub(clamp(dot(n, v), 0, 1)), 3);
   const half = normalize(v.add(l));
-  const glint1 = pow(max(dot(snowFlake(floor(positionWorld.mul(7))), half), 0), 400);
-  const glint2 = pow(max(dot(snowFlake(floor(positionWorld.mul(19)).add(53)), half), 0), 2000);
+  const glint1 = pow(max(dot(snowFlake(wrapForHash(floor(positionWorld.mul(7)))), half), 0), 400);
+  const glint2 = pow(max(dot(snowFlake(wrapForHash(floor(positionWorld.mul(19)).add(53))), half), 0), 2000);
   const track = float(1).sub(
     smoothstep(0.24, 0.62, segmentDistance(positionWorld.xz, uniforms.track.xy, uniforms.track.zw)),
   );
