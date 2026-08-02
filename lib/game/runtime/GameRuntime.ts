@@ -43,7 +43,17 @@ export class CompetitiveRecordingArm {
     }
   }
 
-  onReset(stateTime: number, recorder: RecordingRecorder): "started" | "discarded" | "ignored" {
+  onReset(
+    stateTime: number,
+    recorder: RecordingRecorder,
+    liftFinished = false,
+  ): "started" | "discarded" | "lift-discarded" | "ignored" {
+    if (liftFinished) {
+      if (recorder.recording) recorder.finish();
+      // A lift drop is not a run start; wait for the next genuine restart reset.
+      this.pending = true;
+      return "lift-discarded";
+    }
     if (this.pending) {
       if (stateTime !== 0) console.warn("[drop-in] competitive recorder reset did not land at state.time 0", stateTime);
       recorder.begin(stateTime);
@@ -184,11 +194,11 @@ export class GameRuntime {
         const events = stepSimulation(this.state, this.input.nextFrame(), FIXED_DT, this.world);
         this.audio.playSimulationEvents(events);
         if (events.reset) {
-          const resetAction = this.recordingArm.onReset(this.state.time, this.ghostRecorder);
+          const resetAction = this.recordingArm.onReset(this.state.time, this.ghostRecorder, events.liftFinished);
           if (resetAction === "started" || resetAction === "discarded") {
             this.ghostRecorder.sample(this.state, this.state.time);
           }
-          if (resetAction === "discarded") {
+          if (resetAction === "discarded" || resetAction === "lift-discarded") {
             this.finishedRun = null;
             this.ui.setRunRecordingAvailable(false);
           }

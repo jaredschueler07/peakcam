@@ -157,3 +157,33 @@ test("arming while already at state time zero begins immediately", () => {
   assert.deepEqual(begins, [0]);
   assert.equal(arm.pending, false);
 });
+
+test("lift-finished reset discards an active run without beginning a lift-drop ghost", () => {
+  const arm = new CompetitiveRecordingArm();
+  const state = createSkierState();
+  const recorder = new GhostRecorder();
+
+  arm.arm(0, (now) => recorder.begin(now));
+  recorder.sample(state, 0);
+  arm.onReset(0, recorder, true);
+
+  assert.equal(recorder.recording, false);
+  assert.equal(arm.pending, true);
+  assert.equal(recorder.finish(), null);
+
+  arm.onReset(0, recorder, false);
+  assert.equal(recorder.recording, true);
+  recorder.sample(state, 0);
+  assert.equal(recorder.finish()?.[0].tick, 0);
+});
+
+test("lift-finished reset while pending does not begin recording", () => {
+  const arm = new CompetitiveRecordingArm();
+  const recorder = new GhostRecorder();
+
+  arm.arm(12, (now) => recorder.begin(now));
+  arm.onReset(0, recorder, true);
+
+  assert.equal(recorder.recording, false);
+  assert.equal(arm.pending, true);
+});
