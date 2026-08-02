@@ -38,6 +38,25 @@ test("a resolved course carries the resort's baked half-extent", () => {
   }
 });
 
+test("every resolved course carries real startZ/finishZ gates", () => {
+  for (const slug of Object.keys(DROP_IN_GAME_PROFILES)) {
+    for (const trailId of trailIdsForResort(slug)) {
+      const course = resolveCourse(slug, trailId);
+      assert.ok(course, `${slug}/${trailId} should resolve`);
+      assert.equal(typeof course.startZ, "number", `${slug}/${trailId} missing startZ`);
+      assert.equal(typeof course.finishZ, "number", `${slug}/${trailId} missing finishZ`);
+      assert.notEqual(course.startZ, course.finishZ, `${slug}/${trailId} start equals finish`);
+    }
+  }
+});
+
+test("Breckenridge Horseshoe Bowl gates match the baked real-course polyline", () => {
+  const course = resolveCourse("breckenridge", "horseshoe-bowl");
+  assert.ok(course);
+  assert.equal(course.startZ, 290.4);
+  assert.equal(course.finishZ, -197.2);
+});
+
 test("a time_trial seed is fixed for the life of the course version", () => {
   const monday = courseSeed("time_trial", "breckenridge", "peak-8", COURSE_VERSION, "2026-07-13");
   const friday = courseSeed("time_trial", "breckenridge", "peak-8", COURSE_VERSION, "2026-07-17");

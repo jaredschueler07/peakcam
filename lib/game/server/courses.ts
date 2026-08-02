@@ -2,21 +2,30 @@
  * lib/game/server/courses.ts
  * ──────────────────────────
  * The server's view of what counts as a legal course: which trail ids exist at
- * a resort, and how big the world box is around them.
+ * a resort, how big the world box is around them, and the authoritative start
+ * / finish Z gates for competitive validation.
  *
  * Two consumers, both on the trust boundary:
  *   - `POST /api/drop-in/sessions` refuses to mint a ticket for a trail that
  *     does not exist, so a fabricated `trailId` can never reach the board.
  *   - `POST /api/drop-in/runs` needs the world extent to bounds-check every
- *     ghost keyframe.
+ *     ghost keyframe, and the start/finish Z to reject runs that never left
+ *     the gate or never crossed the line.
  *
  * Read-only over `lib/game/config/profiles.ts` (trail names) and
  * `lib/game/terrain/resorts.ts` (bake extents). Trail *ids* are derived from
  * trail names here because no shared course registry exists yet — the
  * `RunDefinition` in `lib/game/config/modes.ts` is still just an interface with
- * no instances. When that registry lands, `resolveCourse` should read it
- * instead, and `startZ`/`finishZ` (see {@link ServerCourse}) should stop being
- * optional.
+ * no instances.
+ *
+ * ## startZ / finishZ provenance
+ *
+ * Gates are the first and last point Z of each real run after the same
+ * orientation/trim pipeline used by `buildRealCourse` (`lib/game/terrain/
+ * real-course.ts`, P5-RUN-SELECTION.md). Values were measured against the
+ * committed `public/game/terrain/<slug>.{trails,height}` assets and are stored
+ * here so the server stays free of heightfield I/O on the submit path. Bump
+ * `COURSE_VERSION` if a re-bake moves a gate.
  */
 
 import { DROP_IN_GAME_PROFILES } from "../config/profiles";
@@ -45,13 +54,49 @@ export interface ServerCourse {
   /** Half the bake-box edge, metres. World X/Z live in `[-half, +half]`. */
   halfSizeM: number;
   /**
-   * Authoritative course start/finish along Z, when a course registry defines
-   * them. Absent today — see the module header; the validator degrades to the
-   * weaker start/finish checks it can make without them.
+   * Authoritative course start along game Z (metres). Always set for the three
+   * pilot resorts — see {@link COURSE_GATES}.
    */
-  startZ?: number;
-  finishZ?: number;
+  startZ: number;
+  /**
+   * Authoritative course finish along game Z (metres). Direction relative to
+   * `startZ` defines the fall line (see run-lifecycle finish crossing).
+   */
+  finishZ: number;
 }
+
+/**
+ * Start/finish Z (metres) for every competitive trail, keyed by resort then
+ * trail id. Measured from the real-course polylines (P5).
+ */
+export const COURSE_GATES: Readonly<
+  Record<DropInResortSlug, Readonly<Record<string, Readonly<{ startZ: number; finishZ: number }>>>>
+> = {
+  "ski-portillo": {
+    "roca-jack": { startZ: -846.9, finishZ: -699.5 },
+    juncalillo: { startZ: -705.7, finishZ: -765.8 },
+    "el-plateau": { startZ: -1312.4, finishZ: -1040.6 },
+    "la-garganta": { startZ: -1312.4, finishZ: -941 },
+    "kilometro-lanzado": { startZ: -159.6, finishZ: 556.8 },
+    "las-vizcachas": { startZ: -1040.6, finishZ: -878.3 },
+  },
+  breckenridge: {
+    "horseshoe-bowl": { startZ: 290.4, finishZ: -197.2 },
+    "imperial-bowl": { startZ: 269.2, finishZ: 522.3 },
+    "devil-s-crotch": { startZ: 1334.6, finishZ: 929.6 },
+    "four-o-clock": { startZ: 459.5, finishZ: 222 },
+    "whale-s-tail": { startZ: 40.3, finishZ: -375.1 },
+    psychopath: { startZ: 615.3, finishZ: 883.5 },
+  },
+  heavenly: {
+    gunbarrel: { startZ: 1002, finishZ: 638 },
+    "ridge-run": { startZ: 2565, finishZ: 1912.4 },
+    "milky-way-bowl": { startZ: 1911, finishZ: 1546.4 },
+    "mott-canyon": { startZ: 1509.5, finishZ: 657.3 },
+    "olympic-downhill": { startZ: -236.1, finishZ: -1514.9 },
+    "killebrew-canyon": { startZ: 2909.8, finishZ: 2356.3 },
+  },
+};
 
 function isResortSlug(slug: string): slug is DropInResortSlug {
   return Object.hasOwn(DROP_IN_GAME_PROFILES, slug);
@@ -75,11 +120,16 @@ export function resolveCourse(resortSlug: string, trailId: string): ServerCourse
   const trail = profile.trails.find((t) => trailIdFromName(t.name) === trailId);
   if (!trail) return null;
 
+  const gates = COURSE_GATES[resortSlug][trailId];
+  if (!gates) return null;
+
   return {
     resortSlug,
     trailId,
     trailName: trail.name,
     halfSizeM: bake.sizeM / 2,
+    startZ: gates.startZ,
+    finishZ: gates.finishZ,
   };
 }
 

@@ -67,8 +67,8 @@ test("an accepted run records the metrics that will be stored", () => {
   assert.equal(metrics.startSpeedCms, 0);
   assert.ok(metrics.maxSpeedCms <= 3000, `peak speed was ${metrics.maxSpeedCms}`);
   assert.ok(metrics.distanceCm > 10_000, `only covered ${metrics.distanceCm}cm`);
-  // No course registry supplies startZ/finishZ yet — see courses.ts.
-  assert.equal(metrics.startFinishChecked, false);
+  // Real startZ/finishZ from COURSE_GATES — see courses.ts.
+  assert.equal(metrics.startFinishChecked, true);
 });
 
 // ─── Tampered traces ─────────────────────────────────────────
@@ -147,10 +147,13 @@ test("a run that launches at speed never crossed the start gate", () => {
 });
 
 test("a run too short to be a descent is a bad finish", () => {
-  // Eleven keyframes, one second, nobody moved: internally consistent, so it
-  // clears the duration checks and fails on the distance floor.
+  // Eleven keyframes, one second, parked on the start gate: clears the start
+  // and duration checks, fails the distance floor (and never reaches finish).
+  const course = resolveCourseOrThrow();
+  const startZCm = Math.round(course.startZ * 100);
   const result = runValidator({
-    mutateSamples: (samples) => samples.slice(0, 11).map((s) => ({ ...s, speedCms: 0, xCm: 0, zCm: 0 })),
+    mutateSamples: (samples) =>
+      samples.slice(0, 11).map((s) => ({ ...s, speedCms: 0, xCm: 0, zCm: startZCm })),
   });
   assertRejected(result, "bad_finish");
 });
