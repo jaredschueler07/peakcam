@@ -57,7 +57,10 @@ function conditionSurface(resort: ConditionsResort, report: SnowReport): Surface
   const ratings = [resort.cond_rating, report.auto_cond_rating]
     .map((rating) => rating?.toLowerCase() ?? "")
     .filter(Boolean);
-  if (ratings.includes("icy") || /\bicy|ice\b/i.test(report.conditions ?? "")) return "ice";
+  // Grouped deliberately: `/\bicy|ice\b/` parses as `(\bicy)|(ice\b)`, so every
+  // word ending in "ice" — nice, service, twice, practice — selected the ice
+  // integrator and changed the physics under the player.
+  if (ratings.includes("icy") || /\b(icy|ice)\b/i.test(report.conditions ?? "")) return "ice";
   if (ratings.includes("poor")) return "firm";
   return "packed";
 }
