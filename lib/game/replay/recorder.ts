@@ -17,10 +17,20 @@ function centimetres(metres: number): number {
   return Math.round(metres * 100);
 }
 
+/**
+ * The slice of {@link import("../core/types").TerrainSampler} the recorder
+ * needs: ghost samples carry Y relative to the ground, per the codec contract.
+ */
+export interface GroundHeightSampler {
+  height(x: number, z: number): number;
+}
+
 export class GhostRecorder {
   private samples: GhostSample[] | null = null;
   private startedAt = 0;
   private nextTick = 0;
+
+  constructor(private readonly terrain: GroundHeightSampler) {}
 
   get recording(): boolean {
     return this.samples !== null;
@@ -47,7 +57,9 @@ export class GhostRecorder {
       tick,
       xCm: centimetres(state.pos.x),
       zCm: centimetres(state.pos.z),
-      groundOffsetCm: centimetres(state.pos.y),
+      groundOffsetCm: centimetres(
+        state.pos.y - this.terrain.height(state.pos.x, state.pos.z),
+      ),
       yaw: dequantizeYaw(quantizeYaw(state.yaw)),
       speedCms: centimetres(Math.hypot(state.vel.x, state.vel.z)),
       poseFlags,

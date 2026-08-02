@@ -286,3 +286,22 @@ test("a damaged delta frame corrupts only up to the next sync frame", () => {
   // ...and the next absolute sync frame resynchronises the stream exactly.
   assert.deepEqual(decoded.samples.slice(nextSync), expected.slice(nextSync));
 });
+
+test("an out-of-range ground offset saturates at the i16 bounds rather than wrapping", () => {
+  // 300 000 cm is what the recorder would emit if it wrote absolute world Y at
+  // an alpine elevation. It cannot survive the i16 field; the codec's contract
+  // is that it saturates deterministically, so a corrupted value can never
+  // masquerade as a plausible small offset.
+  const absoluteY: GhostSample = {
+    tick: 0, xCm: 0, zCm: 0, groundOffsetCm: 300_000,
+    yaw: 0, speedCms: 0, poseFlags: 0,
+  };
+
+  assert.equal(quantizeGhostSample(absoluteY).groundOffsetCm, 32767);
+  assert.equal(decodeGhost(encodeGhost([absoluteY], META)).samples[0].groundOffsetCm, 32767);
+  assert.equal(quantizeGhostSample({ ...absoluteY, groundOffsetCm: -300_000 }).groundOffsetCm, -32768);
+  assert.equal(
+    decodeGhost(encodeGhost([{ ...absoluteY, groundOffsetCm: -300_000 }], META)).samples[0].groundOffsetCm,
+    -32768,
+  );
+});

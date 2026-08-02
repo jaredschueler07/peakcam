@@ -8,11 +8,16 @@ import {
   POSE_TUCKED,
   quantizeGhostSample,
 } from "./codec";
-import { GhostRecorder } from "./recorder";
+import { GhostRecorder, type GroundHeightSampler } from "./recorder";
 import { CompetitiveRecordingArm, GameRuntime } from "../runtime/GameRuntime";
 
+/** Terrain at a constant height everywhere. */
+function flatGround(heightM = 0): GroundHeightSampler {
+  return { height: () => heightM };
+}
+
 test("records the first fixed-step state and then decimates 120 Hz samples four to one", () => {
-  const recorder = new GhostRecorder();
+  const recorder = new GhostRecorder(flatGround());
   const state = createSkierState();
   recorder.begin(10);
 
@@ -30,8 +35,36 @@ test("records the first fixed-step state and then decimates 120 Hz samples four 
   assert.equal(recorder.recording, false);
 });
 
+test("records ground offset relative to the terrain under the skier, not absolute Y", () => {
+  // Terrain that varies with both axes, so a sample taken at the wrong x/z shows up.
+  const recorder = new GhostRecorder({ height: (x, z) => x * 2 + z });
+  const state = createSkierState();
+  state.pos.x = 5;
+  state.pos.z = -3;
+  state.pos.y = 5 * 2 + -3 + 1.5; // 1.5 m above the ground here
+
+  recorder.begin(0);
+  recorder.sample(state, 0);
+
+  assert.equal(recorder.finish()?.[0].groundOffsetCm, 150);
+});
+
+test("keeps the ground offset inside i16 at alpine absolute elevations", () => {
+  const recorder = new GhostRecorder(flatGround(2999));
+  const state = createSkierState();
+  state.pos.y = 3000;
+
+  recorder.begin(0);
+  recorder.sample(state, 0);
+
+  const sample = recorder.finish()?.[0];
+  assert.equal(sample?.groundOffsetCm, 100);
+  // The value the absolute-Y bug used to emit would not have survived the codec.
+  assert.deepEqual(quantizeGhostSample(sample!), sample);
+});
+
 test("caps a recording at the codec keyframe limit", () => {
-  const recorder = new GhostRecorder();
+  const recorder = new GhostRecorder(flatGround());
   const state = createSkierState();
   recorder.begin(0);
 
@@ -46,7 +79,7 @@ test("caps a recording at the codec keyframe limit", () => {
 });
 
 test("quantizes position, yaw, speed, and pose flags without mutating simulation state", () => {
-  const recorder = new GhostRecorder();
+  const recorder = new GhostRecorder(flatGround());
   const state = createSkierState();
   state.pos.x = 1.234;
   state.pos.y = 2.345;
@@ -83,7 +116,7 @@ test("quantizes position, yaw, speed, and pose flags without mutating simulation
 });
 
 test("beginning again discards samples from the reset run", () => {
-  const recorder = new GhostRecorder();
+  const recorder = new GhostRecorder(flatGround());
   const state = createSkierState();
   recorder.begin(0);
   state.pos.x = 1;
@@ -119,7 +152,7 @@ test("arm then reset begins a run at the reset state's tick zero", () => {
 test("a crash retry discards run one and immediately records run two", () => {
   const arm = new CompetitiveRecordingArm();
   const state = createSkierState();
-  const recorder = new GhostRecorder();
+  const recorder = new GhostRecorder(flatGround());
 
   // The caller arms after a stale pre-restart time; the first reset starts run one.
   arm.arm(12, (now) => recorder.begin(now));
@@ -161,7 +194,7 @@ test("arming while already at state time zero begins immediately", () => {
 test("lift-finished reset discards an active run without beginning a lift-drop ghost", () => {
   const arm = new CompetitiveRecordingArm();
   const state = createSkierState();
-  const recorder = new GhostRecorder();
+  const recorder = new GhostRecorder(flatGround());
 
   arm.arm(0, (now) => recorder.begin(now));
   recorder.sample(state, 0);
@@ -179,7 +212,7 @@ test("lift-finished reset discards an active run without beginning a lift-drop g
 
 test("lift-finished reset while pending does not begin recording", () => {
   const arm = new CompetitiveRecordingArm();
-  const recorder = new GhostRecorder();
+  const recorder = new GhostRecorder(flatGround());
 
   arm.arm(12, (now) => recorder.begin(now));
   arm.onReset(0, recorder, true);
