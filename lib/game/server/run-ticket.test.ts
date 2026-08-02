@@ -23,6 +23,8 @@ const CLAIMS: RunTicketClaims = {
   mode: "time_trial",
   trailId: "roca-jack",
   seed: 1337,
+  surface: "ice",
+  physicsModel: "v2",
   physicsVersion: 3,
   courseVersion: 20260801,
 };
@@ -196,6 +198,48 @@ test("rejects a correctly signed token whose payload lacks required claims", () 
   const payload = Buffer.from(JSON.stringify({ nonce: "n", iat: NOW }), "utf8").toString(
     "base64url",
   );
+  const sig = createHmac("sha256", ring.active.key)
+    .update(`${header}.${payload}`, "utf8")
+    .digest("base64url");
+
+  const err = ticketError(() => verifyTicket(`${header}.${payload}.${sig}`, ring, { now: NOW }));
+  assert.equal(err.code, "malformed");
+});
+
+test("rejects a correctly signed payload missing only physicsModel", () => {
+  const ring = keyring();
+  const { physicsModel: _physicsModel, ...claimsWithoutModel } = CLAIMS;
+  const header = Buffer.from(
+    JSON.stringify({ alg: TICKET_ALG, typ: TICKET_TYPE, kid: "k1" }),
+    "utf8",
+  ).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({
+    ...claimsWithoutModel,
+    nonce: "n",
+    iat: NOW,
+    exp: NOW + TTL,
+  }), "utf8").toString("base64url");
+  const sig = createHmac("sha256", ring.active.key)
+    .update(`${header}.${payload}`, "utf8")
+    .digest("base64url");
+
+  const err = ticketError(() => verifyTicket(`${header}.${payload}.${sig}`, ring, { now: NOW }));
+  assert.equal(err.code, "malformed");
+});
+
+test("rejects a correctly signed payload missing only surface", () => {
+  const ring = keyring();
+  const { surface: _surface, ...claimsWithoutSurface } = CLAIMS;
+  const header = Buffer.from(
+    JSON.stringify({ alg: TICKET_ALG, typ: TICKET_TYPE, kid: "k1" }),
+    "utf8",
+  ).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({
+    ...claimsWithoutSurface,
+    nonce: "n",
+    iat: NOW,
+    exp: NOW + TTL,
+  }), "utf8").toString("base64url");
   const sig = createHmac("sha256", ring.active.key)
     .update(`${header}.${payload}`, "utf8")
     .digest("base64url");

@@ -8,6 +8,7 @@ import type { TerrainSource } from "../terrain/terrain-source";
 import type { TerrainLoadOptions } from "../rendering/loaders/TerrainAssetLoader";
 import type { RealTerrainAssets } from "../terrain/terrain-source";
 import type { ConditionsSnapshot } from "../conditions";
+import type { PhysicsModel } from "../core/config";
 import type { RuntimeAudio } from "./RuntimeAudio";
 import { createRendererBackend, resolveBackendKind } from "../rendering/backend";
 import type { RendererBackend } from "../rendering/Renderer";
@@ -22,6 +23,8 @@ export interface CreateGameOptions {
   uiBridge: UiBridge;
   analytics: RuntimeAnalytics;
   conditions: ConditionsSnapshot;
+  /** Resolved once by the shell, including any explicit playtest override. */
+  physicsModel: PhysicsModel;
   audio: RuntimeAudio;
   signal?: AbortSignal;
   /**
@@ -71,7 +74,7 @@ export async function createGame(options: CreateGameOptions): Promise<GameRuntim
   const backend = await selectRendererBackend(options.canvas);
   const runtime = new GameRuntime(
     options.canvas, options.profile, options.uiBridge, options.analytics, source.sampler,
-    options.conditions, options.audio, assetLoadMs, options.seed, options.spawnArcM, backend,
+    options.conditions, options.physicsModel, options.audio, assetLoadMs, options.seed, options.spawnArcM, backend,
   );
   void runtime.startWhenWarm();
   return runtime;

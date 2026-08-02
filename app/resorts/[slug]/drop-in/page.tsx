@@ -11,6 +11,7 @@ import DropInClientBoundary from "@/components/drop-in/DropInClientBoundary";
 import { getResortBySlug } from "@/lib/supabase";
 import { getWeatherForecast } from "@/lib/weather";
 import { buildConditionsSnapshot } from "@/lib/game/conditions";
+import { PHYSICS_V2_ROLLOUT_ENABLED, physicsModelForRollout } from "@/lib/game/config/physics-rollout";
 
 const BASE_URL = "https://peakcam.io";
 export const revalidate = 3600;
@@ -82,9 +83,10 @@ export default async function DropInPage({
 
   const resort = await getResortBySlug(slug);
   const forecast = resort ? await getWeatherForecast(resort.lat, resort.lng) : null;
+  const physicsModel = physicsModelForRollout(PHYSICS_V2_ROLLOUT_ENABLED);
   const conditions = resort
-    ? buildConditionsSnapshot(resort, resort.snow_report, forecast)
-    : buildConditionsSnapshot({ slug, cond_rating: "good" }, null, null);
+    ? buildConditionsSnapshot(resort, resort.snow_report, forecast, physicsModel)
+    : buildConditionsSnapshot({ slug, cond_rating: "good" }, null, null, physicsModel);
 
   // The layout's global skip link targets #main-content; every other route
   // provides it, and without it "Skip to main content" lands on nothing.

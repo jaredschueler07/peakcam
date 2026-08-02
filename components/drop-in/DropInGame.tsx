@@ -26,6 +26,7 @@ import {
 } from "@/lib/game/competition/ticket-lifecycle";
 import type { CompetitiveRunMode } from "@/lib/game/config/modes";
 import type { DecodedGhost } from "@/lib/game/replay/codec";
+import { physicsModelForSessionRequest, resolveRuntimePhysicsModel } from "@/lib/game/runtime/physics-selection";
 // Shared with the sessions route, which must derive the same ids. Imported from
 // config/ rather than server/ so the browser bundle skips profiles + bake configs.
 import { trailIdFromName } from "@/lib/game/config/course-ids";
@@ -109,6 +110,7 @@ export default function DropInGame({ profile, conditions }: {
   // The server derives legal trail ids from the profile, and a run always drops
   // in on the first trail, so that is the course we ask a ticket for.
   const trailId = useMemo(() => trailIdFromName(profile.trails[0].name), [profile]);
+  const physicsModel = resolveRuntimePhysicsModel(conditions.physicsModel);
   const [mode, setMode] = useState<DropInModeChoice>("free_ski");
   const [ticketState, setTicketState] = useState<TicketState>(NO_TICKET);
   /** The ticket this descent was actually seeded from; frozen at start. */
@@ -150,7 +152,13 @@ export default function DropInGame({ profile, conditions }: {
     applyTicketState({ status: "requesting" });
 
     void requestRunSession(
-      { resortSlug: profile.slug, mode: choice, trailId },
+      {
+        resortSlug: profile.slug,
+        mode: choice,
+        trailId,
+        surface: conditions.surface,
+        physicsModel: physicsModelForSessionRequest(conditions),
+      },
       { signal: controller.signal },
     ).then((result) => {
       if (controller.signal.aborted) return;
@@ -169,7 +177,12 @@ export default function DropInGame({ profile, conditions }: {
       if (duringPlay) {
         // Fails closed on an unknown world seed; refuses a ticket minted for a
         // different course than the one being skied.
-        const forThisRun = ticketForWorld(ready, runtimeRef.current?.runSeed, Date.now());
+        const forThisRun = ticketForWorld(
+          ready,
+          runtimeRef.current?.runSeed,
+          runtimeRef.current?.world.config ?? { surface: conditions.surface, physicsModel },
+          Date.now(),
+        );
         if (!forThisRun) {
           applyTicketState({ status: "offline" });
           freezeRunTicket(null);
@@ -311,7 +324,7 @@ export default function DropInGame({ profile, conditions }: {
         const { createGame } = await import("@/lib/game/runtime/createGame");
         if (cancelled) return;
         const created = await createGame({
-          canvas, profile, uiBridge: bridge, signal: controller.signal, conditions, audio,
+          canvas, profile, uiBridge: bridge, signal: controller.signal, conditions, physicsModel, audio,
           // The ghost header carries world.seed; it must equal the ticket seed
           // or the server rejects the submission with seed_mismatch.
           seed: resolveRunSeed(runTicketRef.current, profile.seed),
@@ -393,7 +406,7 @@ export default function DropInGame({ profile, conditions }: {
       } else {
         // Must match the world we are still skiing — a restart does not rebuild
         // it, so an otherwise-valid ticket for another seed is not usable here.
-        freezeRunTicket(ticketForWorld(ticketStateRef.current, active.runSeed, now));
+        freezeRunTicket(ticketForWorld(ticketStateRef.current, active.runSeed, active.world.config, now));
       }
       active.beginCompetitiveRecording();
     }
@@ -460,6 +473,7 @@ export default function DropInGame({ profile, conditions }: {
         data-drop-in-session={sessionStateAttribute}
         data-drop-in-ticket={ticketState.status}
         data-drop-in-gfx={gfxBackend}
+        data-drop-in-physics={runtime?.world.config.physicsModel ?? physicsModel}
       >
         <Link href={`/resorts/${profile.slug}`} className="absolute left-3 top-3 z-40 inline-flex items-center gap-2 rounded-full border-[1.5px] border-ink bg-cream-50 px-3.5 py-2 text-xs font-bold uppercase text-ink shadow-stamp-sm">
           <ArrowLeft className="h-4 w-4" aria-hidden /> Conditions

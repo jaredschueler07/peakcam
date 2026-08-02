@@ -1,8 +1,10 @@
 import type { Resort, SnowReport, WeatherPeriod } from "../types";
-import type { SurfaceKind } from "./core/config";
+import type { PhysicsModel, SurfaceKind } from "./core/config";
+import { physicsModelForRollout } from "./config/physics-rollout";
 
 export interface ConditionsSnapshot {
   readonly surface: SurfaceKind;
+  readonly physicsModel: PhysicsModel;
   readonly weatherDefault: 0 | 1 | 2;
   readonly powderDay: boolean;
   readonly baseDepthIn: number | null;
@@ -64,10 +66,11 @@ export function buildConditionsSnapshot(
   resort: ConditionsResort,
   latestSnowReport: SnowReport | null,
   nwsForecast?: NwsForecast | null,
+  physicsModel: PhysicsModel = physicsModelForRollout(),
 ): ConditionsSnapshot {
   if (!latestSnowReport) {
     return {
-      surface: "packed", weatherDefault: isSnowing(nwsForecast) ? 1 : 0, powderDay: false,
+      surface: "packed", physicsModel, weatherDefault: isSnowing(nwsForecast) ? 1 : 0, powderDay: false,
       baseDepthIn: null, snow24In: null, stamp: "Classic conditions", narrative: null,
     };
   }
@@ -77,6 +80,7 @@ export function buildConditionsSnapshot(
   const { tags, narrative } = splitConditions(latestSnowReport.conditions);
   return {
     surface: powderDay ? "powder" : conditionSurface(resort, latestSnowReport),
+    physicsModel,
     weatherDefault: isSnowing(nwsForecast) || latestSnowReport.snowing_now ? 1 : 0,
     powderDay,
     baseDepthIn: latestSnowReport.base_depth,

@@ -16,7 +16,8 @@ import { GameRenderer, type RendererBackend, type RenderPerformanceSummary } fro
 import { createWorld } from "../terrain/obstacles";
 import { UiBridge } from "./UiBridge";
 import type { ConditionsSnapshot } from "../conditions";
-import { simulationConfig } from "../core/config";
+import { simulationConfigForConditions } from "./physics-selection";
+import type { PhysicsModel } from "../core/config";
 import type { RuntimeAudio } from "./RuntimeAudio";
 import { encodeGhost, type DecodedGhost, type GhostSample } from "../replay/codec";
 import { GHOST_SAMPLE_HZ, GhostRecorder } from "../replay/recorder";
@@ -132,6 +133,7 @@ export class GameRuntime {
     private readonly analytics: RuntimeAnalytics,
     terrain: TerrainSampler,
     private readonly conditions: ConditionsSnapshot,
+    private readonly physicsModel: PhysicsModel,
     private readonly audio: RuntimeAudio,
     readonly assetLoadMs = 0,
     /** Ticket seed for a competitive run; the profile seed otherwise. */
@@ -141,7 +143,12 @@ export class GameRuntime {
     /** Prepared async renderer backend; omitted only by legacy direct-construction tests. */
     backend?: RendererBackend,
   ) {
-    this.world = createWorld(profile, runSeed, terrain, simulationConfig(conditions.surface));
+    this.world = createWorld(
+      profile,
+      runSeed,
+      terrain,
+      simulationConfigForConditions(conditions, physicsModel),
+    );
     this.state = createSimulation(profile, runSeed, terrain);
     const spawnRun = terrain.kind === "real" ? terrain.realRuns?.[this.state.selectedTrail] : undefined;
     if (spawnArcM !== undefined && Number.isFinite(spawnArcM) && spawnRun) {

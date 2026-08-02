@@ -36,6 +36,7 @@ import {
   MAX_AIRBORNE_SECONDS,
   MAX_CRASHED_SECONDS,
   resimulateGhost,
+  simulationConfigForTicket,
   validateRun,
   type ResimVerdict,
 } from "./validate-run";
@@ -50,6 +51,15 @@ function assertRejected(verdict: ResimVerdict, code: string): void {
 }
 
 const packed = simulationConfig("packed");
+
+test("server resimulation selects the signed ticket's physics model", () => {
+  const v1 = simulationConfigForTicket({ surface: "packed", physicsModel: "v1" });
+  const v2 = simulationConfigForTicket({ surface: "ice", physicsModel: "v2" });
+  assert.equal(v1.physicsModel, "v1");
+  assert.equal(v1.surface, "packed");
+  assert.equal(v2.physicsModel, "v2");
+  assert.equal(v2.surface, "ice");
+});
 
 function spanMs(ghost: { samples: { tick: number }[] }): number {
   return ghostSpanMsFromTicks(ghost.samples[0].tick, ghost.samples.at(-1)!.tick);

@@ -175,6 +175,8 @@ export function makeRunFixture(options: RunFixtureOptions = {}): RunFixture {
       mode: "time_trial",
       trailId: course.trailId,
       seed,
+      surface: "packed",
+      physicsModel: "v1",
       physicsVersion: PHYSICS_VERSION,
       courseVersion: COURSE_VERSION,
       userId: options.userId,

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { Resort, SnowReport, WeatherPeriod } from "../types";
 import { buildConditionsSnapshot } from "./conditions";
+import { physicsModelForRollout } from "./config/physics-rollout";
 
 const resort = {
   id: "resort-1", name: "Heavenly", slug: "heavenly", state: "CA", country: "US",
@@ -64,7 +65,7 @@ test("only the first separator splits, so a narrative may contain pipes", () => 
 
 test("eight inches in 24 hours takes priority and produces the powder-day snapshot", () => {
   assert.deepEqual(buildConditionsSnapshot(resort, { ...report, new_snow_24h: 8 }, null), {
-    surface: "powder", weatherDefault: 0, powderDay: true,
+    surface: "powder", physicsModel: "v1", weatherDefault: 0, powderDay: true,
     baseDepthIn: 64, snow24In: 8, stamp: "POWDER DAY", narrative: null,
   });
 });
@@ -77,21 +78,28 @@ test("poor and explicitly icy conditions map to distinct hard-snow surfaces", ()
 
 test("NWS snow selects the snowfall preset without changing packed surface", () => {
   assert.deepEqual(buildConditionsSnapshot(resort, report, snowForecast), {
-    surface: "packed", weatherDefault: 1, powderDay: false,
+    surface: "packed", physicsModel: "v1", weatherDefault: 1, powderDay: false,
     baseDepthIn: 64, snow24In: 3, stamp: "Packed powder", narrative: null,
   });
 });
 
 test("missing live data uses the deterministic classic fallback", () => {
   assert.deepEqual(buildConditionsSnapshot(resort, null, null), {
-    surface: "packed", weatherDefault: 0, powderDay: false,
+    surface: "packed", physicsModel: "v1", weatherDefault: 0, powderDay: false,
     baseDepthIn: null, snow24In: null, stamp: "Classic conditions", narrative: null,
   });
 });
 
 test("a forecast-only snapshot still starts in snowfall weather", () => {
   assert.deepEqual(buildConditionsSnapshot(resort, null, snowForecast), {
-    surface: "packed", weatherDefault: 1, powderDay: false,
+    surface: "packed", physicsModel: "v1", weatherDefault: 1, powderDay: false,
     baseDepthIn: null, snow24In: null, stamp: "Classic conditions", narrative: null,
   });
+});
+
+test("physicsV2 is rollout-selected but remains off before the feel gate", () => {
+  assert.equal(physicsModelForRollout(false), "v1");
+  assert.equal(physicsModelForRollout(true), "v2");
+  assert.equal(buildConditionsSnapshot(resort, report).physicsModel, "v1");
+  assert.equal(buildConditionsSnapshot(resort, report, null, "v2").physicsModel, "v2");
 });

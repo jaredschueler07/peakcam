@@ -20,6 +20,7 @@
 import { z } from "zod";
 
 import type { CompetitiveRunMode } from "../config/modes";
+import type { PhysicsModel, SurfaceKind } from "../core/config";
 
 export const RUN_SESSIONS_ENDPOINT = "/api/drop-in/sessions";
 
@@ -31,6 +32,8 @@ export const runSessionTicketSchema = z
     resortSlug: z.string().min(1),
     mode: z.enum(["time_trial", "score_attack"]),
     trailId: z.string().min(1),
+    surface: z.enum(["powder", "packed", "firm", "ice"]),
+    physicsModel: z.enum(["v1", "v2"]),
     physicsVersion: z.number().finite(),
     courseVersion: z.number().finite(),
     tickHz: z.number().finite().positive(),
@@ -44,6 +47,8 @@ export interface RunSessionInput {
   resortSlug: string;
   mode: CompetitiveRunMode;
   trailId: string;
+  surface: SurfaceKind;
+  physicsModel: PhysicsModel;
 }
 
 /**
@@ -87,6 +92,8 @@ export async function requestRunSession(
         resortSlug: input.resortSlug,
         mode: input.mode,
         trailId: input.trailId,
+        surface: input.surface,
+        physicsModel: input.physicsModel,
       }),
       // A ticket carries a one-time nonce; a cached one is a dead ticket.
       cache: "no-store",
