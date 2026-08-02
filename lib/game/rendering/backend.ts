@@ -2,6 +2,15 @@ import type { RendererBackend } from "./Renderer";
 
 export type RendererBackendKind = "webgpu" | "webgl";
 
+export function resolveBackendOverride(
+  search: string,
+  hasWebGPU: boolean,
+): RendererBackendKind | null {
+  const requested = new URLSearchParams(search).get("gfx");
+  if (requested !== "webgpu" && requested !== "webgl") return null;
+  return requested === "webgpu" && hasWebGPU ? "webgpu" : "webgl";
+}
+
 export function resolveBackendKind(
   search: string,
   hasWebGPU: boolean,

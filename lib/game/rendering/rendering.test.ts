@@ -11,7 +11,7 @@ import { createProceduralWorld } from "../terrain/obstacles";
 import { CameraController } from "./CameraController";
 import { QualityController, seedQualityRung } from "./QualityController";
 import { createGhostPose, GhostRenderer, sampleGhostAt } from "./GhostRenderer";
-import { GameRenderer, type RendererBackend } from "./Renderer";
+import { GameRenderer, shouldInitializePostProcessing, type RendererBackend } from "./Renderer";
 import { buildPosterLut, buildSnowDetailNormal } from "./SnowMaterial";
 import { chromaticAberrationOffset } from "./MotionEffects";
 import { configureSceneMaterials } from "./Renderer";
@@ -207,6 +207,11 @@ class FakeBackend implements RendererBackend {
   dispose() { this.disposed += 1; }
   forceContextLoss() { this.contextsLost += 1; }
 }
+
+test("PostProcessing remains enabled when no backend is injected", () => {
+  assert.equal(shouldInitializePostProcessing({}), true);
+  assert.equal(shouldInitializePostProcessing({ backend: new FakeBackend() }), false);
+});
 
 test("mount/unmount ten times disposes every scene resource and context", () => {
   const world = createProceduralWorld(profile, profile.seed);

@@ -44,6 +44,11 @@ interface RendererOptions {
   qualitySignals?: DeviceQualitySignals;
 }
 
+/** The legacy renderer path owns PostProcessing; injected backends suppress it. */
+export function shouldInitializePostProcessing(options: Pick<RendererOptions, "backend">): boolean {
+  return !options.backend;
+}
+
 interface ShadowMaterialSetup { setupMaterial(material: THREE.Material): void }
 
 export function configureSceneMaterials(scene: THREE.Scene, csm: ShadowMaterialSetup, atmosphere: Parameters<typeof addHeightFog>[1]): void {
@@ -132,7 +137,7 @@ export class GameRenderer {
     this.built.sun.visible = false;
     configureSceneMaterials(this.built.scene, this.csm, this.built.atmosphereUniforms);
     this.applyQuality(this.quality.rung);
-    if (!options.backend) {
+    if (shouldInitializePostProcessing(options)) {
       void import("./PostProcessing").then(({ PostProcessing: PostProcessingClass }) => {
         if (this.disposed) return;
         this.post = new PostProcessingClass(this.renderer as unknown as THREE.WebGLRenderer, this.built.scene, this.built.camera, this.cameraController.speedUniform, this.reducedMotion);
