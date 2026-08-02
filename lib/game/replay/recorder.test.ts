@@ -9,6 +9,7 @@ import {
   quantizeGhostSample,
 } from "./codec";
 import { GhostRecorder } from "./recorder";
+import { CompetitiveRecordingArm } from "../runtime/GameRuntime";
 
 test("records the first fixed-step state and then decimates 120 Hz samples four to one", () => {
   const recorder = new GhostRecorder();
@@ -96,4 +97,50 @@ test("beginning again discards samples from the reset run", () => {
     tick: 0, xCm: 900, zCm: 0, groundOffsetCm: 0, yaw: 0, speedCms: 0, poseFlags: 0,
   }].map(quantizeGhostSample));
   assert.equal(recorder.finish(), null);
+});
+
+test("arm then reset begins a run at the reset state's tick zero", () => {
+  const arm = new CompetitiveRecordingArm();
+  const begins: number[] = [];
+  let recording = false;
+  const recorder = {
+    get recording() { return recording; },
+    begin(now: number) { begins.push(now); recording = true; },
+    finish() { recording = false; return null; },
+  };
+
+  arm.arm(12, () => recorder.begin(12));
+  assert.deepEqual(begins, []);
+  arm.onReset(0, recorder);
+  assert.deepEqual(begins, [0]);
+  assert.equal(arm.pending, false);
+});
+
+test("a mid-run reset discards the run and stays armed for the next reset", () => {
+  const arm = new CompetitiveRecordingArm();
+  const begins: number[] = [];
+  let recording = false;
+  let finishes = 0;
+  const recorder = {
+    get recording() { return recording; },
+    begin(now: number) { begins.push(now); recording = true; },
+    finish() { finishes += 1; recording = false; return null; },
+  };
+
+  arm.arm(0, () => { recorder.begin(0); });
+  assert.deepEqual(begins, [0]);
+  arm.onReset(0, recorder);
+  assert.equal(finishes, 1);
+  assert.equal(arm.pending, true);
+  arm.onReset(0, recorder);
+  assert.deepEqual(begins, [0, 0]);
+  assert.equal(arm.pending, false);
+});
+
+test("arming while already at state time zero begins immediately", () => {
+  const arm = new CompetitiveRecordingArm();
+  const begins: number[] = [];
+  arm.arm(0, (now) => begins.push(now));
+  assert.deepEqual(begins, [0]);
+  assert.equal(arm.pending, false);
 });

@@ -25,6 +25,41 @@ interface FinishedRunRecording {
   encoded: Uint8Array;
 }
 
+interface RecordingRecorder {
+  readonly recording: boolean;
+  begin(nowSimTime: number): void;
+  finish(): unknown;
+}
+
+/** Owns the armed-versus-active boundary at simulation reset time. */
+export class CompetitiveRecordingArm {
+  pending = false;
+
+  arm(stateTime: number, begin: (nowSimTime: number) => void): void {
+    this.pending = true;
+    if (stateTime === 0) {
+      begin(0);
+      this.pending = false;
+    }
+  }
+
+  onReset(stateTime: number, recorder: RecordingRecorder): "started" | "discarded" | "ignored" {
+    if (this.pending) {
+      if (stateTime !== 0) console.warn("[drop-in] competitive recorder reset did not land at state.time 0", stateTime);
+      recorder.begin(stateTime);
+      this.pending = false;
+      return "started";
+    }
+    if (recorder.recording) {
+      recorder.finish();
+      // Keep the arm live so the next restart captures a fresh run.
+      this.pending = true;
+      return "discarded";
+    }
+    return "ignored";
+  }
+}
+
 export interface RuntimeAnalytics {
   controlActivated(scheme: ControlScheme): void;
   pointerLock(status: "acquired" | "denied" | "unsupported" | "lost", errorName?: string): void;
@@ -51,6 +86,7 @@ export class GameRuntime {
   private disposed = false;
   private activated = false;
   private readonly ghostRecorder = new GhostRecorder();
+  private readonly recordingArm = new CompetitiveRecordingArm();
   private finishedRun: FinishedRunRecording | null = null;
 
   constructor(
@@ -105,8 +141,10 @@ export class GameRuntime {
   beginCompetitiveRecording(): void {
     this.finishedRun = null;
     this.ui.setRunRecordingAvailable(false);
-    this.ghostRecorder.begin(this.state.time);
-    this.ghostRecorder.sample(this.state, this.state.time);
+    this.recordingArm.arm(this.state.time, (nowSimTime) => {
+      this.ghostRecorder.begin(nowSimTime);
+      this.ghostRecorder.sample(this.state, nowSimTime);
+    });
   }
 
   takeFinishedRun(): { samples: GhostSample[]; encoded: Uint8Array } | null {
@@ -144,9 +182,13 @@ export class GameRuntime {
         const events = stepSimulation(this.state, this.input.nextFrame(), FIXED_DT, this.world);
         this.audio.playSimulationEvents(events);
         if (events.reset) {
-          this.ghostRecorder.finish();
-          this.finishedRun = null;
-          this.ui.setRunRecordingAvailable(false);
+          const resetAction = this.recordingArm.onReset(this.state.time, this.ghostRecorder);
+          if (resetAction === "started") {
+            this.ghostRecorder.sample(this.state, this.state.time);
+          } else if (resetAction === "discarded") {
+            this.finishedRun = null;
+            this.ui.setRunRecordingAvailable(false);
+          }
         } else if (this.ghostRecorder.recording) {
           this.ghostRecorder.sample(this.state, this.state.time);
           if (this.state.finished) {
