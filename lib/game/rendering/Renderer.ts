@@ -18,6 +18,7 @@ import type { PostProcessing } from "./PostProcessing";
 import { visualWeatherPreset } from "./VisualPresets";
 
 export interface RendererBackend {
+  readonly backendKind: "webgpu" | "webgl";
   // WebGLRenderer declares this as plain `string` in @types/three 0.185, so a
   // narrower ColorSpace here would reject the real renderer.
   outputColorSpace: string;
@@ -29,8 +30,9 @@ export interface RendererBackend {
   setSize(width: number, height: number, updateStyle?: boolean): void;
   setClearColor(color: THREE.ColorRepresentation, alpha?: number): void;
   render(scene: THREE.Scene, camera: THREE.Camera): void;
+  compileAsync?(scene: THREE.Object3D, camera: THREE.Camera): Promise<unknown>;
   dispose(): void;
-  forceContextLoss(): void;
+  forceContextLoss?(): void;
   resetState?(): void;
 }
 
@@ -99,9 +101,12 @@ export class GameRenderer {
     // parameter — no data or behaviour changes, and nothing links to it.
     const preserveDrawingBuffer =
       typeof location !== "undefined" && new URLSearchParams(location.search).has("e2ecanvas");
-    this.renderer = options.backend ?? new THREE.WebGLRenderer({
-      canvas, antialias: true, powerPreference: "high-performance", preserveDrawingBuffer,
-    });
+    this.renderer = options.backend ?? Object.assign(
+      new THREE.WebGLRenderer({
+        canvas, antialias: true, powerPreference: "high-performance", preserveDrawingBuffer,
+      }),
+      { backendKind: "webgl" as const },
+    );
     this.renderer.outputColorSpace = THREE.SRGBColorSpace; this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.bypassPost = process.env.NODE_ENV !== "production" && typeof location !== "undefined" && new URLSearchParams(location.search).has("nopost");
@@ -130,7 +135,7 @@ export class GameRenderer {
     if (!options.backend) {
       void import("./PostProcessing").then(({ PostProcessing: PostProcessingClass }) => {
         if (this.disposed) return;
-        this.post = new PostProcessingClass(this.renderer as THREE.WebGLRenderer, this.built.scene, this.built.camera, this.cameraController.speedUniform, this.reducedMotion);
+        this.post = new PostProcessingClass(this.renderer as unknown as THREE.WebGLRenderer, this.built.scene, this.built.camera, this.cameraController.speedUniform, this.reducedMotion);
         this.post.setSize(this.width, this.height); this.post.setQuality(this.quality.rung);
       });
     }
@@ -193,6 +198,6 @@ export class GameRenderer {
     this.canvas.removeEventListener("webglcontextlost", this.onContextLost as EventListener, false);
     this.canvas.removeEventListener("webglcontextrestored", this.onContextRestored as EventListener, false);
     this.post?.dispose(); this.post = null; this.csm.dispose(); this.ghost.setGhost(null);
-    disposeObjectTree(this.built.scene, this.options.disposalAudit); this.renderer.renderLists.dispose(); this.renderer.dispose(); this.renderer.forceContextLoss();
+    disposeObjectTree(this.built.scene, this.options.disposalAudit); this.renderer.renderLists.dispose(); this.renderer.dispose(); this.renderer.forceContextLoss?.();
   }
 }

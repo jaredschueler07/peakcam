@@ -189,6 +189,7 @@ test("weather and lift actions are rising-edge input actions", () => {
 });
 
 class FakeBackend implements RendererBackend {
+  readonly backendKind = "webgl" as const;
   readonly domElement = {} as HTMLCanvasElement;
   readonly renderLists = { dispose: () => { this.renderListsDisposed += 1; } };
   renderListsDisposed = 0;

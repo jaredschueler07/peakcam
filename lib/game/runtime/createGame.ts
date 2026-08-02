@@ -9,6 +9,7 @@ import type { TerrainLoadOptions } from "../rendering/loaders/TerrainAssetLoader
 import type { RealTerrainAssets } from "../terrain/terrain-source";
 import type { ConditionsSnapshot } from "../conditions";
 import type { RuntimeAudio } from "./RuntimeAudio";
+import { createRendererBackend, resolveBackendKind } from "../rendering/backend";
 
 interface RuntimeTerrainLoader {
   load(slug: ResortGameProfile["slug"], options?: TerrainLoadOptions): Promise<RealTerrainAssets>;
@@ -66,9 +67,14 @@ export async function createGame(options: CreateGameOptions): Promise<GameRuntim
     options.profile, options.uiBridge, options.analytics, new TerrainAssetLoader(), options.signal,
   );
   const assetLoadMs = performance.now() - startedAt;
+  const kind = resolveBackendKind(
+    typeof location === "undefined" ? "" : location.search,
+    typeof navigator !== "undefined" && "gpu" in navigator,
+  );
+  const backend = await createRendererBackend(options.canvas, kind);
   const runtime = new GameRuntime(
     options.canvas, options.profile, options.uiBridge, options.analytics, source.sampler,
-    options.conditions, options.audio, assetLoadMs, options.seed, options.spawnArcM,
+    options.conditions, options.audio, assetLoadMs, options.seed, options.spawnArcM, backend,
   );
   runtime.start();
   return runtime;
