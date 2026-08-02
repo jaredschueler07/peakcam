@@ -37,6 +37,10 @@ export interface LeaderboardPanelProps {
   highlightRunId?: string | null;
   /** Hand a decoded replay to the runtime. Omitted when there is no live game. */
   onRaceGhost?(ghost: DecodedGhost, runId: string): void;
+  /** The row whose ghost is currently loaded, if any — owned by the shell. */
+  racedRunId?: string | null;
+  /** Drop the loaded ghost. Omitted when there is no live game. */
+  onClearGhost?(): void;
 }
 
 type LoadState =
@@ -57,6 +61,8 @@ export default function LeaderboardPanel({
   trailId,
   highlightRunId = null,
   onRaceGhost,
+  racedRunId = null,
+  onClearGhost,
 }: LeaderboardPanelProps) {
   // One state, not three: the fetch has exactly one outcome, and a single
   // transition set from the callback keeps the effect free of synchronous
@@ -70,6 +76,9 @@ export default function LeaderboardPanel({
   const cancelViewTrackRef = useRef<(() => void) | null>(null);
   const cancelGhostTrackRef = useRef<(() => void) | null>(null);
   const viewedRef = useRef(false);
+  // A ghost blob is the largest thing this panel fetches; an unmount mid-flight
+  // must cancel it, exactly as the board effect cancels its own.
+  const ghostAbortRef = useRef<AbortController | null>(null);
 
   // `highlightRunId` is a dependency on purpose: it arrives when a submission
   // succeeds, and the board read at the end of the run predates that row.
@@ -102,14 +111,22 @@ export default function LeaderboardPanel({
   useEffect(() => () => {
     cancelViewTrackRef.current?.();
     cancelGhostTrackRef.current?.();
+    ghostAbortRef.current?.abort();
+    ghostAbortRef.current = null;
   }, []);
 
   const raceGhost = useCallback(
     (runId: string) => {
       if (!onRaceGhost) return;
+      ghostAbortRef.current?.abort();
+      const controller = new AbortController();
+      ghostAbortRef.current = controller;
       setRacingId(runId);
       setGhostError(null);
-      void fetchGhost(runId).then((result) => {
+      void fetchGhost(runId, { signal: controller.signal }).then((result) => {
+        // Unmounted, or superseded by another row: leave the state alone.
+        if (controller.signal.aborted) return;
+        ghostAbortRef.current = null;
         setRacingId(null);
         if (isRunClientFailure(result)) {
           if (!result.aborted) setGhostError(result.error);
@@ -189,7 +206,20 @@ export default function LeaderboardPanel({
               <span className="shrink-0 font-mono text-xs">
                 {mode === "time_trial" ? formatTime(row.timeMs) : `${row.score.toLocaleString()} pts`}
               </span>
-              {onRaceGhost && row.hasGhost && (
+              {/* A loaded ghost persists across restarts — racing one means
+                  retrying against it — so the row that owns it offers the way
+                  out rather than making the player restart to be rid of it. */}
+              {onClearGhost && racedRunId === row.id && (
+                <button
+                  type="button"
+                  onClick={onClearGhost}
+                  data-testid="drop-in-clear-ghost"
+                  className="shrink-0 rounded-full border-[1.5px] border-ink bg-mustard px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink shadow-stamp-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+                >
+                  Clear ghost
+                </button>
+              )}
+              {onRaceGhost && row.hasGhost && racedRunId !== row.id && (
                 <button
                   type="button"
                   onClick={() => raceGhost(row.id)}

@@ -97,6 +97,8 @@ export default function DropInGame({ profile, conditions }: {
   /** The ticket this descent was actually seeded from; frozen at start. */
   const [runTicket, setRunTicket] = useState<RunSessionTicket | null>(null);
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
+  /** The leaderboard row whose ghost is loaded into the renderer, if any. */
+  const [racedRunId, setRacedRunId] = useState<string | null>(null);
   const sessionAbortRef = useRef<AbortController | null>(null);
   // Read from the load effect and the dialogs, outside the render that set them.
   const modeRef = useRef<DropInModeChoice>("free_ski");
@@ -211,6 +213,12 @@ export default function DropInGame({ profile, conditions }: {
       ?? profile.trails[0].name;
   }, [profile, ticketState, trailId]);
 
+  /** Drop the loaded ghost. See the lifetime rule on `raceGhost`. */
+  const clearGhost = () => {
+    runtimeRef.current?.setGhost(null);
+    setRacedRunId(null);
+  };
+
   const selectMode = (choice: DropInModeChoice) => {
     // Re-picking the mode you already have would throw away a live ticket, or
     // abort and re-fire a request that is already on its way — either way
@@ -226,6 +234,8 @@ export default function DropInGame({ profile, conditions }: {
     setMode(choice);
     modeRef.current = choice;
     setSessionNotice(null);
+    // Back at mode select: the ghost belonged to the course just left.
+    clearGhost();
     // Post-init only: a capture made before posthog.init() is silently dropped.
     cancelPendingTrackRef.current?.();
     cancelPendingTrackRef.current = whenPostHogReady(() =>
@@ -367,13 +377,21 @@ export default function DropInGame({ profile, conditions }: {
    * the ghost and the player leave the gate together. The restart re-arms the
    * recorder and re-mints a spent ticket exactly as any other restart does, so
    * a raced run is still a submittable run.
+   *
+   * Lifetime rule: a loaded ghost **persists across restarts** — racing one is
+   * a retry against it, and clearing it every restart would mean re-picking the
+   * row after every attempt. It is cleared only by an explicit "Clear ghost"
+   * and by returning to mode select, where the next run may be a different
+   * course entirely (and, for Daily Line, a different seed).
    */
-  const raceGhost = (ghost: DecodedGhost) => {
+  const raceGhost = (ghost: DecodedGhost, runId: string) => {
     const active = runtimeRef.current;
     if (!active) return;
     active.setGhost(ghost);
+    setRacedRunId(runId);
     restartRun(active);
   };
+
 
   const toggleAudio = () => {
     setAudioEnabled((current) => {
@@ -463,6 +481,8 @@ export default function DropInGame({ profile, conditions }: {
             // when it opens and holds it for the life of the results screen.
             takeRecording: () => runtimeRef.current?.takeFinishedRun() ?? null,
             onRaceGhost: raceGhost,
+            racedRunId,
+            onClearGhost: clearGhost,
           }}
         /></>}
         {phase === "error" && <ErrorPoster profile={profile} message={error ?? "Unknown error"} />}

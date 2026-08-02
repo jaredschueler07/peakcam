@@ -18,6 +18,7 @@
 import { z } from "zod";
 
 import { COURSE_VERSION, PHYSICS_VERSION } from "../../config/versions";
+import { GHOST_SAMPLE_HZ } from "../../replay/recorder";
 import { competitiveRunModeSchema } from "../run-schema";
 import { courseSeed, resolveCourse, utcDateStamp } from "../courses";
 import { issueTicket, activeKeyOf, type TicketKeyring } from "../run-ticket";
@@ -62,8 +63,17 @@ export interface SessionResponseBody {
   expiresAt: string;
 }
 
-/** Keyframe rate the client must record at, echoed so it cannot drift silently. */
-export const GHOST_TICK_HZ = 10;
+/**
+ * Keyframe rate the client must record at, echoed so it cannot drift silently.
+ *
+ * Derived from the recorder rather than written out again, because "cannot
+ * drift silently" was exactly what a hand-copied `10` failed to deliver: the
+ * recorder moved to 30 Hz and this constant did not, leaving the public
+ * contract advertising a rate nothing sampled at. `validateRun` compares the
+ * PCGH header against the submitted `tickHz`, so any client that believed this
+ * field would have failed every honest run with `tick_hz_mismatch`.
+ */
+export const GHOST_TICK_HZ = GHOST_SAMPLE_HZ;
 
 export async function handleCreateSession(
   request: Request,

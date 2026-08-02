@@ -31,7 +31,8 @@ import {
   resolveCourseOrThrow,
   testKeyring,
 } from "../__fixtures__/run";
-import { handleCreateSession } from "./sessions";
+import { GHOST_SAMPLE_HZ } from "../../replay/recorder";
+import { GHOST_TICK_HZ, handleCreateSession } from "./sessions";
 import { handleSubmitRun } from "./runs";
 import { handleGetLeaderboard } from "./leaderboard";
 import { handleGetGhost } from "./ghosts";
@@ -115,6 +116,13 @@ function leaderboardRow(overrides: Partial<LeaderboardRunRow> = {}): Leaderboard
 
 // ─── POST /api/drop-in/sessions ──────────────────────────────
 
+test("the advertised keyframe rate is the rate the recorder actually samples at", () => {
+  // One constant, two audiences: the sessions payload tells the client what to
+  // record at, and `validateRun` compares the PCGH header against the submitted
+  // tickHz. If this ever splits again, every honest run fails tick_hz_mismatch.
+  assert.equal(GHOST_TICK_HZ, GHOST_SAMPLE_HZ);
+});
+
 const sessionUrl = "https://peakcam.io/api/drop-in/sessions";
 
 test("a session request mints a ticket the server can verify", async () => {
@@ -135,7 +143,11 @@ test("a session request mints a ticket the server can verify", async () => {
   assert.equal(body.trailId, trailId);
   assert.equal(body.physicsVersion, PHYSICS_VERSION);
   assert.equal(body.courseVersion, COURSE_VERSION);
-  assert.equal(body.tickHz, 10);
+  // The rate the client must record at. Bound to the recorder's own constant,
+  // not written out again: this field is the public half of a contract the
+  // validator enforces, and a literal here let it drift to 10 while the
+  // recorder sampled at 30 (see GHOST_TICK_HZ in ./sessions.ts).
+  assert.equal(body.tickHz, GHOST_SAMPLE_HZ);
 
   const payload = verifyTicket(body.ticket, keyring, { now });
   assert.equal(payload.seed, body.seed, "the ticket must bind the seed it advertised");

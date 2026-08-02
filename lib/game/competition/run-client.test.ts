@@ -21,12 +21,15 @@ import {
   ghostEndpoint,
   ghostSampleHz,
   isRunClientFailure,
+  MAX_GHOST_SUBMISSION_BYTES,
   resultsOutcome,
+  takeRecordingOnce,
   runTimeMsFromSamples,
   submitRun,
   type FinishedRunRecording,
   type LeaderboardBoard,
   type LeaderboardRow,
+  type RecordingCache,
   type SubmittableRunSession,
   type SubmittedRun,
 } from "./run-client";
@@ -37,9 +40,10 @@ import {
 import { handleSubmitRun, type RunSubmissionResponseBody } from "../server/handlers/runs";
 import { handleGetLeaderboard } from "../server/handlers/leaderboard";
 import { handleGetGhost } from "../server/handlers/ghosts";
-import type {
-  PublicLeaderboard,
-  PublicLeaderboardRow,
+import {
+  MAX_GHOST_BYTES,
+  type PublicLeaderboard,
+  type PublicLeaderboardRow,
 } from "../server/run-schema";
 import type {
   LeaderboardQuery,
@@ -551,6 +555,77 @@ test("undecodable ghost bytes fail closed", async () => {
     fetchImpl: (async () => new Response(new Uint8Array([1, 2, 3])) ) as unknown as typeof fetch,
   });
   assert.ok(isRunClientFailure(result));
+});
+
+test("a ghost over the submission byte budget is skipped before the network", async () => {
+  const { session } = fixtureRun();
+  // Legal PCGH bytes are irrelevant here: the budget is checked on length, and
+  // sending 129 KB could only ever earn a 413 while spending the ticket.
+  const oversized = makeRunFixture();
+  let called = false;
+  const outcome = await submitRun(
+    session,
+    {
+      samples: oversized.samples,
+      encoded: new Uint8Array(MAX_GHOST_SUBMISSION_BYTES + 1),
+    },
+    {
+      score: 1,
+      finishedAtMs: FIXTURE_NOW_MS,
+      fetchImpl: (async () => {
+        called = true;
+        return new Response(null, { status: 413 });
+      }) as unknown as typeof fetch,
+    },
+  );
+  assert.ok(outcome.status === "skipped" && outcome.reason === "unrecordable");
+  assert.equal(called, false);
+  assert.equal(session.submittedCount, 0);
+});
+
+test("the client's ghost byte budget is the server's", () => {
+  assert.equal(MAX_GHOST_SUBMISSION_BYTES, MAX_GHOST_BYTES);
+  const _budgetsAgree: Extends<typeof MAX_GHOST_SUBMISSION_BYTES, typeof MAX_GHOST_BYTES> = true;
+  void _budgetsAgree;
+});
+
+// ── idempotent recording take ───────────────────────────────────────────────
+
+test("takeRecordingOnce consumes the runtime's recording exactly once", () => {
+  // `GameRuntime.takeFinishedRun()` is a consuming read: the second call
+  // returns null. React StrictMode double-invokes effects, so without this
+  // wrapper a dev-mode results screen takes the run, throws it away, and then
+  // renders "Played offline" for a run that was perfectly submittable.
+  const recording: FinishedRunRecording = { samples: [], encoded: new Uint8Array(0) };
+  let calls = 0;
+  const take = () => {
+    calls += 1;
+    return calls === 1 ? recording : null;
+  };
+  const cache: RecordingCache = { current: undefined };
+
+  assert.equal(takeRecordingOnce(take, cache), recording);
+  assert.equal(takeRecordingOnce(take, cache), recording, "a second take is the cached one");
+  assert.equal(takeRecordingOnce(take, cache), recording);
+  assert.equal(calls, 1, "the runtime is asked exactly once");
+});
+
+test("takeRecordingOnce caches a genuine absence too, and resets for the next run", () => {
+  let calls = 0;
+  const take = () => {
+    calls += 1;
+    return null;
+  };
+  const cache: RecordingCache = { current: undefined };
+
+  assert.equal(takeRecordingOnce(take, cache), null);
+  assert.equal(takeRecordingOnce(take, cache), null);
+  assert.equal(calls, 1, "null is an answer, not a reason to ask again");
+
+  // What the dialog does when it closes: the next results screen is a new run.
+  cache.current = undefined;
+  assert.equal(takeRecordingOnce(take, cache), null);
+  assert.equal(calls, 2);
 });
 
 // ── results outcome ─────────────────────────────────────────────────────────

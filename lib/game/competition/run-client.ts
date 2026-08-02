@@ -59,6 +59,14 @@ export const MAX_NICKNAME_INPUT_LENGTH = 24;
 const MIN_SUBMITTABLE_TIME_MS = 1_000;
 const MAX_SUBMITTABLE_TIME_MS = 1_800_000;
 
+/**
+ * Mirrors `MAX_GHOST_BYTES` in `lib/game/server/run-schema.ts` (pinned equal by
+ * `run-client.test.ts`). Checked before the request so an over-budget ghost —
+ * a long descent at 30 Hz gets close — costs a notice rather than a spent
+ * ticket and a 413.
+ */
+export const MAX_GHOST_SUBMISSION_BYTES = 128 * 1024;
+
 export function ghostEndpoint(runId: string): string {
   return `${GHOSTS_ENDPOINT}/${encodeURIComponent(runId)}`;
 }
@@ -251,8 +259,11 @@ export async function submitRun(
 
   const timeMs = runTimeMsFromSamples(recording.samples);
   // A run outside the server's own bounds cannot be accepted; sending it would
-  // burn the ticket for a guaranteed 400.
+  // burn the ticket for a guaranteed 400 (or 413).
   if (timeMs < MIN_SUBMITTABLE_TIME_MS || timeMs > MAX_SUBMITTABLE_TIME_MS) {
+    return { status: "skipped", reason: "unrecordable" };
+  }
+  if (recording.encoded.byteLength > MAX_GHOST_SUBMISSION_BYTES) {
     return { status: "skipped", reason: "unrecordable" };
   }
 
@@ -343,6 +354,37 @@ export async function submitRun(
  * cannot quietly grow a fourth visible state.
  */
 export type ResultsOutcome = "free_ski" | "submitted" | "offline" | "submittable";
+
+/**
+ * A `useRef`-shaped cell holding the recording a results screen has taken.
+ * `undefined` means "not taken yet"; `null` means "taken, and there was none".
+ */
+export interface RecordingCache {
+  current: FinishedRunRecording | null | undefined;
+}
+
+/**
+ * Take the runtime's finished recording at most once per results screen.
+ *
+ * `GameRuntime.takeFinishedRun()` is a *consuming* read — it clears the run and
+ * the second call returns null. React StrictMode double-invokes effects, so a
+ * dev-mode results screen would take the run, discard it on the simulated
+ * unmount, get null on the remount, and render "Played offline" for a run that
+ * was perfectly submittable. Caching the first answer (including a genuine
+ * `null`) makes the take idempotent for as long as the screen is open; the
+ * dialog clears the cell when it closes, and the next run takes its own.
+ *
+ * Pure and exported so this is testable without a DOM — the bug it fixes is
+ * only visible in a double-mount, which no unit test of the component could
+ * reach in this repo.
+ */
+export function takeRecordingOnce(
+  take: () => FinishedRunRecording | null,
+  cache: RecordingCache,
+): FinishedRunRecording | null {
+  if (cache.current === undefined) cache.current = take();
+  return cache.current;
+}
 
 export function resultsOutcome(input: {
   competitive: boolean;

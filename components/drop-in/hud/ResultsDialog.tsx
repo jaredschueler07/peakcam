@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useStore } from "zustand";
 import type { StoreApi } from "zustand/vanilla";
 
@@ -8,7 +8,9 @@ import type { HudState } from "@/lib/game/runtime/UiBridge";
 import type { CompetitiveRunMode } from "@/lib/game/config/modes";
 import {
   resultsOutcome,
+  takeRecordingOnce,
   type FinishedRunRecording,
+  type RecordingCache,
   type SubmittableRunSession,
   type SubmittedRun,
 } from "@/lib/game/competition/run-client";
@@ -29,6 +31,9 @@ export interface ResultsCompetition {
   /** Consumes the runtime's recording; called once per results screen. */
   takeRecording(): FinishedRunRecording | null;
   onRaceGhost(ghost: DecodedGhost, runId: string): void;
+  /** The ghost currently loaded into the renderer, if any. */
+  racedRunId: string | null;
+  onClearGhost(): void;
 }
 
 interface OpenRun {
@@ -59,20 +64,34 @@ export default function ResultsDialog({
   const [open, setOpen] = useState<OpenRun | null>(null);
   const [submitted, setSubmitted] = useState<SubmittedRun | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  // `undefined` until this results screen has taken its recording. The runtime
+  // hands it over destructively, and StrictMode runs the effect below twice.
+  const takenRef = useRef<RecordingCache["current"]>(undefined);
 
+  // `useLayoutEffect`, not `useEffect`: the first render after the run ends has
+  // no snapshot yet and therefore reads as "offline". Committing the snapshot
+  // before paint is what stops a one-frame "Played offline" flash on a run that
+  // is about to offer a submit button.
+  //
   // Deliberately keyed on `show` alone: everything read here is a snapshot of
   // the moment the run ended, and re-running it when the session object changes
-  // identity (which a submission causes) would take a second recording — there
-  // is only ever one — and reset the dialog under the player.
-  useEffect(() => {
+  // identity (which a submission causes) would reset the dialog under the
+  // player.
+  useLayoutEffect(() => {
     if (!show) {
       setOpen(null);
       setSubmitted(null);
       setDismissed(false);
+      // The next results screen is a different run and takes its own recording.
+      takenRef.current = undefined;
       return;
     }
     setOpen({
-      recording: competition?.takeRecording() ?? null,
+      // Idempotent: StrictMode invokes this twice, and the second raw take
+      // would return null and mislabel a submittable run as offline.
+      recording: competition
+        ? takeRecordingOnce(() => competition.takeRecording(), takenRef)
+        : null,
       offline: competition ? competition.session.offline : true,
       finishedAtMs: Date.now(),
     });
@@ -151,6 +170,8 @@ export default function ResultsDialog({
             trailId={competition.trailId}
             highlightRunId={submitted?.accepted ? submitted.runId : null}
             onRaceGhost={competition.onRaceGhost}
+            racedRunId={competition.racedRunId}
+            onClearGhost={competition.onClearGhost}
           />
         )}
 
