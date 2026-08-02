@@ -21,6 +21,22 @@
  * `lib/analytics-events.ts`. This module only adds the competitive / mode
  * surface for v2; call-site wiring is a separate task.
  *
+ * ## Mode vocabulary (deliberate split, Task A3)
+ *
+ * Two vocabularies coexist on purpose:
+ *
+ * - The legacy `drop_in_started` event in `lib/analytics-events.ts` keeps
+ *   sending `mode: "free_ride"` for non-competitive play. That string is
+ *   already in production dashboards and funnels; changing it would silently
+ *   break every saved query comparing v1 to v2.
+ * - Everything here uses the `CompetitiveRunMode` values from
+ *   `lib/game/config/modes.ts` (`time_trial` | `score_attack`) plus `free_ski`
+ *   for the local mode, so competitive analytics match the ticket, the
+ *   database, and the leaderboard exactly.
+ *
+ * So local play is `free_ride` in the old funnel and `free_ski` in the new one.
+ * If the two are ever unified, migrate the dashboards first.
+ *
  * Constraints: no imports from `lib/game/{core,physics,terrain}`.
  */
 

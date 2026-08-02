@@ -29,23 +29,14 @@
  */
 
 import { DROP_IN_GAME_PROFILES } from "../config/profiles";
+// Shared with the client (the Start poster derives the same ids); re-exported
+// below so server callers keep importing them from here.
+import { trailIdFromName, utcDateStamp } from "../config/course-ids";
 import type { CompetitiveRunMode } from "../config/modes";
 import type { DropInResortSlug } from "../config/schema";
 import { RESORT_BAKE_CONFIGS } from "../terrain/resorts";
 
-/**
- * A trail name as a URL/ticket-safe id: lowercased, diacritics folded, runs of
- * anything else collapsed to a single dash. "Kilómetro Lanzado" →
- * "kilometro-lanzado".
- */
-export function trailIdFromName(name: string): string {
-  return name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
+export { trailIdFromName, utcDateStamp };
 
 export interface ServerCourse {
   resortSlug: DropInResortSlug;
@@ -160,11 +151,6 @@ export function courseSeed(
       ? `${resortSlug}|${trailId}|${courseVersion}|${utcDate}`
       : `${resortSlug}|${trailId}|${courseVersion}`;
   return fnv1a32(material);
-}
-
-/** `YYYY-MM-DD` in UTC for an epoch-millisecond timestamp. */
-export function utcDateStamp(nowMs: number): string {
-  return new Date(nowMs).toISOString().slice(0, 10);
 }
 
 /**
