@@ -52,8 +52,10 @@ export class CompetitiveRecordingArm {
     }
     if (recorder.recording) {
       recorder.finish();
-      // Keep the arm live so the next restart captures a fresh run.
-      this.pending = true;
+      // This reset is already the next run's start: discard, then begin immediately.
+      recorder.begin(stateTime);
+      // The active recorder is now the armed run; a later reset repeats this branch.
+      this.pending = false;
       return "discarded";
     }
     return "ignored";
@@ -183,9 +185,10 @@ export class GameRuntime {
         this.audio.playSimulationEvents(events);
         if (events.reset) {
           const resetAction = this.recordingArm.onReset(this.state.time, this.ghostRecorder);
-          if (resetAction === "started") {
+          if (resetAction === "started" || resetAction === "discarded") {
             this.ghostRecorder.sample(this.state, this.state.time);
-          } else if (resetAction === "discarded") {
+          }
+          if (resetAction === "discarded") {
             this.finishedRun = null;
             this.ui.setRunRecordingAvailable(false);
           }

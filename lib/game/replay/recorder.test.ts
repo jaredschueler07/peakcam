@@ -9,7 +9,7 @@ import {
   quantizeGhostSample,
 } from "./codec";
 import { GhostRecorder } from "./recorder";
-import { CompetitiveRecordingArm } from "../runtime/GameRuntime";
+import { CompetitiveRecordingArm, GameRuntime } from "../runtime/GameRuntime";
 
 test("records the first fixed-step state and then decimates 120 Hz samples four to one", () => {
   const recorder = new GhostRecorder();
@@ -116,25 +116,38 @@ test("arm then reset begins a run at the reset state's tick zero", () => {
   assert.equal(arm.pending, false);
 });
 
-test("a mid-run reset discards the run and stays armed for the next reset", () => {
+test("a crash retry discards run one and immediately records run two", () => {
   const arm = new CompetitiveRecordingArm();
-  const begins: number[] = [];
-  let recording = false;
-  let finishes = 0;
-  const recorder = {
-    get recording() { return recording; },
-    begin(now: number) { begins.push(now); recording = true; },
-    finish() { finishes += 1; recording = false; return null; },
-  };
+  const state = createSkierState();
+  const recorder = new GhostRecorder();
 
-  arm.arm(0, () => { recorder.begin(0); });
-  assert.deepEqual(begins, [0]);
+  // The caller arms after a stale pre-restart time; the first reset starts run one.
+  arm.arm(12, (now) => recorder.begin(now));
   arm.onReset(0, recorder);
-  assert.equal(finishes, 1);
-  assert.equal(arm.pending, true);
+  recorder.sample(state, 0);
+  recorder.sample(state, 1 / 30);
+  assert.equal(recorder.recording, true);
+
+  // Crash/restart: run one is discarded, and this same reset starts run two.
   arm.onReset(0, recorder);
-  assert.deepEqual(begins, [0, 0]);
+  assert.equal(recorder.recording, true);
   assert.equal(arm.pending, false);
+
+  state.pos.x = 2;
+  recorder.sample(state, 0);
+  state.pos.x = 3;
+  recorder.sample(state, 1 / 30);
+  const runTwo = recorder.finish();
+  assert.ok(runTwo);
+  const runtime = {
+    finishedRun: { samples: runTwo, encoded: new Uint8Array([1]) },
+    ui: { setRunRecordingAvailable() {} },
+  };
+  const taken = GameRuntime.prototype.takeFinishedRun.call(runtime as never);
+
+  assert.equal(taken?.samples.length, 2);
+  assert.equal(taken?.samples[0].xCm, 200);
+  assert.equal(taken?.samples[1].xCm, 300);
 });
 
 test("arming while already at state time zero begins immediately", () => {
