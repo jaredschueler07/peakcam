@@ -101,6 +101,8 @@ export class GameRuntime {
   private readonly ghostRecorder: GhostRecorder;
   private readonly recordingArm = new CompetitiveRecordingArm();
   private finishedRun: FinishedRunRecording | null = null;
+  /** Reused listener payload — avoids allocating `{speed,carve,...}` every HUD tick. */
+  private readonly listenerScratch = { speed: 0, carve: 0, onGround: false, liftRide: 0 };
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -251,12 +253,16 @@ export class GameRuntime {
       if (steps === MAX_STEPS_PER_FRAME) this.accumulator = 0;
       if (this.ui.publish(this.state, nowMs)) {
         const weatherPreset = this.world.profile.weather[this.weatherIndex];
-        this.audio.updateListener({
-          speed: Math.hypot(this.state.vel.x, this.state.vel.z),
-          carve: this.state.carve,
-          onGround: this.state.onGround,
-          liftRide: this.state.liftRide,
-        }, this.conditions.surface, Math.min(1, weatherPreset.wind / 15), nowMs);
+        this.listenerScratch.speed = Math.hypot(this.state.vel.x, this.state.vel.z);
+        this.listenerScratch.carve = this.state.carve;
+        this.listenerScratch.onGround = this.state.onGround;
+        this.listenerScratch.liftRide = this.state.liftRide;
+        this.audio.updateListener(
+          this.listenerScratch,
+          this.conditions.surface,
+          Math.min(1, weatherPreset.wind / 15),
+          nowMs,
+        );
       }
       this.renderer.render(this.state, this.world, frameDt, this.state.crouch, rawFrameMs);
     }

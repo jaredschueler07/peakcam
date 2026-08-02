@@ -20,25 +20,30 @@ export function polylineLength(points: readonly RealRunPoint[]): number {
   return length;
 }
 
-export function pointAtArcLength(points: readonly RealRunPoint[], distanceM: number): ArcPoint {
+/**
+ * Sample a draped polyline at arc length. Pass `out` from the render/physics
+ * hot path so the frame loop does not allocate a fresh ArcPoint every call.
+ */
+export function pointAtArcLength(points: readonly RealRunPoint[], distanceM: number, out?: ArcPoint): ArcPoint {
   if (points.length < 2) throw new Error("a real polyline needs at least two points");
+  const result = out ?? { x: 0, y: 0, z: 0, heading: 0 };
   let remaining = Math.max(0, distanceM);
   for (let i = 1; i < points.length; i += 1) {
     const a = points[i - 1], b = points[i];
     const length = Math.hypot(b.x - a.x, b.z - a.z);
     if (remaining <= length || i === points.length - 1) {
       const t = length > 0 ? Math.min(1, remaining / length) : 0;
-      return {
-        x: a.x + (b.x - a.x) * t,
-        y: a.y + (b.y - a.y) * t,
-        z: a.z + (b.z - a.z) * t,
-        heading: Math.atan2(b.x - a.x, b.z - a.z),
-      };
+      result.x = a.x + (b.x - a.x) * t;
+      result.y = a.y + (b.y - a.y) * t;
+      result.z = a.z + (b.z - a.z) * t;
+      result.heading = Math.atan2(b.x - a.x, b.z - a.z);
+      return result;
     }
     remaining -= length;
   }
   const end = points.at(-1)!;
-  return { ...end, heading: 0 };
+  result.x = end.x; result.y = end.y; result.z = end.z; result.heading = 0;
+  return result;
 }
 
 function downhill(points: readonly RealRunPoint[]): RealRunPoint[] {

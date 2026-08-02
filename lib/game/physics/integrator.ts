@@ -14,6 +14,7 @@ const right: Vec3 = { x: 0, y: 0, z: 0 };
 const normal: Vec3 = { x: 0, y: 1, z: 0 };
 const temp: Vec3 = { x: 0, y: 0, z: 0 };
 const temp2: Vec3 = { x: 0, y: 0, z: 0 };
+const liftArcScratch = { x: 0, y: 0, z: 0, heading: 0 };
 
 function liftX(world: SimulationWorld, z: number): number {
   return trailCenter(world.profile.trails[0], z) + LIFT_OFFSET;
@@ -33,7 +34,7 @@ export function integrateSkier(
     const eased = progress * progress * (3 - 2 * progress);
     const realLift = world.terrain.kind === "real" ? world.terrain.mainLift : null;
     if (realLift) {
-      const point = pointAtArcLength(realLift.points, realLift.lengthM * eased);
+      const point = pointAtArcLength(realLift.points, realLift.lengthM * eased, liftArcScratch);
       s.pos.x = point.x; s.pos.y = point.y + 12.8; s.pos.z = point.z;
       s.yaw = point.heading + Math.PI;
     } else {

@@ -15,13 +15,20 @@ function noise1(value: number): number {
   return THREE.MathUtils.lerp(at(cell), at(cell + 1), smooth);
 }
 
-function criticalSpring(value: number, velocity: number, target: number, frequency: number, dt: number): [number, number] {
+/** Writes into `out` — returning a tuple would allocate every camera frame. */
+function criticalSpring(
+  value: number, velocity: number, target: number, frequency: number, dt: number,
+  out: { value: number; velocity: number },
+): void {
   const omega = Math.PI * 2 * frequency;
   const f = 1 + 2 * dt * omega;
   const oo = omega * omega, hoo = dt * oo, hhoo = dt * hoo;
   const inverse = 1 / (f + hhoo);
-  return [(f * value + dt * velocity + hhoo * target) * inverse, (velocity + hoo * (target - value)) * inverse];
+  out.value = (f * value + dt * velocity + hhoo * target) * inverse;
+  out.velocity = (velocity + hoo * (target - value)) * inverse;
 }
+
+const springOut = { value: 0, velocity: 0 };
 
 export class CameraController {
   private readonly position = new THREE.Vector3();
@@ -68,7 +75,8 @@ export class CameraController {
     this.position.z = damp(this.position.z, desiredZ, lambda, dt);
     this.position.y = Math.max(this.position.y, terrain.height(this.position.x, this.position.z) + 1.8);
     const targetShake = this.reducedMotion ? 0 : (state.crash > 0 ? state.crash * 0.06 : this.speedUniform.value * this.speedUniform.value * 0.036);
-    [this.shake, this.shakeVelocity] = criticalSpring(this.shake, this.shakeVelocity, targetShake, 2.2, dt);
+    criticalSpring(this.shake, this.shakeVelocity, targetShake, 2.2, dt, springOut);
+    this.shake = springOut.value; this.shakeVelocity = springOut.velocity;
     this.camera.position.set(
       this.position.x + noise1(this.elapsed * 9.7) * this.shake,
       this.position.y + noise1(this.elapsed * 11.3 + 43) * this.shake,

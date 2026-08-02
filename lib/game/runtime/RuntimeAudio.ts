@@ -14,6 +14,15 @@ type ListenerSource = Readonly<{
 export class RuntimeAudio {
   private engine: AudioEngine | null = null;
   private surface: SurfaceKind = "packed";
+  /** Reused Partial<ListenerState> for setListenerState — no per-HUD-tick object. */
+  private readonly listenerPartial = {
+    speed: 0,
+    carve: 0,
+    airborne: false,
+    surface: "packed" as SurfaceKind,
+    windLevel: 0,
+    liftProximity: 0,
+  };
 
   constructor(private readonly createEngine: () => AudioEngine = () => new AudioEngine()) {}
 
@@ -47,14 +56,14 @@ export class RuntimeAudio {
     windLevel: number,
     nowMs: number,
   ): void {
-    this.engine?.setListenerState({
-      speed: state.speed,
-      carve: state.carve,
-      airborne: !state.onGround,
-      surface,
-      windLevel,
-      liftProximity: state.liftRide > 0 ? 1 : 0,
-    }, nowMs);
+    const partial = this.listenerPartial;
+    partial.speed = state.speed;
+    partial.carve = state.carve;
+    partial.airborne = !state.onGround;
+    partial.surface = surface;
+    partial.windLevel = windLevel;
+    partial.liftProximity = state.liftRide > 0 ? 1 : 0;
+    this.engine?.setListenerState(partial, nowMs);
   }
 
   playSimulationEvents(events: SimulationEvents): void {

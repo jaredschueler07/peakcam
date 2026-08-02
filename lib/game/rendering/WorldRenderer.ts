@@ -13,6 +13,8 @@ import { TILE_SIZE } from "./TerrainRenderer";
 const TOWER_SPACING = 108;
 const matrix = new THREE.Matrix4(), quaternion = new THREE.Quaternion(), position = new THREE.Vector3(), scale = new THREE.Vector3();
 const axisY = new THREE.Vector3(0, 1, 0), axisZ = new THREE.Vector3(0, 0, 1);
+/** Shared arc-sample target for lift/marker updates — never retained across frames. */
+const arcScratch = { x: 0, y: 0, z: 0, heading: 0 };
 
 type Part = { geometry: THREE.BufferGeometry; color: THREE.ColorRepresentation; matrix: THREE.Matrix4 };
 const transform = (x: number, y: number, z: number, sx = 1, sy = 1, sz = 1) =>
@@ -180,7 +182,7 @@ export class WorldRenderer {
       const spacing = Math.max(20, total / 220);
       for (const run of this.world.terrain.realRuns) {
         for (let distanceM = 0; distanceM <= run.lengthM && count + 1 < 460; distanceM += spacing) {
-          const point = pointAtArcLength(run.points, distanceM);
+          const point = pointAtArcLength(run.points, distanceM, arcScratch);
           for (const side of [-1, 1]) {
             const x = point.x + Math.cos(point.heading) * side * run.halfWidthM;
             const z = point.z - Math.sin(point.heading) * side * run.halfWidthM;
@@ -236,7 +238,7 @@ export class WorldRenderer {
       let count = 0;
       for (const ramp of run?.ramps ?? []) {
         if (count >= this.ramps.length) break;
-        const end = pointAtArcLength(run.points, Math.min(run.lengthM, ramp.distanceM + RAMP_LEN));
+        const end = pointAtArcLength(run.points, Math.min(run.lengthM, ramp.distanceM + RAMP_LEN), arcScratch);
         const group = this.ramps[count++]; group.visible = true;
         group.position.set(ramp.x, ramp.y + 0.2, ramp.z); group.rotation.y = ramp.heading;
         const h = end.y - ramp.y;
@@ -263,7 +265,7 @@ export class WorldRenderer {
     const realLift = this.world.terrain.kind === "real" ? this.world.terrain.mainLift : null;
     if (realLift) {
       for (let i = 0; i < this.towers.length; i += 1) {
-        const point = pointAtArcLength(realLift.points, realLift.lengthM * i / (this.towers.length - 1));
+        const point = pointAtArcLength(realLift.points, realLift.lengthM * i / (this.towers.length - 1), arcScratch);
         const tower = this.towers[i]; tower.position.set(point.x, point.y, point.z); tower.rotation.y = point.heading;
         tower.userData.sheaveL.rotation.y = time * 3.1; tower.userData.sheaveR.rotation.y = -time * 3.1;
       }
@@ -271,14 +273,14 @@ export class WorldRenderer {
       for (const side of [-2, 2]) for (let i = 0; i < 31; i += 1) {
         for (const index of [i * 2, i * 2 + 2]) {
           const distanceM = realLift.lengthM * index / 63;
-          const point = pointAtArcLength(realLift.points, distanceM);
+          const point = pointAtArcLength(realLift.points, distanceM, arcScratch);
           cable.setXYZ(at++, point.x + Math.cos(point.heading) * side, point.y + 15.5 - sagAt(distanceM, 0), point.z - Math.sin(point.heading) * side);
         }
       }
       cable.needsUpdate = true;
       for (let i = 0; i < this.chairs.length; i += 1) {
         const side = i % 2, t = (((time * (side ? -1 : 1) * 4.6) / realLift.lengthM + i * 0.62) % 1 + 1) % 1;
-        const point = pointAtArcLength(realLift.points, realLift.lengthM * t), chair = this.chairs[i];
+        const point = pointAtArcLength(realLift.points, realLift.lengthM * t, arcScratch), chair = this.chairs[i];
         chair.position.set(point.x + Math.cos(point.heading) * (side ? 2 : -2), point.y + 15.5 - sagAt(realLift.lengthM * t, 0), point.z - Math.sin(point.heading) * (side ? 2 : -2));
         chair.rotation.set(0, point.heading + (side ? Math.PI : 0), Math.sin(time * 1.7 + i) * 0.05);
       }

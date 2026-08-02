@@ -6,6 +6,8 @@ import type { QualityRung } from "./QualityController";
 const SPRAY_MAX = 900, SNOW_MAX = 3600, SNOW_BOX = 130, TRACK_QUADS = 1600;
 const pointVertex = "attribute float aAlpha;attribute float aSize;uniform float uScale;varying float vA;void main(){vA=aAlpha;vec4 mv=modelViewMatrix*vec4(position,1.);gl_PointSize=aSize*uScale/max(1.,-mv.z);gl_Position=projectionMatrix*mv;}";
 const pointFragment = "uniform sampler2D uTex;uniform vec3 uColor;varying float vA;void main(){vec4 t=texture2D(uTex,gl_PointCoord);float a=t.a*vA;if(a<.012)discard;gl_FragColor=vec4(uColor,a);}";
+/** Preallocated attribute name list — `for (const name of [...])` would allocate every spray update. */
+const SPRAY_ATTRS = ["position", "aAlpha", "aSize"] as const;
 
 function radialTexture(): THREE.DataTexture {
   const size = 32, data = new Uint8Array(size * size * 4);
@@ -23,7 +25,10 @@ export class EffectsRenderer {
   private readonly sprayAlpha = new Float32Array(SPRAY_MAX); private readonly spraySize = new Float32Array(SPRAY_MAX); private readonly sprayGeometry = new THREE.BufferGeometry();
   private readonly snowPosition = new Float32Array(SNOW_MAX * 3); private readonly snowAlpha = new Float32Array(SNOW_MAX); private readonly snowSize = new Float32Array(SNOW_MAX); private readonly snowSeed = new Float32Array(SNOW_MAX); private readonly snowGeometry = new THREE.BufferGeometry();
   private readonly trackPosition = new Float32Array(TRACK_QUADS * 18); private readonly trackGeometry = new THREE.BufferGeometry();
-  private sprayHead = 0; private trackHead = 0; private trackUsed = 0; private trackPrevious: { lx: number; lz: number; rx: number; rz: number } | null = null;
+  private sprayHead = 0; private trackHead = 0; private trackUsed = 0;
+  /** Scalar track ring — avoids allocating a `{lx,lz,rx,rz}` object every ground frame. */
+  private trackHasPrevious = false;
+  private prevLx = 0; private prevLz = 0; private prevRx = 0; private prevRz = 0;
   private quality: QualityRung = 4;
 
   constructor(
@@ -59,9 +64,63 @@ export class EffectsRenderer {
   setQuality(rung: QualityRung): void { this.quality = rung; }
 
   private emitSpray(x: number, y: number, z: number, vx: number, vy: number, vz: number, size: number, life: number) { const i = this.sprayHead = (this.sprayHead + 1) % SPRAY_MAX, p = i * 3; this.sprayPosition[p] = x; this.sprayPosition[p + 1] = y; this.sprayPosition[p + 2] = z; this.sprayVelocity[p] = vx; this.sprayVelocity[p + 1] = vy; this.sprayVelocity[p + 2] = vz; this.sprayLife[i] = this.sprayMaxLife[i] = life; this.spraySize[i] = size; this.sprayAlpha[i] = 1; }
-  private updateSpray(dt: number) { for (let i = 0; i < SPRAY_MAX; i += 1) { if (this.sprayLife[i] <= 0) { this.sprayAlpha[i] = 0; continue; } const p = i * 3; this.sprayLife[i] -= dt; this.sprayVelocity[p + 1] -= 7 * dt; this.sprayVelocity[p] *= 1 - 1.9 * dt; this.sprayVelocity[p + 2] *= 1 - 1.9 * dt; this.sprayPosition[p] += this.sprayVelocity[p] * dt; this.sprayPosition[p + 1] += this.sprayVelocity[p + 1] * dt; this.sprayPosition[p + 2] += this.sprayVelocity[p + 2] * dt; const k = Math.max(0, this.sprayLife[i] / this.sprayMaxLife[i]); this.sprayAlpha[i] = k * k * 0.9; this.spraySize[i] += dt * 2.2; } for (const name of ["position", "aAlpha", "aSize"]) this.sprayGeometry.getAttribute(name).needsUpdate = true; }
+  private updateSpray(dt: number) {
+    for (let i = 0; i < SPRAY_MAX; i += 1) {
+      if (this.sprayLife[i] <= 0) { this.sprayAlpha[i] = 0; continue; }
+      const p = i * 3;
+      this.sprayLife[i] -= dt;
+      this.sprayVelocity[p + 1] -= 7 * dt;
+      this.sprayVelocity[p] *= 1 - 1.9 * dt;
+      this.sprayVelocity[p + 2] *= 1 - 1.9 * dt;
+      this.sprayPosition[p] += this.sprayVelocity[p] * dt;
+      this.sprayPosition[p + 1] += this.sprayVelocity[p + 1] * dt;
+      this.sprayPosition[p + 2] += this.sprayVelocity[p + 2] * dt;
+      const k = Math.max(0, this.sprayLife[i] / this.sprayMaxLife[i]);
+      this.sprayAlpha[i] = k * k * 0.9;
+      this.spraySize[i] += dt * 2.2;
+    }
+    for (let a = 0; a < SPRAY_ATTRS.length; a += 1) this.sprayGeometry.getAttribute(SPRAY_ATTRS[a]).needsUpdate = true;
+  }
   private updateSnow(dt: number, time: number, camera: THREE.Vector3, requested: number, wind: number) { const count = Math.min(this.reducedMotion ? 320 : SNOW_MAX, requested | 0), half = SNOW_BOX * 0.5; this.snowGeometry.setDrawRange(0, count); for (let i = 0; i < count; i += 1) { const p = i * 3; this.snowPosition[p + 1] -= (5.5 + this.snowSize[i] * 3.2) * dt; this.snowPosition[p] += Math.sin(time * 0.9 + this.snowSeed[i]) * 3.4 * dt + wind * dt; this.snowPosition[p + 2] += Math.cos(time * 0.7 + this.snowSeed[i]) * 2.2 * dt; const dx = this.snowPosition[p] - camera.x, dy = this.snowPosition[p + 1] - camera.y, dz = this.snowPosition[p + 2] - camera.z; if (dx > half) this.snowPosition[p] -= SNOW_BOX; else if (dx < -half) this.snowPosition[p] += SNOW_BOX; if (dz > half) this.snowPosition[p + 2] -= SNOW_BOX; else if (dz < -half) this.snowPosition[p + 2] += SNOW_BOX; if (dy < -20) this.snowPosition[p + 1] += SNOW_BOX * 0.8; else if (dy > SNOW_BOX * 0.7) this.snowPosition[p + 1] -= SNOW_BOX * 0.8; } this.snowGeometry.getAttribute("position").needsUpdate = true; }
-  private updateTracks(state: SimulationState) { if (!state.onGround || state.crash > 0) { this.trackPrevious = null; return; } const fx = Math.sin(state.yaw), fz = Math.cos(state.yaw), rx = fz, rz = -fx, width = 0.42; const next = { lx: state.pos.x - rx * width, lz: state.pos.z - rz * width, rx: state.pos.x + rx * width, rz: state.pos.z + rz * width }; if (!this.trackPrevious) { this.trackPrevious = next; return; } const moved = Math.hypot(state.pos.x - (this.trackPrevious.lx + this.trackPrevious.rx) * 0.5, state.pos.z - (this.trackPrevious.lz + this.trackPrevious.rz) * 0.5); if (moved <= 1.4) return; this.pushTrackQuad(this.trackPrevious, next); this.trackPrevious = next; }
-  private pushTrackQuad(a: { lx: number; lz: number; rx: number; rz: number }, b: { lx: number; lz: number; rx: number; rz: number }) { const values = [[a.lx, a.lz], [a.rx, a.rz], [b.lx, b.lz], [a.rx, a.rz], [b.rx, b.rz], [b.lx, b.lz]], offset = this.trackHead * 18; values.forEach(([x, z], i) => { this.trackPosition[offset + i * 3] = x; this.trackPosition[offset + i * 3 + 1] = this.terrain.height(x, z) + 0.07; this.trackPosition[offset + i * 3 + 2] = z; }); this.trackHead = (this.trackHead + 1) % TRACK_QUADS; this.trackUsed = Math.min(this.trackUsed + 1, TRACK_QUADS); this.trackGeometry.setDrawRange(0, this.trackUsed * 6); this.trackGeometry.getAttribute("position").needsUpdate = true; }
-  private clearTracks() { this.trackHead = 0; this.trackUsed = 0; this.trackPrevious = null; this.trackGeometry.setDrawRange(0, 0); }
+  private updateTracks(state: SimulationState) {
+    if (!state.onGround || state.crash > 0) { this.trackHasPrevious = false; return; }
+    const fx = Math.sin(state.yaw), fz = Math.cos(state.yaw), rx = fz, rz = -fx, width = 0.42;
+    const lx = state.pos.x - rx * width, lz = state.pos.z - rz * width;
+    const nrx = state.pos.x + rx * width, nrz = state.pos.z + rz * width;
+    if (!this.trackHasPrevious) {
+      this.prevLx = lx; this.prevLz = lz; this.prevRx = nrx; this.prevRz = nrz;
+      this.trackHasPrevious = true;
+      return;
+    }
+    const moved = Math.hypot(state.pos.x - (this.prevLx + this.prevRx) * 0.5, state.pos.z - (this.prevLz + this.prevRz) * 0.5);
+    if (moved <= 1.4) return;
+    this.pushTrackQuad(this.prevLx, this.prevLz, this.prevRx, this.prevRz, lx, lz, nrx, nrz);
+    this.prevLx = lx; this.prevLz = lz; this.prevRx = nrx; this.prevRz = nrz;
+  }
+  private writeTrackVertex(offset: number, x: number, z: number): void {
+    this.trackPosition[offset] = x;
+    this.trackPosition[offset + 1] = this.terrain.height(x, z) + 0.07;
+    this.trackPosition[offset + 2] = z;
+  }
+  private pushTrackQuad(
+    alx: number, alz: number, arx: number, arz: number,
+    blx: number, blz: number, brx: number, brz: number,
+  ): void {
+    const offset = this.trackHead * 18;
+    // Two triangles: (aL,aR,bL) and (aR,bR,bL) — unrolled so we never allocate a corners array.
+    this.writeTrackVertex(offset, alx, alz);
+    this.writeTrackVertex(offset + 3, arx, arz);
+    this.writeTrackVertex(offset + 6, blx, blz);
+    this.writeTrackVertex(offset + 9, arx, arz);
+    this.writeTrackVertex(offset + 12, brx, brz);
+    this.writeTrackVertex(offset + 15, blx, blz);
+    this.trackHead = (this.trackHead + 1) % TRACK_QUADS;
+    this.trackUsed = Math.min(this.trackUsed + 1, TRACK_QUADS);
+    this.trackGeometry.setDrawRange(0, this.trackUsed * 6);
+    this.trackGeometry.getAttribute("position").needsUpdate = true;
+  }
+  private clearTracks() {
+    this.trackHead = 0; this.trackUsed = 0; this.trackHasPrevious = false;
+    this.trackGeometry.setDrawRange(0, 0);
+  }
 }
