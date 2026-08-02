@@ -18,6 +18,7 @@ import { QualityController, seedQualityRung, type DeviceQualitySignals, type Qua
 import type { PostProcessing } from "./PostProcessing";
 import type { NodePostProcessing } from "./NodePostProcessing";
 import { visualWeatherPreset } from "./VisualPresets";
+import { postBypassEnabled, snowDebugMode } from "./debugFlags";
 
 type PostChain = Pick<PostProcessing | NodePostProcessing, "setSize" | "setQuality" | "render" | "dispose">;
 
@@ -151,16 +152,19 @@ export class GameRenderer {
     );
     this.renderer.outputColorSpace = THREE.SRGBColorSpace; this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.bypassPost = process.env.NODE_ENV !== "production" && typeof location !== "undefined" && new URLSearchParams(location.search).has("nopost");
+    // Not gated on NODE_ENV, like ?e2ecanvas: the browser matrix is shot against a production build,
+    // where a dev-only flag can never fire — which silently made an earlier bloom experiment a no-op.
+    this.bypassPost = postBypassEnabled();
     this.maxDpr = Math.min(options.devicePixelRatio ?? (typeof window === "undefined" ? 1 : window.devicePixelRatio || 1), 2);
     const navigatorLike = typeof navigator === "undefined" ? undefined : navigator as Navigator & { deviceMemory?: number };
     const signals = options.qualitySignals ?? { hardwareConcurrency: navigatorLike?.hardwareConcurrency, deviceMemory: navigatorLike?.deviceMemory, coarsePointer: typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches, dpr: this.maxDpr };
     this.mobile = signals.coarsePointer;
     this.quality = new QualityController(seedQualityRung(signals));
     const backendKind = this.renderer.backendKind;
+    const snowDebug = snowDebugMode();
     const nodes = backendKind === "webgpu";
     this.built = createScene(profile, Math.max(1, canvas.clientWidth) / Math.max(1, canvas.clientHeight), backendKind);
-    this.terrain = new TerrainRenderer(this.built.scene, world, this.built.snowUniforms, backendKind);
+    this.terrain = new TerrainRenderer(this.built.scene, world, this.built.snowUniforms, backendKind, snowDebug);
     this.skier = new SkierRenderer(this.built.scene);
     this.ghost = new GhostRenderer(this.built.scene);
     this.worldRenderer = new WorldRenderer(this.built.scene, profile, world);

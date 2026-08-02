@@ -8,6 +8,7 @@ import { createAtmosphereFog, createAtmosphereNodeUniforms } from "./AtmosphereN
 import { createSkyNodeMaterial, createSkyNodeUniforms } from "./SkyNodeMaterial";
 import type { RendererBackendKind } from "./backend";
 import { visualWeatherPreset } from "./VisualPresets";
+import { SNOW_DEBUG, snowDebugMode } from "./debugFlags";
 
 export const SUN_DIRECTION = new THREE.Vector3(-0.46, 0.62, -0.64).normalize();
 
@@ -146,7 +147,7 @@ void main(){vec3 d=normalize(vDir);float t=clamp(d.y*.5+.5,0.,1.);vec3 c=mix(uHo
     blue: { value: new THREE.Color(visual.fogBlue) }, warm: { value: new THREE.Color(visual.fogWarm) },
     sunDirection: { value: SUN_DIRECTION.clone() },
   } satisfies AtmosphereUniforms;
-  if (nodes) {
+  if (nodes && snowDebugMode() !== SNOW_DEBUG.NO_FOG) {
     // An explicit scene.fogNode wins over the FogExp2 three would otherwise derive from scene.fog
     // (NodeManager.getFogNode), so the height fog replaces it rather than stacking with it.
     (scene as THREE.Scene & { fogNode?: unknown }).fogNode =

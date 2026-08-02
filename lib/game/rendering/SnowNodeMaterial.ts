@@ -6,6 +6,7 @@ import {
   uniform, vec3, vec4,
 } from "three/tsl";
 import type { Node, NodeBuilder, UniformNode } from "three/webgpu";
+import { SNOW_DEBUG } from "./debugFlags";
 
 /**
  * TSL port of `polishSnowMaterial` (SnowMaterial.ts) for the WebGPU backend. Every constant is
@@ -71,7 +72,7 @@ function snowNormalNode(detailNormal: THREE.Texture): Vec3 {
 }
 
 /** The wrap/rim/glint/backscatter block (GLSL lines 101-111) applied to the lit colour. */
-function snowShading(uniforms: SnowNodeUniforms, outgoingLight: Vec3): Vec3 {
+function snowShading(uniforms: SnowNodeUniforms, outgoingLight: Vec3, debug: number = SNOW_DEBUG.NONE): Vec3 {
   const n = normalize(normalWorld);
   const v = normalize(cameraPosition.sub(positionWorld));
   const l = normalize(SUN);
@@ -86,12 +87,21 @@ function snowShading(uniforms: SnowNodeUniforms, outgoingLight: Vec3): Vec3 {
   );
   const sparkle = step(0.72, glint1).mul(glint1).add(step(0.82, glint2).mul(glint2));
 
-  return mix(outgoingLight, AERIAL, float(1).sub(wrap).mul(0.08))
-    .add(diffuseColor.rgb.mul(wrap).mul(0.04))
-    .add(BACKSCATTER.mul(pow(clamp(dot(v, l.negate()), 0, 1), 4)).mul(0.025))
-    // `color` and `vec3` are the same three components once generated; only the types disagree.
-    .add(uniforms.horizon.mul(rim).mul(0.055) as unknown as Vec3)
-    .add(vec3(sparkle).mul(uniforms.glint).mul(float(1).sub(track)).mul(0.35));
+  // Each `?snowdbg` step drops one more term so a browser shot can bisect which one misbehaves.
+  // The terms are removed from the graph entirely, not multiplied by zero: a NaN survives `* 0`.
+  const wrapRimBlock = debug >= SNOW_DEBUG.NO_WRAP_RIM;
+  const noGlint = debug >= SNOW_DEBUG.NO_GLINT;
+
+  let shaded: Vec3 = wrapRimBlock
+    ? outgoingLight
+    : mix(outgoingLight, AERIAL, float(1).sub(wrap).mul(0.08))
+      .add(diffuseColor.rgb.mul(wrap).mul(0.04))
+      .add(BACKSCATTER.mul(pow(clamp(dot(v, l.negate()), 0, 1), 4)).mul(0.025))
+      // `color` and `vec3` are the same three components once generated; only the types disagree.
+      .add(uniforms.horizon.mul(rim).mul(0.055) as unknown as Vec3);
+
+  if (!noGlint) shaded = shaded.add(vec3(sparkle).mul(uniforms.glint).mul(float(1).sub(track)).mul(0.35));
+  return shaded;
 }
 
 /**
@@ -100,13 +110,13 @@ function snowShading(uniforms: SnowNodeUniforms, outgoingLight: Vec3): Vec3 {
  * the extension point three documents for exactly this.
  */
 class SnowStandardNodeMaterial extends MeshStandardNodeMaterial {
-  constructor(private readonly snowUniforms: SnowNodeUniforms) {
+  constructor(private readonly snowUniforms: SnowNodeUniforms, private readonly debug: number = SNOW_DEBUG.NONE) {
     super();
   }
 
   setupOutput(builder: NodeBuilder, outputNode: Node): Node {
     const lit = outputNode as Node<"vec4">;
-    return super.setupOutput(builder, vec4(snowShading(this.snowUniforms, lit.rgb), lit.a));
+    return super.setupOutput(builder, vec4(snowShading(this.snowUniforms, lit.rgb, this.debug), lit.a));
   }
 }
 
@@ -121,15 +131,21 @@ export function createSnowNodeUniforms(horizon = new THREE.Color(0xffffff), glin
 export function createSnowNodeMaterial(
   detailNormal: THREE.Texture,
   uniforms: SnowNodeUniforms,
+  debug: number = SNOW_DEBUG.NONE,
 ): MeshStandardNodeMaterial {
-  const material = new SnowStandardNodeMaterial(uniforms);
+  // Mode 5 is a scene-level switch (no fogNode); it must leave this material untouched.
+  const mode = debug === SNOW_DEBUG.NO_FOG ? SNOW_DEBUG.NONE : debug;
+  // `?snowdbg=4` drops every custom term, leaving the stock node material on the same surface
+  // settings — if the defect survives that, nothing in this module is responsible for it.
+  const plain = mode >= SNOW_DEBUG.PLAIN;
+  const material = plain ? new MeshStandardNodeMaterial() : new SnowStandardNodeMaterial(uniforms, mode);
   material.vertexColors = true;
   material.roughness = 0.86;
   material.metalness = 0.02;
   material.flatShading = false;
   material.dithering = true;
-  material.normalNode = snowNormalNode(detailNormal);
+  if (mode < SNOW_DEBUG.NO_DETAIL_NORMAL) material.normalNode = snowNormalNode(detailNormal);
   material.userData.snowDetail = detailNormal;
-  material.userData.snowOutputNode = (outgoingLight: Vec3) => snowShading(uniforms, outgoingLight);
+  material.userData.snowOutputNode = (outgoingLight: Vec3) => snowShading(uniforms, outgoingLight, mode);
   return material;
 }

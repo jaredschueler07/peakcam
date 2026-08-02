@@ -98,10 +98,11 @@ export class TerrainRenderer {
     private readonly world: SimulationWorld,
     snowUniforms?: SnowUniforms | SnowNodeUniforms,
     backendKind: RendererBackendKind = "webgl",
+    snowDebug = 0,
   ) {
     // The node material is built from the same constants; only the shading language differs.
     const material: THREE.Material = snowUniforms && backendKind === "webgpu"
-      ? createSnowNodeMaterial(buildSnowDetailNormal(world.seed), snowUniforms as SnowNodeUniforms)
+      ? createSnowNodeMaterial(buildSnowDetailNormal(world.seed), snowUniforms as SnowNodeUniforms, snowDebug)
       : new THREE.MeshStandardMaterial({
         vertexColors: true, roughness: 0.86, metalness: 0.02, flatShading: false, dithering: true,
       });
