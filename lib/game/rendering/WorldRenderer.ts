@@ -52,29 +52,54 @@ export const RAMP_MAX_RISE = RAMP_LEN * 0.6;
 /** How far a ramp group floats above the sampled deck, so the rails rest on the snow rather than in it. */
 export const RAMP_DECK_CLEARANCE = 0.2;
 
-/** Height of the ramp's banner panel. */
-export const RAMP_BANNER_H = 2.2;
+/** Lateral offset of the two rails from the ramp's centreline. The deck itself runs to ±RAMP_W. */
+export const RAMP_RAIL_OFFSET = RAMP_W * 0.86;
+
 /**
- * Half-span of the panel and of the uprights that carry it. The rails sit at ±RAMP_W * 0.86, so
- * this straddles the deck with about a metre to spare on each side.
+ * Height of the banner panel. Was 1.5 in v1 and 2.2 in the gate rebuild; 1.6 is the projected-area
+ * budget talking. Panel area is the whole complaint — see RAMP_BANNER_MAX_AREA.
  */
-export const RAMP_BANNER_HALF_SPAN = RAMP_W * 0.95;
-/** Upright height — tall enough that the panel clears a skier's head on the run-in. */
-export const RAMP_BANNER_POST_H = 6;
-/** Gap between the top of the uprights and the top edge of the panel. */
+export const RAMP_BANNER_H = 1.6;
+/**
+ * Half-span of the panel and of the uprights that carry it, derived from what it has to clear
+ * rather than from a fudge factor on RAMP_W.
+ *
+ * Note RAMP_W is the ramp's *half*-width — `heightfield.ts` rejects `|x - centre| > RAMP_W` — so
+ * the deck is 21m across and the rails sit 18.06m apart. A gate that spans this feature is ~19m
+ * wide and there is no honest way to make it much narrower: clearing the rails' outer edges
+ * (±9.28) is already 18.6m. Span was never where the bulk came from.
+ */
+export const RAMP_BANNER_HALF_SPAN = RAMP_RAIL_OFFSET + 0.55;
+/**
+ * Ceiling on the panel's face area, in square metres. Stated as a budget because span is pinned by
+ * the feature and height is the only free geometric term — this is the number that stops the panel
+ * quietly growing back into a billboard.
+ */
+export const RAMP_BANNER_MAX_AREA = 32;
+/**
+ * Clear air under the panel. A skier passes beneath the gate on the run-in, so this cannot go much
+ * below 2.5m; it is also what keeps the panel legibly overhead rather than sitting on the snow.
+ */
+const RAMP_BANNER_UNDER_CLEARANCE = 2.6;
+/** Gap between the top edge of the panel and the top of the uprights. */
 const RAMP_BANNER_HEADROOM = 0.3;
 /** Down-slope offset of the whole gate: it stands just uphill of the ramp's entry. */
 const RAMP_BANNER_Z = -1.5;
 /**
  * Panel centre, in group-local space where y=0 is the ramp deck at the entry.
  *
- * This has been wrong twice, in opposite directions. It began at 4.2 with nothing holding the
- * panel up, so a 23m-wide plane read as a bar floating in the sky; the response was to drop it to
- * ~1.0, which turned it into a 23m x 1.5m ribbon sitting on the snow — the "flat navy slab"
- * report. Height was never the defect. A panel that wide only reads as a banner when something
- * visibly carries it, so it is back overhead and now has uprights.
+ * This has now been wrong three times. It began at 4.2 with nothing holding the panel up, so a 23m
+ * plane read as a bar floating in the sky; dropping it to ~1.0 turned it into a ribbon lying on the
+ * snow; adding uprights and hanging it at 4.6 fixed the structure but put a 20m x 2.2m near-opaque
+ * face across the horizon line at the ~30m viewing distance, which read as a billboard wall.
+ *
+ * So it is derived from the one thing that is actually a constraint — the clear air a skier needs
+ * under it — and everything else follows. Sitting the panel low keeps it against the snow rather
+ * than across the skyline, which is most of what stops it reading as a wall.
  */
-export const RAMP_BANNER_Y = RAMP_BANNER_POST_H - RAMP_BANNER_HEADROOM - RAMP_BANNER_H / 2;
+export const RAMP_BANNER_Y = RAMP_BANNER_UNDER_CLEARANCE + RAMP_BANNER_H / 2;
+/** Upright height: the panel's top edge, plus a little mast above it. */
+export const RAMP_BANNER_POST_H = RAMP_BANNER_Y + RAMP_BANNER_H / 2 + RAMP_BANNER_HEADROOM;
 
 /** The rise a ramp's rails are actually built to, clamped to a rail-shaped range. */
 export function rampRise(startY: number, endY: number): number {
@@ -152,8 +177,12 @@ export class WorldRenderer {
     for (let i = 0; i < 12; i += 1) {
       const group = new THREE.Group(), railMaterial = new THREE.MeshStandardMaterial({ color: 0xffe08a, roughness: 0.5, emissive: 0xffb020, emissiveIntensity: 0.22 });
       const rail = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, RAMP_LEN), railMaterial), rail2 = rail.clone();
-      rail.position.set(-RAMP_W * 0.86, 0, RAMP_LEN * 0.5); rail2.position.set(RAMP_W * 0.86, 0, RAMP_LEN * 0.5);
-      const banner = new THREE.Mesh(new THREE.PlaneGeometry(RAMP_BANNER_HALF_SPAN * 2, RAMP_BANNER_H), new THREE.MeshStandardMaterial({ color: 0x0d1524, side: THREE.DoubleSide, emissive: 0x2e6bd0, emissiveIntensity: 0.3 }));
+      rail.position.set(-RAMP_RAIL_OFFSET, 0, RAMP_LEN * 0.5); rail2.position.set(RAMP_RAIL_OFFSET, 0, RAMP_LEN * 0.5);
+      // Fabric, not sheet metal. A 19m face is unavoidably large, so it earns its size by being
+      // see-through: the run line and the terrain behind the gate stay readable. The old near-black
+      // 0x0d1524 at opacity 0.9 with a hot emissive was a saturated block at any size. Transparency
+      // matches the gates' panels, which use the same idiom.
+      const banner = new THREE.Mesh(new THREE.PlaneGeometry(RAMP_BANNER_HALF_SPAN * 2, RAMP_BANNER_H), new THREE.MeshStandardMaterial({ color: 0x27508f, side: THREE.DoubleSide, emissive: 0x2e6bd0, emissiveIntensity: 0.18, transparent: true, opacity: 0.62 }));
       const postL = new THREE.Mesh(postGeometry, postMaterial), postR = postL.clone();
       postL.position.set(-RAMP_BANNER_HALF_SPAN, RAMP_BANNER_POST_H / 2, RAMP_BANNER_Z);
       postR.position.set(RAMP_BANNER_HALF_SPAN, RAMP_BANNER_POST_H / 2, RAMP_BANNER_Z);

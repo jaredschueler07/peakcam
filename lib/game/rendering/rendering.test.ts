@@ -18,7 +18,11 @@ import { configureSceneMaterials } from "./Renderer";
 import { fogExp2Amount, heightFogAmount, type AtmosphereUniforms } from "./Atmosphere";
 import { SkierRenderer } from "./SkierRenderer";
 import { buildTileGeometry } from "./TerrainRenderer";
-import { rampRise, RAMP_BANNER_H, RAMP_DECK_CLEARANCE, RAMP_MAX_RISE, sagAt, WorldRenderer } from "./WorldRenderer";
+import {
+  rampRise, RAMP_BANNER_H, RAMP_BANNER_MAX_AREA, RAMP_DECK_CLEARANCE, RAMP_MAX_RISE, RAMP_RAIL_OFFSET,
+  sagAt, WorldRenderer,
+} from "./WorldRenderer";
+import { RAMP_W } from "../terrain/heightfield";
 import { staticNodeFactories } from "./nodeFactories.fixture";
 import { CAMERA_FAR, createScene } from "./SceneFactory";
 import { FAR_FIELD_GROUP_NAME, FAR_FIELD_INNER_RADIUS_M, FarFieldRenderer } from "./FarFieldRenderer";
@@ -185,9 +189,36 @@ test("the ramp banner stands as an upright gate panel, not a slab lying on the s
     // the fall line has all its area in x-y and no depth; a slab lying on the snow has it in x-z.
     assert.ok(size.z < 0.2, `banner has no depth when upright, got ${size.z.toFixed(2)}m at ${label}`);
     assert.ok(Math.abs(size.y - RAMP_BANNER_H) < 1e-6, `banner stands its full height at ${label}`);
-    // Wide enough to read as a gate over a deck whose rails sit at +/-9.03m, never the ~40m slab.
-    assert.ok(size.x > 16 && size.x < 24, `banner spans the deck, got ${size.x.toFixed(2)}m at ${label}`);
+    // It must reach across the rails it is a gate for...
+    assert.ok(size.x >= RAMP_RAIL_OFFSET * 2, `banner clears both rails, got ${size.x.toFixed(2)}m at ${label}`);
+    // ...and never exceed the deck it stands on. RAMP_W is the ramp's *half*-width (heightfield
+    // rejects |x - centre| > RAMP_W), so the deck is 21m and this is a real bound, not a formality.
+    assert.ok(size.x <= RAMP_W * 2, `banner never outgrows the 21m deck, got ${size.x.toFixed(2)}m at ${label}`);
+    // The tight one: the posts sit just outside the rails, so the span cannot creep back up.
+    assert.ok(size.x <= RAMP_RAIL_OFFSET * 2 + 1.4, `posts hug the rails, got ${size.x.toFixed(2)}m at ${label}`);
   }
+});
+
+test("the ramp banner's face stays inside its projected-area budget", () => {
+  // Span is pinned by the feature the gate spans, so height is the only free term and area is the
+  // thing that actually made it read as a billboard wall. Budget it explicitly.
+  for (const [runM, dropM, sagM] of BANNER_COURSES) {
+    const { banner } = placedRamp(syntheticCourse(runM, dropM, sagM).world);
+    const { size } = worldBox(banner);
+    const area = size.x * size.y;
+    assert.ok(area <= RAMP_BANNER_MAX_AREA,
+      `banner face is ${area.toFixed(1)}m2, over the ${RAMP_BANNER_MAX_AREA}m2 budget at ${runM}/${dropM}/${sagM}`);
+  }
+});
+
+test("the ramp banner reads as fabric, not as a solid panel", () => {
+  // Near-opaque navy at ~19m wide is a wall whatever its dimensions. The run line behind the gate
+  // has to stay visible through it, so transparency is part of the contract, not a style choice.
+  const { banner } = placedRamp(syntheticCourse(800, 240, 40).world);
+  const material = banner.material as THREE.MeshStandardMaterial;
+  assert.ok(material.transparent, "banner blends rather than occluding");
+  assert.ok(material.opacity <= 0.7, `banner is see-through, got opacity ${material.opacity}`);
+  assert.ok(material.emissiveIntensity <= 0.2, `banner does not glow as a block, got ${material.emissiveIntensity}`);
 });
 
 test("the ramp banner's up-vector stays vertical regardless of the ramp's rise", () => {
@@ -207,10 +238,11 @@ test("the ramp banner is carried overhead by uprights that stand on the deck", (
     const { banner, postL, postR, groundY } = placedRamp(syntheticCourse(runM, dropM, sagM).world);
     const deck = groundY + RAMP_DECK_CLEARANCE;
     const panel = worldBox(banner).box, left = worldBox(postL).box, right = worldBox(postR).box;
-    // Head height: a skier passes under the panel rather than through it, and it never becomes the
-    // detached bar in the sky that the 4.2m no-posts version read as.
-    assert.ok(panel.min.y - deck > 3, `panel clears head height, got ${(panel.min.y - deck).toFixed(2)}m at ${label}`);
-    assert.ok(panel.max.y - deck < 8, `panel stays within gate height, got ${(panel.max.y - deck).toFixed(2)}m at ${label}`);
+    // Bounded at both ends. Below ~2.5m a skier clips the panel and it starts reading as ground
+    // marking again; above ~5m it rises onto the horizon line at the cinematic camera's downward
+    // pitch, which is what made the 6m-post version read as a wall rather than as a gate.
+    assert.ok(panel.min.y - deck > 2.5, `panel clears a skier, got ${(panel.min.y - deck).toFixed(2)}m at ${label}`);
+    assert.ok(panel.max.y - deck < 5, `panel stays below the skyline, got ${(panel.max.y - deck).toFixed(2)}m at ${label}`);
     // Posts do the holding up: based on the deck, tall enough to reach the panel's top edge.
     for (const [name, post] of [["left", left], ["right", right]] as const) {
       assert.ok(Math.abs(post.min.y - deck) < 1e-6, `${name} post is footed on the deck at ${label}`);
