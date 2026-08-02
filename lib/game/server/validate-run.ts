@@ -25,22 +25,31 @@
  *   - **Nonce replay** is enforced by the `run_nonce` unique constraint in
  *     migration 015. The route catches the conflict; there is nothing to
  *     validate in memory (a per-instance seen-set would be worthless on
- *     serverless).
+ *     serverless). See `run-repository.test.ts` (unique-violation →
+ *     `nonce_replay`) and `handlers/routes.test.ts` (409 mapping).
  *   - **Ticket signature and expiry** are `verifyTicket`'s job. Map its typed
  *     errors here with {@link rejectionCodeForTicketError} so every failure
  *     path produces the same `rejection_code` vocabulary.
  *
  * ## Tick timebase
  *
- * `GhostSample.tick` is counted at the ghost's own `sample_hz` — one tick per
- * keyframe period, with gaps allowed. That is what makes the submission's
- * `tickHz` cross-checkable against the header's `sample_hz`, and it is how
- * elapsed time is derived: `spanMs = (lastTick - firstTick) / sampleHz * 1000`.
+ * `GhostSample.tick` is the **absolute 120 Hz simulation step index**
+ * (`FIXED_HZ` from `lib/game/core/clock.ts`), not a sample-counter at
+ * `sample_hz`. The real recorder emits ticks `0, 4, 8, …` when sampling at
+ * 30 Hz (`FIXED_HZ / sampleHz = 4`), or `0, 12, 24, …` at 10 Hz. Elapsed time
+ * is therefore:
+ *
+ *   `spanMs = (lastTick - firstTick) / FIXED_HZ * 1000`
+ *
+ * and the nominal inter-sample gap is `FIXED_HZ / sampleHz` physics ticks.
+ * Dropped samples widen a gap to `k * expected` for small integer `k`; tick
+ * compression (time-edit cheats) shrinks the average gap below `0.9 × expected`.
  */
 
+import { FIXED_HZ } from "../core/clock";
 import { simulationConfig, type SimulationConfig } from "../core/config";
 import type { DecodedGhost, GhostDecodeError, GhostSample } from "../replay/codec";
-import { MAX_KEYFRAMES } from "../replay/codec";
+import { MAX_KEYFRAMES, POSE_AIRBORNE, POSE_CRASHED } from "../replay/codec";
 import type { RunTicketError, RunTicketPayload } from "./run-ticket";
 import type { ServerCourse } from "./courses";
 
@@ -123,10 +132,19 @@ export function rejectionCodeForGhostError(error: GhostDecodeError): RejectionCo
 // honest outliers, and a false rejection on a personal best is worse than a
 // cheat that survives until re-simulation lands.
 
-/** 50 m/s ≈ 180 km/h. Downhill world-cup speeds top out near 45 m/s. */
-export const MAX_RUN_SPEED_CMS = 5_000;
-/** 25 m/s² ≈ 2.5 g of acceleration. Gravity alone gives under 1 g. */
-export const MAX_ACCEL_CMS2 = 2_500;
+/**
+ * 60 m/s ≈ 216 km/h. Raised from 50 m/s (A5 fix round 1): full-tuck honest
+ * procedural runs peak near 58 m/s; world-cup DH tops ~45 m/s, so 60 m/s still
+ * rejects absurd teleports/speed hacks (3×+ overshoot).
+ */
+export const MAX_RUN_SPEED_CMS = 6_000;
+/**
+ * 60 m/s² ≈ 6 g. Raised from 25 m/s² (A5 fix round 1): honest braked p95 ≈
+ * 2520 cm/s²; honest full-tuck grounded peaks ≈ 5250 cm/s² on packed
+ * procedural. Landings/crashes are pose-gated (see {@link isAirborneOrCrashed})
+ * so this bound only covers on-snow segments. Still rejects 3×+ cheats.
+ */
+export const MAX_ACCEL_CMS2 = 6_000;
 /** 80 m/s² of deceleration — a crash into a tree is allowed to be violent. */
 export const MAX_DECEL_CMS2 = 8_000;
 /** Slack on the per-step displacement bound, absorbing quantisation. */
@@ -137,7 +155,7 @@ export const BOUNDS_MARGIN_M = 50;
 export const MAX_START_SPEED_CMS = 800;
 /** A legal descent covers at least 100 m of ground. */
 export const MIN_COURSE_DISTANCE_CM = 10_000;
-/** Fixed slack on the ghost-span/`timeMs` comparison, on top of one tick. */
+/** Fixed slack on the ghost-span/`timeMs` comparison, on top of one physics tick. */
 export const DURATION_TOLERANCE_MS = 250;
 /**
  * Slack between the client's wall clock and its reported elapsed time. Generous:
@@ -147,6 +165,22 @@ export const DURATION_TOLERANCE_MS = 250;
 export const WALL_CLOCK_TOLERANCE_MS = 15_000;
 /** Course start/finish, when known, must be reached within this radius. */
 export const START_FINISH_RADIUS_M = 60;
+/**
+ * Max integer multiple of the nominal inter-sample gap allowed for a single
+ * step (dropped-sample slack). Larger gaps look like a hitch or sparse record;
+ * beyond this the average-gap / teleport checks take over.
+ */
+export const MAX_SAMPLE_GAP_MULTIPLE = 4;
+/**
+ * Tick-compression floor ratio applied to the nominal gap. We reject when
+ * `avgGap < expectedGap * MIN_AVG_GAP_RATIO`. Set to 1 so any average below
+ * the nominal period (×0.8 and ×0.9 time edits) fails, while honest
+ * (avg = expected) and one-dropped-sample (avg > expected) pass.
+ */
+export const MIN_AVG_GAP_RATIO = 1;
+
+/** Packed-surface config used when the resim flag is on (hoisted once). */
+const PACKED_SIM_CONFIG = simulationConfig("packed");
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -186,7 +220,7 @@ export interface RunValidationMetrics {
   maxAbsCoordCm: number;
   startSpeedCms: number;
   finishSpeedCms: number;
-  /** False when no course registry supplied `startZ`/`finishZ` — see courses.ts. */
+  /** Always true once COURSE_GATES supplies startZ/finishZ for every pilot trail. */
   startFinishChecked: boolean;
 }
 
@@ -208,10 +242,26 @@ export type ResimVerdict =
 
 /**
  * Env flag that enables the trajectory re-simulation gate inside
- * {@link validateRun}. When unset / not `"1"`, validateRun is byte-identical
- * to the pre-A5 baseline (no resim call, same metrics, same early returns).
+ * {@link validateRun}. When unset / not `"1"`, validateRun skips resim
+ * (baseline + always-on start/finish gates still run).
  */
 export const DROP_IN_RESIM_ENV = "DROP_IN_RESIM";
+
+// ─── Tick helpers ────────────────────────────────────────────
+
+/** Elapsed milliseconds from absolute 120 Hz tick indices. */
+export function ghostSpanMsFromTicks(firstTick: number, lastTick: number): number {
+  return ((lastTick - firstTick) / FIXED_HZ) * 1000;
+}
+
+/** Nominal physics-tick gap between keyframes at the ghost's sample rate. */
+export function expectedSampleGapTicks(sampleHz: number): number {
+  return FIXED_HZ / sampleHz;
+}
+
+function isAirborneOrCrashed(sample: GhostSample): boolean {
+  return (sample.poseFlags & (POSE_AIRBORNE | POSE_CRASHED)) !== 0;
+}
 
 // ─── Validation ──────────────────────────────────────────────
 
@@ -224,8 +274,9 @@ export const DROP_IN_RESIM_ENV = "DROP_IN_RESIM";
  * rather than the `impossible_acceleration` it also implies.
  *
  * When `process.env.DROP_IN_RESIM === "1"`, a passing baseline run is then
- * checked by {@link resimulateGhost} (trajectory envelopes + start/finish +
- * monotonic progress). The flag-off path never enters that branch.
+ * checked by {@link resimulateGhost}. The flag-off path never enters that
+ * branch. Note: start/finish gates are always-on (COURSE_GATES) — flag-off is
+ * not byte-identical to pre-A5 baseline.
  */
 export function validateRun(input: RunValidationInput): RunValidationResult {
   const { ticket, submission, ghost, course } = input;
@@ -274,11 +325,10 @@ export function validateRun(input: RunValidationInput): RunValidationResult {
   }
 
   // ── Duration ──
-  // The ghost's own tick span is the authority; `timeMs` is a client claim
-  // that has to agree with it.
+  // Absolute 120 Hz ticks are the authority; `timeMs` is a client claim.
 
-  const tickPeriodMs = 1000 / meta.sampleHz;
-  const durationTolerance = tickPeriodMs + DURATION_TOLERANCE_MS;
+  const physicsTickMs = 1000 / FIXED_HZ;
+  const durationTolerance = physicsTickMs + DURATION_TOLERANCE_MS;
   if (Math.abs(submission.timeMs - metrics.ghostSpanMs) > durationTolerance) {
     return fail(
       "duration_mismatch",
@@ -328,7 +378,7 @@ export function validateRun(input: RunValidationInput): RunValidationResult {
   }
 
   for (let i = 1; i < samples.length; i++) {
-    const dtSeconds = (samples[i].tick - samples[i - 1].tick) / meta.sampleHz;
+    const dtSeconds = (samples[i].tick - samples[i - 1].tick) / FIXED_HZ;
     const stepCm = planarDistanceCm(samples[i - 1], samples[i]);
     const allowedStepCm = MAX_RUN_SPEED_CMS * dtSeconds + TELEPORT_SLACK_CM;
     if (stepCm > allowedStepCm) {
@@ -339,19 +389,23 @@ export function validateRun(input: RunValidationInput): RunValidationResult {
       );
     }
 
-    const deltaSpeed = samples[i].speedCms - samples[i - 1].speedCms;
-    const accel = deltaSpeed / dtSeconds;
-    if (accel > MAX_ACCEL_CMS2) {
-      return fail(
-        "impossible_acceleration",
-        `keyframe ${i} accelerates at ${Math.round(accel)}cm/s² (max ${MAX_ACCEL_CMS2})`,
-      );
-    }
-    if (-accel > MAX_DECEL_CMS2) {
-      return fail(
-        "impossible_acceleration",
-        `keyframe ${i} decelerates at ${Math.round(-accel)}cm/s² (max ${MAX_DECEL_CMS2})`,
-      );
+    // Landing impulses alias at 30 Hz; skip accel/decel when either endpoint is
+    // airborne or crashed (poseFlags from the honest recorder).
+    if (!isAirborneOrCrashed(samples[i - 1]) && !isAirborneOrCrashed(samples[i])) {
+      const deltaSpeed = samples[i].speedCms - samples[i - 1].speedCms;
+      const accel = deltaSpeed / dtSeconds;
+      if (accel > MAX_ACCEL_CMS2) {
+        return fail(
+          "impossible_acceleration",
+          `keyframe ${i} accelerates at ${Math.round(accel)}cm/s² (max ${MAX_ACCEL_CMS2})`,
+        );
+      }
+      if (-accel > MAX_DECEL_CMS2) {
+        return fail(
+          "impossible_acceleration",
+          `keyframe ${i} decelerates at ${Math.round(-accel)}cm/s² (max ${MAX_DECEL_CMS2})`,
+        );
+      }
     }
   }
 
@@ -373,11 +427,8 @@ export function validateRun(input: RunValidationInput): RunValidationResult {
   }
 
   // ── Optional re-simulation gate (A5) ──
-  // Flag-off: fall through with the same accepted payload as before A5.
   if (process.env[DROP_IN_RESIM_ENV] === "1") {
-    // Config is required by the public signature (surface-aware envelopes later);
-    // trajectory checks today use the shared physical constants only.
-    const verdict = resimulateGhost(ghost, course, simulationConfig("packed"));
+    const verdict = resimulateGhost(ghost, course, PACKED_SIM_CONFIG);
     if (!verdict.accepted) {
       return fail(verdict.code, verdict.detail);
     }
@@ -395,14 +446,10 @@ export function validateRun(input: RunValidationInput): RunValidationResult {
  * This is not a full input-trace re-step of the physics core (the PCGH format
  * carries samples, not InputFrames). It is the authoritative *trajectory*
  * check that the baseline launch-day validator stages for before rankings are
- * consequential (architecture report §9, DESIGN.md §3.7). The pure core is
- * what *produces* honest fixtures; the server imports core config types and
- * may later step it when input recording lands.
+ * consequential (architecture report §9, DESIGN.md §3.7).
  *
- * Quantisation slack: PCGH stores integer centimetres and integer cm/s, so a
- * single-unit round-trip can inflate apparent step length and accel. Slack is
- * derived from that quantisation only — the named envelopes themselves are
- * never redefined.
+ * Tick timebase is absolute {@link FIXED_HZ} (see module header). Quantisation
+ * slack absorbs integer cm / cm/s round-trips only.
  *
  * `config` is accepted for API stability (surface-specific envelopes later);
  * current checks use the shared constants above.
@@ -425,37 +472,40 @@ export function resimulateGhost(
   const first = samples[0];
   const last = samples[samples.length - 1];
   const sampleHz = meta.sampleHz;
+  const expectedGap = expectedSampleGapTicks(sampleHz);
+  const ghostSpanMs = ghostSpanMsFromTicks(first.tick, last.tick);
 
-  // ── Duration vs sample count ──
-  // Regular cadence: (n-1) periods. Tick gaps (sync/delta) may stretch the
-  // span; compression below the regular span is the time-edit tell.
-  const ghostSpanMs = ((last.tick - first.tick) / sampleHz) * 1000;
-  const regularSpanMs = ((samples.length - 1) / sampleHz) * 1000;
-  if (ghostSpanMs + DURATION_TOLERANCE_MS < regularSpanMs) {
+  // ── Cadence: tick compression vs dropped samples ──
+  const avgGap = (last.tick - first.tick) / (samples.length - 1);
+  if (avgGap < expectedGap * MIN_AVG_GAP_RATIO) {
     return {
       accepted: false,
       code: "duration_mismatch",
       detail:
-        `ghost span ${Math.round(ghostSpanMs)}ms is shorter than the ` +
-        `${samples.length}-sample regular span ${Math.round(regularSpanMs)}ms ` +
-        `(tolerance ${DURATION_TOLERANCE_MS}ms)`,
+        `resim average tick gap ${avgGap.toFixed(2)} is below ` +
+        `${MIN_AVG_GAP_RATIO}× expected ${expectedGap} (tick compression / time edit)`,
     };
   }
-  // Also reject a span that is wildly longer than the sample count implies
-  // (padded ticks without samples) — same tolerance band on the high side,
-  // plus one tick period for the sync cadence.
-  const tickPeriodMs = 1000 / sampleHz;
-  if (ghostSpanMs - regularSpanMs > DURATION_TOLERANCE_MS + tickPeriodMs) {
-    // Only fail when the *average* tick gap is absurdly large; modest gaps are
-    // legal (recorder hitch). Cap: more than 4× the regular period on average.
-    const avgGap = (last.tick - first.tick) / (samples.length - 1);
-    if (avgGap > 4) {
+
+  for (let i = 1; i < samples.length; i++) {
+    const gap = samples[i].tick - samples[i - 1].tick;
+    if (gap <= 0) {
+      return {
+        accepted: false,
+        code: "tick_regression",
+        detail: `resim keyframe ${i} tick ${samples[i].tick} does not advance past ${samples[i - 1].tick}`,
+      };
+    }
+    // Allow gap = k * expected for small integer k (dropped samples). A gap that
+    // is not a near-multiple and is also far below expected is compression noise
+    // on individual steps; the avg check already catches global ×0.8/×0.9.
+    if (gap > expectedGap * MAX_SAMPLE_GAP_MULTIPLE) {
       return {
         accepted: false,
         code: "duration_mismatch",
         detail:
-          `ghost span ${Math.round(ghostSpanMs)}ms averages ${avgGap.toFixed(1)} ticks/sample ` +
-          `(expected ~1 at ${sampleHz} Hz)`,
+          `resim keyframe ${i} tick gap ${gap} exceeds ${MAX_SAMPLE_GAP_MULTIPLE}×` +
+          ` expected ${expectedGap}`,
       };
     }
   }
@@ -478,7 +528,7 @@ export function resimulateGhost(
     };
   }
 
-  // ── Bounds ──
+  // ── Bounds + sweep ──
   const maxAbsCoordCm = (course.halfSizeM + BOUNDS_MARGIN_M) * 100;
 
   let distanceCm = 0;
@@ -508,19 +558,11 @@ export function resimulateGhost(
     if (i === 0) continue;
 
     const prev = samples[i - 1];
-    const dtSeconds = (s.tick - prev.tick) / sampleHz;
-    if (dtSeconds <= 0) {
-      return {
-        accepted: false,
-        code: "tick_regression",
-        detail: `resim keyframe ${i} tick ${s.tick} does not advance past ${prev.tick}`,
-      };
-    }
+    const dtSeconds = (s.tick - prev.tick) / FIXED_HZ;
 
     const stepCm = planarDistanceCm(prev, s);
     distanceCm += stepCm;
 
-    // Teleport: max reachable distance + codec slack + 1 cm quantisation per axis.
     const quantStepSlackCm = Math.SQRT2;
     const allowedStepCm = MAX_RUN_SPEED_CMS * dtSeconds + TELEPORT_SLACK_CM + quantStepSlackCm;
     if (stepCm > allowedStepCm) {
@@ -533,27 +575,27 @@ export function resimulateGhost(
       };
     }
 
-    // Accel / decel on the reported speed field, with quantisation slack:
-    // ±1 cm/s on each endpoint → 2/dt cm/s².
-    const quantAccelSlack = 2 / dtSeconds;
-    const accel = (s.speedCms - prev.speedCms) / dtSeconds;
-    if (accel > MAX_ACCEL_CMS2 + quantAccelSlack) {
-      return {
-        accepted: false,
-        code: "impossible_acceleration",
-        detail:
-          `resim keyframe ${i} accelerates at ${Math.round(accel)}cm/s² ` +
-          `(max ${MAX_ACCEL_CMS2} + quant ${Math.round(quantAccelSlack)})`,
-      };
-    }
-    if (-accel > MAX_DECEL_CMS2 + quantAccelSlack) {
-      return {
-        accepted: false,
-        code: "impossible_acceleration",
-        detail:
-          `resim keyframe ${i} decelerates at ${Math.round(-accel)}cm/s² ` +
-          `(max ${MAX_DECEL_CMS2} + quant ${Math.round(quantAccelSlack)})`,
-      };
+    if (!isAirborneOrCrashed(prev) && !isAirborneOrCrashed(s)) {
+      const quantAccelSlack = 2 / dtSeconds;
+      const accel = (s.speedCms - prev.speedCms) / dtSeconds;
+      if (accel > MAX_ACCEL_CMS2 + quantAccelSlack) {
+        return {
+          accepted: false,
+          code: "impossible_acceleration",
+          detail:
+            `resim keyframe ${i} accelerates at ${Math.round(accel)}cm/s² ` +
+            `(max ${MAX_ACCEL_CMS2} + quant ${Math.round(quantAccelSlack)})`,
+        };
+      }
+      if (-accel > MAX_DECEL_CMS2 + quantAccelSlack) {
+        return {
+          accepted: false,
+          code: "impossible_acceleration",
+          detail:
+            `resim keyframe ${i} decelerates at ${Math.round(-accel)}cm/s² ` +
+            `(max ${MAX_DECEL_CMS2} + quant ${Math.round(quantAccelSlack)})`,
+        };
+      }
     }
 
     const dzCm = s.zCm - prev.zCm;
@@ -587,8 +629,6 @@ export function resimulateGhost(
   }
 
   // ── Monotonic course progress (overall) ──
-  // Allow local backtracking (skids, recoveries) but require net forward
-  // progress and that forward dominates reverse.
   const netProgressCm = (last.zCm - first.zCm) * fallDir;
   if (netProgressCm <= 0) {
     return {
@@ -606,6 +646,10 @@ export function resimulateGhost(
         `forward ${Math.round(forwardProgressCm)}cm`,
     };
   }
+
+  // Silence unused-span warning in case future cross-checks need it; span is
+  // already enforced via avgGap and the baseline timeMs path.
+  void ghostSpanMs;
 
   return { accepted: true };
 }
@@ -627,9 +671,9 @@ export function canPersistRejection(ghost: DecodedGhost): boolean {
 function measure(
   ghost: DecodedGhost,
   submission: RunSubmissionFacts,
-  course: ServerCourse,
+  _course: ServerCourse,
 ): RunValidationMetrics {
-  const { meta, samples } = ghost;
+  const { samples } = ghost;
   const first = samples[0];
   const last = samples[samples.length - 1];
 
@@ -650,10 +694,10 @@ function measure(
     distanceCm += stepCm;
     maxStepCm = Math.max(maxStepCm, stepCm);
 
-    const dtSeconds = (s.tick - samples[i - 1].tick) / meta.sampleHz;
+    const dtSeconds = (s.tick - samples[i - 1].tick) / FIXED_HZ;
     // A non-advancing tick is caught as `tick_regression`; guard the division
     // so metrics stay finite for the rejected row we still want to store.
-    if (dtSeconds > 0) {
+    if (dtSeconds > 0 && !isAirborneOrCrashed(samples[i - 1]) && !isAirborneOrCrashed(s)) {
       const accel = (s.speedCms - samples[i - 1].speedCms) / dtSeconds;
       maxAccelCms2 = Math.max(maxAccelCms2, accel);
       maxDecelCms2 = Math.max(maxDecelCms2, -accel);
@@ -664,8 +708,8 @@ function measure(
 
   return {
     keyframes: samples.length,
-    sampleHz: meta.sampleHz,
-    ghostSpanMs: round2(((last.tick - first.tick) / meta.sampleHz) * 1000),
+    sampleHz: ghost.meta.sampleHz,
+    ghostSpanMs: round2(ghostSpanMsFromTicks(first.tick, last.tick)),
     reportedTimeMs: submission.timeMs,
     wallClockMs: Number.isFinite(wallClockMs) ? wallClockMs : 0,
     distanceCm: round2(distanceCm),

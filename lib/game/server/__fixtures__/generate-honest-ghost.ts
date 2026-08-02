@@ -1,11 +1,16 @@
 /**
- * Generate an honest competitive ghost by running the pure simulation core
- * (`createSimulation` / `stepSimulation`) with a scripted InputFrame tape,
- * sampling every 4th fixed step, quantising through the codec, and mapping the
- * trajectory onto the fixture course's start/finish gates.
+ * Generate honest competitive ghosts by running the pure simulation core
+ * (`createSimulation` / `stepSimulation`) with scripted InputFrame tapes,
+ * sampling every Nth fixed step, emitting absolute 120 Hz ticks (matching the
+ * real recorder), real poseFlags, and mapping trajectories onto the fixture
+ * course start/finish gates.
  *
- * Used to (re)write `honest-ghost.json` / `honest-ghost.pcgh`. Not imported by
- * production code.
+ * Writes commit-able fixtures:
+ *   - honest-ghost.pcgh / .json          (braked crawl — default)
+ *   - honest-ghost-neutral.pcgh / .json  (neutral input)
+ *   - honest-ghost-full-tuck.pcgh / .json
+ *
+ * Not imported by production code.
  */
 
 import { writeFileSync } from "node:fs";
@@ -14,12 +19,16 @@ import { fileURLToPath } from "node:url";
 
 import { DROP_IN_GAME_PROFILES } from "../../config/profiles";
 import { COURSE_VERSION, PHYSICS_VERSION } from "../../config/versions";
-import { FIXED_DT } from "../../core/clock";
+import { FIXED_DT, FIXED_HZ } from "../../core/clock";
 import { simulationConfig } from "../../core/config";
 import { createSimulation, stepSimulation } from "../../core/simulation";
-import type { InputFrame } from "../../core/types";
+import type { InputFrame, SimulationState } from "../../core/types";
 import {
   encodeGhost,
+  POSE_AIRBORNE,
+  POSE_BRAKING,
+  POSE_CRASHED,
+  POSE_TUCKED,
   quantizeGhostSample,
   type GhostSample,
 } from "../../replay/codec";
@@ -31,9 +40,11 @@ import {
   resolveCourseOrThrow,
 } from "./run";
 
-/** Physics steps between ghost samples (120 Hz / 4 = 30 Hz). */
+/** Physics steps between ghost samples (120 / 30 = 4). */
 export const HONEST_SAMPLE_EVERY = 4;
-export const HONEST_SAMPLE_HZ = Math.round(1 / (FIXED_DT * HONEST_SAMPLE_EVERY));
+export const HONEST_SAMPLE_HZ = FIXED_HZ / HONEST_SAMPLE_EVERY;
+
+export type HonestTapeKind = "braked" | "neutral" | "full-tuck";
 
 const EMPTY: InputFrame = {
   steer: 0,
@@ -45,42 +56,63 @@ const EMPTY: InputFrame = {
   trailPressed: false,
 };
 
-/**
- * Scripted tape: light brake + mild tuck keeps peak speed and accel inside the
- * baseline envelopes while still covering the course distance.
- */
-function tape(step: number): InputFrame {
+function tapeFor(kind: HonestTapeKind, step: number): InputFrame {
+  if (kind === "neutral") {
+    // Near-zero input — coast the fall line with a tiny steer to stay oriented.
+    return { ...EMPTY, steer: Math.sin(step / 800) * 0.04 };
+  }
+  if (kind === "full-tuck") {
+    return {
+      ...EMPTY,
+      tuck: step > 60 ? 1 : 0,
+      steer: Math.sin(step / 500) * 0.08,
+    };
+  }
+  // Braked crawl: light tuck/brake stays well inside envelopes.
   const tuck = step > 200 ? 0.15 : 0;
   const brake = step > 200 ? 0.08 : 0.25;
   const steer = Math.sin(step / 600) * 0.06;
   return { ...EMPTY, tuck, brake, steer };
 }
 
+function poseFlagsFrom(state: SimulationState, input: InputFrame): number {
+  let pose = 0;
+  if (!state.onGround) pose |= POSE_AIRBORNE;
+  if (input.tuck > 0.5) pose |= POSE_TUCKED;
+  if (input.brake > 0.5) pose |= POSE_BRAKING;
+  if (state.crash > 0) pose |= POSE_CRASHED;
+  return pose;
+}
+
 /**
- * Run the pure sim and return quantised samples already placed on the fixture
- * course (Breckenridge first trail) start → finish gates.
+ * Run the pure sim and return quantised samples placed on the fixture course
+ * (Breckenridge first trail) start → finish gates. Ticks are absolute 120 Hz
+ * indices: `i * (FIXED_HZ / sampleHz)`.
  */
-export function generateHonestSamples(): GhostSample[] {
+export function generateHonestSamples(kind: HonestTapeKind = "braked"): GhostSample[] {
   const course = resolveCourseOrThrow();
   const profile = DROP_IN_GAME_PROFILES[FIXTURE_RESORT_SLUG];
   const world = createProceduralWorld(profile, profile.seed, simulationConfig("packed"));
   const state = createSimulation(profile, profile.seed);
-  // Standstill at the gate — the spawn helper seeds 15 m/s for free-ski feel,
-  // which is above MAX_START_SPEED_CMS; competitive recording starts still.
+  // Competitive recording starts still (spawn seeds 15 m/s for free-ski feel).
   state.vel.x = 0;
   state.vel.y = 0;
   state.vel.z = 0;
 
   const needDz = Math.abs(course.finishZ - course.startZ) + 5;
   const raw: GhostSample[] = [];
+  const maxSteps = kind === "full-tuck" ? 25_000 : kind === "neutral" ? 35_000 : 40_000;
 
-  for (let step = 0; step < 40_000; step++) {
-    stepSimulation(state, tape(step), FIXED_DT, world);
+  for (let step = 0; step < maxSteps; step++) {
+    const input = tapeFor(kind, step);
+    stepSimulation(state, input, FIXED_DT, world);
     if (step % HONEST_SAMPLE_EVERY === 0) {
+      const sampleIndex = raw.length;
       const speed = Math.hypot(state.vel.x, state.vel.y, state.vel.z);
       raw.push(
         quantizeGhostSample({
-          tick: raw.length,
+          // Absolute 120 Hz tick — matches the real recorder cadence.
+          tick: sampleIndex * HONEST_SAMPLE_EVERY,
           xCm: state.pos.x * 100,
           zCm: state.pos.z * 100,
           groundOffsetCm: Math.round(
@@ -88,7 +120,7 @@ export function generateHonestSamples(): GhostSample[] {
           ),
           yaw: state.yaw,
           speedCms: Math.round(speed * 100),
-          poseFlags: 0,
+          poseFlags: poseFlagsFrom(state, input),
         }),
       );
     }
@@ -96,38 +128,47 @@ export function generateHonestSamples(): GhostSample[] {
   }
 
   if (raw.length < 2) {
-    throw new Error("honest ghost generator: sim produced fewer than 2 samples");
+    throw new Error(`honest ghost generator (${kind}): sim produced fewer than 2 samples`);
   }
 
-  // Procedural terrain skis +Z; map rigidly onto the course fall line so the
-  // trajectory satisfies start/finish gates without altering per-step speeds.
+  return mapOntoCourseGates(raw, course.startZ, course.finishZ);
+}
+
+function mapOntoCourseGates(
+  raw: GhostSample[],
+  startZ: number,
+  finishZ: number,
+): GhostSample[] {
   const z0 = raw[0].zCm / 100;
-  const fallDir = course.finishZ >= course.startZ ? 1 : -1;
+  const fallDir = finishZ >= startZ ? 1 : -1;
   const mapped = raw.map((s) =>
     quantizeGhostSample({
       ...s,
-      zCm: Math.round((course.startZ + fallDir * (s.zCm / 100 - z0)) * 100),
+      zCm: Math.round((startZ + fallDir * (s.zCm / 100 - z0)) * 100),
       yaw: fallDir >= 0 ? s.yaw : s.yaw + Math.PI,
     }),
   );
 
   const crossed = (zM: number): boolean =>
-    course.finishZ >= course.startZ ? zM >= course.finishZ : zM <= course.finishZ;
+    finishZ >= startZ ? zM >= finishZ : zM <= finishZ;
 
   let endIdx = mapped.findIndex((s) => crossed(s.zCm / 100));
   if (endIdx < 0) endIdx = mapped.length - 1;
-  // Keep one sample past the line when available so "crossed" is unambiguous.
   if (endIdx < mapped.length - 1) endIdx += 1;
 
-  const samples = mapped.slice(0, endIdx + 1).map((s, i) => ({ ...s, tick: i }));
-  return samples;
+  // Preserve absolute ticks from the raw run (do not re-index to 0..n).
+  return mapped.slice(0, endIdx + 1);
 }
 
-export function encodeHonestGhost(samples: GhostSample[] = generateHonestSamples()): {
+export function encodeHonestGhost(
+  kind: HonestTapeKind = "braked",
+  samples: GhostSample[] = generateHonestSamples(kind),
+): {
   samples: GhostSample[];
   bytes: Uint8Array;
   sampleHz: number;
   seed: number;
+  kind: HonestTapeKind;
 } {
   const course = resolveCourseOrThrow();
   const seed = courseSeed(
@@ -143,28 +184,28 @@ export function encodeHonestGhost(samples: GhostSample[] = generateHonestSamples
     sampleHz: HONEST_SAMPLE_HZ,
     seed,
   });
-  return { samples, bytes, sampleHz: HONEST_SAMPLE_HZ, seed };
+  return { samples, bytes, sampleHz: HONEST_SAMPLE_HZ, seed, kind };
 }
 
-// ─── CLI: write commit-able fixtures ─────────────────────────
+function fixtureStem(kind: HonestTapeKind): string {
+  if (kind === "braked") return "honest-ghost";
+  return `honest-ghost-${kind}`;
+}
 
-const isMain =
-  typeof process !== "undefined" &&
-  process.argv[1] &&
-  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-
-if (isMain) {
-  const { samples, bytes, sampleHz, seed } = encodeHonestGhost();
-  const dir = path.dirname(fileURLToPath(import.meta.url));
-  const pcghPath = path.join(dir, "honest-ghost.pcgh");
-  const jsonPath = path.join(dir, "honest-ghost.json");
+function writeFixture(kind: HonestTapeKind, dir: string): void {
+  const { samples, bytes, sampleHz, seed } = encodeHonestGhost(kind);
+  const stem = fixtureStem(kind);
+  const pcghPath = path.join(dir, `${stem}.pcgh`);
+  const jsonPath = path.join(dir, `${stem}.json`);
   writeFileSync(pcghPath, bytes);
   writeFileSync(
     jsonPath,
     JSON.stringify(
       {
         description:
-          "Honest Drop In ghost: pure sim (packed) + every-4th-step sample, mapped to horseshoe-bowl gates",
+          `Honest Drop In ghost (${kind}): pure sim packed, absolute 120Hz ticks, ` +
+          `every-${HONEST_SAMPLE_EVERY}th step, real poseFlags, horseshoe-bowl gates`,
+        kind,
         resortSlug: FIXTURE_RESORT_SLUG,
         trailId: resolveCourseOrThrow().trailId,
         sampleHz,
@@ -172,6 +213,9 @@ if (isMain) {
         physicsVersion: PHYSICS_VERSION,
         courseVersion: COURSE_VERSION,
         keyframes: samples.length,
+        firstTick: samples[0].tick,
+        lastTick: samples[samples.length - 1].tick,
+        maxSpeedCms: Math.max(...samples.map((s) => s.speedCms)),
         ghostBase64: Buffer.from(bytes).toString("base64"),
       },
       null,
@@ -179,7 +223,20 @@ if (isMain) {
     ) + "\n",
   );
   console.log(
-    `wrote ${pcghPath} (${bytes.byteLength} B, ${samples.length} keyframes @ ${sampleHz} Hz)`,
+    `wrote ${pcghPath} (${bytes.byteLength} B, ${samples.length} keyframes @ ${sampleHz} Hz, kind=${kind})`,
   );
-  console.log(`wrote ${jsonPath}`);
+}
+
+// ─── CLI ─────────────────────────────────────────────────────
+
+const isMain =
+  typeof process !== "undefined" &&
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  const dir = path.dirname(fileURLToPath(import.meta.url));
+  for (const kind of ["braked", "neutral", "full-tuck"] as const) {
+    writeFixture(kind, dir);
+  }
 }

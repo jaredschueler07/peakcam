@@ -68,6 +68,12 @@ export interface ServerCourse {
 /**
  * Start/finish Z (metres) for every competitive trail, keyed by resort then
  * trail id. Measured from the real-course polylines (P5).
+ *
+ * **Always-on gates:** when these values are present, `validateRun` always
+ * enforces start/finish (A5). That is stricter than the pre-A5 baseline, where
+ * `startZ`/`finishZ` were optional and `startFinishChecked` stayed false. The
+ * `DROP_IN_RESIM` flag only gates the *trajectory re-sim* branch — not these
+ * course gates. Bump `COURSE_VERSION` if a re-bake moves a gate.
  */
 export const COURSE_GATES: Readonly<
   Record<DropInResortSlug, Readonly<Record<string, Readonly<{ startZ: number; finishZ: number }>>>>

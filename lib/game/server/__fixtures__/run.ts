@@ -12,6 +12,7 @@
  * not from the fixture drifting into a bound.
  */
 
+import { FIXED_HZ } from "../../core/clock";
 import { encodeGhost, type GhostSample } from "../../replay/codec";
 import { COURSE_VERSION, PHYSICS_VERSION } from "../../config/versions";
 import {
@@ -22,7 +23,7 @@ import {
   type ServerCourse,
 } from "../courses";
 import { issueTicket, parseTicketKeyring, type TicketKeyring } from "../run-ticket";
-import type { RunSubmissionFacts } from "../validate-run";
+import { ghostSpanMsFromTicks, type RunSubmissionFacts } from "../validate-run";
 
 /** A 32-byte secret of one repeated byte — deterministic and long enough. */
 function testSecret(fill: number): string {
@@ -99,6 +100,8 @@ export function makeRunSamples(options: MakeRunSamplesOptions = {}): GhostSample
   const fallDir = finishZCm >= startZCm ? 1 : -1;
   const samples: GhostSample[] = [];
   const dt = 1 / sampleHz;
+  // Absolute 120 Hz tick index per sample (matches the real recorder).
+  const tickStride = FIXED_HZ / sampleHz;
   // Smooth ease-in so speed ramps under the accel envelope (peak ≪ 50 m/s).
   const ease = (t: number): number => t * t * (3 - 2 * t); // smoothstep
 
@@ -114,7 +117,7 @@ export function makeRunSamples(options: MakeRunSamplesOptions = {}): GhostSample
       speedCms = Math.round(stepCm / dt);
     }
     samples.push({
-      tick: i,
+      tick: Math.round(i * tickStride),
       xCm,
       zCm,
       groundOffsetCm: 90,
@@ -153,7 +156,7 @@ export function makeRunFixture(options: RunFixtureOptions = {}): RunFixture {
     seed: options.ghostMeta?.seed ?? seed,
   });
 
-  const spanMs = ((samples[samples.length - 1].tick - samples[0].tick) / sampleHz) * 1000;
+  const spanMs = ghostSpanMsFromTicks(samples[0].tick, samples[samples.length - 1].tick);
   const startedAt = new Date(nowMs - spanMs - 2_000).toISOString();
   const finishedAt = new Date(nowMs - 2_000).toISOString();
 

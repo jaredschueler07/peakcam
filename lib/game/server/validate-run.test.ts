@@ -89,10 +89,16 @@ test("an impossible top speed is overspeed", () => {
   assertRejected(result, "overspeed");
 });
 
-test("a speed that ramps faster than 2.5g is impossible acceleration", () => {
+test("a speed that ramps faster than the accel envelope is impossible acceleration", () => {
+  // Two grounded samples: +700 cm/s over dt=12/120 s ⇒ 7000 cm/s² > MAX_ACCEL_CMS2,
+  // while both speeds stay under MAX_RUN_SPEED_CMS so overspeed does not fire first.
   const result = runValidator({
     mutateSamples: (samples) =>
-      samples.map((s, i) => (i >= 100 && i < 110 ? { ...s, speedCms: 400 + (i - 100) * 400 } : s)),
+      samples.map((s, i) => {
+        if (i === 100) return { ...s, speedCms: 1_000, poseFlags: 0 };
+        if (i === 101) return { ...s, speedCms: 1_700, poseFlags: 0 };
+        return s;
+      }),
   });
   assertRejected(result, "impossible_acceleration");
 });

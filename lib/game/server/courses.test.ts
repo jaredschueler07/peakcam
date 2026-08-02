@@ -1,10 +1,23 @@
 import assert from "node:assert/strict";
+import { brotliDecompressSync } from "node:zlib";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { test } from "node:test";
 
 import { COURSE_VERSION } from "../config/versions";
 import { DROP_IN_GAME_PROFILES } from "../config/profiles";
+import type { DropInResortSlug } from "../config/schema";
+import type { TerrainMeta, TrailsFile } from "../terrain/formats";
 import { RESORT_BAKE_CONFIGS } from "../terrain/resorts";
-import { courseSeed, resolveCourse, trailIdFromName, trailIdsForResort, utcDateStamp } from "./courses";
+import { createTerrainSource } from "../terrain/terrain-source";
+import {
+  COURSE_GATES,
+  courseSeed,
+  resolveCourse,
+  trailIdFromName,
+  trailIdsForResort,
+  utcDateStamp,
+} from "./courses";
 
 test("trail ids fold diacritics and collapse punctuation", () => {
   assert.equal(trailIdFromName("Kilómetro Lanzado"), "kilometro-lanzado");
@@ -50,11 +63,58 @@ test("every resolved course carries real startZ/finishZ gates", () => {
   }
 });
 
-test("Breckenridge Horseshoe Bowl gates match the baked real-course polyline", () => {
-  const course = resolveCourse("breckenridge", "horseshoe-bowl");
-  assert.ok(course);
-  assert.equal(course.startZ, 290.4);
-  assert.equal(course.finishZ, -197.2);
+test("COURSE_GATES match buildRealCourse polylines for all 18 pilot trails", () => {
+  // Positional binding: regenerate start/finish from the committed terrain
+  // assets (same pipeline as the client) and compare every gate by trail index.
+  const dir = path.join(process.cwd(), "public/game/terrain");
+  const slugs = Object.keys(DROP_IN_GAME_PROFILES) as DropInResortSlug[];
+
+  for (const slug of slugs) {
+    const profile = DROP_IN_GAME_PROFILES[slug];
+    const packed = brotliDecompressSync(readFileSync(path.join(dir, `${slug}.height.u16.br`)));
+    const source = createTerrainSource({
+      profile,
+      mode: "real",
+      assets: {
+        heightfield: packed.buffer.slice(
+          packed.byteOffset,
+          packed.byteOffset + packed.byteLength,
+        ) as ArrayBuffer,
+        meta: JSON.parse(readFileSync(path.join(dir, `${slug}.meta.json`), "utf8")) as TerrainMeta,
+        trails: JSON.parse(readFileSync(path.join(dir, `${slug}.trails.json`), "utf8")) as TrailsFile,
+      },
+    });
+    const runs = source.sampler.realRuns ?? [];
+    const trailIds = trailIdsForResort(slug);
+    assert.equal(runs.length, 6, `${slug}: expected 6 real runs`);
+    assert.equal(trailIds.length, 6, `${slug}: expected 6 trail ids`);
+
+    for (let i = 0; i < 6; i++) {
+      const run = runs[i];
+      const trailId = trailIds[i];
+      const measured = {
+        startZ: Math.round(run.points[0].z * 100) / 100,
+        finishZ: Math.round(run.points.at(-1)!.z * 100) / 100,
+      };
+      const table = COURSE_GATES[slug][trailId];
+      assert.ok(table, `${slug}/${trailId} missing from COURSE_GATES`);
+      assert.equal(
+        table.startZ,
+        measured.startZ,
+        `${slug}/${trailId} startZ: table ${table.startZ} ≠ measured ${measured.startZ}`,
+      );
+      assert.equal(
+        table.finishZ,
+        measured.finishZ,
+        `${slug}/${trailId} finishZ: table ${table.finishZ} ≠ measured ${measured.finishZ}`,
+      );
+
+      const course = resolveCourse(slug, trailId);
+      assert.ok(course);
+      assert.equal(course.startZ, measured.startZ);
+      assert.equal(course.finishZ, measured.finishZ);
+    }
+  }
 });
 
 test("a time_trial seed is fixed for the life of the course version", () => {
