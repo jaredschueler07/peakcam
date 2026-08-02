@@ -2,12 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import * as THREE from "three";
 import { DROP_IN_GAME_PROFILES } from "../config/profiles";
+import { FIXED_HZ } from "../core/clock";
 import { createSimulation } from "../core/simulation";
 import type { TerrainSampler } from "../core/types";
+import type { GhostSample } from "../replay/codec";
 import { InputManager } from "../input/InputManager";
 import { createProceduralWorld } from "../terrain/obstacles";
 import { CameraController } from "./CameraController";
 import { QualityController, seedQualityRung } from "./QualityController";
+import { createGhostPose, GhostRenderer, sampleGhostAt } from "./GhostRenderer";
 import { GameRenderer, type RendererBackend } from "./Renderer";
 import { buildPosterLut, buildSnowDetailNormal } from "./SnowMaterial";
 import { chromaticAberrationOffset } from "./MotionEffects";
@@ -234,3 +237,141 @@ test("mount/unmount ten times disposes every scene resource and context", () => 
     assert.equal(backend.contextsLost, 1);
   }
 });
+
+// ─── Ghost renderer ──────────────────────────────────────────
+
+function ghostSample(tick: number, xCm: number, zCm: number, yaw: number, groundOffsetCm = 0): GhostSample {
+  return { tick, xCm, zCm, groundOffsetCm, yaw, speedCms: 1200, poseFlags: 0 };
+}
+
+test("ghost interpolation lands halfway between two samples at the midpoint tick", () => {
+  const samples = [ghostSample(0, 0, 0, 0, 100), ghostSample(FIXED_HZ, 1000, -2000, 0, 300)];
+  const pose = sampleGhostAt(samples, 0.5, createGhostPose());
+  assert.equal(pose.visible, true);
+  assert.ok(Math.abs(pose.x - 5) < 1e-9, `x ${pose.x}`);
+  assert.ok(Math.abs(pose.z + 10) < 1e-9, `z ${pose.z}`);
+  assert.ok(Math.abs(pose.groundOffset - 2) < 1e-9, `groundOffset ${pose.groundOffset}`);
+});
+
+test("ghost yaw interpolation crosses the wrap seam along the short arc", () => {
+  // 0.1 rad before 2π to 0.1 rad after 0: the short arc is 0.2 rad through the seam.
+  const a = Math.PI * 2 - 0.1;
+  const samples = [ghostSample(0, 0, 0, a), ghostSample(FIXED_HZ, 0, 0, 0.1)];
+  const mid = sampleGhostAt(samples, 0.5, createGhostPose()).yaw;
+  const delta = Math.atan2(Math.sin(mid - a), Math.cos(mid - a));
+  assert.ok(Math.abs(delta - 0.1) < 1e-3, `expected +0.1 rad from ${a}, got ${mid} (delta ${delta})`);
+  // And the same seam taken the other way.
+  const back = [ghostSample(0, 0, 0, 0.1), ghostSample(FIXED_HZ, 0, 0, a)];
+  const midBack = sampleGhostAt(back, 0.5, createGhostPose()).yaw;
+  const deltaBack = Math.atan2(Math.sin(midBack - 0.1), Math.cos(midBack - 0.1));
+  assert.ok(Math.abs(deltaBack + 0.1) < 1e-3, `expected -0.1 rad from 0.1, got ${midBack}`);
+});
+
+test("ghost is hidden outside the recorded sample range and exact at the ends", () => {
+  const samples = [ghostSample(FIXED_HZ, 500, 0, 0), ghostSample(FIXED_HZ * 3, 900, 0, 0)];
+  assert.equal(sampleGhostAt(samples, 0.5, createGhostPose()).visible, false, "before the first sample");
+  assert.equal(sampleGhostAt(samples, 3.5, createGhostPose()).visible, false, "after the last sample");
+  const first = sampleGhostAt(samples, 1, createGhostPose());
+  assert.equal(first.visible, true);
+  assert.ok(Math.abs(first.x - 5) < 1e-9);
+  const last = sampleGhostAt(samples, 3, createGhostPose());
+  assert.equal(last.visible, true);
+  assert.ok(Math.abs(last.x - 9) < 1e-9);
+  assert.equal(sampleGhostAt([], 1, createGhostPose()).visible, false, "empty ghost");
+});
+
+test("ghost interpolation finds the right bracket across many samples without allocating", () => {
+  const samples = Array.from({ length: 64 }, (_, i) => ghostSample(i * 12, i * 100, i * -50, 0));
+  const pose = createGhostPose();
+  for (let i = 0; i < 63; i += 1) {
+    const t = (i * 12 + 6) / FIXED_HZ;
+    sampleGhostAt(samples, t, pose);
+    assert.ok(Math.abs(pose.x - (i + 0.5)) < 1e-9, `sample ${i}: x ${pose.x}`);
+  }
+  // Reusing one `out` object is the whole contract — no new object per call.
+  assert.equal(sampleGhostAt(samples, 0.1, pose), pose);
+});
+
+test("ghost renderer draws a translucent poster-ink rider that never writes depth or shadows", () => {
+  const scene = new THREE.Scene();
+  const ghost = new GhostRenderer(scene);
+  ghost.setGhost({
+    meta: { formatVersion: 1, physicsVersion: 1, courseVersion: 1, sampleHz: 10, flags: 0, seed: 1, originXCm: 0, originYCm: 0, originZCm: 0, keyframeCount: 2 },
+    samples: [ghostSample(0, 0, 0, 0, 200), ghostSample(FIXED_HZ, 1000, 0, 0, 200)],
+  });
+  const meshes: THREE.Mesh[] = [];
+  scene.traverse((object) => { if (object instanceof THREE.Mesh) meshes.push(object); });
+  assert.ok(meshes.length >= 3, `expected a body/head/skis rig, got ${meshes.length} meshes`);
+  for (const mesh of meshes) {
+    const material = mesh.material as THREE.MeshStandardMaterial;
+    assert.equal(mesh.castShadow, false);
+    assert.equal(material.transparent, true);
+    assert.equal(material.opacity, 0.45);
+    assert.equal(material.depthWrite, false);
+    assert.equal(material.color.getHex(), 0x2a1f14);
+  }
+  ghost.update(0.5);
+  const root = scene.children.find((child) => child instanceof THREE.Group) as THREE.Group;
+  assert.equal(root.visible, true);
+  assert.ok(Math.abs(root.position.x - 5) < 1e-9);
+  assert.ok(Math.abs(root.position.y - 2) < 1e-9, "ground offset with no terrain sampler");
+  ghost.update(9);
+  assert.equal(root.visible, false, "hidden past the last sample");
+  ghost.dispose();
+});
+
+test("ghost renderer rides the terrain when a sampler is supplied and releases on setGhost(null)", () => {
+  const scene = new THREE.Scene();
+  const ghost = new GhostRenderer(scene);
+  const sampler: TerrainSampler = {
+    kind: "procedural", profile, seed: 1, noiseOffset: { x: 0, z: 0 },
+    height(x) { return x * 2; },
+    normal(_x, _z, out) { out.x = 0; out.y = 1; out.z = 0; return out; },
+    trailField() { return 0; },
+    nearestTrail(_x, _z, out) { return out; },
+  };
+  ghost.setGhost({
+    meta: { formatVersion: 1, physicsVersion: 1, courseVersion: 1, sampleHz: 10, flags: 0, seed: 1, originXCm: 0, originYCm: 0, originZCm: 0, keyframeCount: 2 },
+    samples: [ghostSample(0, 0, 0, 0, 100), ghostSample(FIXED_HZ, 400, 0, 0, 100)],
+  });
+  ghost.update(0.5, sampler);
+  const root = scene.children.find((child) => child instanceof THREE.Group) as THREE.Group;
+  assert.equal(root.visible, true);
+  assert.ok(Math.abs(root.position.x - 2) < 1e-9);
+  assert.ok(Math.abs(root.position.y - (4 + 1)) < 1e-9, `terrain height + ground offset, got ${root.position.y}`);
+
+  ghost.setGhost(null);
+  assert.equal(root.visible, false, "setGhost(null) hides the rider");
+  ghost.update(0.5, sampler);
+  assert.equal(root.visible, false, "and keeps it hidden");
+  ghost.dispose();
+  assert.equal(scene.children.length, 0, "dispose detaches the rig from the scene");
+});
+
+test("GameRenderer exposes an optional ghost track driven by the sim clock", () => {
+  const world = createProceduralWorld(profile, profile.seed);
+  const state = createSimulation(profile, profile.seed);
+  const canvas = { clientWidth: 800, clientHeight: 600, addEventListener() {}, removeEventListener() {} } as unknown as HTMLCanvasElement;
+  const renderer = new GameRenderer(canvas, profile, world, state, { backend: new FakeBackend(), devicePixelRatio: 1, reducedMotion: true });
+  const before = renderer.resources().materials;
+  renderer.setGhost({
+    meta: { formatVersion: 1, physicsVersion: 1, courseVersion: 1, sampleHz: 10, flags: 0, seed: 1, originXCm: 0, originYCm: 0, originZCm: 0, keyframeCount: 2 },
+    samples: [ghostSample(0, 0, 0, 0, 100), ghostSample(FIXED_HZ * 20, 1000, 0, 0, 100)],
+  });
+  assert.equal(renderer.resources().materials, before, "the ghost rig is built once, up front");
+  state.time = 1;
+  renderer.render(state, world, 1 / 60, 0);
+  const ghostRoot = findGhostRoot(renderer);
+  assert.equal(ghostRoot.visible, true, "the ghost follows state.time");
+  state.time = 40;
+  renderer.render(state, world, 1 / 60, 0);
+  assert.equal(ghostRoot.visible, false, "and hides past the end of the replay");
+  renderer.setGhost(null);
+  renderer.dispose();
+});
+
+function findGhostRoot(renderer: GameRenderer): THREE.Object3D {
+  const root = (renderer as unknown as { ghost: { root: THREE.Object3D } }).ghost.root;
+  assert.ok(root, "GameRenderer owns a GhostRenderer");
+  return root;
+}
