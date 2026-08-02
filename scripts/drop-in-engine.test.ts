@@ -34,9 +34,14 @@ test("every config profile is mirrored field-for-field in the v1 engine", () => 
     // `farRetention` tunes the v2 far field's long-range fog envelope (`fogCurve.ts`). The v1
     // engine has no far field — its horizon is two procedural ridge bands — so the field is
     // meaningless there and is stripped rather than mirrored into a bundler-free static asset.
+    //
+    // Stripped *conditionally*, per weather entry: the moment the v1 engine grows the field, this
+    // stops hiding it and goes back to comparing it, so the exemption cannot outlive its reason.
+    const engineWeather = (engineProfiles[slug] as { weather?: Array<Record<string, unknown>> })?.weather ?? [];
     const configProfile = {
       ...rest,
-      weather: rest.weather.map((w) => {
+      weather: rest.weather.map((w, index) => {
+        if (engineWeather[index] && "farRetention" in engineWeather[index]) return w;
         const { farRetention, ...mirrored } = w;
         void farRetention;
         return mirrored;

@@ -23,7 +23,12 @@ export const GRID_HALF = 2;
 export const Z_TILES_BEHIND = 1;
 
 /**
- * The furthest a near-field pixel can ever be from the player, in metres.
+ * The furthest a **streamed terrain tile** pixel can be from the player, in metres.
+ *
+ * Scope matters here: this bounds the tile grid and nothing else. Lift towers, the lift cable and
+ * trail markers (`WorldRenderer`) are drawn with no proximity limit at all and routinely sit
+ * kilometres away, so "within `NEAR_FIELD_MAX_REACH_M`" is not the same as "near the player".
+ * `fogCurve.ts` relies on the narrow claim only.
  *
  * The grid covers `dx ∈ [-GRID_HALF, GRID_HALF]` and `dz ∈ [-Z_TILES_BEHIND, GRID_SIZE-1-Z_TILES_BEHIND]`
  * in tile indices, and the player sits somewhere inside their own tile — so the worst case is the
@@ -33,7 +38,9 @@ export const Z_TILES_BEHIND = 1;
  *   maxZ = (GRID_SIZE - Z_TILES_BEHIND) · TILE_SIZE     = 800 m
  *   reach = hypot(maxX, maxZ)                           = 1000 m
  *
- * Anything beyond this is far field or sky. Nothing else can be.
+ * Anything beyond this is far field, sky, or one of the unfiltered world objects above — but it is
+ * never a terrain tile. Note the measurement is from the *player*; the fog shaders measure from the
+ * *camera*, which sits up to `MAX_CAMERA_PULLBACK_M` further back.
  */
 export const NEAR_FIELD_MAX_REACH_M = Math.hypot(
   (GRID_HALF + 1) * TILE_SIZE,

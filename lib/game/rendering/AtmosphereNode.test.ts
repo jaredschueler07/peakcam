@@ -54,24 +54,54 @@ test("atmosphere uniform defaults match what SceneFactory seeded for the GLSL pa
 
 test("the fog expression reproduces heightFogAmount exactly", () => {
   const uniforms = createAtmosphereNodeUniforms();
-  for (const density of [0.004, 0.012, 0.03]) {
+  let exercised = 0;
+  for (const density of [0.00135, 0.004, 0.012, 0.03]) {
     for (const heightFalloff of [0, 0.025, 0.08]) {
       for (const referenceHeight of [-40, 0, 913.25]) {
-        for (const worldY of [-120, 0, 12.5, 913.25, 2400]) {
-          for (const distance of [0, 1, 37.5, 480, 3000]) {
-            uniforms.density.value = density;
-            uniforms.heightFalloff.value = heightFalloff;
-            uniforms.referenceHeight.value = referenceHeight;
-            assert.equal(
-              heightFogReference(uniforms, worldY, distance),
-              heightFogAmount(density, distance, worldY, referenceHeight, heightFalloff),
-              `d=${density} f=${heightFalloff} ref=${referenceHeight} y=${worldY} dist=${distance}`,
-            );
+        for (const worldY of [-120, 0, 12.5, 913.25, 2400, 6854]) {
+          // Distances must straddle FAR_START_M/FAR_FULL_M, and retention must actually vary:
+          // with retention pinned at 0 the envelope is inert by construction, so `NODE_OPS.add`
+          // and `NODE_OPS.smoothstep` — which exist only for the envelope — went unexercised.
+          for (const distance of [0, 1, 37.5, 480, 3000, 12_000, 24_000, 30_000]) {
+            for (const farRetention of [0, 0.2, 0.5, 1]) {
+              uniforms.density.value = density;
+              uniforms.heightFalloff.value = heightFalloff;
+              uniforms.referenceHeight.value = referenceHeight;
+              uniforms.farRetention.value = farRetention;
+              assert.equal(
+                heightFogReference(uniforms, worldY, distance),
+                heightFogAmount(density, distance, worldY, referenceHeight, heightFalloff, farRetention),
+                `d=${density} f=${heightFalloff} ref=${referenceHeight} y=${worldY} dist=${distance} k=${farRetention}`,
+              );
+              exercised += 1;
+            }
           }
         }
       }
     }
   }
+  assert.ok(exercised > 2000, `only ${exercised} samples`);
+});
+
+test("the TSL uniform set carries the envelope, and the reference reads it live", () => {
+  // The reference is the only numeric window onto the node path; if it ignored `farRetention` the
+  // sweep above would pass while the WebGPU shader — the default backend — did something else.
+  const uniforms = createAtmosphereNodeUniforms();
+  assert.equal(uniforms.farRetention.value, 0, "defaults to the pre-envelope behaviour");
+  const saturated = heightFogReference(uniforms, 0, 24_000);
+  uniforms.farRetention.value = 0.5;
+  const lifted = heightFogReference(uniforms, 0, 24_000);
+  assert.equal(saturated, 1);
+  assert.ok(Math.abs(lifted - 0.5) < 1e-6, `expected ~0.5 with retention on, got ${lifted}`);
+  assert.equal(createAtmosphereNodeUniforms({ farRetention: 0.2 }).farRetention.value, 0.2);
+});
+
+test("the TSL node graph really builds with the envelope in it", () => {
+  // A numeric reference cannot catch a NODE_OPS entry that throws or is missing — only building
+  // the actual graph does. `add` and `smoothstep` are reached solely through the envelope.
+  const uniforms = createAtmosphereNodeUniforms({ farRetention: 0.5 });
+  const node = createAtmosphereFog(uniforms);
+  assert.ok(node, "createAtmosphereFog returned nothing");
 });
 
 test("the fog reference reads live uniform values, so it stays player-relative", () => {

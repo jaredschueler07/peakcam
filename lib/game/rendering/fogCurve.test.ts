@@ -12,6 +12,7 @@ import {
   heightFogGlsl,
 } from "./fogCurve";
 import { NEAR_FIELD_MAX_REACH_M, TILE_SIZE } from "./nearFieldReach";
+import { MAX_CAMERA_PULLBACK_M } from "./camera-presets";
 
 /** The configured densities, so the sweeps exercise the real operating range. */
 const DENSITIES = [0.00135, 0.0017, 0.0021, 0.0046, 0.009];
@@ -69,13 +70,48 @@ test("every GLSL input name the emitter uses is one the shader actually declares
   for (const name of Object.values(GLSL_FOG_INPUTS)) {
     assert.ok(source.includes(name), `the emitted GLSL never references ${name}`);
   }
-  const declared = new Set(["uFogDensity", "uFogHeightFalloff", "uFogReferenceHeight",
-    "uFogFarRetention", "atmosphereDistance", "vAtmosphereWorldPosition"]);
+  // Parsed from the shader the material actually emits, not hand-transcribed: a renamed uniform
+  // whose declaration was forgotten would otherwise pass here and fail at GLSL compile time.
+  const declared = declaredIdentifiers(compiledFragmentShader());
   for (const identifier of source.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? []) {
-    if (identifier === "exp" || identifier === "max" || identifier === "smoothstep" || identifier === "y") continue;
+    if (GLSL_BUILTINS.has(identifier)) continue;
     assert.ok(declared.has(identifier), `the emitted GLSL references undeclared '${identifier}'`);
   }
+  // The parser found something, so an empty set cannot make this vacuous.
+  assert.ok(declared.size > 5, `only parsed ${declared.size} declarations out of the shader`);
 });
+
+const GLSL_BUILTINS = new Set(["exp", "max", "smoothstep", "y", "x", "z", "rgb"]);
+
+/** Runs `addHeightFog`'s injection and returns the fragment shader it produced. */
+function compiledFragmentShader(retention = 0.5): string {
+  const uniforms: AtmosphereUniforms = {
+    density: { value: 0.00135 }, heightFalloff: { value: 0.025 }, referenceHeight: { value: 0 },
+    farRetention: { value: retention }, blue: { value: new THREE.Color() },
+    warm: { value: new THREE.Color() }, sunDirection: { value: new THREE.Vector3(0, 1, 0) },
+  };
+  const material = new THREE.MeshStandardMaterial();
+  addHeightFog(material, uniforms);
+  const shader = {
+    uniforms: {},
+    vertexShader: "#include <common>\n#include <worldpos_vertex>",
+    fragmentShader: "#include <common>\n#include <fog_fragment>",
+  };
+  material.onBeforeCompile(shader as unknown as THREE.WebGLProgramParametersWithUniforms, {} as THREE.WebGLRenderer);
+  return shader.fragmentShader;
+}
+
+/** Every name the shader declares: `uniform`/`varying` lists and local `float x=` definitions. */
+function declaredIdentifiers(source: string): Set<string> {
+  const declared = new Set<string>();
+  for (const [, names] of source.matchAll(/\b(?:uniform|varying)\s+\w+\s+([^;]+);/g)) {
+    for (const name of names.split(",")) declared.add(name.trim());
+  }
+  for (const [, name] of source.matchAll(/\b(?:float|vec2|vec3|vec4)\s+(\w+)\s*=/g)) {
+    declared.add(name);
+  }
+  return declared;
+}
 
 test("the generated expression is what actually reaches the compiled shader", () => {
   // Generating it is only half the guarantee; it has to be the string the material injects.
@@ -102,14 +138,19 @@ test("the long-range envelope is exactly inert everywhere the near field can dra
   // Derived, not asserted against a literal: if the tile grid grows, this fails rather than
   // silently opening a gap between a fogged near field and a less-fogged far field.
   assert.equal(NEAR_FIELD_MAX_REACH_M, 1000);
+  // The reach is measured from the PLAYER; the fog shaders measure from the CAMERA, which chases
+  // from behind. So the binding distance is the sum, and both halves are derived — a camera preset
+  // with a bigger pull-back must fail here rather than quietly open the seam.
+  const worstCase = NEAR_FIELD_MAX_REACH_M + MAX_CAMERA_PULLBACK_M;
+  assert.equal(MAX_CAMERA_PULLBACK_M, 31, "cinematic is backBase 20 + backSpeedGain 11");
   assert.ok(
-    FAR_START_M > NEAR_FIELD_MAX_REACH_M,
-    `the envelope starts at ${FAR_START_M} m, inside the near field's ${NEAR_FIELD_MAX_REACH_M} m reach`,
+    FAR_START_M > worstCase,
+    `the envelope starts at ${FAR_START_M} m, inside the ${worstCase} m a tile pixel can be from the camera`,
   );
 
   // Below the reach, retention must make no difference at all — bit-identical, not merely close.
   for (const density of DENSITIES) {
-    for (let d = 1; d <= NEAR_FIELD_MAX_REACH_M; d += TILE_SIZE / 8) {
+    for (let d = 1; d <= NEAR_FIELD_MAX_REACH_M + MAX_CAMERA_PULLBACK_M; d += TILE_SIZE / 8) {
       for (const worldY of ALTITUDES) {
         const base = heightFogAmount(density, d, worldY, 0, 0.025, 0);
         for (const farRetention of RETENTIONS) {

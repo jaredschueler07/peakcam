@@ -41,10 +41,20 @@
  * reproduced. `farRetention = 0.5` lands the long-range factor at 0.5, i.e. ~V = 140 km.
  *
  * The envelope is **exactly 1 below {@link FAR_START_M}**, which is placed past
- * `NEAR_FIELD_MAX_REACH_M` — the furthest a near-field pixel can be from the player. So every pixel
- * the near field can draw is fogged by the unmodified curve, the far field is fogged identically
- * wherever the two overlap, and divergence only begins where the near field has stopped existing.
- * That is what keeps the seam invisible, and it is structural rather than tuned.
+ * `NEAR_FIELD_MAX_REACH_M + MAX_CAMERA_PULLBACK_M` — the furthest a *streamed terrain tile* pixel
+ * can be from the camera. So every pixel the tile grid draws is fogged by the unmodified curve, the
+ * far field is fogged identically wherever the two overlap, and divergence begins only where the
+ * tile grid has stopped existing. That is what keeps the terrain seam invisible, and it is
+ * structural rather than tuned.
+ *
+ * **This is a claim about the tile grid only, not about "everything near the player".** Other world
+ * geometry is drawn without any proximity limit and *is* affected on purpose: `WorldRenderer` spreads
+ * nine lift towers and the cable along the whole of `selectMainLift`'s pick — deliberately the
+ * longest eligible lift — and places up to 460 trail markers along every run. A tower 2.5 km out at
+ * Portillo moves from fog 0.99999 to 0.910, and at the far end of a 4 km gondola from 1.0 to 0.688.
+ * That is the intended effect: those towers were previously erased into the fog at exactly the
+ * distances where the new far field now shows real terrain behind them, and leaving them erased
+ * would have put a visible band of "nothing" between the near field and the horizon.
  *
  * `farRetention = 0` restores the previous behaviour exactly, which is what the storm weather
  * presets use — a whiteout *should* swallow the horizon.
