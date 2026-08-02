@@ -113,6 +113,8 @@ export interface SimulationState {
   time: number;
   startY: number;
   carve: number;
+  edgeAngle: number;
+  landingTimer: number;
   lean: number;
   crouch: number;
   jumpCharge: number;

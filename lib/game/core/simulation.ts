@@ -1,5 +1,6 @@
 import type { ResortGameProfile } from "../config/schema";
 import { integrateSkier, preparePhysicsStep } from "../physics/integrator";
+import { integrateSkierV2 } from "../physics/integrator-v2";
 import { createSkierState } from "../physics/skier";
 import { createProceduralTerrain } from "../terrain/heightfield";
 import { cycleTrail, resetSimulation, resetSimulationOnTerrain } from "./run-lifecycle";
@@ -30,7 +31,7 @@ export function stepSimulation(
   }
   state.time += dt;
   tickCombo(state, dt);
-  integrateSkier(state, input, dt, world);
+  (world.config.physicsModel === "v2" ? integrateSkierV2 : integrateSkier)(state, input, dt, world);
   return state.events;
 }
 
