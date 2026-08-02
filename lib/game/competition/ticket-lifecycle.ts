@@ -84,20 +84,6 @@ export function needsRemint(state: TicketState, nowMs: number): boolean {
 }
 
 /**
- * The ticket that may be attached to the run **currently being skied**, or
- * `null`.
- *
- * Stricter than {@link usableTicket}: the ticket's seed, snow surface, and
- * physics model must equal the running world's config. A restart resets the simulation
- * but does not rebuild the world, so a ticket minted afterwards can describe a
- * different course — the Daily Line seed rotates at midnight UTC, and a session
- * spanning that boundary would otherwise submit a run against a course it never
- * skied (`seed_mismatch`, and a leaderboard entry that is simply wrong).
- *
- * Fails closed: an unknown world seed yields no ticket. Not knowing which world
- * is running is exactly when guessing is most expensive.
- */
-/**
  * Does this ticket describe the same physics the run will use?
  *
  * Both axes matter and neither is redundant. `surface` picks the friction and
@@ -136,6 +122,20 @@ export function ticketForConfig(
   return ticket && ticketMatchesConfig(ticket, config) ? ticket : null;
 }
 
+/**
+ * The ticket that may be attached to the run **currently being skied**, or
+ * `null`.
+ *
+ * Stricter than {@link usableTicket}: the ticket's seed, snow surface, and
+ * physics model must equal the running world's config. A restart resets the simulation
+ * but does not rebuild the world, so a ticket minted afterwards can describe a
+ * different course — the Daily Line seed rotates at midnight UTC, and a session
+ * spanning that boundary would otherwise submit a run against a course it never
+ * skied (`seed_mismatch`, and a leaderboard entry that is simply wrong).
+ *
+ * Fails closed: an unknown world seed yields no ticket. Not knowing which world
+ * is running is exactly when guessing is most expensive.
+ */
 export function ticketForWorld(
   state: TicketState,
   runSeed: number | null | undefined,
