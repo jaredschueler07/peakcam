@@ -31,6 +31,8 @@ import { physicsModelForSessionRequest, resolveRuntimePhysicsModel } from "@/lib
 // Shared with the sessions route, which must derive the same ids. Imported from
 // config/ rather than server/ so the browser bundle skips profiles + bake configs.
 import { trailIdFromName } from "@/lib/game/config/course-ids";
+import { cameraPresetName } from "@/lib/game/rendering/debugFlags";
+import type { CameraPresetName } from "@/lib/game/rendering/camera-presets";
 import DropInErrorBoundary from "./DropInErrorBoundary";
 import DropInHUD from "./hud/DropInHUD";
 import ModeSelect, { type DropInModeChoice } from "./hud/ModeSelect";
@@ -105,6 +107,10 @@ export default function DropInGame({ profile, conditions }: {
   // Which renderer actually initialised. The e2e matrix asserts against this rather than guessing
   // from navigator.gpu, because a browser can advertise WebGPU and still fall back.
   const [gfxBackend, setGfxBackend] = useState<"webgpu" | "webgl" | "pending">("pending");
+  // Which chase-camera framing `?cam=` selected, so a comparison shoot can label its frames.
+  // Read after mount, not during render: the server has no location and would hydrate-mismatch.
+  const [camPreset, setCamPreset] = useState<CameraPresetName>("classic");
+  useEffect(() => setCamPreset(cameraPresetName()), []);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const bridge = useMemo(() => new UiBridge(profile), [profile]);
 
@@ -484,6 +490,7 @@ export default function DropInGame({ profile, conditions }: {
         data-drop-in-session={sessionStateAttribute}
         data-drop-in-ticket={ticketState.status}
         data-drop-in-gfx={gfxBackend}
+        data-drop-in-cam={camPreset}
         data-drop-in-physics={runtime?.world.config.physicsModel ?? physicsModel}
       >
         <Link href={`/resorts/${profile.slug}`} className="absolute left-3 top-3 z-40 inline-flex items-center gap-2 rounded-full border-[1.5px] border-ink bg-cream-50 px-3.5 py-2 text-xs font-bold uppercase text-ink shadow-stamp-sm">

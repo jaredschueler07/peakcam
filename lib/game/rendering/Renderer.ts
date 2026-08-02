@@ -19,7 +19,8 @@ import type { PostProcessing } from "./PostProcessing";
 import type { NodePostProcessing } from "./NodePostProcessing";
 import type { NodeFactories } from "./nodeFactories";
 import { visualWeatherPreset } from "./VisualPresets";
-import { postBypassEnabled, snowDebugMode } from "./debugFlags";
+import { cameraPresetName, postBypassEnabled, snowDebugMode } from "./debugFlags";
+import { CAMERA_PRESETS, type CameraPreset } from "./camera-presets";
 
 type PostChain = Pick<PostProcessing | NodePostProcessing, "setSize" | "setQuality" | "render" | "dispose">;
 
@@ -73,6 +74,8 @@ interface RendererOptions {
   nodeFactories?: NodeFactories | null;
   /** Test seam: shortens the pre-warm budget so a hung compile can be exercised quickly. */
   prewarmTimeoutMs?: number;
+  /** Chase-camera framing. Defaults to whatever `?cam=` selects, which is `classic` when absent. */
+  cameraPreset?: CameraPreset;
 }
 
 /** The legacy renderer path owns PostProcessing; injected backends suppress it. */
@@ -201,7 +204,11 @@ export class GameRenderer {
       this.built.scene, world.seed, world.terrain, this.reducedMotion,
       world.config.sprayDepthMultiplier, nodes,
     );
-    this.cameraController = new CameraController(this.built.camera, state, this.reducedMotion);
+    // Reading `?cam=` here, not inside CameraController, keeps that class pure and injectable.
+    this.cameraController = new CameraController(
+      this.built.camera, state, this.reducedMotion,
+      options.cameraPreset ?? CAMERA_PRESETS[cameraPresetName()],
+    );
     this.weather = new WeatherRenderer(profile, this.built, this.renderer);
     this.built.atmosphereUniforms.referenceHeight.value = state.pos.y;
     this.csm = nodes
