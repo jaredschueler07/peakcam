@@ -4,6 +4,7 @@ import type { ResortWeather } from "../config/schema";
 import type { VisualWeatherPreset } from "./VisualPresets";
 import { SUN_DIRECTION } from "./SceneFactory";
 import type { QualityRung } from "./QualityController";
+import { CSM_DEBUG, csmDebugMode } from "./debugFlags";
 
 /** The surface `Renderer` drives, shared by the WebGL `CsmShadows` and this node-pipeline twin. */
 export interface ShadowSystem {
@@ -48,7 +49,9 @@ export class CsmShadowsNode implements ShadowSystem {
     this.cascades = cascadeCountFor(mobile, 4);
 
     this.light = new THREE.DirectionalLight(visual.sunCol, weather.sun);
-    this.light.castShadow = true;
+    // `?csmdbg=1` keeps the light but drops the shadow node entirely, partitioning "the light is
+    // wrong" from "the cascades are wrong" in a single frame.
+    this.light.castShadow = csmDebugMode() !== CSM_DEBUG.NO_SHADOW;
     this.light.shadow.mapSize.set(mobile ? 1024 : 2048, mobile ? 1024 : 2048);
     this.light.shadow.bias = SHADOW_BIAS;
     this.light.shadow.camera.far = LIGHT_FAR;
@@ -101,12 +104,20 @@ export class CsmShadowsNode implements ShadowSystem {
 
   private buildShadowNode(): CSMShadowNode {
     const node = new CSMShadowNode(this.light, {
-      cascades: this.cascades,
+      cascades: csmDebugMode() === CSM_DEBUG.ONE_CASCADE ? 1 : this.cascades,
       maxFar: MAX_FAR,
       mode: "practical",
       lightMargin: LIGHT_MARGIN,
     });
-    node.fade = !this.mobile;
+    // Fade stays OFF, unlike the WebGL path. The two implementations accumulate differently:
+    // `CSMShader`'s fade branch *blends* (`mix(prevLight, reflectedLight, ratio)`), which is
+    // bounded, while `CSMShadowNode._setupFade` *subtracts* into one shared value
+    // (`ret.subAssign(shadowNode.oneMinus().mul(ratio))`). Cascade ranges overlap by their margins,
+    // so two shadowed cascades each subtract up to 1.0 from a value that started at 1.0 and drive
+    // it negative — black, at a hard cascade-shaped distance boundary. `_setupStandard` assigns
+    // from a single cascade and starts fully lit, so it cannot go below zero. The cost is a harder
+    // seam between cascades instead of a cross-fade.
+    node.fade = false;
     // Deliberately not setting node.camera: `setup()` only calls `_init()` while it is null, and
     // `_init()` is what creates the per-cascade shadow maps.
     this.light.shadow.shadowNode = node;
@@ -114,12 +125,13 @@ export class CsmShadowsNode implements ShadowSystem {
   }
 
   /**
-   * WebGL `CSM` parents one real `DirectionalLight` per cascade, each at `weather.sun`, so the
-   * scene was lit by `cascades × sun`. `CSMShadowNode`'s cascade placeholders are bare `Object3D`s
-   * that emit nothing. Directional light is linear, so a single light at the summed intensity
-   * reproduces the old illumination exactly.
+   * One light's worth, not `cascades ×`. The WebGL `CSM` does parent a real `DirectionalLight` per
+   * cascade, but its shader chunk gates `RE_Direct` inside the cascade's depth test
+   * (`CSMShader.js:190`), so **exactly one** of them lights any given fragment — three's own comment
+   * puts it plainly: "all CSM lights are in fact one light only". Summing them tripled the key
+   * light, which blew out the near field on WebGPU and is the residual brightness on Portillo.
    */
   private applyLightBudget(): void {
-    this.light.intensity = this.sunIntensity * this.cascades;
+    this.light.intensity = this.sunIntensity;
   }
 }

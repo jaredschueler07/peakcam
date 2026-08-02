@@ -48,3 +48,17 @@ export function treeDebugEnabled(from = search()): boolean {
 export function postBypassEnabled(from = search()): boolean {
   return new URLSearchParams(from).has("nopost");
 }
+
+/** Partitions a cascaded-shadow defect: is it the light, or the cascades? */
+export const CSM_DEBUG = {
+  NONE: 0,
+  /** 1 — keep the directional light, drop its shadow node (`castShadow = false`). */
+  NO_SHADOW: 1,
+  /** 2 — keep shadows but force a single cascade. */
+  ONE_CASCADE: 2,
+} as const;
+
+/** `?csmdbg=<n>` — see `CSM_DEBUG`. */
+export function csmDebugMode(from = search()): number {
+  return numericFlag("csmdbg", from);
+}

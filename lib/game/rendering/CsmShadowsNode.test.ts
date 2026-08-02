@@ -74,7 +74,6 @@ test("the shadow node carries the CSM configuration and stays uninitialised unti
   assert.equal(node.cascades, 3);
   assert.equal(node.maxFar, 250);
   assert.equal(node.mode, "practical");
-  assert.equal(node.fade, true, "cascade fade on desktop");
   assert.equal(node.light, shadows.light);
 
   // CSMShadowNode discovers the camera from the NodeBuilder on first setup(); presetting
@@ -84,7 +83,6 @@ test("the shadow node carries the CSM configuration and stays uninitialised unti
   const mobile = build(true);
   const mobileNode = shadowNodeOf(mobile.shadows);
   assert.equal(mobileNode.cascades, 1);
-  assert.equal(mobileNode.fade, false, "no cascade fade on mobile");
   assert.equal(mobile.shadows.light.shadow.mapSize.width, 1024);
 });
 
@@ -97,7 +95,6 @@ test("a quality change rebuilds the shadow node, because cascade count is constr
   const lowered = shadowNodeOf(shadows);
   assert.notEqual(lowered, initial, "dropping below rung 3 re-creates the node");
   assert.equal(lowered.cascades, 1);
-  assert.equal(lowered.fade, true, "fade still follows the platform, not the rung");
 
   shadows.setQuality(1);
   assert.equal(shadowNodeOf(shadows), lowered, "no rebuild when the cascade count does not change");
@@ -117,23 +114,33 @@ test("mobile never rebuilds, since every rung maps to a single cascade", () => {
   }
 });
 
-test("light intensity preserves the total illumination the WebGL cascades used to emit", () => {
+test("the light emits one sun's worth at every cascade count", () => {
+  // WebGL CSM parents a DirectionalLight per cascade, but CSMShader gates RE_Direct inside each
+  // cascade's depth test, so exactly one lights any fragment ("all CSM lights are in fact one
+  // light only", CSMShader.js:199). Summing them tripled the key light and blew out the near field.
   const { shadows } = build(false);
-  // three.js CSM (WebGL) parents one real DirectionalLight per cascade, each at weather.sun.
-  // CSMShadowNode's cascade placeholders emit nothing, so the single light carries the sum.
-  assert.equal(shadows.light.intensity, weather.sun * 3);
+  assert.equal(shadows.light.intensity, weather.sun);
   assert.equal(shadows.light.color.getHex(), visual.sunCol);
 
   shadows.setQuality(0);
-  assert.equal(shadows.light.intensity, weather.sun * 1, "one cascade means one light's worth");
+  assert.equal(shadows.light.intensity, weather.sun, "one cascade, same exposure");
 
   const stormy = profile.weather[1];
   shadows.setWeather(stormy, visualWeatherPreset(1));
-  assert.equal(shadows.light.intensity, stormy.sun * 1);
+  assert.equal(shadows.light.intensity, stormy.sun);
   assert.equal(shadows.light.color.getHex(), visualWeatherPreset(1).sunCol);
 
   shadows.setQuality(4);
-  assert.equal(shadows.light.intensity, stormy.sun * 3, "a rebuild re-applies the current weather");
+  assert.equal(shadows.light.intensity, stormy.sun, "and a cascade rebuild does not scale it");
+});
+
+test("cascade fade stays off, because the node path subtracts where WebGL blends", () => {
+  // CSMShadowNode._setupFade does `ret.subAssign(shadow.oneMinus() * ratio)` into one shared value.
+  // Cascade ranges overlap by their margins, so two shadowed cascades can drive it below zero —
+  // negative light, clamped to black at a cascade-shaped distance boundary.
+  for (const mobile of [false, true]) {
+    assert.equal(shadowNodeOf(build(mobile).shadows).fade, false, `mobile=${mobile}`);
+  }
 });
 
 test("setupMaterial and update are inert, and dispose detaches the light", () => {

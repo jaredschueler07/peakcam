@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import * as THREE from "three";
 import { MeshStandardNodeMaterial } from "three/webgpu";
-import { postBypassEnabled, SNOW_DEBUG, snowDebugMode, treeDebugEnabled } from "./debugFlags";
+import { CSM_DEBUG, csmDebugMode, postBypassEnabled, SNOW_DEBUG, snowDebugMode, treeDebugEnabled } from "./debugFlags";
+import { CsmShadowsNode } from "./CsmShadowsNode";
+import { visualWeatherPreset } from "./VisualPresets";
 import { createSnowNodeMaterial, createSnowNodeUniforms } from "./SnowNodeMaterial";
 import { buildSnowDetailNormal } from "./SnowMaterial";
 import { createScene } from "./SceneFactory";
@@ -66,3 +68,35 @@ test("snowdbg=5 leaves the scene without a fog node", () => {
   assert.ok((built.scene as THREE.Scene & { fogNode?: unknown }).fogNode, "and installs it otherwise");
 });
 
+
+test("csmdbg partitions the light from the cascades", () => {
+  assert.equal(csmDebugMode(""), CSM_DEBUG.NONE);
+  assert.equal(csmDebugMode("?csmdbg=1"), CSM_DEBUG.NO_SHADOW);
+  assert.equal(csmDebugMode("?csmdbg=2"), CSM_DEBUG.ONE_CASCADE);
+
+  const withFlag = (search: string, assertion: (shadows: CsmShadowsNode) => void) => {
+    const original = globalThis.location;
+    Object.defineProperty(globalThis, "location", { value: { search }, configurable: true });
+    try {
+      assertion(new CsmShadowsNode(
+        new THREE.PerspectiveCamera(), new THREE.Scene(), false,
+        DROP_IN_GAME_PROFILES["ski-portillo"].weather[0], visualWeatherPreset(0),
+      ));
+    } finally {
+      if (original === undefined) delete (globalThis as { location?: unknown }).location;
+      else Object.defineProperty(globalThis, "location", { value: original, configurable: true });
+    }
+  };
+
+  withFlag("?csmdbg=1", (shadows) => {
+    assert.equal(shadows.light.castShadow, false, "the light stays, the shadow node does not");
+    assert.equal(shadows.light.intensity > 0, true);
+  });
+  withFlag("?csmdbg=2", (shadows) => {
+    assert.equal(shadows.light.castShadow, true);
+    assert.equal((shadows.light.shadow.shadowNode as unknown as { cascades: number }).cascades, 1);
+  });
+  withFlag("", (shadows) => {
+    assert.equal((shadows.light.shadow.shadowNode as unknown as { cascades: number }).cascades, 3);
+  });
+});
