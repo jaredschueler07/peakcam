@@ -19,6 +19,7 @@ import {
   NO_TICKET,
   needsRemint,
   resolveRunSeed,
+  ticketForWorld,
   ticketReducer,
   usableTicket,
   type TicketState,
@@ -26,7 +27,7 @@ import {
 import type { CompetitiveRunMode } from "@/lib/game/config/modes";
 // Shared with the sessions route, which must derive the same ids. Imported from
 // config/ rather than server/ so the browser bundle skips profiles + bake configs.
-import { trailIdFromName, utcDateStamp } from "@/lib/game/config/course-ids";
+import { trailIdFromName } from "@/lib/game/config/course-ids";
 import DropInErrorBoundary from "./DropInErrorBoundary";
 import DropInHUD from "./hud/DropInHUD";
 import ModeSelect, { type DropInModeChoice } from "./hud/ModeSelect";
@@ -100,6 +101,7 @@ export default function DropInGame({ profile, conditions }: {
   const modeRef = useRef<DropInModeChoice>("free_ski");
   const ticketStateRef = useRef<TicketState>(NO_TICKET);
   const runTicketRef = useRef<RunSessionTicket | null>(null);
+  const cancelPendingTrackRef = useRef<(() => void) | null>(null);
 
   const applyTicketState = (next: TicketState) => {
     ticketStateRef.current = next;
@@ -143,17 +145,25 @@ export default function DropInGame({ profile, conditions }: {
         return;
       }
 
-      const activeSeed = runtimeRef.current?.runSeed;
-      if (duringPlay && activeSeed !== undefined && result.seed !== activeSeed) {
-        applyTicketState({ status: "offline" });
-        freezeRunTicket(null);
-        setSessionNotice(OFFLINE_NOTICE);
+      const ready: TicketState = { status: "ready", ticket: result };
+      if (duringPlay) {
+        // Fails closed on an unknown world seed; refuses a ticket minted for a
+        // different course than the one being skied.
+        const forThisRun = ticketForWorld(ready, runtimeRef.current?.runSeed, Date.now());
+        if (!forThisRun) {
+          applyTicketState({ status: "offline" });
+          freezeRunTicket(null);
+          setSessionNotice(OFFLINE_NOTICE);
+          return;
+        }
+        applyTicketState(ready);
+        setSessionNotice(null);
+        freezeRunTicket(forThisRun);
         return;
       }
 
-      applyTicketState({ status: "ready", ticket: result });
+      applyTicketState(ready);
       setSessionNotice(null);
-      if (duringPlay) freezeRunTicket(result);
     });
   };
 
@@ -175,16 +185,23 @@ export default function DropInGame({ profile, conditions }: {
 
   /**
    * `local` Free Ski · `pending` ticket in flight · `ticketed` submittable ·
-   * `offline` competitive but unsubmittable. An in-flight request must not read
-   * as `offline` — nothing has failed yet.
+   * `offline` competitive but unsubmittable.
+   *
+   * Phase matters. Before the descent starts, holding a ready ticket is what
+   * makes the run submittable. Once it has started, only the ticket actually
+   * frozen onto the run counts — a run that began offline stays offline even if
+   * a later ticket lands, and reporting otherwise would advertise a run that
+   * can never be submitted.
    */
   const sessionStateAttribute = mode === "free_ski"
     ? "local"
-    : ticketState.status === "requesting"
-      ? "pending"
-      : session.ticket || ticketState.status === "ready"
+    : phase === "poster"
+      ? ticketState.status === "requesting"
+        ? "pending"
+        : ticketState.status === "ready" ? "ticketed" : "offline"
+      : session.ticket
         ? "ticketed"
-        : "offline";
+        : ticketState.status === "requesting" ? "pending" : "offline";
 
   const dailyCourseName = useMemo(() => {
     const held = ticketState.status === "ready" ? ticketState.ticket : null;
@@ -194,11 +211,14 @@ export default function DropInGame({ profile, conditions }: {
   }, [profile, ticketState, trailId]);
 
   const selectMode = (choice: DropInModeChoice) => {
-    // Re-picking the mode you already hold a live ticket for would throw that
-    // ticket away and spend another of the 20-per-5-minutes rate limit.
-    const unchanged = choice === modeRef.current
-      && (choice === "free_ski" || usableTicket(ticketStateRef.current, Date.now()) !== null);
-    if (unchanged) return;
+    // Re-picking the mode you already have would throw away a live ticket, or
+    // abort and re-fire a request that is already on its way — either way
+    // spending another of the 20-per-5-minutes session limit for nothing.
+    if (choice === modeRef.current) {
+      const settled = choice === "free_ski"
+        || usableTicket(ticketStateRef.current, Date.now()) !== null;
+      if (settled || ticketStateRef.current.status === "requesting") return;
+    }
 
     sessionAbortRef.current?.abort();
     sessionAbortRef.current = null;
@@ -206,7 +226,8 @@ export default function DropInGame({ profile, conditions }: {
     modeRef.current = choice;
     setSessionNotice(null);
     // Post-init only: a capture made before posthog.init() is silently dropped.
-    whenPostHogReady(() =>
+    cancelPendingTrackRef.current?.();
+    cancelPendingTrackRef.current = whenPostHogReady(() =>
       trackDropIn({
         name: "drop_in_mode_selected",
         properties: { resort_slug: profile.slug, mode: choice },
@@ -231,6 +252,8 @@ export default function DropInGame({ profile, conditions }: {
   useEffect(() => () => {
     sessionAbortRef.current?.abort();
     sessionAbortRef.current = null;
+    cancelPendingTrackRef.current?.();
+    cancelPendingTrackRef.current = null;
     teardownRef.current?.abort();
     teardownRef.current = null;
     runtimeRef.current?.dispose();
@@ -324,11 +347,14 @@ export default function DropInGame({ profile, conditions }: {
       // Only a spent or expired ticket is re-minted. A run that was never
       // submitted keeps its ticket, so restart-heavy play does not farm the
       // sessions rate limit. The re-mint is in flight while the run proceeds.
-      if (needsRemint(ticketStateRef.current, Date.now())) {
+      const now = Date.now();
+      if (needsRemint(ticketStateRef.current, now)) {
         freezeRunTicket(null);
         mintTicket(choice, true);
       } else {
-        freezeRunTicket(usableTicket(ticketStateRef.current, Date.now()));
+        // Must match the world we are still skiing — a restart does not rebuild
+        // it, so an otherwise-valid ticket for another seed is not usable here.
+        freezeRunTicket(ticketForWorld(ticketStateRef.current, active.runSeed, now));
       }
       active.beginCompetitiveRecording();
     }
@@ -398,7 +424,6 @@ export default function DropInGame({ profile, conditions }: {
                 selected={session.mode}
                 onSelect={selectMode}
                 dailyCourseName={dailyCourseName}
-                dailyDateStamp={utcDateStamp(Date.now())}
                 pending={ticketState.status === "requesting" ? session.mode : null}
                 notice={sessionNotice}
               />

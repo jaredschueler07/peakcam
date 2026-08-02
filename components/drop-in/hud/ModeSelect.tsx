@@ -21,8 +21,6 @@ export interface ModeSelectProps {
   onSelect(mode: DropInModeChoice): void;
   /** Trail the Daily Line runs today, resolved from the ticket when there is one. */
   dailyCourseName: string;
-  /** `YYYY-MM-DD` UTC — the day the Daily Line seed belongs to. */
-  dailyDateStamp: string;
   /** Mode whose ticket request is in flight, if any. */
   pending?: DropInModeChoice | null;
   /** Set when the sessions API failed; the run still starts, just offline. */
@@ -45,7 +43,6 @@ export default function ModeSelect({
   selected,
   onSelect,
   dailyCourseName,
-  dailyDateStamp,
   pending = null,
   notice = null,
 }: ModeSelectProps) {
@@ -84,7 +81,11 @@ export default function ModeSelect({
                   }`}
                   data-testid="daily-line-course"
                 >
-                  {dailyCourseName} · {dailyDateStamp}
+                  {/* Course name only. The trail is fixed and only the seed
+                      rotates daily, so printing the date beside the trail name
+                      implied the trail changes too. The card blurb already
+                      says "one course a day". */}
+                  {dailyCourseName}
                 </span>
               )}
               {pending === card.mode && (

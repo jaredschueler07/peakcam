@@ -70,22 +70,37 @@ function drain() {
  * calls `posthog.capture` directly). Same readiness rule and same give-up
  * budget as `drain` above — see that comment for why the wait exists.
  */
-export function whenPostHogReady(task: () => void) {
-  if (typeof window === "undefined") return;
+export function whenPostHogReady(task: () => void): () => void {
+  const noop = () => {};
+  if (typeof window === "undefined") return noop;
+  // Without a key the provider never calls init(), so the poll could only ever
+  // time out — don't schedule four seconds of timers to discover that.
+  if (!process.env.NEXT_PUBLIC_POSTHOG_KEY) return noop;
   if (isLoaded()) {
     task();
-    return;
+    return noop;
   }
+
   let attempts = 0;
+  let cancelled = false;
+  let timer: ReturnType<typeof setTimeout>;
   const tick = () => {
+    if (cancelled) return;
     if (isLoaded()) {
       task();
       return;
     }
     if (++attempts > 40) return;
-    setTimeout(tick, 100);
+    timer = setTimeout(tick, 100);
   };
-  setTimeout(tick, 0);
+  timer = setTimeout(tick, 0);
+
+  // Callers that unmount before the SDK loads must be able to drop the task;
+  // firing it afterwards would attribute the event to whatever came next.
+  return () => {
+    cancelled = true;
+    clearTimeout(timer);
+  };
 }
 
 export function track(event: EventName, properties?: Record<string, unknown>) {

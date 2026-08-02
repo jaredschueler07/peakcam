@@ -83,6 +83,30 @@ export function needsRemint(state: TicketState, nowMs: number): boolean {
 }
 
 /**
+ * The ticket that may be attached to the run **currently being skied**, or
+ * `null`.
+ *
+ * Stricter than {@link usableTicket} by one rule: the ticket's seed must equal
+ * the seed the running world was built from. A restart resets the simulation
+ * but does not rebuild the world, so a ticket minted afterwards can describe a
+ * different course — the Daily Line seed rotates at midnight UTC, and a session
+ * spanning that boundary would otherwise submit a run against a course it never
+ * skied (`seed_mismatch`, and a leaderboard entry that is simply wrong).
+ *
+ * Fails closed: an unknown world seed yields no ticket. Not knowing which world
+ * is running is exactly when guessing is most expensive.
+ */
+export function ticketForWorld(
+  state: TicketState,
+  runSeed: number | null | undefined,
+  nowMs: number,
+): RunSessionTicket | null {
+  if (runSeed === null || runSeed === undefined) return null;
+  const ticket = usableTicket(state, nowMs);
+  return ticket && ticket.seed === runSeed ? ticket : null;
+}
+
+/**
  * The seed the world must be built from. A ticketed run uses the server's seed
  * or the validator rejects it (`seed_mismatch`); everything else — Free Ski and
  * offline competitive play — falls back to the profile seed and is not

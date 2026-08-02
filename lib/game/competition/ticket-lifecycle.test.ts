@@ -9,6 +9,7 @@ import {
   NO_TICKET,
   needsRemint,
   resolveRunSeed,
+  ticketForWorld,
   ticketReducer,
   usableTicket,
   type TicketState,
@@ -95,6 +96,35 @@ test("clearing returns to the no-ticket state, which never needs a re-mint", () 
   const state = ticketReducer(ready(), { type: "cleared" });
   assert.equal(state, NO_TICKET);
   assert.equal(needsRemint(NO_TICKET, NOW), false, "Free Ski must never trigger a session request");
+});
+
+// ── ticketForWorld: a ticket is only usable for the world actually running ──
+
+test("a ticket whose seed matches the running world can be frozen onto the run", () => {
+  const state = ready();
+  assert.equal(ticketForWorld(state, fresh.seed, NOW), fresh);
+});
+
+test("a re-minted ticket from a UTC-day rollover is refused rather than submitted", () => {
+  // The Daily Line seed rotates at midnight UTC, but a restart does not rebuild
+  // the world — so the new ticket describes a course this run is not skiing.
+  const rolled = ticketReducer(NO_TICKET, { type: "received", ticket: ticketAt(NOW + 60_000, 111) });
+  assert.equal(ticketForWorld(rolled, 222, NOW), null);
+  assert.equal(usableTicket(rolled, NOW)?.seed, 111, "the ticket itself is still valid, just not for this world");
+});
+
+test("ticketForWorld fails closed when the running world's seed is unknown", () => {
+  const state = ready();
+  assert.equal(ticketForWorld(state, null, NOW), null);
+  assert.equal(ticketForWorld(state, undefined, NOW), null);
+});
+
+test("ticketForWorld still honours spend and expiry", () => {
+  const spent = ticketReducer(ready(), { type: "submitted" });
+  assert.equal(ticketForWorld(spent, fresh.seed, NOW), null);
+
+  const expired = ticketReducer(NO_TICKET, { type: "received", ticket: ticketAt(NOW - 1, fresh.seed) });
+  assert.equal(ticketForWorld(expired, fresh.seed, NOW), null);
 });
 
 // ── C1: the ticket seed must reach the simulated world ──────────────────────

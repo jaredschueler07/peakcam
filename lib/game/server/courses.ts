@@ -29,7 +29,6 @@ import { RESORT_BAKE_CONFIGS } from "../terrain/resorts";
 
 export { trailIdFromName, utcDateStamp };
 
-
 export interface ServerCourse {
   resortSlug: DropInResortSlug;
   trailId: string;

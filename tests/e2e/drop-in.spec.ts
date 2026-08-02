@@ -35,8 +35,10 @@ test("the start poster offers the three run modes, defaulting to Free Ski", asyn
   await expect(modes.getByRole("radio", { name: /free ski/i })).toHaveAttribute("aria-checked", "true");
   await expect(modes.getByRole("radio", { name: /time trial/i })).toHaveAttribute("aria-checked", "false");
   await expect(modes.getByRole("radio", { name: /daily line/i })).toHaveAttribute("aria-checked", "false");
-  // The Daily Line card names the course it rotates to today.
-  await expect(page.getByTestId("daily-line-course")).toContainText(/\d{4}-\d{2}-\d{2}/);
+  // The Daily Line card names its course. Deliberately no date beside it: only
+  // the seed rotates daily, and a date here read as a rotating trail.
+  await expect(page.getByTestId("daily-line-course")).toHaveText("Gunbarrel");
+  await expect(page.getByTestId("daily-line-course")).not.toContainText(/\d{4}-\d{2}-\d{2}/);
 });
 
 test("Free Ski starts a run without ever calling the sessions API", async ({ page }) => {
@@ -76,6 +78,40 @@ test("a ticketed competitive run starts and reports itself submittable", async (
   await expect(page.locator("[data-drop-in-state='running']")).toBeVisible();
   await expect(page.locator("[data-drop-in-session='ticketed'][data-drop-in-mode='score_attack']")).toHaveCount(1);
   await expect(page.getByTestId("drop-in-session-notice")).toHaveCount(0);
+});
+
+test("a run started before its ticket arrives stays offline, and never claims to be ticketed", async ({ page }) => {
+  // Regression: the run is seeded from profile.seed because no ticket existed
+  // at start, so a ticket landing mid-run cannot make it submittable. Reporting
+  // "ticketed" here would advertise a run the server must reject.
+  await page.route("**/api/drop-in/sessions", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ticket: "late.arrival.sig",
+        seed: 987654321,
+        resortSlug: "heavenly",
+        mode: "time_trial",
+        trailId: "gunbarrel",
+        physicsVersion: 1,
+        courseVersion: 1,
+        tickHz: 10,
+        expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+      }),
+    });
+  });
+  await page.goto(V2_URL);
+  await page.getByRole("radio", { name: /time trial/i }).click();
+  await expect(page.locator("[data-drop-in-session='pending']")).toHaveCount(1);
+  await page.getByRole("button", { name: /start descent/i }).click();
+  await expect(page.locator("[data-drop-in-state='running']")).toBeVisible();
+
+  // Let the late ticket land, then confirm the run did not adopt it.
+  await page.waitForTimeout(2500);
+  await expect(page.locator("[data-drop-in-session='offline']")).toHaveCount(1);
+  await expect(page.locator("[data-drop-in-session='ticketed']")).toHaveCount(0);
 });
 
 test("a failed session request degrades to offline play instead of blocking the run", async ({ page }) => {
