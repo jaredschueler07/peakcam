@@ -63,6 +63,30 @@
 >   `?snowdbg`, `?csmdbg`, `?treedbg`, `?e2ecanvas`, `?e2espawn`, `?phys`.
 > - Ledgers with the full deferred/parked backlog: `.superpowers/sdd/*/progress.md`.
 
+> **Visual program Phase 1 COMPLETE (2026-08-02)** — see `VISUALS-DESIGN.md` and
+> `docs/superpowers/plans/2026-08-02-far-field-and-dem.md`. 718 tests green.
+> - **Real DEM per resort**: Breckenridge USGS 3DEP **1 m lidar**, Heavenly 3DEP
+>   **seamless 10 m** (no 1 m project covers the ski area — both candidates return
+>   nodata at its coordinates, verified with `gdallocationinfo`), Portillo Copernicus
+>   GLO-30 (nothing better exists free in the Andes). GDAL warps each resort to its own
+>   UTM zone. **`COURSE_VERSION` bumped to 2**; course gates regenerated from the bake,
+>   not hand-edited. Leaderboards were empty, which is why this landed pre-launch.
+> - **Real 30 km horizon**: pre-baked radially-graded wedge mesh (~265 KB br/resort,
+>   ~14 k verts drawn) replaces the two procedural ridge bands. Aconcagua renders as real
+>   geometry at Portillo (6854 m, 24 km, +9.6°). Ridge bands retained as fallback.
+> - **Fog curve unified**: there were FOUR hand-written copies (TSL, CPU reference, the
+>   WebGL GLSL string, `heightFogAmount`) with only two pinned. One definition now emits
+>   all three; the WebGL shader is generated and its test executes the emitted source.
+>   A long-range envelope (identity below the tile grid's derived reach) stops fog
+>   saturating before the far field begins. Storm presets bit-identical.
+> - Caveat worth knowing: the bit-identity guarantee covers the **tile grid only**.
+>   Lift towers, cable and trail markers sit beyond it and are intentionally affected.
+> - Tooling/licences: $0 spend. See `.superpowers/sdd/research/` for the three research
+>   reports (rendering libs, assets/licensing, terrain data) behind these choices.
+>
+> **Next**: Phase 2 (lighting/surfaces — GTAO, SkyMesh, godrays are already in our
+> bundle, unused), then density, then art direction.
+
 1. **Phase 10b (rollout)** — CI pipeline, device matrix beyond this Mac Mini,
    accessibility pass, percentage rollout per DESIGN §5, delete v1, soft-404 fix.
    BACKLOG (from final review, in ledgers): S1 server-side surface derivation
