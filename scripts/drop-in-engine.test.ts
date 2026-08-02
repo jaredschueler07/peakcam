@@ -29,8 +29,19 @@ test("every config profile is mirrored field-for-field in the v1 engine", () => 
       verticalDropFt: _verticalDropFt,
       terrainSeed: _terrainSeed,
       trailNames: _trailNames,
-      ...configProfile
+      ...rest
     } = DROP_IN_GAME_PROFILES[slug as keyof typeof DROP_IN_GAME_PROFILES];
+    // `farRetention` tunes the v2 far field's long-range fog envelope (`fogCurve.ts`). The v1
+    // engine has no far field — its horizon is two procedural ridge bands — so the field is
+    // meaningless there and is stripped rather than mirrored into a bundler-free static asset.
+    const configProfile = {
+      ...rest,
+      weather: rest.weather.map((w) => {
+        const { farRetention, ...mirrored } = w;
+        void farRetention;
+        return mirrored;
+      }),
+    };
     void _slug;
     void _siteTagline;
     void _summitElevationFt;

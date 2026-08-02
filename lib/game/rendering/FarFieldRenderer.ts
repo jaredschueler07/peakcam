@@ -60,8 +60,20 @@ export const FAR_FIELD_RADIUS_M = 30_000;
 /** Scene-graph name, so tests and debugging can find the far field without reaching into Renderer. */
 export const FAR_FIELD_GROUP_NAME = "far-field";
 
-/** Snow-white, dimmed slightly: distant snowfields read lighter than the near field otherwise. */
-const FAR_FIELD_COLOR = 0xdfe9f5;
+/**
+ * Far-field albedo.
+ *
+ * Was `#dfe9f5`, whose luminance (231.7) sat **1.4 out of 255** from Portillo's sky horizon
+ * (`#d8ecff`, 233.1) — a 0.6% difference. Aconcagua receives literally zero fog (the height term
+ * removes it entirely at that altitude), and was still invisible, because the mesh was painted
+ * almost exactly the colour of the sky behind it. Fixing the fog curve alone would not have
+ * revealed it.
+ *
+ * `#adc2d8` gives ~30 luminance units of separation after the long-range fog blend. Deliberately
+ * still light and blue — real distant ranges are lighter and bluer than near terrain, and
+ * over-darkening reads as a cut-out silhouette, which is the opposite failure.
+ */
+const FAR_FIELD_COLOR = 0xadc2d8;
 
 export interface FarFieldOptions {
   /**
