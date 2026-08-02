@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { SimulationState, TerrainSampler } from "../core/types";
+import { BACK_SPEED_REF, CAMERA_PRESETS, HEIGHT_SPEED_REF, type CameraPreset } from "./camera-presets";
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 const damp = (from: number, to: number, lambda: number, dt: number) =>
@@ -42,9 +43,20 @@ export class CameraController {
 
   get motionAmplitude(): number { return this.shake; }
 
-  constructor(private readonly camera: THREE.PerspectiveCamera, state: SimulationState, reducedMotion?: boolean) {
+  /**
+   * The framing is injected, never read from the URL here — resolving `?cam=` is the renderer's
+   * job (`cameraPresetName()`), which keeps this class pure and testable under any preset.
+   */
+  constructor(
+    private readonly camera: THREE.PerspectiveCamera,
+    state: SimulationState,
+    reducedMotion?: boolean,
+    private readonly preset: CameraPreset = CAMERA_PRESETS.classic,
+  ) {
     this.reducedMotion = reducedMotion ?? (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-    this.position.set(state.pos.x, state.pos.y + 5, state.pos.z - 9);
+    // The seed is the shipped `+5 / -9` expressed against the preset, so a far preset does not
+    // whip in from the skier's face on the first frames. Classic reproduces 5 and 9 exactly.
+    this.position.set(state.pos.x, state.pos.y + preset.heightBase + 1.5, state.pos.z - (preset.backBase + 0.4));
   }
 
   update(state: SimulationState, terrain: TerrainSampler, dt: number, tuck: number): void {
@@ -64,16 +76,18 @@ export class CameraController {
       this.camera.updateProjectionMatrix();
       return;
     }
+    const preset = this.preset;
     const forwardX = Math.sin(state.yaw), forwardZ = Math.cos(state.yaw);
-    const back = 8.6 + clamp01(speed / 55) * 5.2;
+    const back = preset.backBase + clamp01(speed / BACK_SPEED_REF) * preset.backSpeedGain;
     const desiredX = state.pos.x - forwardX * back;
     const desiredZ = state.pos.z - forwardZ * back;
-    const desiredY = state.pos.y + 3.5 + clamp01(speed / 60) * 1.4 + (state.onGround ? 0 : 1);
+    const desiredY = state.pos.y + preset.heightBase + clamp01(speed / HEIGHT_SPEED_REF) * preset.heightSpeedGain
+      + (state.onGround ? 0 : preset.airLift);
     const lambda = state.crash > 0 ? 3 : 6.5;
     this.position.x = damp(this.position.x, desiredX, lambda, dt);
     this.position.y = damp(this.position.y, desiredY, lambda * 1.35, dt);
     this.position.z = damp(this.position.z, desiredZ, lambda, dt);
-    this.position.y = Math.max(this.position.y, terrain.height(this.position.x, this.position.z) + 1.8);
+    this.position.y = Math.max(this.position.y, terrain.height(this.position.x, this.position.z) + preset.floorClearance);
     const targetShake = this.reducedMotion ? 0 : (state.crash > 0 ? state.crash * 0.06 : this.speedUniform.value * this.speedUniform.value * 0.036);
     criticalSpring(this.shake, this.shakeVelocity, targetShake, 2.2, dt, springOut);
     this.shake = springOut.value; this.shakeVelocity = springOut.velocity;
@@ -82,10 +96,14 @@ export class CameraController {
       this.position.y + noise1(this.elapsed * 11.3 + 43) * this.shake,
       this.position.z + noise1(this.elapsed * 8.1 + 91) * this.shake * 0.35,
     );
-    this.target.set(state.pos.x + forwardX * 8, state.pos.y + 1.6, state.pos.z + forwardZ * 8);
+    this.target.set(
+      state.pos.x + forwardX * preset.lookAheadM,
+      state.pos.y + preset.lookHeightM,
+      state.pos.z + forwardZ * preset.lookAheadM,
+    );
     this.camera.lookAt(this.target);
-    const fovRamp = this.reducedMotion ? 8.5 : 17;
-    this.camera.fov = damp(this.camera.fov, 65 + this.speedUniform.value * fovRamp, 5.2, dt);
+    const fovRamp = this.reducedMotion ? preset.fovSpeedGain / 2 : preset.fovSpeedGain;
+    this.camera.fov = damp(this.camera.fov, preset.fovBase + this.speedUniform.value * fovRamp, 5.2, dt);
     const targetRoll = this.reducedMotion ? 0 : THREE.MathUtils.clamp((-state.lean * 0.055 - tuck * state.lean * 0.012) * this.speedUniform.value, -0.065, 0.065);
     this.roll = damp(this.roll, targetRoll, 9, dt);
     this.camera.rotateZ(this.roll);

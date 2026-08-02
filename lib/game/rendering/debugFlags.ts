@@ -6,6 +6,8 @@
  * they only ever subtract work, and each one is inert unless typed by hand.
  */
 
+import { resolveCameraPresetName, type CameraPresetName } from "./camera-presets";
+
 /** Which `SnowNodeMaterial` terms to switch off. Higher numbers subtract more. */
 export const SNOW_DEBUG = {
   NONE: 0,
@@ -61,4 +63,12 @@ export const CSM_DEBUG = {
 /** `?csmdbg=<n>` — see `CSM_DEBUG`. */
 export function csmDebugMode(from = search()): number {
   return numericFlag("csmdbg", from);
+}
+
+/**
+ * `?cam=<name>` — which chase-camera framing to fly, see `CAMERA_PRESETS`. Absent or unrecognised
+ * is `classic`, the shipped geometry, so this can only ever be opted into by hand.
+ */
+export function cameraPresetName(from = search()): CameraPresetName {
+  return resolveCameraPresetName(new URLSearchParams(from).get("cam"));
 }
