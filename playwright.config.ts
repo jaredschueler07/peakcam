@@ -10,11 +10,26 @@ import { defineConfig, devices } from "@playwright/test";
  * so every pixel-reading spec would fail for a reason that has nothing to do
  * with the code. The default `chromium` project therefore pins `?gfx=webgl`
  * through `dropInUrl()` in the spec, and the real-WebGPU coverage lives in
- * `chromium-webgpu`, which needs a headed run on hardware and is excluded from
- * the default sweep. Run it at the gate:
+ * `chromium-webgpu`.
  *
- *   npx playwright test --project=chromium-webgpu --headed
+ * That project is opt-in **by construction**: it is absent from `projects`
+ * unless `PLAYWRIGHT_WEBGPU=1`. Excluding it by convention was not enough —
+ * `npx playwright test <file>` with no `--project` runs every configured
+ * project, so a plain or file-scoped invocation would have launched it
+ * headless and failed its three canvas specs on SwiftShader. Run it at the
+ * gate, on hardware:
+ *
+ *   PLAYWRIGHT_WEBGPU=1 npx playwright test --project=chromium-webgpu --headed
  */
+const webgpuProjects = process.env.PLAYWRIGHT_WEBGPU === "1"
+  ? [{
+      // Real WebGPU. Headed only — headless gets SwiftShader and a black canvas.
+      name: "chromium-webgpu",
+      testMatch: /drop-in\.spec/,
+      use: { ...devices["Desktop Chrome"], headless: false },
+    }]
+  : [];
+
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 30_000,
@@ -33,13 +48,7 @@ export default defineConfig({
       testIgnore: /drop-in-heap/,
       use: { ...devices["Desktop Chrome"] },
     },
-    {
-      // Real WebGPU. Headed only — a headless run gets SwiftShader and a black
-      // canvas. Not part of the default sweep; the gate runs it explicitly.
-      name: "chromium-webgpu",
-      testMatch: /drop-in\.spec/,
-      use: { ...devices["Desktop Chrome"], headless: false },
-    },
+    ...webgpuProjects,
     {
       name: "chromium-heap",
       testMatch: /drop-in-heap/,
