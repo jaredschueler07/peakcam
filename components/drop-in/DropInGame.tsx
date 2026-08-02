@@ -25,6 +25,7 @@ import {
   type TicketState,
 } from "@/lib/game/competition/ticket-lifecycle";
 import type { CompetitiveRunMode } from "@/lib/game/config/modes";
+import type { DecodedGhost } from "@/lib/game/replay/codec";
 // Shared with the sessions route, which must derive the same ids. Imported from
 // config/ rather than server/ so the browser bundle skips profiles + bake configs.
 import { trailIdFromName } from "@/lib/game/config/course-ids";
@@ -361,6 +362,19 @@ export default function DropInGame({ profile, conditions }: {
     active.restart();
   };
 
+  /**
+   * "Race this ghost": hand the decoded replay to the renderer, then restart so
+   * the ghost and the player leave the gate together. The restart re-arms the
+   * recorder and re-mints a spent ticket exactly as any other restart does, so
+   * a raced run is still a submittable run.
+   */
+  const raceGhost = (ghost: DecodedGhost) => {
+    const active = runtimeRef.current;
+    if (!active) return;
+    active.setGhost(ghost);
+    restartRun(active);
+  };
+
   const toggleAudio = () => {
     setAudioEnabled((current) => {
       const next = !current;
@@ -435,7 +449,22 @@ export default function DropInGame({ profile, conditions }: {
         )}
         {(phase === "loading" || phase === "playing") && <canvas ref={canvasRef} data-testid="drop-in-canvas" className="block h-full w-full touch-none" aria-label={`${profile.name} ski game`} />}
         {phase === "loading" && <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-ink/50" role="status"><span className="pc-eyebrow rounded-full bg-cream-50 px-4 py-2 text-ink">Loading real mountain… {Math.round(loadingProgress * 100)}%</span></div>}
-        {phase === "playing" && runtime && <><DropInHUD store={bridge.store} audioEnabled={audioEnabled} onToggleAudio={toggleAudio} /><TouchControls adapter={runtime.touch} /><PauseDialog store={bridge.store} onResume={() => runtime.resume()} onRestart={() => restartRun(runtime)} /><ResultsDialog store={bridge.store} onRestart={() => restartRun(runtime)} /></>}
+        {phase === "playing" && runtime && <><DropInHUD store={bridge.store} audioEnabled={audioEnabled} onToggleAudio={toggleAudio} /><TouchControls adapter={runtime.touch} /><PauseDialog store={bridge.store} onResume={() => runtime.resume()} onRestart={() => restartRun(runtime)} /><ResultsDialog
+          store={bridge.store}
+          onRestart={() => restartRun(runtime)}
+          // Free Ski passes null, which is what removes the leaderboard,
+          // submission and ghost surfaces entirely rather than disabling them.
+          competition={session.mode === "free_ski" ? null : {
+            session,
+            mode: session.mode,
+            resortSlug: profile.slug,
+            trailId: session.trailId,
+            // The runtime hands over its recording once; the dialog takes it
+            // when it opens and holds it for the life of the results screen.
+            takeRecording: () => runtimeRef.current?.takeFinishedRun() ?? null,
+            onRaceGhost: raceGhost,
+          }}
+        /></>}
         {phase === "error" && <ErrorPoster profile={profile} message={error ?? "Unknown error"} />}
       </div>
     </DropInErrorBoundary>
