@@ -18,6 +18,7 @@ import {
   decodeGhost,
   encodeGhost,
   POSE_AIRBORNE,
+  POSE_CRASHED,
   type DecodedGhost,
   type GhostSample,
 } from "../../replay/codec";
@@ -143,6 +144,24 @@ export function tamperAllAirborneSpoof(honest: DecodedGhost): DecodedGhost {
     poseFlags: s.poseFlags | POSE_AIRBORNE,
     // Leave groundOffsetCm unchanged (braked fixture is ~0) so the
     // ground-offset cross-check fires rather than the airtime-cap alone.
+  }));
+  return reencode({ meta: honest.meta, samples });
+}
+
+/**
+ * Pose spoof: mark every sample crashed and oscillate speed by 30× the local
+ * peak so a full-skip of crash envelopes would accept the cheat. Must be
+ * rejected by continuous-crash cap and/or the crashed accel/decel bounds.
+ * Start sample keeps a legal gate speed so bad_start does not fire first.
+ */
+export function tamperAllCrashedSpoof(honest: DecodedGhost): DecodedGhost {
+  const peak = Math.max(1, ...honest.samples.map((s) => s.speedCms));
+  const amp = peak * 30;
+  const samples = honest.samples.map((s, i) => ({
+    ...s,
+    poseFlags: s.poseFlags | POSE_CRASHED,
+    // Keep sample 0 at a legal start speed; oscillate from sample 1.
+    speedCms: i === 0 ? Math.min(s.speedCms, 100) : i % 2 === 0 ? amp : 0,
   }));
   return reencode({ meta: honest.meta, samples });
 }

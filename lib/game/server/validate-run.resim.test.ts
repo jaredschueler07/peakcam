@@ -21,6 +21,7 @@ import {
   dropOneSample,
   loadHonestGhost,
   tamperAllAirborneSpoof,
+  tamperAllCrashedSpoof,
   tamperSpeedHack,
   tamperTeleport,
   tamperTickCompression,
@@ -33,6 +34,7 @@ import {
   expectedSampleGapTicks,
   ghostSpanMsFromTicks,
   MAX_AIRBORNE_SECONDS,
+  MAX_CRASHED_SECONDS,
   resimulateGhost,
   validateRun,
   type ResimVerdict,
@@ -185,6 +187,26 @@ test("resimulateGhost rejects all-airborne pose spoof of the braked fixture", ()
   if (!verdict.accepted) {
     assert.match(verdict.detail, /POSE_AIRBORNE|airborne|groundOffset/i);
   }
+});
+
+test("resimulateGhost rejects all-crashed spoof with 30x speed oscillation", () => {
+  const { ghost, course } = loadHonestGhost("braked");
+  const spoofed = tamperAllCrashedSpoof(ghost);
+  const verdict = resimulateGhost(spoofed, course, packed);
+  assert.equal(verdict.accepted, false, `expected rejection, got ${JSON.stringify(verdict)}`);
+  if (!verdict.accepted) {
+    // Continuous-crash cap (honest max ~1.70s, cap MAX_CRASHED_SECONDS) and/or
+    // crashed accel/decel bounds / overspeed — any rejection of the bypass is fine;
+    // must not accept (the demonstrated bug was full skip → accepted).
+    assert.ok(
+      verdict.code === "impossible_acceleration" ||
+        verdict.code === "overspeed" ||
+        verdict.code === "teleport",
+      `unexpected rejection code ${verdict.code}: ${verdict.detail}`,
+    );
+    assert.match(verdict.detail, /crashed|accelerat|decelerat|speed|moves/i);
+  }
+  assert.ok(MAX_CRASHED_SECONDS >= 4);
 });
 
 // ─── Env flag wiring ─────────────────────────────────────────

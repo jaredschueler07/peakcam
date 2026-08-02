@@ -141,8 +141,8 @@ export const MAX_RUN_SPEED_CMS = 6_000;
 /**
  * 60 m/s² ≈ 6 g. Raised from 25 m/s² (A5 fix round 1): honest braked p95 ≈
  * 2520 cm/s²; honest full-tuck grounded peaks ≈ 5250 cm/s² on packed
- * procedural. Airborne segments use {@link AIRBORNE_ACCEL_MULT}× this bound;
- * crashed samples still skip the check entirely (landing impulses).
+ * procedural. Airborne/crashed segments use the looser mult/limits below —
+ * never a full skip (poseFlags is untrusted).
  */
 export const MAX_ACCEL_CMS2 = 6_000;
 /** 80 m/s² of deceleration — a crash into a tree is allowed to be violent. */
@@ -152,6 +152,18 @@ export const MAX_DECEL_CMS2 = 8_000;
  * Spoofed all-airborne ghosts no longer disable the envelope class.
  */
 export const AIRBORNE_ACCEL_MULT = 3;
+/**
+ * Crashed-segment accel ceiling. Preferred `MAX_ACCEL_CMS2 * 3` (= 18k) is
+ * below honest 30 Hz crash aliases (jump fixture crash peak ≈ 31 290 cm/s²),
+ * so the bound is observed_honest_max × 2.
+ */
+export const CRASHED_MAX_ACCEL_CMS2 = 63_000;
+/**
+ * Crashed-segment decel ceiling. Preferred `MAX_DECEL_CMS2 * 3` (= 24k) is
+ * far below honest impact aliases (full-tuck crash peak ≈ 111 450 cm/s²),
+ * so the bound is observed_honest_max × 2.
+ */
+export const CRASHED_MAX_DECEL_CMS2 = 223_000;
 /**
  * Minimum |groundOffsetCm| required to claim {@link POSE_AIRBORNE}.
  * Codec `groundOffsetCm` is skier Y relative to sampled terrain — the pure-sim
@@ -167,6 +179,12 @@ export const AIRBORNE_MIN_GROUND_OFFSET_CM = 5;
  * jump tape). Longer = held-airborne pose spoof.
  */
 export const MAX_AIRBORNE_SECONDS = 4;
+/**
+ * Max continuous crashed duration in seconds. Honest fixtures peak at 1.70 s
+ * of continuous POSE_CRASHED (neutral/full-tuck/jump); 4 s is ~2× margin.
+ * Longer = held-crash pose spoof that would otherwise mute accel envelopes.
+ */
+export const MAX_CRASHED_SECONDS = 4;
 /** Slack on the per-step displacement bound, absorbing quantisation. */
 export const TELEPORT_SLACK_CM = 100;
 /** How far outside the baked box a keyframe may sit before it is a fabrication. */
@@ -288,19 +306,18 @@ function isCrashed(sample: GhostSample): boolean {
 }
 
 /**
- * Accel/decel envelope for a segment. `null` = skip (crash endpoints).
- * Airborne uses a looser bound; grounded uses the base envelope.
- * poseFlags is untrusted client input — callers must run
- * {@link checkPoseIntegrity} first.
+ * Accel envelope for a segment. Crashed / airborne use looser bounds;
+ * grounded uses the base envelope. Never returns null — poseFlags is
+ * untrusted client input (callers run {@link checkPoseIntegrity} first).
  */
-function segmentAccelLimitCms2(prev: GhostSample, next: GhostSample): number | null {
-  if (isCrashed(prev) || isCrashed(next)) return null;
+function segmentAccelLimitCms2(prev: GhostSample, next: GhostSample): number {
+  if (isCrashed(prev) || isCrashed(next)) return CRASHED_MAX_ACCEL_CMS2;
   if (isAirborne(prev) || isAirborne(next)) return MAX_ACCEL_CMS2 * AIRBORNE_ACCEL_MULT;
   return MAX_ACCEL_CMS2;
 }
 
-function segmentDecelLimitCms2(prev: GhostSample, next: GhostSample): number | null {
-  if (isCrashed(prev) || isCrashed(next)) return null;
+function segmentDecelLimitCms2(prev: GhostSample, next: GhostSample): number {
+  if (isCrashed(prev) || isCrashed(next)) return CRASHED_MAX_DECEL_CMS2;
   if (isAirborne(prev) || isAirborne(next)) return MAX_DECEL_CMS2 * AIRBORNE_ACCEL_MULT;
   return MAX_DECEL_CMS2;
 }
@@ -310,15 +327,17 @@ function segmentDecelLimitCms2(prev: GhostSample, next: GhostSample): number | n
  * 1. POSE_AIRBORNE requires |groundOffsetCm| ≥ {@link AIRBORNE_MIN_GROUND_OFFSET_CM}
  *    (codec terrain-relative height — no DEM load needed on the submit path).
  * 2. Continuous airborne longer than {@link MAX_AIRBORNE_SECONDS} is rejected.
+ * 3. Continuous crashed longer than {@link MAX_CRASHED_SECONDS} is rejected
+ *    (honest max continuous crash ≈ 1.70 s; 4 s is ~2× margin).
  */
 function checkPoseIntegrity(
   samples: readonly GhostSample[],
   sampleHz: number,
 ): { ok: true } | { ok: false; code: RejectionCode; detail: string } {
   const maxAirborneSamples = Math.max(1, Math.ceil(MAX_AIRBORNE_SECONDS * sampleHz));
-  // Longest continuous airborne stretch allowed before rejection. Honest jump
-  // fixture peaks well under this (see honest-ghost-jump; generator comment).
-  let run = 0;
+  const maxCrashedSamples = Math.max(1, Math.ceil(MAX_CRASHED_SECONDS * sampleHz));
+  let airRun = 0;
+  let crashRun = 0;
   for (let i = 0; i < samples.length; i++) {
     const s = samples[i];
     if (isAirborne(s)) {
@@ -331,18 +350,34 @@ function checkPoseIntegrity(
             `(need |offset| ≥ ${AIRBORNE_MIN_GROUND_OFFSET_CM}cm above terrain)`,
         };
       }
-      run += 1;
-      if (run > maxAirborneSamples) {
+      airRun += 1;
+      if (airRun > maxAirborneSamples) {
         return {
           ok: false,
           code: "impossible_acceleration",
           detail:
-            `continuous airborne stretch of ${run} samples exceeds ` +
+            `continuous airborne stretch of ${airRun} samples exceeds ` +
             `${MAX_AIRBORNE_SECONDS}s cap (${maxAirborneSamples} samples at ${sampleHz} Hz)`,
         };
       }
     } else {
-      run = 0;
+      airRun = 0;
+    }
+
+    if (isCrashed(s)) {
+      crashRun += 1;
+      if (crashRun > maxCrashedSamples) {
+        return {
+          ok: false,
+          code: "impossible_acceleration",
+          detail:
+            `continuous crashed stretch of ${crashRun} samples exceeds ` +
+            `${MAX_CRASHED_SECONDS}s cap (${maxCrashedSamples} samples at ${sampleHz} Hz; ` +
+            `honest fixtures peak at ~1.70s)`,
+        };
+      }
+    } else {
+      crashRun = 0;
     }
   }
   return { ok: true };
@@ -357,7 +392,6 @@ function checkSegmentAccel(
 ): { ok: true } | { ok: false; code: RejectionCode; detail: string } {
   const accelLimit = segmentAccelLimitCms2(prev, next);
   const decelLimit = segmentDecelLimitCms2(prev, next);
-  if (accelLimit === null || decelLimit === null) return { ok: true };
 
   const quant = quantSlack && dtSeconds > 0 ? 2 / dtSeconds : 0;
   const accel = (next.speedCms - prev.speedCms) / dtSeconds;
@@ -791,9 +825,8 @@ function measure(
     maxStepCm = Math.max(maxStepCm, stepCm);
 
     const dtSeconds = (s.tick - samples[i - 1].tick) / FIXED_HZ;
-    // Metrics: skip crash endpoints; include airborne under the looser class
-    // so telemetry still reflects airborne spikes without trusting full skip.
-    if (dtSeconds > 0 && !isCrashed(samples[i - 1]) && !isCrashed(s)) {
+    // Metrics include every segment (crash/airborne under looser classes).
+    if (dtSeconds > 0) {
       const accel = (s.speedCms - samples[i - 1].speedCms) / dtSeconds;
       maxAccelCms2 = Math.max(maxAccelCms2, accel);
       maxDecelCms2 = Math.max(maxDecelCms2, -accel);
