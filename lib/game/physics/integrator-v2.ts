@@ -52,6 +52,8 @@ export function integrateSkierV2(
     return;
   }
 
+  if (s.landingTimer > 0) s.landingTimer = Math.max(0, s.landingTimer - dt);
+
   const steer = clamp(input.steer, -1, 1);
   const tuck = clamp01(input.tuck);
   const brake = clamp01(input.brake);
@@ -81,7 +83,7 @@ export function integrateSkierV2(
 
   const turnRate = s.onGround
     ? lerp(3.6, 1.35, clamp01(flatSpeed / 46)) * (1 + brake * 0.5)
-    : 3.4;
+    : 3.4 * cfg.carve.airAuthority * (1 / (1 + s.airTime * 0.8));
   s.yaw += steer * turnRate * dt;
   if (!s.onGround) s.spin += Math.abs(steer * turnRate * dt);
   setVec3(forward, Math.sin(s.yaw), 0, Math.cos(s.yaw));
@@ -153,7 +155,22 @@ export function integrateSkierV2(
     const impact = length(s.vel);
     s.pos.y = groundHeight2; s.onGround = true;
     if (s.vel.y < 0) s.vel.y = 0;
-    if (!launched) onLand(s, impact, world.config.landingImpactThresholdMultiplier);
+    if (!launched) {
+      world.terrain.normal(s.pos.x, s.pos.z, normal);
+      setVec3(temp, 0, -GRAVITY, 0);
+      temp2.x = normal.x; temp2.y = normal.y; temp2.z = normal.z;
+      multiplyScalar(temp2, dot(temp, normal));
+      temp.x -= temp2.x; temp.y -= temp2.y; temp.z -= temp2.z;
+      const fallLineMagnitude = Math.hypot(temp.x, temp.z);
+      const flatVelocityMagnitude = Math.hypot(s.vel.x, s.vel.z);
+      const fallLine = fallLineMagnitude > 1e-4 && flatVelocityMagnitude > 1e-4
+        ? (s.vel.x * temp.x + s.vel.z * temp.z) /
+          (flatVelocityMagnitude * fallLineMagnitude) : 1;
+      const cleanLanding = fallLine >= Math.cos(25 * Math.PI / 180);
+      if (cleanLanding) s.landingTimer = cfg.carve.landingWindow;
+      onLand(s, cleanLanding ? impact * 0.72 : impact,
+        world.config.landingImpactThresholdMultiplier);
+    }
   }
 
   const velocity = length(s.vel);
@@ -161,6 +178,6 @@ export function integrateSkierV2(
   if (velocity > maxSpeed) multiplyScalar(s.vel, maxSpeed / velocity);
   s.distance += flatSpeed * dt;
   if (s.invuln > 0) s.invuln -= dt;
-  checkObstacleCollision(s, world);
+  if (s.landingTimer <= 0) checkObstacleCollision(s, world);
   checkGates(s, world);
 }

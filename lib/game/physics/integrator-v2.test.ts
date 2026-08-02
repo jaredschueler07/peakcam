@@ -6,7 +6,7 @@ import { FIXED_DT } from "../core/clock";
 import { simulationConfig, type SurfaceKind } from "../core/config";
 import { mulberry32 } from "../core/rng";
 import { createSimulation, stepSimulation } from "../core/simulation";
-import type { InputFrame, SimulationState } from "../core/types";
+import type { InputFrame, SimulationState, SimulationWorld } from "../core/types";
 import { createProceduralWorld } from "../terrain/obstacles";
 import { GRAVITY, MAX_SPEED } from "./constants";
 import { integrateSkierV2 } from "./integrator-v2";
@@ -26,6 +26,24 @@ function setup(surface: SurfaceKind = "packed") {
   const state = createSimulation(profile, profile.seed, world.terrain);
   state.invuln = 100;
   return { state, world };
+}
+
+function setupPlanarLanding(): { state: SimulationState; world: SimulationWorld } {
+  const fixture = setup();
+  const terrain = {
+    ...fixture.world.terrain,
+    height: (_x: number, z: number) => -0.5 * z,
+    normal: (_x: number, _z: number, out: { x: number; y: number; z: number }) => {
+      out.x = 0; out.y = 2 / Math.sqrt(5); out.z = 1 / Math.sqrt(5);
+      return out;
+    },
+  };
+  fixture.world = { ...fixture.world, terrain };
+  fixture.state.pos.x = 0; fixture.state.pos.y = 0; fixture.state.pos.z = 0;
+  fixture.state.onGround = false;
+  fixture.state.airTime = 1;
+  fixture.state.invuln = 0;
+  return fixture;
 }
 
 function rightVelocity(state: SimulationState): number {
@@ -154,6 +172,57 @@ test("braking applies the carve grip multiplier", () => {
   integrateSkierV2(free.state, input(), FIXED_DT, free.world);
   integrateSkierV2(braking.state, input({ brake: 1 }), FIXED_DT, braking.world);
   assert.ok(Math.abs(rightVelocity(braking.state)) < Math.abs(rightVelocity(free.state)));
+});
+
+test("fall-line-aligned landing absorbs an impact that crashes a 90-degree-off landing", () => {
+  const aligned = setupPlanarLanding();
+  const acrossSlope = setupPlanarLanding();
+  aligned.state.vel.x = 0; aligned.state.vel.y = 0; aligned.state.vel.z = 24;
+  aligned.state.yaw = Math.PI / 2;
+  acrossSlope.state.vel.x = 24; acrossSlope.state.vel.y = 0; acrossSlope.state.vel.z = 0;
+  acrossSlope.state.yaw = 0;
+
+  integrateSkierV2(aligned.state, input(), 0, aligned.world);
+  integrateSkierV2(acrossSlope.state, input(), 0, acrossSlope.world);
+
+  assert.equal(aligned.state.crash, 0);
+  assert.equal(aligned.state.landingTimer, aligned.world.config.carve.landingWindow);
+  assert.equal(acrossSlope.state.events.crashReason, "LANDING");
+});
+
+test("airborne yaw authority after two seconds is lower than during the first half-second", () => {
+  const early = setup();
+  const late = setup();
+  for (const fixture of [early, late]) {
+    fixture.state.onGround = false;
+    fixture.state.pos.y += 200;
+    fixture.state.vel.x = 0; fixture.state.vel.y = 0; fixture.state.vel.z = 0;
+  }
+  late.state.airTime = 2;
+
+  for (let i = 0; i < 30; i += 1) {
+    integrateSkierV2(early.state, input({ steer: 1 }), 1 / 60, early.world);
+  }
+  for (let i = 0; i < 60; i += 1) {
+    integrateSkierV2(late.state, input({ steer: 1 }), 1 / 60, late.world);
+  }
+
+  assert.ok(late.state.yaw < early.state.yaw);
+});
+
+test("landing absorption timer counts down while suppressing obstacle collisions", () => {
+  const { state, world } = setupPlanarLanding();
+  state.onGround = true;
+  state.airTime = 0;
+  state.landingTimer = 0.1;
+  world.chunks.set("0:0", [{
+    x: 0, y: 0, z: 0, s: 1, rot: 0, type: "tree", r: 10,
+  }]);
+
+  integrateSkierV2(state, input(), 0.04, world);
+
+  assert.ok(Math.abs(state.landingTimer - 0.06) < 1e-12);
+  assert.equal(state.crash, 0);
 });
 
 test("v2 with the v1 carve table matches v1 dynamics for legacy fields", () => {
