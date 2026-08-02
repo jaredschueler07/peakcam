@@ -23,10 +23,24 @@ import {
   type TerrainMeta,
   type TrailsFile,
 } from "@/lib/game/terrain/formats";
-import { clipPolylineToBox, latToPixelY, lonToPixelX, overpassQuery, rdp, type Pt } from "@/scripts/bake-resort";
+import { clipPolylineToBox, emitKtx2Texture, latToPixelY, lonToPixelX, overpassQuery, rdp, type Pt } from "@/scripts/bake-resort";
 import { RESORT_BAKE_CONFIGS } from "@/lib/game/terrain/resorts";
 
 const QUANTUM = 0.1;
+
+test("runtime raster outputs keep valid KTX2 bytes and use the KTX2 extension", () => {
+  const identifier = Buffer.from([0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const encoded = Buffer.concat([identifier, Buffer.from("payload")]);
+
+  const output = emitKtx2Texture("snow-albedo.png", encoded);
+
+  assert.equal(output.name, "snow-albedo.ktx2");
+  assert.equal(output.data, encoded);
+});
+
+test("runtime raster outputs reject bytes that are not KTX2", () => {
+  assert.throws(() => emitKtx2Texture("snow-albedo.png", Buffer.from("not ktx2")), /invalid KTX2/i);
+});
 
 function metaFor(grid: number, sizeM: number, minZ: number, maxZ: number): TerrainMeta {
   return {

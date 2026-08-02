@@ -20,9 +20,12 @@
  *                           a local intermediate, gitignored
  *   <slug>.height.u16.br    the same bytes, brotli quality 11; this is the
  *                           committed source of truth for the heightfield
- *   <slug>.height.png       16-bit grayscale PNG — inspection artifact only
+ *   <slug>.height.png       16-bit grayscale PNG — inspection artifact only,
+ *                           never a runtime texture
  *   <slug>.meta.json        georeference + decode constants
  *   <slug>.trails.json(.br) delta-encoded run/lift centrelines
+ *   *.ktx2                  any future runtime raster texture (the encoder
+ *                           supplies KTX2 bytes to emitKtx2Texture)
  *
  * Sources & licences: see public/game/terrain/LICENSE.md.
  */
@@ -288,6 +291,25 @@ function sampleCopernicus(w: CopernicusWindow, lat: number, lon: number): number
 export interface BakedFile {
   name: string;
   data: Buffer;
+}
+
+const KTX2_IDENTIFIER = Buffer.from([
+  0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a,
+]);
+
+/**
+ * Boundary for runtime raster assets produced by this bake pipeline. Encoding
+ * is deliberately upstream of this helper; it prevents raw PNG/JPEG bytes
+ * from being mislabeled while ensuring every emitted runtime texture is KTX2.
+ */
+export function emitKtx2Texture(sourceName: string, encoded: Buffer): BakedFile {
+  if (encoded.length < KTX2_IDENTIFIER.length || !encoded.subarray(0, KTX2_IDENTIFIER.length).equals(KTX2_IDENTIFIER)) {
+    throw new Error(`${sourceName}: invalid KTX2 texture bytes`);
+  }
+  return {
+    name: `${sourceName.replace(/\.[^./]+$/, "")}.ktx2`,
+    data: encoded,
+  };
 }
 
 async function bakeHeightfield(
