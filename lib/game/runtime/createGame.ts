@@ -30,6 +30,11 @@ export interface CreateGameOptions {
    * and get the profile seed.
    */
   seed?: number;
+  /**
+   * Test-only: start this many metres along the selected course instead of at
+   * the top. See `spawnOnRunAtArcLength`; the resulting run is unsubmittable.
+   */
+  spawnArcM?: number;
 }
 
 export async function loadTerrainForRuntime(
@@ -63,7 +68,7 @@ export async function createGame(options: CreateGameOptions): Promise<GameRuntim
   const assetLoadMs = performance.now() - startedAt;
   const runtime = new GameRuntime(
     options.canvas, options.profile, options.uiBridge, options.analytics, source.sampler,
-    options.conditions, options.audio, assetLoadMs, options.seed,
+    options.conditions, options.audio, assetLoadMs, options.seed, options.spawnArcM,
   );
   runtime.start();
   return runtime;

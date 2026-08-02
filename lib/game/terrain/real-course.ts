@@ -1,5 +1,5 @@
 import type { ResortGameProfile } from "../config/schema";
-import type { RealGate, RealLift, RealRamp, RealRun, RealRunPoint } from "../core/types";
+import type { RealGate, RealLift, RealRamp, RealRun, RealRunPoint, SimulationState, TerrainSampler } from "../core/types";
 import { mulberry32 } from "../core/rng";
 import type { DrapedLift, DrapedRun } from "./real-heightfield";
 
@@ -172,4 +172,51 @@ export function nearestPointOnRun(
     progress += segmentLength;
   }
   return { distance: bestDistance, progressM: bestProgress, x: bestX, z: bestZ };
+}
+
+/**
+ * Place a freshly reset simulation onto a course at a given arc length, facing
+ * downhill, at the same 15 m/s the normal spawn uses.
+ *
+ * Only the automated play→submit→board check calls this, via `?e2espawn`. It
+ * exists because a hands-off descent cannot reach the finish gate — the skier
+ * leaves the run corridor and `courseProgress` stops advancing — so the only
+ * way to exercise everything *after* the finish line was to start nearer to it.
+ * The run then finishes naturally through `checkGates` with real physics and
+ * real recorder samples; nothing about the finish itself is faked.
+ *
+ * Prod-harmless by construction rather than by obscurity: a ghost recorded from
+ * a near-finish spawn is refused by the server validator, which checks the run
+ * began in the start zone and covered at least `MIN_COURSE_DISTANCE`. Typing
+ * the parameter yields a run that cannot be submitted.
+ *
+ * This is initial state, not per-step logic: it runs once after reset and never
+ * touches the deterministic step path or the parity fixtures.
+ *
+ * @returns the arc length actually used, clamped to `[0, finishM - 10]`.
+ */
+export function spawnOnRunAtArcLength(
+  state: SimulationState,
+  run: RealRun,
+  arcM: number,
+  terrain: TerrainSampler,
+): number {
+  // A negative value counts back from the finish, so a caller can ask for "40 m
+  // out" without knowing the course length — which keeps the e2e spec free of
+  // hardcoded geometry that would rot the next time a run is re-baked.
+  const requested = arcM < 0 ? run.finishM + arcM : arcM;
+  const clamped = Math.max(0, Math.min(requested, run.finishM - 10));
+  const at = pointAtArcLength(run.points, clamped);
+  const y = terrain.height(at.x, at.z);
+
+  state.pos.x = at.x; state.pos.y = y; state.pos.z = at.z;
+  state.vel.x = Math.sin(at.heading) * 15; state.vel.y = 0; state.vel.z = Math.cos(at.heading) * 15;
+  state.yaw = at.heading;
+  state.startY = y;
+  // Seed both progress fields so the gate sweep does not treat the spawn as a
+  // single enormous forward step and award every gate behind us.
+  state.courseProgress = clamped; state.prevCourseProgress = clamped;
+  state.prevX = at.x; state.prevZ = at.z;
+  state.onGround = true; state.airTime = 0;
+  return clamped;
 }

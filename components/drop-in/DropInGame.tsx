@@ -60,6 +60,20 @@ export interface DropInRunSession {
 
 const OFFLINE_NOTICE = "Leaderboard unavailable — playing offline";
 
+/**
+ * `?e2espawn=<metres>` — start the descent that far along the course so the
+ * automated play→submit→board check can reach the finish gate. Undefined for
+ * every normal visit. See `spawnOnRunAtArcLength` for why this is harmless in
+ * production: the run it produces cannot be submitted.
+ */
+function e2eSpawnArcM(): number | undefined {
+  if (typeof location === "undefined") return undefined;
+  const raw = new URLSearchParams(location.search).get("e2espawn");
+  if (raw === null) return undefined;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 function ErrorPoster({ profile, message }: { profile: ResortGameProfile; message: string }) {
   return (
     <div className="pc-topo fixed inset-0 flex items-center justify-center p-6 text-center">
@@ -196,6 +210,12 @@ export default function DropInGame({ profile, conditions }: {
    * a later ticket lands, and reporting otherwise would advertise a run that
    * can never be submitted.
    */
+  // `data-drop-in-ticket` (rendered below) reports the ticket the *shell*
+  // holds; `data-drop-in-session` reports whether the *running descent* can be
+  // submitted. Mid-run those deliberately diverge — a ticket arriving after the
+  // start moves the first and must not move the second — and keeping both in
+  // the DOM is what lets a test wait for a response to be processed rather than
+  // sleeping and hoping.
   const sessionStateAttribute = mode === "free_ski"
     ? "local"
     : phase === "poster"
@@ -292,6 +312,10 @@ export default function DropInGame({ profile, conditions }: {
           // The ghost header carries world.seed; it must equal the ticket seed
           // or the server rejects the submission with seed_mismatch.
           seed: resolveRunSeed(runTicketRef.current, profile.seed),
+          // Test-only start offset (`?e2espawn=<metres>`). The run it produces
+          // finishes through real physics but is refused by the server
+          // validator's start-zone and minimum-distance checks.
+          spawnArcM: e2eSpawnArcM(),
           analytics: {
             controlActivated: (scheme) => track(EVENTS.DROP_IN_CONTROL_ACTIVATED, { resort: profile.slug, engine: "v2", control_scheme: scheme }),
             pointerLock: (status, errorName) => track(EVENTS.DROP_IN_POINTER_LOCK_RESULT, { resort: profile.slug, engine: "v2", pointer_lock_state: status, failure_code: errorName }),
@@ -430,6 +454,7 @@ export default function DropInGame({ profile, conditions }: {
         data-drop-in-state={phase === "playing" ? "running" : phase}
         data-drop-in-mode={session.mode}
         data-drop-in-session={sessionStateAttribute}
+        data-drop-in-ticket={ticketState.status}
       >
         <Link href={`/resorts/${profile.slug}`} className="absolute left-3 top-3 z-40 inline-flex items-center gap-2 rounded-full border-[1.5px] border-ink bg-cream-50 px-3.5 py-2 text-xs font-bold uppercase text-ink shadow-stamp-sm">
           <ArrowLeft className="h-4 w-4" aria-hidden /> Conditions
