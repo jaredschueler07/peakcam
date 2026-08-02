@@ -1,10 +1,12 @@
 import * as THREE from "three";
 import type { ResortGameProfile } from "../config/schema";
 import type { SimulationState, SimulationWorld } from "../core/types";
+import type { DecodedGhost } from "../replay/codec";
 import { CameraController } from "./CameraController";
 import { addHeightFog } from "./Atmosphere";
 import { CsmShadows } from "./CsmShadows";
 import { EffectsRenderer } from "./EffectsRenderer";
+import { GhostRenderer } from "./GhostRenderer";
 import { disposeObjectTree, resourceCounts, type DisposalAudit, type ResourceCounts } from "./resources";
 import { createScene, SUN_DIRECTION } from "./SceneFactory";
 import { SkierRenderer } from "./SkierRenderer";
@@ -69,6 +71,7 @@ export class GameRenderer {
   private readonly built: ReturnType<typeof createScene>;
   private readonly terrain: TerrainRenderer;
   private readonly skier: SkierRenderer;
+  private readonly ghost: GhostRenderer;
   private readonly worldRenderer: WorldRenderer;
   private readonly effects: EffectsRenderer;
   private readonly cameraController: CameraController;
@@ -97,6 +100,7 @@ export class GameRenderer {
     this.built = createScene(profile, Math.max(1, canvas.clientWidth) / Math.max(1, canvas.clientHeight));
     this.terrain = new TerrainRenderer(this.built.scene, world, this.built.snowUniforms);
     this.skier = new SkierRenderer(this.built.scene);
+    this.ghost = new GhostRenderer(this.built.scene);
     this.worldRenderer = new WorldRenderer(this.built.scene, profile, world);
     this.reducedMotion = options.reducedMotion ?? (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
     this.effects = new EffectsRenderer(
@@ -131,6 +135,9 @@ export class GameRenderer {
     this.built.snowUniforms.glint.value = rung >= 4 ? visualWeatherPreset(this.weather.index).glint : 0;
   }
 
+  /** Attach a decoded replay to render alongside the live skier, or `null` to clear it. */
+  setGhost(ghost: DecodedGhost | null): void { this.ghost.setGhost(ghost); }
+
   setWeather(index: number): void { if (index < 0) this.weather.cycle(); else this.weather.apply(index); this.csm.setWeather(this.weather.current, visualWeatherPreset(this.weather.index)); this.applyQuality(this.quality.rung); }
 
   render(state: SimulationState, world: SimulationWorld, dt: number, tuck: number, frameMs = dt * 1000): void {
@@ -141,7 +148,7 @@ export class GameRenderer {
       const fps = this.fpsFrames / this.fpsTime; this.fpsFrames = 0; this.fpsTime = 0;
       if (this.adaptTime >= 1.4) { this.adaptTime = 0; const quality = this.quality.observe(fps); if (quality.changed) { this.applyQuality(quality.rung); this.applySize(); } }
     }
-    this.terrain.update(state.pos.x, state.pos.z); this.worldRenderer.update(state, dt); this.skier.update(state, world.terrain, dt);
+    this.terrain.update(state.pos.x, state.pos.z); this.worldRenderer.update(state, dt); this.skier.update(state, world.terrain, dt); this.ghost.update(state.time, world.terrain);
     this.cameraController.update(state, world.terrain, dt, tuck);
     this.effects.update(state, this.built.camera, dt, this.weather.current.snow, this.weather.current.wind);
     this.built.atmosphereUniforms.referenceHeight.value = state.pos.y;
@@ -172,7 +179,7 @@ export class GameRenderer {
     if (this.disposed) return; this.disposed = true;
     this.canvas.removeEventListener("webglcontextlost", this.onContextLost as EventListener, false);
     this.canvas.removeEventListener("webglcontextrestored", this.onContextRestored as EventListener, false);
-    this.post?.dispose(); this.post = null; this.csm.dispose();
+    this.post?.dispose(); this.post = null; this.csm.dispose(); this.ghost.setGhost(null);
     disposeObjectTree(this.built.scene, this.options.disposalAudit); this.renderer.renderLists.dispose(); this.renderer.dispose(); this.renderer.forceContextLoss();
   }
 }
