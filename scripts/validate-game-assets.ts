@@ -97,9 +97,22 @@ function validateMeta(r: Report, meta: unknown, cfg: ResortBakeConfig): meta is 
   if (!isNum(m.minZ) || !isNum(m.maxZ) || (m.minZ as number) >= (m.maxZ as number)) {
     problems.push(`minZ/maxZ ${String(m.minZ)}/${String(m.maxZ)}`);
   }
-  if (m.source !== "terrarium" && m.source !== "copernicus") problems.push(`source=${String(m.source)}`);
+  if (m.source !== "terrarium" && m.source !== "copernicus" && m.source !== "3dep" && m.source !== "3dep-seamless") {
+    problems.push(`source=${String(m.source)}`);
+  }
   if (m.source === "terrarium" ? !isNum(m.sourceZoom) : m.sourceZoom !== null) {
     problems.push(`sourceZoom=${String(m.sourceZoom)}`);
+  }
+  if (JSON.stringify(m.demSource) !== JSON.stringify(cfg.demSource)) {
+    problems.push(`demSource=${JSON.stringify(m.demSource)}`);
+  }
+  if (m.source === "terrarium" ? m.epsg !== null : !Number.isInteger(m.epsg)) {
+    problems.push(`epsg=${String(m.epsg)}`);
+  }
+  const expectedSourceResolution =
+    m.source === "3dep" ? 1 : m.source === "3dep-seamless" ? 10 : m.source === "copernicus" ? 30 : null;
+  if (expectedSourceResolution !== null && m.sourceResolutionM !== expectedSourceResolution) {
+    problems.push(`sourceResolutionM=${String(m.sourceResolutionM)}`);
   }
   if (m.orientation !== HEIGHTFIELD_ORIENTATION) problems.push("orientation string drifted");
   if (typeof m.bakedAt !== "string" || Number.isNaN(Date.parse(m.bakedAt as string))) {

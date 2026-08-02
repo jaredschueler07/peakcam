@@ -38,7 +38,13 @@
 export const HEIGHTFIELD_ORIENTATION =
   "row-major; row 0 = north edge, col 0 = west edge; x east, y north, both in metres from center";
 
-export type TerrainSource = "terrarium" | "copernicus";
+/**
+ * The `kind` of the DEM a bake used. "3dep" and "3dep-seamless" are separate
+ * products (1 m lidar vs ~10 m seamless) and must stay separate here — a bare
+ * "3dep" that could mean either resolution is a provenance claim the asset
+ * cannot support.
+ */
+export type TerrainSource = "terrarium" | "copernicus" | "3dep" | "3dep-seamless";
 
 export interface TerrainMeta {
   /** Format version of this meta + .u16 pair. */
@@ -59,6 +65,12 @@ export interface TerrainMeta {
   source: TerrainSource;
   /** Web-Mercator zoom level sampled (terrarium only; null for COG sources). */
   sourceZoom: number | null;
+  /** Exact upstream dataset selection used for this bake. */
+  demSource: DemSource;
+  /** Projected CRS used for sampling, or null for the legacy Terrarium fallback. */
+  epsg: number | null;
+  /** Native horizontal resolution advertised by the source dataset, metres. */
+  sourceResolutionM: number;
   /** Human-readable orientation contract — equals HEIGHTFIELD_ORIENTATION. */
   orientation: string;
   /** ISO-8601 timestamp of the bake. */
@@ -300,3 +312,4 @@ export function decodeTrails(json: TrailsFile): Trails {
     })),
   };
 }
+import type { DemSource } from "../../../scripts/dem/sources";

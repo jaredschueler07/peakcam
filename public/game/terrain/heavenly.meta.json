@@ -7,11 +7,16 @@
   ],
   "sizeM": 6144,
   "grid": 1024,
-  "minZ": 1900.2,
-  "maxZ": 3065.4,
+  "minZ": 1899.9,
+  "maxZ": 3064.2,
   "quantum": 0.1,
-  "source": "terrarium",
-  "sourceZoom": 14,
+  "source": "3dep-seamless",
+  "sourceZoom": null,
+  "demSource": {
+    "kind": "3dep-seamless"
+  },
+  "epsg": 32611,
+  "sourceResolutionM": 10,
   "orientation": "row-major; row 0 = north edge, col 0 = west edge; x east, y north, both in metres from center",
-  "bakedAt": "2026-08-01T18:25:30.747Z"
+  "bakedAt": "2026-08-02T20:28:55.126Z"
 }
