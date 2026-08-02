@@ -7,11 +7,19 @@
   ],
   "sizeM": 6144,
   "grid": 1024,
-  "minZ": 2875.7,
-  "maxZ": 4017.1,
+  "minZ": 2869,
+  "maxZ": 4024.5,
   "quantum": 0.1,
-  "source": "terrarium",
-  "sourceZoom": 14,
+  "source": "3dep",
+  "sourceZoom": null,
+  "demSource": {
+    "kind": "3dep",
+    "projects": [
+      "CO_Central_Western_2016"
+    ]
+  },
+  "epsg": 32613,
+  "sourceResolutionM": 1,
   "orientation": "row-major; row 0 = north edge, col 0 = west edge; x east, y north, both in metres from center",
-  "bakedAt": "2026-08-01T18:25:15.141Z"
+  "bakedAt": "2026-08-02T20:28:42.256Z"
 }

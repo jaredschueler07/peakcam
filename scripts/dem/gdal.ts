@@ -1,4 +1,5 @@
 import { execFile, spawn } from "node:child_process";
+import { fromFile } from "geotiff";
 
 type TranslateOptions = {
   /** Geographic bounds `[west, south, east, north]`. */
@@ -37,11 +38,21 @@ export function vrtArgs(inputs: string[], out: string): string[] {
   return [out, ...inputs];
 }
 
-export function warpArgs(input: string, out: string, epsg: number, resM: number, grid?: WarpGrid): string[] {
+export function warpArgs(
+  input: string,
+  out: string,
+  epsg: number,
+  resM: number,
+  grid?: WarpGrid,
+  dstNodata?: number,
+): string[] {
   const args = [
     "-t_srs",
     `EPSG:${epsg}`,
   ];
+  // Without -dstnodata, cells no source tile reaches keep gdalwarp's init value
+  // (0 m) and read as real terrain. Tagging them makes the gap detectable.
+  if (dstNodata !== undefined) args.push("-dstnodata", String(dstNodata));
   if (grid) {
     const { west, south, east, north } = grid.bounds;
     args.push("-te", String(west), String(south), String(east), String(north));
@@ -73,8 +84,35 @@ export async function warpToUtm(
   epsg: number,
   resolutionM: number,
   grid?: WarpGrid,
+  dstNodata?: number,
 ): Promise<void> {
-  await run("gdalwarp", warpArgs(input, out, epsg, resolutionM, grid));
+  await run("gdalwarp", warpArgs(input, out, epsg, resolutionM, grid, dstNodata));
+}
+
+export function fillNodataArgs(input: string, out: string, maxDistancePx: number): string[] {
+  // Inverse-distance interpolation from the hole edges, and deliberately zero
+  // smoothing iterations: smoothing would also touch the real terrain around
+  // the hole, changing cells that had perfectly good source data.
+  return ["-q", "-md", String(maxDistancePx), "-interp", "inv_dist", "-of", "GTiff", input, out];
+}
+
+/** Interpolate the band's tagged nodata cells from their surrounding values. */
+export async function fillNodata(input: string, out: string, maxDistancePx: number): Promise<void> {
+  await run("gdal_fillnodata", fillNodataArgs(input, out, maxDistancePx));
+}
+
+export type Raster = { values: ArrayLike<number>; width: number; height: number };
+
+/** Read band 1 of a GeoTIFF into memory, in natural north-to-south row order. */
+export async function readRaster(path: string): Promise<Raster> {
+  const tiff = await fromFile(path);
+  const image = await tiff.getImage();
+  const rasters = await image.readRasters();
+  return {
+    values: rasters[0] as ArrayLike<number>,
+    width: image.getWidth(),
+    height: image.getHeight(),
+  };
 }
 
 /** Transform one XY coordinate with GDAL/PROJ, returning projected XY. */

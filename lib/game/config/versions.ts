@@ -17,4 +17,11 @@
  */
 
 export const PHYSICS_VERSION = 1;
-export const COURSE_VERSION = 1;
+/**
+ * 2 — the Phase 1 DEM upgrade re-baked every heightfield from a real elevation
+ * source (Portillo Copernicus GLO-30, Breckenridge 3DEP 1 m lidar, Heavenly
+ * 3DEP 1/3 arc-second seamless), which moved the terrain under every course
+ * and shifted one gate. `PHYSICS_VERSION` deliberately stays 1: the
+ * deterministic core is byte-for-byte unchanged, only the ground it runs over.
+ */
+export const COURSE_VERSION = 2;

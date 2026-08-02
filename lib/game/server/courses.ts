@@ -78,7 +78,7 @@ export const COURSE_GATES: Readonly<
     "las-vizcachas": { startZ: -1040.6, finishZ: -878.3 },
   },
   breckenridge: {
-    "horseshoe-bowl": { startZ: 290.4, finishZ: -197.2 },
+    "horseshoe-bowl": { startZ: 290.4, finishZ: 86.7 },
     "imperial-bowl": { startZ: 269.2, finishZ: 522.3 },
     "devil-s-crotch": { startZ: 1334.6, finishZ: 929.6 },
     "four-o-clock": { startZ: 459.5, finishZ: 222 },

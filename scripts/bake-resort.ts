@@ -58,14 +58,25 @@ import {
   mPerDegLon,
   type ResortBakeConfig,
 } from "@/lib/game/terrain/resorts";
-import { buildVrt, transformPoint, warpToUtm } from "./dem/gdal";
+import { buildVrt, fillNodata, readRaster, transformPoint, warpToUtm, type Raster } from "./dem/gdal";
 import { utmZoneFor } from "./dem/utm";
 import {
   fetch3depTiles,
   resolveDemSource,
+  seamlessCellUrl,
+  seamlessCellsFor,
   type DemSource,
   type UtmBounds,
 } from "./dem/sources";
+import {
+  WARP_NODATA,
+  assertPlausibleElevations,
+  auditNodata,
+  nodataExtentCorners,
+  nodataFailureMessage,
+  nodataSummary,
+  type SourceMosaic,
+} from "./dem/nodata";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -251,16 +262,8 @@ export function projectedRasterBounds(
   };
 }
 
-/** Load a projected raster once, then sample its natural north-to-south rows directly. */
-export async function sampleFromWarpedTiff(
-  tiffPath: string,
-): Promise<(row: number, col: number) => number> {
-  const tiff = await fromFile(tiffPath);
-  const image = await tiff.getImage();
-  const width = image.getWidth();
-  const height = image.getHeight();
-  const rasters = await image.readRasters();
-  const values = rasters[0] as ArrayLike<number>;
+/** Index a projected raster by its natural north-to-south, west-to-east cells. */
+export function samplerFor({ values, width, height }: Raster): (row: number, col: number) => number {
   return (row: number, col: number): number => {
     if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || col < 0 || row >= height || col >= width) {
       throw new RangeError(`sample (${row}, ${col}) is outside ${width}x${height} warped raster`);
@@ -269,11 +272,76 @@ export async function sampleFromWarpedTiff(
   };
 }
 
+/** Load a projected raster once, then sample its natural north-to-south rows directly. */
+export async function sampleFromWarpedTiff(
+  tiffPath: string,
+): Promise<(row: number, col: number) => number> {
+  return samplerFor(await readRaster(tiffPath));
+}
+
+/**
+ * Fill the warp's nodata cells or refuse to bake.
+ *
+ * A hole within the fill budget is interpolated from its own edges, which is
+ * safe at that size and beats failing a bake over a handful of cells. Anything
+ * larger means the configured projects genuinely do not span the bake box, and
+ * the only useful response is to say so precisely — with the count, the share,
+ * the projects that were tried, and where the hole is — so the fix is to add a
+ * project rather than to go hunting through the quantiser.
+ */
+export async function resolveNodata(
+  slug: string,
+  warpedPath: string,
+  workDir: string,
+  bounds: UtmBounds,
+  epsg: number,
+  mosaic: SourceMosaic,
+): Promise<Raster> {
+  const raster = await readRaster(warpedPath);
+  const audit = auditNodata(raster.values, raster.width, raster.height);
+  if (audit.decision === "clean") return raster;
+
+  const corners = nodataExtentCorners(audit.extent!, bounds, raster.width, raster.height);
+  const summary = nodataSummary(slug, mosaic, audit, corners, epsg);
+  if (audit.decision === "fail") {
+    throw new Error(nodataFailureMessage(slug, mosaic, audit, corners, epsg));
+  }
+
+  console.warn(`  ! ${summary} Within the fill budget — interpolating from the hole edges.`);
+  const filledPath = path.join(workDir, "filled.tif");
+  // The hole's own diagonal bounds how far the interpolator ever has to reach.
+  const span = Math.max(
+    audit.extent!.maxCol - audit.extent!.minCol,
+    audit.extent!.maxRow - audit.extent!.minRow,
+  );
+  await fillNodata(warpedPath, filledPath, Math.max(span + 1, 8));
+
+  const filled = await readRaster(filledPath);
+  const after = auditNodata(filled.values, filled.width, filled.height);
+  if (after.count > 0) {
+    // gdal_fillnodata only knows the cells the band tags as nodata; anything
+    // still bad here is an undeclared source sentinel it could not see.
+    throw new Error(
+      `${slug}: ${after.count} cells still had no data after interpolation ` +
+        `(${after.uncovered} uncovered, ${after.implausible} implausible) — gdal_fillnodata only sees ` +
+        `cells the band tags as nodata, so an undeclared source sentinel survives it. ${summary}`,
+    );
+  }
+  return filled;
+}
+
 export function terrainProvenance(
   demSource: DemSource,
   epsg: number | null,
 ): Pick<TerrainMeta, "demSource" | "epsg" | "sourceResolutionM"> {
-  const sourceResolutionM = demSource.kind === "3dep" ? 1 : demSource.kind === "copernicus" ? 30 : 0;
+  const sourceResolutionM =
+    demSource.kind === "3dep"
+      ? 1
+      : demSource.kind === "3dep-seamless"
+        ? 10
+        : demSource.kind === "copernicus"
+          ? 30
+          : 0;
   return { demSource, epsg, sourceResolutionM };
 }
 
@@ -289,26 +357,52 @@ async function projectedSampler(
   const warpedPath = path.join(workDir, "warped.tif");
   try {
     let inputs: string[];
-    if (demSource.kind === "3dep") {
+    let projects: string[];
+    if (demSource.kind === "3dep-seamless") {
+      const [cLat, cLon] = cfg.center;
+      const half = cfg.sizeM / 2;
+      // A degree of margin buys nothing; ~1 km covers the ENU approximation and
+      // only pulls a neighbouring cell when the box really is near a boundary.
+      const margin = 0.01;
+      const cells = seamlessCellsFor({
+        south: cLat - half / M_PER_DEG_LAT - margin,
+        north: cLat + half / M_PER_DEG_LAT + margin,
+        west: cLon - half / mPerDegLon(cLat) - margin,
+        east: cLon + half / mPerDegLon(cLat) + margin,
+      });
+      projects = cells;
+      inputs = cells.map((cell) => `/vsicurl/${seamlessCellUrl(cell)}`);
+      console.log(`  3DEP seamless (1/3 arc-second, ~10 m): ${cells.join(", ")}`);
+    } else if (demSource.kind === "3dep") {
       const cacheRoot = process.env.PEAKCAM_DEM_CACHE || path.join(os.tmpdir(), "peakcam-dem-cache");
-      inputs = await fetch3depTiles(
-        demSource.project,
-        bounds,
-        path.join(cacheRoot, demSource.project),
-      );
+      projects = demSource.projects;
+      inputs = await fetch3depTiles(projects, bounds, cacheRoot, fetch, ({ project, tiles }) => {
+        const note = tiles === 0 ? " — contributes nothing to this box" : "";
+        console.log(`  3DEP ${project}: ${tiles} tile(s)${note}`);
+      });
     } else {
+      projects = [demSource.tile];
       const name = `Copernicus_DSM_COG_10_${demSource.tile}_DEM`;
       inputs = [`/vsicurl/${COPERNICUS_URL}/${name}/${name}.tif`];
     }
+    // A single VRT over every project's tiles, then one warp: GDAL resolves the
+    // overlaps and reprojects once, so no seam is introduced by the mosaicking
+    // itself. Projects flown in different years still differ where they meet.
     await buildVrt(inputs, vrtPath);
     const cellSizeM = cfg.sizeM / (GRID - 1);
-    await warpToUtm(vrtPath, warpedPath, epsg, cellSizeM, {
-      bounds,
-      width: GRID,
-      height: GRID,
+    await warpToUtm(
+      vrtPath,
+      warpedPath,
+      epsg,
+      cellSizeM,
+      { bounds, width: GRID, height: GRID },
+      WARP_NODATA,
+    );
+    const raster = await resolveNodata(cfg.slug, warpedPath, workDir, bounds, epsg, {
+      projects,
+      tiles: inputs.length,
     });
-    const sample = await sampleFromWarpedTiff(warpedPath);
-    return { sample, epsg };
+    return { sample: samplerFor(raster), epsg };
   } finally {
     // sampleFromWarpedTiff materializes the band, so the intermediates are no longer needed.
     fs.rmSync(workDir, { recursive: true, force: true });
@@ -337,6 +431,20 @@ export function emitKtx2Texture(sourceName: string, encoded: Buffer): BakedFile 
     name: `${sourceName.replace(/\.[^./]+$/, "")}.ktx2`,
     data: encoded,
   };
+}
+
+/**
+ * Guard the quantiser's inputs, in that order: implausible elevations first,
+ * then the uint16 range. A nodata sentinel reaching here otherwise surfaces as
+ * "relief 1003065 m exceeds uint16 range", which points the reader at the
+ * encoding when the real problem is the source data.
+ */
+export function assertBakeableRelief(slug: string, sampleMin: number, sampleMax: number): void {
+  assertPlausibleElevations(slug, sampleMin, sampleMax);
+  const minZ = Math.floor(sampleMin / QUANTUM) * QUANTUM;
+  if (quantizeHeight(sampleMax, minZ, QUANTUM) >= 65535) {
+    throw new Error(`${slug}: relief ${(sampleMax - sampleMin).toFixed(0)} m exceeds uint16 range at ${QUANTUM} m`);
+  }
 }
 
 async function bakeHeightfield(
@@ -380,13 +488,11 @@ async function bakeHeightfield(
     if (v < sampleMin) sampleMin = v;
     if (v > sampleMax) sampleMax = v;
   }
+  assertBakeableRelief(cfg.slug, sampleMin, sampleMax);
   // Snap the datum to a quantum multiple so the encoding is reproducible and
   // code 0 means exactly minZ.
   const minZ = Number((Math.floor(sampleMin / QUANTUM) * QUANTUM).toFixed(3));
   const maxCode = quantizeHeight(sampleMax, minZ, QUANTUM);
-  if (maxCode >= 65535) {
-    throw new Error(`${cfg.slug}: relief ${(sampleMax - sampleMin).toFixed(0)} m exceeds uint16 range at ${QUANTUM} m`);
-  }
   const maxZ = Number((minZ + maxCode * QUANTUM).toFixed(3));
 
   const u16 = Buffer.alloc(GRID * GRID * 2);

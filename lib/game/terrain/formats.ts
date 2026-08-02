@@ -38,7 +38,13 @@
 export const HEIGHTFIELD_ORIENTATION =
   "row-major; row 0 = north edge, col 0 = west edge; x east, y north, both in metres from center";
 
-export type TerrainSource = "terrarium" | "copernicus" | "3dep";
+/**
+ * The `kind` of the DEM a bake used. "3dep" and "3dep-seamless" are separate
+ * products (1 m lidar vs ~10 m seamless) and must stay separate here — a bare
+ * "3dep" that could mean either resolution is a provenance claim the asset
+ * cannot support.
+ */
+export type TerrainSource = "terrarium" | "copernicus" | "3dep" | "3dep-seamless";
 
 export interface TerrainMeta {
   /** Format version of this meta + .u16 pair. */

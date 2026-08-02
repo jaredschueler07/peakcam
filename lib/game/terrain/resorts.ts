@@ -66,7 +66,7 @@ export const RESORT_BAKE_CONFIGS: Record<string, ResortBakeConfig> = {
     bbox: [39.42, -106.15, 39.53, -106.01],
     convention: "north_america",
     elevationBand: [2917, 3910],
-    demSource: { kind: "3dep", project: "CO_Central_and_WesternCO_2016_A16" },
+    demSource: { kind: "3dep", projects: ["CO_Central_Western_2016"] },
   },
   heavenly: {
     slug: "heavenly",
@@ -76,7 +76,24 @@ export const RESORT_BAKE_CONFIGS: Record<string, ResortBakeConfig> = {
     bbox: [38.89, -120.02, 38.97, -119.88],
     convention: "north_america",
     elevationBand: [2025, 3052],
-    demSource: { kind: "3dep", project: "CA_SierraNevada_B22" },
+    /**
+     * Seamless ~10 m, not 1 m lidar — deliberately, and verified by probe.
+     *
+     * No 3DEP 1 m project covers Heavenly's ski area. CA_SierraNevada_B22 and
+     * NV_Reno_Carson_QL1_2017 both stage the two tiles the box needs
+     * (x24y432, x25y432) and both return nodata at the actual coordinates:
+     * gdallocationinfo at UTM 11N (249000, 4314000) and (250500, 4314000) gives
+     * -999999 from every one of them. Mosaicking CA alone leaves 29.86% of the
+     * grid empty; adding NV takes it to 29.00%. A staged tile existing is not
+     * coverage.
+     *
+     * The 1/3 arc-second seamless layer does cover it (probe at the centre:
+     * 2790.23 m). Breckenridge deliberately stays on 1 m lidar, which averaged
+     * to this 6 m grid genuinely beats 10 m; only Heavenly drops down, and the
+     * meta records "3dep-seamless" so no asset can claim a resolution it does
+     * not have.
+     */
+    demSource: { kind: "3dep-seamless" },
   },
 };
 
