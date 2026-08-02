@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { HEIGHTFIELD_ORIENTATION, type TerrainMeta, type TrailsFile } from "../../terrain/formats";
 import { TerrainAssetLoader } from "./TerrainAssetLoader";
+import { assertAcceptableReceivers, receiverCheckingFetch } from "./fetch-receiver.fixture";
 
 const meta: TerrainMeta = {
   version: 1, slug: "heavenly", center: [38.9404, -119.912], sizeM: 16, grid: 2,
@@ -50,4 +51,28 @@ test("terrain loader aborts all in-flight pack requests", async () => {
   const pending = loader.load("heavenly");
   loader.abort();
   await assert.rejects(pending, (reason) => reason instanceof DOMException && reason.name === "AbortError");
+});
+
+test("the terrain fetcher is also invoked with a receiver real fetch accepts", async () => {
+  // This loader is correct today only by accident of call shape: it hands the fetcher to a free
+  // helper (`checked`), which calls it unbound. A refactor to `this.fetcher(...)` would break it
+  // exactly as it broke FarFieldAssetLoader — a browser-only `TypeError: Illegal invocation` that
+  // no plain-function fake can see. Pin it here so the refactor fails in CI instead.
+  const bodies = new Map<string, BodyInit>([
+    ["/game/terrain/heavenly.meta.json", JSON.stringify(meta)],
+    ["/game/terrain/heavenly.trails.json", JSON.stringify(trails)],
+    ["/game/terrain/heavenly.height.u16.br", new Uint8Array(8)],
+  ]);
+  const recorded = receiverCheckingFetch((url) => new Response(bodies.get(url) ?? "", { status: bodies.has(url) ? 200 : 404 }));
+
+  const assets = await new TerrainAssetLoader(recorded.fetcher).load("heavenly");
+
+  assertAcceptableReceivers(recorded, "TerrainAssetLoader");
+  assert.equal(recorded.urls.length, 3);
+  assert.equal(assets.meta.slug, "heavenly");
+});
+
+test("the terrain loader's default fetcher survives being called as a method", () => {
+  const loader = new TerrainAssetLoader() as unknown as { fetcher: { name: string } };
+  assert.equal(loader.fetcher.name, "bound fetch");
 });

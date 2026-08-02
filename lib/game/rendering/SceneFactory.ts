@@ -16,8 +16,9 @@ export const SUN_DIRECTION = new THREE.Vector3(-0.46, 0.62, -0.64).normalize();
  *
  * The cost is depth precision: at near 0.5 a 24-bit depth buffer resolves roughly 100 m at 30 km.
  * That is inside one far-field cell (256-384 m out there), so it should hold, but horizon z-fighting
- * is the first thing to check in a visual pass — and it would be a WebGL-only artefact, since the
- * WebGPU path uses a reversed depth buffer.
+ * is worth checking in a visual pass — **on both backends**. three's `reversedDepthBuffer` defaults
+ * to false and `backend.ts` never enables it, so WebGPU has exactly the same precision here as
+ * WebGL; an earlier version of this comment claimed otherwise and was wrong.
  */
 export const CAMERA_FAR = 34_000;
 

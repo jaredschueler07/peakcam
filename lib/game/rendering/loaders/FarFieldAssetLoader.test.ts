@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { encodeFarField, type FarFieldWedge } from "../../terrain/far-field-format";
 import { FarFieldAssetLoader } from "./FarFieldAssetLoader";
+import { assertAcceptableReceivers, receiverCheckingFetch } from "./fetch-receiver.fixture";
 
 const CENTRE: [number, number] = [-32.842, -70.129];
 const RADIUS_M = 30_000;
@@ -91,4 +92,34 @@ test("an abort propagates — the caller cancelled and needs to know", async () 
   const pending = loader.load("ski-portillo", { expect: EXPECT, signal: controller.signal });
   controller.abort();
   await assert.rejects(pending, (e: unknown) => e instanceof DOMException && e.name === "AbortError");
+});
+
+test("the fetcher is invoked with a receiver real fetch accepts", async () => {
+  // The bug this pins shipped: `this.fetcher(url)` is a method call, and fetch's WebIDL binding
+  // rejects any receiver that is not the global — `TypeError: Illegal invocation`. Every existing
+  // test passed anyway, because a plain injected function does not care what `this` is. The loader
+  // then swallowed the TypeError as "unusable asset" and fell back to the ridge bands, so the far
+  // field silently never rendered while looking like a working fallback.
+  const bytes = asset();
+  const recorded = receiverCheckingFetch(() => ({
+    ok: true, status: 200, arrayBuffer: async () => bytes.slice().buffer,
+  } as unknown as Response));
+
+  const warnings: string[] = [];
+  const loaded = await new FarFieldAssetLoader(recorded.fetcher).load("ski-portillo", {
+    expect: EXPECT, onWarn: (m) => warnings.push(m),
+  });
+
+  assertAcceptableReceivers(recorded, "FarFieldAssetLoader");
+  assert.deepEqual(warnings, [], `the load warned instead of succeeding: ${warnings[0]}`);
+  assert.ok(loaded, "a well-formed asset over an honest fetch stub must load");
+});
+
+test("the default fetcher survives being called as a method", () => {
+  // Belt to the call-shape braces: even if someone reintroduces `this.fetcher(...)`, the bound
+  // default keeps production working.
+  const loader = new FarFieldAssetLoader() as unknown as { fetcher: (i: string) => Promise<Response> };
+  assert.equal(typeof loader.fetcher, "function");
+  // A bound function ignores its receiver, which is exactly the property being asserted.
+  assert.equal(loader.fetcher.name, "bound fetch");
 });

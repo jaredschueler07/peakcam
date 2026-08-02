@@ -32,7 +32,14 @@ export interface FarFieldLoadOptions {
 export class FarFieldAssetLoader {
   private controller: AbortController | null = null;
 
-  constructor(private readonly fetcher: FetchLike = fetch) {}
+/**
+   * `fetch` is bound to the global on purpose. Its WebIDL binding rejects any receiver that is not
+   * the `Window`/`WorkerGlobalScope`, so calling an unbound `fetch` as a *method* —
+   * `this.fetcher(url)` — throws `TypeError: Illegal invocation` in the browser while working
+   * perfectly in every test that injects a plain function, because a plain function does not care
+   * what `this` is. Binding here makes the loader correct under either call shape.
+   */
+  constructor(private readonly fetcher: FetchLike = fetch.bind(globalThis)) {}
 
   abort(): void {
     this.controller?.abort(new DOMException("Far field load aborted", "AbortError"));
@@ -49,7 +56,10 @@ export class FarFieldAssetLoader {
 
     try {
       const url = farFieldAssetUrl(slug);
-      const response = await this.fetcher(url, { signal: controller.signal });
+      // Read into a local first: `this.fetcher(...)` would call it as a method, and an
+      // unbound `fetch` rejects a non-global receiver. See the constructor.
+      const fetcher = this.fetcher;
+      const response = await fetcher(url, { signal: controller.signal });
       if (!response.ok) {
         warn(`[Drop In] no far field for ${slug} (${response.status}); keeping the ridge bands`);
         return null;
