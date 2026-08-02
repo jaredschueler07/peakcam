@@ -2,24 +2,62 @@ import * as THREE from "three";
 import type { ResortGameProfile } from "../config/schema";
 import { mulberry32 } from "../core/rng";
 import type { SnowUniforms } from "./SnowMaterial";
+import { createSnowNodeUniforms } from "./SnowNodeMaterial";
 import type { AtmosphereUniforms } from "./Atmosphere";
+import { createAtmosphereFog, createAtmosphereNodeUniforms } from "./AtmosphereNode";
+import { createSkyNodeMaterial, createSkyNodeUniforms } from "./SkyNodeMaterial";
+import type { RendererBackendKind } from "./backend";
 import { visualWeatherPreset } from "./VisualPresets";
+import { SNOW_DEBUG, snowDebugMode } from "./debugFlags";
 
 export const SUN_DIRECTION = new THREE.Vector3(-0.46, 0.62, -0.64).normalize();
+
+/**
+ * Both backends carry the same uniform *shape*: the WebGL path uses `THREE.IUniform` objects and
+ * the WebGPU path uses TSL `uniform()` nodes, and both expose `.value`. Renderer and
+ * WeatherRenderer are written against these structural types so they need no backend branch.
+ */
+/** A type alias, not an interface, so it still satisfies `ShaderMaterial`'s indexed uniform map. */
+export type SkyUniformSet = {
+  uTop: { value: THREE.Color };
+  uMid: { value: THREE.Color };
+  uHorizon: { value: THREE.Color };
+  uCloud: { value: THREE.Color };
+  uCloudiness: { value: number };
+  uTime: { value: number };
+  uSun: { value: THREE.Color };
+  uSunDir: { value: THREE.Vector3 };
+  uHaze: { value: number };
+};
+
+export interface SnowUniformSet {
+  horizon: { value: THREE.Color };
+  glint: { value: number };
+  track: { value: THREE.Vector4 };
+}
+
+export interface AtmosphereUniformSet {
+  density: { value: number };
+  heightFalloff: { value: number };
+  referenceHeight: { value: number };
+  blue: { value: THREE.Color };
+  warm: { value: THREE.Color };
+  sunDirection: { value: THREE.Vector3 };
+}
 
 export interface GameScene {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
-  sky: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial>;
-  skyUniforms: Record<string, THREE.IUniform>;
+  sky: THREE.Mesh<THREE.SphereGeometry, THREE.Material>;
+  skyUniforms: SkyUniformSet;
   sun: THREE.DirectionalLight;
   hemi: THREE.HemisphereLight;
   ambient: THREE.AmbientLight;
   sunDisc: THREE.Mesh;
   sunGlow: THREE.Mesh;
   peaks: THREE.Group;
-  snowUniforms: SnowUniforms;
-  atmosphereUniforms: AtmosphereUniforms;
+  snowUniforms: SnowUniformSet;
+  atmosphereUniforms: AtmosphereUniformSet;
 }
 
 function makeRidge(radius: number, height: number, seed: number, low: number, high: number, segments: number) {
@@ -51,7 +89,8 @@ function makeRidge(radius: number, height: number, seed: number, low: number, hi
   return geometry;
 }
 
-export function createScene(profile: ResortGameProfile, aspect: number): GameScene {
+export function createScene(profile: ResortGameProfile, aspect: number, backendKind: RendererBackendKind = "webgl"): GameScene {
+  const nodes = backendKind === "webgpu";
   const weather = profile.weather[0], visual = visualWeatherPreset(0), scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(weather.fogCol, weather.fog);
   const camera = new THREE.PerspectiveCamera(65, aspect, 0.5, 6000);
@@ -63,12 +102,20 @@ export function createScene(profile: ResortGameProfile, aspect: number): GameSce
   sun.shadow.bias = -0.0009; sun.shadow.normalBias = 0.35;
   scene.add(hemi, ambient, sun, sun.target);
 
-  const skyUniforms: Record<string, THREE.IUniform> = {
+  const skyGeometry = new THREE.SphereGeometry(3400, 32, 20);
+  const skyNodeUniforms = nodes ? createSkyNodeUniforms({
+    top: new THREE.Color(weather.top), mid: new THREE.Color(visual.mid), horizon: new THREE.Color(weather.hor),
+    cloud: new THREE.Color(visual.cloud), cloudiness: visual.cloudiness, sun: new THREE.Color(visual.sunCol),
+    sunDir: SUN_DIRECTION.clone(), haze: weather.haze,
+  }) : null;
+  const skyUniforms: SkyUniformSet = skyNodeUniforms ?? {
     uTop: { value: new THREE.Color(weather.top) }, uMid: { value: new THREE.Color(visual.mid) }, uHorizon: { value: new THREE.Color(weather.hor) },
     uCloud: { value: new THREE.Color(visual.cloud) }, uCloudiness: { value: visual.cloudiness }, uTime: { value: 0 },
     uSun: { value: new THREE.Color(visual.sunCol) }, uSunDir: { value: SUN_DIRECTION.clone() }, uHaze: { value: weather.haze },
   };
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(3400, 32, 20), new THREE.ShaderMaterial({
+  const sky = skyNodeUniforms
+    ? new THREE.Mesh(skyGeometry, createSkyNodeMaterial(skyNodeUniforms) as THREE.Material)
+    : new THREE.Mesh(skyGeometry, new THREE.ShaderMaterial({
     uniforms: skyUniforms, side: THREE.BackSide, depthWrite: false, fog: false,
     vertexShader: "varying vec3 vDir; void main(){vDir=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
     fragmentShader: `uniform vec3 uTop,uMid,uHorizon,uCloud,uSun,uSunDir;uniform float uHaze,uCloudiness,uTime;varying vec3 vDir;
@@ -85,15 +132,26 @@ void main(){vec3 d=normalize(vDir);float t=clamp(d.y*.5+.5,0.,1.);vec3 c=mix(uHo
   const near = new THREE.Mesh(makeRidge(1750, 460 * profile.relief, 31 + ridgeSeed, 0x53749e, 0xd6e9ff, 96), ridgeMaterial());
   far.position.y = 120; near.position.y = 40; far.frustumCulled = near.frustumCulled = false;
   peaks.add(far, near); scene.add(peaks);
-  const snowUniforms: SnowUniforms = {
+  const snowUniforms: SnowUniformSet = nodes ? createSnowNodeUniforms(new THREE.Color(weather.hor), visual.glint) : {
     horizon: { value: new THREE.Color(weather.hor) },
     glint: { value: visual.glint },
     track: { value: new THREE.Vector4(1e6, 1e6, 1e6, 1e6) },
-  };
-  const atmosphereUniforms: AtmosphereUniforms = {
+  } satisfies SnowUniforms;
+  const atmosphereUniforms: AtmosphereUniformSet = nodes ? createAtmosphereNodeUniforms({
+    // Always explicit: the module's own default density is a placeholder, not this weather preset.
+    density: weather.fog, heightFalloff: 0.025, referenceHeight: 0,
+    blue: new THREE.Color(visual.fogBlue), warm: new THREE.Color(visual.fogWarm),
+    sunDirection: SUN_DIRECTION.clone(),
+  }) : {
     density: { value: weather.fog }, heightFalloff: { value: 0.025 }, referenceHeight: { value: 0 },
     blue: { value: new THREE.Color(visual.fogBlue) }, warm: { value: new THREE.Color(visual.fogWarm) },
     sunDirection: { value: SUN_DIRECTION.clone() },
-  };
+  } satisfies AtmosphereUniforms;
+  if (nodes && snowDebugMode() !== SNOW_DEBUG.NO_FOG) {
+    // An explicit scene.fogNode wins over the FogExp2 three would otherwise derive from scene.fog
+    // (NodeManager.getFogNode), so the height fog replaces it rather than stacking with it.
+    (scene as THREE.Scene & { fogNode?: unknown }).fogNode =
+      createAtmosphereFog(atmosphereUniforms as Parameters<typeof createAtmosphereFog>[0]);
+  }
   return { scene, camera, sky, skyUniforms, sun, hemi, ambient, sunDisc, sunGlow, peaks, snowUniforms, atmosphereUniforms };
 }

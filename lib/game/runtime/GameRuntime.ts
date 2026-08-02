@@ -73,6 +73,27 @@ export class CompetitiveRecordingArm {
   }
 }
 
+/**
+ * The last step of loading: hold the bar at 95% while the shaders compile, then start. Extracted
+ * so the ordering is testable without a canvas — a pre-warm that resolves after `start()` would
+ * defeat the point, and a pre-warm that throws must never strand the player on the loading screen.
+ */
+export async function warmUpAndStart(
+  ui: Pick<UiBridge, "setLoadingProgress">,
+  renderer: { prewarm(): Promise<void> },
+  start: () => void,
+): Promise<void> {
+  ui.setLoadingProgress(0.95);
+  try {
+    await renderer.prewarm();
+  } catch (reason) {
+    // A failed pre-warm costs a stutter, not a run.
+    console.warn("[Drop In] Shader pre-warm failed; starting anyway.", reason);
+  }
+  ui.setLoadingProgress(1);
+  start();
+}
+
 export interface RuntimeAnalytics {
   controlActivated(scheme: ControlScheme): void;
   pointerLock(status: "acquired" | "denied" | "unsupported" | "lost", errorName?: string): void;
@@ -157,6 +178,15 @@ export class GameRuntime {
     this.paused = false; this.lastMs = performance.now(); this.ui.setStatus("running");
     this.raf = requestAnimationFrame(this.frame);
   }
+
+  /**
+   * Compile the shaders before the first frame so the run does not stutter its way through the
+   * first appearance of each pipeline. Resolves once the loop is running.
+   */
+  async startWhenWarm(): Promise<void> {
+    if (this.disposed) return;
+    await warmUpAndStart(this.ui, this.renderer, () => this.start());
+  }
   pause(): void { this.paused = true; this.input.clearHeld(); this.ui.setPaused(true); }
   resume(): void {
     if (this.disposed) return;
@@ -180,6 +210,9 @@ export class GameRuntime {
    * it; this is the one thing the shell legitimately drives from a UI action.
    */
   setGhost(ghost: DecodedGhost | null): void { this.renderer.setGhost(ghost); }
+
+  /** Which renderer backend the run is actually using. */
+  get backendKind(): "webgpu" | "webgl" { return this.renderer.backendKind; }
 
   takeFinishedRun(): { samples: GhostSample[]; encoded: Uint8Array } | null {
     const run = this.finishedRun;

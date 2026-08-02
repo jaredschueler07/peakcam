@@ -7,6 +7,7 @@ import { RAMP_LEN, RAMP_SPACING, RAMP_W } from "../terrain/heightfield";
 import { hash2 } from "../terrain/noise";
 import { trailCenter } from "../terrain/trails";
 import { pointAtArcLength } from "../terrain/real-course";
+import { treeDebugEnabled } from "./debugFlags";
 import { createLandmarks } from "./LandmarkRenderer";
 import { TILE_SIZE } from "./TerrainRenderer";
 
@@ -70,15 +71,17 @@ export class WorldRenderer {
       { geometry: rockBase, color: 0x50535b, matrix: transform(0, 0.55, 0) },
       { geometry: new THREE.SphereGeometry(0.82, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.42), color: 0xeef5ff, matrix: transform(0, 1.05, 0, 1.05, 0.7, 1.05) },
     ]);
-    this.tree = new THREE.InstancedMesh(treeGeometry, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.94 }), 2600);
-    this.rock = new THREE.InstancedMesh(rockGeometry, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0.03 }), 900);
+    // ?treedbg=1 drops the vertex-colour multiply so a shot can tell "colours lost" from "never applied".
+    const propColors = !treeDebugEnabled();
+    this.tree = new THREE.InstancedMesh(treeGeometry, new THREE.MeshStandardMaterial({ vertexColors: propColors, roughness: 0.94 }), 2600);
+    this.rock = new THREE.InstancedMesh(rockGeometry, new THREE.MeshStandardMaterial({ vertexColors: propColors, roughness: 0.95, metalness: 0.03 }), 900);
     this.tree.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.rock.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.tree.frustumCulled = this.rock.frustumCulled = false; this.tree.castShadow = this.rock.castShadow = true;
     const markerGeometry = mergeParts([
       { geometry: new THREE.CylinderGeometry(0.075, 0.075, 2.1, 5), color: 0xff7a1a, matrix: transform(0, 1.05, 0) },
       { geometry: new THREE.CylinderGeometry(0.085, 0.085, 0.35, 5), color: 0x1a1a1e, matrix: transform(0, 1.45, 0) },
     ]);
-    this.markers = new THREE.InstancedMesh(markerGeometry, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 }), 460);
+    this.markers = new THREE.InstancedMesh(markerGeometry, new THREE.MeshStandardMaterial({ vertexColors: propColors, roughness: 0.7 }), 460);
     this.markers.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.markers.frustumCulled = false; this.markers.castShadow = true;
     scene.add(this.tree, this.rock, this.markers);
     this.landmarks = world.terrain.kind === "real" ? createLandmarks(profile, world.terrain) : null;
