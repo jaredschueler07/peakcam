@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import { clamp, cameraPosition, dot, fog, length, max, mix, normalize, positionWorld, pow, uniform } from "three/tsl";
+import { clamp, cameraPosition, dot, float, fog, length, max, mix, normalize, positionWorld, pow, smoothstep, uniform } from "three/tsl";
+import { NUMBER_OPS, fogFactorExpression, type FogOps } from "./fogCurve";
 import type { Node, UniformNode } from "three/webgpu";
 
 /**
@@ -10,6 +11,8 @@ export interface AtmosphereNodeUniforms {
   density: UniformNode<"float", number>;
   heightFalloff: UniformNode<"float", number>;
   referenceHeight: UniformNode<"float", number>;
+  /** Fraction of the fog removed beyond `FAR_START_M`; 0 is the pre-envelope behaviour. */
+  farRetention: UniformNode<"float", number>;
   blue: UniformNode<"color", THREE.Color>;
   warm: UniformNode<"color", THREE.Color>;
   sunDirection: UniformNode<"vec3", THREE.Vector3>;
@@ -19,6 +22,7 @@ export interface AtmosphereNodeSeed {
   density?: number;
   heightFalloff?: number;
   referenceHeight?: number;
+  farRetention?: number;
   blue?: THREE.Color;
   warm?: THREE.Color;
   sunDirection?: THREE.Vector3;
@@ -28,50 +32,18 @@ export interface AtmosphereNodeSeed {
 const SUN_DIRECTION = new THREE.Vector3(-0.46, 0.62, -0.64).normalize();
 
 /**
- * The arithmetic `heightFogAmount` performs, written once against an operator interface so the same
- * expression tree can be instantiated with TSL nodes (the shader) and with plain numbers (the
- * reference, which `heightFogReference` exposes and the tests pin to `Atmosphere.ts`).
+ * The TSL instantiation of the shared curve (`fogCurve.ts`). This file is the only one allowed to
+ * import `three/tsl`, which is why the ops live here while the expression does not.
  */
-interface FogOps<T> {
-  mul(a: T, b: T): T;
-  sub(a: T, b: T): T;
-  maxZero(a: T): T;
-  exp(a: T): T;
-  negate(a: T): T;
-  oneMinus(a: T): T;
-}
-
-interface FogInputs<T> {
-  density: T;
-  distance: T;
-  worldY: T;
-  referenceHeight: T;
-  heightFalloff: T;
-}
-
-function fogFactorExpression<T>(ops: FogOps<T>, inputs: FogInputs<T>): T {
-  const above = ops.maxZero(ops.sub(inputs.worldY, inputs.referenceHeight));
-  const height = ops.exp(ops.negate(ops.mul(inputs.heightFalloff, above)));
-  const optical = ops.mul(inputs.density, inputs.distance);
-  return ops.oneMinus(ops.exp(ops.negate(ops.mul(ops.mul(optical, optical), height))));
-}
-
-const NUMBER_OPS: FogOps<number> = {
-  mul: (a, b) => a * b,
-  sub: (a, b) => a - b,
-  maxZero: (a) => Math.max(a, 0),
-  exp: Math.exp,
-  negate: (a) => -a,
-  oneMinus: (a) => 1 - a,
-};
-
 const NODE_OPS: FogOps<Node<"float">> = {
+  add: (a, b) => a.add(b),
   mul: (a, b) => a.mul(b),
   sub: (a, b) => a.sub(b),
   maxZero: (a) => max(a, 0),
   exp: (a) => a.exp(),
   negate: (a) => a.negate(),
   oneMinus: (a) => a.oneMinus(),
+  smoothstep: (edge0, edge1, x) => smoothstep(float(edge0), float(edge1), x),
 };
 
 export function createAtmosphereNodeUniforms(seed: AtmosphereNodeSeed = {}): AtmosphereNodeUniforms {
@@ -79,6 +51,7 @@ export function createAtmosphereNodeUniforms(seed: AtmosphereNodeSeed = {}): Atm
     density: uniform(seed.density ?? 0.012),
     heightFalloff: uniform(seed.heightFalloff ?? 0.025),
     referenceHeight: uniform(seed.referenceHeight ?? 0),
+    farRetention: uniform(seed.farRetention ?? 0),
     blue: uniform(seed.blue ?? new THREE.Color(0x9fc0e8)),
     warm: uniform(seed.warm ?? new THREE.Color(0xffd9a8)),
     sunDirection: uniform(seed.sunDirection ?? SUN_DIRECTION.clone()),
@@ -97,6 +70,7 @@ export function heightFogReference(uniforms: AtmosphereNodeUniforms, worldY: num
     worldY,
     referenceHeight: uniforms.referenceHeight.value,
     heightFalloff: uniforms.heightFalloff.value,
+    farRetention: uniforms.farRetention.value,
   });
 }
 
@@ -111,6 +85,7 @@ export function createAtmosphereFog(uniforms: AtmosphereNodeUniforms): Node {
       worldY: positionWorld.y,
       referenceHeight: uniforms.referenceHeight,
       heightFalloff: uniforms.heightFalloff,
+      farRetention: uniforms.farRetention,
     }),
     0,
     1,
