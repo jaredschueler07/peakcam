@@ -136,7 +136,7 @@ test("a session request mints a ticket the server can verify", async () => {
       mode: "time_trial",
       trailId,
       surface: "ice",
-      physicsModel: "v2",
+      physicsModel: "v1",
     }),
     { keyring: () => keyring, currentUserId: async () => null, limiter: permissiveLimiter(), now: () => now },
   );
@@ -148,7 +148,7 @@ test("a session request mints a ticket the server can verify", async () => {
   assert.equal(body.resortSlug, FIXTURE_RESORT_SLUG);
   assert.equal(body.trailId, trailId);
   assert.equal(body.surface, "ice");
-  assert.equal(body.physicsModel, "v2");
+  assert.equal(body.physicsModel, "v1");
   assert.equal(body.physicsVersion, PHYSICS_VERSION);
   assert.equal(body.courseVersion, COURSE_VERSION);
   // The rate the client must record at. Bound to the recorder's own constant,
@@ -161,7 +161,7 @@ test("a session request mints a ticket the server can verify", async () => {
   assert.equal(payload.seed, body.seed, "the ticket must bind the seed it advertised");
   assert.equal(payload.trailId, trailId);
   assert.equal(payload.surface, "ice");
-  assert.equal(payload.physicsModel, "v2");
+  assert.equal(payload.physicsModel, "v1");
   assert.equal(payload.userId, undefined, "an anonymous session binds no user");
   assert.equal(payload.exp - payload.iat, 30 * 60 * 1000);
   assert.equal(new Date(body.expiresAt).getTime(), payload.exp);
@@ -184,6 +184,25 @@ test("the seed is chosen server-side and ignores anything the client sends", asy
 
   // `.strict()` on the schema: an unexpected field is a 400, not a silent drop.
   assert.equal(response.status, 400);
+});
+
+test("a direct physicsV2 session request is refused while the rollout flag is off", async () => {
+  const response = await handleCreateSession(
+    postRequest(sessionUrl, {
+      resortSlug: FIXTURE_RESORT_SLUG,
+      mode: "time_trial",
+      trailId: resolveCourseOrThrow().trailId,
+      surface: "packed",
+      physicsModel: "v2",
+    }),
+    {
+      keyring: () => testKeyring(),
+      currentUserId: async () => null,
+      limiter: permissiveLimiter(),
+      now: () => Date.UTC(2026, 6, 15, 17, 0, 0),
+    },
+  );
+  assert.ok(response.status >= 400 && response.status < 500);
 });
 
 test("a signed-in session binds the user id into the ticket", async () => {

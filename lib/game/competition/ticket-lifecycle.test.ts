@@ -121,7 +121,9 @@ test("ticketForWorld fails closed when the running world's seed is unknown", () 
   assert.equal(ticketForWorld(state, undefined, { surface: "packed", physicsModel: "v1" }, NOW), null);
 });
 
-test("a v2 world is unsubmittable unless its ticket declares physicsModel v2", () => {
+test("?phys=v2 override is unsubmittable unless its ticket declares physicsModel v2", () => {
+  // The URL override changes the world only; ticket requests stay on the
+  // rollout model, so a v1 ticket must fail closed here.
   assert.equal(ticketForWorld(ready(), fresh.seed, { surface: "packed", physicsModel: "v2" }, NOW), null);
   const v2 = { ...fresh, physicsModel: "v2" as const };
   const state = ticketReducer(NO_TICKET, { type: "received", ticket: v2 });

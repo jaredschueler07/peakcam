@@ -14,10 +14,10 @@ export function resolveRuntimePhysicsModel(
 
 export function simulationConfigForConditions(
   conditions: { surface: SurfaceKind; physicsModel: PhysicsModel },
-  search?: string,
+  physicsModel: PhysicsModel = conditions.physicsModel,
 ) {
   return simulationConfig(
     conditions.surface,
-    resolveRuntimePhysicsModel(conditions.physicsModel, search),
+    physicsModel,
   );
 }

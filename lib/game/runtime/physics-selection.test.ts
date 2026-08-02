@@ -17,10 +17,8 @@ test("unknown phys values fail closed to the configured model", () => {
 });
 
 test("runtime config combines the live surface with the selected model", () => {
-  const config = simulationConfigForConditions(
-    { surface: "ice", physicsModel: "v1" },
-    "?phys=v2",
-  );
+  const selected = resolveRuntimePhysicsModel("v1", "?phys=v2");
+  const config = simulationConfigForConditions({ surface: "ice", physicsModel: "v1" }, selected);
   assert.equal(config.surface, "ice");
   assert.equal(config.physicsModel, "v2");
   assert.equal(config.gripMultiplier, 0.7);

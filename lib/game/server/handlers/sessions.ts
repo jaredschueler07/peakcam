@@ -18,6 +18,7 @@
 import { z } from "zod";
 
 import { COURSE_VERSION, PHYSICS_VERSION } from "../../config/versions";
+import { PHYSICS_V2_ROLLOUT_ENABLED } from "../../config/physics-rollout";
 import type { PhysicsModel, SurfaceKind } from "../../core/config";
 import { GHOST_SAMPLE_HZ } from "../../replay/recorder";
 import { competitiveRunModeSchema } from "../run-schema";
@@ -103,6 +104,9 @@ export async function handleCreateSession(
   }
 
   const { resortSlug, mode, trailId, surface, physicsModel } = parsed.data;
+  if (physicsModel === "v2" && !PHYSICS_V2_ROLLOUT_ENABLED) {
+    return jsonError(400, "physicsV2 is not enabled for run sessions");
+  }
   const course = resolveCourse(resortSlug, trailId);
   if (!course) {
     return jsonError(404, "Unknown resort or trail");

@@ -318,7 +318,7 @@ export default function DropInGame({ profile, conditions }: {
         const { createGame } = await import("@/lib/game/runtime/createGame");
         if (cancelled) return;
         const created = await createGame({
-          canvas, profile, uiBridge: bridge, signal: controller.signal, conditions, audio,
+          canvas, profile, uiBridge: bridge, signal: controller.signal, conditions, physicsModel, audio,
           // The ghost header carries world.seed; it must equal the ticket seed
           // or the server rejects the submission with seed_mismatch.
           seed: resolveRunSeed(runTicketRef.current, profile.seed),
