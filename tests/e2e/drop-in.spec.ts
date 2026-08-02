@@ -77,6 +77,17 @@ test("v2 renders a keyboard start control without an iframe", async ({ page }) =
   await expect(page.locator("iframe")).toHaveCount(0);
 });
 
+test("the running game reports the backend this project exists to exercise", async ({ page }) => {
+  // Without this the matrix is theatre: a WebGPU device-init failure falls back to WebGL silently,
+  // so the headed project would pass while testing the same renderer as the default one.
+  // `data-drop-in-gfx` is set from the runtime that actually initialised, not from navigator.gpu.
+  const expected = test.info().project.name === "chromium-webgpu" ? "webgpu" : "webgl";
+  await page.goto(dropInUrl(V2_URL));
+  await page.getByRole("button", { name: /start descent/i }).click();
+  await expect(page.locator("[data-drop-in-state='running']")).toBeVisible();
+  await expect(page.locator(`[data-drop-in-gfx='${expected}']`)).toHaveCount(1);
+});
+
 test("the start poster offers the three run modes, defaulting to Free Ski", async ({ page }) => {
   await page.goto(dropInUrl(V2_URL));
   const modes = page.getByTestId("drop-in-mode-select");

@@ -22,6 +22,9 @@ import { postBypassEnabled, snowDebugMode } from "./debugFlags";
 
 type PostChain = Pick<PostProcessing | NodePostProcessing, "setSize" | "setQuality" | "render" | "dispose">;
 
+/** How long pre-warm may hold the loading bar at 95% before starting anyway. */
+const PREWARM_TIMEOUT_MS = 4000;
+
 /** Module-scope scratch — `render()` must not allocate a Vector3 per frame. */
 const sunPositionScratch = new THREE.Vector3();
 
@@ -57,6 +60,8 @@ interface RendererOptions {
   disposalAudit?: DisposalAudit;
   qualitySignals?: DeviceQualitySignals;
   onQualityChange?(event: QualityChangeEvent): void;
+  /** Test seam: shortens the pre-warm budget so a hung compile can be exercised quickly. */
+  prewarmTimeoutMs?: number;
 }
 
 /** The legacy renderer path owns PostProcessing; injected backends suppress it. */
@@ -124,7 +129,15 @@ export class GameRenderer {
   private readonly reducedMotion: boolean;
   private readonly mobile: boolean;
   private readonly frameTimes: number[] = [];
-  /** Reused by the 1.4s governor tick so the windowed p75 costs no allocation. */
+  /**
+   * The governor's own sample history, deliberately not `frameTimes`. That array stops accepting
+   * pushes at 36,000 entries (~10 minutes at 60fps), so a window read from its tail would freeze on
+   * ten-minute-old frames — going deaf exactly when a device starts thermally throttling. This ring
+   * always holds the newest 240 samples (~4s), whatever the run has done before.
+   */
+  private readonly governorRing = new Float64Array(240);
+  private governorSamples = 0;
+  /** Sort scratch for the 1.4s governor tick, so the windowed p75 costs no allocation. */
   private readonly p75Window = new Float64Array(240);
   private readonly bypassPost: boolean;
   private readonly maxDpr: number;
@@ -194,8 +207,11 @@ export class GameRenderer {
   }
 
   /**
-   * Both chains are dynamically imported so the backend the session did not pick stays out of the
-   * bundle. `render()` falls back to a direct render until the promise lands.
+   * Both chains are dynamically imported, which defers *evaluating* the unused one and keeps it off
+   * the critical path — but it does not keep it out of the bundle. `SceneFactory`, `TerrainRenderer`
+   * and `CsmShadowsNode` all import `three/webgpu` statically, so both backends ship either way.
+   * Making the split real needs the node modules behind a single dynamic boundary; ledgered for
+   * Task 10. `render()` falls back to a direct render until the promise lands.
    */
   private async initializePost(): Promise<void> {
     try {
@@ -234,16 +250,32 @@ export class GameRenderer {
     await this.postReady;
     if (this.disposed || !this.renderer.compileAsync) return;
     const seeded = this.quality.rung;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const budget = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, this.options.prewarmTimeoutMs ?? PREWARM_TIMEOUT_MS);
+    });
+    try {
+      // A compileAsync that never settles must cost a stutter, not the run: the loading bar is
+      // parked at 95% waiting on this, so it gets a budget and then we start regardless.
+      await Promise.race([this.compileRungs(seeded), budget]);
+    } finally {
+      clearTimeout(timer);
+      // If the budget won mid-sequence the rung can be left at 4; put it back.
+      if (!this.disposed && this.quality.rung !== seeded) this.applyQuality(seeded);
+    }
+  }
+
+  private async compileRungs(seeded: QualityRung): Promise<void> {
     if (seeded !== 4) {
       // Warm the expensive variants first, then come back to the rung we will actually start on —
       // restoring it last matters because CsmShadowsNode rebuilds its shadow node on a rung change,
       // so a compile taken before the restore would warm a node we then throw away.
       this.applyQuality(4);
-      await this.renderer.compileAsync(this.built.scene, this.built.camera);
+      await this.renderer.compileAsync?.(this.built.scene, this.built.camera);
       if (this.disposed) return;
       this.applyQuality(seeded);
     }
-    await this.renderer.compileAsync(this.built.scene, this.built.camera);
+    await this.renderer.compileAsync?.(this.built.scene, this.built.camera);
   }
 
   /**
@@ -264,9 +296,11 @@ export class GameRenderer {
    * p75 across all of it would stop reflecting the device's current thermal state.
    */
   private windowedP75(): number {
+    const ring = this.governorRing;
+    const held = Math.min(this.governorSamples, ring.length);
     let count = 0, total = 0;
-    for (let i = this.frameTimes.length - 1; i >= 0 && count < this.p75Window.length && total < 2000; i -= 1) {
-      const sample = this.frameTimes[i];
+    for (let i = 0; i < held && total < 2000; i += 1) {
+      const sample = ring[(this.governorSamples - 1 - i) % ring.length];
       this.p75Window[count] = sample; count += 1; total += sample;
     }
     if (count === 0) return 0;
@@ -297,7 +331,11 @@ export class GameRenderer {
   render(state: SimulationState, world: SimulationWorld, dt: number, tuck: number, frameMs = dt * 1000): void {
     if (this.disposed || this.contextLost) return;
     this.fpsTime += dt; this.fpsFrames += 1; this.adaptTime += dt; this.elapsed += dt;
-    if (frameMs > 0 && this.frameTimes.length < 36_000) this.frameTimes.push(frameMs);
+    if (frameMs > 0) {
+      if (this.frameTimes.length < 36_000) this.frameTimes.push(frameMs);
+      this.governorRing[this.governorSamples % this.governorRing.length] = frameMs;
+      this.governorSamples += 1;
+    }
     if (this.fpsTime >= 0.5) {
       this.fpsFrames = 0; this.fpsTime = 0;
       if (this.adaptTime >= 1.4) {

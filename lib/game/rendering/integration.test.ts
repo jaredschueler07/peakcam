@@ -193,6 +193,24 @@ test("pre-warm compiles the seeded rung and the top rung, then restores the rung
   renderer.dispose();
 });
 
+test("a compile that never settles costs a stutter, not the loading screen", async () => {
+  const backend = Object.assign(new FakeBackend("webgpu"), {
+    compileAsync: () => new Promise<void>(() => {}),
+  });
+  const world = createProceduralWorld(profile, profile.seed);
+  const state = createSimulation(profile, profile.seed);
+  const renderer = new GameRenderer(fakeCanvas(), profile, world, state, {
+    backend, devicePixelRatio: 1, reducedMotion: true, prewarmTimeoutMs: 10,
+  });
+  const quality = (renderer as unknown as { quality: { rung: number } }).quality;
+  quality.rung = 2;
+
+  await renderer.prewarm();
+
+  assert.equal(quality.rung, 2, "and the budget expiring mid-sequence does not strand it on rung 4");
+  renderer.dispose();
+});
+
 test("pre-warm is safe on a backend without compileAsync", async () => {
   const complete: Record<string, unknown> = { ...new FakeBackend("webgl") };
   delete complete.compileAsync;
@@ -233,6 +251,23 @@ test("a healthy 60Hz display never loses quality to the governor", () => {
 
   assert.equal(quality.rung, 4, "60fps is not distress");
   assert.deepEqual(events, []);
+  renderer.dispose();
+});
+
+test("the governor keeps hearing after the perf buffer stops recording", () => {
+  // frameTimes caps at 36,000 entries (~10 min at 60fps). A window read from its tail would freeze
+  // on ten-minute-old frames — deaf exactly when a device starts to throttle.
+  const { renderer, world, state } = buildRenderer(new FakeBackend("webgpu"));
+  const internals = renderer as unknown as { frameTimes: number[]; windowedP75(): number };
+
+  for (let i = 0; i < 36_050; i += 1) renderer.render(state, world, 1 / 60, 0, 40);
+  assert.equal(internals.frameTimes.length, 36_000, "the perf array is full and no longer growing");
+  assert.equal(Math.round(internals.windowedP75()), 40);
+
+  // Everything after this point is invisible to frameTimes, and must not be to the governor.
+  for (let i = 0; i < 120; i += 1) renderer.render(state, world, 1 / 60, 0, 8);
+  assert.equal(Math.round(internals.windowedP75()), 8, "the window tracks the newest samples");
+  assert.equal(internals.frameTimes[internals.frameTimes.length - 1], 40, "…which frameTimes never saw");
   renderer.dispose();
 });
 
