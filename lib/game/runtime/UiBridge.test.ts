@@ -19,7 +19,6 @@ test("HUD snapshots publish at 15Hz and contain a copied minimap position", () =
   assert.equal(bridge.store.getState().position.x, 8);
   assert.equal(bridge.store.getState().speedKmh, 36);
 });
-
 test("typed events update crash and pause state immediately", () => {
   const bridge = new UiBridge(DROP_IN_GAME_PROFILES.heavenly);
   bridge.emit({ type: "crashed", reason: "TREE" });
@@ -28,3 +27,15 @@ test("typed events update crash and pause state immediately", () => {
   assert.equal(bridge.store.getState().status, "paused");
 });
 
+test("finished recording availability is surfaced and can be cleared", () => {
+  const bridge = new UiBridge(DROP_IN_GAME_PROFILES.heavenly);
+  assert.equal(bridge.store.getState().runRecording, false);
+
+  bridge.setRunRecordingAvailable(true);
+  bridge.emit({ type: "finished", reason: "finish" });
+  assert.equal(bridge.store.getState().status, "results");
+  assert.equal(bridge.store.getState().runRecording, true);
+
+  bridge.setRunRecordingAvailable(false);
+  assert.equal(bridge.store.getState().runRecording, false);
+});

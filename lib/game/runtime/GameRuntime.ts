@@ -1,4 +1,5 @@
 import type { ResortGameProfile } from "../config/schema";
+import { COURSE_VERSION, PHYSICS_VERSION } from "../config/versions";
 import { FIXED_DT, MAX_FRAME_DT, MAX_STEPS_PER_FRAME } from "../core/clock";
 import { createSimulation, stepSimulation } from "../core/simulation";
 import { beginLiftRide } from "../core/run-lifecycle";
@@ -16,6 +17,13 @@ import { UiBridge } from "./UiBridge";
 import type { ConditionsSnapshot } from "../conditions";
 import { simulationConfig } from "../core/config";
 import type { RuntimeAudio } from "./RuntimeAudio";
+import { encodeGhost, type GhostSample } from "../replay/codec";
+import { GHOST_SAMPLE_HZ, GhostRecorder } from "../replay/recorder";
+
+interface FinishedRunRecording {
+  samples: GhostSample[];
+  encoded: Uint8Array;
+}
 
 export interface RuntimeAnalytics {
   controlActivated(scheme: ControlScheme): void;
@@ -42,6 +50,8 @@ export class GameRuntime {
   private paused = false;
   private disposed = false;
   private activated = false;
+  private readonly ghostRecorder = new GhostRecorder();
+  private finishedRun: FinishedRunRecording | null = null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -92,6 +102,20 @@ export class GameRuntime {
   }
   restart(): void { this.input.setAction("restart", true); this.input.setAction("restart", false); this.resume(); }
 
+  beginCompetitiveRecording(): void {
+    this.finishedRun = null;
+    this.ui.setRunRecordingAvailable(false);
+    this.ghostRecorder.begin(this.state.time);
+    this.ghostRecorder.sample(this.state, this.state.time);
+  }
+
+  takeFinishedRun(): { samples: GhostSample[]; encoded: Uint8Array } | null {
+    const run = this.finishedRun;
+    this.finishedRun = null;
+    this.ui.setRunRecordingAvailable(false);
+    return run;
+  }
+
   private frame = (nowMs: number) => {
     this.raf = 0;
     if (this.disposed) return;
@@ -119,6 +143,29 @@ export class GameRuntime {
       while (this.accumulator >= FIXED_DT && steps < MAX_STEPS_PER_FRAME) {
         const events = stepSimulation(this.state, this.input.nextFrame(), FIXED_DT, this.world);
         this.audio.playSimulationEvents(events);
+        if (events.reset) {
+          this.ghostRecorder.finish();
+          this.finishedRun = null;
+          this.ui.setRunRecordingAvailable(false);
+        } else if (this.ghostRecorder.recording) {
+          this.ghostRecorder.sample(this.state, this.state.time);
+          if (this.state.finished) {
+            const samples = this.ghostRecorder.finish();
+            if (samples) {
+              this.finishedRun = {
+                samples,
+                encoded: encodeGhost(samples, {
+                  physicsVersion: PHYSICS_VERSION,
+                  courseVersion: COURSE_VERSION,
+                  sampleHz: GHOST_SAMPLE_HZ,
+                  seed: this.world.seed,
+                  originYCm: Math.round(this.state.startY * 100),
+                }),
+              };
+              this.ui.setRunRecordingAvailable(true);
+            }
+          }
+        }
         if (events.crashed && events.crashReason) this.ui.emit({ type: "crashed", reason: events.crashReason });
         if (events.landed) this.ui.emit({ type: "landed" });
         if (events.gatePassed) this.ui.emit({ type: "gate-passed" });
