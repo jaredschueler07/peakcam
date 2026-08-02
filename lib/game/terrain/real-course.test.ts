@@ -61,6 +61,16 @@ test("arc-length sampling interpolates real x/z/y geometry instead of a sine cor
   assert.deepEqual(sample, { x: 30, y: 85, z: 65, heading: 0 });
 });
 
+test("arc-length sampling can write into a caller-supplied out object (zero-alloc)", () => {
+  const points = [
+    { x: 0, y: 100, z: 0 }, { x: 30, y: 90, z: 40 }, { x: 30, y: 80, z: 90 },
+  ] as const;
+  const out = { x: -1, y: -1, z: -1, heading: -1 };
+  const sample = pointAtArcLength(points, 75, out);
+  assert.equal(sample, out, "must return the same out object");
+  assert.deepEqual(out, { x: 30, y: 85, z: 65, heading: 0 });
+});
+
 test("real course skips a flat summit bench before choosing its spawn", () => {
   const flatThenDownhill: DrapedRun = {
     name: "Roca Jack", difficulty: "expert", grooming: null, gladed: false,

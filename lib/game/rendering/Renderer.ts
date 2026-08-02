@@ -17,6 +17,9 @@ import { QualityController, seedQualityRung, type DeviceQualitySignals, type Qua
 import type { PostProcessing } from "./PostProcessing";
 import { visualWeatherPreset } from "./VisualPresets";
 
+/** Module-scope scratch — `render()` must not allocate a Vector3 per frame. */
+const sunPositionScratch = new THREE.Vector3();
+
 export interface RendererBackend {
   // WebGLRenderer declares this as plain `string` in @types/three 0.185, so a
   // narrower ColorSpace here would reject the real renderer.
@@ -169,7 +172,8 @@ export class GameRenderer {
     const fx = Math.sin(state.yaw), fz = Math.cos(state.yaw);
     this.built.snowUniforms.track.value.set(state.pos.x - fx * 8, state.pos.z - fz * 8, state.pos.x, state.pos.z);
     this.built.sky.position.copy(this.built.camera.position); this.built.peaks.position.copy(this.built.camera.position);
-    const sunPosition = this.built.camera.position.clone().addScaledVector(SUN_DIRECTION, 2400); this.built.sunDisc.position.copy(sunPosition); this.built.sunGlow.position.copy(sunPosition);
+    sunPositionScratch.copy(this.built.camera.position).addScaledVector(SUN_DIRECTION, 2400);
+    this.built.sunDisc.position.copy(sunPositionScratch); this.built.sunGlow.position.copy(sunPositionScratch);
     this.built.sun.position.set(state.pos.x, state.pos.y, state.pos.z).addScaledVector(SUN_DIRECTION, 150); this.built.sun.target.position.set(state.pos.x, state.pos.y, state.pos.z); this.built.sun.target.updateMatrixWorld();
     this.csm.update();
     if (this.post && !this.bypassPost) this.post.render(dt); else this.renderer.render(this.built.scene, this.built.camera);

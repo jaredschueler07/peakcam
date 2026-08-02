@@ -2,7 +2,11 @@ import * as THREE from "three";
 import type { SimulationState, TerrainSampler, Vec3 } from "../core/types";
 
 const UP = new THREE.Vector3(0, 1, 0);
+/** Stable tumble axis — previously `new THREE.Vector3(0.6,0.4,0.7).normalize()` every crash frame. */
+const TUMBLE_AXIS = new THREE.Vector3(0.6, 0.4, 0.7).normalize();
 const normal: Vec3 = { x: 0, y: 1, z: 0 };
+const normalVec = new THREE.Vector3();
+const upScratch = new THREE.Vector3();
 
 const material = (color: THREE.ColorRepresentation, roughness = 0.7, metalness = 0, emissive: THREE.ColorRepresentation = 0) => {
   const result = new THREE.MeshStandardMaterial({ color, roughness, metalness, emissive, emissiveIntensity: emissive ? 0.35 : 0 });
@@ -69,10 +73,11 @@ export class SkierRenderer {
   update(state: SimulationState, terrain: TerrainSampler, dt: number): void {
     this.root.position.set(state.pos.x, state.pos.y, state.pos.z);
     terrain.normal(state.pos.x, state.pos.z, normal);
+    normalVec.set(normal.x, normal.y, normal.z);
     if (state.crash > 0) {
       this.tumble += dt * 9;
-      this.qGround.setFromUnitVectors(UP, new THREE.Vector3(normal.x, normal.y, normal.z));
-      this.qYaw.setFromAxisAngle(new THREE.Vector3(0.6, 0.4, 0.7).normalize(), this.tumble);
+      this.qGround.setFromUnitVectors(UP, normalVec);
+      this.qYaw.setFromAxisAngle(TUMBLE_AXIS, this.tumble);
       this.root.quaternion.copy(this.qGround).multiply(this.qYaw);
       this.body.position.y = 0;
       this.body.rotation.set(Math.sin(this.tumble * 1.7) * 0.8, 0, Math.cos(this.tumble * 1.3) * 0.7);
@@ -80,8 +85,8 @@ export class SkierRenderer {
       this.legL.rotation.x = Math.cos(this.tumble * 2.4); this.legR.rotation.x = -Math.sin(this.tumble * 2.2);
     } else {
       this.tumble = 0;
-      const up = UP.clone().lerp(new THREE.Vector3(normal.x, normal.y, normal.z), state.onGround ? 1 : 0.25).normalize();
-      this.qGround.setFromUnitVectors(UP, up); this.qYaw.setFromAxisAngle(UP, state.yaw);
+      upScratch.copy(UP).lerp(normalVec, state.onGround ? 1 : 0.25).normalize();
+      this.qGround.setFromUnitVectors(UP, upScratch); this.qYaw.setFromAxisAngle(UP, state.yaw);
       this.root.quaternion.slerp(this.qGround.multiply(this.qYaw), 1 - Math.exp(-16 * dt));
       this.body.position.y = -state.crouch * 0.46;
       this.body.rotation.set(state.crouch * 0.72 + Math.min(1, Math.hypot(state.vel.x, state.vel.z) / 70) * 0.18 - (state.onGround ? 0 : 0.15), state.lean * 0.2, -state.lean * 0.46);

@@ -137,6 +137,16 @@ test("reduced motion disables chromatic aberration at every speed", () => {
   assert.ok(x > 0 && y > 0 && x < 0.002 && y < x);
 });
 
+test("chromaticAberrationOffset reuses a module-scope tuple (zero-alloc frame path)", () => {
+  const first = chromaticAberrationOffset(1, false);
+  const second = chromaticAberrationOffset(0.5, false);
+  assert.equal(first, second, "must return the same buffer every call");
+  // Values from the latest call are still correct after reuse.
+  assert.deepEqual([...chromaticAberrationOffset(0, false)], [0, 0]);
+  const full = chromaticAberrationOffset(1, false);
+  assert.ok(full[0] > 0 && full[1] > 0 && full[1] < full[0]);
+});
+
 test("every preset's height fog matches v1 FogExp2 at player altitude and ignores absolute resort elevation", () => {
   for (const resort of Object.values(DROP_IN_GAME_PROFILES)) for (const weather of resort.weather) for (const distance of [25, 100, 400]) {
     const expected = 1 - Math.exp(-((weather.fog * distance) ** 2));

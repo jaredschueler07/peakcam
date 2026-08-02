@@ -46,8 +46,9 @@ export class PostProcessing {
   }
 
   render(deltaTime: number): void {
-    const [x, y] = chromaticAberrationOffset(this.speed.value, this.reducedMotion);
-    this.chromatic.offset.set(x, y);
+    // Write straight into the effect's Vector2 — do not destructure a fresh tuple each frame.
+    const offset = chromaticAberrationOffset(this.speed.value, this.reducedMotion);
+    this.chromatic.offset.set(offset[0], offset[1]);
     this.composer.render(deltaTime);
   }
 
