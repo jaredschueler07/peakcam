@@ -97,7 +97,7 @@ export class GameRuntime {
   private paused = false;
   private disposed = false;
   private activated = false;
-  private readonly ghostRecorder = new GhostRecorder();
+  private readonly ghostRecorder: GhostRecorder;
   private readonly recordingArm = new CompetitiveRecordingArm();
   private finishedRun: FinishedRunRecording | null = null;
 
@@ -113,6 +113,7 @@ export class GameRuntime {
   ) {
     this.world = createWorld(profile, profile.seed, terrain, simulationConfig(conditions.surface));
     this.state = createSimulation(profile, profile.seed, terrain);
+    this.ghostRecorder = new GhostRecorder(this.world.terrain);
     ui.configureTerrain(terrain);
     this.input = new InputManager((scheme) => {
       if (!this.activated) { this.activated = true; analytics.controlActivated(scheme); }
