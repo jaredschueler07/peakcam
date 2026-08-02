@@ -35,12 +35,22 @@
 
 ## Remaining work (in PLAN.md order)
 
-1. **Phase 8.3/8.4** — ghost recorder wired into the runtime, Time Trial + Daily Line
-   mode selection UI, results submission + leaderboard/ghost panels, server
-   re-simulation validator enabled before Daily Line marketing. Note handoffs: courses
-   need real startZ/finishZ (validator's `startFinishChecked:false`), and
-   `RuntimeAudio`/`UiBridge` event streams are the integration points.
-2. **Phase 10** — device-matrix perf validation (budgets in BUDGETS.md), full CI,
+> Session 2026-08-01/02 (multi-fleet: Opus 5 + Codex gpt-5.6-sol + Grok, Fable 5
+> orchestrating): **Phase 8 COMPLETE** (P8-COMPLETION-PLAN.md tasks A1–A6 + gate:
+> recorder, ghost renderer, modes/tickets, panels, re-sim validator behind
+> `DROP_IN_RESIM`, analytics; 503/503 unit, 18/18 e2e, joint recorder→validator
+> smoke green; merged 0d25122). **P12 Tasks 11–14 merged** (physicsV2 flag-gated,
+> parity-neutral; T15 + feel gate remain). **P11 modules 2/3/4/5/7/9 done**
+> (TSL snow/fog/CSM/post, KTX2, governor — all module-only, review-clean);
+> Tasks 1+8 in flight; Task 6 integration carries an 11-item real-frame
+> checklist (see .superpowers/sdd/P11-P12-PLAN/progress.md). New dev levers:
+> `?gfx=webgl` (prod-allowed), `?e2ecanvas`, `?e2espawn=<m>` (validator-hardened).
+> Latent issue ledgered: `conditionSurface` regex scans narrative prose.
+
+1. **Phase 11** — Task 1 (backend seam), Task 6 (WebGPU integration + real-frame
+   checklist), Task 8 (zero-alloc + heap guard), Task 10 (dual-backend gate).
+2. **Phase 12 wrap** — Task 15 (runtime wiring + `?phys=v2`), Jared feel-check gate.
+3. **Phase 10** — device-matrix perf validation (budgets in BUDGETS.md), full CI,
    accessibility pass, percentage rollout per DESIGN §5 gates, delete v1
    (engine.html/vendored three/sync script/drift test/CORS header), fix the
    **pre-existing site-wide soft-404** (notFound() streams HTTP 200 — confirmed on prod,
