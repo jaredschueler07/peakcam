@@ -18,6 +18,8 @@ import type { RuntimeAudio } from "./RuntimeAudio";
 import { createRendererBackend, resolveBackendKind } from "../rendering/backend";
 import { loadNodeFactories } from "../rendering/nodeFactories";
 import type { RendererBackend } from "../rendering/Renderer";
+import { createGameTextureLoader } from "../rendering/loaders/GameTextureLoader";
+import { loadSurfaceTextures, type SurfaceTextures } from "../rendering/surfaceTextures";
 
 interface RuntimeTerrainLoader {
   load(slug: ResortGameProfile["slug"], options?: TerrainLoadOptions): Promise<RealTerrainAssets>;
@@ -26,6 +28,12 @@ interface RuntimeTerrainLoader {
 /** Structural, like RuntimeTerrainLoader above, so tests need no cast to substitute a fake. */
 interface RuntimeFarFieldLoader {
   load(slug: ResortGameProfile["slug"], options: FarFieldLoadOptions): Promise<DecodedFarField | null>;
+}
+
+/** Structural, so tests can inject a fake load without a real GPU device. */
+interface RuntimeSurfaceTexturesConsumer {
+  attachSurfaceTextures(surfaces: SurfaceTextures): void;
+  readonly rung: number;
 }
 
 export interface CreateGameOptions {
@@ -93,6 +101,7 @@ export async function createGame(options: CreateGameOptions): Promise<GameRuntim
   );
   void runtime.startWhenWarm();
   void attachFarFieldWhenReady(runtime, options);
+  void attachSurfaceTexturesWhenReady(runtime, backend);
   return runtime;
 }
 
@@ -117,6 +126,33 @@ export async function attachFarFieldWhenReady(
     if (asset && !options.signal?.aborted) runtime.attachFarField(asset);
   } catch {
     // Aborted, or the runtime went away mid-flight. The ridge bands are still standing.
+  }
+}
+
+/**
+ * Loads the real snow surface KTX2 pair alongside the run, mirroring `attachFarFieldWhenReady`:
+ * never awaited by the caller, and every failure path leaves the procedural detail normal
+ * untouched — `loadSurfaceTextures` already returns `null` rather than throwing, and the extra
+ * try/catch here is defence in depth against `createGameTextureLoader` itself misbehaving.
+ *
+ * Gated twice before a single byte is fetched: WebGPU only (`GameTextureLoader` needs a KTX2-
+ * capable backend, and `SnowNodeMaterial` only wires the real surface into the WebGPU node
+ * path), and rung 3+ (`runtime.rung`, seeded once at construction like every other quality-ladder
+ * setting) — a low-end device that will never render the real surface has no reason to spend the
+ * bandwidth fetching it.
+ */
+export async function attachSurfaceTexturesWhenReady(
+  runtime: RuntimeSurfaceTexturesConsumer,
+  backend: RendererBackend | undefined,
+  load: (backend: RendererBackend) => Promise<SurfaceTextures | null> =
+    (b) => loadSurfaceTextures(createGameTextureLoader(b)),
+): Promise<void> {
+  if (!backend || backend.backendKind !== "webgpu" || runtime.rung < 3) return;
+  try {
+    const surfaces = await load(backend);
+    if (surfaces) runtime.attachSurfaceTextures(surfaces);
+  } catch {
+    // The procedural detail normal is still standing.
   }
 }
 

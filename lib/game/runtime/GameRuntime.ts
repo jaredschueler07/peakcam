@@ -23,6 +23,8 @@ import type { RuntimeAudio } from "./RuntimeAudio";
 import { encodeGhost, type DecodedGhost, type GhostSample } from "../replay/codec";
 import type { DecodedFarField } from "../terrain/far-field-format";
 import { GHOST_SAMPLE_HZ, GhostRecorder } from "../replay/recorder";
+import type { SurfaceTextures } from "../rendering/surfaceTextures";
+import type { QualityRung } from "../rendering/QualityController";
 
 interface FinishedRunRecording {
   samples: GhostSample[];
@@ -227,6 +229,16 @@ export class GameRuntime {
    * way on the procedural ridge bands, and a resort without an asset simply never calls this.
    */
   attachFarField(asset: DecodedFarField): void { this.renderer.attachFarField(asset); }
+
+  /**
+   * Swap in the real snow surface KTX2 pair once it resolves. Optional by design: the run is
+   * already under way on the procedural detail normal, and a rung below 3 (or the WebGL path)
+   * simply never calls this — see `attachSurfaceTexturesWhenReady` in createGame.ts.
+   */
+  attachSurfaceTextures(surfaces: SurfaceTextures): void { this.renderer.attachSurfaceTextures(surfaces); }
+
+  /** The quality rung seeded at construction; `attachSurfaceTexturesWhenReady` gates on it before fetching. */
+  get rung(): QualityRung { return this.renderer.rung; }
 
   /** Which renderer backend the run is actually using. */
   get backendKind(): "webgpu" | "webgl" { return this.renderer.backendKind; }

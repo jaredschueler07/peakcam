@@ -6,6 +6,8 @@ import { GRID_HALF, GRID_SIZE, TILE_SIZE, Z_TILES_BEHIND } from "./nearFieldReac
 import { buildSnowDetailNormal, polishSnowMaterial, type SnowUniforms } from "./SnowMaterial";
 import type { SnowNodeUniforms } from "./SnowNodeMaterial";
 import type { NodeFactories } from "./nodeFactories";
+import type { QualityRung } from "./QualityController";
+import type { SurfaceTextures } from "./surfaceTextures";
 
 // The grid's dimensions live in `nearFieldReach.ts`, which also derives how far a near-field
 // pixel can be from the player — a number `fogCurve.ts` needs to place its long-range envelope
@@ -94,32 +96,60 @@ export class TerrainRenderer {
   private readonly tiles: Tile[] = [];
   private centerX = Infinity;
   private centerZ = Infinity;
+  private readonly detailNormal: THREE.Texture;
+  private material: THREE.Material;
 
   constructor(
     private readonly scene: THREE.Scene,
     private readonly world: SimulationWorld,
-    snowUniforms?: SnowUniforms | SnowNodeUniforms,
+    private readonly snowUniforms?: SnowUniforms | SnowNodeUniforms,
     /** Present exactly on the WebGPU path; see `nodeFactories`. */
-    nodes: NodeFactories | null = null,
-    snowDebug = 0,
+    private readonly nodes: NodeFactories | null = null,
+    private readonly snowDebug = 0,
+    /** Seeded once at renderer construction; see `attachSurfaceTextures`. */
+    private readonly rung: QualityRung = 0,
   ) {
+    this.detailNormal = buildSnowDetailNormal(world.seed);
     // The node material is built from the same constants; only the shading language differs.
     const material: THREE.Material = snowUniforms && nodes
-      ? nodes.snow.createSnowNodeMaterial(buildSnowDetailNormal(world.seed), snowUniforms as SnowNodeUniforms, snowDebug)
+      ? nodes.snow.createSnowNodeMaterial(this.detailNormal, snowUniforms as SnowNodeUniforms, snowDebug, null, rung)
       : new THREE.MeshStandardMaterial({
         vertexColors: true, roughness: 0.86, metalness: 0.02, flatShading: false, dithering: true,
       });
     if (snowUniforms && !nodes) {
-      const detailNormal = buildSnowDetailNormal(world.seed);
-      material.userData.snowDetail = detailNormal;
-      polishSnowMaterial(material as THREE.MeshStandardMaterial, detailNormal, snowUniforms as SnowUniforms);
+      material.userData.snowDetail = this.detailNormal;
+      polishSnowMaterial(material as THREE.MeshStandardMaterial, this.detailNormal, snowUniforms as SnowUniforms);
     }
+    this.material = material;
     for (let index = 0; index < GRID_SIZE * GRID_SIZE; index += 1) {
         const mesh = new THREE.Mesh(new THREE.BufferGeometry(), material);
         mesh.receiveShadow = true;
         scene.add(mesh);
         this.tiles.push({ mesh, x: Infinity, z: Infinity });
     }
+  }
+
+  /**
+   * Swap the procedural detail normal for the real KTX2 pair once `loadSurfaceTextures` resolves.
+   * WebGPU-only, and one-shot: this rebuilds the shared tile material exactly once, the moment the
+   * async texture load lands — never on a later governor rung change, matching how every other
+   * rung-gated setting (`GameRenderer.applyQuality`) tweaks uniforms in place rather than rebuilding
+   * a material. `rung` was captured once at construction for the same reason `createSnowNodeMaterial`
+   * treats it as fixed: below rung 3 the real surface is never wired in, so there is nothing to swap.
+   */
+  attachSurfaceTextures(surfaces: SurfaceTextures): void {
+    if (!this.nodes || !this.snowUniforms || this.rung < 3) return;
+    const next = this.nodes.snow.createSnowNodeMaterial(
+      this.detailNormal, this.snowUniforms as SnowNodeUniforms, this.snowDebug, surfaces, this.rung,
+    );
+    const previous = this.material;
+    this.material = next;
+    for (const tile of this.tiles) tile.mesh.material = next;
+    previous.dispose();
+    // The procedural detail normal is orphaned by the swap — nothing in the new material's graph
+    // references it, and disposeObjectTree only walks materials still attached to the scene, so
+    // without this it would sit on the GPU for the rest of the session.
+    this.detailNormal.dispose();
   }
 
   update(playerX: number, playerZ: number): void {
@@ -155,7 +185,7 @@ export class TerrainRenderer {
     for (const { mesh } of this.tiles) {
       this.scene.remove(mesh); mesh.geometry.dispose();
     }
-    this.tiles[0]?.mesh.material.dispose();
+    this.material.dispose();
     this.tiles.length = 0;
   }
 }
