@@ -7,9 +7,11 @@ import { bloom } from "three/addons/tsl/display/BloomNode.js";
 import { fxaa } from "three/addons/tsl/display/FXAANode.js";
 import { smaa } from "three/addons/tsl/display/SMAANode.js";
 import { lut3D } from "three/addons/tsl/display/Lut3DNode.js";
+import { godrays } from "three/addons/tsl/display/GodraysNode.js";
 import type { QualityRung } from "./QualityController";
 import { buildPosterLut } from "./SnowMaterial";
 import { chromaticAberrationOffset } from "./MotionEffects";
+import { SUN_DIRECTION } from "./SceneFactory";
 
 const LUT_SIZE = 32;
 const BLOOM_STRENGTH = 0.5;
@@ -71,17 +73,74 @@ const AO_SAMPLES = 16;
  */
 const AO_RESOLUTION_SCALE = 0.5;
 
+/*
+ * Godrays tuning. This genre over-uses sun shafts until they read as a lens effect rather than
+ * atmosphere, so every knob below pulls the other way: quiet density, a hard cap on brightness,
+ * and a gate that only opens when the sun is actually near the middle of the frame.
+ */
+/**
+ * Multiplies the raymarched shaft on top of GodraysNode's own [0, `maxDensity`] output. Kept low
+ * on purpose — this is the single biggest lever on "atmosphere" vs. "lens flare", and 0.35 was
+ * chosen to be visible on the sun-facing frames of the Task 3 screenshots without lifting the
+ * mean luminance of a full slope-away frame at all (the gate below already zeroes it there).
+ */
+const GODRAYS_INTENSITY = 0.35;
+/** GodraysNode default (0.7) darkens too much of the open sky between the skier and the sun on a
+ *  slope with no real "humid air" to speak of; softened to keep the shaft thin. */
+const GODRAYS_DENSITY = 0.45;
+/** GodraysNode default (0.5) is a lens-flare-bright ceiling; halved so the brightest shaft pixel
+ *  still reads as haze, not glow. */
+const GODRAYS_MAX_DENSITY = 0.22;
+/** Half resolution, matching AO: godrays are as low-frequency as light shafts get. */
+const GODRAYS_RESOLUTION_SCALE = 0.5;
+/**
+ * The sun-proximity gate is expressed as the cosine of the angle between the camera's forward
+ * vector and the (constant) sun direction, computed fresh each frame from `camera.fov` so it
+ * tracks zoom. Full intensity inside `GODRAYS_INNER_FOV_FRACTION` of the half-FOV cone around
+ * dead-centre; zero at the edge of the vertical field of view, where the sun disc itself would be
+ * leaving frame. Between the two it smoothsteps, so the shaft doesn't pop as the camera pans.
+ */
+const GODRAYS_INNER_FOV_FRACTION = 0.4;
+
+/** Cosine of `angleDeg`, cached per call — cheap, but named so the gate math reads as geometry. */
+function cosDeg(angleDeg: number): number {
+  return Math.cos(THREE.MathUtils.degToRad(angleDeg));
+}
+
+/** Plain-JS smoothstep for the CPU-side proximity gate; the shader graph has its own via TSL. */
+function smoothstep01(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+/** Module-scope scratch for the per-frame camera-forward dot product — no per-frame allocation. */
+const forwardScratch = new THREE.Vector3();
+
+/**
+ * How much the sun is "in frame" this frame: 1 when it sits within `GODRAYS_INNER_FOV_FRACTION` of
+ * the half-FOV cone around dead-centre, 0 once it would be outside the vertical field of view
+ * (where the shaft's own source, the sun disc, is no longer visible), smoothstepped between.
+ */
+function sunFrameProximity(camera: THREE.PerspectiveCamera): number {
+  const halfFov = camera.fov * 0.5;
+  const outer = cosDeg(halfFov);
+  const inner = cosDeg(halfFov * GODRAYS_INNER_FOV_FRACTION);
+  const facing = camera.getWorldDirection(forwardScratch).dot(SUN_DIRECTION);
+  return smoothstep01(outer, inner, facing);
+}
+
 export interface PostChainPolicy {
   chain: boolean;
   bloom: boolean;
   aa: boolean;
   chromatic: boolean;
   ao: boolean;
+  godrays: boolean;
 }
 
 /** The rung ladder from `PostProcessing.setQuality`, lifted out so it cannot drift. */
 export function postChainPolicy(rung: QualityRung, reducedMotion: boolean): PostChainPolicy {
-  return { chain: rung > 0, bloom: rung >= 3, aa: rung >= 2, chromatic: rung > 0 && !reducedMotion, ao: rung >= 3 };
+  return { chain: rung > 0, bloom: rung >= 3, aa: rung >= 2, chromatic: rung > 0 && !reducedMotion, ao: rung >= 3, godrays: rung >= 4 };
 }
 
 export interface PostChainUniforms {
@@ -89,6 +148,7 @@ export interface PostChainUniforms {
   bloom: UniformNode<"float", number>;
   aa: UniformNode<"float", number>;
   ao: UniformNode<"float", number>;
+  godrays: UniformNode<"float", number>;
   aberration: UniformNode<"vec2", THREE.Vector2>;
   aspect: UniformNode<"float", number>;
 }
@@ -136,12 +196,16 @@ export class NodePostProcessing {
     bloom: uniform(1),
     aa: uniform(1),
     ao: uniform(1),
+    // Zero, not one like the other rung-4 stages: this one is also gated on sun proximity, which
+    // is only known once a frame has actually run, so it must not default to visible.
+    godrays: uniform(0),
     aberration: uniform(new THREE.Vector2()),
     aspect: uniform(1),
   };
   readonly aoNode: ReturnType<typeof ao>;
   /** The single-channel occlusion buffer as it is wired into the chain. */
   readonly aoTexture: Vec4;
+  readonly godraysNode: ReturnType<typeof godrays>;
   readonly bloomNode: ReturnType<typeof bloom>;
   /** The poster lookup. Everything reachable from here is graded; everything after it is not. */
   readonly lutNode: Vec4;
@@ -153,9 +217,11 @@ export class NodePostProcessing {
   constructor(
     renderer: Renderer,
     scene: THREE.Scene,
-    camera: THREE.PerspectiveCamera,
+    private readonly camera: THREE.PerspectiveCamera,
     private readonly speed: { value: number },
     private readonly reducedMotion: boolean,
+    /** The CSM key light — see `CsmShadowsNode.light`, the narrow accessor this reads. */
+    sunLight: THREE.DirectionalLight,
     readonly antialias: "smaa" | "fxaa" = "smaa",
   ) {
     const scenePass = pass(scene, camera);
@@ -192,10 +258,24 @@ export class NodePostProcessing {
     const occlusion = mix(float(1), this.aoTexture.r, this.uniforms.ao);
     const occluded = vec4(aberrated.rgb.mul(occlusion), aberrated.a);
 
-    this.bloomNode = bloom(occluded, BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD);
+    // Additive, not a lerp like AO: a shaft is light being added into the frame, not light being
+    // removed from it. It lands after occlusion (a shaft is unaffected by contact shadows on the
+    // snow) but before the bloom threshold, so a bright shaft can still bloom the way the sun disc
+    // does — the whole point of keeping it "atmosphere" is that it behaves like the rest of the
+    // light in the scene rather than a screen-space decal on top of it. GodraysNode itself is fed
+    // no normals for the same MRT-cost reason as GTAO above, and needs no depth-space reasoning of
+    // its own: the raymarch only ever samples the *light's* shadow map, not scene normals.
+    this.godraysNode = godrays(scenePass.getTextureNode("depth"), camera, sunLight);
+    this.godraysNode.density.value = GODRAYS_DENSITY;
+    this.godraysNode.maxDensity.value = GODRAYS_MAX_DENSITY;
+    this.godraysNode.resolutionScale = GODRAYS_RESOLUTION_SCALE;
+    const shaftTexture = asVec4(this.godraysNode.getTextureNode());
+    const shafted = vec4(occluded.rgb.add(shaftTexture.r.mul(GODRAYS_INTENSITY).mul(this.uniforms.godrays)), occluded.a);
+
+    this.bloomNode = bloom(shafted, BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD);
     // `postprocessing` screen-blended the bloom (BlendFunction.SCREEN), not additive.
     const lit = asVec4(this.bloomNode).mul(this.uniforms.bloom);
-    const bloomed = vec4(occluded.add(lit).sub(occluded.mul(lit)).rgb, occluded.a);
+    const bloomed = vec4(shafted.add(lit).sub(shafted.mul(lit)).rgb, shafted.a);
 
     // `postprocessing`'s LUT3DEffect declares `inputColorSpace = SRGBColorSpace`, so the effect
     // framework encoded the linear working buffer to sRGB around it. Feeding the same cube linear
@@ -240,6 +320,11 @@ export class NodePostProcessing {
     // expensive of the two off-screen passes, so it gets the same treatment.
     this.bloomNode.updateBeforeType = this.uniforms.bloom.value > 0 ? NodeUpdateType.FRAME : NodeUpdateType.NONE;
     this.aoNode.updateBeforeType = this.uniforms.ao.value > 0 ? NodeUpdateType.FRAME : NodeUpdateType.NONE;
+    // The rung gate is fixed here; the sun-proximity gate that multiplies it is per-frame and set
+    // in render(), so a rung-3 step-down must also zero the uniform immediately rather than wait
+    // for the next render() call to notice the policy changed.
+    if (!(this.policy.chain && this.policy.godrays)) this.uniforms.godrays.value = 0;
+    this.godraysNode.updateBeforeType = this.policy.chain && this.policy.godrays ? NodeUpdateType.FRAME : NodeUpdateType.NONE;
   }
 
   render(deltaTime: number): void {
@@ -250,6 +335,7 @@ export class NodePostProcessing {
       ? chromaticAberrationOffset(this.speed.value, this.reducedMotion)
       : [0, 0];
     this.uniforms.aberration.value.set(x, y);
+    this.uniforms.godrays.value = this.policy.chain && this.policy.godrays ? sunFrameProximity(this.camera) : 0;
     this.pipeline.render();
   }
 
@@ -257,9 +343,10 @@ export class NodePostProcessing {
     this.pipeline.dispose();
     this.lut.dispose();
     // RenderPipeline.dispose() only releases its own quad material — it never walks the graph — so
-    // the AO node's full-screen render target has to be released here or every renderer re-init
-    // leaks one. `dispose()` is missing from the r185 GTAONode typings but present on the class.
+    // both off-screen render targets have to be released here or every renderer re-init leaks them.
+    // `dispose()` is missing from the r185 typings for both node classes but present on both.
     (this.aoNode as unknown as { dispose(): void }).dispose();
+    (this.godraysNode as unknown as { dispose(): void }).dispose();
   }
 
   /** Cross-fades an optional stage in and out on the `aa` uniform without dropping it from the graph. */

@@ -6,6 +6,7 @@ import { ColorSpaceNode, NodeUpdateType } from "three/webgpu";
 import { chromaticAberrationOffset } from "./MotionEffects";
 import { NodePostProcessing, postChainPolicy } from "./NodePostProcessing";
 import { PostProcessing } from "./PostProcessing";
+import { SUN_DIRECTION } from "./SceneFactory";
 
 // SMAANode decodes its edge/area lookup atlases through `new Image()`, which Node lacks.
 // The stub only has to exist; nothing in these structure tests reads the decoded pixels.
@@ -39,33 +40,37 @@ function stubRenderer() {
   return { renderer: renderer as unknown as Renderer, calls };
 }
 
-function build(options?: { reducedMotion?: boolean; antialias?: "smaa" | "fxaa" }) {
+function build(options?: { reducedMotion?: boolean; antialias?: "smaa" | "fxaa"; camera?: THREE.PerspectiveCamera }) {
   const { renderer, calls } = stubRenderer();
   const speed = { value: 0 };
+  const camera = options?.camera ?? new THREE.PerspectiveCamera();
+  const sunLight = new THREE.DirectionalLight();
   const post = new NodePostProcessing(
     renderer,
     new THREE.Scene(),
-    new THREE.PerspectiveCamera(),
+    camera,
     speed,
     options?.reducedMotion ?? false,
+    sunLight,
     options?.antialias,
   );
-  return { post, speed, calls };
+  return { post, speed, calls, camera, sunLight };
 }
 
 test("the rung policy matches what PostProcessing.setQuality does today", () => {
   // PostProcessing.ts:41-46 — effectPass rung>0, chromaticPass rung>0 && !reducedMotion,
-  // bloom rung>=3, smaa rung>=2. `ao` joins the table at rung 3, alongside bloom.
-  assert.deepEqual(postChainPolicy(0, false), { chain: false, bloom: false, aa: false, chromatic: false, ao: false });
-  assert.deepEqual(postChainPolicy(1, false), { chain: true, bloom: false, aa: false, chromatic: true, ao: false });
-  assert.deepEqual(postChainPolicy(2, false), { chain: true, bloom: false, aa: true, chromatic: true, ao: false });
-  assert.deepEqual(postChainPolicy(3, false), { chain: true, bloom: true, aa: true, chromatic: true, ao: true });
-  assert.deepEqual(postChainPolicy(4, false), { chain: true, bloom: true, aa: true, chromatic: true, ao: true });
+  // bloom rung>=3, smaa rung>=2. `ao` joins the table at rung 3, `godrays` at rung 4.
+  assert.deepEqual(postChainPolicy(0, false), { chain: false, bloom: false, aa: false, chromatic: false, ao: false, godrays: false });
+  assert.deepEqual(postChainPolicy(1, false), { chain: true, bloom: false, aa: false, chromatic: true, ao: false, godrays: false });
+  assert.deepEqual(postChainPolicy(2, false), { chain: true, bloom: false, aa: true, chromatic: true, ao: false, godrays: false });
+  assert.deepEqual(postChainPolicy(3, false), { chain: true, bloom: true, aa: true, chromatic: true, ao: true, godrays: false });
+  assert.deepEqual(postChainPolicy(4, false), { chain: true, bloom: true, aa: true, chromatic: true, ao: true, godrays: true });
 
   for (const rung of [0, 1, 2, 3, 4] as const) {
     assert.equal(postChainPolicy(rung, true).chromatic, false, "reduced motion always drops the aberration");
     assert.equal(postChainPolicy(rung, true).chain, rung > 0, "and nothing else changes");
     assert.equal(postChainPolicy(rung, true).ao, rung >= 3, "AO is not a motion effect — reduced motion keeps it");
+    assert.equal(postChainPolicy(rung, true).godrays, rung >= 4, "nor are godrays");
   }
 });
 
@@ -97,6 +102,7 @@ test("quality changes flip uniforms without ever rebuilding the graph", () => {
 
   post.setQuality(3);
   assert.equal(post.uniforms.ao.value, 1, "AO survives the step down to rung 3");
+  assert.equal(post.uniforms.godrays.value, 0, "but godrays does not — it is a rung 4 exclusive");
 
   post.setQuality(2);
   assert.equal(post.uniforms.bloom.value, 0, "bloom is a rung 3 luxury");
@@ -112,8 +118,58 @@ test("quality changes flip uniforms without ever rebuilding the graph", () => {
   assert.equal(post.uniforms.bloom.value, 0);
   assert.equal(post.uniforms.aa.value, 0);
   assert.equal(post.uniforms.ao.value, 0);
+  assert.equal(post.uniforms.godrays.value, 0);
 
   assert.equal(post.pipeline.outputNode, graph, "same node graph throughout — no recompile mid-run");
+});
+
+test("godrays stay at zero below rung 4 no matter where the camera looks", () => {
+  const camera = new THREE.PerspectiveCamera();
+  camera.lookAt(SUN_DIRECTION); // dead on the sun — would be maximal proximity at rung 4
+  const { post } = build({ camera });
+
+  for (const rung of [0, 1, 2, 3] as const) {
+    post.setQuality(rung);
+    post.render(1 / 60);
+    assert.equal(post.uniforms.godrays.value, 0, `rung ${rung} keeps godrays at zero even facing the sun`);
+  }
+});
+
+test("godrays are gated on the sun being near the frame, not just the rung", () => {
+  const facingSun = new THREE.PerspectiveCamera();
+  facingSun.lookAt(SUN_DIRECTION);
+  const { post: onSun } = build({ camera: facingSun });
+  onSun.setQuality(4);
+  onSun.render(1 / 60);
+  assert.ok(onSun.uniforms.godrays.value > 0, "sun dead ahead — the shaft has a visible source");
+
+  const facingAway = new THREE.PerspectiveCamera();
+  facingAway.lookAt(SUN_DIRECTION.clone().negate());
+  const { post: awaySun } = build({ camera: facingAway });
+  awaySun.setQuality(4);
+  awaySun.render(1 / 60);
+  assert.equal(awaySun.uniforms.godrays.value, 0, "sun directly behind the camera — no shaft with no source");
+});
+
+test("the godrays render pass stops running when the rung drops below it", () => {
+  const camera = new THREE.PerspectiveCamera();
+  camera.lookAt(SUN_DIRECTION);
+  const { post } = build({ camera });
+  post.setQuality(4);
+  assert.equal(post.godraysNode.updateBeforeType, NodeUpdateType.FRAME, "the raymarch runs when godrays are on");
+  post.setQuality(3);
+  assert.equal(post.godraysNode.updateBeforeType, NodeUpdateType.NONE, "and stops entirely one rung down");
+  post.setQuality(4);
+  assert.equal(post.godraysNode.updateBeforeType, NodeUpdateType.FRAME, "restored on the way back up");
+});
+
+test("dispose releases the godrays render target too", () => {
+  const { post } = build();
+  let disposed = false;
+  const target = (post.godraysNode as unknown as { _godraysRenderTarget: THREE.RenderTarget })._godraysRenderTarget;
+  target.addEventListener("dispose", () => { disposed = true; });
+  post.dispose();
+  assert.equal(disposed, true);
 });
 
 test("AO is a lighting term: it lands before the bloom threshold and before the poster LUT", () => {
