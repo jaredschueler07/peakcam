@@ -224,7 +224,18 @@ export class NodePostProcessing {
     sunLight: THREE.DirectionalLight,
     readonly antialias: "smaa" | "fxaa" = "smaa",
   ) {
-    const scenePass = pass(scene, camera);
+    // `renderer` is constructed with `antialias: true` (backend.ts), which without an override
+    // PassNode inherits onto this offscreen render target (`renderTarget.samples = options.samples
+    // ?? renderer.samples` — PassNode.js `setup()`). On real WebGPU hardware that makes the pass's
+    // depth attachment a multisampled texture; GTAONode's depth sampling compiles a
+    // `textureDimensions(tex, level)` call that has no WGSL overload for
+    // `texture_depth_multisampled_2d` (only the no-level form is valid on a multisampled texture),
+    // which fails renderPipeline_GTAO creation with a GPUValidationError on the real backend —
+    // invisible under SwiftShader/unit tests, which don't enforce the overload set as strictly.
+    // This chain already antialiases explicitly via SMAA/FXAA below, so hardware MSAA on the scene
+    // pass was never load-bearing; disabling it here removes the failure without touching the AA
+    // the user actually sees.
+    const scenePass = pass(scene, camera, { samples: 0 });
     const aberrated = aberrate(scenePass.getTextureNode(), this.uniforms);
 
     // GTAO is given depth but no normals, so it reconstructs them from depth in the shader. That is
@@ -265,6 +276,36 @@ export class NodePostProcessing {
     // light in the scene rather than a screen-space decal on top of it. GodraysNode itself is fed
     // no normals for the same MRT-cost reason as GTAO above, and needs no depth-space reasoning of
     // its own: the raymarch only ever samples the *light's* shadow map, not scene normals.
+    // GodraysNode's directional-light branch unconditionally reads `light.shadow.map.depthTexture`
+    // to test whether a raymarch sample is occluded (GodraysNode.js's `inShadow`). `sunLight` is
+    // `CsmShadowsNode`'s light, whose shadow is driven entirely by `light.shadow.shadowNode`
+    // (`CSMShadowNode`): `AnalyticLightNode.setupShadow()` takes the `customShadowNode` branch
+    // whenever that field is set and never runs the code that assigns `light.shadow.map` — so under
+    // CSM, `.map` stays `null` forever, by construction, not by ordering. GodraysNode was never
+    // written with CSM in mind ("the main light must cast shadows" in its own docs assumes a plain
+    // single shadow map). SwiftShader and the unit suite never build a real WGSL pipeline, so
+    // nothing caught this before the real-hardware gate: on actual WebGPU, `godraysNode.setup()`
+    // throws building the shader the instant it dereferences `null.depthTexture`, which crashes
+    // every frame's pipeline compile. A dedicated single-map shadow light for godrays' own occlusion
+    // test is a real fix but out of scope for this round; this stub only keeps the property access
+    // valid so the shader compiles. Cost: godrays are not geometry-occluded (a shaft can pass
+    // through shadowed terrain) until that's built — a visible-but-minor gap on an already-subtle,
+    // rung-4-only, near-sun-gated effect, versus the total real-hardware crash it replaces.
+    //
+    // The depth texture alone isn't enough: `inShadow`'s `texture(...).compare(...)` compiles to a
+    // WGSL `textureSampleCompare`, which needs a *comparison* sampler bound alongside the texture.
+    // The WebGPU backend only creates that binding when `depthTexture.compareFunction` is set — real
+    // shadow maps get it from `ShadowNode.js`'s own setup (`depthTexture.compareFunction =
+    // reversedDepthBuffer ? GreaterEqualCompare : LessEqualCompare`), which this stub bypasses
+    // entirely, so it must set the same thing itself or the shader compiles but references a sampler
+    // the backend never bound ("unresolved value ..._sampler").
+    if (sunLight.shadow.map === null) {
+      const stubShadowMap = new THREE.RenderTarget(1, 1, { depthBuffer: true });
+      const stubDepthTexture = new THREE.DepthTexture(1, 1);
+      stubDepthTexture.compareFunction = renderer.reversedDepthBuffer ? THREE.GreaterEqualCompare : THREE.LessEqualCompare;
+      stubShadowMap.depthTexture = stubDepthTexture;
+      sunLight.shadow.map = stubShadowMap;
+    }
     this.godraysNode = godrays(scenePass.getTextureNode("depth"), camera, sunLight);
     this.godraysNode.density.value = GODRAYS_DENSITY;
     this.godraysNode.maxDensity.value = GODRAYS_MAX_DENSITY;
