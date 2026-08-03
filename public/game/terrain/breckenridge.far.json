@@ -1,0 +1,40 @@
+{
+  "slug": "breckenridge",
+  "radiusM": 30000,
+  "wedgeCount": 16,
+  "centre": [
+    39.4749,
+    -106.081
+  ],
+  "demSource": "3dep-13-10m+copernicus-glo30",
+  "bakedAt": "2026-08-02T20:23:41.181Z",
+  "innerRadiusM": 0,
+  "bands": [
+    {
+      "untilM": 500,
+      "cellM": 16
+    },
+    {
+      "untilM": 2000,
+      "cellM": 48
+    },
+    {
+      "untilM": 6000,
+      "cellM": 128
+    },
+    {
+      "untilM": 15000,
+      "cellM": 256
+    },
+    {
+      "untilM": 30000,
+      "cellM": 256
+    }
+  ],
+  "vertexCount": 46304,
+  "triangleCount": 85968,
+  "drawnVertexEstimate": 14470,
+  "rawBytes": 795060,
+  "compressedBytes": 228261,
+  "maxQuantisationErrorM": 0.22888532845044632
+}
