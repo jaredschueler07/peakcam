@@ -6,6 +6,8 @@ import type { AtmosphereUniforms } from "./Atmosphere";
 import type { NodeFactories } from "./nodeFactories";
 import { visualWeatherPreset } from "./VisualPresets";
 import { SNOW_DEBUG, snowDebugMode } from "./debugFlags";
+import type { QualityRung } from "./QualityController";
+import type { SkyNodeSeed } from "./SkyNodeMaterial";
 
 export const SUN_DIRECTION = new THREE.Vector3(-0.46, 0.62, -0.64).normalize();
 
@@ -59,8 +61,21 @@ export interface AtmosphereUniformSet {
 export interface GameScene {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
-  sky: THREE.Mesh<THREE.SphereGeometry, THREE.Material>;
+  /**
+   * A `SphereGeometry` gradient dome below rung 2, or a `SkyMesh` (its own `BoxGeometry`, sized by
+   * the depth-pinning trick in its vertex shader) at rung 2+ on WebGPU. `BufferGeometry` is the
+   * common ancestor; nothing downstream reads the concrete geometry type.
+   */
+  sky: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
   skyUniforms: SkyUniformSet;
+  /**
+   * Present only when the physical sky (`SkyMesh`, rung 2+ WebGPU) is mounted. `skyUniforms` alone
+   * does not reach it — `SkyMesh` reads none of the `u*` values `WeatherRenderer` writes — so
+   * `WeatherRenderer.apply` calls this on every weather change to re-derive `SkyMesh`'s own
+   * turbidity/rayleigh/mie/cloud parameters from the new preset. Undefined on the gradient path
+   * (rung 0-1, or WebGL), where the live `skyUniforms` references already do the job.
+   */
+  updatePhysicalSky?: (seed: SkyNodeSeed) => void;
   sun: THREE.DirectionalLight;
   hemi: THREE.HemisphereLight;
   ambient: THREE.AmbientLight;
@@ -104,8 +119,13 @@ function makeRidge(radius: number, height: number, seed: number, low: number, hi
  * `nodes` doubles as the backend switch: the WebGPU pipeline is exactly the sessions that resolved
  * the node-material chunk (`loadNodeFactories()`), and `null` is the WebGL path with its GLSL
  * `ShaderMaterial` sky and `FogExp2`.
+ *
+ * `rung` is the *seeded* quality rung (`QualityController.rung` at construction time), not a live
+ * value the sky re-reads later: the physical `SkyMesh` is a full-screen shader, expensive enough
+ * that which sky mounts is a scene-build-time decision rather than something the governor swaps
+ * mid-run, the way it does post-processing or shadow cascades.
  */
-export function createScene(profile: ResortGameProfile, aspect: number, nodes: NodeFactories | null = null): GameScene {
+export function createScene(profile: ResortGameProfile, aspect: number, nodes: NodeFactories | null = null, rung: QualityRung = 0): GameScene {
   const weather = profile.weather[0], visual = visualWeatherPreset(0), scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(weather.fogCol, weather.fog);
   const camera = new THREE.PerspectiveCamera(65, aspect, 0.5, CAMERA_FAR);
@@ -118,17 +138,27 @@ export function createScene(profile: ResortGameProfile, aspect: number, nodes: N
   scene.add(hemi, ambient, sun, sun.target);
 
   const skyGeometry = new THREE.SphereGeometry(3400, 32, 20);
-  const skyNodeUniforms = nodes ? nodes.sky.createSkyNodeUniforms({
+  const skySeed = {
     top: new THREE.Color(weather.top), mid: new THREE.Color(visual.mid), horizon: new THREE.Color(weather.hor),
     cloud: new THREE.Color(visual.cloud), cloudiness: visual.cloudiness, sun: new THREE.Color(visual.sunCol),
     sunDir: SUN_DIRECTION.clone(), haze: weather.haze,
-  }) : null;
+  };
+  // A full-screen physical sky is real GPU cost; rungs 0-1 exist for hardware that can't spend it,
+  // so they keep the gradient even on WebGPU. See SkyNodeMaterial.createPhysicalSky for why the
+  // preset's colours drive the model's parameters rather than tinting its output.
+  const physicalSky = nodes && rung >= 2 ? nodes.sky.createPhysicalSky(skySeed) : null;
+  const updatePhysicalSky = nodes && physicalSky
+    ? (seed: SkyNodeSeed) => nodes.sky.applyPhysicalSkyParams(physicalSky.mesh, seed)
+    : undefined;
+  const skyNodeUniforms = physicalSky ? physicalSky.uniforms : nodes ? nodes.sky.createSkyNodeUniforms(skySeed) : null;
   const skyUniforms: SkyUniformSet = skyNodeUniforms ?? {
     uTop: { value: new THREE.Color(weather.top) }, uMid: { value: new THREE.Color(visual.mid) }, uHorizon: { value: new THREE.Color(weather.hor) },
     uCloud: { value: new THREE.Color(visual.cloud) }, uCloudiness: { value: visual.cloudiness }, uTime: { value: 0 },
     uSun: { value: new THREE.Color(visual.sunCol) }, uSunDir: { value: SUN_DIRECTION.clone() }, uHaze: { value: weather.haze },
   };
-  const sky = nodes && skyNodeUniforms
+  const sky: THREE.Mesh<THREE.BufferGeometry, THREE.Material> = physicalSky
+    ? physicalSky.mesh
+    : nodes && skyNodeUniforms
     ? new THREE.Mesh(skyGeometry, nodes.sky.createSkyNodeMaterial(skyNodeUniforms) as THREE.Material)
     : new THREE.Mesh(skyGeometry, new THREE.ShaderMaterial({
     uniforms: skyUniforms, side: THREE.BackSide, depthWrite: false, fog: false,
@@ -170,5 +200,5 @@ void main(){vec3 d=normalize(vDir);float t=clamp(d.y*.5+.5,0.,1.);vec3 c=mix(uHo
     (scene as THREE.Scene & { fogNode?: unknown }).fogNode =
       nodes.atmosphere.createAtmosphereFog(atmosphereUniforms as Parameters<NodeFactories["atmosphere"]["createAtmosphereFog"]>[0]);
   }
-  return { scene, camera, sky, skyUniforms, sun, hemi, ambient, sunDisc, sunGlow, peaks, snowUniforms, atmosphereUniforms };
+  return { scene, camera, sky, skyUniforms, updatePhysicalSky, sun, hemi, ambient, sunDisc, sunGlow, peaks, snowUniforms, atmosphereUniforms };
 }

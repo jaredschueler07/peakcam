@@ -25,6 +25,7 @@ import {
 import { RAMP_W } from "../terrain/heightfield";
 import { staticNodeFactories } from "./nodeFactories.fixture";
 import { CAMERA_FAR, createScene } from "./SceneFactory";
+import { WeatherRenderer } from "./WeatherRenderer";
 import { FAR_FIELD_GROUP_NAME, FAR_FIELD_INNER_RADIUS_M, FarFieldRenderer } from "./FarFieldRenderer";
 import { CSM_FAR_REFERENCE, CsmShadows } from "./CsmShadows";
 import { visualWeatherPreset } from "./VisualPresets";
@@ -534,6 +535,9 @@ test("the WebGPU scene really is built from node materials, so the audit above c
   const renderer = new GameRenderer(canvas, profile, world, state, {
     backend: new FakeBackend("webgpu"), devicePixelRatio: 1, reducedMotion: true,
     nodeFactories: staticNodeFactories(),
+    // Pinned above rung 2 so the sky is deterministically SkyMesh (its `NodeMaterial`, not the
+    // gradient's `MeshBasicNodeMaterial`) regardless of the machine running the suite.
+    qualitySignals: { hardwareConcurrency: 8, deviceMemory: 8, coarsePointer: false, dpr: 1 },
   });
   const scene = (renderer as unknown as { built: { scene: THREE.Scene } }).built.scene;
   const kinds = new Set<string>();
@@ -546,7 +550,8 @@ test("the WebGPU scene really is built from node materials, so the audit above c
       for (const value of Object.values(material.userData)) if (value instanceof THREE.Texture) sprites.add(value);
     }
   });
-  assert.deepEqual([...kinds].sort(), ["MeshBasicNodeMaterial", "PointsNodeMaterial", "SnowStandardNodeMaterial"]);
+  // "NodeMaterial" is SkyMesh's own material (rung 2+ mounts the physical sky, not the gradient).
+  assert.deepEqual([...kinds].sort(), ["NodeMaterial", "PointsNodeMaterial", "SnowStandardNodeMaterial"]);
   assert.equal(sprites.size, 3, "snow detail normal plus a radial sprite per particle cloud");
   renderer.dispose();
   assert.deepEqual(renderer.resources(), { geometries: 0, materials: 0, textures: 0 });
@@ -938,4 +943,90 @@ test("the far field gets height fog on its real, asynchronous attach path", () =
     }
     renderer.dispose();
   }
+});
+
+/**
+ * Phase 2 task 2: `SkyMesh` (the Preetham physical sky) replaces the procedural gradient on
+ * WebGPU once quality clears rung 2 — a full-screen atmospheric shader is too expensive to force
+ * on the rungs that exist for weak hardware. WebGL has no WebGPU-only `SkyMesh` import available
+ * to it at all (the P11 bundle split forbids it reaching that path), so it keeps the legacy
+ * `ShaderMaterial` gradient regardless of rung.
+ *
+ * The hard constraint: the gradient's `top`/`hor` colours used to double as the only colour input
+ * the sky owned, but fog is coloured entirely by `atmosphereUniforms.blue`/`warm`, which come from
+ * `VisualWeatherPreset.fogBlue`/`fogWarm` — never from the sky's palette. Swapping the sky
+ * implementation must leave those two fog uniforms byte-identical for every resort and weather
+ * preset; this test drives `WeatherRenderer.apply` across all of them and diffs the hex values
+ * between a rung-4 WebGPU scene (SkyMesh) and the WebGL scene (legacy gradient, the baseline).
+ */
+test("SkyMesh replaces the gradient at rung 2+ on WebGPU, and never touches the fog colour inputs", () => {
+  const NODES = staticNodeFactories();
+  const backend = new FakeBackend("webgpu");
+
+  for (const resortProfile of Object.values(DROP_IN_GAME_PROFILES)) {
+    // Rungs 0-1 keep the gradient even on WebGPU: SkyMesh is a full-screen shader, not something
+    // to force on the rungs that exist for weak hardware.
+    for (const rung of [0, 1] as const) {
+      const built = createScene(resortProfile, 16 / 9, NODES, rung);
+      assert.equal((built.sky as unknown as { isSkyMesh?: boolean }).isSkyMesh, undefined, `rung ${rung}: gradient, not SkyMesh`);
+    }
+
+    const legacy = createScene(resortProfile, 16 / 9, null, 4);
+    const physical = createScene(resortProfile, 16 / 9, NODES, 2);
+    assert.ok(legacy.sky.material instanceof THREE.ShaderMaterial, "WebGL always keeps the legacy gradient");
+    assert.equal((physical.sky as unknown as { isSkyMesh?: boolean }).isSkyMesh, true, "rung 2+ WebGPU is SkyMesh");
+
+    const legacyWeather = new WeatherRenderer(resortProfile, legacy, backend);
+    const physicalWeather = new WeatherRenderer(resortProfile, physical, backend);
+    for (let weatherIndex = 0; weatherIndex < resortProfile.weather.length; weatherIndex += 1) {
+      legacyWeather.apply(weatherIndex);
+      physicalWeather.apply(weatherIndex);
+      assert.equal(
+        physical.atmosphereUniforms.blue.value.getHex(), legacy.atmosphereUniforms.blue.value.getHex(),
+        `${resortProfile.slug} weather ${weatherIndex}: fog blue diverged`,
+      );
+      assert.equal(
+        physical.atmosphereUniforms.warm.value.getHex(), legacy.atmosphereUniforms.warm.value.getHex(),
+        `${resortProfile.slug} weather ${weatherIndex}: fog warm diverged`,
+      );
+    }
+  }
+});
+
+/**
+ * Fix round 1: a storm rolling in mid-run (WeatherRenderer.apply on player input) used to leave
+ * the physical sky frozen at whatever preset built the scene — `SkyMesh` never read the `u*`
+ * uniforms `WeatherRenderer` writes, unlike the gradient (both backends) where those uniforms are
+ * live references the shader reads every frame. `GameScene.updatePhysicalSky` closes that gap by
+ * re-running `applyPhysicalSkyParams` on every weather change; this proves it actually fires and
+ * moves `SkyMesh`'s own uniforms, not just `skyUniforms`.
+ */
+test("cycling weather mid-run re-derives the physical sky's parameters, not just skyUniforms", () => {
+  const NODES = staticNodeFactories();
+  const backend = new FakeBackend("webgpu");
+  const resortProfile = DROP_IN_GAME_PROFILES.breckenridge;
+  const physical = createScene(resortProfile, 16 / 9, NODES, 2);
+  assert.equal((physical.sky as unknown as { isSkyMesh?: boolean }).isSkyMesh, true);
+  assert.equal(typeof physical.updatePhysicalSky, "function", "GameScene exposes the re-derive hook at rung 2+");
+
+  const sky = physical.sky as unknown as {
+    turbidity: { value: number }; mieCoefficient: { value: number }; cloudCoverage: { value: number };
+  };
+  const weather = new WeatherRenderer(resortProfile, physical, backend);
+
+  // Index 0 is the clearest preset (Bluebird), index 2 the harshest (Whiteout/Ground Blizzard) —
+  // see VISUAL_WEATHER_PRESETS' cloudiness ladder (0.14 → 0.94) and each profile's haze ladder.
+  weather.apply(0);
+  const clear = { turbidity: sky.turbidity.value, mie: sky.mieCoefficient.value, cloud: sky.cloudCoverage.value };
+
+  weather.apply(2);
+  const stormy = { turbidity: sky.turbidity.value, mie: sky.mieCoefficient.value, cloud: sky.cloudCoverage.value };
+
+  assert.ok(stormy.turbidity > clear.turbidity, `turbidity should rise with haze: ${clear.turbidity} -> ${stormy.turbidity}`);
+  assert.ok(stormy.mie > clear.mie, `mieCoefficient should rise with haze: ${clear.mie} -> ${stormy.mie}`);
+  assert.ok(stormy.cloud > clear.cloud, `cloudCoverage should rise with cloudiness: ${clear.cloud} -> ${stormy.cloud}`);
+
+  // And back to clear: proves this isn't a one-shot "second preset always wins" artefact.
+  weather.apply(0);
+  assert.equal(sky.turbidity.value, clear.turbidity, "cycling back to the same preset reproduces the same parameters");
 });
