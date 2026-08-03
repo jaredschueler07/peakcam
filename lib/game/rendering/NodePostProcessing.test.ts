@@ -55,16 +55,17 @@ function build(options?: { reducedMotion?: boolean; antialias?: "smaa" | "fxaa" 
 
 test("the rung policy matches what PostProcessing.setQuality does today", () => {
   // PostProcessing.ts:41-46 — effectPass rung>0, chromaticPass rung>0 && !reducedMotion,
-  // bloom rung>=3, smaa rung>=2.
-  assert.deepEqual(postChainPolicy(0, false), { chain: false, bloom: false, aa: false, chromatic: false });
-  assert.deepEqual(postChainPolicy(1, false), { chain: true, bloom: false, aa: false, chromatic: true });
-  assert.deepEqual(postChainPolicy(2, false), { chain: true, bloom: false, aa: true, chromatic: true });
-  assert.deepEqual(postChainPolicy(3, false), { chain: true, bloom: true, aa: true, chromatic: true });
-  assert.deepEqual(postChainPolicy(4, false), { chain: true, bloom: true, aa: true, chromatic: true });
+  // bloom rung>=3, smaa rung>=2. `ao` joins the table at rung 3, alongside bloom.
+  assert.deepEqual(postChainPolicy(0, false), { chain: false, bloom: false, aa: false, chromatic: false, ao: false });
+  assert.deepEqual(postChainPolicy(1, false), { chain: true, bloom: false, aa: false, chromatic: true, ao: false });
+  assert.deepEqual(postChainPolicy(2, false), { chain: true, bloom: false, aa: true, chromatic: true, ao: false });
+  assert.deepEqual(postChainPolicy(3, false), { chain: true, bloom: true, aa: true, chromatic: true, ao: true });
+  assert.deepEqual(postChainPolicy(4, false), { chain: true, bloom: true, aa: true, chromatic: true, ao: true });
 
   for (const rung of [0, 1, 2, 3, 4] as const) {
     assert.equal(postChainPolicy(rung, true).chromatic, false, "reduced motion always drops the aberration");
     assert.equal(postChainPolicy(rung, true).chain, rung > 0, "and nothing else changes");
+    assert.equal(postChainPolicy(rung, true).ao, rung >= 3, "AO is not a motion effect — reduced motion keeps it");
   }
 });
 
@@ -92,9 +93,14 @@ test("quality changes flip uniforms without ever rebuilding the graph", () => {
   assert.equal(post.uniforms.chain.value, 1);
   assert.equal(post.uniforms.bloom.value, 1);
   assert.equal(post.uniforms.aa.value, 1);
+  assert.equal(post.uniforms.ao.value, 1);
+
+  post.setQuality(3);
+  assert.equal(post.uniforms.ao.value, 1, "AO survives the step down to rung 3");
 
   post.setQuality(2);
   assert.equal(post.uniforms.bloom.value, 0, "bloom is a rung 3 luxury");
+  assert.equal(post.uniforms.ao.value, 0, "and so is the occlusion");
   assert.equal(post.uniforms.aa.value, 1);
 
   post.setQuality(1);
@@ -105,8 +111,32 @@ test("quality changes flip uniforms without ever rebuilding the graph", () => {
   assert.equal(post.uniforms.chain.value, 0, "rung 0 is the raw render");
   assert.equal(post.uniforms.bloom.value, 0);
   assert.equal(post.uniforms.aa.value, 0);
+  assert.equal(post.uniforms.ao.value, 0);
 
   assert.equal(post.pipeline.outputNode, graph, "same node graph throughout — no recompile mid-run");
+});
+
+test("AO is a lighting term: it lands before the bloom threshold and before the poster LUT", () => {
+  const { post } = build();
+  // Reachability from a stage means the stage consumes it, i.e. the AO is applied upstream.
+  // Grading occlusion is the whole point — applying it over the LUT would darken the poster
+  // palette instead of the light, and letting it bypass bloom would let occluded creases glow.
+  assert.ok(collectNodes(post.lutNode).has(post.aoTexture), "the LUT grades an already-occluded frame");
+  assert.ok(collectNodes(post.bloomNode).has(post.aoTexture), "and the bloom threshold sees the darkened creases");
+});
+
+test("the AO node is tuned for metre-scale occluders on snow, not for architecture", () => {
+  // three's defaults (radius 0.25, distanceExponent 1, scale 1) find hand-width creases, of which
+  // an open snow slope has none. These values are the ones the visual round signs off; pinning them
+  // here means a silent revert to the defaults fails the suite rather than quietly doing nothing.
+  const { post } = build();
+  assert.equal(post.aoNode.radius.value, 1.5, "metre-scale reach — props, rocks, terrain rolls");
+  assert.equal(post.aoNode.distanceExponent.value, 2, "steps cluster at the contact shadow");
+  assert.equal(post.aoNode.thickness.value, 1, "below the radius, so silhouettes get no dark halo");
+  assert.equal(post.aoNode.scale.value, 1.5, "contrast knob that is a no-op on unoccluded snow");
+  assert.equal(post.aoNode.samples.value, 16);
+  assert.equal(post.aoNode.resolutionScale, 0.5, "AO is low-frequency; half-res is the standard trade");
+  assert.equal(post.aoNode.useTemporalFiltering, false, "temporal filtering needs a TRAANode we do not have");
 });
 
 test("disabled stages also stop doing their off-screen work", () => {
@@ -117,6 +147,16 @@ test("disabled stages also stop doing their off-screen work", () => {
   assert.equal(post.bloomNode.updateBeforeType, NodeUpdateType.NONE, "and is skipped entirely when it is off");
   post.setQuality(3);
   assert.equal(post.bloomNode.updateBeforeType, NodeUpdateType.FRAME, "restored on the way back up");
+});
+
+test("the AO buffer also stops rendering when the rung drops below it", () => {
+  const { post } = build();
+  post.setQuality(3);
+  assert.equal(post.aoNode.updateBeforeType, NodeUpdateType.FRAME, "the AO target is filled when AO is on");
+  post.setQuality(2);
+  assert.equal(post.aoNode.updateBeforeType, NodeUpdateType.NONE, "zeroing the uniform must not leave the pass running");
+  post.setQuality(4);
+  assert.equal(post.aoNode.updateBeforeType, NodeUpdateType.FRAME, "restored on the way back up");
 });
 
 test("each frame pushes the speed-driven aberration offset and renders once", () => {
@@ -190,6 +230,17 @@ test("dispose releases the LUT and the pipeline", () => {
   post.lut.addEventListener("dispose", () => { lutDisposed = true; });
   post.dispose();
   assert.equal(lutDisposed, true);
+});
+
+test("dispose releases the AO render target, which the pipeline does not own", () => {
+  // RenderPipeline.dispose() only disposes its own quad material — it never walks the graph, so a
+  // node holding a full-screen render target has to be released by hand or every re-init leaks one.
+  const { post } = build();
+  let aoDisposed = false;
+  const target = (post.aoNode as unknown as { _aoRenderTarget: THREE.RenderTarget })._aoRenderTarget;
+  target.addEventListener("dispose", () => { aoDisposed = true; });
+  post.dispose();
+  assert.equal(aoDisposed, true);
 });
 
 test("the poster LUT is fed sRGB, the way postprocessing's LUT3DEffect was", () => {
