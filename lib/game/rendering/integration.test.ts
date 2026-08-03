@@ -184,6 +184,18 @@ test("the instanced props carry vertex colours identically on both backends", ()
   }
 });
 
+test("the godrays node reads the exact light CsmShadowsNode casts shadows from — the (this.csm as CsmShadowsNode).light wiring in buildPost()", async () => {
+  const { renderer } = buildRenderer(new FakeBackend("webgpu"));
+  await renderer.prewarm(); // awaits postReady, so the async NodePostProcessing import has landed
+
+  const csm = (renderer as unknown as { csm: CsmShadowsNode }).csm;
+  const post = (renderer as unknown as { post: { godraysNode: { _light: THREE.DirectionalLight } } | null }).post;
+
+  assert.ok(post, "buildPost()'s `(this.csm as CsmShadowsNode).light` cast held at runtime, not just at the type checker");
+  assert.equal(post.godraysNode._light, csm.light, "godrays was built with the CSM's real shadow-casting light, not a stand-in");
+  renderer.dispose();
+});
+
 test("pre-warm compiles the seeded rung and the top rung, then restores the rung", async () => {
   const backend = new FakeBackend("webgpu");
   const { renderer } = buildRenderer(backend);
