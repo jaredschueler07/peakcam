@@ -1,6 +1,7 @@
 # Drop In v2 — Build Status
 
-> Session log 2026-08-01 (design + phases 0–7 and 9 in one day). Orchestrator: Claude
+> Session logs: `SESSION-2026-08-02.md` (phases 8/11/12 + visual program + security + email).
+> Original session log 2026-08-01 (design + phases 0–7 and 9 in one day). Orchestrator: Claude
 > (Fable 5) verifying every gate; implementation: Codex gpt-5.6-sol + Claude Opus
 > subagents. Read `DESIGN.md` + `PLAN.md` first; this file is the delta.
 
