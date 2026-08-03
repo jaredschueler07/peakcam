@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { MeshBasicNodeMaterial } from "three/webgpu";
 import type { Node, UniformNode } from "three/webgpu";
 import { clamp, dot, float, floor, fract, max, mix, normalize, positionLocal, pow, sin, smoothstep, uniform, vec2 } from "three/tsl";
+import { SkyMesh } from "three/addons/objects/SkyMesh.js";
 
 /**
  * TSL port of the sky dome shader that lived inline in `SceneFactory` (a raw `ShaderMaterial`,
@@ -100,4 +101,52 @@ export function createSkyNodeMaterial(uniforms: SkyNodeUniforms): MeshBasicNodeM
   material.depthWrite = false;
   material.fog = false;
   return material;
+}
+
+export interface PhysicalSky {
+  mesh: SkyMesh;
+  /**
+   * `SceneFactory` still needs a `SkyUniformSet`-shaped object to hand back as `GameScene.skyUniforms`
+   * — `WeatherRenderer` writes `uTop`/`uHorizon`/etc by name on every weather change regardless of
+   * which sky is mounted, and `Renderer.render()` ticks `uTime` unconditionally. `SkyMesh` reads none
+   * of these (its clouds animate off TSL's own `time`), so this is a compatibility sink, not wiring.
+   */
+  uniforms: SkyNodeUniforms;
+}
+
+/**
+ * A real atmospheric model (Preetham scattering) in place of the hand-tuned 3-stop gradient,
+ * gated to rung 2+ because it is a full-screen shader with a five-octave cloud FBM in the
+ * fragment stage — too expensive to force on the rungs that exist for weak hardware.
+ *
+ * Design decision: drive `SkyMesh`'s own physical parameters from the weather preset's severity
+ * (`cloudiness`, `haze`) rather than tinting its output with the preset's `top`/`hor` colours.
+ * Preetham scattering already produces a horizon-to-zenith gradient and a cloud layer from first
+ * principles; painting a flat tint over that would fight the model's own colour response and had
+ * no clean seam to inject into (`SkyMesh` builds its `NodeMaterial` internally and exposes no
+ * `colorNode` hook to compose with). Turbidity and Mie coefficient rise with haze (more scattering
+ * = the milky, desaturated sky a whiteout preset wants); cloud coverage/density track cloudiness;
+ * the sun disc hides once haze crosses the point the gradient's own `uHaze` term would have washed
+ * it out. This is coarser than the old gradient's exact preset colours, and deliberately so: fog
+ * remains the only colour contract downstream code depends on (`atmosphereUniforms.blue`/`warm`),
+ * and those never read from the sky at all — see `SceneFactory.createScene`.
+ */
+export function createPhysicalSky(seed: SkyNodeSeed): PhysicalSky {
+  const mesh = new SkyMesh();
+  // Scale is cosmetic here: SkyMesh's vertex shader pins depth to the far plane (`position.z =
+  // position.w`), the same skybox trick the old sphere used via `renderOrder`/`frustumCulled`.
+  // The upstream example's own demo uses this magnitude; kept for parity with its `sunfade` term,
+  // which divides `sunPosition.y` by a fixed constant tuned for it.
+  mesh.scale.setScalar(450_000);
+  mesh.turbidity.value = 2 + seed.haze * 8;
+  mesh.rayleigh.value = Math.max(0.3, 2 - seed.cloudiness * 1.6);
+  mesh.mieCoefficient.value = 0.005 + seed.haze * 0.03;
+  mesh.mieDirectionalG.value = 0.8;
+  mesh.cloudCoverage.value = seed.cloudiness;
+  mesh.cloudDensity.value = 0.3 + seed.cloudiness * 0.4;
+  mesh.showSunDisc.value = seed.haze > 0.6 ? 0 : 1;
+  // `seed.sunDir` is already a unit vector (`SUN_DIRECTION` is normalized at module scope), which
+  // matches the magnitude the upstream Sky/SkyMesh examples pass — not a world-space position.
+  mesh.sunPosition.value.copy(seed.sunDir);
+  return { mesh, uniforms: createSkyNodeUniforms(seed) };
 }

@@ -202,7 +202,7 @@ export class GameRenderer {
     if (this.renderer.backendKind === "webgpu" && !nodes) {
       throw new Error("[Drop In] A WebGPU backend needs nodeFactories; await loadNodeFactories() before constructing GameRenderer.");
     }
-    this.built = createScene(profile, Math.max(1, canvas.clientWidth) / Math.max(1, canvas.clientHeight), nodes);
+    this.built = createScene(profile, Math.max(1, canvas.clientWidth) / Math.max(1, canvas.clientHeight), nodes, this.quality.rung);
     this.terrain = new TerrainRenderer(this.built.scene, world, this.built.snowUniforms, nodes, snowDebug);
     this.skier = new SkierRenderer(this.built.scene);
     this.ghost = new GhostRenderer(this.built.scene);
