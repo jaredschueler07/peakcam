@@ -13,9 +13,11 @@ import { UiBridge } from "./UiBridge";
 import { loadTerrainForRuntime, selectRendererBackend } from "./createGame";
 import { warmUpAndStart } from "./GameRuntime";
 import type { createRendererBackend } from "../rendering/backend";
-import { attachFarFieldWhenReady, type CreateGameOptions } from "./createGame";
+import { attachFarFieldWhenReady, attachSurfaceTexturesWhenReady, type CreateGameOptions } from "./createGame";
 import { RESORT_BAKE_CONFIGS } from "../terrain/resorts";
 import type { DecodedFarField } from "../terrain/far-field-format";
+import type { RendererBackend } from "../rendering/Renderer";
+import type { SurfaceTextures } from "../rendering/surfaceTextures";
 
 function portilloAssets() {
   const directory = path.join(process.cwd(), "public/game/terrain");
@@ -193,4 +195,71 @@ test("a resort with no bake config never asks for a far field", async () => {
     { load: async () => { requested += 1; return null; } },
   );
   assert.equal(requested, 0);
+});
+
+// ─── Surface textures ───────────────────────────────────────────────
+
+const webgpuBackend = { backendKind: "webgpu" } as RendererBackend;
+const webglBackend = { backendKind: "webgl" } as RendererBackend;
+
+function fakeSurfaces(): SurfaceTextures {
+  return { snowNormal: {} as SurfaceTextures["snowNormal"], snowRoughness: {} as SurfaceTextures["snowRoughness"] };
+}
+
+test("real surface textures attach on WebGPU once the rung is high enough", async () => {
+  const attached: unknown[] = [];
+  const asset = fakeSurfaces();
+  const seenBackends: RendererBackend[] = [];
+  await attachSurfaceTexturesWhenReady(
+    { attachSurfaceTextures: (s) => attached.push(s), rung: 3 },
+    webgpuBackend,
+    async (backend) => { seenBackends.push(backend); return asset; },
+  );
+  assert.deepEqual(attached, [asset]);
+  assert.deepEqual(seenBackends, [webgpuBackend]);
+});
+
+test("surface textures never load on the WebGL path", async () => {
+  let requested = 0;
+  await attachSurfaceTexturesWhenReady(
+    { attachSurfaceTextures: () => assert.fail("must not attach"), rung: 4 },
+    webglBackend,
+    async () => { requested += 1; return fakeSurfaces(); },
+  );
+  assert.equal(requested, 0);
+});
+
+test("surface textures never load below rung 3, so a low-end device never spends the bandwidth", async () => {
+  let requested = 0;
+  await attachSurfaceTexturesWhenReady(
+    { attachSurfaceTextures: () => assert.fail("must not attach"), rung: 2 },
+    webgpuBackend,
+    async () => { requested += 1; return fakeSurfaces(); },
+  );
+  assert.equal(requested, 0);
+});
+
+test("a missing WebGPU backend never attempts the load", async () => {
+  let requested = 0;
+  await attachSurfaceTexturesWhenReady(
+    { attachSurfaceTextures: () => assert.fail("must not attach"), rung: 4 },
+    undefined,
+    async () => { requested += 1; return fakeSurfaces(); },
+  );
+  assert.equal(requested, 0);
+});
+
+test("missing or failed surface textures leave the run untouched", async () => {
+  let attachedCount = 0;
+  await attachSurfaceTexturesWhenReady(
+    { attachSurfaceTextures: () => { attachedCount += 1; }, rung: 3 },
+    webgpuBackend,
+    async () => null,
+  );
+  await attachSurfaceTexturesWhenReady(
+    { attachSurfaceTextures: () => { attachedCount += 1; }, rung: 3 },
+    webgpuBackend,
+    async () => { throw new Error("KTX2 decode failed"); },
+  );
+  assert.equal(attachedCount, 0, "nothing should attach, and nothing should throw");
 });

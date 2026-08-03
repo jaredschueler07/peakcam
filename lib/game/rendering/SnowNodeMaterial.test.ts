@@ -6,6 +6,7 @@ import type { Node } from "three/webgpu";
 import { vec3 } from "three/tsl";
 import { buildSnowDetailNormal } from "./SnowMaterial";
 import { createSnowNodeMaterial, createSnowNodeUniforms } from "./SnowNodeMaterial";
+import type { SurfaceTextures } from "./surfaceTextures";
 
 type Traversable = { getChildren?: () => Iterable<Traversable> };
 
@@ -87,4 +88,34 @@ test("the detail texture is bound to the material so disposal can find it", () =
   assert.equal(material.userData.snowDetail, detail);
   material.dispose();
   detail.dispose();
+});
+
+test("real snow maps replace the procedural detail only at rung 3 and above", () => {
+  const procedural = buildSnowDetailNormal(17);
+  const surfaces: SurfaceTextures = {
+    snowNormal: new THREE.Texture(),
+    snowRoughness: new THREE.Texture(),
+  };
+
+  for (const rung of [0, 1, 2] as const) {
+    const material = createSnowNodeMaterial(procedural, createSnowNodeUniforms(), 0, surfaces, rung);
+    const normalNodes = collectNodes(material.normalNode);
+    assert.equal([...normalNodes].filter((node) => (node as { value?: unknown }).value === procedural).length, 6);
+    assert.equal([...normalNodes].some((node) => (node as { value?: unknown }).value === surfaces.snowNormal), false);
+    assert.equal(material.roughnessNode, null, `rung ${rung} keeps today's scalar roughness`);
+  }
+
+  for (const rung of [3, 4] as const) {
+    const material = createSnowNodeMaterial(procedural, createSnowNodeUniforms(), 0, surfaces, rung);
+    const normalNodes = collectNodes(material.normalNode);
+    assert.equal([...normalNodes].filter((node) => (node as { value?: unknown }).value === surfaces.snowNormal).length, 6);
+    assert.equal([...normalNodes].some((node) => (node as { value?: unknown }).value === procedural), false);
+    const roughnessNodes = collectNodes(material.roughnessNode);
+    assert.equal(
+      [...roughnessNodes].filter((node) => (node as { value?: unknown }).value === surfaces.snowRoughness).length,
+      6,
+      "roughness follows the same two-scale triplanar path",
+    );
+    assert.equal(material.userData.snowDetail, surfaces.snowNormal);
+  }
 });

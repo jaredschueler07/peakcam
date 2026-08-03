@@ -51,6 +51,21 @@ keep them under the ODbL and carry the attribution above.
 
 The heightfields contain no OSM data and are not affected by the ODbL.
 
+## Snow surface material — ambientCG Snow006
+
+Source: `https://ambientcg.com/a/Snow006`. Licence: CC0 1.0 Universal.
+Selected and downloaded 2026-08-03 (see `PROVENANCE.json` for the full record).
+
+Only `Snow006_2K-PNG_NormalGL.png` and
+`Snow006_2K-PNG_Roughness.png` are baked. The albedo is deliberately discarded:
+snow albedo carries almost no signal, and a photographic albedo fights the
+PeakCam poster palette.
+
+Baked with `toktx` (KTX-Software v4.4.2) to ETC1S/BasisLZ KTX2 at 1024x1024
+(resized down from the 2048x2048 source to fit the 512 KB per-asset budget):
+`public/game/textures/snow-normal.ktx2` (238,614 bytes) and
+`public/game/textures/snow-roughness.ktx2` (169,834 bytes).
+
 ## Explicitly not used
 
 **FABDEM** is licensed CC BY-NC-SA (non-commercial only) and must not be used

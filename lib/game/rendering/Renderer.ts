@@ -23,6 +23,7 @@ import type { NodeFactories } from "./nodeFactories";
 import { visualWeatherPreset } from "./VisualPresets";
 import { cameraPresetName, postBypassEnabled, snowDebugMode } from "./debugFlags";
 import { CAMERA_PRESETS, type CameraPreset } from "./camera-presets";
+import type { SurfaceTextures } from "./surfaceTextures";
 
 type PostChain = Pick<PostProcessing | NodePostProcessing, "setSize" | "setQuality" | "render" | "dispose">;
 
@@ -203,7 +204,7 @@ export class GameRenderer {
       throw new Error("[Drop In] A WebGPU backend needs nodeFactories; await loadNodeFactories() before constructing GameRenderer.");
     }
     this.built = createScene(profile, Math.max(1, canvas.clientWidth) / Math.max(1, canvas.clientHeight), nodes, this.quality.rung);
-    this.terrain = new TerrainRenderer(this.built.scene, world, this.built.snowUniforms, nodes, snowDebug);
+    this.terrain = new TerrainRenderer(this.built.scene, world, this.built.snowUniforms, nodes, snowDebug, this.quality.rung);
     this.skier = new SkierRenderer(this.built.scene);
     this.ghost = new GhostRenderer(this.built.scene);
     this.worldRenderer = new WorldRenderer(this.built.scene, profile, world);
@@ -445,6 +446,19 @@ export class GameRenderer {
   }
 
   get farFieldWedgesDrawn(): number { return this.farField?.visibleWedgeCount ?? 0; }
+
+  /** The rung seeded at construction; quality-gated callers read it before fetching an asset. */
+  get rung(): QualityRung { return this.quality.rung; }
+
+  /**
+   * Swap the procedural snow detail normal for the real KTX2 pair once it resolves. Mirrors
+   * `attachFarField`: optional, fire-and-forget from the caller's side, and a no-op past disposal
+   * or below the rung `TerrainRenderer` gates on internally.
+   */
+  attachSurfaceTextures(surfaces: SurfaceTextures): void {
+    if (this.disposed) return;
+    this.terrain.attachSurfaceTextures(surfaces);
+  }
 
   /** Read-only handle for tests and debugging; the render loop owns everything in it. */
   get scene(): THREE.Scene { return this.built.scene; }

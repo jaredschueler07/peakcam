@@ -51,11 +51,21 @@ lazy chunk rather than eager bytes in the meantime.
 
 ## KTX2 asset inventory
 
-Task 7 inventory found no eligible file textures: excluding `public/game/terrain`
-and `public/game/audio`, `public/game` contained zero files, and no project loader
-used `TextureLoader`. Current snow textures are procedural `DataTexture`s, while
-the baked 16-bit terrain PNGs are inspection artifacts and are not loaded by the
-runtime. They remain PNG rather than being relabeled or converted.
+Task 7 originally found no eligible file textures. Phase 2 Task 4 adds the first
+runtime raster pair, sourced from ambientCG Snow006 and baked through the shared
+KTX2 boundary:
+
+| Asset | Committed size | Gate |
+|---|---:|---:|
+| `public/game/textures/snow-normal.ktx2` | 238,614 bytes (233 KB) | ≤ 512 KB |
+| `public/game/textures/snow-roughness.ktx2` | 169,834 bytes (166 KB) | ≤ 512 KB |
+
+Both are ETC1S/BasisLZ KTX2 at 1024x1024, resized down from the 2048x2048
+ambientCG source and baked with `toktx` (KTX-Software v4.4.2) — the native-
+resolution UASTC encode was ~5.6 MB per map, well past the gate; ETC1S plus the
+resize brings each comfortably under it. The procedural detail normal remains
+the fallback below rung 3 (`SnowNodeMaterial.ts`); baked 16-bit terrain PNGs
+remain inspection artifacts and are not runtime textures.
 
 Future runtime raster outputs from `scripts/bake-resort.ts` must pass through its
 KTX2 emission boundary, which validates the KTX2 identifier and emits a `.ktx2`
