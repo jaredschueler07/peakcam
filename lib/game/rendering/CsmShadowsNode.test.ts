@@ -25,6 +25,17 @@ function shadowNodeOf(shadows: CsmShadowsNode): CSMShadowNode {
   return node;
 }
 
+test("light is a public accessor onto the CSM's real directional light, for callers outside this module", () => {
+  // Godrays (NodePostProcessing) needs "the CSM's light" and reads this field rather than reaching
+  // into the shadow node's internals. `CsmShadows` (WebGL) has no equivalent single-light accessor
+  // on purpose — it parents a real `DirectionalLight` per cascade with only one ever active (see
+  // "the light emits one sun's worth" below), so there is no one light to expose there; godrays is
+  // WebGPU-only and reads this class exclusively.
+  const { shadows } = build(false);
+  assert.ok(shadows.light instanceof THREE.DirectionalLight);
+  assert.equal(shadows.light.shadow.shadowNode, shadowNodeOf(shadows), "it is the light the cascades actually shadow from, not a decoy");
+});
+
 test("the cascade policy is one cascade on mobile or below rung 3, three otherwise", () => {
   for (const rung of [0, 1, 2, 3, 4] as const) {
     assert.equal(cascadeCountFor(true, rung), 1, `mobile rung ${rung} stays at one cascade`);

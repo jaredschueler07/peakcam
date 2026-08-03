@@ -5,7 +5,7 @@ import type { DecodedGhost } from "../replay/codec";
 import { CameraController } from "./CameraController";
 import { addHeightFog } from "./Atmosphere";
 import { CsmShadows } from "./CsmShadows";
-import type { ShadowSystem } from "./CsmShadowsNode";
+import type { CsmShadowsNode, ShadowSystem } from "./CsmShadowsNode";
 import { EffectsRenderer } from "./EffectsRenderer";
 import { GhostRenderer } from "./GhostRenderer";
 import { disposeObjectTree, resourceCounts, type DisposalAudit, type ResourceCounts } from "./resources";
@@ -256,9 +256,14 @@ export class GameRenderer {
     if (this.renderer.backendKind === "webgpu") {
       const { NodePostProcessing } = await import("./NodePostProcessing");
       if (this.disposed) return;
+      // `this.csm` is a `CsmShadowsNode` whenever `backendKind === "webgpu"`: the constructor
+      // above only takes the `nodes` branch (which builds a `CsmShadowsNode`) on that backend,
+      // and throws if webgpu lacks `nodes`. `.light` is that class's narrow accessor for exactly
+      // this — godrays needs the CSM's directional light, not the shadow internals around it.
       this.post = new NodePostProcessing(
         this.renderer as unknown as ConstructorParameters<typeof NodePostProcessing>[0],
         this.built.scene, this.built.camera, this.cameraController.speedUniform, this.reducedMotion,
+        (this.csm as CsmShadowsNode).light,
       );
     } else if (shouldInitializePostProcessing(this.options)) {
       const { PostProcessing } = await import("./PostProcessing");
