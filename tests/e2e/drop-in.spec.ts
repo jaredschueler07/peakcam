@@ -427,14 +427,27 @@ test("keyboard-only start reaches a running canvas with a ticking HUD", async ({
  * Note for whoever touches these next: breckenridge's stdev is BIMODAL across
  * runs (~24.9 or ~21.6 depending on which frame the 750ms wait lands on), and
  * the low mode clears the floor by only 0.6. That is the flakiest budget here.
+ *
+ * RE-BASELINED 2026-08-03 (deliberate, Visual Phase 2 gate): the baked far-field
+ * horizon assets (*.far.bin.br) are committed and loading for the first time —
+ * every earlier calibration ran against their silent 404 (empty horizon). The
+ * far field raises mean ~+13 everywhere and, at Portillo, replaces structured
+ * sky with the deliberately fog-tinted Aconcagua massif (#adc2d8 base — see
+ * FarFieldRenderer.ts), collapsing whole-frame stdev from ~27 to ~10-12. That
+ * is the DESIGNED look, not a washout, but it permanently weakens Portillo's
+ * contrast floor: a real washout there now has only ~5 units of slack. 5 runs,
+ * default project, WebGL, production build: portillo 198.9-199.4 / 9.7-12.4 ·
+ * breckenridge 194.9-200.1 / 22.5-25.8 · heavenly 221.4 / 27.4. Phase 2's own
+ * effects (GTAO/godrays/SkyMesh/textures) are all WebGPU-only and cannot move
+ * these WebGL numbers.
  */
 const LUMINANCE_BUDGETS = [
-  // measured mean / stdev at this sample point: 186.6 / 27.6
-  { slug: "ski-portillo", maxMean: 195, minStdev: 23 },
-  // 186.1 / 25.2 — the flattest-looking of the three, and the binding case
-  { slug: "breckenridge", maxMean: 195, minStdev: 21 },
-  // 207.7-208.2 / 33.7 — brightest, but also the most structured
-  { slug: "heavenly", maxMean: 215, minStdev: 29 },
+  // measured mean / stdev at this sample point: 198.9-199.4 / 9.7-12.4
+  { slug: "ski-portillo", maxMean: 208, minStdev: 7 },
+  // 194.9-200.1 / 22.5-25.8 — still the flakiest floor here
+  { slug: "breckenridge", maxMean: 208, minStdev: 20 },
+  // 221.4 / 27.4 — brightest, but also the most structured
+  { slug: "heavenly", maxMean: 230, minStdev: 23 },
 ] as const;
 
 for (const { slug, maxMean, minStdev } of LUMINANCE_BUDGETS) {
