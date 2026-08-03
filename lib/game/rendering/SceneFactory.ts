@@ -7,6 +7,7 @@ import type { NodeFactories } from "./nodeFactories";
 import { visualWeatherPreset } from "./VisualPresets";
 import { SNOW_DEBUG, snowDebugMode } from "./debugFlags";
 import type { QualityRung } from "./QualityController";
+import type { SkyNodeSeed } from "./SkyNodeMaterial";
 
 export const SUN_DIRECTION = new THREE.Vector3(-0.46, 0.62, -0.64).normalize();
 
@@ -67,6 +68,14 @@ export interface GameScene {
    */
   sky: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
   skyUniforms: SkyUniformSet;
+  /**
+   * Present only when the physical sky (`SkyMesh`, rung 2+ WebGPU) is mounted. `skyUniforms` alone
+   * does not reach it — `SkyMesh` reads none of the `u*` values `WeatherRenderer` writes — so
+   * `WeatherRenderer.apply` calls this on every weather change to re-derive `SkyMesh`'s own
+   * turbidity/rayleigh/mie/cloud parameters from the new preset. Undefined on the gradient path
+   * (rung 0-1, or WebGL), where the live `skyUniforms` references already do the job.
+   */
+  updatePhysicalSky?: (seed: SkyNodeSeed) => void;
   sun: THREE.DirectionalLight;
   hemi: THREE.HemisphereLight;
   ambient: THREE.AmbientLight;
@@ -138,6 +147,9 @@ export function createScene(profile: ResortGameProfile, aspect: number, nodes: N
   // so they keep the gradient even on WebGPU. See SkyNodeMaterial.createPhysicalSky for why the
   // preset's colours drive the model's parameters rather than tinting its output.
   const physicalSky = nodes && rung >= 2 ? nodes.sky.createPhysicalSky(skySeed) : null;
+  const updatePhysicalSky = nodes && physicalSky
+    ? (seed: SkyNodeSeed) => nodes.sky.applyPhysicalSkyParams(physicalSky.mesh, seed)
+    : undefined;
   const skyNodeUniforms = physicalSky ? physicalSky.uniforms : nodes ? nodes.sky.createSkyNodeUniforms(skySeed) : null;
   const skyUniforms: SkyUniformSet = skyNodeUniforms ?? {
     uTop: { value: new THREE.Color(weather.top) }, uMid: { value: new THREE.Color(visual.mid) }, uHorizon: { value: new THREE.Color(weather.hor) },
@@ -188,5 +200,5 @@ void main(){vec3 d=normalize(vDir);float t=clamp(d.y*.5+.5,0.,1.);vec3 c=mix(uHo
     (scene as THREE.Scene & { fogNode?: unknown }).fogNode =
       nodes.atmosphere.createAtmosphereFog(atmosphereUniforms as Parameters<NodeFactories["atmosphere"]["createAtmosphereFog"]>[0]);
   }
-  return { scene, camera, sky, skyUniforms, sun, hemi, ambient, sunDisc, sunGlow, peaks, snowUniforms, atmosphereUniforms };
+  return { scene, camera, sky, skyUniforms, updatePhysicalSky, sun, hemi, ambient, sunDisc, sunGlow, peaks, snowUniforms, atmosphereUniforms };
 }

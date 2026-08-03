@@ -24,6 +24,20 @@ export class WeatherRenderer {
     (this.built.skyUniforms.uSun.value as THREE.Color).setHex(visual.sunCol);
     this.built.skyUniforms.uCloudiness.value = visual.cloudiness;
     this.built.skyUniforms.uHaze.value = weather.haze;
+    // The physical sky (rung 2+ WebGPU) reads none of the `u*` uniforms above — `SkyMesh` has its
+    // own parameters — so without this call cycling weather would silently stop touching the sky
+    // at that rung while still changing fog, lights and snow tint. Reuses the Color/Vector3
+    // references just written above; no allocation.
+    this.built.updatePhysicalSky?.({
+      top: this.built.skyUniforms.uTop.value as THREE.Color,
+      mid: this.built.skyUniforms.uMid.value as THREE.Color,
+      horizon: this.built.skyUniforms.uHorizon.value as THREE.Color,
+      cloud: this.built.skyUniforms.uCloud.value as THREE.Color,
+      cloudiness: this.built.skyUniforms.uCloudiness.value,
+      sun: this.built.skyUniforms.uSun.value as THREE.Color,
+      sunDir: this.built.skyUniforms.uSunDir.value as THREE.Vector3,
+      haze: this.built.skyUniforms.uHaze.value,
+    });
     this.built.sun.color.setHex(visual.sunCol);
     this.built.hemi.color.setHex(visual.hemiSky);
     this.built.hemi.groundColor.setHex(visual.hemiGround);

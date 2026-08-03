@@ -115,10 +115,6 @@ export interface PhysicalSky {
 }
 
 /**
- * A real atmospheric model (Preetham scattering) in place of the hand-tuned 3-stop gradient,
- * gated to rung 2+ because it is a full-screen shader with a five-octave cloud FBM in the
- * fragment stage — too expensive to force on the rungs that exist for weak hardware.
- *
  * Design decision: drive `SkyMesh`'s own physical parameters from the weather preset's severity
  * (`cloudiness`, `haze`) rather than tinting its output with the preset's `top`/`hor` colours.
  * Preetham scattering already produces a horizon-to-zenith gradient and a cloud layer from first
@@ -130,14 +126,14 @@ export interface PhysicalSky {
  * it out. This is coarser than the old gradient's exact preset colours, and deliberately so: fog
  * remains the only colour contract downstream code depends on (`atmosphereUniforms.blue`/`warm`),
  * and those never read from the sky at all — see `SceneFactory.createScene`.
+ *
+ * Split out from `createPhysicalSky` so `WeatherRenderer` can re-run the same mapping on every
+ * weather change: the gradient's `UniformNode`s hold live references `WeatherRenderer` mutates in
+ * place, so cycling weather visibly changes the sky on every rung *except* this one, where `SkyMesh`
+ * never reads `skyUniforms` at all. Every write here is a `.value` assignment or an in-place
+ * `Vector3.copy` — no allocation, and the material is never rebuilt, only its uniforms.
  */
-export function createPhysicalSky(seed: SkyNodeSeed): PhysicalSky {
-  const mesh = new SkyMesh();
-  // Scale is cosmetic here: SkyMesh's vertex shader pins depth to the far plane (`position.z =
-  // position.w`), the same skybox trick the old sphere used via `renderOrder`/`frustumCulled`.
-  // The upstream example's own demo uses this magnitude; kept for parity with its `sunfade` term,
-  // which divides `sunPosition.y` by a fixed constant tuned for it.
-  mesh.scale.setScalar(450_000);
+export function applyPhysicalSkyParams(mesh: SkyMesh, seed: SkyNodeSeed): void {
   mesh.turbidity.value = 2 + seed.haze * 8;
   mesh.rayleigh.value = Math.max(0.3, 2 - seed.cloudiness * 1.6);
   mesh.mieCoefficient.value = 0.005 + seed.haze * 0.03;
@@ -148,5 +144,20 @@ export function createPhysicalSky(seed: SkyNodeSeed): PhysicalSky {
   // `seed.sunDir` is already a unit vector (`SUN_DIRECTION` is normalized at module scope), which
   // matches the magnitude the upstream Sky/SkyMesh examples pass — not a world-space position.
   mesh.sunPosition.value.copy(seed.sunDir);
+}
+
+/**
+ * A real atmospheric model (Preetham scattering) in place of the hand-tuned 3-stop gradient,
+ * gated to rung 2+ because it is a full-screen shader with a five-octave cloud FBM in the
+ * fragment stage — too expensive to force on the rungs that exist for weak hardware.
+ */
+export function createPhysicalSky(seed: SkyNodeSeed): PhysicalSky {
+  const mesh = new SkyMesh();
+  // Scale is cosmetic here: SkyMesh's vertex shader pins depth to the far plane (`position.z =
+  // position.w`), the same skybox trick the old sphere used via `renderOrder`/`frustumCulled`.
+  // The upstream example's own demo uses this magnitude; kept for parity with its `sunfade` term,
+  // which divides `sunPosition.y` by a fixed constant tuned for it.
+  mesh.scale.setScalar(450_000);
+  applyPhysicalSkyParams(mesh, seed);
   return { mesh, uniforms: createSkyNodeUniforms(seed) };
 }

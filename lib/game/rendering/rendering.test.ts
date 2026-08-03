@@ -992,3 +992,41 @@ test("SkyMesh replaces the gradient at rung 2+ on WebGPU, and never touches the 
     }
   }
 });
+
+/**
+ * Fix round 1: a storm rolling in mid-run (WeatherRenderer.apply on player input) used to leave
+ * the physical sky frozen at whatever preset built the scene — `SkyMesh` never read the `u*`
+ * uniforms `WeatherRenderer` writes, unlike the gradient (both backends) where those uniforms are
+ * live references the shader reads every frame. `GameScene.updatePhysicalSky` closes that gap by
+ * re-running `applyPhysicalSkyParams` on every weather change; this proves it actually fires and
+ * moves `SkyMesh`'s own uniforms, not just `skyUniforms`.
+ */
+test("cycling weather mid-run re-derives the physical sky's parameters, not just skyUniforms", () => {
+  const NODES = staticNodeFactories();
+  const backend = new FakeBackend("webgpu");
+  const resortProfile = DROP_IN_GAME_PROFILES.breckenridge;
+  const physical = createScene(resortProfile, 16 / 9, NODES, 2);
+  assert.equal((physical.sky as unknown as { isSkyMesh?: boolean }).isSkyMesh, true);
+  assert.equal(typeof physical.updatePhysicalSky, "function", "GameScene exposes the re-derive hook at rung 2+");
+
+  const sky = physical.sky as unknown as {
+    turbidity: { value: number }; mieCoefficient: { value: number }; cloudCoverage: { value: number };
+  };
+  const weather = new WeatherRenderer(resortProfile, physical, backend);
+
+  // Index 0 is the clearest preset (Bluebird), index 2 the harshest (Whiteout/Ground Blizzard) —
+  // see VISUAL_WEATHER_PRESETS' cloudiness ladder (0.14 → 0.94) and each profile's haze ladder.
+  weather.apply(0);
+  const clear = { turbidity: sky.turbidity.value, mie: sky.mieCoefficient.value, cloud: sky.cloudCoverage.value };
+
+  weather.apply(2);
+  const stormy = { turbidity: sky.turbidity.value, mie: sky.mieCoefficient.value, cloud: sky.cloudCoverage.value };
+
+  assert.ok(stormy.turbidity > clear.turbidity, `turbidity should rise with haze: ${clear.turbidity} -> ${stormy.turbidity}`);
+  assert.ok(stormy.mie > clear.mie, `mieCoefficient should rise with haze: ${clear.mie} -> ${stormy.mie}`);
+  assert.ok(stormy.cloud > clear.cloud, `cloudCoverage should rise with cloudiness: ${clear.cloud} -> ${stormy.cloud}`);
+
+  // And back to clear: proves this isn't a one-shot "second preset always wins" artefact.
+  weather.apply(0);
+  assert.equal(sky.turbidity.value, clear.turbidity, "cycling back to the same preset reproduces the same parameters");
+});
