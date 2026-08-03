@@ -6,7 +6,9 @@ import {
   uniform, vec3, vec4,
 } from "three/tsl";
 import type { Node, NodeBuilder, UniformNode } from "three/webgpu";
+import type { QualityRung } from "./QualityController";
 import { SNOW_DEBUG } from "./debugFlags";
+import type { SurfaceTextures } from "./surfaceTextures";
 
 /**
  * TSL port of `polishSnowMaterial` (SnowMaterial.ts) for the WebGPU backend. Every constant is
@@ -54,8 +56,8 @@ const segmentDistance = (p: Vec2, a: Vec2, b: Vec2): Float => {
 /** `1 - smoothstep(28, 105, distanceToCamera)` — the near/far detail blend from line 94 of the GLSL. */
 const nearness = (): Float => float(1).sub(smoothstep(28, 105, length(positionWorld.sub(cameraPosition))));
 
-function triplanarDetail(detailNormal: THREE.Texture, scale: number, weights: Vec3): Vec3 {
-  const at = (uv: Vec2): Vec3 => texture(detailNormal, uv.div(scale)).xyz.mul(2).sub(1);
+function triplanarTexture(source: THREE.Texture, scale: number, weights: Vec3): Vec3 {
+  const at = (uv: Vec2): Vec3 => texture(source, uv.div(scale)).xyz;
   return at(positionWorld.yz).mul(weights.x)
     .add(at(positionWorld.xz).mul(weights.y))
     .add(at(positionWorld.xy).mul(weights.z));
@@ -65,10 +67,25 @@ function snowNormalNode(detailNormal: THREE.Texture): Vec3 {
   const raw = abs(normalize(normalWorld)).pow(4);
   const weights = raw.div(max(dot(raw, vec3(1)), 0.001));
   const near = nearness();
-  const detail = mix(triplanarDetail(detailNormal, 3, weights), triplanarDetail(detailNormal, 0.35, weights), near);
+  const detail = mix(
+    triplanarTexture(detailNormal, 3, weights),
+    triplanarTexture(detailNormal, 0.35, weights),
+    near,
+  ).mul(2).sub(1);
   // mat3(viewMatrix) * detail — a w of 0 drops the translation column.
   const detailView = cameraViewMatrix.mul(vec4(detail, 0)).xyz;
   return normalize(normalView.add(detailView.mul(mix(0.08, 0.22, near))));
+}
+
+function snowRoughnessNode(roughness: THREE.Texture): Float {
+  const raw = abs(normalize(normalWorld)).pow(4);
+  const weights = raw.div(max(dot(raw, vec3(1)), 0.001));
+  const sampled = mix(
+    triplanarTexture(roughness, 3, weights),
+    triplanarTexture(roughness, 0.35, weights),
+    nearness(),
+  ).x;
+  return clamp(sampled, 0.6, 1);
 }
 
 /** The wrap/rim/glint/backscatter block (GLSL lines 101-111) applied to the lit colour. */
@@ -132,6 +149,8 @@ export function createSnowNodeMaterial(
   detailNormal: THREE.Texture,
   uniforms: SnowNodeUniforms,
   debug: number = SNOW_DEBUG.NONE,
+  surfaces: SurfaceTextures | null = null,
+  rung: QualityRung = 0,
 ): MeshStandardNodeMaterial {
   // Mode 5 is a scene-level switch (no fogNode); it must leave this material untouched.
   const mode = debug === SNOW_DEBUG.NO_FOG ? SNOW_DEBUG.NONE : debug;
@@ -144,8 +163,12 @@ export function createSnowNodeMaterial(
   material.metalness = 0.02;
   material.flatShading = false;
   material.dithering = true;
-  if (mode < SNOW_DEBUG.NO_DETAIL_NORMAL) material.normalNode = snowNormalNode(detailNormal);
-  material.userData.snowDetail = detailNormal;
+  const useRealSurface = rung >= 3 && surfaces !== null;
+  const selectedNormal = useRealSurface ? surfaces.snowNormal : detailNormal;
+  if (mode < SNOW_DEBUG.NO_DETAIL_NORMAL) material.normalNode = snowNormalNode(selectedNormal);
+  if (useRealSurface) material.roughnessNode = snowRoughnessNode(surfaces.snowRoughness);
+  material.userData.snowDetail = selectedNormal;
+  material.userData.snowRoughness = useRealSurface ? surfaces.snowRoughness : null;
   material.userData.snowOutputNode = (outgoingLight: Vec3) => snowShading(uniforms, outgoingLight, mode);
   return material;
 }
