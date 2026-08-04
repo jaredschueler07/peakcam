@@ -2,6 +2,8 @@
 
 import type { ResortWithData, ConditionRating } from "@/lib/types";
 import { isOffSeason, timeAgo, OFF_SEASON_COLOR } from "@/lib/map-utils";
+import { isDropInResort } from "@/lib/drop-in";
+import DropInLink from "@/components/drop-in/DropInLink";
 import MapCamPreview from "./MapCamPreview";
 
 // Condition chip palette — matches MapPopupCard / ConditionBadge.
@@ -129,6 +131,12 @@ export default function MapBottomSheet({
             onClick={() => onViewResort(resort.slug)}
             className="mb-4"
           />
+
+          {/* Drop In — pilot resorts only, above the standard actions so the
+              existing View resort / Cams pair keeps its familiar shape. */}
+          {isDropInResort(resort.slug) && (
+            <DropInLink slug={resort.slug} variant="block" className="mb-3" />
+          )}
 
           {/* Actions */}
           <div className="flex items-center gap-3">

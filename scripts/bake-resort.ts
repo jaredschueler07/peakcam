@@ -1,0 +1,868 @@
+/**
+ * bake-resort.ts
+ * ──────────────
+ * Offline bake of the Drop In v2 terrain assets: a 1024² quantised heightfield
+ * plus delta-encoded trail/lift centrelines, per resort, committed to the repo.
+ *
+ * Nothing upstream is in the deploy path — neither AWS Terrain Tiles nor
+ * Overpass carries an SLA, and terrain does not change. Run this by hand,
+ * inspect the PNG, commit the output.
+ *
+ * Usage:
+ *   npx tsx scripts/bake-resort.ts ski-portillo
+ *   npx tsx scripts/bake-resort.ts all
+ *   npx tsx scripts/bake-resort.ts all --verify          # re-bake, hash-compare
+ *   npx tsx scripts/bake-resort.ts ski-portillo --source=copernicus
+ *   npx tsx scripts/bake-resort.ts all --skip-trails     # DEM only
+ *
+ * Outputs (public/game/terrain/):
+ *   <slug>.height.u16       raw little-endian uint16, row-major N→S, W→E —
+ *                           a local intermediate, gitignored
+ *   <slug>.height.u16.br    the same bytes, brotli quality 11; this is the
+ *                           committed source of truth for the heightfield
+ *   <slug>.height.png       16-bit grayscale PNG — inspection artifact only,
+ *                           never a runtime texture
+ *   <slug>.meta.json        georeference + decode constants
+ *   <slug>.trails.json(.br) delta-encoded run/lift centrelines
+ *   *.ktx2                  any future runtime raster texture (the encoder
+ *                           supplies KTX2 bytes to emitKtx2Texture)
+ *
+ * Sources & licences: see public/game/terrain/LICENSE.md.
+ */
+
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
+import crypto from "node:crypto";
+import zlib from "node:zlib";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { setTimeout as sleep } from "node:timers/promises";
+import { PNG } from "pngjs";
+import { fromFile } from "geotiff";
+import {
+  HEIGHTFIELD_ORIENTATION,
+  encodeDelta,
+  quantizeHeight,
+  type TerrainMeta,
+  type TrailsFile,
+  type RawRun,
+  type RawLift,
+} from "@/lib/game/terrain/formats";
+import {
+  GRID,
+  M_PER_DEG_LAT,
+  QUANTUM,
+  RESORT_BAKE_CONFIGS,
+  RESORT_SLUGS,
+  SOURCE_ZOOM,
+  mPerDegLon,
+  type ResortBakeConfig,
+} from "@/lib/game/terrain/resorts";
+import { buildVrt, fillNodata, readRaster, transformPoint, warpToUtm, type Raster } from "./dem/gdal";
+import { utmZoneFor } from "./dem/utm";
+import {
+  fetch3depTiles,
+  resolveDemSource,
+  seamlessCellUrl,
+  seamlessCellsFor,
+  type DemSource,
+  type UtmBounds,
+} from "./dem/sources";
+import {
+  WARP_NODATA,
+  assertPlausibleElevations,
+  auditNodata,
+  nodataExtentCorners,
+  nodataFailureMessage,
+  nodataSummary,
+  type SourceMosaic,
+} from "./dem/nodata";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(__dirname, "..");
+export const OUT_DIR = path.join(ROOT, "public", "game", "terrain");
+
+const META_VERSION = 1;
+const TRAILS_VERSION = 1;
+/** Ramer–Douglas–Peucker tolerance, metres (terrain-report §3). */
+const RDP_EPSILON_M = 6;
+/** Trail coordinate unit, metres (decimetres). */
+const TRAIL_UNIT = 0.1;
+
+const TERRARIUM_URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium";
+const COPERNICUS_URL = "https://copernicus-dem-30m.s3.amazonaws.com";
+const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+];
+/** Courtesy pause between per-resort Overpass queries (terrain-report §2). */
+const OVERPASS_SLEEP_MS = 8000;
+const TILE_CONCURRENCY = 6;
+const FETCH_RETRIES = 4;
+
+// ─── Web Mercator ────────────────────────────────────────────
+
+const DEG = Math.PI / 180;
+const TILE_PX = 256;
+
+/** Longitude → global pixel x at zoom z. */
+export function lonToPixelX(lon: number, z: number): number {
+  return ((lon + 180) / 360) * Math.pow(2, z) * TILE_PX;
+}
+
+/** Latitude → global pixel y at zoom z. */
+export function latToPixelY(lat: number, z: number): number {
+  const s = Math.sin(lat * DEG);
+  return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * Math.pow(2, z) * TILE_PX;
+}
+
+// ─── Fetch helpers ───────────────────────────────────────────
+
+async function fetchWithRetry(url: string, label: string): Promise<Buffer> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= FETCH_RETRIES; attempt++) {
+    try {
+      const res = await fetch(url, { headers: { "User-Agent": "peakcam-drop-in-bake/1.0" } });
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      return Buffer.from(await res.arrayBuffer());
+    } catch (err) {
+      lastError = err;
+      if (attempt < FETCH_RETRIES) {
+        const backoff = 400 * Math.pow(2, attempt - 1);
+        console.warn(`  ! ${label} attempt ${attempt} failed (${String(err)}); retrying in ${backoff}ms`);
+        await sleep(backoff);
+      }
+    }
+  }
+  throw new Error(`${label} failed after ${FETCH_RETRIES} attempts: ${String(lastError)}`);
+}
+
+/** Run `tasks` with a bounded number in flight, preserving rejection. */
+async function pooled<T>(tasks: Array<() => Promise<T>>, limit: number): Promise<T[]> {
+  const results = new Array<T>(tasks.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, tasks.length) }, async () => {
+    for (;;) {
+      const i = next++;
+      if (i >= tasks.length) return;
+      results[i] = await tasks[i]();
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+// ─── Terrarium sampling (seam-safe) ──────────────────────────
+
+interface TerrariumTiles {
+  z: number;
+  tiles: Map<string, Buffer>;
+}
+
+/**
+ * Prefetch every z-level tile the box touches, plus a one-tile margin so
+ * bilinear taps that fall in a neighbouring tile resolve without clamping
+ * (terrain-report gotcha #4 — clamping at x=255 leaves a ridge every 256 px).
+ */
+async function prefetchTerrariumTiles(cfg: ResortBakeConfig, z: number): Promise<TerrariumTiles> {
+  console.warn(
+    "  ! Terrarium fallback selected: its mixed-source dataset attaches CC-BY attribution obligations to this bake",
+  );
+  const [cLat, cLon] = cfg.center;
+  const half = cfg.sizeM / 2;
+  const latN = cLat + half / M_PER_DEG_LAT;
+  const latS = cLat - half / M_PER_DEG_LAT;
+  const lonW = cLon - half / mPerDegLon(cLat);
+  const lonE = cLon + half / mPerDegLon(cLat);
+
+  // Bilinear taps reach half a pixel beyond the grid extremes; the ±1 pixel
+  // margin below covers that before we widen to whole tiles.
+  const minPx = lonToPixelX(lonW, z) - 1;
+  const maxPx = lonToPixelX(lonE, z) + 1;
+  const minPy = latToPixelY(latN, z) - 1;
+  const maxPy = latToPixelY(latS, z) + 1;
+
+  const tx0 = Math.floor(minPx / TILE_PX);
+  const tx1 = Math.floor(maxPx / TILE_PX);
+  const ty0 = Math.floor(minPy / TILE_PX);
+  const ty1 = Math.floor(maxPy / TILE_PX);
+
+  const keys: Array<[number, number]> = [];
+  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) keys.push([tx, ty]);
+
+  const tiles = new Map<string, Buffer>();
+  await pooled(
+    keys.map(([tx, ty]) => async () => {
+      const key = `${tx}/${ty}`;
+      const buf = await fetchWithRetry(`${TERRARIUM_URL}/${z}/${key}.png`, `terrarium ${z}/${key}`);
+      const png = PNG.sync.read(buf);
+      if (png.width !== TILE_PX || png.height !== TILE_PX) {
+        throw new Error(`terrarium ${z}/${key}: unexpected size ${png.width}x${png.height}`);
+      }
+      tiles.set(key, png.data);
+    }),
+    TILE_CONCURRENCY,
+  );
+  console.log(`  fetched ${tiles.size} terrarium tiles at z${z}`);
+  return { z, tiles };
+}
+
+/** Decoded elevation at an integer global pixel. Terrarium: R*256 + G + B/256 - 32768. */
+function terrariumPixel(t: TerrariumTiles, gx: number, gy: number): number {
+  const tx = Math.floor(gx / TILE_PX);
+  const ty = Math.floor(gy / TILE_PX);
+  const data = t.tiles.get(`${tx}/${ty}`);
+  if (!data) throw new Error(`tile ${t.z}/${tx}/${ty} was not prefetched`);
+  const px = gx - tx * TILE_PX;
+  const py = gy - ty * TILE_PX;
+  const i = (py * TILE_PX + px) * 4;
+  return data[i] * 256 + data[i + 1] + data[i + 2] / 256 - 32768;
+}
+
+/**
+ * Bilinear terrarium sample. Pixel centres sit at +0.5, and taps are addressed
+ * in *global* pixel space, so a tap that lands in the next tile simply reads
+ * that tile — no seam.
+ */
+function sampleTerrarium(t: TerrariumTiles, lat: number, lon: number): number {
+  const fx = lonToPixelX(lon, t.z) - 0.5;
+  const fy = latToPixelY(lat, t.z) - 0.5;
+  const x0 = Math.floor(fx);
+  const y0 = Math.floor(fy);
+  const ax = fx - x0;
+  const ay = fy - y0;
+  const h00 = terrariumPixel(t, x0, y0);
+  const h10 = terrariumPixel(t, x0 + 1, y0);
+  const h01 = terrariumPixel(t, x0, y0 + 1);
+  const h11 = terrariumPixel(t, x0 + 1, y0 + 1);
+  return (h00 * (1 - ax) + h10 * ax) * (1 - ay) + (h01 * (1 - ax) + h11 * ax) * ay;
+}
+
+// ─── Heightfield bake ────────────────────────────────────────
+
+export type ProjectedRasterBounds = UtmBounds;
+
+/**
+ * GDAL bounds are pixel-edge bounds. Expanding the desired centre span by
+ * half a cell at each edge makes first-to-last pixel centres span `sizeM`.
+ */
+export function projectedRasterBounds(
+  centerUtm: readonly [number, number],
+  sizeM: number,
+  grid: number,
+): ProjectedRasterBounds {
+  if (grid < 2) throw new Error("projected raster grid must contain at least two samples per edge");
+  const cellSizeM = sizeM / (grid - 1);
+  const outerSizeM = sizeM + cellSizeM;
+  return {
+    west: centerUtm[0] - outerSizeM / 2,
+    south: centerUtm[1] - outerSizeM / 2,
+    east: centerUtm[0] + outerSizeM / 2,
+    north: centerUtm[1] + outerSizeM / 2,
+  };
+}
+
+/** Index a projected raster by its natural north-to-south, west-to-east cells. */
+export function samplerFor({ values, width, height }: Raster): (row: number, col: number) => number {
+  return (row: number, col: number): number => {
+    if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || col < 0 || row >= height || col >= width) {
+      throw new RangeError(`sample (${row}, ${col}) is outside ${width}x${height} warped raster`);
+    }
+    return values[row * width + col];
+  };
+}
+
+/** Load a projected raster once, then sample its natural north-to-south rows directly. */
+export async function sampleFromWarpedTiff(
+  tiffPath: string,
+): Promise<(row: number, col: number) => number> {
+  return samplerFor(await readRaster(tiffPath));
+}
+
+/**
+ * Fill the warp's nodata cells or refuse to bake.
+ *
+ * A hole within the fill budget is interpolated from its own edges, which is
+ * safe at that size and beats failing a bake over a handful of cells. Anything
+ * larger means the configured projects genuinely do not span the bake box, and
+ * the only useful response is to say so precisely — with the count, the share,
+ * the projects that were tried, and where the hole is — so the fix is to add a
+ * project rather than to go hunting through the quantiser.
+ */
+export async function resolveNodata(
+  slug: string,
+  warpedPath: string,
+  workDir: string,
+  bounds: UtmBounds,
+  epsg: number,
+  mosaic: SourceMosaic,
+): Promise<Raster> {
+  const raster = await readRaster(warpedPath);
+  const audit = auditNodata(raster.values, raster.width, raster.height);
+  if (audit.decision === "clean") return raster;
+
+  const corners = nodataExtentCorners(audit.extent!, bounds, raster.width, raster.height);
+  const summary = nodataSummary(slug, mosaic, audit, corners, epsg);
+  if (audit.decision === "fail") {
+    throw new Error(nodataFailureMessage(slug, mosaic, audit, corners, epsg));
+  }
+
+  console.warn(`  ! ${summary} Within the fill budget — interpolating from the hole edges.`);
+  const filledPath = path.join(workDir, "filled.tif");
+  // The hole's own diagonal bounds how far the interpolator ever has to reach.
+  const span = Math.max(
+    audit.extent!.maxCol - audit.extent!.minCol,
+    audit.extent!.maxRow - audit.extent!.minRow,
+  );
+  await fillNodata(warpedPath, filledPath, Math.max(span + 1, 8));
+
+  const filled = await readRaster(filledPath);
+  const after = auditNodata(filled.values, filled.width, filled.height);
+  if (after.count > 0) {
+    // gdal_fillnodata only knows the cells the band tags as nodata; anything
+    // still bad here is an undeclared source sentinel it could not see.
+    throw new Error(
+      `${slug}: ${after.count} cells still had no data after interpolation ` +
+        `(${after.uncovered} uncovered, ${after.implausible} implausible) — gdal_fillnodata only sees ` +
+        `cells the band tags as nodata, so an undeclared source sentinel survives it. ${summary}`,
+    );
+  }
+  return filled;
+}
+
+export function terrainProvenance(
+  demSource: DemSource,
+  epsg: number | null,
+): Pick<TerrainMeta, "demSource" | "epsg" | "sourceResolutionM"> {
+  const sourceResolutionM =
+    demSource.kind === "3dep"
+      ? 1
+      : demSource.kind === "3dep-seamless"
+        ? 10
+        : demSource.kind === "copernicus"
+          ? 30
+          : 0;
+  return { demSource, epsg, sourceResolutionM };
+}
+
+async function projectedSampler(
+  cfg: ResortBakeConfig,
+  demSource: Exclude<DemSource, { kind: "terrarium" }>,
+): Promise<{ sample: (row: number, col: number) => number; epsg: number }> {
+  const epsg = utmZoneFor(cfg.center[0], cfg.center[1]).epsg;
+  const centerUtm = await transformPoint(cfg.center[1], cfg.center[0], 4326, epsg);
+  const bounds = projectedRasterBounds(centerUtm, cfg.sizeM, GRID);
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), `peakcam-${cfg.slug}-warp-`));
+  const vrtPath = path.join(workDir, "source.vrt");
+  const warpedPath = path.join(workDir, "warped.tif");
+  try {
+    let inputs: string[];
+    let projects: string[];
+    if (demSource.kind === "3dep-seamless") {
+      const [cLat, cLon] = cfg.center;
+      const half = cfg.sizeM / 2;
+      // A degree of margin buys nothing; ~1 km covers the ENU approximation and
+      // only pulls a neighbouring cell when the box really is near a boundary.
+      const margin = 0.01;
+      const cells = seamlessCellsFor({
+        south: cLat - half / M_PER_DEG_LAT - margin,
+        north: cLat + half / M_PER_DEG_LAT + margin,
+        west: cLon - half / mPerDegLon(cLat) - margin,
+        east: cLon + half / mPerDegLon(cLat) + margin,
+      });
+      projects = cells;
+      inputs = cells.map((cell) => `/vsicurl/${seamlessCellUrl(cell)}`);
+      console.log(`  3DEP seamless (1/3 arc-second, ~10 m): ${cells.join(", ")}`);
+    } else if (demSource.kind === "3dep") {
+      const cacheRoot = process.env.PEAKCAM_DEM_CACHE || path.join(os.tmpdir(), "peakcam-dem-cache");
+      projects = demSource.projects;
+      inputs = await fetch3depTiles(projects, bounds, cacheRoot, fetch, ({ project, tiles }) => {
+        const note = tiles === 0 ? " — contributes nothing to this box" : "";
+        console.log(`  3DEP ${project}: ${tiles} tile(s)${note}`);
+      });
+    } else {
+      projects = [demSource.tile];
+      const name = `Copernicus_DSM_COG_10_${demSource.tile}_DEM`;
+      inputs = [`/vsicurl/${COPERNICUS_URL}/${name}/${name}.tif`];
+    }
+    // A single VRT over every project's tiles, then one warp: GDAL resolves the
+    // overlaps and reprojects once, so no seam is introduced by the mosaicking
+    // itself. Projects flown in different years still differ where they meet.
+    await buildVrt(inputs, vrtPath);
+    const cellSizeM = cfg.sizeM / (GRID - 1);
+    await warpToUtm(
+      vrtPath,
+      warpedPath,
+      epsg,
+      cellSizeM,
+      { bounds, width: GRID, height: GRID },
+      WARP_NODATA,
+    );
+    const raster = await resolveNodata(cfg.slug, warpedPath, workDir, bounds, epsg, {
+      projects,
+      tiles: inputs.length,
+    });
+    return { sample: samplerFor(raster), epsg };
+  } finally {
+    // sampleFromWarpedTiff materializes the band, so the intermediates are no longer needed.
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
+}
+
+export interface BakedFile {
+  name: string;
+  data: Buffer;
+}
+
+const KTX2_IDENTIFIER = Buffer.from([
+  0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a,
+]);
+
+/**
+ * Boundary for runtime raster assets produced by this bake pipeline. Encoding
+ * is deliberately upstream of this helper; it prevents raw PNG/JPEG bytes
+ * from being mislabeled while ensuring every emitted runtime texture is KTX2.
+ */
+export function emitKtx2Texture(sourceName: string, encoded: Buffer): BakedFile {
+  if (encoded.length < KTX2_IDENTIFIER.length || !encoded.subarray(0, KTX2_IDENTIFIER.length).equals(KTX2_IDENTIFIER)) {
+    throw new Error(`${sourceName}: invalid KTX2 texture bytes`);
+  }
+  return {
+    name: `${sourceName.replace(/\.[^./]+$/, "")}.ktx2`,
+    data: encoded,
+  };
+}
+
+/**
+ * Guard the quantiser's inputs, in that order: implausible elevations first,
+ * then the uint16 range. A nodata sentinel reaching here otherwise surfaces as
+ * "relief 1003065 m exceeds uint16 range", which points the reader at the
+ * encoding when the real problem is the source data.
+ */
+export function assertBakeableRelief(slug: string, sampleMin: number, sampleMax: number): void {
+  assertPlausibleElevations(slug, sampleMin, sampleMax);
+  const minZ = Math.floor(sampleMin / QUANTUM) * QUANTUM;
+  if (quantizeHeight(sampleMax, minZ, QUANTUM) >= 65535) {
+    throw new Error(`${slug}: relief ${(sampleMax - sampleMin).toFixed(0)} m exceeds uint16 range at ${QUANTUM} m`);
+  }
+}
+
+async function bakeHeightfield(
+  cfg: ResortBakeConfig,
+  demSource: DemSource,
+  zoom: number,
+): Promise<BakedFile[]> {
+  const [cLat, cLon] = cfg.center;
+  const half = cfg.sizeM / 2;
+  const cell = cfg.sizeM / (GRID - 1);
+  const mLat = M_PER_DEG_LAT;
+  const mLon = mPerDegLon(cLat);
+
+  let epsg: number | null = null;
+  const projected = demSource.kind === "terrarium" ? null : await projectedSampler(cfg, demSource);
+  if (projected) epsg = projected.epsg;
+  const sample =
+    demSource.kind === "terrarium"
+      ? await (async () => {
+          const tiles = await prefetchTerrariumTiles(cfg, zoom);
+          return (row: number, col: number) => {
+            const lat = cLat + (half - row * cell) / mLat;
+            const lon = cLon + (col * cell - half) / mLon;
+            return sampleTerrarium(tiles, lat, lon);
+          };
+        })()
+      : projected!.sample;
+
+  const raw = new Float64Array(GRID * GRID);
+  for (let row = 0; row < GRID; row++) {
+    // row 0 = north edge, col 0 = west edge (see formats.ts orientation contract)
+    for (let col = 0; col < GRID; col++) {
+      raw[row * GRID + col] = sample(row, col);
+    }
+  }
+
+  let sampleMin = Infinity;
+  let sampleMax = -Infinity;
+  for (const v of raw) {
+    if (!Number.isFinite(v)) throw new Error(`${cfg.slug}: non-finite elevation sampled`);
+    if (v < sampleMin) sampleMin = v;
+    if (v > sampleMax) sampleMax = v;
+  }
+  assertBakeableRelief(cfg.slug, sampleMin, sampleMax);
+  // Snap the datum to a quantum multiple so the encoding is reproducible and
+  // code 0 means exactly minZ.
+  const minZ = Number((Math.floor(sampleMin / QUANTUM) * QUANTUM).toFixed(3));
+  const maxCode = quantizeHeight(sampleMax, minZ, QUANTUM);
+  const maxZ = Number((minZ + maxCode * QUANTUM).toFixed(3));
+
+  const u16 = Buffer.alloc(GRID * GRID * 2);
+  for (let i = 0; i < raw.length; i++) {
+    u16.writeUInt16LE(quantizeHeight(raw[i], minZ, QUANTUM), i * 2);
+  }
+
+  // pngjs takes 16-bit samples in host (little-endian) order and byte-swaps
+  // them into the big-endian on-the-wire form itself — feeding it the u16
+  // buffer verbatim is correct, feeding it big-endian bytes is not.
+  const png = new PNG({ width: GRID, height: GRID, colorType: 0, bitDepth: 16, inputHasAlpha: false });
+  png.data = u16;
+  const pngBuf = PNG.sync.write(png, {
+    colorType: 0,
+    bitDepth: 16,
+    inputColorType: 0,
+    deflateLevel: 9,
+  });
+
+  const meta: TerrainMeta = {
+    version: META_VERSION,
+    slug: cfg.slug,
+    center: [cLat, cLon],
+    sizeM: cfg.sizeM,
+    grid: GRID,
+    minZ,
+    maxZ,
+    quantum: QUANTUM,
+    source: demSource.kind,
+    sourceZoom: demSource.kind === "terrarium" ? zoom : null,
+    ...terrainProvenance(demSource, epsg),
+    orientation: HEIGHTFIELD_ORIENTATION,
+    bakedAt: new Date().toISOString(),
+  };
+
+  console.log(
+    `  heightfield ${GRID}x${GRID} over ${cfg.sizeM} m (${cell.toFixed(2)} m/px) | ` +
+      `elev ${meta.minZ.toFixed(1)}–${meta.maxZ.toFixed(1)} m (relief ${(meta.maxZ - meta.minZ).toFixed(0)} m)`,
+  );
+
+  return [
+    { name: `${cfg.slug}.height.u16`, data: u16 },
+    { name: `${cfg.slug}.height.u16.br`, data: brotli(u16) },
+    { name: `${cfg.slug}.height.png`, data: pngBuf },
+    { name: `${cfg.slug}.meta.json`, data: Buffer.from(JSON.stringify(meta, null, 2) + "\n") },
+  ];
+}
+
+function brotli(input: Buffer): Buffer {
+  return zlib.brotliCompressSync(input, {
+    params: {
+      [zlib.constants.BROTLI_PARAM_QUALITY]: zlib.constants.BROTLI_MAX_QUALITY,
+      [zlib.constants.BROTLI_PARAM_LGWIN]: 24,
+      [zlib.constants.BROTLI_PARAM_SIZE_HINT]: input.length,
+    },
+  });
+}
+
+// ─── Trail geometry ──────────────────────────────────────────
+
+export type Pt = [number, number];
+
+/** Ramer–Douglas–Peucker simplification with a perpendicular-distance tolerance. */
+export function rdp(points: Pt[], epsilon: number): Pt[] {
+  if (points.length < 3) return points.slice();
+  const a = points[0];
+  const b = points[points.length - 1];
+  let maxDist = 0;
+  let maxIndex = 0;
+  for (let i = 1; i < points.length - 1; i++) {
+    const d = perpendicularDistance(points[i], a, b);
+    if (d > maxDist) {
+      maxDist = d;
+      maxIndex = i;
+    }
+  }
+  if (maxDist <= epsilon) return [a, b];
+  const left = rdp(points.slice(0, maxIndex + 1), epsilon);
+  const right = rdp(points.slice(maxIndex), epsilon);
+  return [...left.slice(0, -1), ...right];
+}
+
+function perpendicularDistance(p: Pt, a: Pt, b: Pt): number {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return Math.hypot(p[0] - a[0], p[1] - a[1]);
+  let t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+}
+
+/**
+ * Clip a polyline to the square `[-half, half]²` (Liang–Barsky per segment),
+ * returning the pieces that survive. Splitting rather than point-filtering
+ * matters: a run that leaves and re-enters the box must not gain a straight
+ * shortcut across it.
+ */
+export function clipPolylineToBox(points: Pt[], half: number): Pt[][] {
+  const pieces: Pt[][] = [];
+  let current: Pt[] | null = null;
+  const EPS = 1e-6;
+
+  for (let i = 0; i + 1 < points.length; i++) {
+    const seg = clipSegment(points[i], points[i + 1], half);
+    if (!seg) {
+      current = null;
+      continue;
+    }
+    const [a, b] = seg;
+    if (current && Math.abs(current[current.length - 1][0] - a[0]) < EPS && Math.abs(current[current.length - 1][1] - a[1]) < EPS) {
+      current.push(b);
+    } else {
+      current = [a, b];
+      pieces.push(current);
+    }
+  }
+  // A single point inside the box carries no geometry; drop degenerate pieces.
+  return pieces.filter((p) => p.length >= 2);
+}
+
+function clipSegment(a: Pt, b: Pt, half: number): [Pt, Pt] | null {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  let t0 = 0;
+  let t1 = 1;
+  const clip = (p: number, q: number): boolean => {
+    if (p === 0) return q >= 0; // parallel to this edge: inside iff q >= 0
+    const r = q / p;
+    if (p < 0) {
+      if (r > t1) return false;
+      if (r > t0) t0 = r;
+    } else {
+      if (r < t0) return false;
+      if (r < t1) t1 = r;
+    }
+    return true;
+  };
+  if (!clip(-dx, a[0] + half)) return null;
+  if (!clip(dx, half - a[0])) return null;
+  if (!clip(-dy, a[1] + half)) return null;
+  if (!clip(dy, half - a[1])) return null;
+  if (t1 <= t0) return null;
+  return [
+    [a[0] + t0 * dx, a[1] + t0 * dy],
+    [a[0] + t1 * dx, a[1] + t1 * dy],
+  ];
+}
+
+// ─── Overpass ────────────────────────────────────────────────
+
+const LIFT_TYPES =
+  "^(chair_lift|gondola|cable_car|t-bar|platter|rope_tow|mixed_lift|drag_lift|magic_carpet)$";
+
+export function overpassQuery(bbox: [number, number, number, number]): string {
+  const b = bbox.join(",");
+  return `[out:json][timeout:120];
+(
+  way["piste:type"="downhill"](${b});
+  way["aerialway"~"${LIFT_TYPES}"](${b});
+);
+out geom;`;
+}
+
+interface OverpassWay {
+  type: string;
+  id: number;
+  tags?: Record<string, string>;
+  geometry?: Array<{ lat: number; lon: number }>;
+}
+
+/** GET, never POST — overpass-api.de intermittently rejects POST (gotcha #1). */
+async function fetchOverpass(cfg: ResortBakeConfig): Promise<OverpassWay[]> {
+  const query = overpassQuery(cfg.bbox);
+  let lastError: unknown;
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    try {
+      const url = `${endpoint}?${new URLSearchParams({ data: query })}`;
+      const buf = await fetchWithRetry(url, `overpass ${new URL(endpoint).host}`);
+      const json = JSON.parse(buf.toString("utf8")) as { elements?: OverpassWay[] };
+      if (!json.elements) throw new Error("no elements in response");
+      console.log(`  overpass ${new URL(endpoint).host}: ${json.elements.length} ways (${(buf.length / 1024).toFixed(0)} KB)`);
+      return json.elements;
+    } catch (err) {
+      lastError = err;
+      console.warn(`  ! ${endpoint} failed: ${String(err)} — trying next endpoint`);
+    }
+  }
+  throw new Error(`all Overpass endpoints failed: ${String(lastError)}`);
+}
+
+function bakeTrails(cfg: ResortBakeConfig, elements: OverpassWay[]): BakedFile[] {
+  const [cLat, cLon] = cfg.center;
+  const mLon = mPerDegLon(cLat);
+  const half = cfg.sizeM / 2;
+  const runs: RawRun[] = [];
+  const lifts: RawLift[] = [];
+
+  for (const el of elements) {
+    if (!el.geometry || el.geometry.length < 2) continue;
+    const tags = el.tags ?? {};
+    const projected: Pt[] = el.geometry.map((g) => [(g.lon - cLon) * mLon, (g.lat - cLat) * M_PER_DEG_LAT]);
+    const isRun = Boolean(tags["piste:type"]);
+
+    for (const piece of clipPolylineToBox(projected, half)) {
+      const simplified = rdp(piece, RDP_EPSILON_M);
+      if (simplified.length < 2) continue;
+      const quantized = simplified.map(
+        (p) => [Math.round(p[0] / TRAIL_UNIT), Math.round(p[1] / TRAIL_UNIT)] as const,
+      );
+      const name = tags.name ?? tags["piste:name"] ?? null;
+      const p = encodeDelta(quantized);
+      if (isRun) {
+        const run: RawRun = { n: name, p };
+        run.d = tags["piste:difficulty"] ?? null;
+        if (tags["piste:grooming"]) run.g = tags["piste:grooming"];
+        if (tags.gladed === "yes") run.gl = 1;
+        if (tags.oneway === "yes" || tags["piste:oneway"] === "yes") run.o = 1;
+        runs.push(run);
+      } else if (tags.aerialway) {
+        lifts.push({ n: name, t: tags.aerialway, p });
+      }
+    }
+  }
+
+  const file: TrailsFile = {
+    v: TRAILS_VERSION,
+    center: [cLat, cLon],
+    sizeM: cfg.sizeM,
+    unit: TRAIL_UNIT,
+    convention: cfg.convention,
+    runs,
+    lifts,
+  };
+  const json = Buffer.from(JSON.stringify(file));
+  const nodes = [...runs, ...lifts].reduce((a, r) => a + r.p.length / 2, 0);
+  console.log(
+    `  trails: ${runs.length} runs, ${lifts.length} lifts, ${nodes} nodes | ` +
+      `json ${(json.length / 1024).toFixed(1)} KB`,
+  );
+  return [
+    { name: `${cfg.slug}.trails.json`, data: json },
+    { name: `${cfg.slug}.trails.json.br`, data: brotli(json) },
+  ];
+}
+
+// ─── Orchestration ───────────────────────────────────────────
+
+export interface BakeOptions {
+  source: DemSource;
+  zoom: number;
+  skipTrails: boolean;
+}
+
+export async function bakeResort(cfg: ResortBakeConfig, opts: BakeOptions): Promise<BakedFile[]> {
+  console.log(`\n▸ ${cfg.name} (${cfg.slug}) — ${opts.source.kind}`);
+  const files = await bakeHeightfield(cfg, opts.source, opts.zoom);
+  if (!opts.skipTrails) {
+    files.push(...bakeTrails(cfg, await fetchOverpass(cfg)));
+  }
+  return files;
+}
+
+function writeFiles(files: BakedFile[]): void {
+  fs.mkdirSync(OUT_DIR, { recursive: true });
+  for (const f of files) {
+    fs.writeFileSync(path.join(OUT_DIR, f.name), f.data);
+    console.log(`  wrote ${f.name} (${(f.data.length / 1024).toFixed(1)} KB)`);
+  }
+}
+
+const sha256 = (b: Buffer) => crypto.createHash("sha256").update(b).digest("hex");
+
+/** Raw heightfields are gitignored intermediates — absence is not a failure. */
+const isCommitted = (name: string) => !name.endsWith(".height.u16");
+
+/**
+ * Compare a fresh bake against the committed files. `bakedAt` is expected to
+ * differ, so meta files are compared with that field normalised; everything
+ * else must be byte-identical. The raw `.u16` is only compared when a local
+ * bake left one on disk — an identical `.u16.br` already proves the bytes
+ * match, since brotli here is deterministic.
+ */
+function verifyFiles(files: BakedFile[]): { name: string; reason: string }[] {
+  const diffs: { name: string; reason: string }[] = [];
+  for (const f of files) {
+    const p = path.join(OUT_DIR, f.name);
+    if (!fs.existsSync(p)) {
+      if (isCommitted(f.name)) diffs.push({ name: f.name, reason: "missing on disk" });
+      else console.log(`  · ${f.name} not present locally (gitignored intermediate) — covered by the .br`);
+      continue;
+    }
+    const onDisk = fs.readFileSync(p);
+    if (f.name.endsWith(".meta.json")) {
+      const strip = (b: Buffer) => {
+        const j = JSON.parse(b.toString("utf8")) as Record<string, unknown>;
+        delete j.bakedAt;
+        return JSON.stringify(j);
+      };
+      if (strip(onDisk) !== strip(f.data)) diffs.push({ name: f.name, reason: "meta fields differ" });
+      else console.log(`  ✓ ${f.name} (ignoring bakedAt)`);
+      continue;
+    }
+    if (sha256(onDisk) === sha256(f.data)) {
+      console.log(`  ✓ ${f.name} ${sha256(f.data).slice(0, 12)}`);
+    } else {
+      diffs.push({
+        name: f.name,
+        reason: `sha256 ${sha256(onDisk).slice(0, 12)} on disk vs ${sha256(f.data).slice(0, 12)} rebaked`,
+      });
+    }
+  }
+  return diffs;
+}
+
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  const target = args.find((a) => !a.startsWith("--"));
+  const verify = args.includes("--verify");
+  const skipTrails = args.includes("--skip-trails");
+  const sourceArg = args.find((a) => a.startsWith("--source="))?.split("=")[1] ?? "designed";
+
+  if (!target || (target !== "all" && !RESORT_BAKE_CONFIGS[target])) {
+    console.error(`Usage: npx tsx scripts/bake-resort.ts <${RESORT_SLUGS.join("|")}|all> [--verify] [--source=designed|terrarium|copernicus] [--skip-trails]`);
+    process.exit(1);
+  }
+  if (sourceArg !== "designed" && sourceArg !== "terrarium" && sourceArg !== "copernicus") {
+    console.error(`Unknown --source=${sourceArg} (expected designed, terrarium, or copernicus)`);
+    process.exit(1);
+  }
+
+  const slugs = target === "all" ? RESORT_SLUGS : [target];
+  const allDiffs: { name: string; reason: string }[] = [];
+
+  for (const [i, slug] of slugs.entries()) {
+    const cfg = RESORT_BAKE_CONFIGS[slug];
+    const source: DemSource = sourceArg === "designed"
+      ? resolveDemSource(cfg)
+      : sourceArg === "copernicus" && cfg.copernicusTile
+        ? { kind: "copernicus", tile: cfg.copernicusTile }
+        : { kind: "terrarium" };
+    if (sourceArg === "copernicus" && !cfg.copernicusTile) {
+      console.warn(`  ! ${slug} has no Copernicus tile configured; falling back to terrarium`);
+    }
+    const files = await bakeResort(cfg, { source, zoom: SOURCE_ZOOM, skipTrails });
+    if (verify) allDiffs.push(...verifyFiles(files));
+    else writeFiles(files);
+    if (!skipTrails && i < slugs.length - 1) {
+      console.log(`  sleeping ${OVERPASS_SLEEP_MS / 1000}s before the next Overpass query`);
+      await sleep(OVERPASS_SLEEP_MS);
+    }
+  }
+
+  if (verify) {
+    if (allDiffs.length === 0) {
+      console.log("\n✓ verify: re-bake is byte-identical to the committed assets");
+    } else {
+      console.error(`\n✗ verify: ${allDiffs.length} file(s) differ from the committed assets:`);
+      for (const d of allDiffs) console.error(`  - ${d.name}: ${d.reason}`);
+      console.error("  (upstream DEM tiles or OSM data changed, or the bake is not reproducible)");
+      process.exit(1);
+    }
+  } else {
+    console.log("\n✓ bake complete");
+  }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

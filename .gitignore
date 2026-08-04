@@ -63,3 +63,17 @@ scripts/*.log
 .claude/worktrees/
 .worktrees/
 .agent-team/
+
+# Drop In terrain bake: the raw heightfield is a local intermediate — the
+# committed source of truth is the brotli sidecar (public/game/terrain/*.u16.br)
+public/game/terrain/*.height.u16
+
+# Playwright output: run artifacts, never sources. test-results/.last-run.json
+# was tracked by accident and churned on every local e2e run.
+test-results/
+playwright-report/
+
+# agent session artifacts
+codex-*.log
+grok-*.log
+REPORT-*.md

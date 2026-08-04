@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "slug": "ski-portillo",
+  "center": [
+    -32.842,
+    -70.129
+  ],
+  "sizeM": 4096,
+  "grid": 1024,
+  "minZ": 2329.2,
+  "maxZ": 4139.8,
+  "quantum": 0.1,
+  "source": "copernicus",
+  "sourceZoom": null,
+  "demSource": {
+    "kind": "copernicus",
+    "tile": "S33_00_W071_00"
+  },
+  "epsg": 32719,
+  "sourceResolutionM": 30,
+  "orientation": "row-major; row 0 = north edge, col 0 = west edge; x east, y north, both in metres from center",
+  "bakedAt": "2026-08-02T20:28:34.914Z"
+}

@@ -3,6 +3,8 @@
 import type { MouseEvent } from "react";
 import type { ResortWithData, ConditionRating } from "@/lib/types";
 import { isOffSeason, timeAgo, OFF_SEASON_COLOR } from "@/lib/map-utils";
+import { isDropInResort } from "@/lib/drop-in";
+import DropInLink from "@/components/drop-in/DropInLink";
 import MapCamPreview from "./MapCamPreview";
 
 // Condition chip palette — matches ConditionBadge
@@ -123,6 +125,12 @@ export default function MapPopupCard({ resort, onViewResort }: MapPopupCardProps
         onClick={() => (onViewResort ? onViewResort(resort.slug) : (window.location.href = resortHref))}
         className="mb-3"
       />
+
+      {/* Drop In — pilot resorts only. Its own row so it never competes with
+          the "View resort" link for the footer's attention. */}
+      {isDropInResort(resort.slug) && (
+        <DropInLink slug={resort.slug} variant="pill" className="mb-3" />
+      )}
 
       {/* Footer */}
       <div className="flex items-center justify-between">

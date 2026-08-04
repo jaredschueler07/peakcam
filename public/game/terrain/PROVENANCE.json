@@ -1,0 +1,38 @@
+{
+  "$comment": "Machine-readable provenance for Drop In assets. The Phase 0 provenance file is absent from this branch, so Task 4 records its new surface source here without inventing or duplicating terrain records from the unmerged licence branch.",
+  "version": 1,
+  "updated": "2026-08-03",
+  "surfaceMaterials": [
+    {
+      "asset": "Snow006",
+      "provider": "ambientCG",
+      "sourceUrl": "https://ambientcg.com/a/Snow006",
+      "licence": "CC0 1.0 Universal",
+      "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "selectedAt": "2026-08-03",
+      "downloadedAt": "2026-08-03",
+      "downloadStatus": "Downloaded and baked.",
+      "sourceFiles": [
+        "Snow006_2K-PNG_NormalGL.png",
+        "Snow006_2K-PNG_Roughness.png"
+      ],
+      "outputs": [
+        { "path": "../textures/snow-normal.ktx2", "bytes": 238614 },
+        { "path": "../textures/snow-roughness.ktx2", "bytes": 169834 }
+      ],
+      "encoding": {
+        "tool": "toktx (KTX-Software) v4.4.2",
+        "format": "ETC1S / BasisLZ",
+        "resolution": "1024x1024 (resized down from the 2048x2048 source)",
+        "flags": "--t2 --encode etc1s --clevel 4 --qlevel 200 --resize 1024x1024 --genmipmap --assign_oetf linear --assign_primaries none",
+        "note": "Resized and supercompressed to meet the 512 KB per-asset KTX2 budget in docs/drop-in-v2/BUDGETS.md; UASTC at the native 2K resolution produced ~5.6 MB per map."
+      },
+      "excludedFiles": [
+        {
+          "pattern": "Snow006_2K-PNG_Color.png",
+          "reason": "Snow albedo carries almost no signal, and a photographic albedo fights the PeakCam poster palette."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "layers": [
+    {
+      "name": "wind-bed",
+      "url": "/game/audio/wind-bed.ogg",
+      "fallbackUrl": "/game/audio/wind-bed.m4a",
+      "gain": 0.9,
+      "loop": true,
+      "bus": "sfx"
+    },
+    {
+      "name": "wind-gust",
+      "url": "/game/audio/wind-gust.ogg",
+      "fallbackUrl": "/game/audio/wind-gust.m4a",
+      "gain": 0.7,
+      "loop": true,
+      "bus": "sfx"
+    },
+    {
+      "name": "carve-packed",
+      "url": "/game/audio/carve-packed.ogg",
+      "fallbackUrl": "/game/audio/carve-packed.m4a",
+      "gain": 1.25,
+      "loop": true,
+      "bus": "sfx"
+    },
+    {
+      "name": "carve-powder",
+      "url": "/game/audio/carve-powder.ogg",
+      "fallbackUrl": "/game/audio/carve-powder.m4a",
+      "gain": 1,
+      "loop": true,
+      "bus": "sfx"
+    },
+    {
+      "name": "lift-hum",
+      "url": "/game/audio/lift-hum.ogg",
+      "fallbackUrl": "/game/audio/lift-hum.m4a",
+      "gain": 0.45,
+      "loop": true,
+      "bus": "sfx"
+    },
+    {
+      "name": "jump-whoosh",
+      "url": "/game/audio/jump-whoosh.ogg",
+      "fallbackUrl": "/game/audio/jump-whoosh.m4a",
+      "gain": 0.7,
+      "loop": false,
+      "bus": "sfx"
+    },
+    {
+      "name": "land-soft",
+      "url": "/game/audio/land-soft.ogg",
+      "fallbackUrl": "/game/audio/land-soft.m4a",
+      "gain": 0.9,
+      "loop": false,
+      "bus": "sfx"
+    },
+    {
+      "name": "crash-impact",
+      "url": "/game/audio/crash-impact.ogg",
+      "fallbackUrl": "/game/audio/crash-impact.m4a",
+      "gain": 1.3,
+      "loop": false,
+      "bus": "sfx"
+    },
+    {
+      "name": "ui-tick",
+      "url": "/game/audio/ui-tick.ogg",
+      "fallbackUrl": "/game/audio/ui-tick.m4a",
+      "gain": 0.6,
+      "loop": false,
+      "bus": "sfx"
+    },
+    {
+      "name": "trick-chime",
+      "url": "/game/audio/trick-chime.ogg",
+      "fallbackUrl": "/game/audio/trick-chime.m4a",
+      "gain": 1.4,
+      "loop": false,
+      "bus": "sfx"
+    }
+  ]
+}
