@@ -17,7 +17,7 @@ npm test                 # node:test via tsx — lib/*.test.ts + scripts/*.test.
 npm run drop-in:sync-three   # Re-vendor public/drop-in/three.module.js after bumping `three`
 
 # Data & ops scripts (all load .env.local themselves, write via service-role key)
-npm run import-resorts:standalone  # Seed resorts/cams from data/*.csv (the maintained importer)
+npm run import-resorts:standalone  # Seed resorts/cams from data/*.csv (the maintained importer). A newly-imported resort has no live page until the next deploy — /resorts/[slug] uses dynamicParams=false, so its static params list is fixed at build time.
 npm run snotel-sync      # SNOTEL sync — the production data feed (launchd runs it every 6h)
 npm run pipeline-sync    # Multi-source pipeline (currently dormant in prod — see Gotchas)
 npm run seed-normals     # 30-year SNOTEL normals (run-once/annual)

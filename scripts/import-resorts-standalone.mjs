@@ -278,6 +278,7 @@ async function main() {
   await importCams(slugToId);
 
   console.log("\n🎉  Import complete.\n");
+  console.log("    Note: newly-added resorts won't get a live page until the next deploy — /resorts/[slug] uses dynamicParams=false, so its static params list is fixed at build time.\n");
 }
 
 // Only run main() when this file is executed directly (e.g.
