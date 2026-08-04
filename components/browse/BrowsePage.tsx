@@ -460,7 +460,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
               {search && (
                 <button
                   onClick={handleClearSearch}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-bark hover:text-ink transition-colors"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 pointer-coarse:p-3 text-bark hover:text-ink transition-colors"
                   aria-label="Clear search"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -541,7 +541,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
                 <button
                   key={opt}
                   onClick={() => setSort(opt)}
-                  className={`text-[12px] font-semibold px-3 py-1 rounded-full border-[1.5px] transition-colors duration-150 ${
+                  className={`text-[12px] font-semibold px-3 py-1 pointer-coarse:min-h-11 pointer-coarse:px-4 rounded-full border-[1.5px] transition-colors duration-150 ${
                     sort === opt
                       ? "bg-ink border-ink text-cream-50"
                       : "border-bark text-ink hover:border-ink hover:bg-cream-50"

@@ -94,7 +94,7 @@ function AuthForm() {
             type="button"
             onClick={() => { setMode(m); setError(null); }}
             className={`
-              flex-1 py-2 rounded-lg text-sm font-semibold transition-all duration-[220ms]
+              flex-1 py-2 pointer-coarse:min-h-11 rounded-lg text-sm font-semibold transition-all duration-[220ms]
               ${mode === m
                 ? "bg-surface text-text-base border border-border shadow-sm"
                 : "text-text-muted hover:text-text-subtle"}
@@ -120,7 +120,7 @@ function AuthForm() {
             autoFocus
             autoComplete="email"
             className="w-full bg-surface2 border border-border rounded-lg
-              px-3 py-2.5 text-sm text-text-base placeholder:text-text-muted
+              px-3 py-2.5 text-[16px] md:text-sm text-text-base placeholder:text-text-muted
               outline-none transition-all duration-[220ms]
               focus:border-cyan focus:bg-surface3"
           />
@@ -139,7 +139,7 @@ function AuthForm() {
             required
             autoComplete={mode === "signin" ? "current-password" : "new-password"}
             className="w-full bg-surface2 border border-border rounded-lg
-              px-3 py-2.5 text-sm text-text-base placeholder:text-text-muted
+              px-3 py-2.5 text-[16px] md:text-sm text-text-base placeholder:text-text-muted
               outline-none transition-all duration-[220ms]
               focus:border-cyan focus:bg-surface3"
           />
@@ -188,7 +188,7 @@ export default function AuthPage() {
 
         <p className="text-text-muted text-xs text-center mt-4">
           By signing in, you agree to our{" "}
-          <Link href="/about" className="text-text-subtle hover:text-cyan transition-colors">
+          <Link href="/about" className="text-text-subtle hover:text-cyan underline transition-colors inline-block py-2 px-1">
             terms of use
           </Link>
           .

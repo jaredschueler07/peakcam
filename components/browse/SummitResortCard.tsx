@@ -234,7 +234,7 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite }: Props)
                 {onToggleFavorite && (
                   <button
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(); }}
-                    className={`p-1.5 rounded-full border-[1.5px] transition-all duration-100 ${
+                    className={`p-1.5 pointer-coarse:p-3 rounded-full border-[1.5px] transition-all duration-100 ${
                       favorited
                         ? "bg-alpen/15 border-alpen text-alpen shadow-[2px_2px_0_#2a1f14]"
                         : "bg-cream-50 border-ink/30 text-bark hover:text-alpen hover:border-ink hover:shadow-[2px_2px_0_#2a1f14]"

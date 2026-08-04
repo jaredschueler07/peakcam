@@ -131,7 +131,7 @@ function WebcamTile({
           </div>
           <button
             onClick={onLoad}
-            className="inline-flex items-center gap-2 px-5 py-2.5
+            className="inline-flex items-center gap-2 px-5 py-2.5 pointer-coarse:min-h-11
                        bg-alpen text-cream-50 font-semibold text-[14px]
                        rounded-full border-[1.5px] border-ink shadow-stamp
                        hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]

@@ -141,7 +141,7 @@ export default function MapPopupCard({ resort, onViewResort }: MapPopupCardProps
         <a
           href={resortHref}
           onClick={handleNav}
-          className="text-alpen-dk text-[12px] font-bold hover:text-alpen transition-colors uppercase tracking-[0.06em] cursor-pointer"
+          className="text-alpen-dk text-[12px] font-bold hover:text-alpen transition-colors uppercase tracking-[0.06em] cursor-pointer inline-flex items-center py-2 pointer-coarse:min-h-11"
         >
           View resort &rarr;
         </a>

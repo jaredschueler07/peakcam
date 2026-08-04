@@ -58,7 +58,7 @@ export function FullPageMap({ resorts, radarFrames }: Props) {
       <div className="absolute top-4 left-16 z-20">
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 px-3 py-2 bg-cream-50 border-[1.5px] border-ink rounded-full text-ink text-sm font-semibold shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px] transition-[transform,box-shadow] duration-100"
+          className="inline-flex items-center gap-1.5 px-3 py-2 pointer-coarse:min-h-11 pointer-coarse:px-4 bg-cream-50 border-[1.5px] border-ink rounded-full text-ink text-sm font-semibold shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px] transition-[transform,box-shadow] duration-100"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />

@@ -59,7 +59,7 @@ export default function MapControls({
             <button
               key={m}
               onClick={() => onMetricChange(m)}
-              className={`px-3 py-1 text-[11.5px] font-bold rounded-full border-[1.5px] transition-colors duration-150 uppercase tracking-[0.06em] ${
+              className={`px-3 py-1 pointer-coarse:min-h-10 pointer-coarse:px-4 text-[11.5px] font-bold rounded-full border-[1.5px] transition-colors duration-150 uppercase tracking-[0.06em] ${
                 isActive
                   ? "bg-ink text-cream-50 border-ink"
                   : "border-transparent text-bark hover:text-ink"
@@ -81,7 +81,7 @@ export default function MapControls({
             onClick={() => onWeatherLayerChange(weatherLayer === "radar" ? "off" : "radar")}
             aria-pressed={weatherLayer === "radar"}
             title="Precipitation radar (RainViewer) — no radar coverage in Chile; use Satellite there"
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border-[1.5px] text-[11.5px] font-bold uppercase tracking-[0.06em] transition-[transform,box-shadow] duration-100 ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 pointer-coarse:min-h-11 pointer-coarse:px-4 rounded-full border-[1.5px] text-[11.5px] font-bold uppercase tracking-[0.06em] transition-[transform,box-shadow] duration-100 ${
               weatherLayer === "radar"
                 ? "bg-alpen text-cream-50 border-ink shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]"
                 : "bg-cream-50 text-ink border-ink shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]"
@@ -95,7 +95,7 @@ export default function MapControls({
           onClick={() => onWeatherLayerChange(weatherLayer === "satellite" ? "off" : "satellite")}
           aria-pressed={weatherLayer === "satellite"}
           title="GOES-East satellite (NASA GIBS) — clouds over the whole Americas, updated every 10 min"
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border-[1.5px] text-[11.5px] font-bold uppercase tracking-[0.06em] transition-[transform,box-shadow] duration-100 ${
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 pointer-coarse:min-h-11 pointer-coarse:px-4 rounded-full border-[1.5px] text-[11.5px] font-bold uppercase tracking-[0.06em] transition-[transform,box-shadow] duration-100 ${
             weatherLayer === "satellite"
               ? "bg-alpen text-cream-50 border-ink shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]"
               : "bg-cream-50 text-ink border-ink shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]"
@@ -109,11 +109,11 @@ export default function MapControls({
       {/* Radar loop scrubber — play/pause + frame slider + relative time */}
       {radarScrubber && (
         <div className="flex items-center gap-2 px-3 py-1.5 bg-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp-sm">
-          {/* min 24px hit area (WCAG 2.5.8) — the icon alone is too small a target */}
+          {/* 24px hit area on desktop; 44px on touch (WCAG 2.5.8 / Apple HIG) */}
           <button
             onClick={radarScrubber.onTogglePlay}
             aria-label={radarScrubber.playing ? "Pause radar loop" : "Play radar loop"}
-            className="flex min-h-[24px] min-w-[24px] items-center justify-center -my-1 text-ink hover:text-alpen transition-colors"
+            className="flex min-h-[24px] min-w-[24px] pointer-coarse:min-h-11 pointer-coarse:min-w-11 items-center justify-center -my-1 text-ink hover:text-alpen transition-colors"
           >
             {radarScrubber.playing ? (
               <Pause size={14} strokeWidth={2.5} fill="currentColor" />
@@ -141,7 +141,7 @@ export default function MapControls({
       <button
         onClick={onToggleInSeason}
         aria-pressed={inSeasonOnly}
-        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border-[1.5px] text-[11.5px] font-bold uppercase tracking-[0.06em] transition-[transform,box-shadow] duration-100 ${
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 pointer-coarse:min-h-11 pointer-coarse:px-4 rounded-full border-[1.5px] text-[11.5px] font-bold uppercase tracking-[0.06em] transition-[transform,box-shadow] duration-100 ${
           inSeasonOnly
             ? "bg-forest text-cream-50 border-ink shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]"
             : "bg-cream-50 text-ink border-ink shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]"

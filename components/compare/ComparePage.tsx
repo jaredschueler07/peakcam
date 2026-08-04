@@ -125,7 +125,7 @@ function ResortPicker({
           className="w-full pl-4 pr-9 py-2.5 bg-snow text-ink placeholder:text-bark
                      border-[1.5px] border-ink rounded-full shadow-stamp-sm
                      focus:shadow-[3px_3px_0_#a93f20] focus:border-alpen-dk
-                     outline-none text-sm font-medium transition-shadow duration-100"
+                     outline-none text-[16px] md:text-sm font-medium transition-shadow duration-100"
         />
         <Plus
           size={15}
@@ -143,7 +143,7 @@ function ResortPicker({
                 setQuery("");
                 setOpen(false);
               }}
-              className="w-full text-left px-4 py-2.5 hover:bg-cream transition-colors flex items-center justify-between gap-2 border-b border-dashed border-bark/30 last:border-b-0"
+              className="w-full text-left px-4 py-2.5 pointer-coarse:min-h-11 hover:bg-cream transition-colors flex items-center justify-between gap-2 border-b border-dashed border-bark/30 last:border-b-0"
             >
               <div>
                 <span className="font-display font-black text-ink text-[14px]">{resort.name}</span>
@@ -210,7 +210,7 @@ function ResortColumnHeader({
           </Link>
           <button
             onClick={onRemove}
-            className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-cream-50 border-[1.5px] border-ink text-ink hover:bg-alpen hover:text-cream-50 shadow-[2px_2px_0_#2a1f14] transition-colors"
+            className="shrink-0 w-6 h-6 pointer-coarse:w-10 pointer-coarse:h-10 flex items-center justify-center rounded-full bg-cream-50 border-[1.5px] border-ink text-ink hover:bg-alpen hover:text-cream-50 shadow-[2px_2px_0_#2a1f14] transition-colors"
             aria-label={`Remove ${resort.name} from comparison`}
           >
             <X size={12} strokeWidth={2.5} />
@@ -399,7 +399,7 @@ export function ComparePage({ allResorts, initialResorts }: Props) {
         <div className="mb-8">
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 text-bark hover:text-ink text-[13px] font-semibold mb-5 transition-colors"
+            className="inline-flex items-center gap-1.5 text-bark hover:text-ink text-[13px] font-semibold mb-5 py-2 px-1 pointer-coarse:min-h-11 transition-colors"
           >
             <ArrowLeft size={14} />
             Back to resorts
@@ -426,7 +426,7 @@ export function ComparePage({ allResorts, initialResorts }: Props) {
             <>
               <button
                 onClick={handleShare}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-cream-50 text-ink
+                className="inline-flex items-center gap-2 px-4 py-2 pointer-coarse:min-h-11 bg-cream-50 text-ink
                            border-[1.5px] border-ink rounded-full shadow-stamp-sm
                            hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]
                            transition-[transform,box-shadow] duration-100 text-[13px] font-semibold"
@@ -436,7 +436,7 @@ export function ComparePage({ allResorts, initialResorts }: Props) {
               </button>
               <button
                 onClick={() => setResorts([])}
-                className="text-bark hover:text-ink text-[13px] font-semibold transition-colors"
+                className="text-bark hover:text-ink text-[13px] font-semibold px-3 py-2 pointer-coarse:min-h-11 transition-colors"
               >
                 Clear all
               </button>
@@ -460,7 +460,7 @@ export function ComparePage({ allResorts, initialResorts }: Props) {
                 return (
                   <button key={`${a}-${b}`}
                     onClick={() => { addResort(ra); addResort(rb); }}
-                    className="px-4 py-2 bg-cream-50 text-ink border-[1.5px] border-ink rounded-full
+                    className="px-4 py-2 pointer-coarse:min-h-11 bg-cream-50 text-ink border-[1.5px] border-ink rounded-full
                                shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]
                                transition-[transform,box-shadow] duration-100 text-[13px] font-semibold">
                     {ra.name} <span className="text-bark font-normal italic">vs</span> {rb.name}

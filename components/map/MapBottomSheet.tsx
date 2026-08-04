@@ -5,6 +5,7 @@ import { isOffSeason, timeAgo, OFF_SEASON_COLOR } from "@/lib/map-utils";
 import { isDropInResort } from "@/lib/drop-in";
 import DropInLink from "@/components/drop-in/DropInLink";
 import MapCamPreview from "./MapCamPreview";
+import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 
 // Condition chip palette — matches MapPopupCard / ConditionBadge.
 const conditionChip: Record<ConditionRating, string> = {
@@ -29,6 +30,7 @@ export default function MapBottomSheet({
   onClose,
   onViewResort,
 }: MapBottomSheetProps) {
+  useBodyScrollLock(true);
   const snow = resort.snow_report;
   const camCount = resort.cams.length;
   const chipCls = conditionChip[resort.cond_rating] ?? "bg-cream-50 text-ink border-bark";
@@ -64,7 +66,7 @@ export default function MapBottomSheet({
         role="dialog"
         aria-label={`${resort.name} conditions`}
       >
-        <div className="bg-cream-50 border-t-[1.5px] border-ink rounded-t-[18px] px-5 pt-3 pb-6 shadow-[0_-6px_20px_-8px_rgba(42,31,20,0.35)]">
+        <div className="bg-cream-50 border-t-[1.5px] border-ink rounded-t-[18px] px-5 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] max-h-[80dvh] overflow-y-auto shadow-[0_-6px_20px_-8px_rgba(42,31,20,0.35)]">
           {/* Drag handle */}
           <div className="flex justify-center mb-3">
             <div className="w-10 h-1 bg-bark/40 rounded-full" />
@@ -142,13 +144,13 @@ export default function MapBottomSheet({
           <div className="flex items-center gap-3">
             <button
               onClick={() => onViewResort(resort.slug)}
-              className="flex-1 px-4 py-2.5 rounded-full bg-ink text-cream-50 border-[1.5px] border-ink text-sm font-bold uppercase tracking-[0.06em] shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px] transition-[transform,box-shadow] duration-100"
+              className="flex-1 px-4 py-2.5 min-h-11 rounded-full bg-ink text-cream-50 border-[1.5px] border-ink text-sm font-bold uppercase tracking-[0.06em] shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px] transition-[transform,box-shadow] duration-100"
             >
               View resort
             </button>
             <button
               onClick={() => onViewResort(resort.slug)}
-              className="px-4 py-2.5 rounded-full bg-cream-50 text-ink border-[1.5px] border-ink text-sm font-bold uppercase tracking-[0.06em] shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px] transition-[transform,box-shadow] duration-100"
+              className="px-4 py-2.5 min-h-11 rounded-full bg-cream-50 text-ink border-[1.5px] border-ink text-sm font-bold uppercase tracking-[0.06em] shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px] transition-[transform,box-shadow] duration-100"
             >
               {camCount} {camCount === 1 ? "Cam" : "Cams"}
             </button>

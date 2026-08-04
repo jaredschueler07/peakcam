@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, type ReactNode } from "react";
+import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 
 interface ModalProps {
   open: boolean;
@@ -10,6 +11,8 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, title, children, footer }: ModalProps) {
+  useBodyScrollLock(open);
+
   // Close on Escape
   useEffect(() => {
     if (!open) return;
@@ -30,7 +33,7 @@ export function Modal({ open, onClose, title, children, footer }: ModalProps) {
       aria-modal="true"
       role="dialog"
     >
-      <div className="w-full max-w-3xl bg-cream-50 border-[1.5px] border-ink
+      <div className="w-full max-w-3xl max-h-[90dvh] flex flex-col bg-cream-50 border-[1.5px] border-ink
         rounded-[18px] overflow-hidden animate-slideUp shadow-stamp-lg">
 
         {/* Header — ink bar, cream text, alpen LIVE stamp */}
@@ -46,7 +49,7 @@ export function Modal({ open, onClose, title, children, footer }: ModalProps) {
           <button
             onClick={onClose}
             aria-label="Close"
-            className="w-8 h-8 flex items-center justify-center rounded-full
+            className="w-8 h-8 pointer-coarse:w-11 pointer-coarse:h-11 flex items-center justify-center rounded-full
               bg-cream-50 text-ink border-[1.5px] border-ink text-lg font-bold
               hover:bg-alpen hover:text-cream-50 transition-colors duration-150
               shadow-[2px_2px_0_#2a1f14]"
@@ -56,7 +59,7 @@ export function Modal({ open, onClose, title, children, footer }: ModalProps) {
         </div>
 
         {/* Body */}
-        <div className="bg-cream-50">{children}</div>
+        <div className="bg-cream-50 overflow-y-auto min-h-0 flex-1">{children}</div>
 
         {/* Footer */}
         {footer && (

@@ -50,7 +50,7 @@ export default function MapLegend({ metric }: MapLegendProps) {
         <div className="bg-cream-50 border-[1.5px] border-ink rounded-[14px] shadow-stamp p-3 transition-all">
           <button
             onClick={() => setOpen(false)}
-            className="pc-eyebrow mb-2 text-left hover:text-ink transition-colors"
+            className="pc-eyebrow mb-2 py-1 pointer-coarse:min-h-10 pointer-coarse:min-w-11 text-left hover:text-ink transition-colors"
             style={{ color: "var(--pc-bark)" }}
           >
             Legend ×
@@ -100,7 +100,7 @@ export default function MapLegend({ metric }: MapLegendProps) {
       ) : (
         <button
           onClick={() => setOpen(true)}
-          className="bg-cream-50 border-[1.5px] border-ink rounded-full px-3 py-1.5 text-ink text-[11px] font-bold uppercase tracking-[0.14em] shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px] transition-[transform,box-shadow] duration-100"
+          className="bg-cream-50 border-[1.5px] border-ink rounded-full px-3 py-1.5 pointer-coarse:min-h-11 pointer-coarse:px-4 text-ink text-[11px] font-bold uppercase tracking-[0.14em] shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px] transition-[transform,box-shadow] duration-100"
         >
           <span className="flex items-center gap-1.5">
             <svg width="14" height="14" viewBox="0 0 12 12" fill="none">

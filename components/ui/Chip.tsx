@@ -15,6 +15,7 @@ export function Chip({ label, active = false, onClick, icon }: ChipProps) {
       onClick={onClick}
       className={`
         inline-flex items-center gap-1.5 rounded-full px-3 py-1
+        pointer-coarse:min-h-11 pointer-coarse:px-4
         text-[12px] font-bold uppercase tracking-[0.08em]
         border-[1.5px] cursor-pointer select-none whitespace-nowrap
         transition-colors duration-150
