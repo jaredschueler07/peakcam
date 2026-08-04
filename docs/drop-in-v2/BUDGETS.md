@@ -77,3 +77,21 @@ version, not once per texture.
 Production telemetry emits p50/p95 frame time, final quality rung, DPR, and
 device tier once per run. It never emits per-frame samples. The quality ladder
 drops post effects, shadow cascades, and glint before reducing pixel scale.
+
+## Phase 2 gate measurement (2026-08-03)
+
+Widest camera (`?cam=wide`), real WebGPU, default (highest) rung, all Phase 2
+effects active (GTAO, physical sky, godrays, real snow textures), 60 s
+mid-run RAF sampling per resort on the Apple-silicon reference machine:
+
+| resort | p50 | p75 | p95 | max |
+|---|---|---|---|---|
+| breckenridge | 8.3 ms | 8.5 ms | 10.3 ms | 16.7 ms |
+| heavenly | 8.3 ms | 8.5 ms | 10.2 ms | 10.4 ms |
+| ski-portillo | 8.3 ms | 8.5 ms | 10.3 ms | 10.4 ms |
+
+p75 sits at the 120 Hz vsync interval — the display, not the renderer, is the
+limiter, and the governor's 22.2 ms desktop budget is never approached. Caveat:
+this machine cannot exercise the weakest-hardware rungs; the ladder's step-down
+behaviour there is covered by the policy unit tests and production telemetry,
+not by this measurement. Probe: `.superpowers/sdd/frame-cost.mjs`.
