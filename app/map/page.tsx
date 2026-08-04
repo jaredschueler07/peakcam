@@ -4,6 +4,8 @@ import { getRadarFrames } from "@/lib/weather-radar";
 import { isOffSeason } from "@/lib/map-utils";
 import { FullPageMap } from "./FullPageMap";
 
+const BASE_URL = "https://peakcam.io";
+
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
@@ -17,6 +19,7 @@ export const metadata: Metadata = {
     url: "https://peakcam.io/map",
     type: "website",
   },
+  alternates: { canonical: `${BASE_URL}/map` },
 };
 
 export default async function MapPage() {

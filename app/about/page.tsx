@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 
+const BASE_URL = "https://peakcam.io";
+
 export const metadata = {
   title: "About",
   description:
     "PeakCam is a free, real-time mountain webcam and snow report aggregator for ski resorts across North & South America.",
+  alternates: { canonical: `${BASE_URL}/about` },
 };
 
 export default function About() {

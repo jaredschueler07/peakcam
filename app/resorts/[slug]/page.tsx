@@ -9,6 +9,14 @@ const BASE_URL = "https://peakcam.io";
 
 export const revalidate = 3600;
 
+// Reject any slug not returned by generateStaticParams at the router layer,
+// before the page function runs. Without this, Next's full-route-cache for
+// this SSG segment caches a notFound() render as a 200 (it stores the HTML,
+// not the status code) — garbage slugs would 200 forever once first hit.
+// Trade-off: a resort added to the DB between deploys 404s until the next
+// build regenerates the static params list.
+export const dynamicParams = false;
+
 // Pre-render all active resort pages at build time
 export async function generateStaticParams() {
   try {

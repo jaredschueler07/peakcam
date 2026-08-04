@@ -1,9 +1,15 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AlertManagePage } from "@/components/alerts/AlertManagePage";
 
 interface PageProps {
   searchParams: Promise<{ token?: string }>;
 }
+
+// Capability-token URL for a specific subscriber — never indexable.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 async function getManageData(token: string) {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";

@@ -16,6 +16,8 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "My Favorites",
   description: "Your saved ski resorts — quick access to conditions, cams, and snow reports.",
+  // Personalized per-user content — nothing here is the same page twice.
+  robots: { index: false, follow: false },
 };
 
 export default async function Page() {

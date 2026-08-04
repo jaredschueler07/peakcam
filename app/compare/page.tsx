@@ -3,6 +3,8 @@ import { getAllResorts } from "@/lib/supabase";
 import { ComparePage } from "@/components/compare/ComparePage";
 import type { ResortWithData } from "@/lib/types";
 
+const BASE_URL = "https://peakcam.io";
+
 export const revalidate = 3600;
 
 interface Props {
@@ -20,6 +22,10 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
     title,
     description:
       "Side-by-side snow depth, new snow, trail counts, and webcam comparison for ski resorts across North America.",
+    // Canonicalize to the bare /compare URL regardless of ?resorts= — the
+    // query param produces unbounded combinations that shouldn't each be
+    // treated as a distinct indexable page.
+    alternates: { canonical: `${BASE_URL}/compare` },
   };
 }
 

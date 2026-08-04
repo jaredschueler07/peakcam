@@ -2,10 +2,13 @@ import { getAllResorts } from "@/lib/supabase";
 import { SnowReportPage } from "@/components/snow-report/SnowReportPage";
 import type { ResortWithData } from "@/lib/types";
 
+const BASE_URL = "https://peakcam.io";
+
 export const revalidate = 3600;
 
 export const metadata = {
   title: "Ski Resort Snow Report — Live Base Depth & Trail Conditions",
+  alternates: { canonical: `${BASE_URL}/snow-report` },
   description:
     "Compare live snow conditions across 150+ ski resorts in North & South America. " +
     "Base depth, 24h & 48h fresh snow, open trails, lift status, and powder day alerts — updated hourly.",
