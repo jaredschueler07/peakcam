@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { MeshBasicNodeMaterial } from "three/webgpu";
 import type { Node, UniformNode } from "three/webgpu";
-import { clamp, dot, float, floor, fract, max, mix, normalize, positionLocal, pow, sin, smoothstep, uniform, vec2 } from "three/tsl";
+import { clamp, dot, float, floor, fract, max, mix, normalize, positionLocal, pow, sin, smoothstep, uniform, vec2, vec4 } from "three/tsl";
 import { SkyMesh } from "three/addons/objects/SkyMesh.js";
 
 /**
@@ -36,6 +36,7 @@ export interface SkyNodeSeed {
 type Float = Node<"float">;
 type Vec2 = Node<"vec2">;
 type Vec3 = Node<"vec3">;
+type Vec4 = Node<"vec4">;
 
 /** `color` and `vec3` generate the same three floats; only the r185 typings distinguish them. */
 const asVec3 = (node: object): Vec3 => node as Vec3;
@@ -147,12 +148,33 @@ export function applyPhysicalSkyParams(mesh: SkyMesh, seed: SkyNodeSeed): void {
 }
 
 /**
+ * Scales `SkyMesh`'s Preetham radiance into the range the rest of the frame is authored in.
+ *
+ * Preetham returns physical sky radiance, and `SkyMesh` hands it back only nominally normalised
+ * (its own `* 0.04`): the dome still lands well above 1 under this scene's `toneMappingExposure`
+ * (~1.06). Everything downstream was tuned against the 3-stop gradient this replaced, whose colours
+ * came straight from the weather presets and so never left [0, 1] — most consequentially
+ * `BLOOM_THRESHOLD` (0.9, `NodePostProcessing`), which exists to catch the sun disc and glint. An
+ * unscaled physical sky puts the *entire* dome over that threshold, so bloom smeared a milk-white
+ * wash across the whole frame and buried the poster-flat terrain the art direction is built on.
+ *
+ * 0.25 was picked by eye against the WebGL reference frame (`shots/breckenridge-webgl-default.png`)
+ * — the value where the zenith reads as the same saturated blue and only the sun keeps blooming.
+ * It is an exposure match, not a physical constant: retune it by screenshot if
+ * `toneMappingExposure` or the bloom threshold moves.
+ */
+const SKY_RADIANCE_SCALE = 0.25;
+
+/**
  * A real atmospheric model (Preetham scattering) in place of the hand-tuned 3-stop gradient,
  * gated to rung 2+ because it is a full-screen shader with a five-octave cloud FBM in the
  * fragment stage — too expensive to force on the rungs that exist for weak hardware.
  */
 export function createPhysicalSky(seed: SkyNodeSeed): PhysicalSky {
   const mesh = new SkyMesh();
+  const material = mesh.material as unknown as { colorNode: Vec4 };
+  const radiance = material.colorNode;
+  material.colorNode = vec4(radiance.rgb.mul(float(SKY_RADIANCE_SCALE)), radiance.a) as unknown as Vec4;
   // Scale is cosmetic here: SkyMesh's vertex shader pins depth to the far plane (`position.z =
   // position.w`), the same skybox trick the old sphere used via `renderOrder`/`frustumCulled`.
   // The upstream example's own demo uses this magnitude; kept for parity with its `sunfade` term,
