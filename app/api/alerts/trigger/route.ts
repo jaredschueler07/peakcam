@@ -10,6 +10,10 @@ const CRON_SECRET = process.env.CRON_SECRET;
 function sbFetch(path: string, init?: RequestInit) {
   return fetch(`${SUPABASE_URL}/rest/v1${path}`, {
     ...init,
+    // Without this, a hung DB hangs every one of this route's five
+    // sequential queries (and the cron run with it) — the anon-client
+    // timeout wrapper doesn't cover this raw service-role fetch.
+    signal: AbortSignal.timeout(8_000),
     headers: {
       apikey: SERVICE_KEY,
       Authorization: `Bearer ${SERVICE_KEY}`,

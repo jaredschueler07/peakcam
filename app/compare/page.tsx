@@ -33,9 +33,11 @@ export default async function ComparePageRoute({ searchParams }: Props) {
   const params = await searchParams;
   const slugs = params.resorts?.split(",").filter(Boolean).slice(0, 4) ?? [];
 
-  // Let a fetch failure propagate — it fails this ISR revalidation so
-  // Next.js keeps serving the last good page instead of caching an empty
-  // compare page at 200.
+  // This route reads `searchParams`, which makes it dynamic (server-rendered
+  // per request) regardless of the `revalidate` export above — there is no
+  // cached ISR entry for it to fall back to. Letting the fetch failure
+  // propagate here means a DB outage surfaces as a request-time 500 rather
+  // than a page that silently renders with zero resorts to compare.
   const allResorts: ResortWithData[] = await getAllResorts();
 
   const compareResorts = slugs
