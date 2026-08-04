@@ -5,11 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { track, EVENTS } from "@/lib/analytics-events";
+import { safeNext } from "@/lib/safe-redirect";
 
 function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/";
+  const next = safeNext(searchParams.get("next"));
   const urlError = searchParams.get("error");
 
   const [mode, setMode] = useState<"signin" | "signup">("signin");

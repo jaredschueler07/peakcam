@@ -706,7 +706,10 @@ app.get('/api/claude/discover', (req, res) => {
 // ── Permission Approval System ────────────────────────────────────────────────
 //
 // Surfaces Claude Code permission prompts in the dashboard UI so they can be
-// approved or denied remotely (e.g. from a phone browser).
+// approved or denied remotely (e.g. from a phone browser). Note that the server
+// binds 127.0.0.1 only (see the listen call at the bottom of this file), so
+// "remotely" now means over an SSH tunnel — `ssh -L 3333:127.0.0.1:3333 <host>`
+// — not by pointing a phone at the Mac's LAN address.
 //
 // Detection:   Scans captured stdout/stderr of dashboard-managed sessions for
 //              permission prompt patterns. External sessions (started outside
@@ -971,21 +974,20 @@ app.post('/api/permissions/inject', (req, res) => {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 
-app.listen(PORT, '0.0.0.0', () => {
-  const interfaces = os.networkInterfaces();
-  let networkIP = 'localhost';
-  for (const ifaces of Object.values(interfaces)) {
-    for (const iface of ifaces) {
-      if (iface.family === 'IPv4' && !iface.internal) {
-        networkIP = iface.address;
-        break;
-      }
-    }
-  }
-
+// ⚠️  BIND LOCALHOST ONLY — DO NOT CHANGE BACK TO '0.0.0.0'.
+// This server is unauthenticated, has no CORS or origin checks, and POST
+// /api/claude/start spawns `claude --dangerously-skip-permissions`. Binding to
+// 0.0.0.0 therefore hands remote code execution to anyone on the LAN (guest
+// Wi-Fi, a compromised IoT device) — and through it the contents of
+// ~/projects/peakcam/.env.local, including SUPABASE_SERVICE_ROLE_KEY (bypasses
+// every RLS policy), RESEND_API_KEY and CRON_SECRET. Because the dashboard is
+// plain HTTP with no CSRF protection, a no-preflight cross-site POST from any
+// page a LAN browser visits reaches it too. See the C1 finding in
+// .superpowers/sdd/auth-review.md. Use an SSH tunnel for remote access.
+app.listen(PORT, '127.0.0.1', () => {
   console.log('\n  ╔══════════════════════════════════════╗');
   console.log('  ║   PeakCam Ops Dashboard              ║');
   console.log('  ╚══════════════════════════════════════╝');
   console.log(`\n  Local:   http://localhost:${PORT}`);
-  console.log(`  Network: http://${networkIP}:${PORT}\n`);
+  console.log('  (bound to 127.0.0.1 — not reachable from the LAN)\n');
 });

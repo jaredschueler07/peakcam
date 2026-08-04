@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { safeNext } from "@/lib/safe-redirect";
 
 interface Props {
   onClose: () => void;
@@ -23,7 +24,8 @@ export function AuthModal({ onClose, redirectTo }: Props) {
     setError(null);
 
     const supabase = createSupabaseBrowserClient();
-    const callbackUrl = `${window.location.origin}/auth/callback${redirectTo ? `?next=${encodeURIComponent(redirectTo)}` : ""}`;
+    const next = redirectTo ? safeNext(redirectTo) : null;
+    const callbackUrl = `${window.location.origin}/auth/callback${next ? `?next=${encodeURIComponent(next)}` : ""}`;
 
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
