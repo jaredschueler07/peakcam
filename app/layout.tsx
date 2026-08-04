@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import { Fraunces, DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
@@ -29,6 +29,15 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 const BASE_URL = "https://peakcam.io";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  // Lets the page extend into the notch/home-indicator areas so
+  // env(safe-area-inset-*) is non-zero where components need it.
+  viewportFit: "cover",
+  themeColor: "#2a1f14",
+};
 
 export const metadata: Metadata = {
   title: {

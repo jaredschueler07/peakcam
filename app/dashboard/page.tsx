@@ -11,7 +11,7 @@ export default function DashboardPage() {
   const { widgets, isLoading } = useDashboard();
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-bg flex flex-col">
       <Header />
 
       <main className="flex-grow container mx-auto px-4 py-12">
