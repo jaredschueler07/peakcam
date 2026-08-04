@@ -66,6 +66,23 @@ export function csmDebugMode(from = search()): number {
 }
 
 /**
+ * `?weather=<0|1|2>` — pin the starting weather preset instead of taking it from live conditions.
+ *
+ * `ConditionsSnapshot.weatherDefault` is derived from the live NWS forecast and the latest snow
+ * report (`lib/game/conditions.ts`), so which sky, fog density and exposure a session starts with
+ * depends on the real weather at a real resort on the day. That is right for players and wrong for
+ * any pixel-reading test: the e2e luminance guard exists to catch *rendering* washouts, and it
+ * cannot do that if its frame changes when it starts snowing in Chile. Returns `null` when absent
+ * or unparseable, which leaves live conditions in charge.
+ */
+export function weatherOverride(from = search()): 0 | 1 | 2 | null {
+  const raw = new URLSearchParams(from).get("weather");
+  if (raw === null) return null;
+  const value = Number.parseInt(raw, 10);
+  return value === 0 || value === 1 || value === 2 ? value : null;
+}
+
+/**
  * `?cam=<name>` — which chase-camera framing to fly, see `CAMERA_PRESETS`. Absent or unrecognised
  * is `classic`, the shipped geometry, so this can only ever be opted into by hand.
  */

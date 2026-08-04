@@ -441,9 +441,37 @@ test("keyboard-only start reaches a running canvas with a ticking HUD", async ({
  * effects (GTAO/godrays/SkyMesh/textures) are all WebGPU-only and cannot move
  * these WebGL numbers.
  */
+/**
+ * WEATHER PIN (2026-08-04). These budgets used to depend on the live weather at
+ * three real ski resorts.
+ *
+ * `ConditionsSnapshot.weatherDefault` is `isSnowing(nwsForecast) ||
+ * latestSnowReport.snowing_now ? 1 : 0` (`lib/game/conditions.ts`), and it picks
+ * the starting weather preset — sky colours, fog density, exposure, snowfall.
+ * The e2e therefore measured whichever picture the real forecast happened to
+ * produce. It surfaced when ski-portillo went from passing at 199.4 to failing
+ * at 208.3 across a day with no code change at all: it had stopped snowing in
+ * Chile. Pinning `?weather=0` reproduced 208.3, `?weather=1` reproduced the old
+ * 199.4 / 10.0 almost exactly, and `?weather=2` gave 220.6 / 6.8 — three
+ * different verdicts from one build.
+ *
+ * The specs now pin preset 0. That is the clear-weather preset, and it is the
+ * right one for a *washout* guard: it has the most structure to lose (portillo
+ * stdev 19.1, against 10.0 on preset 1 and 6.8 on preset 2, the last being a
+ * designed whiteout that leaves almost no contrast for a regression to erase).
+ *
+ * Re-measured under the pin, 5 runs each, production build. Only ski-portillo's
+ * WebGL pair moved — it was the one calibrated on a snowing day:
+ *   WebGL   portillo 208.2-208.4 / 19.1 · breckenridge 198.3-198.4 / 22.4 ·
+ *           heavenly 224.7 / 25.1
+ *   WebGPU  portillo 207.0-207.2 / 13.6-13.8 · breckenridge 213.2-213.3 /
+ *           15.1-15.4 · heavenly 216.3-216.5 / 22.8-24.0
+ * Every other budget in both tables was verified to still hold unchanged.
+ */
 const LUMINANCE_BUDGETS = [
-  // measured mean / stdev at this sample point: 198.9-199.4 / 9.7-12.4
-  { slug: "ski-portillo", maxMean: 208, minStdev: 7 },
+  // 208.2-208.4 / 19.1 — see WEATHER PIN below; was 198.9-199.4 / 9.7-12.4 when
+  // this frame was, unknowingly, a snowing one
+  { slug: "ski-portillo", maxMean: 217, minStdev: 16 },
   // 194.9-200.1 / 22.5-25.8 — still the flakiest floor here
   { slug: "breckenridge", maxMean: 208, minStdev: 20 },
   // 221.4 / 27.4 — brightest, but also the most structured
@@ -508,7 +536,12 @@ for (const { slug, maxMean, minStdev } of LUMINANCE_BUDGETS) {
       : { maxMean, minStdev };
     // ?e2ecanvas keeps the WebGL drawing buffer readable; without it the sample
     // below reads all-zeros regardless of what is on screen.
-    await page.goto(dropInUrl(`/resorts/${slug}/drop-in?engine=v2&e2ecanvas`));
+    // `&weather=0` pins the starting weather preset. Without it the frame these
+    // budgets describe is chosen by `ConditionsSnapshot.weatherDefault`, which
+    // comes from the live NWS forecast and the latest snow report — so the guard
+    // silently measured a different picture depending on the real weather at a
+    // real resort that day. See the note above the budgets.
+    await page.goto(dropInUrl(`/resorts/${slug}/drop-in?engine=v2&e2ecanvas&weather=0`));
     await page.getByRole("button", { name: /start descent/i }).click();
     await expect(page.locator("[data-drop-in-state='running'] canvas[data-testid='drop-in-canvas']")).toBeVisible();
     await page.waitForTimeout(750);

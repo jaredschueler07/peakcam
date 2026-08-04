@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import * as THREE from "three";
 import { MeshStandardNodeMaterial } from "three/webgpu";
-import { CSM_DEBUG, csmDebugMode, postBypassEnabled, SNOW_DEBUG, snowDebugMode, treeDebugEnabled } from "./debugFlags";
+import { CSM_DEBUG, csmDebugMode, postBypassEnabled, SNOW_DEBUG, snowDebugMode, treeDebugEnabled, weatherOverride } from "./debugFlags";
 import { CsmShadowsNode } from "./CsmShadowsNode";
 import { visualWeatherPreset } from "./VisualPresets";
 import { createSnowNodeMaterial, createSnowNodeUniforms } from "./SnowNodeMaterial";
@@ -100,4 +100,13 @@ test("csmdbg partitions the light from the cascades", () => {
   withFlag("", (shadows) => {
     assert.equal((shadows.light.shadow.shadowNode as unknown as { cascades: number }).cascades, 3);
   });
+});
+
+test("?weather pins the starting preset, and anything else leaves live conditions in charge", () => {
+  assert.equal(weatherOverride("?weather=0"), 0, "0 is a real preset, not an absent flag");
+  assert.equal(weatherOverride("?weather=1"), 1);
+  assert.equal(weatherOverride("?weather=2"), 2);
+  for (const absent of ["", "?cam=wide", "?weather=", "?weather=3", "?weather=-1", "?weather=x"]) {
+    assert.equal(weatherOverride(absent), null, `"${absent}" falls back to live conditions`);
+  }
 });

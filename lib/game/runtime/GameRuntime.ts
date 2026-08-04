@@ -17,6 +17,7 @@ import type { NodeFactories } from "../rendering/nodeFactories";
 import { createWorld } from "../terrain/obstacles";
 import { UiBridge } from "./UiBridge";
 import type { ConditionsSnapshot } from "../conditions";
+import { weatherOverride } from "../rendering/debugFlags";
 import { simulationConfigForConditions } from "./physics-selection";
 import type { PhysicsModel } from "../core/config";
 import type { RuntimeAudio } from "./RuntimeAudio";
@@ -106,6 +107,15 @@ export interface RuntimeAnalytics {
   performance(summary: RenderPerformanceSummary): void;
 }
 
+/**
+ * The weather preset a session starts on: live conditions, unless `?weather=` pins it. Both call
+ * sites below must agree — the renderer is told once at construction and `weatherIndex` seeds the
+ * in-run cycling — so the choice lives here rather than being spelled twice.
+ */
+function startingWeatherIndex(conditions: ConditionsSnapshot): number {
+  return weatherOverride() ?? conditions.weatherDefault;
+}
+
 export class GameRuntime {
   readonly state: SimulationState;
   readonly world: SimulationWorld;
@@ -167,7 +177,7 @@ export class GameRuntime {
     });
     const sceneStartedAt = performance.now();
     this.renderer = new GameRenderer(canvas, profile, this.world, this.state, { backend, nodeFactories });
-    this.renderer.setWeather(conditions.weatherDefault);
+    this.renderer.setWeather(startingWeatherIndex(conditions));
     this.sceneBuildMs = performance.now() - sceneStartedAt;
     this.keyboard = new KeyboardAdapter(this.input);
     this.pointerDrag = new PointerDragAdapter(canvas, this.input);
@@ -336,7 +346,7 @@ export class GameRuntime {
   private onVisibility = () => { if (document.hidden) this.pause(); else this.input.clearHeld(); };
   private onPointerLockGesture = () => { void this.pointerLock.request(); };
 
-  private weatherIndex: number = this.conditions.weatherDefault;
+  private weatherIndex: number = startingWeatherIndex(this.conditions);
 
   setAudioEnabled(enabled: boolean): void { this.audio.setEnabled(enabled); }
 
