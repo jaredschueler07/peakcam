@@ -87,6 +87,18 @@
 >
 > **Next**: Phase 2 (lighting/surfaces — GTAO, SkyMesh, godrays are already in our
 > bundle, unused), then density, then art direction.
+>
+> **Visual program Phase 2 COMPLETE (2026-08-04) — and everything MERGED TO
+> MAIN (90008a5).** Drop In v2 is on production, DORMANT behind `?engine=v2`
+> (default route still serves the v1 iframe; public flip is Phase 10). GTAO,
+> physical sky, godrays, real KTX2 snow textures; three real-GPU fix rounds
+> (see `P2-GATE-VISUAL-FIXES.md` — bloom blend inverted HDR, GTAO
+> depth-precision banding, tone-map ordering); luminance guards re-baselined
+> per-backend and weather-pinned (`?weather=`). Full story:
+> `SESSION-2026-08-04.md`. NEW PHASE 10 BLOCKERS from the final review:
+> (1) rung captured at construction — governor cannot shed SkyMesh/textures on
+> thermal step-DOWN; (2) rungs 0/1 on WebGPU have no AA (samples:0 removed
+> inherited MSAA; `aa` starts at rung 2).
 
 1. **Phase 10b (rollout)** — CI pipeline, device matrix beyond this Mac Mini,
    accessibility pass, percentage rollout per DESIGN §5, delete v1, soft-404 fix.
