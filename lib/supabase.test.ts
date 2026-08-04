@@ -1,6 +1,10 @@
 import { test, before } from "node:test";
 import assert from "node:assert";
-import type { supabase as SupabaseClient, getResortBySlug as GetResortBySlug } from "./supabase";
+import type {
+  supabase as SupabaseClient,
+  getResortBySlug as GetResortBySlug,
+  withFetchTimeout as WithFetchTimeout,
+} from "./supabase";
 
 // `lib/supabase.ts` throws at import time if these are unset (see the file's
 // top-of-module guard, which matters for real builds/deploys). The values
@@ -11,11 +15,74 @@ import type { supabase as SupabaseClient, getResortBySlug as GetResortBySlug } f
 // dynamically in a `before` hook, after the env vars are set.
 let supabase: typeof SupabaseClient;
 let getResortBySlug: typeof GetResortBySlug;
+let withFetchTimeout: typeof WithFetchTimeout;
 
 before(async () => {
   process.env.NEXT_PUBLIC_SUPABASE_URL ??= "http://localhost:54321";
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??= "test-anon-key";
-  ({ supabase, getResortBySlug } = await import("./supabase"));
+  ({ supabase, getResortBySlug, withFetchTimeout } = await import("./supabase"));
+});
+
+// ─────────────────────────────────────────────────────────────
+// withFetchTimeout
+// ─────────────────────────────────────────────────────────────
+
+test("withFetchTimeout injects an AbortSignal when the caller supplies none", async () => {
+  let seenInit: RequestInit | undefined;
+  const fakeFetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    seenInit = init;
+    return new Response("ok");
+  }) as typeof fetch;
+
+  const wrapped = withFetchTimeout(fakeFetch, 8_000);
+  await wrapped("https://example.com");
+
+  assert.ok(seenInit?.signal instanceof AbortSignal);
+});
+
+test("withFetchTimeout preserves caller-supplied options (headers, method, body)", async () => {
+  let seenInit: RequestInit | undefined;
+  const fakeFetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    seenInit = init;
+    return new Response("ok");
+  }) as typeof fetch;
+
+  const wrapped = withFetchTimeout(fakeFetch, 8_000);
+  await wrapped("https://example.com", {
+    method: "POST",
+    headers: { "X-Test": "1" },
+    body: "payload",
+  });
+
+  assert.strictEqual(seenInit?.method, "POST");
+  assert.strictEqual((seenInit?.headers as Record<string, string>)["X-Test"], "1");
+  assert.strictEqual(seenInit?.body, "payload");
+  assert.ok(seenInit?.signal instanceof AbortSignal);
+});
+
+test("withFetchTimeout does not clobber a caller-supplied signal", async () => {
+  let seenInit: RequestInit | undefined;
+  const fakeFetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    seenInit = init;
+    return new Response("ok");
+  }) as typeof fetch;
+
+  const callerController = new AbortController();
+  const wrapped = withFetchTimeout(fakeFetch, 8_000);
+  await wrapped("https://example.com", { signal: callerController.signal });
+
+  assert.strictEqual(seenInit?.signal, callerController.signal);
+});
+
+test("withFetchTimeout causes the fetch to reject once the timeout elapses", async () => {
+  const neverSettles = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    return new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+    });
+  }) as typeof fetch;
+
+  const wrapped = withFetchTimeout(neverSettles, 10); // 10ms — fast for the test
+  await assert.rejects(() => wrapped("https://example.com"));
 });
 
 type Result = { data: unknown; error: unknown };

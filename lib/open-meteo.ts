@@ -8,6 +8,10 @@ import { windChill } from "./weather";
 // ─────────────────────────────────────────────────────────────
 
 const OPEN_METEO_BASE = "https://api.open-meteo.com/v1/forecast";
+// See lib/weather.ts's NWS_TIMEOUT_MS for why: caps a hung upstream call so
+// it can't hang the page render; the existing try/catch below turns the
+// abort into the same `null` result as any other Open-Meteo failure.
+const OPEN_METEO_TIMEOUT_MS = 5_000;
 const PAST_DAYS = 2;
 const NOW_IDX = PAST_DAYS * 24; // hourly index representing "now" (local midnight of today)
 
@@ -145,6 +149,7 @@ async function fetchOpenMeteo(
   try {
     const res = await fetch(`${OPEN_METEO_BASE}?${params}`, {
       next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(OPEN_METEO_TIMEOUT_MS),
     });
     if (!res.ok) return null;
     return await res.json();
