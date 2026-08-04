@@ -51,13 +51,10 @@ const jsonLd = {
 };
 
 export default async function SnowReport() {
-  let resorts: ResortWithData[] = [];
-
-  try {
-    resorts = await getAllResorts();
-  } catch {
-    console.warn("[PeakCam] Could not fetch resorts for snow report.");
-  }
+  // Let a fetch failure propagate — it fails this ISR revalidation so
+  // Next.js keeps serving the last good page instead of caching an empty
+  // snow report at 200.
+  const resorts: ResortWithData[] = await getAllResorts();
 
   return (
     <>

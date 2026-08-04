@@ -20,8 +20,10 @@ export const metadata: Metadata = {
 };
 
 export default async function MapPage() {
+  // Resort fetch failures propagate so a failed ISR revalidation keeps
+  // serving the last good page instead of caching an empty map at 200.
   const [resorts, radarFrames] = await Promise.all([
-    getAllResorts().catch(() => []),
+    getAllResorts(),
     getRadarFrames().catch(() => []),
   ]);
 

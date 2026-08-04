@@ -27,12 +27,10 @@ export default async function ComparePageRoute({ searchParams }: Props) {
   const params = await searchParams;
   const slugs = params.resorts?.split(",").filter(Boolean).slice(0, 4) ?? [];
 
-  let allResorts: ResortWithData[] = [];
-  try {
-    allResorts = await getAllResorts();
-  } catch {
-    console.warn("[PeakCam] Could not fetch resorts for compare page.");
-  }
+  // Let a fetch failure propagate — it fails this ISR revalidation so
+  // Next.js keeps serving the last good page instead of caching an empty
+  // compare page at 200.
+  const allResorts: ResortWithData[] = await getAllResorts();
 
   const compareResorts = slugs
     .map((slug) => allResorts.find((r) => r.slug === slug))

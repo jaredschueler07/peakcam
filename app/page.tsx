@@ -48,13 +48,13 @@ export const metadata = {
 };
 
 export default async function Home() {
-  // Fetch resorts and the radar frames in parallel — radar is best-effort so a
-  // RainViewer outage never blocks the page (or the sidebar map's radar layer).
+  // Fetch resorts and the radar frames in parallel. Resort fetch failures are
+  // allowed to propagate: throwing here fails this ISR revalidation, so
+  // Next.js keeps serving the last good cached page instead of caching an
+  // empty state at 200. Radar is best-effort so a RainViewer outage never
+  // blocks the page (or the sidebar map's radar layer).
   const [resorts, radarFrames] = await Promise.all([
-    getAllResorts().catch(() => {
-      console.warn("[PeakCam] Could not fetch resorts. Check .env.local.");
-      return [] as ResortWithData[];
-    }),
+    getAllResorts(),
     getRadarFrames().catch(() => []),
   ]);
 

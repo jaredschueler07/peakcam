@@ -74,16 +74,24 @@ export async function getAllResorts(): Promise<ResortWithData[]> {
   }));
 }
 
-/** Fetch a single resort by slug with full cam list and latest snow report. */
+/**
+ * Fetch a single resort by slug with full cam list and latest snow report.
+ *
+ * Returns `null` only for a genuine "no such resort" — the query succeeded
+ * and returned zero rows. A failed query (network error, DB outage, etc.)
+ * throws instead of returning `null`, so callers can tell "doesn't exist"
+ * (real 404) apart from "couldn't check" (should fail closed, not 404).
+ */
 export async function getResortBySlug(slug: string): Promise<ResortWithData | null> {
   const { data: resort, error: resortError } = await supabase
     .from("resorts")
     .select("*")
     .eq("slug", slug)
     .eq("is_active", true)
-    .single();
+    .maybeSingle();
 
-  if (resortError || !resort) return null;
+  if (resortError) throw resortError;
+  if (!resort) return null;
 
   const [snowResult, camResult] = await Promise.all([
     supabase
@@ -98,6 +106,9 @@ export async function getResortBySlug(slug: string): Promise<ResortWithData | nu
       .eq("is_active", true)
       .order("name"),
   ]);
+
+  if (snowResult.error) throw snowResult.error;
+  if (camResult.error) throw camResult.error;
 
   return {
     ...resort,
