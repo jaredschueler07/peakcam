@@ -604,7 +604,11 @@ test("leaving the game by the in-app Conditions link unmounts the runtime withou
     if (message.type() !== "error") return;
     // /_vercel/* analytics scripts only exist on Vercel infrastructure; their
     // 404s when serving a production build locally are environmental noise.
+    // MIME-refusal errors ("Refused to execute script from …/_vercel/…")
+    // attribute to the document, not the script, so location().url alone
+    // misses them — match the message text as well.
     if (message.location().url.includes("/_vercel/")) return;
+    if (message.text().includes("/_vercel/")) return;
     errors.push(message.text());
   });
   page.on("pageerror", (error) => errors.push(error.message));
