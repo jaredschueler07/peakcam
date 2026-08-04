@@ -348,3 +348,38 @@ test("bloom and the poster LUT are fed tone-mapped colour, not raw HDR", () => {
   // The tail encode must not tone map a second time.
   assert.equal(post.pipeline.outputColorTransform, false, "renderOutput() is still placed by hand");
 });
+
+test("the scene pass is built without MSAA, so GTAO can sample its depth on real WebGPU", () => {
+  // `renderer` is constructed with `antialias: true`, which PassNode inherits onto its offscreen
+  // target unless overridden — and a multisampled depth attachment makes GTAONode's
+  // `textureDimensions(tex, level)` a WGSL overload that does not exist for
+  // `texture_depth_multisampled_2d`, failing renderPipeline_GTAO creation with a GPUValidationError.
+  // SwiftShader and this suite never build a real WGSL pipeline, so nothing here can catch that
+  // directly; assert the one construction detail the fix turns on instead.
+  //
+  // Assert the *option*, not `renderTarget.samples`: PassNode only resolves the latter in
+  // `updateBefore` (`options.samples ?? renderer.samples`), which never runs in this suite, so the
+  // render target reads 0 either way and an assertion on it passes even with the fix reverted.
+  const { post } = build();
+  const scenePass = (post.aoNode as unknown as { depthNode: { passNode: { options: { samples?: number } } } }).depthNode.passNode;
+  assert.equal(scenePass.options.samples, 0, "the scene pass is constructed with MSAA explicitly off");
+});
+
+test("godrays get a shadow map with a comparison sampler even under CSM", () => {
+  // GodraysNode's directional-light branch dereferences `light.shadow.map.depthTexture` while
+  // building its shader, but `CsmShadowsNode`'s light drives shadows through `shadow.shadowNode`,
+  // so `AnalyticLightNode.setupShadow()` takes the customShadowNode branch and `.map` stays null
+  // forever. On real WebGPU that threw on every frame's pipeline compile. The depth texture alone
+  // is not enough either: `inShadow` compiles to `textureSampleCompare`, which needs a comparison
+  // sampler, and the WebGPU backend only binds one when `compareFunction` is set.
+  const { post, sunLight } = build();
+  void post;
+  assert.notEqual(sunLight.shadow.map, null, "a shadow map is stubbed in when CSM left it null");
+  const depthTexture = sunLight.shadow.map?.depthTexture;
+  assert.ok(depthTexture, "the stub carries a depth texture for the raymarch to sample");
+  assert.ok(
+    depthTexture?.compareFunction === THREE.LessEqualCompare
+      || depthTexture?.compareFunction === THREE.GreaterEqualCompare,
+    `the depth texture declares a compare function so a comparison sampler is bound — got ${depthTexture?.compareFunction}`,
+  );
+});
