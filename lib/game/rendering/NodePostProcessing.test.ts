@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import * as THREE from "three";
 import type { Renderer } from "three/webgpu";
-import { ColorSpaceNode, NodeUpdateType } from "three/webgpu";
+import { ColorSpaceNode, NodeUpdateType, RenderOutputNode } from "three/webgpu";
 import { chromaticAberrationOffset } from "./MotionEffects";
 import { NodePostProcessing, postChainPolicy } from "./NodePostProcessing";
 import { PostProcessing } from "./PostProcessing";
@@ -32,7 +32,7 @@ function collectNodes(root: unknown): Set<unknown> {
 function stubRenderer() {
   const calls = { render: 0 };
   const renderer = {
-    toneMapping: THREE.NoToneMapping,
+    toneMapping: THREE.ACESFilmicToneMapping,
     outputColorSpace: THREE.SRGBColorSpace,
     xr: { enabled: false },
     render() { calls.render += 1; },
@@ -331,4 +331,20 @@ test("the AO distance gate reads the scene camera's clip planes, not the post qu
   assert.equal(post.uniforms.near.value, camera.near, "near comes from the scene camera");
   assert.equal(post.uniforms.far.value, camera.far, "far comes from the scene camera");
   assert.notEqual(post.uniforms.far.value, new THREE.PerspectiveCamera().far, "not a default camera's far");
+});
+
+test("bloom and the poster LUT are fed tone-mapped colour, not raw HDR", () => {
+  // The chain used to defer renderOutput() to the tail, which handed both LDR-calibrated stages raw
+  // HDR radiance: BLOOM_THRESHOLD then passed essentially every pixel of a snow field, and the
+  // screen blend lifted the darks to match, collapsing a heavenly frame to stdev 4.8 against
+  // WebGL's 26.3. The LUT clamped at the top of its cube for the same reason. Assert the tone
+  // mapping sits upstream of bloom so the ordering cannot quietly go back.
+  const { post } = build();
+  const bloomInput = (post.bloomNode as unknown as { inputNode: unknown }).inputNode;
+  assert.ok(
+    bloomInput instanceof RenderOutputNode,
+    `bloom's input is tone mapped — got ${(bloomInput as object)?.constructor?.name}`,
+  );
+  // The tail encode must not tone map a second time.
+  assert.equal(post.pipeline.outputColorTransform, false, "renderOutput() is still placed by hand");
 });

@@ -361,40 +361,70 @@ export class NodePostProcessing {
     const shaftTexture = asVec4(this.godraysNode.getTextureNode());
     const shafted = vec4(occluded.rgb.add(shaftTexture.r.mul(GODRAYS_INTENSITY).mul(this.uniforms.godrays)), occluded.a);
 
-    this.bloomNode = bloom(shafted, BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD);
-    // `postprocessing` screen-blended the bloom (BlendFunction.SCREEN), not additive.
+    // Tone map HERE, not at the tail of the chain — but tone map ONLY, staying in linear.
     //
-    // Written as `a + b·(1 − saturate(a))` rather than the textbook `a + b − a·b`. The two are
-    // algebraically identical for `a` in [0, 1], which is the only range a screen blend is defined
-    // on — and the only range `postprocessing` ever fed it, because its WebGL chain blends after
-    // tone mapping. This chain blends *before* `renderOutput()`, so `a` here is HDR: the sun disc
-    // carries `vSunE * 19000` out of the Preetham sky, and the sky dome itself sits above 1. At
-    // `a = b = 2` the textbook form returns exactly 0 and above that it goes negative, which is
-    // what turned the whole sky black on real WebGPU and ringed the sun in gold at the contour
-    // where it crossed zero. Saturating only the *attenuation* factor leaves highlights to pass
-    // through undimmed (`a ≥ 1` simply adds nothing further) instead of inverting them.
+    // Everything below this line is calibrated for low dynamic range: BLOOM_THRESHOLD is a
+    // luminance cut-off, and the poster LUT is a 32³ cube whose domain is [0, 1]. The WebGL chain
+    // gets that for free — `postprocessing`'s RenderPass hands its EffectPass an already
+    // tone-mapped buffer, so BloomEffect's 0.85 and LUT3DEffect both see LDR. This chain used to
+    // defer `renderOutput()` to the very end, which fed both stages raw HDR radiance, and both
+    // mis-fired in the same direction:
+    //
+    //   - Bloom: on a bright snow field, essentially every pixel cleared a 0.9 threshold measured
+    //     against HDR linear, so the bloom buffer was bright *everywhere*. A screen blend lifts
+    //     darks hardest, so the dark trees and ridge shadows were dragged up to the level of the
+    //     snow. At heavenly's start view that collapsed the sampled luminance into [186, 228] —
+    //     stdev 4.8 against WebGL's 26.3 — a whiteout with the mean still on budget.
+    //   - LUT: HDR values ran off the top of the cube and clamped, capping every highlight at 228
+    //     where WebGL reaches 250+, flattening the frame's whole top end.
+    //
+    // Tone mapping first restores parity with WebGL by construction rather than by re-tuning two
+    // constants against the artifact, and it is why BLOOM_THRESHOLD can stay at the value its own
+    // comment always described. `pipeline.outputColorTransform` stays false: the transform is still
+    // applied exactly once, just earlier.
+    //
+    // Tone mapping and the output-colour-space encode are split apart deliberately. WebGL's working
+    // buffer is tone-mapped *linear* — three applies tone mapping in the material shader on the way
+    // into RenderPass's linear render target — and `postprocessing` grades in that space, with
+    // LUT3DEffect doing its own sRGB round trip around itself and VignetteEffect multiplying in
+    // linear. Encoding to sRGB here as well would put bloom, the LUT and the vignette in a space
+    // none of them was authored for; the frame came back structurally right but grey, with the
+    // vignette biting far too hard. So: tone map now, keep linear, and encode at the very end.
+    const toned = asVec4(renderOutput(shafted, renderer.toneMapping, THREE.LinearSRGBColorSpace));
+
+    this.bloomNode = bloom(toned, BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD);
+    // `postprocessing` screen-blended the bloom (BlendFunction.SCREEN), not additive. Written as
+    // `a + b·(1 − saturate(a))`, which is the same identity for `a` in [0, 1]. With tone mapping
+    // now upstream that is the only range this ever sees, so the saturate is belt-and-braces —
+    // kept because it costs nothing and the alternative failure (negative colour, i.e. the black
+    // sky this chain shipped with) is silent and total.
     const lit = asVec4(this.bloomNode).mul(this.uniforms.bloom);
-    const bloomed = vec4(shafted.rgb.add(lit.rgb.mul(shafted.rgb.clamp(0, 1).oneMinus())), shafted.a);
+    const bloomed = vec4(toned.rgb.add(lit.rgb.mul(toned.rgb.clamp(0, 1).oneMinus())), toned.a);
 
     // `postprocessing`'s LUT3DEffect declares `inputColorSpace = SRGBColorSpace`, so the effect
-    // framework encoded the linear working buffer to sRGB around it. Feeding the same cube linear
-    // values washes the whole frame out, so do the same round trip here.
+    // framework encoded the linear working buffer to sRGB around it. The chain is linear again by
+    // this point, so the same round trip still applies — the difference from before is only that
+    // the values going in are now tone-mapped, so they land inside the cube's [0, 1] domain instead
+    // of running off the top of it and clamping every highlight.
     const encoded = asVec4(workingToColorSpace(bloomed, THREE.SRGBColorSpace));
     this.lutNode = asVec4(lut3D(encoded, texture3D(this.lut), LUT_SIZE, this.uniforms.chain));
     const graded = asVec4(colorSpaceToWorking(this.lutNode, THREE.SRGBColorSpace));
     const shaded = vec4(graded.rgb.mul(vignetteFactor(this.uniforms)), graded.a);
 
-    // SMAA wants linear input and FXAA wants sRGB, so each sits on its own side of renderOutput.
-    // The AA nodes wrap their input in convertToTexture(). Hoisting that render target out and
-    // using it as the blend base too means the graded chain above is evaluated once, not once
-    // inside the AA target and again inline. convertToTexture() is a no-op on a texture node.
+    // SMAA wants linear input and FXAA wants sRGB, so each still sits on its own side of the
+    // encode — only the encode no longer carries tone mapping with it. The AA nodes wrap their
+    // input in convertToTexture(); hoisting that render target out and using it as the blend base
+    // too means the graded chain above is evaluated once, not once inside the AA target and again
+    // inline. convertToTexture() is a no-op on a texture node.
+    const encodeOnly = (node: Vec4): Vec4 =>
+      asVec4(renderOutput(node, THREE.NoToneMapping, renderer.outputColorSpace));
     let output: Vec4;
     if (antialias === "smaa") {
       this.aaInput = asVec4(convertToTexture(shaded));
       this.aaNode = smaa(this.aaInput);
-      output = asVec4(renderOutput(this.blend(this.aaInput, asVec4(this.aaNode))));
+      output = encodeOnly(this.blend(this.aaInput, asVec4(this.aaNode)));
     } else {
-      this.aaInput = asVec4(convertToTexture(renderOutput(shaded)));
+      this.aaInput = asVec4(convertToTexture(encodeOnly(shaded)));
       this.aaNode = fxaa(this.aaInput);
       output = this.blend(this.aaInput, asVec4(this.aaNode));
     }
