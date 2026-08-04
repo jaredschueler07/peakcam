@@ -315,8 +315,18 @@ export class NodePostProcessing {
 
     this.bloomNode = bloom(shafted, BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD);
     // `postprocessing` screen-blended the bloom (BlendFunction.SCREEN), not additive.
+    //
+    // Written as `a + b·(1 − saturate(a))` rather than the textbook `a + b − a·b`. The two are
+    // algebraically identical for `a` in [0, 1], which is the only range a screen blend is defined
+    // on — and the only range `postprocessing` ever fed it, because its WebGL chain blends after
+    // tone mapping. This chain blends *before* `renderOutput()`, so `a` here is HDR: the sun disc
+    // carries `vSunE * 19000` out of the Preetham sky, and the sky dome itself sits above 1. At
+    // `a = b = 2` the textbook form returns exactly 0 and above that it goes negative, which is
+    // what turned the whole sky black on real WebGPU and ringed the sun in gold at the contour
+    // where it crossed zero. Saturating only the *attenuation* factor leaves highlights to pass
+    // through undimmed (`a ≥ 1` simply adds nothing further) instead of inverting them.
     const lit = asVec4(this.bloomNode).mul(this.uniforms.bloom);
-    const bloomed = vec4(shafted.add(lit).sub(shafted.mul(lit)).rgb, shafted.a);
+    const bloomed = vec4(shafted.rgb.add(lit.rgb.mul(shafted.rgb.clamp(0, 1).oneMinus())), shafted.a);
 
     // `postprocessing`'s LUT3DEffect declares `inputColorSpace = SRGBColorSpace`, so the effect
     // framework encoded the linear working buffer to sRGB around it. Feeding the same cube linear
