@@ -4,12 +4,11 @@ import { getAllResortSlugs } from "@/lib/supabase";
 const BASE_URL = "https://peakcam.io";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  let resortSlugs: string[] = [];
-  try {
-    resortSlugs = await getAllResortSlugs();
-  } catch {
-    // Return static pages only if DB is unavailable
-  }
+  // Let a listing failure throw rather than silently emitting a sitemap with
+  // only the static pages — same failure class as generateStaticParams in
+  // app/resorts/[slug]/page.tsx: a transient DB blip during a build must not
+  // quietly produce a "successful" sitemap that drops every resort.
+  const resortSlugs: string[] = await getAllResortSlugs();
 
   const resortEntries: MetadataRoute.Sitemap = resortSlugs.map((slug) => ({
     url: `${BASE_URL}/resorts/${slug}`,

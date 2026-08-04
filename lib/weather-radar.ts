@@ -26,6 +26,13 @@ export const SATELLITE_MAX_ZOOM = 7;
 export const SATELLITE_ATTRIBUTION =
   'Satellite: <a href="https://earthdata.nasa.gov/gibs">NASA EOSDIS GIBS</a>';
 
+// Both call sites (app/page.tsx, app/map/page.tsx) already treat a rejected
+// fetch as "no radar this cycle" via `.catch(() => [])`, but that only
+// covers errors — a hung RainViewer connection would otherwise stall the
+// `Promise.all` render for as long as the connection stays open. This bounds
+// it to 5s so a stuck radar call can't hang the page.
+const RADAR_TIMEOUT_MS = 5_000;
+
 export interface RadarFrame {
   time: number;
   tileUrl: string;
@@ -54,7 +61,7 @@ interface RainViewerResponse {
 export async function getRadarFrames(): Promise<RadarFrame[]> {
   const res = await fetch(
     "https://api.rainviewer.com/public/weather-maps.json",
-    { next: { revalidate: 300 } }
+    { next: { revalidate: 300 }, signal: AbortSignal.timeout(RADAR_TIMEOUT_MS) }
   );
 
   if (!res.ok) {

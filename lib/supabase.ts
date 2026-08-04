@@ -15,7 +15,26 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const SUPABASE_FETCH_TIMEOUT_MS = 8_000;
+
+/**
+ * Wraps `fetch` so every request the client makes aborts after `ms` instead
+ * of hanging indefinitely (the Aug 3 outage: a single stuck connection held
+ * page renders for 8+ minutes). An abort rejects the fetch like any other
+ * network failure, which — combined with the fail-closed error handling in
+ * this file's query functions — means ISR keeps serving the last good stale
+ * page instead of hanging the revalidation. Preserves any signal the caller
+ * already supplied (none of the current call sites do, but this keeps the
+ * wrapper correct if that changes).
+ */
+export function withFetchTimeout(fetchImpl: typeof fetch, ms: number): typeof fetch {
+  return (input, init) =>
+    fetchImpl(input, { ...init, signal: init?.signal ?? AbortSignal.timeout(ms) });
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  global: { fetch: withFetchTimeout(fetch, SUPABASE_FETCH_TIMEOUT_MS) },
+});
 
 // ─────────────────────────────────────────────────────────────
 // Queries
@@ -74,16 +93,24 @@ export async function getAllResorts(): Promise<ResortWithData[]> {
   }));
 }
 
-/** Fetch a single resort by slug with full cam list and latest snow report. */
+/**
+ * Fetch a single resort by slug with full cam list and latest snow report.
+ *
+ * Returns `null` only for a genuine "no such resort" — the query succeeded
+ * and returned zero rows. A failed query (network error, DB outage, etc.)
+ * throws instead of returning `null`, so callers can tell "doesn't exist"
+ * (real 404) apart from "couldn't check" (should fail closed, not 404).
+ */
 export async function getResortBySlug(slug: string): Promise<ResortWithData | null> {
   const { data: resort, error: resortError } = await supabase
     .from("resorts")
     .select("*")
     .eq("slug", slug)
     .eq("is_active", true)
-    .single();
+    .maybeSingle();
 
-  if (resortError || !resort) return null;
+  if (resortError) throw resortError;
+  if (!resort) return null;
 
   const [snowResult, camResult] = await Promise.all([
     supabase
@@ -98,6 +125,9 @@ export async function getResortBySlug(slug: string): Promise<ResortWithData | nu
       .eq("is_active", true)
       .order("name"),
   ]);
+
+  if (snowResult.error) throw snowResult.error;
+  if (camResult.error) throw camResult.error;
 
   return {
     ...resort,

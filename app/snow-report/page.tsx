@@ -2,10 +2,13 @@ import { getAllResorts } from "@/lib/supabase";
 import { SnowReportPage } from "@/components/snow-report/SnowReportPage";
 import type { ResortWithData } from "@/lib/types";
 
+const BASE_URL = "https://peakcam.io";
+
 export const revalidate = 3600;
 
 export const metadata = {
   title: "Ski Resort Snow Report — Live Base Depth & Trail Conditions",
+  alternates: { canonical: `${BASE_URL}/snow-report` },
   description:
     "Compare live snow conditions across 150+ ski resorts in North & South America. " +
     "Base depth, 24h & 48h fresh snow, open trails, lift status, and powder day alerts — updated hourly.",
@@ -51,13 +54,10 @@ const jsonLd = {
 };
 
 export default async function SnowReport() {
-  let resorts: ResortWithData[] = [];
-
-  try {
-    resorts = await getAllResorts();
-  } catch {
-    console.warn("[PeakCam] Could not fetch resorts for snow report.");
-  }
+  // Let a fetch failure propagate — it fails this ISR revalidation so
+  // Next.js keeps serving the last good page instead of caching an empty
+  // snow report at 200.
+  const resorts: ResortWithData[] = await getAllResorts();
 
   return (
     <>

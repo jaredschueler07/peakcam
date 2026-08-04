@@ -9,14 +9,30 @@ const BASE_URL = "https://peakcam.io";
 
 export const revalidate = 3600;
 
-// Pre-render all active resort pages at build time
+// Reject any slug not returned by generateStaticParams at the router layer,
+// before the page function runs. Without this, Next's full-route-cache for
+// this SSG segment caches a notFound() render as a 200 (it stores the HTML,
+// not the status code) — garbage slugs would 200 forever once first hit.
+// Trade-off: a resort added to the DB between deploys 404s until the next
+// build regenerates the static params list.
+export const dynamicParams = false;
+
+// Pre-render all active resort pages at build time.
+//
+// Must NOT swallow a listing failure into `[]`: with dynamicParams=false
+// above, whatever this returns *is* the entire set of resort pages that
+// will ever serve for this deployment — there is no on-demand fallback to
+// recover unlisted slugs at request time. A `catch { return [] }` here used
+// to be safe because dynamicParams defaulted to true (missing slugs just
+// rendered on demand); now that it's false, the same catch would let a
+// transient DB blip during build silently produce zero resort pages, the
+// build would report SUCCESS, and every /resorts/[slug] URL would 404 at
+// the router — no page code even runs, so nothing here can catch or serve
+// stale. Letting this throw fails the build instead, and Vercel keeps
+// serving the previous (good) deployment.
 export async function generateStaticParams() {
-  try {
-    const slugs = await getAllResortSlugs();
-    return slugs.map((slug) => ({ slug }));
-  } catch {
-    return [];
-  }
+  const slugs = await getAllResortSlugs();
+  return slugs.map((slug) => ({ slug }));
 }
 
 // Dynamic metadata per resort
@@ -26,50 +42,50 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  try {
-    const resort = await getResortBySlug(slug);
-    if (!resort) return {};
-    const snow = resort.snow_report;
-    const conditionsNarrative = snow?.conditions 
-      ? (snow.conditions.includes("||") ? snow.conditions.split("||")[1] : snow.conditions) 
-      : "current conditions";
+  // getResortBySlug only returns null for a genuine "no such resort" (query
+  // succeeded, zero rows). A failed query throws and is intentionally left
+  // uncaught here: it fails this ISR revalidation so Next.js keeps serving
+  // the last good metadata instead of caching an empty `{}` at 200.
+  const resort = await getResortBySlug(slug);
+  if (!resort) return {};
+  const snow = resort.snow_report;
+  const conditionsNarrative = snow?.conditions
+    ? (snow.conditions.includes("||") ? snow.conditions.split("||")[1] : snow.conditions)
+    : "current conditions";
 
-    const desc = snow
-      ? `${resort.name} live cams — ${snow.base_depth ?? "?"}″ base, ${conditionsNarrative}. ${resort.cams.length} webcam${resort.cams.length !== 1 ? "s" : ""} available. Real-time snow report for ${resort.state}.`
-      : `Live webcams and real-time snow conditions at ${resort.name}, ${resort.state}. Check base depth, trail status, and powder reports.`;
+  const desc = snow
+    ? `${resort.name} live cams — ${snow.base_depth ?? "?"}″ base, ${conditionsNarrative}. ${resort.cams.length} webcam${resort.cams.length !== 1 ? "s" : ""} available. Real-time snow report for ${resort.state}.`
+    : `Live webcams and real-time snow conditions at ${resort.name}, ${resort.state}. Check base depth, trail status, and powder reports.`;
 
-    const pageUrl = `${BASE_URL}/resorts/${slug}`;
+  const pageUrl = `${BASE_URL}/resorts/${slug}`;
 
-    return {
-      title: `${resort.name} Live Webcams — Snow Report & Ski Conditions`,
+  return {
+    title: `${resort.name} Live Webcams — Snow Report & Ski Conditions`,
+    description: desc,
+    keywords: [
+      `${resort.name} webcam`,
+      `${resort.name} snow report`,
+      `${resort.name} ski conditions`,
+      `${resort.name} live cam`,
+      `${resort.state} ski resort webcam`,
+      "live ski cam",
+      "ski resort snow report",
+      "mountain webcam",
+    ],
+    openGraph: {
+      type: "website",
+      url: pageUrl,
+      title: `${resort.name} Live Webcams`,
       description: desc,
-      keywords: [
-        `${resort.name} webcam`,
-        `${resort.name} snow report`,
-        `${resort.name} ski conditions`,
-        `${resort.name} live cam`,
-        `${resort.state} ski resort webcam`,
-        "live ski cam",
-        "ski resort snow report",
-        "mountain webcam",
-      ],
-      openGraph: {
-        type: "website",
-        url: pageUrl,
-        title: `${resort.name} Live Webcams`,
-        description: desc,
-        siteName: "PeakCam",
-      },
-      twitter: {
-        card: "summary_large_image",
-        title: `${resort.name} Live Webcams`,
-        description: desc,
-      },
-      alternates: { canonical: pageUrl },
-    };
-  } catch {
-    return {};
-  }
+      siteName: "PeakCam",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${resort.name} Live Webcams`,
+      description: desc,
+    },
+    alternates: { canonical: pageUrl },
+  };
 }
 
 export default async function ResortPage({
