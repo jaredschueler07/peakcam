@@ -33,9 +33,9 @@ const BASE_URL = "https://peakcam.io";
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  // Lets the page extend into the notch/home-indicator areas so
-  // env(safe-area-inset-*) is non-zero where components need it.
-  viewportFit: "cover",
+  // NOTE: no viewportFit:"cover" yet — the sticky Header and edge-pinned
+  // overlays have no safe-area padding, so cover would put them under the
+  // notch/home indicator. Add it together with that padding (roadmap M4).
   themeColor: "#2a1f14",
 };
 

@@ -19,7 +19,7 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
       : "Both Hemispheres";
 
   return (
-    <div className="pc-topo relative h-[100svh] w-full overflow-hidden">
+    <div className="pc-topo relative h-screen supports-[height:100svh]:h-[100svh] w-full overflow-hidden">
       {/* Subtle warmth radials layered over topo */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(1200px_600px_at_10%_-10%,rgba(217,85,47,0.10),transparent_60%)]" />

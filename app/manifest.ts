@@ -8,7 +8,7 @@ export default function manifest(): MetadataRoute.Manifest {
       "Live cams, snow reports, and weather forecasts for ski resorts across North & South America.",
     start_url: "/",
     display: "standalone",
-    background_color: "#f5edda",
+    background_color: "#f1e7cf",
     theme_color: "#2a1f14",
     icons: [
       {

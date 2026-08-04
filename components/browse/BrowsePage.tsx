@@ -646,9 +646,9 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
             )}
           </div>
 
-          {/* Map sidebar */}
+          {/* Map sidebar — top clears header (64px) + pinned filter bar (~191px) + gap */}
           {showMap && (
-            <div className="hidden lg:block sticky top-20 h-[calc(100vh-6rem)] rounded-[18px] overflow-hidden border-[1.5px] border-ink shadow-stamp">
+            <div className="hidden lg:block sticky top-[271px] h-[calc(100vh-287px)] rounded-[18px] overflow-hidden border-[1.5px] border-ink shadow-stamp">
               <MapView
                 resorts={filtered}
                 hoveredSlug={hoveredSlug}
