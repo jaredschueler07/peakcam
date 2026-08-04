@@ -7,6 +7,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { containsProfanity } from "@/lib/profanity";
+import { hasRecentReport } from "@/lib/user-conditions/rate-limit";
 import type { UserSnowQuality, UserVisibility, UserWind, UserTrailConditions } from "@/lib/types";
 
 const SNOW_QUALITY_VALUES: UserSnowQuality[] = ["powder", "packed", "crud", "ice", "spring"];
@@ -62,16 +63,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   }
 
-  // 4. Rate limit — max 1 report per resort per user per hour
-  const { data: recent } = await supabase
-    .from("user_conditions")
-    .select("id")
-    .eq("resort_id", resort_id)
-    .eq("user_id", user.id)
-    .gte("submitted_at", new Date(Date.now() - 3600_000).toISOString())
-    .limit(1);
+  // 4. Rate limit — max 1 report per resort per user per hour.
+  // Read with the service-role key, not the user's client: RLS hides
+  // is_flagged=true rows from the user, so an RLS-scoped check never sees a
+  // profanity-flagged report and lets a flagged user submit without limit.
+  // See lib/user-conditions/rate-limit.ts. The insert below stays RLS-scoped.
+  const rateLimited = await hasRecentReport({
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    resortId: resort_id,
+    userId: user.id,
+  });
 
-  if (recent && recent.length > 0) {
+  if (rateLimited) {
     return NextResponse.json(
       { error: "You already submitted a report here recently. Try again in an hour." },
       { status: 429 }

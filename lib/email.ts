@@ -39,6 +39,41 @@ export async function sendWelcomeEmail(params: {
   });
 }
 
+// ─── Existing-subscriber manage link ──────────────────────────────────────────
+// Sent when /api/alerts/subscribe is called with an address that is already
+// subscribed. The endpoint has no proof the caller owns that address, so it
+// must not apply the requested changes; mailing the manage link puts the edit
+// in the hands of whoever actually reads the inbox. The copy deliberately does
+// not echo back the resorts the caller asked for — that request may not have
+// come from the subscriber.
+
+export async function sendManageLinkEmail(params: {
+  email: string;
+  manageToken: string;
+}) {
+  const manageUrl = `${SITE_URL}/alerts/manage?token=${params.manageToken}`;
+
+  await getResend().emails.send({
+    from: FROM,
+    to: params.email,
+    subject: "Your PeakCam powder alerts",
+    html: buildEmailHtml({
+      preheader: "You're already subscribed — here's your link to change what you follow.",
+      title: "You're already on the list.",
+      body: `
+        <p>Someone just used this address to sign up for powder alerts on PeakCam,
+        and it's already subscribed — so nothing has been changed.</p>
+        <p>Use the link below to add resorts, adjust your snow thresholds, or
+        unsubscribe. If this wasn't you, you can ignore this email; your alerts
+        are exactly as you left them.</p>
+      `,
+      ctaUrl: manageUrl,
+      ctaLabel: "Manage your alerts",
+      manageUrl,
+    }),
+  });
+}
+
 // ─── Powder alert email ───────────────────────────────────────────────────────
 
 export async function sendPowderAlertEmail(params: {

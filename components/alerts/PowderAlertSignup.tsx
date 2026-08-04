@@ -321,10 +321,14 @@ export function PowderAlertSignup({ resorts }: Props) {
                                 justify-center mx-auto">
                   <Check size={24} className="text-cyan" />
                 </div>
-                <h2 className="text-text-base font-semibold text-lg">Powder alerts activated</h2>
+                {/* Wording is deliberately the same whether or not this address
+                    was already subscribed — the endpoint cannot tell the caller
+                    which it was without leaking who has an account. */}
+                <h2 className="text-text-base font-semibold text-lg">Check your inbox</h2>
                 <p className="text-text-subtle text-sm leading-relaxed">
-                  We'll email <strong className="text-text-base">{email}</strong> when your resorts
-                  get fresh snow. Check your inbox for a welcome message.
+                  We&apos;ve emailed <strong className="text-text-base">{email}</strong> a link to
+                  confirm and manage your powder alerts. If that address is already subscribed,
+                  the link lets you change what you follow.
                 </p>
                 <button
                   onClick={handleClose}
