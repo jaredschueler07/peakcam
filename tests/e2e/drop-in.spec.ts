@@ -450,8 +450,62 @@ const LUMINANCE_BUDGETS = [
   { slug: "heavenly", maxMean: 230, minStdev: 23 },
 ] as const;
 
+/**
+ * The same six numbers, re-measured on the WebGPU backend, because the figures
+ * above are WebGL's and the two backends do not draw the same sky.
+ *
+ * This is a per-backend baseline, NOT a relaxation to make a red test green.
+ * The evidence that the WebGPU frame is healthy, taken at this exact sample
+ * point on breckenridge (the resort that pushed hardest against the WebGL cap):
+ *
+ *   region                      WebGL          WebGPU
+ *   terrain only (lower 3/4)    205.7 / 23.3   206.7 / 23.1
+ *   sky only (upper 1/4)        169.3, 170.8   223.4, 228.3
+ *   whole sample                198.3 / 22.4   213.3 / 15.1
+ *
+ * The terrain — the snow, the exposure, the whole poster surface the art
+ * direction is about — matches within 1.0 of a luminance unit and 0.2 of a
+ * stdev. Every bit of the ~15-unit whole-frame difference is the sky, and it is
+ * a difference of *colour*, not brightness: WebGL draws the preset's
+ * art-directed gradient (breckenridge's `top` is 0x2560c4, a deep poster blue
+ * with a luminance of only ~91), while rung 2+ on WebGPU draws the Preetham
+ * physical sky from Phase 2 Task 2, which near the horizon is legitimately pale.
+ * A pale sky is brighter in luminance while reading as the same sky, so it lifts
+ * the mean and, being flat, lowers the stdev.
+ *
+ * That is the intended, merged outcome of Task 2, so these budgets follow the
+ * frame rather than the frame being bent back to the budgets. Retuning was tried
+ * first and every lever made the picture worse, not better:
+ *   - dropping SKY_RADIANCE_SCALE (0.15 / 0.09 / 0.05) *lowers* stdev, because
+ *     it walks the sky toward the terrain's luminance instead of away from it,
+ *     and it cannot fix chroma;
+ *   - replacing the physical sky with the gradient outright gets breckenridge's
+ *     mean to ~205 but collapses its stdev to 11-19, far under any floor;
+ *   - clearing `fog` on the sky dome makes every resort brighter still and drops
+ *     heavenly under its contrast floor.
+ *
+ * Measured over 5 runs each, production build, `chromium-webgpu`, on the commit
+ * that added this block:
+ *   ski-portillo 207.0-207.3 / 13.5-13.8
+ *   breckenridge 213.2-213.4 / 15.0-15.1
+ *   heavenly     216.3-216.5 / 22.9-24.0
+ *
+ * Headroom matches the WebGL block's convention: roughly +8 on the mean cap and
+ * -3 on the contrast floor. Note heavenly's 22.9 low — it sits *under* WebGL's
+ * floor of 23, so the shared budget was already one unlucky run from flaking on
+ * this backend. Re-measure before tightening; do not tune these to green.
+ */
+const WEBGPU_LUMINANCE_BUDGETS: Record<string, { maxMean: number; minStdev: number }> = {
+  "ski-portillo": { maxMean: 216, minStdev: 10 },
+  breckenridge: { maxMean: 222, minStdev: 12 },
+  heavenly: { maxMean: 225, minStdev: 19 },
+};
+
 for (const { slug, maxMean, minStdev } of LUMINANCE_BUDGETS) {
   test(`gameplay canvas retains terrain contrast and does not wash toward white (${slug})`, async ({ page }) => {
+    const budget = test.info().project.name === "chromium-webgpu"
+      ? WEBGPU_LUMINANCE_BUDGETS[slug]
+      : { maxMean, minStdev };
     // ?e2ecanvas keeps the WebGL drawing buffer readable; without it the sample
     // below reads all-zeros regardless of what is on screen.
     await page.goto(dropInUrl(`/resorts/${slug}/drop-in?engine=v2&e2ecanvas`));
@@ -460,8 +514,8 @@ for (const { slug, maxMean, minStdev } of LUMINANCE_BUDGETS) {
     await page.waitForTimeout(750);
     const luminance = await canvasLuminance(page);
     console.log(`${slug} canvas luminance mean=${luminance.mean.toFixed(2)} stdev=${luminance.stdev.toFixed(2)}`);
-    expect(luminance.stdev).toBeGreaterThan(minStdev);
-    expect(luminance.mean).toBeLessThan(maxMean);
+    expect(luminance.stdev).toBeGreaterThan(budget.minStdev);
+    expect(luminance.mean).toBeLessThan(budget.maxMean);
   });
 }
 
