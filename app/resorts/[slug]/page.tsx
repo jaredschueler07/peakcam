@@ -17,14 +17,22 @@ export const revalidate = 3600;
 // build regenerates the static params list.
 export const dynamicParams = false;
 
-// Pre-render all active resort pages at build time
+// Pre-render all active resort pages at build time.
+//
+// Must NOT swallow a listing failure into `[]`: with dynamicParams=false
+// above, whatever this returns *is* the entire set of resort pages that
+// will ever serve for this deployment — there is no on-demand fallback to
+// recover unlisted slugs at request time. A `catch { return [] }` here used
+// to be safe because dynamicParams defaulted to true (missing slugs just
+// rendered on demand); now that it's false, the same catch would let a
+// transient DB blip during build silently produce zero resort pages, the
+// build would report SUCCESS, and every /resorts/[slug] URL would 404 at
+// the router — no page code even runs, so nothing here can catch or serve
+// stale. Letting this throw fails the build instead, and Vercel keeps
+// serving the previous (good) deployment.
 export async function generateStaticParams() {
-  try {
-    const slugs = await getAllResortSlugs();
-    return slugs.map((slug) => ({ slug }));
-  } catch {
-    return [];
-  }
+  const slugs = await getAllResortSlugs();
+  return slugs.map((slug) => ({ slug }));
 }
 
 // Dynamic metadata per resort
