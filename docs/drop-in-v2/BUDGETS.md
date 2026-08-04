@@ -42,6 +42,32 @@ brotli)**. `nodeFactories.test.ts` enforces the rule the split rests on: outside
 nothing may import `three/webgpu`, `three/tsl`, `CSMShadowNode.js`, or a node-material module at
 value level. `import type` is erased and stays free.
 
+**KTX2 moved out too (Phase 2 final review).** `createGame.ts` statically imported
+`createGameTextureLoader`, which pulls `KTX2Loader` and, behind it, `ktx-parse` and `zstddec`.
+Naming it in a default parameter was enough: a default expression is still linked eagerly even on
+the calls that never evaluate it, so every session paid for the transcoder — WebGL sessions and
+rungs below 3 included, neither of which can ever use it. `attachSurfaceTexturesWhenReady` now
+imports it dynamically, after the two gates it already had, so the bytes follow the feature.
+
+Measured on a production build, before and after, on the chunk carrying the drop-in runtime
+(identified by the `far.bin.br` and `snow-normal.ktx2` string literals):
+
+| | raw | brotli |
+|---|---:|---:|
+| before | 536,578 B (524.0 KB) | 121,099 B (118.3 KB) |
+| after | 474,615 B (463.5 KB) | 100,987 B (98.6 KB) |
+| **saved** | **61,963 B (60.5 KB)** | **20,112 B (19.6 KB)** |
+
+The transcoder now sits in its own lazy chunk of 61,289 B raw / 20,804 B brotli, which accounts
+for the delta almost exactly. Verified structurally as well as by size: after the change the
+eager chunk contains no `KTX2` marker at all, only the `snow-normal.ktx2` URL constant and the
+`/game/basis/` transcoder path, both of which are just strings in `surfaceTextures.ts`.
+
+Note the 839.0 KB figure above is Task 7's, measured over the whole chunk *group* that
+`createGame`'s dynamic import fetches; the table here measures the single runtime chunk, so the
+two are not directly comparable. The 60.5 KB raw / 19.6 KB brotli saving is the like-for-like
+before/after of this change.
+
 **The `postprocessing` package (6.39.4) stays.** It is the WebGL path's whole post chain —
 `EffectComposer`, bloom, SMAA, the 3D LUT, vignette and chromatic aberration in
 `lib/game/rendering/PostProcessing.ts` — and `NodePostProcessing` replaces it only on WebGPU.

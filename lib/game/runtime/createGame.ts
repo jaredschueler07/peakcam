@@ -18,7 +18,6 @@ import type { RuntimeAudio } from "./RuntimeAudio";
 import { createRendererBackend, resolveBackendKind } from "../rendering/backend";
 import { loadNodeFactories } from "../rendering/nodeFactories";
 import type { RendererBackend } from "../rendering/Renderer";
-import { createGameTextureLoader } from "../rendering/loaders/GameTextureLoader";
 import { loadSurfaceTextures, type SurfaceTextures } from "../rendering/surfaceTextures";
 
 interface RuntimeTerrainLoader {
@@ -144,12 +143,20 @@ export async function attachFarFieldWhenReady(
 export async function attachSurfaceTexturesWhenReady(
   runtime: RuntimeSurfaceTexturesConsumer,
   backend: RendererBackend | undefined,
-  load: (backend: RendererBackend) => Promise<SurfaceTextures | null> =
-    (b) => loadSurfaceTextures(createGameTextureLoader(b)),
+  load?: (backend: RendererBackend) => Promise<SurfaceTextures | null>,
 ): Promise<void> {
   if (!backend || backend.backendKind !== "webgpu" || runtime.rung < 3) return;
   try {
-    const surfaces = await load(backend);
+    // Imported here rather than at module scope so `KTX2Loader` — and the `ktx-parse` and
+    // `zstddec` it drags with it — land in their own lazy chunk instead of the eager group every
+    // session downloads. The gates above already decided nobody else will ever call this, so the
+    // bytes now follow the feature: WebGL sessions and rungs below 3 never fetch them. The
+    // `load` seam is unchanged for tests; it just no longer names the loader in a default
+    // parameter, because a default expression still has to be linked eagerly even when unused.
+    const surfaces = await (load
+      ? load(backend)
+      : import("../rendering/loaders/GameTextureLoader").then(({ createGameTextureLoader }) =>
+          loadSurfaceTextures(createGameTextureLoader(backend))));
     if (surfaces) runtime.attachSurfaceTextures(surfaces);
   } catch {
     // The procedural detail normal is still standing.
