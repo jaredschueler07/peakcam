@@ -318,3 +318,17 @@ test("the poster LUT is fed sRGB, the way postprocessing's LUT3DEffect was", () 
     "and decodes back afterwards",
   );
 });
+
+test("the AO distance gate reads the scene camera's clip planes, not the post quad's", () => {
+  // The AO fade converts the scene pass's depth back to view-space metres, which is only meaningful
+  // against the *scene* camera's near/far. TSL's `cameraNear`/`cameraFar` built-ins would instead
+  // resolve to whichever camera is rendering at that point in the graph — the post chain's own
+  // full-screen quad camera — which silently pins the gate open at every distance and leaves the
+  // depth-precision banding it exists to remove. Pin the seeding so that can't regress.
+  const camera = new THREE.PerspectiveCamera(65, 1.6, 0.5, 34_000);
+  const { post } = build({ camera });
+
+  assert.equal(post.uniforms.near.value, camera.near, "near comes from the scene camera");
+  assert.equal(post.uniforms.far.value, camera.far, "far comes from the scene camera");
+  assert.notEqual(post.uniforms.far.value, new THREE.PerspectiveCamera().far, "not a default camera's far");
+});

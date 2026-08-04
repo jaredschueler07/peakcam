@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { NodeUpdateType, RenderPipeline } from "three/webgpu";
 import type { Node, Renderer, UniformNode } from "three/webgpu";
-import { colorSpaceToWorking, convertToTexture, float, mix, pass, renderOutput, screenUV, smoothstep, texture3D, uniform, vec2, vec4, workingToColorSpace } from "three/tsl";
+import { colorSpaceToWorking, convertToTexture, float, mix, pass, perspectiveDepthToViewZ, renderOutput, screenUV, smoothstep, texture3D, uniform, vec2, vec4, workingToColorSpace } from "three/tsl";
 import { ao } from "three/addons/tsl/display/GTAONode.js";
 import { bloom } from "three/addons/tsl/display/BloomNode.js";
 import { fxaa } from "three/addons/tsl/display/FXAANode.js";
@@ -72,6 +72,22 @@ const AO_SAMPLES = 16;
  * lives, so it is the first thing to check in the visual round.
  */
 const AO_RESOLUTION_SCALE = 0.5;
+/**
+ * View-space metres over which the AO term fades out — full strength inside `AO_FADE_START_M`, gone
+ * by `AO_FADE_END_M`. See the banding note at the `occlusion` term for why the far end has to be
+ * switched off rather than left to fall off on its own.
+ *
+ * Both numbers were read off a fade sweep against real WebGPU frames, not derived: at a 160 m cutoff
+ * the distant ridges came clean but the grazing-angle mid slope still hatched, at 25 m a faint hatch
+ * survived, and at 12 m the frame was clean. Grazing surfaces are the binding constraint rather than
+ * raw distance — the depth *gradient* per pixel is what defeats the normal reconstruction, and it
+ * blows up on a slope seen edge-on long before distance alone would hurt. 10/28 sits below where the
+ * artifact starts on the worst surface in any of the three resorts, and still covers what this AO is
+ * for: the chase camera holds the skier at roughly 8-15 m, with the gate poles and rocks they pass
+ * inside the same band.
+ */
+const AO_FADE_START_M = 10;
+const AO_FADE_END_M = 28;
 
 /*
  * Godrays tuning. This genre over-uses sun shafts until they read as a lens effect rather than
@@ -151,6 +167,9 @@ export interface PostChainUniforms {
   godrays: UniformNode<"float", number>;
   aberration: UniformNode<"vec2", THREE.Vector2>;
   aspect: UniformNode<"float", number>;
+  /** The *scene* camera's clip planes — see the note at `sceneViewZ` for why the built-ins can't. */
+  near: UniformNode<"float", number>;
+  far: UniformNode<"float", number>;
 }
 
 type Vec4 = Node<"vec4">;
@@ -201,6 +220,8 @@ export class NodePostProcessing {
     godrays: uniform(0),
     aberration: uniform(new THREE.Vector2()),
     aspect: uniform(1),
+    near: uniform(0),
+    far: uniform(0),
   };
   readonly aoNode: ReturnType<typeof ao>;
   /** The single-channel occlusion buffer as it is wired into the chain. */
@@ -235,6 +256,8 @@ export class NodePostProcessing {
     // This chain already antialiases explicitly via SMAA/FXAA below, so hardware MSAA on the scene
     // pass was never load-bearing; disabling it here removes the failure without touching the AA
     // the user actually sees.
+    this.uniforms.near.value = camera.near;
+    this.uniforms.far.value = camera.far;
     const scenePass = pass(scene, camera, { samples: 0 });
     const aberrated = aberrate(scenePass.getTextureNode(), this.uniforms);
 
@@ -266,7 +289,32 @@ export class NodePostProcessing {
     // scaling the term the way additive bloom is. It lands here, ahead of bloom and the LUT: the
     // threshold must see the darkened creases or occluded geometry still glows, and the poster
     // palette must grade the occlusion rather than have it laid over the grade.
-    const occlusion = mix(float(1), this.aoTexture.r, this.uniforms.ao);
+    //
+    // ...and only over the range where a 1.5 m hemisphere still means something. GTAO here has no
+    // normal attachment, so it reconstructs normals from depth (see above) — which makes it only as
+    // good as the depth buffer's *local* precision. This camera runs near 0.5 / far 34_000 to reach
+    // the baked far field, and a 24-bit buffer spends almost all of that precision in the first few
+    // hundred metres: out on the far ridges, neighbouring pixels quantise onto the same depth value,
+    // the reconstructed normal snaps between a handful of orientations, and the AO term snaps with
+    // it. That is the horizontal banding and moiré across the mid-ground and prop fields on real
+    // hardware — not a texture mip problem, which is where it looks like it comes from.
+    //
+    // Fading the term out with distance is the fix rather than a workaround, because AO is a contact
+    // shadow: past a few tens of metres a 1.5 m sampling radius projects to under a pixel and the
+    // term carries no signal worth keeping even where depth is exact. So this gives up nothing
+    // visible and removes the whole class of artifact at its source.
+    // `cameraNear`/`cameraFar` are deliberately NOT used here. Those built-ins resolve to whatever
+    // camera is rendering, and by this point in the graph that is the post chain's own internal
+    // full-screen quad camera — not the scene's perspective camera. Reading them yields a depth
+    // conversion off by orders of magnitude, which silently pins the gate open at every distance.
+    // GTAONode sidesteps the same trap with its own `_cameraNear`/`_cameraFar` uniforms.
+    const sceneViewZ = perspectiveDepthToViewZ(
+      scenePass.getTextureNode("depth").sample(screenUV).r,
+      this.uniforms.near,
+      this.uniforms.far,
+    );
+    const aoReach = float(1).sub(smoothstep(float(AO_FADE_START_M), float(AO_FADE_END_M), sceneViewZ.negate()));
+    const occlusion = mix(float(1), this.aoTexture.r, this.uniforms.ao.mul(aoReach));
     const occluded = vec4(aberrated.rgb.mul(occlusion), aberrated.a);
 
     // Additive, not a lerp like AO: a shaft is light being added into the frame, not light being
