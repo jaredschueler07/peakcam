@@ -178,7 +178,7 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Filter resorts..."
           className="w-full px-4 py-2.5 bg-surface border border-border rounded-lg text-text-base
-                     placeholder:text-text-muted outline-none focus:border-cyan/50 mb-4 text-sm"
+                     placeholder:text-text-muted outline-none focus:border-cyan/50 mb-4 text-[16px] md:text-sm"
         />
 
         {/* Resort list */}
@@ -256,7 +256,7 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
             onClick={handleUnsubscribe}
             disabled={unsubscribing}
             className="flex items-center gap-2 text-text-muted hover:text-red-400 text-sm
-                       transition-colors disabled:opacity-50"
+                       px-2 py-2 pointer-coarse:min-h-11 transition-colors disabled:opacity-50"
           >
             <Trash2 size={14} />
             {unsubscribing ? "Unsubscribing..." : "Unsubscribe from all alerts"}
@@ -265,7 +265,7 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
           <button
             onClick={handleSave}
             disabled={saving || saved}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold
+            className={`flex items-center gap-2 px-5 py-2.5 pointer-coarse:min-h-11 rounded-lg text-sm font-semibold
                         transition-colors disabled:opacity-60 ${
                           saved
                             ? "bg-green-500/20 border border-green-500/40 text-green-400"

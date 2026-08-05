@@ -238,7 +238,7 @@ export function UserConditionsForm({ resortId, resortSlug, onSubmitted }: Props)
                 placeholder="Anything else riders should know? (e.g. grooming quality, hazards, lift lines)"
                 rows={2}
                 className="w-full bg-surface2 border border-border rounded-lg
-                  px-3 py-2.5 text-sm text-text-base placeholder:text-text-muted
+                  px-3 py-2.5 text-[16px] md:text-sm text-text-base placeholder:text-text-muted
                   outline-none resize-none transition-all duration-[220ms]
                   focus:border-cyan focus:bg-surface3"
               />

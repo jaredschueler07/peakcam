@@ -210,6 +210,13 @@ body {
   background: transparent !important;
   border-color: rgba(42,31,20,.15) !important;
 }
+/* 44px touch targets for the library-rendered zoom/compass/locate buttons */
+@media (pointer: coarse) {
+  .maplibregl-ctrl-group button {
+    width: 44px !important;
+    height: 44px !important;
+  }
+}
 .maplibregl-ctrl-group button:hover {
   background: var(--pc-cream-dk) !important;
 }

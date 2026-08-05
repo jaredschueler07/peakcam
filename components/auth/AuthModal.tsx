@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import { safeNext } from "@/lib/safe-redirect";
 
 interface Props {
@@ -11,6 +12,7 @@ interface Props {
 
 // Poster auth modal — ink backdrop, cream card, alpen submit button, stamp shadows
 export function AuthModal({ onClose, redirectTo }: Props) {
+  useBodyScrollLock(true);
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -47,7 +49,7 @@ export function AuthModal({ onClose, redirectTo }: Props) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 backdrop-blur-sm p-4 animate-fadeIn"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-cream-50 border-[1.5px] border-ink rounded-[18px] shadow-stamp-lg p-6 w-full max-w-sm animate-slideUp">
+      <div className="bg-cream-50 border-[1.5px] border-ink rounded-[18px] shadow-stamp-lg p-6 w-full max-w-sm max-h-[90dvh] overflow-y-auto animate-slideUp">
         {/* Header */}
         <div className="flex items-start justify-between mb-5">
           <div>
@@ -101,9 +103,11 @@ export function AuthModal({ onClose, redirectTo }: Props) {
                 placeholder="you@example.com"
                 required
                 autoFocus
+                autoComplete="email"
+                inputMode="email"
                 className="w-full bg-snow text-ink placeholder:text-bark
                            border-[1.5px] border-ink rounded-full shadow-stamp-sm
-                           px-4 py-2.5 text-[14px] font-medium
+                           px-4 py-2.5 text-[16px] md:text-[14px] font-medium
                            focus:shadow-[3px_3px_0_#a93f20] focus:border-alpen-dk
                            outline-none transition-shadow duration-100"
               />

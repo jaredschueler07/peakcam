@@ -66,7 +66,7 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
     return (
       <button
         onClick={() => handleSort(field)}
-        className={`flex items-center gap-1 text-xs uppercase tracking-wider font-semibold transition-colors
+        className={`flex items-center gap-1 py-2 pointer-coarse:min-h-11 text-xs uppercase tracking-wider font-semibold transition-colors
           ${active ? "text-cyan" : "text-text-muted hover:text-text-subtle"}`}
       >
         {label}
@@ -94,7 +94,7 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
               {resortsWithoutData > 0 && ` · ${resortsWithoutData} awaiting data`}
             </p>
           </div>
-          <Link href="/" className="text-text-muted hover:text-cyan text-sm transition-colors">
+          <Link href="/" className="text-text-muted hover:text-cyan text-sm py-2 px-1 pointer-coarse:min-h-11 inline-flex items-center transition-colors">
             ← Browse
           </Link>
         </div>
@@ -103,7 +103,7 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
         <div className="flex items-center gap-2 flex-wrap mb-4">
           <button
             onClick={() => setStateFilter("All")}
-            className={`text-xs px-2.5 py-1 rounded-lg border transition-colors duration-150 ${
+            className={`text-xs px-2.5 py-1 pointer-coarse:min-h-11 pointer-coarse:px-3.5 rounded-lg border transition-colors duration-150 ${
               stateFilter === "All"
                 ? "bg-cyan/10 border-cyan/40 text-cyan"
                 : "border-border text-text-muted hover:text-text-base"
@@ -115,7 +115,7 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
             <button
               key={s}
               onClick={() => setStateFilter(stateFilter === s ? "All" : s)}
-              className={`text-xs px-2.5 py-1 rounded-lg border transition-colors duration-150 ${
+              className={`text-xs px-2.5 py-1 pointer-coarse:min-h-11 pointer-coarse:px-3.5 rounded-lg border transition-colors duration-150 ${
                 stateFilter === s
                   ? "bg-cyan/10 border-cyan/40 text-cyan"
                   : "border-border text-text-muted hover:text-text-base"
@@ -155,7 +155,7 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
                     <td className="px-4 py-3">
                       <Link
                         href={`/resorts/${resort.slug}`}
-                        className="text-text-base font-medium hover:text-cyan transition-colors"
+                        className="text-text-base font-medium hover:text-cyan transition-colors inline-block py-1.5"
                       >
                         {resort.name}
                       </Link>

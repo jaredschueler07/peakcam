@@ -67,7 +67,7 @@ export function DashboardGrid({ initialLayout = [] }: DashboardGridProps) {
       <div className="flex justify-end mb-4 gap-2">
         <button
           onClick={() => setIsEditMode(!isEditMode)}
-          className={`px-4 py-2 rounded-full text-[13px] font-semibold border-[1.5px] transition-[transform,box-shadow] duration-100 ${
+          className={`px-4 py-2 pointer-coarse:min-h-11 rounded-full text-[13px] font-semibold border-[1.5px] transition-[transform,box-shadow] duration-100 ${
             isEditMode
               ? "bg-alpen text-cream-50 border-ink shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]"
               : "bg-cream-50 text-ink border-ink shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]"
@@ -93,8 +93,9 @@ export function DashboardGrid({ initialLayout = [] }: DashboardGridProps) {
             key={widget.id}
             className="bg-cream-50 border-[1.5px] border-ink rounded-[18px] overflow-hidden group shadow-stamp"
           >
+            {/* Always visible in edit mode — hover-reveal left touch users with no way to drag */}
             {isEditMode && (
-              <div className="drag-handle absolute top-2 left-2 z-30 p-1 bg-ink/80 text-cream-50 rounded cursor-move opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="drag-handle absolute top-2 left-2 z-30 p-1 pointer-coarse:p-2.5 bg-ink/80 text-cream-50 rounded cursor-move transition-opacity">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>
               </div>
             )}

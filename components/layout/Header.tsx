@@ -82,7 +82,7 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
             placeholder="Search resorts, states, regions…"
             className="w-full bg-cream-50 border-[1.5px] border-ink
               rounded-full shadow-[2px_2px_0_#2a1f14]
-              pl-10 pr-9 py-2 text-[13.5px] text-ink placeholder:text-bark
+              pl-10 pr-9 py-2 text-[16px] md:text-[13.5px] text-ink placeholder:text-bark
               outline-none transition-shadow duration-100
               focus:shadow-[3px_3px_0_#a93f20] focus:border-alpen-dk"
           />

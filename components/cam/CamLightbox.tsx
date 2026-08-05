@@ -73,7 +73,7 @@ export function CamLightbox({ cams, initialIndex, resortSlug, resortName, onClos
       <div className="flex-1 flex items-center justify-center px-4 pb-4 min-h-0" onClick={(e) => e.stopPropagation()}>
         {cams.length > 1 && (
           <button onClick={prev} aria-label="Previous cam"
-            className="p-2.5 mr-3 bg-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp text-ink hover:-translate-y-0.5 transition-transform shrink-0">
+            className="p-2.5 pointer-coarse:p-3 sm:static sm:mr-3 absolute left-2 top-1/2 -translate-y-1/2 sm:translate-y-0 z-10 bg-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp text-ink hover:-translate-y-0.5 transition-transform shrink-0">
             <ChevronLeft size={18} />
           </button>
         )}
@@ -82,7 +82,7 @@ export function CamLightbox({ cams, initialIndex, resortSlug, resortName, onClos
         </div>
         {cams.length > 1 && (
           <button onClick={next} aria-label="Next cam"
-            className="p-2.5 ml-3 bg-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp text-ink hover:-translate-y-0.5 transition-transform shrink-0">
+            className="p-2.5 pointer-coarse:p-3 sm:static sm:ml-3 absolute right-2 top-1/2 -translate-y-1/2 sm:translate-y-0 z-10 bg-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp text-ink hover:-translate-y-0.5 transition-transform shrink-0">
             <ChevronRight size={18} />
           </button>
         )}
