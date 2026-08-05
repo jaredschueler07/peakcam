@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { Camera, ArrowLeftRight, TrendingUp, TrendingDown, Minus, Snowflake, Sun, Thermometer, Heart } from "lucide-react";
 import type { ResortWithData, ConditionRating, SnowTrend, SnowOutlook } from "@/lib/types";
 import { isOffSeason, OFF_SEASON_COLOR } from "@/lib/map-utils";
@@ -10,10 +10,14 @@ import { trackResortCardClick } from "@/lib/posthog";
 
 // ── Animated count-up number ─────────────────────────────────────────────────
 
-function AnimatedNumber({ value }: { value: number }) {
-  const [count, setCount] = useState(0);
+function AnimatedNumber({ value, animate = true }: { value: number; animate?: boolean }) {
+  const [count, setCount] = useState(animate ? 0 : value);
 
   useEffect(() => {
+    if (!animate) {
+      setCount(value);
+      return;
+    }
     const duration = 600;
     const steps = 30;
     const increment = value / steps;
@@ -30,7 +34,7 @@ function AnimatedNumber({ value }: { value: number }) {
     }, duration / steps);
 
     return () => clearInterval(timer);
-  }, [value]);
+  }, [value, animate]);
 
   return <>{count}</>;
 }
@@ -77,9 +81,17 @@ interface Props {
   resort: ResortWithData;
   favorited?: boolean;
   onToggleFavorite?: () => void;
+  /**
+   * Entrance animation + count-up. Only the first screenful of cards should
+   * animate — with all 148 on, every card mounts an IntersectionObserver and
+   * an interval timer, and fast scrolls hit blank not-yet-revealed patches.
+   */
+  animate?: boolean;
 }
 
-export function SummitResortCard({ resort, favorited, onToggleFavorite }: Props) {
+export function SummitResortCard({ resort, favorited, onToggleFavorite, animate = true }: Props) {
+  const reducedMotion = useReducedMotion();
+  const entrance = animate && !reducedMotion;
   const snow = resort.snow_report;
   const baseDepth = snow?.base_depth ?? 0;
   const snow24h = snow?.new_snow_24h ?? 0;
@@ -102,10 +114,10 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite }: Props)
   return (
     <motion.div
       className="group relative rounded-[18px] cursor-pointer"
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={entrance ? { opacity: 0, y: 20 } : false}
+      whileInView={entrance ? { opacity: 1, y: 0 } : undefined}
       viewport={{ once: true }}
-      whileHover={{ y: -4, x: -1 }}
+      whileHover={reducedMotion ? undefined : { y: -4, x: -1 }}
       transition={{ duration: 0.15 }}
     >
       {/* Card paper — cream-50 bg, ink border, stamp shadow */}
@@ -159,7 +171,7 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite }: Props)
               >
                 {baseDepth > 0 ? (
                   <>
-                    <AnimatedNumber value={baseDepth} />
+                    <AnimatedNumber value={baseDepth} animate={entrance} />
                     <span className="text-alpen">&quot;</span>
                   </>
                 ) : (

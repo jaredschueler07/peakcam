@@ -85,8 +85,28 @@ export default async function Home() {
     })
     .filter(Boolean) as { cam: (typeof resorts)[0]["cams"][0]; resort: ResortWithData }[];
 
+  // Server-rendered ItemList of every resort: the browse grid now paginates
+  // client-side ("Show more"), so crawlers get the full catalog from here and
+  // from the per-resort SSG pages, not from the grid HTML.
+  const resortListJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "Ski resorts on PeakCam",
+    numberOfItems: resorts.length,
+    itemListElement: resorts.map((r, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: r.name,
+      url: `https://peakcam.io/resorts/${r.slug}`,
+    })),
+  };
+
   return (
     <main id="main-content">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(resortListJsonLd) }}
+      />
       <PeakHero resortCount={resorts.length} />
       <PowderTicker alerts={powderAlerts} />
       {snowCams.length > 0 && (

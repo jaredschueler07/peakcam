@@ -9,6 +9,7 @@ import { Header } from "@/components/layout/Header";
 import { SummitResortCard } from "@/components/browse/SummitResortCard";
 import { PowderAlertSignup } from "@/components/alerts/PowderAlertSignup";
 import { useFavorites } from "@/lib/useFavorites";
+import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import { AuthModal } from "@/components/auth/AuthModal";
 import type { ResortWithData } from "@/lib/types";
 import type { RadarFrame } from "@/lib/weather-radar";
@@ -137,6 +138,104 @@ function FilterChip({
       {icon}
       {label}
     </button>
+  );
+}
+
+// ── Mobile filter sheet ──────────────────────────────────────────────────────
+// Below md the chip stack wraps to ~5 rows and eats a third of the viewport
+// while sticky; on phones everything but state + "The Goods" lives in here.
+
+function FilterSheet({
+  open,
+  onClose,
+  condFilter,
+  setCondFilter,
+  freshSnow,
+  setFreshSnow,
+  hasLiveCams,
+  setHasLiveCams,
+  showFavorites,
+  setShowFavorites,
+  canFavorite,
+  sort,
+  setSort,
+}: {
+  open: boolean;
+  onClose: () => void;
+  condFilter: ConditionFilter;
+  setCondFilter: (c: ConditionFilter) => void;
+  freshSnow: boolean;
+  setFreshSnow: (v: boolean) => void;
+  hasLiveCams: boolean;
+  setHasLiveCams: (v: boolean) => void;
+  showFavorites: boolean;
+  setShowFavorites: (v: boolean) => void;
+  canFavorite: boolean;
+  sort: SortOption;
+  setSort: (s: SortOption) => void;
+}) {
+  useBodyScrollLock(open);
+  if (!open) return null;
+
+  return (
+    <div className="md:hidden">
+      <div className="fixed inset-0 z-40 bg-ink/40 animate-fadeIn" onClick={onClose} />
+      <div
+        className="fixed bottom-0 left-0 right-0 z-50 animate-slideUp"
+        role="dialog"
+        aria-label="Filters and sort"
+      >
+        <div className="bg-cream-50 border-t-[1.5px] border-ink rounded-t-[18px] px-5 pt-3
+                        pb-[max(1.5rem,env(safe-area-inset-bottom))] max-h-[85dvh] overflow-y-auto
+                        shadow-[0_-6px_20px_-8px_rgba(42,31,20,0.35)]">
+          <div className="flex justify-center mb-4">
+            <div className="w-10 h-1 bg-bark/40 rounded-full" />
+          </div>
+
+          <div className="pc-eyebrow mb-2" style={{ color: "var(--pc-bark)" }}>Conditions</div>
+          <div className="flex flex-wrap gap-2 mb-5">
+            <FilterChip
+              label="The Goods"
+              icon={<Snowflake size={14} />}
+              active={condFilter === "goods"}
+              onClick={() => setCondFilter(condFilter === "goods" ? "all" : "goods")}
+            />
+            {(["all", "great", "good", "fair", "poor"] as ConditionFilter[]).map((c) => (
+              <FilterChip
+                key={c}
+                label={c === "all" ? "Any Condition" : c.charAt(0).toUpperCase() + c.slice(1)}
+                active={condFilter === c}
+                onClick={() => setCondFilter(condFilter === c ? "all" : c)}
+              />
+            ))}
+          </div>
+
+          <div className="pc-eyebrow mb-2" style={{ color: "var(--pc-bark)" }}>Features</div>
+          <div className="flex flex-wrap gap-2 mb-5">
+            <FilterChip label="Fresh Snow" active={freshSnow} onClick={() => setFreshSnow(!freshSnow)} />
+            <FilterChip label="Live Cams" active={hasLiveCams} onClick={() => setHasLiveCams(!hasLiveCams)} />
+            {canFavorite && (
+              <FilterChip label="My Favorites" active={showFavorites} onClick={() => setShowFavorites(!showFavorites)} />
+            )}
+          </div>
+
+          <div className="pc-eyebrow mb-2" style={{ color: "var(--pc-bark)" }}>Sort by</div>
+          <div className="flex flex-wrap gap-2 mb-6">
+            {(["popular", "best", "snow", "name"] as SortOption[]).map((opt) => (
+              <FilterChip key={opt} label={SORT_LABEL[opt]} active={sort === opt} onClick={() => setSort(opt)} />
+            ))}
+          </div>
+
+          <button
+            onClick={onClose}
+            className="w-full py-3 min-h-11 bg-ink text-cream-50 border-[1.5px] border-ink rounded-full
+                       font-bold text-[14px] uppercase tracking-[0.06em] shadow-stamp-sm"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -322,6 +421,15 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
   const [showMap, setShowMap] = useState(false);
   const [showStates, setShowStates] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
+
+  // Badge on the mobile "Filters" trigger — non-default choices hidden in the sheet
+  const activeFilterCount =
+    (condFilter !== "all" && condFilter !== "goods" ? 1 : 0) +
+    (freshSnow ? 1 : 0) +
+    (hasLiveCams ? 1 : 0) +
+    (showFavoritesOnly ? 1 : 0) +
+    (sort !== "popular" ? 1 : 0);
   const { user, isFavorite, toggle: toggleFav } = useFavorites();
 
   // SA full-country labels first, then US/CA abbreviations alphabetically
@@ -401,6 +509,19 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
 
   const handleClearSearch = useCallback(() => setSearch(""), []);
 
+  // Progressive disclosure: render 24 cards at a time instead of all ~148.
+  // Full-list SEO is preserved by the server-rendered ItemList JSON-LD in
+  // app/page.tsx and per-resort SSG pages; the grid is a browsing surface.
+  const PAGE_SIZE = 24;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [search, stateFilter, condFilter, hasLiveCams, freshSnow, showFavoritesOnly, sort]);
+  const visibleResorts = useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount],
+  );
+
   // Debounced search tracking
   const searchTrackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -471,8 +592,46 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
             </div>
           </div>
 
-          {/* Filter chips row */}
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Mobile: single compact row — state, The Goods, everything else in the sheet */}
+          <div className="flex md:hidden items-center gap-2">
+            <button
+              onClick={() => setShowStates(v => !v)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 min-h-[44px] text-[13px] font-semibold border-[1.5px] cursor-pointer select-none transition-colors duration-150 whitespace-nowrap min-w-0 ${
+                stateFilter !== "All"
+                  ? "bg-ink border-ink text-cream-50"
+                  : "bg-cream-50 border-bark text-ink"
+              }`}
+            >
+              <MapPin size={14} className="shrink-0" />
+              <span className="truncate">{stateFilter === "All" ? "All States" : stateFilter}</span>
+              <ChevronDown size={14} className={`shrink-0 transition-transform ${showStates ? "rotate-180" : ""}`} />
+            </button>
+            <FilterChip
+              label="The Goods"
+              icon={<Snowflake size={14} />}
+              active={condFilter === "goods"}
+              onClick={() => setCondFilter(condFilter === "goods" ? "all" : "goods")}
+            />
+            <button
+              onClick={() => setShowFilterSheet(true)}
+              className={`ml-auto inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 min-h-[44px] text-[13px] font-semibold border-[1.5px] cursor-pointer select-none transition-colors duration-150 whitespace-nowrap ${
+                activeFilterCount > 0
+                  ? "bg-ink border-ink text-cream-50"
+                  : "bg-cream-50 border-bark text-ink"
+              }`}
+            >
+              <SlidersHorizontal size={14} />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full bg-alpen text-cream-50 font-mono text-[11px] font-bold">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Filter chips row (md+) */}
+          <div className="hidden md:flex items-center gap-2 flex-wrap">
             {/* State dropdown */}
             <button
               onClick={() => setShowStates(v => !v)}
@@ -628,21 +787,42 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {filtered.map((resort) => (
-                  <div
-                    key={resort.id}
-                    onMouseEnter={() => setHoveredSlug(resort.slug)}
-                    onMouseLeave={() => setHoveredSlug(null)}
-                  >
-                    <SummitResortCard
-                      resort={resort}
-                      favorited={isFavorite(resort.id)}
-                      onToggleFavorite={user ? () => toggleFav(resort.id) : () => setShowAuthModal(true)}
-                    />
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {visibleResorts.map((resort, i) => (
+                    <div
+                      key={resort.id}
+                      onMouseEnter={() => setHoveredSlug(resort.slug)}
+                      onMouseLeave={() => setHoveredSlug(null)}
+                      style={{ contentVisibility: "auto", containIntrinsicSize: "0 560px" }}
+                    >
+                      <SummitResortCard
+                        resort={resort}
+                        favorited={isFavorite(resort.id)}
+                        onToggleFavorite={user ? () => toggleFav(resort.id) : () => setShowAuthModal(true)}
+                        animate={i < 12}
+                      />
+                    </div>
+                  ))}
+                </div>
+                {visibleCount < filtered.length && (
+                  <div className="flex justify-center mt-10">
+                    <button
+                      onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}
+                      className="inline-flex items-center gap-2 px-7 py-3 min-h-11 bg-cream-50 text-ink
+                                 border-[1.5px] border-ink rounded-full shadow-stamp font-bold text-[14px]
+                                 hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]
+                                 active:translate-x-[2px] active:translate-y-[2px] active:shadow-stamp-sm
+                                 transition-transform duration-100"
+                    >
+                      Show more
+                      <span className="font-mono text-[11px] text-bark uppercase tracking-[0.1em]">
+                        {filtered.length - visibleCount} left
+                      </span>
+                    </button>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </div>
 
@@ -663,6 +843,21 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
       </div>
 
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
+      <FilterSheet
+        open={showFilterSheet}
+        onClose={() => setShowFilterSheet(false)}
+        condFilter={condFilter}
+        setCondFilter={setCondFilter}
+        freshSnow={freshSnow}
+        setFreshSnow={setFreshSnow}
+        hasLiveCams={hasLiveCams}
+        setHasLiveCams={setHasLiveCams}
+        showFavorites={showFavoritesOnly}
+        setShowFavorites={setShowFavoritesOnly}
+        canFavorite={!!user}
+        sort={sort}
+        setSort={setSort}
+      />
     </div>
   );
 }
