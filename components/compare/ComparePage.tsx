@@ -185,6 +185,7 @@ function ResortColumnHeader({
             <img
               src={thumb.url}
               alt={`${resort.name} webcam`}
+              loading="lazy"
               className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-ink/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">

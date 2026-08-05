@@ -53,7 +53,7 @@ export function FullPageMap({ resorts, radarFrames }: Props) {
   );
 
   return (
-    <div className="h-screen w-full relative bg-cream">
+    <div className="h-screen supports-[height:100dvh]:h-[100dvh] w-full relative bg-cream">
       {/* Back nav overlay */}
       <div className="absolute top-4 left-16 z-20">
         <Link

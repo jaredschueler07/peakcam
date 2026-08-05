@@ -19,7 +19,7 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
       : "Both Hemispheres";
 
   return (
-    <div className="pc-topo relative h-screen w-full overflow-hidden">
+    <div className="pc-topo relative h-screen supports-[height:100svh]:h-[100svh] w-full overflow-hidden">
       {/* Subtle warmth radials layered over topo */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(1200px_600px_at_10%_-10%,rgba(217,85,47,0.10),transparent_60%)]" />
@@ -103,7 +103,7 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
             Est. 2025 · {countLabel}
           </motion.div>
 
-          <h1 className="font-display font-black text-[26vw] sm:text-[22vw] md:text-[18vw] lg:text-[15rem] xl:text-[18rem] leading-[0.88] tracking-[-0.03em] mb-4">
+          <h1 className="font-display font-black text-[20vw] sm:text-[18vw] md:text-[18vw] lg:text-[15rem] xl:text-[18rem] leading-[0.88] tracking-[-0.03em] mb-4">
             <span className="text-ink">Peak</span>
             <span className="text-alpen italic font-bold">Cam</span>
           </h1>

@@ -56,7 +56,7 @@ function ImageFeed({ url, name, refreshMs }: { url: string; name: string; refres
     return (
       <div className="absolute inset-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/images/cam-placeholder.jpg" alt="" className="absolute inset-0 w-full h-full object-cover opacity-60" />
+        <img src="/images/cam-placeholder.jpg" alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover opacity-60" />
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="px-3 py-1.5 bg-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp font-mono text-[11px] font-bold text-ink uppercase tracking-[0.12em]">
             Feed unavailable

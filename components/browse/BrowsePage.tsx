@@ -438,7 +438,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
       <Header showSearch={false} />
 
       {/* ── Sticky paper search + filter bar ─────────────────── */}
-      <div className="sticky top-0 z-30 border-b-[1.5px] border-ink bg-cream/95 backdrop-blur-md">
+      <div className="sticky top-[64px] z-30 border-b-[1.5px] border-ink bg-cream/95 backdrop-blur-md">
         <div className="max-w-screen-2xl mx-auto px-4 py-5 md:px-8">
           {/* Top row: search input (pc-input style) */}
           <div className="flex items-center gap-4 mb-4">
@@ -646,9 +646,9 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
             )}
           </div>
 
-          {/* Map sidebar */}
+          {/* Map sidebar — top clears header (64px) + pinned filter bar (~191px) + gap */}
           {showMap && (
-            <div className="hidden lg:block sticky top-20 h-[calc(100vh-6rem)] rounded-[18px] overflow-hidden border-[1.5px] border-ink shadow-stamp">
+            <div className="hidden lg:block sticky top-[271px] h-[calc(100vh-287px)] rounded-[18px] overflow-hidden border-[1.5px] border-ink shadow-stamp">
               <MapView
                 resorts={filtered}
                 hoveredSlug={hoveredSlug}

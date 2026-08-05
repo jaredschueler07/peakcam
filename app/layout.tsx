@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import { Fraunces, DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
@@ -29,6 +29,15 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 const BASE_URL = "https://peakcam.io";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  // NOTE: no viewportFit:"cover" yet — the sticky Header and edge-pinned
+  // overlays have no safe-area padding, so cover would put them under the
+  // notch/home indicator. Add it together with that padding (roadmap M4).
+  themeColor: "#2a1f14",
+};
 
 export const metadata: Metadata = {
   title: {
