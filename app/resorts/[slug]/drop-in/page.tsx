@@ -5,14 +5,21 @@ import {
   getDropInGameUrl,
   getDropInProfile,
 } from "@/lib/drop-in";
+import { getResortBySlug } from "@/lib/supabase";
 import DropInFrame from "@/components/drop-in/DropInFrame";
+import DropInUnavailable from "@/components/drop-in/DropInUnavailable";
+import { Header } from "@/components/layout/Header";
 
 const BASE_URL = "https://peakcam.io";
 
-// The pilot roster is static and tiny — prerender all three.
+// The pilot roster is static and tiny — prerender all three. Everything else is
+// rendered on demand (and cached by the revalidate below), so the resort lookup
+// that powers the "not in the pilot yet" state never runs during the build.
 export function generateStaticParams() {
   return DROP_IN_RESORT_SLUGS.map((slug) => ({ slug }));
 }
+
+export const revalidate = 3600;
 
 export async function generateMetadata({
   params,
@@ -21,7 +28,18 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const profile = getDropInProfile(slug);
-  if (!profile) return {};
+
+  // Off-roster: don't spend a DB round-trip on a title. Generic, and noindex so
+  // the ~125 non-pilot permutations of this URL never enter the index.
+  if (!profile) {
+    return {
+      title: "Drop In isn't available for this resort yet",
+      description:
+        "Drop In is PeakCam's arcade ski descent, hand-built for a few resorts at a time. " +
+        "See which mountains you can ski right now.",
+      robots: { index: false, follow: true },
+    };
+  }
 
   const title = `Drop In — Ski ${profile.name}`;
   const description =
@@ -47,7 +65,8 @@ export async function generateMetadata({
       description,
     },
     alternates: { canonical: pageUrl },
-    // A playable canvas isn't a search result worth indexing; the resort page is.
+    // A playable canvas isn't a search result worth indexing; the resort page is
+    // (and /drop-in is the indexable front door for the feature).
     robots: { index: false, follow: true },
   };
 }
@@ -61,8 +80,36 @@ export default async function DropInPage({
   const profile = getDropInProfile(slug);
   const gameUrl = getDropInGameUrl(slug);
 
-  // Anything outside the three-resort pilot is a 404, not a default mountain.
-  if (!profile || !gameUrl) return notFound();
+  // Off the pilot roster. Two very different situations share this URL shape:
+  // a resort we cover but haven't built a descent for (Vail — by far the common
+  // case), and a slug that isn't a resort at all. Telling the first group
+  // "RESORT NOT FOUND" is simply false, so look the slug up and split them.
+  //
+  // Fail safe: if the lookup errors we render the unnamed "no descent here"
+  // copy rather than 404ing a resort that exists or crashing the route.
+  if (!profile || !gameUrl) {
+    let resortName: string | undefined;
+    let lookupFailed = false;
+    try {
+      const resort = await getResortBySlug(slug);
+      if (resort) resortName = resort.name;
+    } catch {
+      lookupFailed = true;
+    }
+
+    // Genuinely unknown slug — a true 404, handled by the sibling
+    // not-found.tsx so the copy is about Drop In, not about a missing resort.
+    if (!resortName && !lookupFailed) notFound();
+
+    return (
+      <>
+        <Header showSearch={false} />
+        <main id="main-content">
+          <DropInUnavailable resortName={resortName} resortSlug={slug} />
+        </main>
+      </>
+    );
+  }
 
   // The layout's global skip link targets #main-content; every other route
   // provides it, and without it "Skip to main content" lands on nothing.

@@ -23,6 +23,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/snow-report`, lastModified: new Date(), changeFrequency: "hourly", priority: 0.9 },
     { url: `${BASE_URL}/map`, lastModified: new Date(), changeFrequency: "hourly", priority: 0.8 },
     { url: `${BASE_URL}/compare`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.6 },
+    // The Drop In hub only. The three playable routes
+    // (/resorts/{slug}/drop-in) are deliberately `robots: { index: false }`, and
+    // a sitemap of noindex URLs is a contradiction — the hub links to them.
+    { url: `${BASE_URL}/drop-in`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.5 },
     { url: `${BASE_URL}/about`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.4 },
     ...resortEntries,
   ];

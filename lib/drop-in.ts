@@ -101,6 +101,15 @@ export function getDropInProfile(slug: string): DropInProfile | null {
   return PROFILES[slug] ?? null;
 }
 
+/**
+ * Every pilot profile, in roster order. The hub page and the "no Drop In here
+ * yet" states render from this so the marketing surface can never advertise a
+ * mountain the engine doesn't have — it is derived, never hand-listed.
+ */
+export function getDropInRoster(): DropInProfile[] {
+  return DROP_IN_RESORT_SLUGS.map((slug) => PROFILES[slug]).filter(Boolean);
+}
+
 /** Whether a resort is part of the Drop In pilot. */
 export function isDropInResort(slug: string): boolean {
   return getDropInProfile(slug) !== null;

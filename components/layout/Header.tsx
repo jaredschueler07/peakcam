@@ -16,6 +16,7 @@ export const navLinks = [
   { label: "Map",         href: "/map" },
   { label: "Compare",     href: "/compare" },
   { label: "Snow Report", href: "/snow-report" },
+  { label: "Drop In",     href: "/drop-in" },
   { label: "Favorites",   href: "/favorites", authOnly: true },
   { label: "My Peak",     href: "/dashboard", authOnly: true },
   { label: "About",       href: "/about" },
