@@ -188,8 +188,7 @@ function FeaturedRow({ resorts }: { resorts: ResortWithData[] }) {
               href={`/resorts/${resort.slug}`}
               className="group relative flex-shrink-0 w-72 bg-cream-50 border-[1.5px] border-ink rounded-[18px] overflow-hidden
                          shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]
-                         transition-[transform,box-shadow] duration-150
-                         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alpen"
+                         transition-[transform,box-shadow] duration-150"
             >
               <div className="p-5">
                 <div className="flex items-start justify-between gap-2 mb-4">
@@ -250,7 +249,9 @@ function PowderAlert({ resorts }: { resorts: ResortWithData[] }) {
   if (alerts.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-3 px-5 py-3 bg-alpen text-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp mb-8">
+    /* pc-on-ink: saturated alpenglow fill — the default ember focus ring is
+       1.3:1 against it, so links inside get the cream ring (3.6:1) instead. */
+    <div className="pc-on-ink flex items-center gap-3 px-5 py-3 bg-alpen text-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp mb-8">
       <span className="relative flex h-3 w-3 shrink-0">
         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cream-50 opacity-75" />
         <span className="relative inline-flex rounded-full h-3 w-3 bg-cream-50" />
@@ -455,7 +456,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
                 className="w-full pl-12 pr-10 py-3 bg-snow text-ink placeholder:text-bark
                            border-[1.5px] border-ink rounded-full shadow-stamp
                            focus:shadow-[4px_4px_0_#a93f20] focus:border-alpen-dk
-                           outline-none transition-shadow duration-100 font-medium"
+                           transition-shadow duration-100 font-medium"
               />
               {search && (
                 <button
@@ -586,8 +587,10 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
         <FeaturedRow resorts={resorts} />
         <PowderAlert resorts={resorts} />
 
-        {/* Powder alert signup banner — forest card */}
-        <div className="flex items-center justify-between gap-4 px-6 py-5 bg-forest text-cream-50
+        {/* Powder alert signup banner — forest card.
+            pc-on-ink flips the focus ring to cream: ember-on-forest is
+            1.50:1, cream-on-forest is 7.05:1. */}
+        <div className="pc-on-ink flex items-center justify-between gap-4 px-6 py-5 bg-forest text-cream-50
                         border-[1.5px] border-ink rounded-[18px] shadow-stamp mb-8">
           <div>
             <p className="font-display font-black text-lg leading-tight">

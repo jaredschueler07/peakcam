@@ -8,9 +8,16 @@
   --pc-cream:      #f1e7cf;
   --pc-cream-dk:   #e3d5b2;
 
-  /* Bark */
+  /* Bark
+     --pc-bark is the site-wide *muted / secondary text* colour (eyebrows,
+     "SORT:", "PRECIP CHANCE", "Updated … · Source: …" metadata). It was
+     #7a5a3a, which only reached 4.3:1 on cream-dk and 4.8:1 on the grained
+     paper — too close to the 4.5:1 AA floor for 10–11px labels. #63482d is
+     the same taupe hue, darkened to 6.8:1 on cream / 5.8:1 on cream-dk.
+     NOTE: bark is a *light-surface* token (1.9:1 on ink). Muted text on dark
+     surfaces must use --pc-bark-50 (6.1:1 on ink) or cream at reduced alpha. */
   --pc-bark-50:    #b59b74;
-  --pc-bark:       #7a5a3a;
+  --pc-bark:       #63482d;
   --pc-bark-dk:    #4a3620;
   --pc-ink:        #2a1f14;
 
@@ -28,6 +35,17 @@
   --pc-alpen:      #d9552f;
   --pc-alpen-dk:   #a93f20;
   --pc-mustard:    #e2a740;
+  /* Text-safe mustard: --pc-mustard is 1.7:1 on cream — fine as a fill on ink
+     or forest, unreadable as small text on paper. Use this for amber readouts
+     that sit on cream (5.0:1 on cream, 5.6:1 on cream-50). */
+  --pc-mustard-dk: #7d5c12;
+
+  /* Focus ring — an alpenglow ember picked to clear WCAG 1.4.11 (3:1) against
+     *both* families of surface, because a single global ring has to survive
+     landing anywhere: cream 4.20:1 · cream-50 4.71:1 · cream-dk 3.55:1 ·
+     ink 3.12:1. On forest/alpen fills it drops below 3:1, which is what the
+     `.pc-on-ink` cream override exists for. */
+  --pc-focus:      #bd4624;
 
   /* Condition semantics */
   --pc-great:      #3c5a3a;
@@ -66,6 +84,9 @@
 /* ── Base ── */
 *, *::before, *::after { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
 body {
   font-family: var(--pc-sans);
   background: var(--pc-cream);
@@ -73,6 +94,33 @@ body {
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
   line-height: 1.45;
+}
+
+/* ── Focus visibility ──────────────────────────────────────────────────────
+   The UA default was `outline: auto 1px currentColor`, which on the ink header
+   resolved to cream-at-80% and was all but invisible. One global, high-contrast
+   `:focus-visible` ring instead:
+
+     · everywhere (default) → --pc-focus ember; ≥3:1 on cream (4.20:1) AND on
+       ink (3.12:1), so it survives whatever surface the element lands on.
+     · genuinely dark fills → cream-50; 14.68:1 on ink, 7.05:1 on forest.
+       Opt in with `.pc-on-ink` on the dark container (see Header, the forest
+       alert card and the alpenglow pow-day pill).
+
+   3px + 2px offset clears the WCAG 2.4.13 "focus appearance" thickness bar.
+   Declared in @layer base so components that deliberately opt out with
+   `outline-none` + their own `ring-*`/shadow treatment (utilities layer) still
+   win — no double rings. */
+@layer base {
+  :focus-visible {
+    outline: 3px solid var(--pc-focus);
+    outline-offset: 2px;
+  }
+
+  .pc-on-ink:focus-visible,
+  .pc-on-ink :focus-visible {
+    outline-color: var(--pc-cream-50);
+  }
 }
 
 /* ── Paper + topo backgrounds ── */
