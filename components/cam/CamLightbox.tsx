@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Cam } from "@/lib/types";
-import { CamEmbed } from "./CamEmbed";
+import { CamEmbed, camDisplayName } from "./CamEmbed";
 
 interface Props {
   cams: Cam[];
@@ -55,7 +55,7 @@ export function CamLightbox({ cams, initialIndex, resortSlug, resortName, onClos
       <div className="flex items-center justify-between px-4 py-3" onClick={(e) => e.stopPropagation()}>
         <div className="min-w-0">
           <p className="font-mono text-[10.5px] font-bold text-cream-50/70 uppercase tracking-[0.14em]">{resortName}</p>
-          <h2 className="font-display font-black text-cream-50 text-xl leading-tight truncate">{cam.name}</h2>
+          <h2 className="font-display font-black text-cream-50 text-xl leading-tight truncate">{camDisplayName(cam)}</h2>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <span className="font-mono text-[11px] text-cream-50/70">{index + 1} / {cams.length}</span>

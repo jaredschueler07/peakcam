@@ -7,7 +7,7 @@ import { Heart, Maximize2 } from "lucide-react";
 import { ConditionBadge } from "@/components/ui/Badge";
 import type { ResortWithData, WeatherPeriod, LiveConditions, Cam, UserCondition, ForecastPeriod, HourlyWeather } from "@/lib/types";
 import { CamReportButton } from "@/components/cam/CamReportButton";
-import { CamEmbed } from "@/components/cam/CamEmbed";
+import { CamEmbed, camDisplayName } from "@/components/cam/CamEmbed";
 import { CamLightbox } from "@/components/cam/CamLightbox";
 import { ConditionsHero } from "@/components/resort/ConditionsHero";
 import { ForecastTable } from "@/components/resort/ForecastTable";
@@ -35,6 +35,28 @@ interface Props {
 
 // ─── Cam player ──────────────────────────────────────────────────────────────
 
+/** Caption under a cam tile. Some imported cam rows have a blank `name`, which
+ *  used to render an empty <p>; fall back to the feed name and, failing that,
+ *  drop the caption entirely. */
+function CamCaption({ cam }: { cam: Cam }) {
+  const label = camDisplayName(cam, "");
+  const elevNum = cam.elevation != null ? Number(cam.elevation) : NaN;
+  const elevation = Number.isFinite(elevNum) ? `${elevNum.toLocaleString()}′` : null;
+  if (!label && !elevation) return null;
+
+  return (
+    <p className="text-text-muted text-xs mt-1.5 px-1">
+      {label}
+      {elevation && (
+        <span className={label ? "ml-1.5 text-text-muted/60" : "text-text-muted/60"}>
+          {label ? "· " : ""}
+          {elevation}
+        </span>
+      )}
+    </p>
+  );
+}
+
 function CamPlayer({
   cam,
   resortSlug,
@@ -48,8 +70,10 @@ function CamPlayer({
   index?: number;
   onExpand?: () => void;
 }) {
-  // Auto-load first 2 image cams; lazy-load the rest
+  // Auto-load first 2 image cams; lazy-load the rest (each image cam re-fetches
+  // every 30s once live, so the deferred tiles are a deliberate bandwidth guard)
   const [loaded, setLoaded] = useState(cam.embed_type !== "image" || index < 2);
+  const label = camDisplayName(cam);
 
   // Link-out cams — no embed available
   if (cam.embed_type === "link") {
@@ -74,7 +98,7 @@ function CamPlayer({
           </div>
           <div className="text-center px-4">
             <p className="text-text-subtle text-sm font-medium group-hover:text-cyan transition-colors">
-              {cam.name}
+              {label}
             </p>
             <p className="text-text-muted text-xs mt-0.5">Opens on resort website</p>
           </div>
@@ -105,13 +129,16 @@ function CamPlayer({
               </svg>
             </div>
             <div className="text-center px-4">
-              <p className="text-text-subtle text-sm font-medium">{cam.name}</p>
+              <p className="text-text-subtle text-sm font-medium">{label}</p>
               {cam.elevation && (
                 <p className="text-text-muted text-xs mt-0.5">
                   {Number(cam.elevation).toLocaleString()}′ elevation
                 </p>
               )}
-              <p className="text-text-muted text-xs mt-1">Click to load snapshot</p>
+              <span className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
+                               border border-cyan/40 text-cyan text-[11px] font-semibold uppercase tracking-wider">
+                Click to load snapshot
+              </span>
             </div>
           </button>
         ) : (
@@ -153,16 +180,17 @@ function CamPlayer({
             </svg>
           </div>
           <div className="text-center px-4">
-            <p className="text-text-subtle text-sm font-medium">{cam.name}</p>
+            <p className="text-text-subtle text-sm font-medium">{label}</p>
             {cam.elevation && (
               <p className="text-text-muted text-xs mt-0.5">
                 {Number(cam.elevation).toLocaleString()}′ elevation
               </p>
             )}
-            <p className="text-text-muted text-xs mt-1 flex items-center justify-center gap-1">
+            <span className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
+                             border border-cyan/40 text-cyan text-[11px] font-semibold uppercase tracking-wider">
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-[livePulse_2s_ease-in-out_infinite]" />
               Click to load live cam
-            </p>
+            </span>
           </div>
         </button>
       )}
@@ -517,9 +545,14 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">
               Live Cams
-              <span className="ml-2 text-text-muted text-sm font-normal">
-                {activeCams.length} available
-              </span>
+              {/* Real separator text — a CSS margin alone glued the count onto
+                  "Cams" in the accessibility tree ("Live Cams3 available"). */}
+              {activeCams.length > 0 && (
+                <span className="text-text-muted text-sm font-normal">
+                  {" · "}
+                  {activeCams.length} available
+                </span>
+              )}
             </h2>
             {resort.cam_page_url && (
               <a
@@ -561,14 +594,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
                         : undefined
                     }
                   />
-                  <p className="text-text-muted text-xs mt-1.5 px-1">
-                    {cam.name}
-                    {cam.elevation && (
-                      <span className="ml-1.5 text-text-muted/60">
-                        · {Number(cam.elevation).toLocaleString()}′
-                      </span>
-                    )}
-                  </p>
+                  <CamCaption cam={cam} />
                 </div>
               ))}
             </div>

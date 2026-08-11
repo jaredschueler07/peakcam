@@ -6,6 +6,36 @@ import type { Cam } from "@/lib/types";
 
 const REFRESH_MS = { tile: 30_000, lightbox: 15_000 } as const;
 
+/** Last path segment of a cam URL, humanized — "…/CP/AGS.png" → "AGS". */
+function nameFromUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  try {
+    const { pathname, hostname } = new URL(url, "https://cam.invalid");
+    const file = pathname.split("/").filter(Boolean).pop() ?? "";
+    const stem = file.replace(/\.[a-z0-9]{2,5}$/i, "").replace(/[-_+]+/g, " ").trim();
+    if (stem) return stem;
+    return hostname === "cam.invalid" ? "" : hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+/** Display name for a cam. `cams.name` is typed non-null but some imported rows
+ *  carry a blank name, which rendered empty captions / empty alt text. Falls back
+ *  to the feed URL's filename, then the YouTube id, then `fallback`. Pass
+ *  `fallback: ""` at call sites that would rather omit the element entirely. */
+export function camDisplayName(
+  cam: Pick<Cam, "name" | "embed_url" | "youtube_id">,
+  fallback = "Live cam"
+): string {
+  return (
+    cam.name?.trim() ||
+    nameFromUrl(cam.embed_url) ||
+    cam.youtube_id?.trim() ||
+    fallback
+  );
+}
+
 function timeAgo(ts: number): string {
   const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
   return s < 60 ? `${s}s ago` : `${Math.floor(s / 60)}m ago`;
@@ -102,11 +132,13 @@ function ImageFeed({ url, name, refreshMs }: { url: string; name: string; refres
  *  `border-0` class. That exact allow list / className is preserved on both
  *  branches below so embed behavior is unchanged. */
 export function CamEmbed({ cam, variant }: { cam: Cam; resortSlug: string; variant: "tile" | "lightbox" }) {
+  const name = camDisplayName(cam);
+
   if (cam.embed_type === "youtube" && cam.youtube_id) {
     return (
       <iframe
         src={`https://www.youtube.com/embed/${cam.youtube_id}?autoplay=1&mute=1`}
-        title={cam.name}
+        title={name}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen
         className="absolute inset-0 w-full h-full border-0"
@@ -117,7 +149,7 @@ export function CamEmbed({ cam, variant }: { cam: Cam; resortSlug: string; varia
     return (
       <iframe
         src={cam.embed_url}
-        title={cam.name}
+        title={name}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen
         className="absolute inset-0 w-full h-full border-0"
@@ -125,7 +157,7 @@ export function CamEmbed({ cam, variant }: { cam: Cam; resortSlug: string; varia
     );
   }
   if (cam.embed_type === "image" && cam.embed_url) {
-    return <ImageFeed url={cam.embed_url} name={cam.name} refreshMs={REFRESH_MS[variant]} />;
+    return <ImageFeed url={cam.embed_url} name={name} refreshMs={REFRESH_MS[variant]} />;
   }
   return null;
 }
