@@ -1,17 +1,30 @@
 import type { Metadata } from "next";
 import { getAllResorts } from "@/lib/supabase";
 import { ComparePage } from "@/components/compare/ComparePage";
+import { parseCompareSlugs } from "@/lib/compare-params";
 import type { ResortWithData } from "@/lib/types";
 
 export const revalidate = 3600;
 
+/**
+ * `resorts` can arrive as a comma list (`?resorts=vail,alta`) OR as a repeated
+ * key (`?resorts=vail&resorts=alta`), which Next.js surfaces as a string[].
+ * Both go through `parseCompareSlugs`.
+ */
 interface Props {
-  searchParams: Promise<{ resorts?: string }>;
+  searchParams: Promise<{ resorts?: string | string[] }>;
 }
 
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
-  const params = await searchParams;
-  const slugs = params.resorts?.split(",").filter(Boolean) ?? [];
+  let slugs: string[] = [];
+  try {
+    const params = await searchParams;
+    slugs = parseCompareSlugs(params?.resorts);
+  } catch {
+    // Metadata must never take the route down — fall back to the generic title.
+    slugs = [];
+  }
+
   const title =
     slugs.length > 0
       ? `Compare ${slugs.length} Resort${slugs.length > 1 ? "s" : ""}`
@@ -24,19 +37,43 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
 }
 
 export default async function ComparePageRoute({ searchParams }: Props) {
-  const params = await searchParams;
-  const slugs = params.resorts?.split(",").filter(Boolean).slice(0, 4) ?? [];
+  let slugs: string[] = [];
+  try {
+    const params = await searchParams;
+    slugs = parseCompareSlugs(params?.resorts);
+  } catch {
+    slugs = [];
+  }
 
   let allResorts: ResortWithData[] = [];
+  let loadFailed = false;
   try {
     allResorts = await getAllResorts();
   } catch {
+    loadFailed = true;
     console.warn("[PeakCam] Could not fetch resorts for compare page.");
   }
+  if (!Array.isArray(allResorts)) allResorts = [];
 
-  const compareResorts = slugs
-    .map((slug) => allResorts.find((r) => r.slug === slug))
-    .filter((r): r is ResortWithData => r !== undefined);
+  // Resolve slugs → resorts, tracking the ones we couldn't find so the client
+  // can explain itself instead of silently dropping them.
+  const bySlug = new Map(allResorts.map((r) => [r.slug, r]));
+  const compareResorts: ResortWithData[] = [];
+  const missingSlugs: string[] = [];
+  for (const slug of slugs) {
+    const resort = bySlug.get(slug);
+    if (resort) compareResorts.push(resort);
+    else missingSlugs.push(slug);
+  }
 
-  return <main id="main-content"><ComparePage allResorts={allResorts} initialResorts={compareResorts} /></main>;
+  return (
+    <main id="main-content">
+      <ComparePage
+        allResorts={allResorts}
+        initialResorts={compareResorts}
+        missingSlugs={loadFailed ? [] : missingSlugs}
+        loadFailed={loadFailed}
+      />
+    </main>
+  );
 }

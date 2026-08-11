@@ -4,13 +4,14 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Fuse from "fuse.js";
-import { X, Plus, Share2, Camera, ArrowLeft } from "lucide-react";
+import { X, Plus, Share2, Camera, ArrowLeft, AlertTriangle } from "lucide-react";
 import { Header } from "@/components/layout/Header";
+import { MAX_COMPARE_RESORTS, buildCompareHref } from "@/lib/compare-params";
 import type { ResortWithData, ConditionRating } from "@/lib/types";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const MAX_RESORTS = 4;
+const MAX_RESORTS = MAX_COMPARE_RESORTS;
 
 // Poster condition palette (matches ConditionBadge)
 const conditionChip: Record<ConditionRating, string> = {
@@ -62,10 +63,16 @@ function isBestLow(value: number | null, allValues: (number | null)[]): boolean 
   return value === min;
 }
 
+/** Cams are always an array from getAllResorts(), but never trust partial data. */
+function camsOf(resort: ResortWithData) {
+  return Array.isArray(resort?.cams) ? resort.cams : [];
+}
+
 function getFirstCamThumbnail(resort: ResortWithData) {
-  const ytCam = resort.cams.find((c) => c.embed_type === "youtube" && c.youtube_id);
+  const cams = camsOf(resort);
+  const ytCam = cams.find((c) => c.embed_type === "youtube" && c.youtube_id);
   if (ytCam) return { type: "youtube" as const, url: `https://img.youtube.com/vi/${ytCam.youtube_id}/mqdefault.jpg` };
-  const imgCam = resort.cams.find((c) => c.embed_type === "image" && c.embed_url && c.is_active);
+  const imgCam = cams.find((c) => c.embed_type === "image" && c.embed_url && c.is_active);
   if (imgCam) return { type: "image" as const, url: imgCam.embed_url! };
   return null;
 }
@@ -173,26 +180,36 @@ function ResortColumnHeader({
 }) {
   const chipCls = resort.cond_rating ? conditionChip[resort.cond_rating] : null;
   const thumb = getFirstCamThumbnail(resort);
-  const activeCamCount = resort.cams.filter((c) => c.is_active).length;
+  const activeCamCount = camsOf(resort).filter((c) => c.is_active).length;
 
   return (
     <div className="flex flex-col gap-3 p-4">
-      {/* Webcam thumbnail */}
-      <div className="relative w-full aspect-video rounded-[14px] overflow-hidden bg-cream border-[1.5px] border-ink shadow-stamp-sm">
+      {/*
+        Webcam thumbnail. The box is a fixed 16:9 flex item with `shrink-0` and
+        `min-h-0` so a late-loading cam image can never stretch it — in a column
+        flex container `min-height: auto` would otherwise let the loaded image
+        grow the box and shove the Remove button out from under the cursor
+        mid-click. Every child is absolutely positioned inside the same box, so
+        the placeholder and the loaded image occupy identical space.
+      */}
+      <div className="relative w-full aspect-video shrink-0 min-h-0 rounded-[14px] overflow-hidden bg-cream border-[1.5px] border-ink shadow-stamp-sm">
         {thumb ? (
-          <Link href={`/resorts/${resort.slug}`} tabIndex={-1}>
+          <Link href={`/resorts/${resort.slug}`} tabIndex={-1} className="absolute inset-0 block">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={thumb.url}
               alt={`${resort.name} webcam`}
-              className="w-full h-full object-cover"
+              width={320}
+              height={180}
+              decoding="async"
+              className="absolute inset-0 w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-ink/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
               <Camera size={20} className="text-cream-50" />
             </div>
           </Link>
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-bark">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-bark">
             <Camera size={18} />
             <span className="font-mono text-[10.5px] uppercase tracking-[0.12em]">
               {activeCamCount} cam{activeCamCount !== 1 ? "s" : ""}
@@ -202,17 +219,19 @@ function ResortColumnHeader({
       </div>
 
       {/* Resort info + remove button */}
-      <div>
+      <div className="relative z-10">
         <div className="flex items-start justify-between gap-1">
           <Link href={`/resorts/${resort.slug}`} className="hover:text-alpen transition-colors flex-1 min-w-0">
             <h3 className="font-display font-black text-ink text-[16px] leading-[1.05] tracking-[-0.01em]">{resort.name}</h3>
           </Link>
+          {/* Sits above the cam panel in stacking order with a 32px hit target. */}
           <button
+            type="button"
             onClick={onRemove}
-            className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-cream-50 border-[1.5px] border-ink text-ink hover:bg-alpen hover:text-cream-50 shadow-[2px_2px_0_#2a1f14] transition-colors"
+            className="relative z-10 shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-cream-50 border-[1.5px] border-ink text-ink hover:bg-alpen hover:text-cream-50 shadow-[2px_2px_0_#2a1f14] transition-colors touch-manipulation"
             aria-label={`Remove ${resort.name} from comparison`}
           >
-            <X size={12} strokeWidth={2.5} />
+            <X size={14} strokeWidth={2.5} />
           </button>
         </div>
         <p className="font-mono text-[10.5px] text-bark uppercase tracking-[0.12em] mt-1">
@@ -260,12 +279,22 @@ function StatCell({ value, isBest }: { value: string; isBest: boolean }) {
 interface Props {
   allResorts: ResortWithData[];
   initialResorts: ResortWithData[];
+  /** Slugs from the URL that didn't match any resort (shown as a soft notice). */
+  missingSlugs?: string[];
+  /** True when the resort catalog couldn't be fetched at all. */
+  loadFailed?: boolean;
 }
 
-export function ComparePage({ allResorts, initialResorts }: Props) {
+export function ComparePage({
+  allResorts,
+  initialResorts,
+  missingSlugs = [],
+  loadFailed = false,
+}: Props) {
   const router = useRouter();
   const [resorts, setResorts] = useState<ResortWithData[]>(initialResorts);
   const [copied, setCopied] = useState(false);
+  const [dismissedNotice, setDismissedNotice] = useState(false);
   const isFirstRender = useRef(true);
 
   // Sync URL when resorts change (skip on initial mount to avoid replacing server URL)
@@ -274,9 +303,7 @@ export function ComparePage({ allResorts, initialResorts }: Props) {
       isFirstRender.current = false;
       return;
     }
-    const slugs = resorts.map((r) => r.slug).join(",");
-    const url = slugs ? `/compare?resorts=${slugs}` : "/compare";
-    router.replace(url, { scroll: false });
+    router.replace(buildCompareHref(resorts.map((r) => r.slug)), { scroll: false });
   }, [resorts, router]);
 
   function addResort(resort: ResortWithData) {
@@ -312,6 +339,8 @@ export function ComparePage({ allResorts, initialResorts }: Props) {
     const t = r.snow_report?.lifts_total;
     return o != null && t != null && t > 0 ? o / t : null;
   });
+  const showNotice = !dismissedNotice && (loadFailed || missingSlugs.length > 0);
+
   const condRanks = resorts.map((r) =>
     r.cond_rating != null ? CONDITION_ORDER[r.cond_rating] : null
   );
@@ -383,7 +412,7 @@ export function ComparePage({ allResorts, initialResorts }: Props) {
     {
       label: "WEBCAMS",
       values: resorts.map((r) => ({
-        display: `${r.cams.filter((c) => c.is_active).length}`,
+        display: `${camsOf(r).filter((c) => c.is_active).length}`,
         isBest: false,
       })),
     },
@@ -410,6 +439,46 @@ export function ComparePage({ allResorts, initialResorts }: Props) {
             Compare <em className="text-alpen italic font-bold">resorts</em>.
           </h1>
         </div>
+
+        {/* Soft failure notices — never a blank page, never a 500 */}
+        {showNotice && (
+          <div
+            role="status"
+            className="mb-8 flex items-start gap-3 rounded-[14px] border-[1.5px] border-ink bg-cream-50 px-4 py-3 shadow-stamp-sm"
+          >
+            <AlertTriangle size={16} className="mt-0.5 shrink-0 text-alpen-dk" aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-semibold text-ink">
+                {loadFailed
+                  ? "We couldn’t load resort data just now."
+                  : `We couldn’t find ${missingSlugs.length === 1 ? "that resort" : "those resorts"}.`}
+              </p>
+              <p className="mt-0.5 text-[12.5px] text-bark break-words">
+                {loadFailed ? (
+                  <>Snow reports are temporarily unavailable — please try again in a moment.</>
+                ) : (
+                  <>
+                    Skipped{" "}
+                    <span className="font-mono text-[11.5px] text-ink break-all">
+                      {missingSlugs
+                        .map((s) => (s.length > 40 ? `${s.slice(0, 40)}…` : s))
+                        .join(", ")}
+                    </span>
+                    . {resorts.length > 0 ? "The rest are shown below." : "Search below to pick resorts."}
+                  </>
+                )}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDismissedNotice(true)}
+              className="relative z-10 -mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-bark transition-colors hover:bg-cream hover:text-ink"
+              aria-label="Dismiss notice"
+            >
+              <X size={14} strokeWidth={2.5} />
+            </button>
+          </div>
+        )}
 
         {/* Toolbar */}
         <div className="flex items-center gap-3 flex-wrap mb-8">
