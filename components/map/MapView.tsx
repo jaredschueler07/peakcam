@@ -28,7 +28,9 @@ import {
   resortsToGeoJSON,
   resortBounds,
   seasonalDefaultViewState,
+  OFF_SEASON_COLOR,
 } from "@/lib/map-utils";
+import { PC_BARK, PC_BARK_DK } from "@/lib/theme-tokens";
 import MapPopupCard from "./MapPopupCard";
 import MapControls from "./MapControls";
 import MapLegend from "./MapLegend";
@@ -301,7 +303,7 @@ export default function MapView({
     const ratingColor = [
       "match", ["get", "condRating"],
       "great", "#3c5a3a", "good", "#6d8a4a", "fair", "#e2a740", "poor", "#a93f20",
-      "#7a5a3a",
+      PC_BARK,
     ];
     const byMetric =
       metric === "conditions"
@@ -315,7 +317,7 @@ export default function MapView({
               METRIC_RAMP[metric].max, RAMP_DARK,
             ],
           ];
-    return ["case", ["get", "offSeason"], "#b59b74", byMetric];
+    return ["case", ["get", "offSeason"], OFF_SEASON_COLOR, byMetric];
   }, [metric]);
 
   const markerTextColorExpr = useMemo(() => {
@@ -660,7 +662,7 @@ export default function MapView({
               "text-font": ["Noto Sans Regular", "Arial Unicode MS Regular"],
             }}
             paint={{
-              "text-color": "#4a3620",             /* pc-bark-dk */
+              "text-color": PC_BARK_DK,
               "text-halo-color": "#faf4e6",        /* pc-cream-50 halo */
               "text-halo-width": 1.25,
             }}

@@ -3,10 +3,28 @@
 import { useState } from "react";
 import type { ForecastPeriod } from "@/lib/types";
 import WeatherIcon from "@/components/weather/WeatherIcon";
-import WindArrow from "@/components/weather/WindArrow";
+import WindArrow, { normalizeCompass } from "@/components/weather/WindArrow";
 
 interface ForecastTableProps {
   periods: ForecastPeriod[];
+}
+
+/** Wind readout parts. NWS reports an empty windDirection for calm periods, so
+ *  speed, direction and gust each have to stand alone. */
+function windReadout(p: ForecastPeriod) {
+  const mph = Number.isFinite(p.windSpeed) ? Math.round(p.windSpeed) : null;
+  const direction = normalizeCompass(p.windDirection);
+  const gust =
+    mph != null && Number.isFinite(p.windGust) && p.windGust > p.windSpeed + 5
+      ? Math.round(p.windGust)
+      : null;
+  const label =
+    mph == null
+      ? "Wind unavailable"
+      : `Wind ${mph} mph${direction ? ` from ${direction}` : ""}${
+          gust != null ? `, gusting ${gust} mph` : ""
+        }`;
+  return { mph, direction, gust, label };
 }
 
 const PERIOD_LABEL: Record<string, string> = {
@@ -97,17 +115,31 @@ export function ForecastTable({ periods }: ForecastTableProps) {
 
                     {/* Wind */}
                     <td className="px-3 py-2.5 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono font-bold text-ink text-[13px] tabular-nums">
-                          {Math.round(p.windSpeed)}
-                        </span>
-                        <WindArrow direction={p.windDirection} size={14} />
-                        {p.windGust > p.windSpeed + 5 && (
-                          <span className="font-mono text-bark text-[11px] tabular-nums">
-                            g{Math.round(p.windGust)}
-                          </span>
-                        )}
-                      </div>
+                      {(() => {
+                        const wind = windReadout(p);
+                        if (wind.mph == null) {
+                          return <span className="font-mono text-bark text-[11px]">&mdash;</span>;
+                        }
+                        return (
+                          <div className="flex items-center gap-1.5" role="img" aria-label={wind.label}>
+                            <span className="font-mono font-bold text-ink text-[13px] tabular-nums">
+                              {wind.mph}
+                            </span>
+                            {wind.direction ? (
+                              <WindArrow direction={wind.direction} size={14} decorative />
+                            ) : (
+                              <span className="font-mono text-bark text-[10px] uppercase tracking-[0.08em]">
+                                mph
+                              </span>
+                            )}
+                            {wind.gust != null && (
+                              <span className="font-mono text-bark text-[11px] tabular-nums">
+                                g{wind.gust}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     {/* Snow bar */}
@@ -179,12 +211,24 @@ export function ForecastTable({ periods }: ForecastTableProps) {
                       <span className="font-mono font-bold text-ink tabular-nums">
                         {Math.round(p.highTemp)}°
                       </span>
-                      <div className="flex items-center gap-1">
-                        <span className="font-mono text-ink text-[12px] tabular-nums">
-                          {Math.round(p.windSpeed)}
-                        </span>
-                        <WindArrow direction={p.windDirection} size={12} />
-                      </div>
+                      {(() => {
+                        const wind = windReadout(p);
+                        if (wind.mph == null) return null;
+                        return (
+                          <div className="flex items-center gap-1" role="img" aria-label={wind.label}>
+                            <span className="font-mono text-ink text-[12px] tabular-nums">
+                              {wind.mph}
+                            </span>
+                            {wind.direction ? (
+                              <WindArrow direction={wind.direction} size={12} decorative />
+                            ) : (
+                              <span className="font-mono text-bark text-[10px] uppercase tracking-[0.08em]">
+                                mph
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                       {p.snowInches > 0 && (
                         <span className="font-mono font-bold text-alpen-dk text-[12px] tabular-nums">
                           {p.snowInches}&quot;

@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition } from "./types";
+import { withResolvedCamNames } from "./cam-name";
 
 // ─────────────────────────────────────────────────────────────
 // Client
@@ -77,9 +78,11 @@ export async function getAllResorts(): Promise<ResortWithData[]> {
     snowByResort.set(s.resort_id, s);
   }
 
-  // Group cams by resort using push() to avoid O(n²) spread
+  // Group cams by resort using push() to avoid O(n²) spread. Names are
+  // resolved here so every consumer gets the same non-blank label without each
+  // one re-parsing cam URLs at render time.
   const camsByResort = new Map<string, Cam[]>();
-  for (const c of camResult.data ?? []) {
+  for (const c of withResolvedCamNames<Cam>(camResult.data ?? [])) {
     if (!camsByResort.has(c.resort_id)) {
       camsByResort.set(c.resort_id, []);
     }
@@ -132,8 +135,43 @@ export async function getResortBySlug(slug: string): Promise<ResortWithData | nu
   return {
     ...resort,
     snow_report: snowResult.data ?? null,
-    cams: camResult.data ?? [],
+    cams: withResolvedCamNames<Cam>(camResult.data ?? []),
   };
+}
+
+/**
+ * The three outcomes of resolving a slug, kept distinct on purpose.
+ *
+ * `absent` is the only one a caller may turn into a 404. `errored` means we
+ * couldn't check — 404ing on it would bake "this resort doesn't exist" into
+ * the ISR cache for the length of the revalidate window, outliving the outage
+ * that caused it.
+ */
+export type ResortNameLookup =
+  | { status: "found"; name: string }
+  | { status: "absent" }
+  | { status: "errored" };
+
+/**
+ * Resolve a slug to a display name in one round trip.
+ *
+ * For callers that only need "is this a real resort, and what's it called?" —
+ * `getResortBySlug` answers the same question but costs three queries (resort
+ * + snow report + cams) to get there.
+ */
+export async function lookupResortNameBySlug(slug: string): Promise<ResortNameLookup> {
+  const { data, error } = await supabase
+    .from("resorts")
+    .select("name")
+    .eq("slug", slug)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (error) {
+    console.warn(`[PeakCam] Could not resolve resort slug "${slug}":`, error.message);
+    return { status: "errored" };
+  }
+  return data?.name ? { status: "found", name: data.name } : { status: "absent" };
 }
 
 // ─────────────────────────────────────────────────────────────
