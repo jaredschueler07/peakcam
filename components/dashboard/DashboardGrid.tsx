@@ -1,24 +1,34 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Responsive, WidthProvider } from "react-grid-layout/legacy";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
-import { type WidgetConfig } from "@/lib/types";
+import { type WidgetConfig, type ResolvedWidget } from "@/lib/types";
+import { DashboardWidget } from "./DashboardWidget";
 
 // Import styles (standard for react-grid-layout)
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
+const EMPTY_RESOLVED = new Map<string, ResolvedWidget>();
 
 interface DashboardGridProps {
   initialLayout?: WidgetConfig[];
+  resolved?: Map<string, ResolvedWidget>;
 }
 
-export function DashboardGrid({ initialLayout = [] }: DashboardGridProps) {
+export function DashboardGrid({ initialLayout = [], resolved = EMPTY_RESOLVED }: DashboardGridProps) {
   const [layout, setLayout] = useState<WidgetConfig[]>(initialLayout);
   const [isEditMode, setIsEditMode] = useState(false);
   const supabase = createSupabaseBrowserClient();
+
+  // refresh() replaces initialLayout; skip during edit so in-progress drags are not clobbered.
+  useEffect(() => {
+    if (isEditMode) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync from parent, not an external store
+    setLayout(initialLayout);
+  }, [initialLayout, isEditMode]);
 
   // Map our WidgetConfig to RGL Layout format
   const rglLayout = useMemo(() => {
@@ -58,7 +68,7 @@ export function DashboardGrid({ initialLayout = [] }: DashboardGridProps) {
           user_id: user.id,
           config: { widgets: updatedWidgets },
           updated_at: new Date().toISOString(),
-        });
+        }, { onConflict: "user_id" });
     }
   };
 
@@ -100,9 +110,10 @@ export function DashboardGrid({ initialLayout = [] }: DashboardGridProps) {
               </div>
             )}
 
-            <div className="w-full h-full flex flex-col items-center justify-center p-4">
-              <span className="pc-eyebrow" style={{ color: "var(--pc-bark)" }}>{widget.type}</span>
-              <span className="font-display font-black text-ink mt-1">{widget.id.slice(0, 8)}</span>
+            {/* inert while editing: the body is a link, and a drag or a stray
+                Tab+Enter must not navigate away mid-layout-change. */}
+            <div className="w-full h-full" inert={isEditMode || undefined}>
+              <DashboardWidget widget={widget} resolved={resolved.get(widget.id)} />
             </div>
           </div>
         ))}

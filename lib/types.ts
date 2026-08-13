@@ -234,3 +234,10 @@ export interface DashboardLayout {
   };
   updated_at: string;
 }
+
+/** A dashboard widget with its referenced resort/cam resolved from the DB.
+ *  `missing` marks a favorite whose resort/cam has since been deleted or deactivated. */
+export type ResolvedWidget =
+  | { kind: "resort"; resort: Resort; snow: SnowReport | null; cams: Cam[] }
+  | { kind: "cam"; cam: Cam; resort: Resort | null }
+  | { kind: "missing"; type: FavoriteType };
