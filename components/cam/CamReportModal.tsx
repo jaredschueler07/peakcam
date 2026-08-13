@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import type { Cam, CamReportReason } from "@/lib/types";
+import { camDisplayName } from "@/lib/cam-name";
 
 interface Props {
   cam: Cam;
@@ -104,7 +105,7 @@ export function CamReportModal({
     <Modal
       open
       onClose={onClose}
-      title={`Report · ${resortName} — ${cam.name}`}
+      title={`Report · ${resortName} — ${camDisplayName(cam)}`}
     >
       <form onSubmit={handleSubmit} className="px-6 pt-5 pb-6 space-y-5">
         <fieldset className="space-y-2">

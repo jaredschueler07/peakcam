@@ -1,6 +1,6 @@
 "use client";
 
-import WindArrow from "@/components/weather/WindArrow";
+import WindArrow, { normalizeCompass } from "@/components/weather/WindArrow";
 
 interface ConditionsHeroProps {
   currentTemp?: number | null;
@@ -29,6 +29,23 @@ export function ConditionsHero({
 }: ConditionsHeroProps) {
   const precip = precipProbability ?? 0;
 
+  // Wind, the same way ForecastTable does it. Gating the arrow on the raw
+  // string meant a direction NWS reports outside the 16 compass points ("VRB",
+  // "NW to NE") rendered a truthy value that WindArrow then declined to draw:
+  // no arrow, and — because the arrow is what carried the aria-label — no
+  // spoken direction either. Normalize first, keep the "mph" unit visible
+  // either way, and label the whole readout so it reads as one value.
+  const windCompass = normalizeCompass(windDirection);
+  const windMph = windSpeed != null ? Math.round(windSpeed) : null;
+  const windLabel =
+    windMph == null
+      ? "Wind unavailable"
+      : `Wind ${windMph} mph${windCompass ? ` from ${windCompass}` : ""}${
+          windGust != null && windSpeed != null && windGust > windSpeed
+            ? `, gusting ${Math.round(windGust)} mph`
+            : ""
+        }`;
+
   return (
     <div className="bg-cream-50 border-[1.5px] border-ink rounded-[18px] shadow-stamp p-2">
       <div className="grid grid-cols-2 md:grid-cols-4">
@@ -54,11 +71,11 @@ export function ConditionsHero({
 
         {/* Wind */}
         <div className="flex flex-col items-center justify-center px-4 py-4 md:border-r-[1.5px] md:border-dashed md:border-bark border-t-[1.5px] border-dashed border-bark md:border-t-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" role="img" aria-label={windLabel}>
             <span className="font-display font-black text-4xl leading-none text-ink tracking-[-0.02em] tabular-nums">
               {fmt(windSpeed, "")}
             </span>
-            {windDirection && <WindArrow direction={windDirection} size={22} />}
+            {windCompass && <WindArrow direction={windCompass} size={22} decorative />}
             <span className="font-mono text-bark text-sm font-bold">mph</span>
           </div>
           {windGust != null && windSpeed != null && windGust > windSpeed ? (

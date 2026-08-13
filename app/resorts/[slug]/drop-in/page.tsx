@@ -1,22 +1,28 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import {
   DROP_IN_RESORT_SLUGS,
   getDropInGameUrl,
   getDropInProfile,
   DROP_IN_GAME_PROFILES,
 } from "@/lib/drop-in";
+import { getResortBySlug, lookupResortNameBySlug } from "@/lib/supabase";
 import DropInFrame from "@/components/drop-in/DropInFrame";
 import DropInClientBoundary from "@/components/drop-in/DropInClientBoundary";
-import { getResortBySlug } from "@/lib/supabase";
+import DropInUnavailable from "@/components/drop-in/DropInUnavailable";
+import { Header } from "@/components/layout/Header";
 import { getWeatherForecast } from "@/lib/weather";
 import { buildConditionsSnapshot } from "@/lib/game/conditions";
 import { PHYSICS_V2_ROLLOUT_ENABLED, physicsModelForRollout } from "@/lib/game/config/physics-rollout";
 
 const BASE_URL = "https://peakcam.io";
+
 export const revalidate = 3600;
 
-// The pilot roster is static and tiny — prerender all three.
+// The pilot roster is static and tiny — prerender all three. Everything else is
+// rendered on demand (and cached by the revalidate above), so the resort lookup
+// that powers the "not in the pilot yet" state never runs during the build.
 export function generateStaticParams() {
   return DROP_IN_RESORT_SLUGS.map((slug) => ({ slug }));
 }
@@ -28,7 +34,18 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const profile = getDropInProfile(slug);
-  if (!profile) return {};
+
+  // Off-roster: don't spend a DB round-trip on a title. Generic, and noindex so
+  // the ~125 non-pilot permutations of this URL never enter the index.
+  if (!profile) {
+    return {
+      title: "Drop In isn't available for this resort yet",
+      description:
+        "Drop In is PeakCam's arcade ski descent, hand-built for a few resorts at a time. " +
+        "See which mountains you can ski right now.",
+      robots: { index: false, follow: true },
+    };
+  }
 
   const title = `Drop In — Ski ${profile.name}`;
   const description =
@@ -54,7 +71,8 @@ export async function generateMetadata({
       description,
     },
     alternates: { canonical: pageUrl },
-    // A playable canvas isn't a search result worth indexing; the resort page is.
+    // A playable canvas isn't a search result worth indexing; the resort page is
+    // (and /drop-in is the indexable front door for the feature).
     robots: { index: false, follow: true },
   };
 }
@@ -70,11 +88,45 @@ export default async function DropInPage({
   const profile = getDropInProfile(slug);
   const gameUrl = getDropInGameUrl(slug);
 
-  // Anything outside the three-resort pilot is a 404, not a default mountain.
-  // Decided before searchParams is awaited: touching searchParams opts the
-  // route into dynamic streaming, and once the shell has flushed notFound()
-  // can no longer set the 404 status code.
-  if (!profile || !gameUrl) return notFound();
+  // Off the pilot roster. Two very different situations share this URL shape:
+  // a resort we cover but haven't built a descent for (Vail — by far the common
+  // case), and a slug that isn't a resort at all. Telling the first group
+  // "RESORT NOT FOUND" is simply false, so look the slug up and split them.
+  //
+  // The branch is taken before `searchParams` is awaited: touching searchParams
+  // opts the route into dynamic streaming, and once the shell has flushed,
+  // notFound() can no longer set the 404 status code.
+  //
+  // `lookupResortNameBySlug` is a one-query name-only probe rather than
+  // `getResortBySlug` (three round trips for cams and a snow report this page
+  // never renders), and it reports "couldn't check" separately from "no such
+  // resort" — the distinction the fail-safe below depends on.
+  if (!profile || !gameUrl) {
+    const lookup = await lookupResortNameBySlug(slug);
+
+    // Genuinely unknown slug — a true 404, handled by the sibling
+    // not-found.tsx so the copy is about Drop In, not about a missing resort.
+    if (lookup.status === "absent") notFound();
+
+    // Lookup errored. Render the unnamed "no descent here" copy rather than
+    // 404ing a resort that probably exists — and opt this render out of the
+    // route cache, so a blip during the revalidate window isn't frozen into
+    // ISR for the next hour. Both statements matter: without connection() the
+    // degraded page caches; without the guard every off-roster resort page
+    // would go dynamic.
+    if (lookup.status === "errored") await connection();
+
+    const resortName = lookup.status === "found" ? lookup.name : undefined;
+
+    return (
+      <>
+        <Header showSearch={false} />
+        <main id="main-content">
+          <DropInUnavailable resortName={resortName} resortSlug={slug} />
+        </main>
+      </>
+    );
+  }
 
   const { engine } = await searchParams;
   if (engine !== "v2") {

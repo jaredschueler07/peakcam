@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion } from "motion/react";
 import { Snowflake, Play } from "lucide-react";
 import type { Cam, ResortWithData } from "@/lib/types";
+import { camDisplayName } from "@/lib/cam-name";
 
 interface SnowCam {
   cam: Cam;
@@ -91,6 +92,7 @@ function SnowCamCard({
   onLoad: () => void;
 }) {
   const snow = resort.snow_report;
+  const name = camDisplayName(cam);
 
   const embedSrc =
     cam.embed_type === "youtube" && cam.youtube_id
@@ -118,7 +120,7 @@ function SnowCamCard({
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={cam.embed_url ?? ""}
-              alt={cam.name}
+              alt={`${name} webcam`}
               className="w-full h-full object-cover"
               loading="lazy"
               decoding="async"
@@ -129,7 +131,7 @@ function SnowCamCard({
               className="w-full h-full border-0"
               allow="autoplay; encrypted-media"
               allowFullScreen
-              title={cam.name}
+              title={name}
             />
           )
         ) : (
@@ -176,7 +178,7 @@ function SnowCamCard({
               {resort.name}
             </h3>
             <p className="font-mono text-[10.5px] text-bark uppercase tracking-[0.1em] mt-0.5 truncate">
-              {cam.name} · {resort.state}
+              {name} · {resort.state}
             </p>
           </div>
           <div className="text-right shrink-0">
