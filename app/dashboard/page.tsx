@@ -8,7 +8,7 @@ import { PeakFooter } from "@/components/home/PeakFooter";
 import { Star, Layout, Loader2 } from "lucide-react";
 
 export default function DashboardPage() {
-  const { widgets, isLoading } = useDashboard();
+  const { widgets, resolved, isLoading } = useDashboard();
 
   return (
     <div className="min-h-screen bg-bg flex flex-col">
@@ -33,7 +33,7 @@ export default function DashboardPage() {
             </p>
           </div>
         ) : (
-          <DashboardGrid initialLayout={widgets} />
+          <DashboardGrid initialLayout={widgets} resolved={resolved} />
         )}
 
         <section className="mt-20 pt-12 border-t border-border/40">
