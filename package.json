@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import tsx --test lib/*.test.ts 'lib/game/**/*.test.ts' scripts/*.test.ts tests/*.test.ts",
+    "test": "node --import tsx --test lib/*.test.ts 'lib/alerts/*.test.ts' 'lib/game/**/*.test.ts' scripts/*.test.ts tests/*.test.ts",
     "drop-in:sync-three": "node scripts/sync-three.mjs",
     "bake-terrain": "tsx scripts/bake-resort.ts",
     "validate-game-assets": "tsx scripts/validate-game-assets.ts",

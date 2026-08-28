@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loadManageData } from "@/lib/alerts/manage-data";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -15,6 +16,12 @@ function sbFetch(path: string, init?: RequestInit) {
   });
 }
 
+/** Mirrors clampThreshold in lib/alerts/subscribe-core.ts. */
+function clampThreshold(value: unknown): number {
+  const n = typeof value === "number" && Number.isFinite(value) ? value : 6;
+  return Math.max(1, Math.min(48, Math.round(n)));
+}
+
 // GET /api/alerts/manage?token=xxx
 // Returns the subscriber's current preferences + all available resorts
 export async function GET(request: NextRequest) {
@@ -23,31 +30,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "token is required" }, { status: 400 });
   }
 
-  const subResp = await sbFetch(
-    `/alert_subscribers?manage_token=eq.${encodeURIComponent(token)}&select=id,email,created_at&limit=1`
-  );
-  const subscribers = subResp.ok ? await subResp.json() : [];
-  if (!subscribers.length) {
+  const data = await loadManageData(token);
+  if (!data) {
     return NextResponse.json({ error: "Invalid or expired token" }, { status: 404 });
   }
-  const subscriber = subscribers[0];
 
-  const [prefsResp, resortsResp] = await Promise.all([
-    sbFetch(
-      `/alert_preferences?subscriber_id=eq.${subscriber.id}&select=resort_id,threshold_inches`
-    ),
-    sbFetch(`/resorts?is_active=eq.true&select=id,name,state,region,slug&order=name`),
-  ]);
-
-  const preferences = prefsResp.ok ? await prefsResp.json() : [];
-  const resorts = resortsResp.ok ? await resortsResp.json() : [];
-
-  return NextResponse.json({
-    email: subscriber.email,
-    created_at: subscriber.created_at,
-    preferences,
-    resorts,
-  });
+  return NextResponse.json(data);
 }
 
 // PUT /api/alerts/manage
@@ -79,11 +67,15 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ ok: true, resort_count: 0 });
   }
 
-  const thresholds: Record<string, number> = body.thresholds ?? {};
+  const thresholds: Record<string, unknown> = body.thresholds ?? {};
   const prefs = body.resort_ids.map((rid: string) => ({
     subscriber_id: subscriberId,
     resort_id: rid,
-    threshold_inches: Math.max(1, Math.min(48, thresholds[rid] ?? 6)),
+    // Same clamp as the subscribe path. Guarding the type as well as the range
+    // matters here: a non-numeric threshold fell straight through Math.min to
+    // NaN, which Postgres rejects — losing the whole save after the delete
+    // above had already cleared the subscriber's existing preferences.
+    threshold_inches: clampThreshold(thresholds[rid]),
   }));
 
   const insertResp = await sbFetch("/alert_preferences", {
