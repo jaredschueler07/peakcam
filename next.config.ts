@@ -125,6 +125,15 @@ const nextConfig: NextConfig = {
   images: {
     domains: [],
   },
+  experimental: {
+    // Max attempts per page during the static export (default 1). The build
+    // prerenders ~148 resort pages against live Supabase behind an 8s fetch
+    // abort (lib/supabase.ts), and generateStaticParams deliberately fails
+    // closed — so a single transient slow query kills the whole build. Three
+    // failures on the same page still fail the build, keeping the fail-closed
+    // behavior for real outages.
+    staticGenerationRetryCount: 3,
+  },
   async headers() {
     return [
       {
