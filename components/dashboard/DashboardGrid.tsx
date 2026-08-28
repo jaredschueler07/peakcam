@@ -11,6 +11,9 @@ import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
+// Stable identities: both feed the sync effect's dep array, and a fresh `[]` or
+// `new Map()` per render would re-run it forever.
+const EMPTY_LAYOUT: WidgetConfig[] = [];
 const EMPTY_RESOLVED = new Map<string, ResolvedWidget>();
 
 interface DashboardGridProps {
@@ -18,7 +21,7 @@ interface DashboardGridProps {
   resolved?: Map<string, ResolvedWidget>;
 }
 
-export function DashboardGrid({ initialLayout = [], resolved = EMPTY_RESOLVED }: DashboardGridProps) {
+export function DashboardGrid({ initialLayout = EMPTY_LAYOUT, resolved = EMPTY_RESOLVED }: DashboardGridProps) {
   const [layout, setLayout] = useState<WidgetConfig[]>(initialLayout);
   const [isEditMode, setIsEditMode] = useState(false);
   const supabase = createSupabaseBrowserClient();
