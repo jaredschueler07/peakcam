@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { Camera, ArrowLeftRight, TrendingUp, TrendingDown, Minus, Snowflake, Sun, Thermometer, Heart } from "lucide-react";
 import type { ResortWithData, ConditionRating, SnowTrend, SnowOutlook } from "@/lib/types";
 import { isOffSeason, OFF_SEASON_COLOR } from "@/lib/map-utils";
@@ -27,13 +27,16 @@ const COUNT_UP_MS = 600;
  *  2. A mid-flight target change animates from the *currently displayed*
  *     number rather than resetting to 0.
  *  3. `prefers-reduced-motion: reduce` jumps straight to the final value.
+ *
+ * `animate={false}` (below-the-fold cards on the animation diet) renders the
+ * final value immediately and never runs the count-up.
  */
-function AnimatedNumber({ value }: { value: number }) {
-  const [count, setCount] = useState(0);
+function AnimatedNumber({ value, animate = true }: { value: number; animate?: boolean }) {
+  const [count, setCount] = useState(animate ? 0 : value);
   // What is actually painted right now, and what the last completed run
   // settled on. Refs (not state) so reading them can't re-trigger the effect.
-  const displayedRef = useRef(0);
-  const settledRef = useRef<number | null>(null);
+  const displayedRef = useRef(animate ? 0 : value);
+  const settledRef = useRef<number | null>(animate ? null : value);
 
   useEffect(() => {
     // Guard 1 — already showing this number: do nothing.
@@ -51,8 +54,8 @@ function AnimatedNumber({ value }: { value: number }) {
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const from = displayedRef.current;
-    // Guard 3 (reduced motion) + degenerate no-distance case.
-    if (prefersReducedMotion || from === value) {
+    // Guard 3 (reduced motion) + animation diet + degenerate no-distance case.
+    if (!animate || prefersReducedMotion || from === value) {
       settle();
       return;
     }
@@ -76,7 +79,7 @@ function AnimatedNumber({ value }: { value: number }) {
     // Cancelled on unmount and on target change — no leaked rAF, no stale
     // closure writing an old target into state after the value moved on.
     return () => cancelAnimationFrame(frame);
-  }, [value]);
+  }, [value, animate]);
 
   return <span aria-hidden="true">{count}</span>;
 }
@@ -123,9 +126,17 @@ interface Props {
   resort: ResortWithData;
   favorited?: boolean;
   onToggleFavorite?: () => void;
+  /**
+   * Entrance animation + count-up. Only the first screenful of cards should
+   * animate — with all 148 on, every card mounts an IntersectionObserver and
+   * an interval timer, and fast scrolls hit blank not-yet-revealed patches.
+   */
+  animate?: boolean;
 }
 
-export function SummitResortCard({ resort, favorited, onToggleFavorite }: Props) {
+export function SummitResortCard({ resort, favorited, onToggleFavorite, animate = true }: Props) {
+  const reducedMotion = useReducedMotion();
+  const entrance = animate && !reducedMotion;
   const snow = resort.snow_report;
   const baseDepth = snow?.base_depth ?? 0;
   const snow24h = snow?.new_snow_24h ?? 0;
@@ -148,10 +159,10 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite }: Props)
   return (
     <motion.div
       className="group relative rounded-[18px] cursor-pointer"
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={entrance ? { opacity: 0, y: 20 } : false}
+      whileInView={entrance ? { opacity: 1, y: 0 } : undefined}
       viewport={{ once: true }}
-      whileHover={{ y: -4, x: -1 }}
+      whileHover={reducedMotion ? undefined : { y: -4, x: -1 }}
       transition={{ duration: 0.15 }}
     >
       {/* Card paper — cream-50 bg, ink border, stamp shadow */}
@@ -210,7 +221,7 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite }: Props)
               >
                 {baseDepth > 0 ? (
                   <>
-                    <AnimatedNumber value={baseDepth} />
+                    <AnimatedNumber value={baseDepth} animate={entrance} />
                     <span className="text-alpen">&quot;</span>
                   </>
                 ) : (
