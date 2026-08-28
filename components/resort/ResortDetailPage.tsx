@@ -24,6 +24,7 @@ import { trackViewContent } from "@/lib/meta-pixel-events";
 import { FavoriteButton } from "../ui/FavoriteButton";
 import { isDropInResort } from "@/lib/drop-in";
 import DropInLink from "@/components/drop-in/DropInLink";
+import { ResortAlertCard } from "@/components/alerts/ResortAlertCard";
 
 interface Props {
   resort: ResortWithData;
@@ -502,6 +503,16 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
             </div>
           </section>
         )}
+
+        {/* Powder alert signup for this resort. Sits under the snow report so
+            it lands right after the number a reader came here to check. */}
+        <section>
+          <ResortAlertCard
+            resortId={resort.id}
+            resortName={resort.name}
+            resortSlug={resort.slug}
+          />
+        </section>
 
         {/* ForecastTable — 5-day morning/afternoon/evening */}
         {forecastPeriods && forecastPeriods.length > 0 ? (

@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { EmailSendError, sendPowderAlertEmail } from "@/lib/email";
 import { checkFreshness } from "@/lib/feed-freshness";
 import { sendFeedFreshnessAlertEmail } from "@/lib/alerts/freshness-email";
+import {
+  selectPowderAlerts,
+  cooldownLookbackDate,
+  type AlertPreference,
+  type AlertLogRow,
+  type SnowSnapshot,
+} from "@/lib/alerts/powder-trigger";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -21,25 +28,6 @@ function sbFetch(path: string, init?: RequestInit) {
       ...(init?.headers ?? {}),
     },
   });
-}
-
-interface Subscriber {
-  id: string;
-  email: string;
-  manage_token: string;
-}
-
-interface AlertPreference {
-  subscriber_id: string;
-  resort_id: string;
-  threshold_inches: number;
-  alert_subscribers: Subscriber;
-  resorts: { name: string; slug: string };
-}
-
-interface SnowReport {
-  resort_id: string;
-  new_snow_24h: number | null;
 }
 
 interface FreshnessSummary {
@@ -124,73 +112,63 @@ async function handleTrigger(request: NextRequest) {
     });
   }
 
-  // 2. Load latest snow reports for all relevant resort IDs
+  // 2. Load latest snow reports for all relevant resort IDs.
+  // updated_at comes along so the freshness rule in selectPowderAlerts can
+  // reject a resort whose feed has stopped moving.
   const resortIds = [...new Set(prefs.map((p) => p.resort_id))];
   const snowResp = await sbFetch(
-    `/latest_snow_reports?resort_id=in.(${resortIds.map((id) => `"${id}"`).join(",")})&select=resort_id,new_snow_24h`
+    `/latest_snow_reports?resort_id=in.(${resortIds.map((id) => `"${id}"`).join(",")})&select=resort_id,new_snow_24h,updated_at`
   );
   if (!snowResp.ok) {
     return NextResponse.json({ error: "Failed to load snow reports", freshness }, { status: 500 });
   }
-  const snowReports: SnowReport[] = await snowResp.json();
-  const snowByResort = new Map(snowReports.map((s) => [s.resort_id, s.new_snow_24h ?? 0]));
+  const snow: SnowSnapshot[] = await snowResp.json();
 
-  // 3. Group triggered alerts by subscriber
-  // Map: subscriber_id → { subscriber, alerts[] }
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10); // YYYY-MM-DD
 
-  // Load already-sent alerts for today (dedup check)
+  // 3. Load the alert log back over the whole cooldown window, not just today.
+  // A same-day-only read (what this used to do) can never catch the repeat
+  // sends the cooldown exists to prevent, since the cron runs once a day.
   const logResp = await sbFetch(
-    `/powder_alert_log?alert_date=eq.${today}&select=subscriber_id,resort_id`
+    `/powder_alert_log?alert_date=gte.${cooldownLookbackDate(now)}` +
+      `&select=subscriber_id,resort_id,new_snow_inches,alert_date`
   );
-  const todayLog: Array<{ subscriber_id: string; resort_id: string }> = logResp.ok
-    ? await logResp.json()
-    : [];
-  const alreadySent = new Set(todayLog.map((l) => `${l.subscriber_id}:${l.resort_id}`));
-
-  type AlertEntry = { resortName: string; slug: string; newSnow: number; threshold: number; resort_id: string };
-  const bySubscriber = new Map<string, { subscriber: Subscriber; alerts: AlertEntry[] }>();
-
-  for (const pref of prefs) {
-    const newSnow = snowByResort.get(pref.resort_id) ?? 0;
-    if (newSnow < pref.threshold_inches) continue;
-
-    const dedupKey = `${pref.subscriber_id}:${pref.resort_id}`;
-    if (alreadySent.has(dedupKey)) continue;
-
-    const sub = pref.alert_subscribers;
-    if (!bySubscriber.has(pref.subscriber_id)) {
-      bySubscriber.set(pref.subscriber_id, { subscriber: sub, alerts: [] });
-    }
-    bySubscriber.get(pref.subscriber_id)!.alerts.push({
-      resortName: pref.resorts.name,
-      slug: pref.resorts.slug,
-      newSnow,
-      threshold: pref.threshold_inches,
-      resort_id: pref.resort_id,
-    });
+  if (!logResp.ok) {
+    // Fail closed: with no log we cannot tell a first alert from a repeat, and
+    // re-mailing everyone their last storm is worse than skipping a run.
+    console.error("[alerts/trigger] alert log read failed — skipping send");
+    return NextResponse.json(
+      { error: "Failed to load alert log", freshness },
+      { status: 500 }
+    );
   }
+  const recentLog: AlertLogRow[] = await logResp.json();
 
-  if (bySubscriber.size === 0) {
+  // 4. Apply the threshold / freshness / cooldown rules.
+  const { batches, skipped } = selectPowderAlerts({ prefs, snow, recentLog, now });
+
+  if (batches.length === 0) {
     return NextResponse.json({
       ok: true,
       attempted: 0,
       sent: 0,
       failed: 0,
-      message: "No thresholds exceeded",
+      message: "No alerts due",
+      skipped,
       freshness,
     });
   }
 
-  // 4. Send emails and log
-  const attempted = bySubscriber.size;
+  // 5. Send emails and log
+  const attempted = batches.length;
   let sent = 0;
   let failed = 0;
   // Distinct failure reasons, surfaced in the response so a dead API key shows
   // up in the cron result itself instead of only in the logs.
   const errors = new Set<string>();
 
-  for (const [subscriberId, { subscriber, alerts }] of bySubscriber) {
+  for (const { subscriber, alerts } of batches) {
     try {
       await sendPowderAlertEmail({
         email: subscriber.email,
@@ -198,19 +176,31 @@ async function handleTrigger(request: NextRequest) {
         alerts,
       });
 
-      // Log sent alerts (ON CONFLICT DO NOTHING for dedup safety)
+      // Logged only after the mail is accepted: this row is what the cooldown
+      // reads next run, so writing it first would silence a subscriber for the
+      // whole window on the strength of an email that never went out.
       const logEntries = alerts.map((a) => ({
-        subscriber_id: subscriberId,
+        subscriber_id: subscriber.id,
         resort_id: a.resort_id,
         new_snow_inches: a.newSnow,
         alert_date: today,
       }));
 
-      await sbFetch("/powder_alert_log", {
+      const logWrite = await sbFetch("/powder_alert_log", {
         method: "POST",
         headers: { Prefer: "resolution=ignore-duplicates" },
         body: JSON.stringify(logEntries),
       });
+      if (!logWrite.ok) {
+        // The email is already out; the run is not a failure. But the cooldown
+        // is now blind to this send, so say so loudly rather than let a silent
+        // repeat next run look like correct behaviour.
+        console.error(
+          `[alerts/trigger] alert log write failed for ${subscriber.email} — ` +
+            `cooldown will not suppress a repeat: ${await logWrite.text()}`
+        );
+        errors.add("log_write_failed");
+      }
 
       sent++;
     } catch (err) {
@@ -229,6 +219,7 @@ async function handleTrigger(request: NextRequest) {
     attempted,
     sent,
     failed,
+    skipped,
     ...(errors.size > 0 ? { errors: [...errors] } : {}),
     freshness,
   };

@@ -175,6 +175,23 @@ async function sendOrThrow(
   if (!result.ok) throw new EmailSendError(emailType, to, result.error);
 }
 
+/**
+ * RFC 8058 one-click unsubscribe headers. Gmail and Yahoo require these of
+ * bulk senders, and mail clients surface them as a native "Unsubscribe" button
+ * next to the sender — the alternative for a reader who wants out is marking
+ * the mail as spam, which costs the sending domain its reputation.
+ *
+ * `List-Unsubscribe-Post` is what makes the click one-click: the client POSTs
+ * the URL itself, so it must be honoured without a confirmation page.
+ */
+function unsubscribeHeaders(manageToken: string): Record<string, string> {
+  const url = `${SITE_URL}/api/alerts/unsubscribe?token=${encodeURIComponent(manageToken)}`;
+  return {
+    "List-Unsubscribe": `<${url}>`,
+    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+  };
+}
+
 // ─── Welcome email ────────────────────────────────────────────────────────────
 
 /** Throws {@link EmailSendError} if the mail was not accepted by Resend. */
@@ -191,6 +208,7 @@ export async function sendWelcomeEmail(
 
   await sendOrThrow("welcome", params.email, {
     subject: "Powder alerts activated — PeakCam",
+    headers: unsubscribeHeaders(params.manageToken),
     html: buildEmailHtml({
       preheader: `You'll be notified when your resorts get fresh snow.`,
       title: "Powder alerts are on.",
@@ -226,6 +244,7 @@ export async function sendManageLinkEmail(
 
   await sendOrThrow("manage_link", params.email, {
     subject: "Your PeakCam powder alerts",
+    headers: unsubscribeHeaders(params.manageToken),
     html: buildEmailHtml({
       preheader: "You're already subscribed — here's your link to change what you follow.",
       title: "You're already on the list.",
@@ -284,6 +303,7 @@ export async function sendPowderAlertEmail(
 
   await sendOrThrow("powder_alert", params.email, {
     subject,
+    headers: unsubscribeHeaders(params.manageToken),
     html: buildEmailHtml({
       preheader: `${topResort.newSnow}" of fresh snow at ${topResort.resortName}${params.alerts.length > 1 ? ` and ${params.alerts.length - 1} more` : ""}.`,
       title: "Fresh powder dropped.",

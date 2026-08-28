@@ -15,10 +15,8 @@ function sbFetch(path: string, init?: RequestInit) {
   });
 }
 
-// DELETE /api/alerts/unsubscribe?token=xxx
-// Removes the subscriber entirely (cascades to preferences + alert log)
-export async function DELETE(request: NextRequest) {
-  const token = request.nextUrl.searchParams.get("token");
+/** Removes the subscriber entirely (cascades to preferences + alert log). */
+async function unsubscribe(token: string | null) {
   if (!token) {
     return NextResponse.json({ error: "token is required" }, { status: 400 });
   }
@@ -35,4 +33,18 @@ export async function DELETE(request: NextRequest) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+// DELETE /api/alerts/unsubscribe?token=xxx — the manage page's button.
+export async function DELETE(request: NextRequest) {
+  return unsubscribe(request.nextUrl.searchParams.get("token"));
+}
+
+// POST /api/alerts/unsubscribe?token=xxx — RFC 8058 one-click unsubscribe.
+// Gmail and Yahoo require bulk senders to honour the mail client's own
+// unsubscribe button, which POSTs to the List-Unsubscribe URL with no user
+// interaction; without this the header we now send would point at a method
+// that does not exist and the click would fail silently.
+export async function POST(request: NextRequest) {
+  return unsubscribe(request.nextUrl.searchParams.get("token"));
 }
