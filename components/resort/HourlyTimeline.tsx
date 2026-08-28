@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import type { HourlyWeather } from "@/lib/types";
+import { PC_BARK } from "@/lib/theme-tokens";
 
 interface HourlyTimelineProps {
   hourlyData: HourlyWeather[];
@@ -9,7 +10,7 @@ interface HourlyTimelineProps {
 
 // Paper palette: alpen bars, bark axis labels, ink temperature line
 const SNOW_BAR = "#d9552f";   // pc-alpen
-const AXIS     = "#7a5a3a";   // pc-bark
+const AXIS     = PC_BARK;
 const TEMP_LINE = "#2a1f14";  // pc-ink
 
 /** Convert compass direction to degrees (arrow points where wind blows TO). */

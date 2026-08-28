@@ -27,9 +27,13 @@ const config: Config = {
         },
 
         // Bark (browns)
+        // `bark` (DEFAULT) is the muted secondary-text colour and must stay in
+        // sync with --pc-bark in app/globals.css. Darkened from #7a5a3a so
+        // 10–11px labels clear WCAG AA on every cream surface (6.84:1 on cream,
+        // 5.78:1 on cream-dk). It is a light-surface token — on ink use bark-50.
         bark: {
           50:      "#b59b74",
-          DEFAULT: "#7a5a3a",
+          DEFAULT: "#63482d",
           dk:      "#4a3620",
         },
 
@@ -55,7 +59,12 @@ const config: Config = {
           DEFAULT: "#d9552f",
           dk:      "#a93f20",
         },
-        mustard: "#e2a740",
+        // `mustard` is a fill colour (1.74:1 on cream). `mustard-dk` is the
+        // text-safe amber for readouts on paper (5.00:1 on cream).
+        mustard: {
+          DEFAULT: "#e2a740",
+          dk:      "#7d5c12",
+        },
 
         // ── Back-compat alias for alpenglow ──
         alpenglow: {
@@ -84,9 +93,10 @@ const config: Config = {
         "border-hi": "rgba(42, 31, 20, 0.3)",
 
         // Text hierarchy — ink → bark → bark-50
+        // (`text-muted` tracks bark/--pc-bark; darkened for WCAG AA.)
         "text-base":   "#2a1f14",
         "text-subtle": "#4a3620",
-        "text-muted":  "#7a5a3a",
+        "text-muted":  "#63482d",
 
         // ── Legacy cyan remapped to forest for any stragglers ──
         cyan: {

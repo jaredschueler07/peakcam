@@ -4,6 +4,7 @@ import { getResortBySlug, getAllResortSlugs, getLiveConditions, getUserCondition
 import { getWeatherForecast, getHourlyForecast, bucketIntoPeriods } from "@/lib/weather";
 import { getOpenMeteoForecast, getOpenMeteoHourly } from "@/lib/open-meteo";
 import { ResortDetailPage } from "@/components/resort/ResortDetailPage";
+import { camDisplayName } from "@/lib/cam-name";
 
 const BASE_URL = "https://peakcam.io";
 
@@ -142,7 +143,7 @@ export default async function ResortPage({
   const youtubeCams = resort.cams.filter((c) => c.youtube_id);
   const videos = youtubeCams.map((cam) => ({
     "@type": "VideoObject",
-    name: `${resort.name} — ${cam.name} Live Webcam`,
+    name: `${resort.name} — ${camDisplayName(cam)} Live Webcam`,
     description: `Live webcam at ${resort.name}${cam.elevation ? ` (${cam.elevation})` : ""}.`,
     thumbnailUrl: `https://img.youtube.com/vi/${cam.youtube_id}/hqdefault.jpg`,
     embedUrl: `https://www.youtube.com/embed/${cam.youtube_id}`,

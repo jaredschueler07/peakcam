@@ -16,6 +16,7 @@ export const navLinks = [
   { label: "Map",         href: "/map" },
   { label: "Compare",     href: "/compare" },
   { label: "Snow Report", href: "/snow-report" },
+  { label: "Drop In",     href: "/drop-in" },
   { label: "Favorites",   href: "/favorites", authOnly: true },
   { label: "My Peak",     href: "/dashboard", authOnly: true },
   { label: "About",       href: "/about" },
@@ -58,7 +59,10 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
   }
 
   return (
-    <header className="sticky top-0 z-50 h-[64px] flex items-center gap-5 px-6 md:px-7
+    /* pc-on-ink — the header surface is ink, so the global ember
+       :focus-visible ring (3.1:1 on ink) is upgraded to the cream ring
+       (14.7:1 on ink) by the rule in app/globals.css. */
+    <header className="pc-on-ink sticky top-0 z-50 h-[64px] flex items-center gap-5 px-6 md:px-7
       bg-ink text-cream-50 border-b-[1.5px] border-ink">
 
       {/* Logo — Fraunces display, italic, PEAK cream + CAM alpen */}
@@ -74,6 +78,9 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
         <div className="flex-1 max-w-[420px] relative hidden sm:block">
           <Search size={15} strokeWidth={2.5}
             className="absolute left-4 top-1/2 -translate-y-1/2 text-bark pointer-events-none" />
+          {/* 16px base font keeps iOS Safari from zooming the viewport on focus;
+              no `outline-none` — the focus shadow alone isn't a reliable focus
+              indicator (forced-colors mode drops box-shadows entirely). */}
           <input
             ref={inputRef}
             type="text"
@@ -83,7 +90,7 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
             className="w-full bg-cream-50 border-[1.5px] border-ink
               rounded-full shadow-[2px_2px_0_#2a1f14]
               pl-10 pr-9 py-2 text-[16px] md:text-[13.5px] text-ink placeholder:text-bark
-              outline-none transition-shadow duration-100
+              transition-shadow duration-100
               focus:shadow-[3px_3px_0_#a93f20] focus:border-alpen-dk"
           />
           {query && (

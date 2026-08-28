@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import type { Cam } from "@/lib/types";
+import { camDisplayName } from "@/lib/cam-name";
 
 const REFRESH_MS = { tile: 30_000, lightbox: 15_000 } as const;
 
@@ -102,11 +103,13 @@ function ImageFeed({ url, name, refreshMs }: { url: string; name: string; refres
  *  `border-0` class. That exact allow list / className is preserved on both
  *  branches below so embed behavior is unchanged. */
 export function CamEmbed({ cam, variant }: { cam: Cam; resortSlug: string; variant: "tile" | "lightbox" }) {
+  const name = camDisplayName(cam);
+
   if (cam.embed_type === "youtube" && cam.youtube_id) {
     return (
       <iframe
         src={`https://www.youtube.com/embed/${cam.youtube_id}?autoplay=1&mute=1`}
-        title={cam.name}
+        title={name}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen
         className="absolute inset-0 w-full h-full border-0"
@@ -117,7 +120,7 @@ export function CamEmbed({ cam, variant }: { cam: Cam; resortSlug: string; varia
     return (
       <iframe
         src={cam.embed_url}
-        title={cam.name}
+        title={name}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen
         className="absolute inset-0 w-full h-full border-0"
@@ -125,7 +128,7 @@ export function CamEmbed({ cam, variant }: { cam: Cam; resortSlug: string; varia
     );
   }
   if (cam.embed_type === "image" && cam.embed_url) {
-    return <ImageFeed url={cam.embed_url} name={cam.name} refreshMs={REFRESH_MS[variant]} />;
+    return <ImageFeed url={cam.embed_url} name={name} refreshMs={REFRESH_MS[variant]} />;
   }
   return null;
 }

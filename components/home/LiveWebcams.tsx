@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { Camera, Play } from "lucide-react";
 import { useState } from "react";
 import type { Cam } from "@/lib/types";
+import { camDisplayName } from "@/lib/cam-name";
 
 interface LiveWebcamsProps {
   cams: Cam[];
@@ -82,6 +83,8 @@ function WebcamTile({
   onLoad: () => void;
   isHero?: boolean;
 }) {
+  const name = camDisplayName(cam);
+
   const embedSrc =
     cam.embed_type === "youtube" && cam.youtube_id
       ? `https://www.youtube.com/embed/${cam.youtube_id}?autoplay=1&mute=1`
@@ -104,7 +107,7 @@ function WebcamTile({
           className="w-full h-full border-0"
           allow="autoplay; encrypted-media"
           allowFullScreen
-          title={cam.name}
+          title={name}
         />
       )}
 
@@ -121,7 +124,7 @@ function WebcamTile({
             <Camera className="text-ink" size={isHero ? 40 : 32} strokeWidth={2} />
           </span>
           <div className="text-center px-4">
-            <h3 className="font-display font-black text-ink text-2xl leading-tight">{cam.name}</h3>
+            <h3 className="font-display font-black text-ink text-2xl leading-tight">{name}</h3>
             {cam.elevation && (
               <span className="mt-2 inline-block font-mono font-bold text-[10.5px] px-2.5 py-0.5
                                rounded-full bg-ink text-cream-50 uppercase tracking-[0.14em]">

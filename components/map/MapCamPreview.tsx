@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Cam } from "@/lib/types";
+import { camDisplayName } from "@/lib/cam-name";
 
 // Small live-cam thumbnail for the map's popup card and bottom sheet — the
 // "conditions + map + webcam in one view" piece. Previewable cams:
@@ -50,18 +51,20 @@ export default function MapCamPreview({
 
   if (!preview || failed) return null;
 
+  const camName = camDisplayName(preview.cam);
+
   return (
     <button
       type="button"
       onClick={onClick}
       className={`group/cam relative block w-full overflow-hidden rounded-[10px] border-[1.5px] border-ink text-left ${className}`}
-      aria-label={`${preview.kind === "live" ? "Live webcam" : "Webcam preview"}: ${preview.cam.name} at ${resortName} — view resort`}
+      aria-label={`${preview.kind === "live" ? "Live webcam" : "Webcam preview"}: ${camName} at ${resortName} — view resort`}
     >
       {/* Plain <img>: cam hosts are arbitrary external domains (matches CamEmbed). */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={preview.src}
-        alt={`${preview.cam.name} webcam at ${resortName}`}
+        alt={`${camName} webcam at ${resortName}`}
         className="h-24 w-full object-cover transition-transform duration-200 group-hover/cam:scale-[1.03]"
         loading="lazy"
         onError={() => setFailed(true)}
@@ -76,7 +79,7 @@ export default function MapCamPreview({
       </span>
       {/* Cam name strip */}
       <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-ink/75 to-transparent px-2 pb-1 pt-3 font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-cream-50">
-        {preview.cam.name}
+        {camName}
       </span>
     </button>
   );

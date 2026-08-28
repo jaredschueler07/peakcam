@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import { Camera, ArrowLeftRight, TrendingUp, TrendingDown, Minus, Snowflake, Sun, Thermometer, Heart } from "lucide-react";
@@ -10,33 +10,78 @@ import { trackResortCardClick } from "@/lib/posthog";
 
 // ── Animated count-up number ─────────────────────────────────────────────────
 
+const COUNT_UP_MS = 600;
+
+/**
+ * Poster-style count-up for the big base-depth stat.
+ *
+ * The number this renders is *transiently wrong* while it climbs, so it is
+ * purely decorative: it renders inside `aria-hidden` and the true value is
+ * exposed separately (see the `sr-only` line in the card body). There is
+ * deliberately no live region here.
+ *
+ * Three guards keep the count-up from ever showing stale/bogus snow data:
+ *  1. It no-ops when the target already equals what is on screen, so a
+ *     re-render / data refresh with an unchanged value never restarts from 0
+ *     (that restart is what briefly painted e.g. "6″" for a 94″ base).
+ *  2. A mid-flight target change animates from the *currently displayed*
+ *     number rather than resetting to 0.
+ *  3. `prefers-reduced-motion: reduce` jumps straight to the final value.
+ *
+ * `animate={false}` (below-the-fold cards on the animation diet) renders the
+ * final value immediately and never runs the count-up.
+ */
 function AnimatedNumber({ value, animate = true }: { value: number; animate?: boolean }) {
   const [count, setCount] = useState(animate ? 0 : value);
+  // What is actually painted right now, and what the last completed run
+  // settled on. Refs (not state) so reading them can't re-trigger the effect.
+  const displayedRef = useRef(animate ? 0 : value);
+  const settledRef = useRef<number | null>(animate ? null : value);
 
   useEffect(() => {
-    if (!animate) {
+    // Guard 1 — already showing this number: do nothing.
+    if (settledRef.current === value) return;
+
+    const settle = () => {
+      displayedRef.current = value;
+      settledRef.current = value;
       setCount(value);
+    };
+
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const from = displayedRef.current;
+    // Guard 3 (reduced motion) + animation diet + degenerate no-distance case.
+    if (!animate || prefersReducedMotion || from === value) {
+      settle();
       return;
     }
-    const duration = 600;
-    const steps = 30;
-    const increment = value / steps;
-    let current = 0;
 
-    const timer = setInterval(() => {
-      current += increment;
-      if (current >= value) {
-        setCount(value);
-        clearInterval(timer);
-      } else {
-        setCount(Math.floor(current));
+    // Guard 2 — count from whatever is on screen to the new target.
+    let frame = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min((now - start) / COUNT_UP_MS, 1);
+      if (t >= 1) {
+        settle();
+        return;
       }
-    }, duration / steps);
+      const next = Math.round(from + (value - from) * t);
+      displayedRef.current = next;
+      setCount(next);
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
 
-    return () => clearInterval(timer);
+    // Cancelled on unmount and on target change — no leaked rAF, no stale
+    // closure writing an old target into state after the value moved on.
+    return () => cancelAnimationFrame(frame);
   }, [value, animate]);
 
-  return <>{count}</>;
+  return <span aria-hidden="true">{count}</span>;
 }
 
 // ── Condition palette (earth tones) ──────────────────────────────────────────
@@ -52,7 +97,7 @@ const conditionColors: Record<ConditionRating, { bg: string; text: string; borde
 
 const trendConfig: Record<SnowTrend, { icon: typeof TrendingUp; color: string; label: string }> = {
   rising:  { icon: TrendingUp,   color: "#3c5a3a", label: "Rising"  },
-  stable:  { icon: Minus,        color: "#7a5a3a", label: "Stable"  },
+  stable:  { icon: Minus,        color: "#63482d", label: "Stable"  },
   falling: { icon: TrendingDown, color: "#a93f20", label: "Falling" },
 };
 
@@ -70,7 +115,7 @@ function TrendBadge({ trend }: { trend: SnowTrend }) {
 
 const outlookConfig: Record<SnowOutlook, { icon: typeof Snowflake; color: string; label: string }> = {
   more_snow:  { icon: Snowflake,  color: "#3c5a3a", label: "More snow" },
-  stable:     { icon: Minus,      color: "#7a5a3a", label: "Stable"    },
+  stable:     { icon: Minus,      color: "#63482d", label: "Stable"    },
   warming:    { icon: Sun,        color: "#e2a740", label: "Warming"   },
   melt_risk:  { icon: Thermometer,color: "#a93f20", label: "Melt risk" },
 };
@@ -163,9 +208,14 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
               {resort.name}
             </h3>
 
-            {/* Giant base depth stat — centered poster-style */}
+            {/* Giant base depth stat — centered poster-style.
+                The whole visual block is aria-hidden because the digits count
+                up and are therefore momentarily wrong; the sr-only line below
+                carries the real, final number (and never a live region, so
+                nothing is announced mid-animation). */}
             <div className="text-center py-4">
               <div
+                aria-hidden="true"
                 className="font-display font-black text-[6.5rem] leading-none text-ink tracking-[-0.04em] group-hover:scale-[1.03] transition-transform duration-200"
                 style={{ fontVariantNumeric: "tabular-nums" }}
               >
@@ -175,12 +225,17 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
                     <span className="text-alpen">&quot;</span>
                   </>
                 ) : (
-                  <span className="text-bark/60 text-6xl">&mdash;</span>
+                  <span className="text-bark text-6xl">&mdash;</span>
                 )}
               </div>
-              <div className="font-mono font-bold text-[10.5px] text-bark tracking-[0.18em] uppercase mt-1">
+              <div aria-hidden="true" className="font-mono font-bold text-[10.5px] text-bark tracking-[0.18em] uppercase mt-1">
                 Base Depth
               </div>
+              <p className="sr-only">
+                {baseDepth > 0
+                  ? `Base depth: ${baseDepth} inches`
+                  : "Base depth: no report"}
+              </p>
             </div>
 
             {/* Data strip — dashed bark rule top/bottom, mono numbers */}
@@ -224,11 +279,13 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
                     {cond.label}
                   </span>
                 ) : (
-                  <span className="text-bark/70 text-xs">&mdash;</span>
+                  <span className="text-bark text-xs">&mdash;</span>
                 )}
                 {trend && <TrendBadge trend={trend} />}
+                {/* mustard-dk, not mustard: raw mustard is 1.74:1 on the cream
+                    card — unreadable for an 11px readout. */}
                 {pctNormal != null && (
-                  <span className={`font-mono font-bold text-[11px] tabular-nums ${pctNormal >= 110 ? "text-forest" : pctNormal >= 90 ? "text-bark-dk" : pctNormal >= 70 ? "text-mustard" : "text-alpen-dk"}`}>
+                  <span className={`font-mono font-bold text-[11px] tabular-nums ${pctNormal >= 110 ? "text-forest" : pctNormal >= 90 ? "text-bark-dk" : pctNormal >= 70 ? "text-mustard-dk" : "text-alpen-dk"}`}>
                     {pctNormal}%
                   </span>
                 )}
