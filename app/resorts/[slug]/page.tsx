@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getResortBySlug, getAllResortSlugs, getLiveConditions, getUserConditions, getResortElevationFt } from "@/lib/supabase";
+import { ResortAboutSection } from "@/components/resort/ResortAboutSection";
 import { getWeatherForecast, getHourlyForecast, bucketIntoPeriods } from "@/lib/weather";
 import { getOpenMeteoForecast, getOpenMeteoHourly } from "@/lib/open-meteo";
 import { ResortDetailPage } from "@/components/resort/ResortDetailPage";
@@ -225,6 +226,7 @@ export default async function ResortPage({
         />
       )}
       <ResortDetailPage resort={resort} weather={weather} forecastPeriods={forecastPeriods} hourlyData={hourlyRaw} liveConditions={liveConditions} userConditions={userConditions} />
+      <ResortAboutSection resort={resort} />
     </main>
   );
 }

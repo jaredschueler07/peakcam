@@ -31,6 +31,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // a sitemap of noindex URLs is a contradiction — the hub links to them.
     { url: `${SITE_URL}/drop-in`, lastModified: buildTime, changeFrequency: "monthly", priority: 0.5 },
     { url: `${SITE_URL}/about`, lastModified: buildTime, changeFrequency: "monthly", priority: 0.4 },
+    { url: `${SITE_URL}/methodology`, lastModified: buildTime, changeFrequency: "monthly", priority: 0.5 },
     ...resortEntries,
   ];
 }
