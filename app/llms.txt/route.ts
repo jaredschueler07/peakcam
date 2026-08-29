@@ -58,6 +58,7 @@ report (sensors sit at a fixed elevation; resorts often quote their upper mounta
 - [Resort Map](${SITE_URL}/map): interactive map of all resorts with live snow data and weather radar
 - [Compare](${SITE_URL}/compare): side-by-side conditions for any set of resorts
 - [About](${SITE_URL}/about): what PeakCam is and where the data comes from
+- [Methodology](${SITE_URL}/methodology): how the numbers are measured — SNOTEL telemetry, quality control, 30-year normals, and the user-report blend
 
 ## Resorts
 

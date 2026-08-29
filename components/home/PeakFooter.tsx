@@ -89,6 +89,7 @@ export function PeakFooter() {
             <ul className="space-y-2.5">
               {[
                 { href: "/about", label: "About" },
+                { href: "/methodology", label: "How we measure snow" },
                 { href: "/about#privacy", label: "Privacy policy" },
                 { href: "/about#terms", label: "Terms of service" },
               ].map((item) => (
