@@ -28,7 +28,7 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
-const BASE_URL = "https://peakcam.io";
+import { SITE_URL as BASE_URL } from "@/lib/site";
 
 export const viewport: Viewport = {
   width: "device-width",

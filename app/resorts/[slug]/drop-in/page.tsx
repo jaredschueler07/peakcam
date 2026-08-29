@@ -16,7 +16,7 @@ import { getWeatherForecast } from "@/lib/weather";
 import { buildConditionsSnapshot } from "@/lib/game/conditions";
 import { PHYSICS_V2_ROLLOUT_ENABLED, physicsModelForRollout } from "@/lib/game/config/physics-rollout";
 
-const BASE_URL = "https://peakcam.io";
+import { SITE_URL as BASE_URL } from "@/lib/site";
 
 export const revalidate = 3600;
 

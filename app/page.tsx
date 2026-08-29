@@ -1,3 +1,4 @@
+import { SITE_URL } from "@/lib/site";
 import { Suspense } from "react";
 import { getAllResorts } from "@/lib/supabase";
 import { getRadarFrames } from "@/lib/weather-radar";
@@ -37,7 +38,7 @@ export const metadata = {
     title: "Live Ski Resort Webcams, Snow Reports & Conditions",
     description:
       "Browse live webcams, real-time snow reports, and powder alerts for 150+ ski resorts across North & South America.",
-    url: "https://peakcam.io",
+    url: SITE_URL,
     type: "website" as const,
   },
   twitter: {
@@ -97,7 +98,7 @@ export default async function Home() {
       "@type": "ListItem",
       position: i + 1,
       name: r.name,
-      url: `https://peakcam.io/resorts/${r.slug}`,
+      url: `${SITE_URL}/resorts/${r.slug}`,
     })),
   };
 
