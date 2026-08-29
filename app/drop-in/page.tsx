@@ -6,7 +6,7 @@ import { PeakFooter } from "@/components/home/PeakFooter";
 import DropInRoster, { dropInResortCount } from "@/components/drop-in/DropInRoster";
 import { getDropInRoster } from "@/lib/drop-in";
 
-const BASE_URL = "https://peakcam.io";
+import { SITE_URL as BASE_URL } from "@/lib/site";
 const PAGE_URL = `${BASE_URL}/drop-in`;
 const OG_IMAGE = `${BASE_URL}/opengraph-image`;
 const OG_IMAGE_ALT = "PeakCam — live ski resort webcams and snow reports";

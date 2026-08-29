@@ -4,7 +4,7 @@ import { getRadarFrames } from "@/lib/weather-radar";
 import { isOffSeason } from "@/lib/map-utils";
 import { FullPageMap } from "./FullPageMap";
 
-const BASE_URL = "https://peakcam.io";
+import { SITE_URL } from "@/lib/site";
 
 export const revalidate = 3600;
 
@@ -16,10 +16,10 @@ export const metadata: Metadata = {
     title: "Interactive Ski Resort Map",
     description:
       "Explore ski resorts on an interactive map with live snow data and weather radar.",
-    url: "https://peakcam.io/map",
+    url: `${SITE_URL}/map`,
     type: "website",
   },
-  alternates: { canonical: `${BASE_URL}/map` },
+  alternates: { canonical: `${SITE_URL}/map` },
 };
 
 export default async function MapPage() {

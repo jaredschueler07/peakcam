@@ -4,7 +4,7 @@ import { ComparePage } from "@/components/compare/ComparePage";
 import { parseCompareSlugs } from "@/lib/compare-params";
 import type { ResortWithData } from "@/lib/types";
 
-const BASE_URL = "https://peakcam.io";
+import { SITE_URL as BASE_URL } from "@/lib/site";
 
 export const revalidate = 3600;
 

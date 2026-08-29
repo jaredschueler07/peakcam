@@ -6,7 +6,7 @@ import { getOpenMeteoForecast, getOpenMeteoHourly } from "@/lib/open-meteo";
 import { ResortDetailPage } from "@/components/resort/ResortDetailPage";
 import { camDisplayName } from "@/lib/cam-name";
 
-const BASE_URL = "https://peakcam.io";
+import { SITE_URL as BASE_URL } from "@/lib/site";
 
 export const revalidate = 3600;
 
@@ -160,6 +160,7 @@ export default async function ResortPage({
   const skiResortLd = {
     "@context": "https://schema.org",
     "@type": ["SkiResort", "TouristAttraction"],
+    "@id": pageUrl,
     name: resort.name,
     description: snow
       ? `${resort.name} — ${snow.base_depth ?? "?"}″ base depth, ${snow.conditions ?? "current conditions"}. ${resort.cams.length} live webcams available.`
@@ -169,7 +170,7 @@ export default async function ResortPage({
     address: {
       "@type": "PostalAddress",
       addressRegion: resort.state,
-      addressCountry: "US",
+      addressCountry: resort.country,
     },
     geo: {
       "@type": "GeoCoordinates",
@@ -193,6 +194,20 @@ export default async function ResortPage({
     ],
   };
 
+  // SkiResort is a Place, which schema.org gives no dateModified — so freshness
+  // rides on a WebPage node instead: dateModified is the latest snow report's
+  // updated_at, the moment this page's data-bearing content last changed.
+  const webPageLd = snow
+    ? {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        url: pageUrl,
+        name: `${resort.name} Snow Report & Webcams`,
+        dateModified: snow.updated_at,
+        mainEntity: { "@id": pageUrl },
+      }
+    : null;
+
   return (
     <main id="main-content">
       <script
@@ -203,6 +218,12 @@ export default async function ResortPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
       />
+      {webPageLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageLd) }}
+        />
+      )}
       <ResortDetailPage resort={resort} weather={weather} forecastPeriods={forecastPeriods} hourlyData={hourlyRaw} liveConditions={liveConditions} userConditions={userConditions} />
     </main>
   );

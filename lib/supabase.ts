@@ -318,6 +318,30 @@ export async function getResortElevationFt(resortId: string): Promise<number | n
 // Static Params
 // ─────────────────────────────────────────────────────────────
 
+export interface ResortSitemapEntry {
+  slug: string;
+  /** updated_at of the latest snow report, null when a resort has none. */
+  lastReportAt: string | null;
+}
+
+/** Slugs plus real last-report timestamps — used for sitemap lastModified. */
+export async function getResortSitemapEntries(): Promise<ResortSitemapEntry[]> {
+  const [resortsRes, reportsRes] = await Promise.all([
+    supabase.from("resorts").select("id, slug").eq("is_active", true),
+    supabase.from("latest_snow_reports").select("resort_id, updated_at"),
+  ]);
+  if (resortsRes.error) throw resortsRes.error;
+  if (reportsRes.error) throw reportsRes.error;
+
+  const lastByResort = new Map<string, string>(
+    (reportsRes.data ?? []).map((r) => [r.resort_id, r.updated_at]),
+  );
+  return (resortsRes.data ?? []).map((r) => ({
+    slug: r.slug,
+    lastReportAt: lastByResort.get(r.id) ?? null,
+  }));
+}
+
 /** Fetch all resort slugs — used for generateStaticParams. */
 export async function getAllResortSlugs(): Promise<string[]> {
   const { data, error } = await supabase

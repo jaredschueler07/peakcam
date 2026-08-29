@@ -1,7 +1,8 @@
+import { SITE_URL as CANONICAL_SITE_URL } from "@/lib/site";
 import { Resend } from "resend";
 import type { CreateEmailOptions, CreateEmailResponse } from "resend";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://peakcam.io";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || CANONICAL_SITE_URL;
 const FROM = "PeakCam Alerts <alerts@send.peakcam.io>";
 
 // ─── Sending core ─────────────────────────────────────────────────────────────

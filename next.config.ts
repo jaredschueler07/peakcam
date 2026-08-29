@@ -179,7 +179,7 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*",
         has: [{ type: "host", value: "peakcam.vercel.app" }],
-        destination: "https://peakcam.io/:path*",
+        destination: "https://www.peakcam.io/:path*",
         permanent: true,
       },
     ];
