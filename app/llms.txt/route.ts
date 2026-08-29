@@ -43,14 +43,16 @@ export async function GET(): Promise<Response> {
   const body = `# PeakCam
 
 > Live ski resort webcams, snow reports, and powder alerts for ${resorts.length} resorts
-> across North and South America. Snow data comes from NRCS SNOTEL sensors near each
-> resort, synced every 6 hours, quality-controlled, and blended with on-mountain user
-> reports. Every resort page shows current base depth, 24/48-hour new snow, a 7-day
-> trend, percent of the 30-year normal, an NWS/Open-Meteo forecast, and live webcams.
+> across North and South America. Where a resort has an assigned NRCS SNOTEL/SCAN
+> station (most of the western U.S.), snow data is sensor telemetry synced every 6
+> hours and quality-controlled; resorts without one (Canada, most of the East, South
+> America) use weather-model estimates and say so on their page. Resort pages show
+> base depth, 24/48-hour new snow, a 7-day trend, percent of the 30-year normal where
+> station history exists, a forecast, and webcams.
 
-Data on this site is measured, not scraped from resort marketing: base depth and new
-snow come from government SNOTEL telemetry, so numbers can differ from a resort's own
-report (sensors sit at a fixed elevation; resorts often quote their upper mountain).
+Sensor-fed numbers are measured, not scraped from resort marketing, so they can
+differ from a resort's own report (a station sits at one fixed elevation; resorts
+often quote their upper mountain). Full details: ${SITE_URL}/methodology
 
 ## Key pages
 
