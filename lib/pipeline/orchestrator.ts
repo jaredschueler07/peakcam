@@ -16,7 +16,7 @@ import { fetchLiftie } from "./fetchers/liftie";
 import { fetchSnodas } from "./fetchers/snodas";
 import { fetchWeatherUnlocked } from "./fetchers/weather-unlocked";
 import { fetchUserReports } from "./fetchers/user-reports";
-import { blendReadings } from "./blender";
+import { blend } from "./blender";
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -388,7 +388,9 @@ export async function runPipelineSync(
       }
 
       // Blend all readings
-      const blended = blendReadings(readings, resort.id);
+      // blend() threads the resort's real base elevation (or the 99999
+      // sentinel when metadata is missing) into the conditions engine.
+      const blended = blend(resort, readings);
 
       // Write blended results
       if (!dryRun) {

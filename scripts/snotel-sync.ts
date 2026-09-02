@@ -31,6 +31,17 @@ import {
   type UserConditionReport,
 } from "../lib/conditions-engine.js";
 
+// Single source of truth for the NWS snow heuristic + gridpoint resolution.
+// These used to be copy-pasted here and drifted (wintry mix scored 0 locally,
+// 1 in lib/weather.ts). Import them; do not re-declare.
+import {
+  estimateSnow,
+  resolveGridPoint,
+  NWS_USER_AGENT,
+  NWS_TIMEOUT_MS,
+  SNOW_KEYWORDS,
+} from "../lib/weather.js";
+
 // ─── Load .env.local manually ────────────────────────────────────────────
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -70,7 +81,6 @@ const supaHeaders = {
 };
 
 const SNOTEL_BASE = "https://wcc.sc.egov.usda.gov/awdbRestApi/services/v1";
-const NWS_USER_AGENT = "PeakCam/1.0 (contact@peakcam.io)";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -80,15 +90,6 @@ function fmtDate(d: Date): string {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
-}
-
-/** Rough snow-inch estimate from NWS forecast string. */
-function estimateSnow(shortForecast: string): number {
-  const lower = shortForecast.toLowerCase();
-  if (lower.includes("heavy snow") || lower.includes("blizzard")) return 8;
-  if (lower.includes("snow")) return 3;
-  if (lower.includes("flurr")) return 1;
-  return 0;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────
@@ -333,8 +334,6 @@ async function fetchUserReports(
 
 // ─── Step 8: Fetch NWS forecast summary & Grid Data ────────────────────────
 
-const SNOW_KEYWORDS = ["snow", "blizzard", "flurr", "wintry", "sleet", "freezing"];
-
 interface ForecastSummary {
   snowInchesNext48h: number;
   maxHighTemp48h: number;
@@ -348,21 +347,17 @@ async function fetchNwsForecast(
 ): Promise<ForecastSummary> {
   const defaults: ForecastSummary = { snowInchesNext48h: 0, maxHighTemp48h: 32, snowingNow: false, gridData: null };
   try {
-    // Step 1: resolve gridpoint
-    const pointsRes = await fetch(
-      `https://api.weather.gov/points/${lat.toFixed(4)},${lng.toFixed(4)}`,
-      { headers: { "User-Agent": NWS_USER_AGENT } },
-    );
-    if (!pointsRes.ok) return defaults;
-    const pointsData = await pointsRes.json();
-    const forecastUrl: string | undefined = pointsData?.properties?.forecast;
-    const gridUrl: string | undefined = pointsData?.properties?.forecastGridData;
-    
+    // Step 1: resolve gridpoint (shared with lib/weather.ts — includes the 5s timeout)
+    const grid = await resolveGridPoint(lat, lng);
+    const forecastUrl = grid?.forecastUrl;
+    const gridUrl = grid?.forecastGridDataUrl;
+
     if (!forecastUrl) return defaults;
 
     // Step 2: fetch forecast (Summary)
     const forecastRes = await fetch(forecastUrl, {
       headers: { "User-Agent": NWS_USER_AGENT },
+      signal: AbortSignal.timeout(NWS_TIMEOUT_MS),
     });
     
     let totalSnow = 0;
@@ -397,7 +392,10 @@ async function fetchNwsForecast(
     // Step 3: fetch Grid Data (for tags/narrative)
     let gridData = null;
     if (gridUrl) {
-      const gridRes = await fetch(gridUrl, { headers: { "User-Agent": NWS_USER_AGENT }});
+      const gridRes = await fetch(gridUrl, {
+        headers: { "User-Agent": NWS_USER_AGENT },
+        signal: AbortSignal.timeout(NWS_TIMEOUT_MS),
+      });
       if (gridRes.ok) {
         gridData = await gridRes.json();
       }
