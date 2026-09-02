@@ -13,50 +13,16 @@
  * Writes: Supabase snotel_normals table
  */
 
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { dayOfWaterYear } from "../lib/snow-quality.js";
+import { loadEnv, requireSupabaseEnv } from "./lib/env.mjs";
+import { sbDelete, sbInsert, sbSelect } from "../lib/supabase-rest.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, "..");
+// ─── Env (shared loader — see scripts/lib/env.mjs) ─────────────────────────
 
-// ─── Load .env.local manually (same pattern as snotel-sync) ────────────────
-
-function loadEnv(filePath: string): void {
-  if (!fs.existsSync(filePath)) return;
-  const lines = fs.readFileSync(filePath, "utf-8").split("\n");
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    const val = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, "");
-    if (key && !(key in process.env)) process.env[key] = val;
-  }
-}
-
-loadEnv(path.join(ROOT, ".env.local"));
-loadEnv(path.join(ROOT, ".env"));
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!SUPABASE_URL || !SERVICE_KEY) {
-  console.error(
-    "Missing env vars. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local"
-  );
-  process.exit(1);
-}
+loadEnv();
+const SUPA = requireSupabaseEnv();
 
 const SNOTEL_BASE = "https://wcc.sc.egov.usda.gov/awdbRestApi/services/v1";
-
-const supaHeaders: Record<string, string> = {
-  apikey: SERVICE_KEY,
-  Authorization: `Bearer ${SERVICE_KEY}`,
-  "Content-Type": "application/json",
-};
 
 // ─── Stats Helpers ─────────────────────────────────────────────────────────
 
@@ -93,15 +59,11 @@ interface ResortRow {
 }
 
 async function fetchResortsWithSnotel(): Promise<ResortRow[]> {
-  const url = `${SUPABASE_URL}/rest/v1/resorts?select=name,state,snotel_station_id&snotel_station_id=not.is.null`;
-  const resp = await fetch(url, {
-    headers: {
-      apikey: SERVICE_KEY!,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-    },
-  });
-  if (!resp.ok) throw new Error(`Supabase resorts fetch failed: ${resp.status}`);
-  return resp.json();
+  return sbSelect<ResortRow>(
+    SUPA,
+    "/resorts?select=name,state,snotel_station_id&snotel_station_id=not.is.null",
+    { errorLabel: "Supabase resorts fetch failed" },
+  );
 }
 
 // ─── Step 2: Fetch 30-year period-of-record from NRCS AWDB ────────────────
@@ -188,14 +150,9 @@ async function writeNormals(
   snwdByDay: Map<number, number[]>
 ): Promise<number> {
   // Delete existing rows for this station (idempotent)
-  const delResp = await fetch(
-    `${SUPABASE_URL}/rest/v1/snotel_normals?station_id=eq.${stationId}`,
-    { method: "DELETE", headers: supaHeaders }
-  );
-  if (!delResp.ok) {
-    const text = await delResp.text();
-    throw new Error(`Supabase DELETE failed (${delResp.status}): ${text}`);
-  }
+  await sbDelete(SUPA, "snotel_normals", `station_id=eq.${stationId}`, {
+    errorLabel: "Supabase DELETE failed",
+  });
 
   // Build rows for all 366 possible days
   const rows: NormalRow[] = [];
@@ -216,15 +173,9 @@ async function writeNormals(
   }
 
   // Batch insert
-  const insResp = await fetch(`${SUPABASE_URL}/rest/v1/snotel_normals`, {
-    method: "POST",
-    headers: supaHeaders,
-    body: JSON.stringify(rows),
+  await sbInsert(SUPA, "snotel_normals", rows, {
+    errorLabel: "Supabase INSERT failed",
   });
-  if (!insResp.ok) {
-    const text = await insResp.text();
-    throw new Error(`Supabase INSERT failed (${insResp.status}): ${text}`);
-  }
 
   return rows.length;
 }

@@ -17,6 +17,16 @@ import { fetchSnodas } from "./fetchers/snodas";
 import { fetchWeatherUnlocked } from "./fetchers/weather-unlocked";
 import { fetchUserReports } from "./fetchers/user-reports";
 import { blend } from "./blender";
+import {
+  sbSelect,
+  sbSelectOrEmpty,
+  sbUpsert,
+  type SupabaseRestConfig,
+} from "../supabase-rest";
+import {
+  insertSnowReport as writeSnowReport,
+  updateResortRating as writeResortRating,
+} from "./writes";
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -49,7 +59,9 @@ function isInConus(lat: number, lng: number): boolean {
 
 // ── Supabase REST helpers ───────────────────────────────────
 
-function getEnv(): { url: string; key: string } {
+// Read lazily (not at module scope) so a caller can load .env before the
+// first DB call. scripts/pipeline-sync.ts relies on this.
+function getEnv(): SupabaseRestConfig {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {
@@ -58,15 +70,6 @@ function getEnv(): { url: string; key: string } {
     );
   }
   return { url, key };
-}
-
-function supaHeaders(): Record<string, string> {
-  const { key } = getEnv();
-  return {
-    apikey: key,
-    Authorization: `Bearer ${key}`,
-    "Content-Type": "application/json",
-  };
 }
 
 interface ResortRow {
@@ -94,27 +97,22 @@ interface MetadataRow {
 }
 
 async function fetchActiveResorts(): Promise<ResortContext[]> {
-  const { url } = getEnv();
-  const headers = supaHeaders();
+  const cfg = getEnv();
 
   // Fetch resorts
-  const resortResp = await fetch(
-    `${url}/rest/v1/resorts?is_active=eq.true&select=id,slug,name,lat,lng,snotel_station_id`,
-    { headers },
+  const resorts = await sbSelect<ResortRow>(
+    cfg,
+    "/resorts?is_active=eq.true&select=id,slug,name,lat,lng,snotel_station_id",
+    { errorLabel: "Failed to fetch resorts" },
   );
-  if (!resortResp.ok) {
-    throw new Error(`Failed to fetch resorts: ${resortResp.status}`);
-  }
-  const resorts: ResortRow[] = await resortResp.json();
 
-  // Fetch metadata
-  const metaResp = await fetch(
-    `${url}/rest/v1/resort_metadata?select=resort_id,liftie_slug,weather_unlocked_id,elevation_base_ft,elevation_summit_ft,vertical_drop_ft,run_count,lift_count,openskistats_id,snodas_grid_x,snodas_grid_y`,
-    { headers },
-  );
+  // Fetch metadata (best-effort — a missing metadata table still yields resorts)
   const metaByResort = new Map<string, MetadataRow>();
-  if (metaResp.ok) {
-    const rows: MetadataRow[] = await metaResp.json();
+  {
+    const rows = await sbSelectOrEmpty<MetadataRow>(
+      cfg,
+      "/resort_metadata?select=resort_id,liftie_slug,weather_unlocked_id,elevation_base_ft,elevation_summit_ft,vertical_drop_ft,run_count,lift_count,openskistats_id,snodas_grid_x,snodas_grid_y",
+    );
     for (const row of rows) {
       metaByResort.set(row.resort_id, row);
     }
@@ -149,94 +147,47 @@ async function fetchActiveResorts(): Promise<ResortContext[]> {
 }
 
 // ── DB Write Helpers ────────────────────────────────────────
+// The three writes shared with the two sync scripts (snow_reports,
+// resorts.cond_rating, snowpack_daily) live in ./writes.ts. Only the two
+// pipeline-only tables are written here.
 
 async function upsertSourceReading(reading: SourceReading): Promise<void> {
-  const { url } = getEnv();
-  const resp = await fetch(`${url}/rest/v1/data_source_readings`, {
-    method: "POST",
-    headers: {
-      ...supaHeaders(),
-      Prefer: "resolution=merge-duplicates",
-    },
-    body: JSON.stringify(reading),
+  await sbUpsert(getEnv(), "data_source_readings", reading, {
+    errorLabel: "data_source_readings upsert failed",
   });
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(
-      `data_source_readings upsert failed (${resp.status}): ${text}`,
-    );
-  }
 }
 
 async function upsertConditionsSummary(result: BlendedResult): Promise<void> {
-  const { url } = getEnv();
-  const resp = await fetch(`${url}/rest/v1/resort_conditions_summary`, {
-    method: "POST",
-    headers: {
-      ...supaHeaders(),
-      Prefer: "resolution=merge-duplicates",
-    },
-    body: JSON.stringify(result),
+  await sbUpsert(getEnv(), "resort_conditions_summary", result, {
+    errorLabel: "resort_conditions_summary upsert failed",
   });
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(
-      `resort_conditions_summary upsert failed (${resp.status}): ${text}`,
-    );
-  }
 }
 
 async function insertSnowReport(
   resortId: string,
   blended: BlendedResult,
 ): Promise<void> {
-  const { url } = getEnv();
-  const conditionsString = `${blended.tags.join(",")}||${blended.narrative ?? ""}`;
-  const body = {
-    resort_id: resortId,
-    base_depth: blended.snow_depth_in != null ? Math.round(blended.snow_depth_in) : null,
-    new_snow_24h: blended.new_snow_24h_in != null ? Math.round(blended.new_snow_24h_in) : null,
-    new_snow_48h: blended.new_snow_48h_in != null ? Math.round(blended.new_snow_48h_in) : null,
-    swe_in: blended.swe_in,
-    pct_of_normal: blended.pct_of_normal,
-    trend_7d: blended.trend_7d,
+  await writeSnowReport(getEnv(), {
+    resortId,
+    baseDepthIn: blended.snow_depth_in,
+    newSnow24h: blended.new_snow_24h_in,
+    newSnow48h: blended.new_snow_48h_in,
+    sweIn: blended.swe_in,
+    pctOfNormal: blended.pct_of_normal,
+    trend7d: blended.trend_7d,
     outlook: blended.outlook,
-    auto_cond_rating: blended.cond_rating,
-    conditions: conditionsString,
+    condRating: blended.cond_rating,
+    tags: blended.tags,
+    narrative: blended.narrative ?? "",
     source: "pipeline",
-    updated_at: new Date().toISOString(),
-  };
-
-  const resp = await fetch(`${url}/rest/v1/snow_reports`, {
-    method: "POST",
-    headers: supaHeaders(),
-    body: JSON.stringify(body),
   });
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`snow_reports insert failed (${resp.status}): ${text}`);
-  }
 }
 
 async function updateResortRating(
   resortId: string,
   condRating: string,
 ): Promise<void> {
-  const { url } = getEnv();
-  const resp = await fetch(
-    `${url}/rest/v1/resorts?id=eq.${resortId}`,
-    {
-      method: "PATCH",
-      headers: supaHeaders(),
-      body: JSON.stringify({ cond_rating: condRating }),
-    },
-  );
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(
-      `resorts.cond_rating update failed (${resp.status}): ${text}`,
-    );
-  }
+  await writeResortRating(getEnv(), resortId, condRating);
 }
 
 // ── Orchestrator ────────────────────────────────────────────

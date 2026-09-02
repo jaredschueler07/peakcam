@@ -9,6 +9,7 @@ import { LiveWebcams } from "@/components/home/LiveWebcams";
 import { SnowCams } from "@/components/home/SnowCams";
 import { PeakFooter } from "@/components/home/PeakFooter";
 import type { ResortWithData } from "@/lib/types";
+import { POWDER_INCHES } from "@/lib/conditions-engine";
 
 export const revalidate = 3600;
 
@@ -59,9 +60,9 @@ export default async function Home() {
     getRadarFrames().catch(() => []),
   ]);
 
-  // Build powder alerts for ticker — resorts with 8"+ fresh snow
+  // Build powder alerts for ticker — resorts at or over the powder threshold
   const powderAlerts = resorts
-    .filter((r) => (r.snow_report?.new_snow_24h ?? 0) >= 8)
+    .filter((r) => (r.snow_report?.new_snow_24h ?? 0) >= POWDER_INCHES)
     .sort((a, b) => (b.snow_report?.new_snow_24h ?? 0) - (a.snow_report?.new_snow_24h ?? 0))
     .slice(0, 8)
     .map((r) => ({ name: r.name.toUpperCase(), snow24h: r.snow_report!.new_snow_24h! }));

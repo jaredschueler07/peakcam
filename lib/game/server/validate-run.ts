@@ -164,26 +164,26 @@ export const MAX_RUN_SPEED_CMS =
  * procedural. Airborne/crashed segments use the looser mult/limits below —
  * never a full skip (poseFlags is untrusted).
  */
-export const MAX_ACCEL_CMS2 = 6_000;
+const MAX_ACCEL_CMS2 = 6_000;
 /** 80 m/s² of deceleration — a crash into a tree is allowed to be violent. */
-export const MAX_DECEL_CMS2 = 8_000;
+const MAX_DECEL_CMS2 = 8_000;
 /**
  * Airborne accel/decel multiplier (gravity + drag reality, not free pass).
  * Spoofed all-airborne ghosts no longer disable the envelope class.
  */
-export const AIRBORNE_ACCEL_MULT = 3;
+const AIRBORNE_ACCEL_MULT = 3;
 /**
  * Crashed-segment accel ceiling. Preferred `MAX_ACCEL_CMS2 * 3` (= 18k) is
  * below honest 30 Hz crash aliases (jump fixture crash peak ≈ 31 290 cm/s²),
  * so the bound is observed_honest_max × 2.
  */
-export const CRASHED_MAX_ACCEL_CMS2 = 63_000;
+const CRASHED_MAX_ACCEL_CMS2 = 63_000;
 /**
  * Crashed-segment decel ceiling. Preferred `MAX_DECEL_CMS2 * 3` (= 24k) is
  * far below honest impact aliases (full-tuck crash peak ≈ 111 450 cm/s²),
  * so the bound is observed_honest_max × 2.
  */
-export const CRASHED_MAX_DECEL_CMS2 = 223_000;
+const CRASHED_MAX_DECEL_CMS2 = 223_000;
 /**
  * Minimum |groundOffsetCm| required to claim {@link POSE_AIRBORNE}.
  * Codec `groundOffsetCm` is skier Y relative to sampled terrain — the pure-sim
@@ -206,36 +206,36 @@ export const MAX_AIRBORNE_SECONDS = 4;
  */
 export const MAX_CRASHED_SECONDS = 4;
 /** Slack on the per-step displacement bound, absorbing quantisation. */
-export const TELEPORT_SLACK_CM = 100;
+const TELEPORT_SLACK_CM = 100;
 /** How far outside the baked box a keyframe may sit before it is a fabrication. */
-export const BOUNDS_MARGIN_M = 50;
+const BOUNDS_MARGIN_M = 50;
 /** A run must start from a standstill-ish state: 8 m/s. */
-export const MAX_START_SPEED_CMS = 800;
+const MAX_START_SPEED_CMS = 800;
 /** A legal descent covers at least 100 m of ground. */
-export const MIN_COURSE_DISTANCE_CM = 10_000;
+const MIN_COURSE_DISTANCE_CM = 10_000;
 /** Fixed slack on the ghost-span/`timeMs` comparison, on top of one physics tick. */
-export const DURATION_TOLERANCE_MS = 250;
+const DURATION_TOLERANCE_MS = 250;
 /**
  * Slack between the client's wall clock and its reported elapsed time. Generous:
  * device clocks drift and the two are measured differently. Wall-clock times are
  * a sanity rail, never the ranked duration.
  */
-export const WALL_CLOCK_TOLERANCE_MS = 15_000;
+const WALL_CLOCK_TOLERANCE_MS = 15_000;
 /** Course start/finish, when known, must be reached within this radius. */
-export const START_FINISH_RADIUS_M = 60;
+const START_FINISH_RADIUS_M = 60;
 /**
  * Max integer multiple of the nominal inter-sample gap allowed for a single
  * step (dropped-sample slack). Larger gaps look like a hitch or sparse record;
  * beyond this the average-gap / teleport checks take over.
  */
-export const MAX_SAMPLE_GAP_MULTIPLE = 4;
+const MAX_SAMPLE_GAP_MULTIPLE = 4;
 /**
  * Tick-compression floor ratio applied to the nominal gap. We reject when
  * `avgGap < expectedGap * MIN_AVG_GAP_RATIO`. Set to 1 so any average below
  * the nominal period (×0.8 and ×0.9 time edits) fails, while honest
  * (avg = expected) and one-dropped-sample (avg > expected) pass.
  */
-export const MIN_AVG_GAP_RATIO = 1;
+const MIN_AVG_GAP_RATIO = 1;
 
 /** Rebuild the signed model selection server-side; never infer it from the client ghost. */
 export function simulationConfigForTicket(
@@ -440,6 +440,175 @@ function checkSegmentAccel(
   return { ok: true };
 }
 
+// ─── Shared sample sweep ─────────────────────────────────────
+
+/**
+ * One violation the sweep found, reported structurally rather than as a
+ * finished sentence. {@link validateRun} and {@link resimulateGhost} word their
+ * details differently ("keyframe 4 moves …" vs "resim keyframe 4 moves …"), and
+ * both wordings are stored, so the sweep says *what* it found and each caller
+ * says it in its own voice.
+ *
+ * `index` is the keyframe the finding is attached to; the sweep records the
+ * first of each kind rather than returning early, so callers stay free to order
+ * the checks the way they always have.
+ */
+type SweepFinding =
+  | { kind: "tick_regression"; index: number; tick: number; prevTick: number }
+  | { kind: "oversized_gap"; index: number; gap: number }
+  | { kind: "out_of_bounds"; index: number; absCoordCm: number }
+  | { kind: "overspeed"; index: number; speedCms: number }
+  | { kind: "teleport"; index: number; stepCm: number; dtSeconds: number; allowedStepCm: number }
+  | { kind: "accel"; index: number; code: RejectionCode; detail: string }
+  | { kind: "start_speed"; index: number; speedCms: number }
+  | { kind: "start_radius"; index: number; z: number };
+
+/**
+ * The deliberately divergent tolerances. Baseline validation reads the ghost as
+ * submitted; re-simulation re-derives quantities from integer cm / cm/s fields
+ * and so allows the round-trip error those fields carry.
+ */
+interface SweepOptions {
+  /** Extra cm/s allowed on a reported speed before it counts as overspeed. */
+  readonly overspeedSlackCms: number;
+  /** Extra cm allowed on one step, on top of {@link TELEPORT_SLACK_CM}. */
+  readonly stepSlackCm: number;
+  /** Whether the per-segment accel envelope gets quantisation slack. */
+  readonly accelQuantSlack: boolean;
+  /**
+   * Nominal inter-sample gap in ticks. When set, a gap beyond
+   * {@link MAX_SAMPLE_GAP_MULTIPLE}× it is a finding; when null the sweep only
+   * checks that ticks advance.
+   */
+  readonly expectedGapTicks: number | null;
+}
+
+/** Baseline validation: no quantisation slack anywhere, no gap ceiling. */
+const BASELINE_SWEEP: SweepOptions = {
+  overspeedSlackCms: 0, stepSlackCm: 0, accelQuantSlack: false, expectedGapTicks: null,
+};
+
+interface SweepResult {
+  /** First tick that does not advance, or (resim) a gap beyond the multiple. */
+  readonly tick: SweepFinding | null;
+  /** Start-gate failure: speed first, then radius, as both callers check them. */
+  readonly start: SweepFinding | null;
+  readonly bounds: SweepFinding | null;
+  readonly overspeed: SweepFinding | null;
+  /** First segment that teleports or breaks the accel envelope, teleport first. */
+  readonly segment: SweepFinding | null;
+  readonly distanceCm: number;
+  readonly forwardProgressCm: number;
+  readonly backwardProgressCm: number;
+}
+
+/** Phase order within one keyframe, so callers can pick the earliest finding. */
+const FINDING_RANK: Readonly<Record<SweepFinding["kind"], number>> = {
+  tick_regression: 0, oversized_gap: 0, start_speed: 0, start_radius: 0,
+  out_of_bounds: 1, overspeed: 2, teleport: 3, accel: 3,
+};
+
+/** The finding a caller that interleaves these phases per keyframe would hit first. */
+function earliestFinding(...candidates: readonly (SweepFinding | null)[]): SweepFinding | null {
+  let best: SweepFinding | null = null;
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    if (
+      best === null
+      || candidate.index < best.index
+      || (candidate.index === best.index
+        && FINDING_RANK[candidate.kind] < FINDING_RANK[best.kind])
+    ) {
+      best = candidate;
+    }
+  }
+  return best;
+}
+
+/**
+ * The one physical sweep of a decoded ghost: tick cadence, world bounds, speed
+ * ceiling, start gate, per-step displacement, per-segment accel envelope, and
+ * the distance / fall-line progress totals.
+ *
+ * Both validation entry points ran their own copy of this; they now differ only
+ * in {@link SweepOptions} and in how they order and word the findings.
+ * Requires at least one sample (callers check keyframe count first).
+ */
+function sweepSamples(
+  samples: readonly GhostSample[], course: ServerCourse, opts: SweepOptions,
+): SweepResult {
+  const maxAbsCoordCm = (course.halfSizeM + BOUNDS_MARGIN_M) * 100;
+  const fallDir = course.finishZ >= course.startZ ? 1 : -1;
+
+  let tick: SweepFinding | null = null;
+  let bounds: SweepFinding | null = null;
+  let overspeed: SweepFinding | null = null;
+  let segment: SweepFinding | null = null;
+  let distanceCm = 0;
+  let forwardProgressCm = 0;
+  let backwardProgressCm = 0;
+
+  const first = samples[0];
+  let start: SweepFinding | null = null;
+  if (first.speedCms > MAX_START_SPEED_CMS) {
+    start = { kind: "start_speed", index: 0, speedCms: first.speedCms };
+  } else if (Math.abs(first.zCm / 100 - course.startZ) > START_FINISH_RADIUS_M) {
+    start = { kind: "start_radius", index: 0, z: first.zCm / 100 };
+  }
+
+  for (let i = 0; i < samples.length; i++) {
+    const s = samples[i];
+
+    const absCoord = Math.max(Math.abs(s.xCm), Math.abs(s.zCm));
+    if (bounds === null && absCoord > maxAbsCoordCm) {
+      bounds = { kind: "out_of_bounds", index: i, absCoordCm: absCoord };
+    }
+    if (overspeed === null && s.speedCms > MAX_RUN_SPEED_CMS + opts.overspeedSlackCms) {
+      overspeed = { kind: "overspeed", index: i, speedCms: s.speedCms };
+    }
+
+    if (i === 0) continue;
+
+    const prev = samples[i - 1];
+    const gap = s.tick - prev.tick;
+    if (tick === null) {
+      if (gap <= 0) {
+        tick = { kind: "tick_regression", index: i, tick: s.tick, prevTick: prev.tick };
+      } else if (
+        opts.expectedGapTicks !== null
+        && gap > opts.expectedGapTicks * MAX_SAMPLE_GAP_MULTIPLE
+      ) {
+        tick = { kind: "oversized_gap", index: i, gap };
+      }
+    }
+
+    const dtSeconds = gap / FIXED_HZ;
+    const stepCm = planarDistanceCm(prev, s);
+    distanceCm += stepCm;
+
+    if (segment === null) {
+      const allowedStepCm = MAX_RUN_SPEED_CMS * dtSeconds + TELEPORT_SLACK_CM + opts.stepSlackCm;
+      if (stepCm > allowedStepCm) {
+        segment = { kind: "teleport", index: i, stepCm, dtSeconds, allowedStepCm };
+      } else {
+        const accel = checkSegmentAccel(prev, s, dtSeconds, i, opts.accelQuantSlack);
+        if (!accel.ok) {
+          segment = { kind: "accel", index: i, code: accel.code, detail: accel.detail };
+        }
+      }
+    }
+
+    const progress = (s.zCm - prev.zCm) * fallDir;
+    if (progress > 0) forwardProgressCm += progress;
+    else backwardProgressCm += -progress;
+  }
+
+  return {
+    tick, start, bounds, overspeed, segment,
+    distanceCm, forwardProgressCm, backwardProgressCm,
+  };
+}
+
 // ─── Validation ──────────────────────────────────────────────
 
 /**
@@ -492,12 +661,12 @@ export function validateRun(input: RunValidationInput): RunValidationResult {
     return fail("keyframe_count", `${samples.length} keyframes is outside 2..${MAX_KEYFRAMES}`);
   }
 
-  for (let i = 1; i < samples.length; i++) {
-    if (samples[i].tick <= samples[i - 1].tick) {
-      return fail(
-        "tick_regression",
-        `keyframe ${i} ticks ${samples[i].tick} after ${samples[i - 1].tick}`,
-      );
+  const sweep = sweepSamples(samples, course, BASELINE_SWEEP);
+
+  if (sweep.tick) {
+    const t = sweep.tick;
+    if (t.kind === "tick_regression") {
+      return fail("tick_regression", `keyframe ${t.index} ticks ${t.tick} after ${t.prevTick}`);
     }
   }
 
@@ -522,36 +691,40 @@ export function validateRun(input: RunValidationInput): RunValidationResult {
 
   // ── Per-keyframe sweep ──
 
+  // Reported from the aggregate metrics rather than the offending keyframe:
+  // "the run reached here" is the useful line in a server log.
   const maxAbsCoordCm = (course.halfSizeM + BOUNDS_MARGIN_M) * 100;
-  if (metrics.maxAbsCoordCm > maxAbsCoordCm) {
+  if (sweep.bounds) {
     return fail(
       "out_of_bounds",
       `a keyframe sits ${metrics.maxAbsCoordCm}cm from the origin, outside the ` +
         `${course.resortSlug} box (±${maxAbsCoordCm}cm)`,
     );
   }
-  if (metrics.maxSpeedCms > MAX_RUN_SPEED_CMS) {
+  if (sweep.overspeed) {
     return fail(
       "overspeed",
       `peak speed ${metrics.maxSpeedCms}cm/s exceeds ${MAX_RUN_SPEED_CMS}cm/s`,
     );
   }
 
-  // Checked before the sweep: a run that is already moving at the gate never
-  // started legally, and diagnosing that is more useful than the violent
-  // deceleration such a trace also implies a moment later.
-  const first = samples[0];
-  if (first.speedCms > MAX_START_SPEED_CMS) {
-    return fail(
-      "bad_start",
-      `run opens at ${first.speedCms}cm/s, above the ${MAX_START_SPEED_CMS}cm/s gate speed`,
-    );
-  }
-  if (Math.abs(first.zCm / 100 - course.startZ) > START_FINISH_RADIUS_M) {
-    return fail(
-      "bad_start",
-      `run opens at z=${first.zCm / 100}m, more than ${START_FINISH_RADIUS_M}m from the start`,
-    );
+  // Checked before the per-segment findings: a run that is already moving at
+  // the gate never started legally, and diagnosing that is more useful than the
+  // violent deceleration such a trace also implies a moment later.
+  if (sweep.start) {
+    const start = sweep.start;
+    if (start.kind === "start_speed") {
+      return fail(
+        "bad_start",
+        `run opens at ${start.speedCms}cm/s, above the ${MAX_START_SPEED_CMS}cm/s gate speed`,
+      );
+    }
+    if (start.kind === "start_radius") {
+      return fail(
+        "bad_start",
+        `run opens at z=${start.z}m, more than ${START_FINISH_RADIUS_M}m from the start`,
+      );
+    }
   }
 
   // poseFlags is client-controlled: ground-offset cross-check + airtime cap
@@ -559,20 +732,17 @@ export function validateRun(input: RunValidationInput): RunValidationResult {
   const pose = checkPoseIntegrity(samples, meta.sampleHz);
   if (!pose.ok) return fail(pose.code, pose.detail);
 
-  for (let i = 1; i < samples.length; i++) {
-    const dtSeconds = (samples[i].tick - samples[i - 1].tick) / FIXED_HZ;
-    const stepCm = planarDistanceCm(samples[i - 1], samples[i]);
-    const allowedStepCm = MAX_RUN_SPEED_CMS * dtSeconds + TELEPORT_SLACK_CM;
-    if (stepCm > allowedStepCm) {
+  if (sweep.segment) {
+    const segment = sweep.segment;
+    if (segment.kind === "teleport") {
       return fail(
         "teleport",
-        `keyframe ${i} moves ${Math.round(stepCm)}cm in ${dtSeconds.toFixed(3)}s ` +
-          `(at most ${Math.round(allowedStepCm)}cm is reachable)`,
+        `keyframe ${segment.index} moves ${Math.round(segment.stepCm)}cm in ` +
+          `${segment.dtSeconds.toFixed(3)}s ` +
+          `(at most ${Math.round(segment.allowedStepCm)}cm is reachable)`,
       );
     }
-
-    const accelCheck = checkSegmentAccel(samples[i - 1], samples[i], dtSeconds, i, false);
-    if (!accelCheck.ok) return fail(accelCheck.code, accelCheck.detail);
+    if (segment.kind === "accel") return fail(segment.code, segment.detail);
   }
 
   // ── Finish ──
@@ -653,45 +823,58 @@ export function resimulateGhost(
     };
   }
 
-  for (let i = 1; i < samples.length; i++) {
-    const gap = samples[i].tick - samples[i - 1].tick;
-    if (gap <= 0) {
+  // Quantisation slack absorbs the integer cm / cm/s round-trip: 1 cm/s on a
+  // reported speed, √2 cm on a step reconstructed from two integer positions.
+  const sweep = sweepSamples(samples, course, {
+    overspeedSlackCms: 1,
+    stepSlackCm: Math.SQRT2,
+    accelQuantSlack: true,
+    expectedGapTicks: expectedGap,
+  });
+
+  // Cadence is checked across the whole tape before anything else, so a time
+  // edit anywhere reports as such rather than as its downstream symptom.
+  // A gap of k × expected is fine (dropped samples); the avg check above
+  // already catches global ×0.8/×0.9 compression.
+  if (sweep.tick) {
+    const t = sweep.tick;
+    if (t.kind === "tick_regression") {
       return {
         accepted: false,
         code: "tick_regression",
-        detail: `resim keyframe ${i} tick ${samples[i].tick} does not advance past ${samples[i - 1].tick}`,
+        detail: `resim keyframe ${t.index} tick ${t.tick} does not advance past ${t.prevTick}`,
       };
     }
-    // Allow gap = k * expected for small integer k (dropped samples). A gap that
-    // is not a near-multiple and is also far below expected is compression noise
-    // on individual steps; the avg check already catches global ×0.8/×0.9.
-    if (gap > expectedGap * MAX_SAMPLE_GAP_MULTIPLE) {
+    if (t.kind === "oversized_gap") {
       return {
         accepted: false,
         code: "duration_mismatch",
         detail:
-          `resim keyframe ${i} tick gap ${gap} exceeds ${MAX_SAMPLE_GAP_MULTIPLE}×` +
+          `resim keyframe ${t.index} tick gap ${t.gap} exceeds ${MAX_SAMPLE_GAP_MULTIPLE}×` +
           ` expected ${expectedGap}`,
       };
     }
   }
 
   // ── Start gate ──
-  if (first.speedCms > MAX_START_SPEED_CMS) {
-    return {
-      accepted: false,
-      code: "bad_start",
-      detail: `resim start speed ${first.speedCms}cm/s exceeds ${MAX_START_SPEED_CMS}cm/s`,
-    };
-  }
-  if (Math.abs(first.zCm / 100 - course.startZ) > START_FINISH_RADIUS_M) {
-    return {
-      accepted: false,
-      code: "bad_start",
-      detail:
-        `resim opens at z=${first.zCm / 100}m, more than ${START_FINISH_RADIUS_M}m ` +
-        `from startZ=${course.startZ}`,
-    };
+  if (sweep.start) {
+    const start = sweep.start;
+    if (start.kind === "start_speed") {
+      return {
+        accepted: false,
+        code: "bad_start",
+        detail: `resim start speed ${start.speedCms}cm/s exceeds ${MAX_START_SPEED_CMS}cm/s`,
+      };
+    }
+    if (start.kind === "start_radius") {
+      return {
+        accepted: false,
+        code: "bad_start",
+        detail:
+          `resim opens at z=${start.z}m, more than ${START_FINISH_RADIUS_M}m ` +
+          `from startZ=${course.startZ}`,
+      };
+    }
   }
 
   // ── Pose integrity (untrusted client poseFlags) ──
@@ -701,62 +884,45 @@ export function resimulateGhost(
   }
 
   // ── Bounds + sweep ──
+  // One keyframe at a time, so the earliest offending frame is diagnosed
+  // whichever bound it breaks.
   const maxAbsCoordCm = (course.halfSizeM + BOUNDS_MARGIN_M) * 100;
-
-  let distanceCm = 0;
-  let forwardProgressCm = 0;
-  let backwardProgressCm = 0;
-  const fallDir = course.finishZ >= course.startZ ? 1 : -1;
-
-  for (let i = 0; i < samples.length; i++) {
-    const s = samples[i];
-    const absCoord = Math.max(Math.abs(s.xCm), Math.abs(s.zCm));
-    if (absCoord > maxAbsCoordCm) {
-      return {
-        accepted: false,
-        code: "out_of_bounds",
-        detail: `resim keyframe ${i} at ${absCoord}cm exceeds box ±${maxAbsCoordCm}cm`,
-      };
+  const finding = earliestFinding(sweep.bounds, sweep.overspeed, sweep.segment);
+  if (finding) {
+    switch (finding.kind) {
+      case "out_of_bounds":
+        return {
+          accepted: false,
+          code: "out_of_bounds",
+          detail:
+            `resim keyframe ${finding.index} at ${finding.absCoordCm}cm ` +
+            `exceeds box ±${maxAbsCoordCm}cm`,
+        };
+      case "overspeed":
+        return {
+          accepted: false,
+          code: "overspeed",
+          detail:
+            `resim keyframe ${finding.index} speed ${finding.speedCms}cm/s ` +
+            `exceeds ${MAX_RUN_SPEED_CMS}cm/s`,
+        };
+      case "teleport":
+        return {
+          accepted: false,
+          code: "teleport",
+          detail:
+            `resim keyframe ${finding.index} moves ${Math.round(finding.stepCm)}cm ` +
+            `in ${finding.dtSeconds.toFixed(3)}s ` +
+            `(cap ${Math.round(finding.allowedStepCm)}cm)`,
+        };
+      case "accel":
+        return { accepted: false, code: finding.code, detail: `resim ${finding.detail}` };
+      default:
+        break;
     }
-    // Quantisation can nudge reported speed by 1 cm/s.
-    if (s.speedCms > MAX_RUN_SPEED_CMS + 1) {
-      return {
-        accepted: false,
-        code: "overspeed",
-        detail: `resim keyframe ${i} speed ${s.speedCms}cm/s exceeds ${MAX_RUN_SPEED_CMS}cm/s`,
-      };
-    }
-
-    if (i === 0) continue;
-
-    const prev = samples[i - 1];
-    const dtSeconds = (s.tick - prev.tick) / FIXED_HZ;
-
-    const stepCm = planarDistanceCm(prev, s);
-    distanceCm += stepCm;
-
-    const quantStepSlackCm = Math.SQRT2;
-    const allowedStepCm = MAX_RUN_SPEED_CMS * dtSeconds + TELEPORT_SLACK_CM + quantStepSlackCm;
-    if (stepCm > allowedStepCm) {
-      return {
-        accepted: false,
-        code: "teleport",
-        detail:
-          `resim keyframe ${i} moves ${Math.round(stepCm)}cm in ${dtSeconds.toFixed(3)}s ` +
-          `(cap ${Math.round(allowedStepCm)}cm)`,
-      };
-    }
-
-    const accelCheck = checkSegmentAccel(prev, s, dtSeconds, i, true);
-    if (!accelCheck.ok) {
-      return { accepted: false, code: accelCheck.code, detail: `resim ${accelCheck.detail}` };
-    }
-
-    const dzCm = s.zCm - prev.zCm;
-    const progress = dzCm * fallDir;
-    if (progress > 0) forwardProgressCm += progress;
-    else backwardProgressCm += -progress;
   }
+
+  const { distanceCm, forwardProgressCm, backwardProgressCm } = sweep;
 
   // ── Distance floor ──
   if (distanceCm < MIN_COURSE_DISTANCE_CM) {
@@ -783,6 +949,7 @@ export function resimulateGhost(
   }
 
   // ── Monotonic course progress (overall) ──
+  const fallDir = course.finishZ >= course.startZ ? 1 : -1;
   const netProgressCm = (last.zCm - first.zCm) * fallDir;
   if (netProgressCm <= 0) {
     return {

@@ -77,6 +77,13 @@ export const RATING_THRESHOLDS = {
   fair:  { pctOfNormal: 70, minDepth: 20 },
 } as const;
 
+/**
+ * A "powder day": inches of new snow in 24h that earn the alpenglow pill, the
+ * home-page ticker and the "fresh snow" filter. One number, four call sites —
+ * it used to be a bare `>= 8` in each of them.
+ */
+export const POWDER_INCHES = 8;
+
 const TREND_THRESHOLD_IN = 0.5;  // SWE change in inches
 const SNOW_FORECAST_THRESHOLD = 3; // inches for "more_snow"
 const WARM_TEMP_THRESHOLD = 40;    // °F for warming/melt
@@ -227,8 +234,12 @@ export function computeUserScore(reports: UserConditionReport[]): number | null 
 
 // ── Condition Rating ─────────────────────────────────────────
 
-// Rating order for numeric blending
-const RATING_ORDER: ConditionRating[] = ["poor", "fair", "good", "great"];
+/**
+ * Rating order for numeric blending — worst first, so the index is a tier
+ * number that can be averaged and clamped. UI sort order (best first) is
+ * `CONDITION_ORDER` in `lib/theme-tokens.ts`, derived from this array.
+ */
+export const RATING_ORDER: ConditionRating[] = ["poor", "fair", "good", "great"];
 
 function ratingToIndex(r: ConditionRating): number {
   return RATING_ORDER.indexOf(r);

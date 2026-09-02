@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
-import { Heart, Maximize2 } from "lucide-react";
+import { Maximize2 } from "lucide-react";
 import { ConditionBadge } from "@/components/ui/Badge";
 import type { ResortWithData, WeatherPeriod, LiveConditions, Cam, UserCondition, ForecastPeriod, HourlyWeather } from "@/lib/types";
 import { CamReportButton } from "@/components/cam/CamReportButton";
@@ -23,6 +23,7 @@ import { trackResortView, trackCamClick } from "@/lib/posthog";
 import { trackViewContent } from "@/lib/meta-pixel-events";
 import { FavoriteButton } from "../ui/FavoriteButton";
 import { isDropInResort } from "@/lib/drop-in";
+import { formatInches, formatRatio, parseConditions } from "@/lib/format";
 import DropInLink from "@/components/drop-in/DropInLink";
 
 interface Props {
@@ -251,10 +252,10 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
   };
 
   const stats = [
-    { label: "Base Depth", value: snow.base_depth != null ? `${snow.base_depth}″` : "—", color: "text-powder" },
-    { label: "24h New Snow", value: snow.new_snow_24h != null ? `${snow.new_snow_24h}″` : "—", color: "text-cyan" },
-    { label: "48h New Snow", value: snow.new_snow_48h != null ? `${snow.new_snow_48h}″` : "—", color: "text-text-subtle" },
-    ...(snow.swe_in != null ? [{ label: "SWE", value: `${snow.swe_in}″`, color: "text-text-base" }] : []),
+    { label: "Base Depth", value: formatInches(snow.base_depth), color: "text-powder" },
+    { label: "24h New Snow", value: formatInches(snow.new_snow_24h), color: "text-cyan" },
+    { label: "48h New Snow", value: formatInches(snow.new_snow_48h), color: "text-text-subtle" },
+    ...(snow.swe_in != null ? [{ label: "SWE", value: formatInches(snow.swe_in), color: "text-text-base" }] : []),
     ...(snow.pct_of_normal != null ? [{
       label: "% of Normal",
       value: `${snow.pct_of_normal}%`,
@@ -267,12 +268,12 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
     }] : []),
     {
       label: "Trails Open",
-      value: snow.trails_open != null ? `${snow.trails_open}${snow.trails_total ? `/${snow.trails_total}` : ""}` : "—",
+      value: formatRatio(snow.trails_open, snow.trails_total),
       color: "text-text-base",
     },
     {
       label: "Lifts Open",
-      value: snow.lifts_open != null ? `${snow.lifts_open}${snow.lifts_total ? `/${snow.lifts_total}` : ""}` : "—",
+      value: formatRatio(snow.lifts_open, snow.lifts_total),
       color: "text-text-base",
     },
   ];
@@ -288,9 +289,10 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
       {(() => {
         if (!snow.conditions) return null;
         const conditionsRaw = snow.conditions;
-        const [tagsStr, narrativeStr] = conditionsRaw.includes("||") ? conditionsRaw.split("||") : ["", conditionsRaw];
-        const tags = tagsStr ? tagsStr.split(",") : [];
-        const narrative = narrativeStr || conditionsRaw;
+        // No "||" means no tags and no narrative; the block has always fallen
+        // back to showing the raw string as the sentence.
+        const { tags, narrative: parsedNarrative } = parseConditions(conditionsRaw);
+        const narrative = parsedNarrative ?? conditionsRaw;
 
         return (
           <div className="bg-surface border border-border rounded-xl px-4 py-3 flex-1 min-w-[200px]">
@@ -328,6 +330,13 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const favorited = isFavorite(resort.id);
+
+  // Both hero favorite controls share this handler, so they toggle the same
+  // `useFavorites` state instead of drifting apart.
+  const handleToggleFavorite = () => {
+    if (!user) { setShowAuthModal(true); return; }
+    toggleFav(resort.id);
+  };
 
   useEffect(() => {
     trackResortView(resort.name, resort.slug);
@@ -368,7 +377,15 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
                 <h1 className="text-3xl md:text-4xl font-heading font-bold text-text-base uppercase tracking-wider leading-tight">
                   {resort.name}
                 </h1>
-                <FavoriteButton itemId={resort.id} itemType="resort" size="md" variant="outline" className="mt-1" />
+                <FavoriteButton
+                  itemId={resort.id}
+                  itemType="resort"
+                  size="md"
+                  variant="outline"
+                  className="mt-1"
+                  favorited={favorited}
+                  onToggle={handleToggleFavorite}
+                />
               </div>
               <p className="text-text-muted text-sm mt-1.5">
                 {resort.region} · {resort.state}
@@ -381,21 +398,14 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
                   label={resort.cond_rating.charAt(0).toUpperCase() + resort.cond_rating.slice(1)}
                 />
               )}
-              <button
-                onClick={() => {
-                  if (!user) { setShowAuthModal(true); return; }
-                  toggleFav(resort.id);
-                }}
-                className={`p-2 rounded-lg border transition-all duration-[220ms] ${
-                  favorited
-                    ? "bg-alpenglow/15 border-alpenglow/40 text-alpenglow hover:bg-alpenglow/25"
-                    : "bg-surface2/50 border-border text-text-muted hover:text-alpenglow hover:border-alpenglow/30 hover:bg-alpenglow/10"
-                }`}
-                aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
-                title={favorited ? "Remove from favorites" : user ? "Add to favorites" : "Sign in to save favorites"}
-              >
-                <Heart size={18} fill={favorited ? "currentColor" : "none"} strokeWidth={favorited ? 0 : 1.5} />
-              </button>
+              <FavoriteButton
+                itemId={resort.id}
+                itemType="resort"
+                variant="pill"
+                size="md"
+                favorited={favorited}
+                onToggle={handleToggleFavorite}
+              />
               <div className="flex items-center gap-2">
                 {resort.instagram_url && (
                   <a href={resort.instagram_url} target="_blank" rel="noopener noreferrer"

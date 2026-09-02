@@ -1,5 +1,6 @@
 import type { ResortWithData } from "@/lib/types";
 import { isOffSeason } from "@/lib/map-utils";
+import { parseConditions } from "@/lib/format";
 
 /**
  * Data-derived prose for resort pages: an "about" paragraph and a FAQ block
@@ -79,17 +80,6 @@ function trendPhrase(trend: string | null | undefined): string | null {
     default:
       return null;
   }
-}
-
-/**
- * The overloaded `snow_reports.conditions` string is "tags||narrative". With
- * no "||" there is no narrative — only a tag list ("powder,fresh"), which is
- * not a sentence and must not be published as one.
- */
-function conditionsNarrative(conditions: string | null | undefined): string | null {
-  if (!conditions || !conditions.includes("||")) return null;
-  const narrative = conditions.split("||")[1].trim();
-  return narrative || null;
 }
 
 /**
@@ -204,8 +194,9 @@ export function buildResortFaq(resort: ResortWithData, now: Date): ResortFaqItem
     });
   }
 
-  // Q3 — conditions today, only when a real narrative exists.
-  const narrative = conditionsNarrative(snow?.conditions);
+  // Q3 — conditions today, only when a real narrative exists. A bare tag list
+  // ("powder,fresh") parses to a null narrative and is never published here.
+  const { narrative } = parseConditions(snow?.conditions);
   if (!offSeason && narrative) {
     faq.push({
       question: `What are the ski conditions at ${resort.name} today?`,

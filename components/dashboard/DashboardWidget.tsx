@@ -5,18 +5,9 @@ import Link from "next/link";
 import { Camera } from "lucide-react";
 import { pickPreview } from "@/components/map/MapCamPreview";
 import { camDisplayName } from "@/lib/cam-name";
-import type { ConditionRating, ResolvedWidget, WidgetConfig } from "@/lib/types";
-
-const conditionColors: Record<ConditionRating, { bg: string; text: string; border: string; label: string }> = {
-  great: { bg: "bg-great",  text: "text-cream-50", border: "border-forest-dk", label: "GREAT" },
-  good:  { bg: "bg-good",   text: "text-cream-50", border: "border-forest-dk", label: "GOOD"  },
-  fair:  { bg: "bg-fair",   text: "text-ink",      border: "border-bark-dk",   label: "FAIR"  },
-  poor:  { bg: "bg-poor",   text: "text-cream-50", border: "border-bark-dk",   label: "POOR"  },
-};
-
-function formatInches(n: number | null | undefined): string {
-  return n == null ? "\u2014" : `${n}"`;
-}
+import type { ResolvedWidget, WidgetConfig } from "@/lib/types";
+import { RATING_CHIP_CLASS, ratingLabel } from "@/lib/theme-tokens";
+import { formatInches } from "@/lib/format";
 
 function MissingBody({ type }: { type: WidgetConfig["type"] }) {
   return (
@@ -34,7 +25,7 @@ function MissingBody({ type }: { type: WidgetConfig["type"] }) {
 
 function ResortBody({ resolved }: { resolved: Extract<ResolvedWidget, { kind: "resort" }> }) {
   const { resort, snow, cams } = resolved;
-  const cond = resort.cond_rating ? conditionColors[resort.cond_rating] : null;
+  const rating = resort.cond_rating ?? null;
   const camCount = cams.length;
 
   return (
@@ -61,13 +52,13 @@ function ResortBody({ resolved }: { resolved: Extract<ResolvedWidget, { kind: "r
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {cond && (
+          {rating && (
             <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full border font-mono font-bold text-[10px] uppercase tracking-[0.14em] ${cond.bg} ${cond.text} ${cond.border}`}
+              className={`inline-flex items-center px-2 py-0.5 rounded-full border font-mono font-bold text-[10px] uppercase tracking-[0.14em] ${RATING_CHIP_CLASS[rating]}`}
               role="img"
-              aria-label={`Conditions: ${cond.label}`}
+              aria-label={`Conditions: ${ratingLabel(rating)}`}
             >
-              {cond.label}
+              {ratingLabel(rating)}
             </span>
           )}
           <div

@@ -4,13 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import type { Cam } from "@/lib/types";
 import { camDisplayName } from "@/lib/cam-name";
+import { timeAgo } from "@/lib/format";
 
 const REFRESH_MS = { tile: 30_000, lightbox: 15_000 } as const;
 
-function timeAgo(ts: number): string {
-  const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
-  return s < 60 ? `${s}s ago` : `${Math.floor(s / 60)}m ago`;
-}
+/** Cam stills refresh every 15-30s, so this badge needs the seconds rung. */
+const freshness = (ts: number) => timeAgo(ts, { seconds: true }) ?? "";
 
 /** Auto-refreshing image feed: freshness badge, manual refresh,
  *  paused while the tab is hidden, placeholder on load failure. */
@@ -79,7 +78,7 @@ function ImageFeed({ url, name, refreshMs }: { url: string; name: string; refres
       />
       <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1.5">
         <span className="px-2 py-0.5 bg-ink/80 rounded-full font-mono text-[10px] font-bold text-cream-50 uppercase tracking-[0.12em]">
-          Live · {timeAgo(refreshedAt)}
+          Live · {freshness(refreshedAt)}
         </span>
         <button
           onClick={refresh}

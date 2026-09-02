@@ -15,6 +15,8 @@
 // that a user can only write rows for themselves.
 // ─────────────────────────────────────────────────────────────
 
+import { readServiceEnv } from "@/lib/api/service-env";
+
 export const RATE_LIMIT_WINDOW_MS = 3_600_000;
 
 /**
@@ -47,14 +49,21 @@ export function recentReportPath(
  * the site. The failure is logged so it is visible if it stops being transient.
  */
 export async function hasRecentReport(params: {
-  supabaseUrl: string | undefined;
-  serviceKey: string | undefined;
+  /** Defaults to NEXT_PUBLIC_SUPABASE_URL. */
+  supabaseUrl?: string | undefined;
+  /** Defaults to SUPABASE_SERVICE_ROLE_KEY. */
+  serviceKey?: string | undefined;
   resortId: string;
   userId: string;
   now?: number;
   fetchImpl?: typeof fetch;
 }): Promise<boolean> {
-  const { supabaseUrl, serviceKey, resortId, userId } = params;
+  const { resortId, userId } = params;
+  // Only omitted keys fall back to the environment. An explicitly-passed
+  // `undefined` stays undefined, so a caller can still exercise fail-open.
+  const env = readServiceEnv();
+  const supabaseUrl = "supabaseUrl" in params ? params.supabaseUrl : env.url;
+  const serviceKey = "serviceKey" in params ? params.serviceKey : env.serviceKey;
   if (!supabaseUrl || !serviceKey) {
     console.error("[PeakCam] rate-limit check skipped: service-role env missing");
     return false;

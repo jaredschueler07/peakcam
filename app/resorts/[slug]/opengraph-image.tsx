@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { getResortBySlug } from "@/lib/supabase";
+import { parseConditions } from "@/lib/format";
 
 export const runtime = "nodejs";
 export const size = { width: 1200, height: 630 };
@@ -29,8 +30,10 @@ export default async function OgImage({
     : "#60C8FF";
   const snow = resort?.snow_report;
 
-  const conditionsNarrative = snow?.conditions 
-    ? (snow.conditions.includes("||") ? snow.conditions.split("||")[1] : snow.conditions) 
+  // No stored narrative means the raw string is a bare tag list; the card has
+  // always drawn it verbatim rather than leaving the strip empty.
+  const conditionsNarrative = snow?.conditions
+    ? parseConditions(snow.conditions).narrative ?? snow.conditions
     : null;
 
   return new ImageResponse(

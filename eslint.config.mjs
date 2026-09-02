@@ -23,7 +23,6 @@ const eslintConfig = defineConfig([
       "components/resort/ConditionVoter.tsx",
       "components/resort/UserConditionsForm.tsx",
       "components/resort/UserConditionsList.tsx",
-      "components/ui/FavoriteButton.tsx",
       "scripts/snotel-sync.ts",
     ],
     rules: { "@typescript-eslint/no-explicit-any": "off" },

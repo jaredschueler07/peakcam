@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "node --import tsx --test 'lib/**/*.test.ts' 'scripts/**/*.test.ts' 'scripts/**/*.test.mjs' 'tests/**/*.test.ts'",
     "drop-in:sync-three": "node scripts/sync-three.mjs",
+    "drop-in:sync-profiles": "tsx scripts/drop-in-sync-profiles.ts",
     "bake-terrain": "tsx scripts/bake-resort.ts",
     "bake-far-field": "tsx scripts/bake-far-field.ts",
     "validate-game-assets": "tsx scripts/validate-game-assets.ts",

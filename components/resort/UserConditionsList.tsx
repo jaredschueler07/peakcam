@@ -18,6 +18,7 @@ import {
   Split
 } from "lucide-react";
 import type { UserCondition } from "@/lib/types";
+import { timeAgo } from "@/lib/format";
 
 // ── Label maps ───────────────────────────────────────────────
 
@@ -47,18 +48,6 @@ const trailLabels: Record<string, { label: string; icon: any }> = {
   moguls:    { label: "Moguls",     icon: Zap },
   variable:  { label: "Variable",   icon: Split },
 };
-
-// ── Helpers ──────────────────────────────────────────────────
-
-function timeAgo(isoString: string): string {
-  const diffMs = Date.now() - new Date(isoString).getTime();
-  const diffMins = Math.floor(diffMs / 60_000);
-  if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHrs = Math.floor(diffMins / 60);
-  if (diffHrs < 24) return `${diffHrs}h ago`;
-  return `${Math.floor(diffHrs / 24)}d ago`;
-}
 
 // ── Component ────────────────────────────────────────────────
 
@@ -101,7 +90,7 @@ export function UserConditionsList({ conditions }: Props) {
                   {snow?.label}
                 </span>
               </div>
-              <span className="text-text-muted text-[11px] shrink-0">{timeAgo(c.submitted_at)}</span>
+              <span className="text-text-muted text-[11px] shrink-0">{timeAgo(c.submitted_at) ?? ""}</span>
             </div>
 
             {/* Condition pills */}

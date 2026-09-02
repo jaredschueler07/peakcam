@@ -6,32 +6,10 @@
  * row timestamp on data_source_readings, resort_conditions_summary, and
  * resort_metadata.
  */
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { loadEnv, requireSupabaseEnv } from "./lib/env.mjs";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, "..");
-for (const f of [".env.local", ".env"]) {
-  const p = path.join(ROOT, f);
-  if (!fs.existsSync(p)) continue;
-  for (const line of fs.readFileSync(p, "utf-8").split("\n")) {
-    const t = line.trim();
-    if (!t || t.startsWith("#")) continue;
-    const eq = t.indexOf("=");
-    if (eq === -1) continue;
-    const k = t.slice(0, eq).trim();
-    const v = t.slice(eq + 1).trim().replace(/^["']|["']$/g, "");
-    if (k && !(k in process.env)) process.env[k] = v;
-  }
-}
-
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!URL || !KEY) {
-  console.error("Missing Supabase env (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)");
-  process.exit(1);
-}
+loadEnv();
+const { url: URL, key: KEY } = requireSupabaseEnv();
 
 // table -> { selectCol, orderCol } — resort_conditions_summary has no `id`
 // column; its PK is `resort_id` and its timestamp is `updated_at`.

@@ -4,8 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import { Camera, ArrowLeftRight, TrendingUp, TrendingDown, Minus, Snowflake, Sun, Thermometer, Heart } from "lucide-react";
-import type { ResortWithData, ConditionRating, SnowTrend, SnowOutlook } from "@/lib/types";
+import type { ResortWithData, SnowTrend, SnowOutlook } from "@/lib/types";
 import { isOffSeason, OFF_SEASON_COLOR } from "@/lib/map-utils";
+import { RATING_CHIP_CLASS, RATING_COLORS, PC_BARK, ratingLabel } from "@/lib/theme-tokens";
+import { POWDER_INCHES } from "@/lib/conditions-engine";
+import { formatInches, formatRatio } from "@/lib/format";
 import { trackResortCardClick } from "@/lib/posthog";
 
 // ── Animated count-up number ─────────────────────────────────────────────────
@@ -84,21 +87,15 @@ function AnimatedNumber({ value, animate = true }: { value: number; animate?: bo
   return <span aria-hidden="true">{count}</span>;
 }
 
-// ── Condition palette (earth tones) ──────────────────────────────────────────
-
-const conditionColors: Record<ConditionRating, { bg: string; text: string; border: string; label: string }> = {
-  great: { bg: "bg-great",  text: "text-cream-50", border: "border-forest-dk", label: "GREAT" },
-  good:  { bg: "bg-good",   text: "text-cream-50", border: "border-forest-dk", label: "GOOD"  },
-  fair:  { bg: "bg-fair",   text: "text-ink",      border: "border-bark-dk",   label: "FAIR"  },
-  poor:  { bg: "bg-poor",   text: "text-cream-50", border: "border-bark-dk",   label: "POOR"  },
-};
-
 // ── Trend indicator ──────────────────────────────────────────────────────────
+//
+// Trend and outlook borrow the rating hues: building snow reads forest-green,
+// melting reads alpenglow-red, holding steady reads neutral bark.
 
 const trendConfig: Record<SnowTrend, { icon: typeof TrendingUp; color: string; label: string }> = {
-  rising:  { icon: TrendingUp,   color: "#3c5a3a", label: "Rising"  },
-  stable:  { icon: Minus,        color: "#63482d", label: "Stable"  },
-  falling: { icon: TrendingDown, color: "#a93f20", label: "Falling" },
+  rising:  { icon: TrendingUp,   color: RATING_COLORS.great, label: "Rising"  },
+  stable:  { icon: Minus,        color: PC_BARK,             label: "Stable"  },
+  falling: { icon: TrendingDown, color: RATING_COLORS.poor,  label: "Falling" },
 };
 
 function TrendBadge({ trend }: { trend: SnowTrend }) {
@@ -114,10 +111,10 @@ function TrendBadge({ trend }: { trend: SnowTrend }) {
 // ── Outlook indicator ────────────────────────────────────────────────────────
 
 const outlookConfig: Record<SnowOutlook, { icon: typeof Snowflake; color: string; label: string }> = {
-  more_snow:  { icon: Snowflake,  color: "#3c5a3a", label: "More snow" },
-  stable:     { icon: Minus,      color: "#63482d", label: "Stable"    },
-  warming:    { icon: Sun,        color: "#e2a740", label: "Warming"   },
-  melt_risk:  { icon: Thermometer,color: "#a93f20", label: "Melt risk" },
+  more_snow:  { icon: Snowflake,   color: RATING_COLORS.great, label: "More snow" },
+  stable:     { icon: Minus,       color: PC_BARK,             label: "Stable"    },
+  warming:    { icon: Sun,         color: RATING_COLORS.fair,  label: "Warming"   },
+  melt_risk:  { icon: Thermometer, color: RATING_COLORS.poor,  label: "Melt risk" },
 };
 
 // ── SummitResortCard (pc-cam-tile) ───────────────────────────────────────────
@@ -144,8 +141,8 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
   const trailsOpen = snow?.trails_open;
   const trailsTotal = snow?.trails_total;
   const camCount = resort.cams.filter((c) => c.is_active).length;
-  const isFresh = snow24h >= 8;
-  const cond = resort.cond_rating ? conditionColors[resort.cond_rating] : null;
+  const isFresh = snow24h >= POWDER_INCHES;
+  const chipCls = resort.cond_rating ? RATING_CHIP_CLASS[resort.cond_rating] : null;
   const pctNormal = snow?.pct_of_normal;
   const trend = snow?.trend_7d as SnowTrend | null;
   const outlook = snow?.outlook as SnowOutlook | null;
@@ -222,7 +219,9 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
                 {baseDepth > 0 ? (
                   <>
                     <AnimatedNumber value={baseDepth} animate={entrance} />
-                    <span className="text-alpen">&quot;</span>
+                    {/* The unit glyph is split out so it can take the alpenglow
+                        accent; same ″ that formatInches renders. */}
+                    <span className="text-alpen">″</span>
                   </>
                 ) : (
                   <span className="text-bark text-6xl">&mdash;</span>
@@ -241,18 +240,16 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
             {/* Data strip — dashed bark rule top/bottom, mono numbers */}
             <div className="grid grid-cols-3 gap-4 py-4 border-t border-b border-dashed border-bark/60">
               <div className="text-center">
-                <div className="font-mono font-bold text-xl text-ink tabular-nums">{snow24h}&quot;</div>
+                <div className="font-mono font-bold text-xl text-ink tabular-nums">{formatInches(snow24h)}</div>
                 <div className="font-mono text-[10px] text-bark uppercase tracking-widest mt-0.5">24H</div>
               </div>
               <div className="text-center border-x border-dashed border-bark/60">
-                <div className="font-mono font-bold text-xl text-ink tabular-nums">{snow48h}&quot;</div>
+                <div className="font-mono font-bold text-xl text-ink tabular-nums">{formatInches(snow48h)}</div>
                 <div className="font-mono text-[10px] text-bark uppercase tracking-widest mt-0.5">48H</div>
               </div>
               <div className="text-center">
                 <div className="font-mono font-bold text-xl text-ink tabular-nums">
-                  {trailsOpen != null && trailsTotal != null
-                    ? `${trailsOpen}/${trailsTotal}`
-                    : "\u2014"}
+                  {formatRatio(trailsOpen, trailsTotal)}
                 </div>
                 <div className="font-mono text-[10px] text-bark uppercase tracking-widest mt-0.5">Runs</div>
               </div>
@@ -270,13 +267,13 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
                   >
                     Off-season
                   </span>
-                ) : cond ? (
+                ) : chipCls && resort.cond_rating ? (
                   <span
                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
                       border font-bold text-[11.5px] tracking-[0.08em] uppercase
-                      ${cond.bg} ${cond.text} ${cond.border}`}
+                      ${chipCls}`}
                   >
-                    {cond.label}
+                    {ratingLabel(resort.cond_rating)}
                   </span>
                 ) : (
                   <span className="text-bark text-xs">&mdash;</span>

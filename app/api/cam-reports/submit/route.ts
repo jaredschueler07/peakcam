@@ -6,50 +6,27 @@
 // direct anon writes.
 
 import { NextResponse, type NextRequest } from "next/server";
-import crypto from "node:crypto";
-import { createClient } from "@supabase/supabase-js";
 import { parseCamReportBody } from "@/lib/cam-reports/validate";
 import { sendCamReportEmail } from "@/lib/cam-reports/email";
+import { getServiceClient } from "@/lib/api/service-client";
+import { jsonError, parseJsonBody } from "@/lib/api/response";
+import { extractIp } from "@/lib/api/request-ip";
+import { hashIp } from "@/lib/api/hash-ip";
 
+// hashIp pulls in node:crypto.
 export const runtime = "nodejs";
-
-function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new Error("Supabase service role env not configured");
-  }
-  return createClient(url, key, { auth: { persistSession: false } });
-}
-
-function hashIp(ip: string | null): string | null {
-  if (!ip) return null;
-  const salt = process.env.CAM_REPORT_SALT;
-  if (!salt) return null;
-  const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
-  return crypto.createHash("sha256").update(`${ip}${salt}${today}`).digest("hex");
-}
-
-function extractIp(req: NextRequest): string | null {
-  // Vercel sets x-forwarded-for; first hop is the original client.
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
-  return req.headers.get("x-real-ip");
-}
 
 export async function POST(req: NextRequest) {
   // 1. Parse body
-  let raw: unknown;
-  try {
-    raw = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = await parseJsonBody(req);
+  if (!body.ok) {
+    return jsonError("Invalid JSON", 400);
   }
 
   // 2. Validate shape
-  const parsed = parseCamReportBody(raw);
+  const parsed = parseCamReportBody(body.value);
   if (!parsed.ok) {
-    return NextResponse.json({ error: parsed.error }, { status: 400 });
+    return jsonError(parsed.error, 400);
   }
   const { cam_id, session_id, reason, resort_link_dead, suggested_url } = parsed.value;
 
@@ -63,7 +40,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (camErr || !cam) {
-    return NextResponse.json({ error: "Cam not found" }, { status: 404 });
+    return jsonError("Cam not found", 404);
   }
 
   const { data: resort, error: resortErr } = await supabase
@@ -73,7 +50,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (resortErr || !resort) {
-    return NextResponse.json({ error: "Resort not found" }, { status: 404 });
+    return jsonError("Resort not found", 404);
   }
 
   // 4. Rate limit: one report per cam per session per 24h
@@ -87,10 +64,7 @@ export async function POST(req: NextRequest) {
     .limit(1);
 
   if (recent && recent.length > 0) {
-    return NextResponse.json(
-      { error: "Already reported recently" },
-      { status: 429 },
-    );
+    return jsonError("Already reported recently", 429);
   }
 
   // 5. Insert
@@ -114,7 +88,7 @@ export async function POST(req: NextRequest) {
 
   if (insertErr || !inserted) {
     console.error("[cam-reports] insert failed:", insertErr?.message);
-    return NextResponse.json({ error: "Failed to save report" }, { status: 500 });
+    return jsonError("Failed to save report", 500);
   }
 
   // 6. Counts for email context — fire-and-forget, don't block client

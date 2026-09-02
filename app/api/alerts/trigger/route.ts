@@ -2,26 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { EmailSendError, sendPowderAlertEmail } from "@/lib/email";
 import { checkFreshness } from "@/lib/feed-freshness";
 import { sendFeedFreshnessAlertEmail } from "@/lib/alerts/freshness-email";
+import { createSbFetch } from "@/lib/api/sb-fetch";
+import { jsonError } from "@/lib/api/response";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const CRON_SECRET = process.env.CRON_SECRET;
 
-function sbFetch(path: string, init?: RequestInit) {
-  return fetch(`${SUPABASE_URL}/rest/v1${path}`, {
-    ...init,
-    // Without this, a hung DB hangs every one of this route's five
-    // sequential queries (and the cron run with it) — the anon-client
-    // timeout wrapper doesn't cover this raw service-role fetch.
-    signal: AbortSignal.timeout(8_000),
-    headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
-}
+// Without the timeout, a hung DB hangs every one of this route's five
+// sequential queries (and the cron run with it) — the anon-client timeout
+// wrapper doesn't cover this raw service-role fetch.
+const sbFetch = createSbFetch({ timeoutMs: 8_000 });
 
 interface Subscriber {
   id: string;
@@ -94,11 +83,11 @@ async function runFreshnessCheck(): Promise<FreshnessSummary> {
 async function handleTrigger(request: NextRequest) {
   // Auth check — fail closed when CRON_SECRET is not configured
   if (!CRON_SECRET) {
-    return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
+    return jsonError("CRON_SECRET not configured", 500);
   }
   const auth = request.headers.get("authorization");
   if (auth !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return jsonError("Unauthorized", 401);
   }
 
   // Runs regardless of what happens below — see runFreshnessCheck's isolation note.

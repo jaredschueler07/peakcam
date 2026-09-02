@@ -1,19 +1,13 @@
 "use client";
 
-import type { ResortWithData, ConditionRating } from "@/lib/types";
+import type { ResortWithData } from "@/lib/types";
 import { isOffSeason, timeAgo, OFF_SEASON_COLOR } from "@/lib/map-utils";
+import { RATING_CHIP_CLASS, ratingLabel } from "@/lib/theme-tokens";
+import { formatInches, formatRatio } from "@/lib/format";
 import { isDropInResort } from "@/lib/drop-in";
 import DropInLink from "@/components/drop-in/DropInLink";
 import MapCamPreview from "./MapCamPreview";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
-
-// Condition chip palette — matches MapPopupCard / ConditionBadge.
-const conditionChip: Record<ConditionRating, string> = {
-  great: "bg-great text-cream-50 border-forest-dk",
-  good:  "bg-good text-cream-50 border-forest-dk",
-  fair:  "bg-fair text-ink border-bark-dk",
-  poor:  "bg-poor text-cream-50 border-bark-dk",
-};
 
 interface MapBottomSheetProps {
   resort: ResortWithData;
@@ -33,23 +27,16 @@ export default function MapBottomSheet({
   useBodyScrollLock(true);
   const snow = resort.snow_report;
   const camCount = resort.cams.length;
-  const chipCls = conditionChip[resort.cond_rating] ?? "bg-cream-50 text-ink border-bark";
-  const ratingLabel =
-    resort.cond_rating.charAt(0).toUpperCase() + resort.cond_rating.slice(1);
+  const chipCls = RATING_CHIP_CLASS[resort.cond_rating] ?? "bg-cream-50 text-ink border-bark";
+  const label = ratingLabel(resort.cond_rating);
   const offSeason = isOffSeason(resort.lat, new Date());
   const updated = timeAgo(snow?.updated_at);
 
   const stats: { label: string; value: string; accent?: boolean }[] = [
-    { label: "Base", value: snow?.base_depth != null ? `${snow.base_depth}"` : "—" },
-    { label: "24h", value: snow?.new_snow_24h != null ? `${snow.new_snow_24h}"` : "—", accent: true },
-    { label: "48h", value: snow?.new_snow_48h != null ? `${snow.new_snow_48h}"` : "—" },
-    {
-      label: "Trails",
-      value:
-        snow?.trails_open != null
-          ? `${snow.trails_open}/${snow?.trails_total ?? "?"}`
-          : "—",
-    },
+    { label: "Base", value: formatInches(snow?.base_depth) },
+    { label: "24h", value: formatInches(snow?.new_snow_24h), accent: true },
+    { label: "48h", value: formatInches(snow?.new_snow_48h) },
+    { label: "Trails", value: formatRatio(snow?.trails_open, snow?.trails_total) },
   ];
 
   return (
@@ -94,7 +81,7 @@ export default function MapBottomSheet({
                 <span
                   className={`rounded-full border-[1.5px] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] leading-tight ${chipCls}`}
                 >
-                  {ratingLabel}
+                  {label}
                 </span>
               )}
               {!offSeason && snow?.snowing_now && (

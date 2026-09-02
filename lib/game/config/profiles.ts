@@ -1,9 +1,15 @@
 import { resortGameProfilesSchema } from "./schema";
 
 /**
- * Complete Drop In resort configuration. Engine-facing values are copied
- * exactly from public/drop-in/engine.html; siteTagline preserves the existing
- * public lib/drop-in.ts copy until the v1 iframe is retired.
+ * Complete Drop In resort configuration — the single source of truth for both
+ * engines. `public/drop-in/engine.html` is a bundler-free static asset that
+ * cannot import this file, so its embedded `RESORT_PROFILES` table is GENERATED
+ * from here by `npm run drop-in:sync-profiles`. Edit this file, re-run that, and
+ * never hand-edit the engine's copy; `scripts/drop-in-engine.test.ts` fails if
+ * the two diverge.
+ *
+ * `siteTagline` and `farRetention` are v2/site-only and are filtered out of the
+ * generated v1 table — see `scripts/drop-in-sync-profiles.ts` for the field list.
  */
 export const DROP_IN_GAME_PROFILES = resortGameProfilesSchema.parse({
   "ski-portillo": {
@@ -14,7 +20,9 @@ export const DROP_IN_GAME_PROFILES = resortGameProfilesSchema.parse({
     summitFt: 10860,
     verticalFt: 2500,
     seed: 32836,
+    /** Steep for its size — Roca Jack is a wall, not a cruiser. */
     fall: 0.46,
+    /** Enormous naked Andean relief: big spines, deep couloirs. */
     relief: 1.28,
     accent: "#f5b32d",
     accent2: "#ffe08a",
@@ -28,6 +36,7 @@ export const DROP_IN_GAME_PROFILES = resortGameProfilesSchema.parse({
       { name: "Kilómetro Lanzado", grade: "RED", hex: "#ff9f43", col: 0xff9f43, off: -486, amp: 22, freq: 0.00096, phase: 2.44, half: 21, ramp: 520 },
       { name: "Las Vizcachas", grade: "GREEN", hex: "#3ad686", col: 0x3ad686, off: 702, amp: 112, freq: 0.00118, phase: 4.31, half: 35, ramp: 660 },
     ],
+    /** Above treeline in the Andes: rock and wind-scoured snow, near-zero trees. */
     forest: {
       treeline: 0.93,
       rockBias: 0.34,
@@ -51,6 +60,7 @@ export const DROP_IN_GAME_PROFILES = resortGameProfilesSchema.parse({
     summitFt: 12998,
     verticalFt: 3398,
     seed: 39481,
+    /** Long, sustained, wide-open — less pitch than Portillo, far more of it. */
     fall: 0.4,
     relief: 1,
     accent: "#3d7fd6",
@@ -65,6 +75,7 @@ export const DROP_IN_GAME_PROFILES = resortGameProfilesSchema.parse({
       { name: "Whale's Tail", grade: "BLUE", hex: "#35b8d4", col: 0x35b8d4, off: -498, amp: 78, freq: 0.00198, phase: 4.22, half: 32, ramp: 385 },
       { name: "Psychopath", grade: "RED", hex: "#ff9f43", col: 0xff9f43, off: 724, amp: 48, freq: 0.00268, phase: 2.28, half: 19, ramp: 540 },
     ],
+    /** Lodgepole and subalpine fir below the bowls, bare rock above. */
     forest: {
       treeline: 0.44,
       rockBias: 0.15,
@@ -89,6 +100,7 @@ export const DROP_IN_GAME_PROFILES = resortGameProfilesSchema.parse({
     verticalFt: 3500,
     seed: 38935,
     fall: 0.43,
+    /** Rounder, more forgiving Sierra ridgelines. */
     relief: 0.86,
     accent: "#6f5bd4",
     accent2: "#5ec8e8",
@@ -102,6 +114,7 @@ export const DROP_IN_GAME_PROFILES = resortGameProfilesSchema.parse({
       { name: "Olympic Downhill", grade: "BLUE", hex: "#35b8d4", col: 0x35b8d4, off: -512, amp: 62, freq: 0.00208, phase: 4.44, half: 31, ramp: 395 },
       { name: "Killebrew Canyon", grade: "RED", hex: "#ff9f43", col: 0xff9f43, off: 712, amp: 86, freq: 0.00152, phase: 2.19, half: 22, ramp: 545 },
     ],
+    /** Thick Jeffrey pine and red fir all the way to the summit ridge. */
     forest: {
       treeline: 0.33,
       rockBias: 0.09,
