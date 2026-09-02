@@ -149,6 +149,20 @@ const V2_CONFIGS: Readonly<Record<SurfaceKind, SimulationConfig>> = {
   slush: { ...SURFACE_CONFIGS.slush, physicsModel: "v2", carve: V2_CARVE.slush },
 };
 
+/**
+ * The largest `topSpeedMultiplier` any surface can hand the integrators, over
+ * both physics models. The integrators clamp 3D velocity to
+ * `MAX_SPEED * topSpeedMultiplier`, so this is the factor between the physics
+ * constant and the fastest speed a legal run can reach. Server-side bounds
+ * derive from it rather than restating a number (see `MAX_RUN_SPEED_CMS` in
+ * `lib/game/server/validate-run.ts`); adding a faster surface row widens those
+ * bounds automatically instead of silently rejecting honest runs.
+ */
+export const MAX_TOP_SPEED_MULTIPLIER: number = Math.max(
+  ...Object.values(SURFACE_CONFIGS).map((config) => config.topSpeedMultiplier),
+  ...Object.values(V2_CONFIGS).map((config) => config.topSpeedMultiplier),
+);
+
 export function simulationConfig(
   surface: SurfaceKind = "packed", model: PhysicsModel = "v1", environment?: SimulationEnvironment,
   riderMode: RiderMode = "skier", stance: SnowboardStance = "regular",

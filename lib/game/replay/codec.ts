@@ -107,7 +107,10 @@ export const MAX_KEYFRAMES = 20000;
 export const MAX_COORD_CM = 20_000_000;
 /**
  * 200 m/s (720 km/h). A corruption guard, not a gameplay cap — the physics
- * validator owns the real speed ceiling.
+ * validator owns the real speed ceiling (`MAX_RUN_SPEED_CMS`, derived from the
+ * integrator clamp). Keep this comfortably above that cap, or the codec would
+ * clamp honest fast runs before the validator ever sees them; a test in
+ * `lib/game/server/validate-run.test.ts` asserts the ordering.
  */
 export const MAX_SPEED_CMS = 20000;
 

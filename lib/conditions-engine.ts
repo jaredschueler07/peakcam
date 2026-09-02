@@ -149,34 +149,77 @@ export function computeOutlook(
 
 // ── User Conditions Score ────────────────────────────────────
 
-const SNOW_QUALITY_SCORES: Record<UserSnowQuality, number> = {
+// These four maps are the single source of truth for how a user-submitted
+// vocabulary value scores. Anything that needs a per-dimension number — the
+// blend below, or the pipeline's user-reports fetcher — must derive it from
+// these rather than restating the numbers. Each map has its own scale, so
+// divide by the matching *_SCORE_MAX to normalize to 0–1.
+export const SNOW_QUALITY_SCORES: Record<UserSnowQuality, number> = {
   powder: 4, packed: 3, crud: 2, ice: 1, spring: 2,
 };
-const VISIBILITY_SCORES: Record<UserVisibility, number> = {
+export const VISIBILITY_SCORES: Record<UserVisibility, number> = {
   clear: 3, foggy: 2, whiteout: 1,
 };
-const WIND_SCORES: Record<UserWind, number> = {
+export const WIND_SCORES: Record<UserWind, number> = {
   calm: 3, breezy: 2, gusty: 1, high: 0,
 };
-const TRAIL_SCORES: Record<UserTrailConditions, number> = {
+export const TRAIL_SCORES: Record<UserTrailConditions, number> = {
   groomed: 3, ungroomed: 2, moguls: 2, variable: 1,
 };
+
+export const SNOW_QUALITY_SCORE_MAX = 4;
+export const VISIBILITY_SCORE_MAX = 3;
+export const WIND_SCORE_MAX = 3;
+export const TRAIL_SCORE_MAX = 3;
+
+/** Midpoint of a 0–1 normalized scale, used when a value is off-vocabulary. */
+const NORMALIZED_FALLBACK = 0.5;
+
+function normalize<K extends string>(
+  scores: Record<K, number>,
+  max: number,
+  value: K | string | null | undefined,
+): number {
+  const raw = (scores as Record<string, number | undefined>)[value as string];
+  return raw == null ? NORMALIZED_FALLBACK : raw / max;
+}
+
+/** Visibility as a 0–1 score derived from VISIBILITY_SCORES. */
+export function normalizeVisibility(v: UserVisibility | string | null | undefined): number {
+  return normalize(VISIBILITY_SCORES, VISIBILITY_SCORE_MAX, v);
+}
+
+/** Wind as a 0–1 score derived from WIND_SCORES. */
+export function normalizeWind(w: UserWind | string | null | undefined): number {
+  return normalize(WIND_SCORES, WIND_SCORE_MAX, w);
+}
+
+/** Snow quality as a 0–1 score derived from SNOW_QUALITY_SCORES. */
+export function normalizeSnowQuality(q: UserSnowQuality | string | null | undefined): number {
+  return normalize(SNOW_QUALITY_SCORES, SNOW_QUALITY_SCORE_MAX, q);
+}
+
+/** Trail conditions as a 0–1 score derived from TRAIL_SCORES. */
+export function normalizeTrailConditions(t: UserTrailConditions | string | null | undefined): number {
+  return normalize(TRAIL_SCORES, TRAIL_SCORE_MAX, t);
+}
 
 /**
  * Aggregate user reports into a normalized 0–1 quality score.
  * Snow quality is weighted most heavily (40%), with visibility (20%),
  * wind (20%), and trail conditions (20%) splitting the remainder.
- * Returns null if no reports are available.
+ * Returns null if no reports are available. Off-vocabulary values fall back
+ * to the midpoint of their scale rather than poisoning the average with NaN.
  */
 export function computeUserScore(reports: UserConditionReport[]): number | null {
   if (reports.length === 0) return null;
 
   let totalScore = 0;
   for (const r of reports) {
-    const snowNorm = SNOW_QUALITY_SCORES[r.snow_quality] / 4;   // 0–1
-    const visNorm = VISIBILITY_SCORES[r.visibility] / 3;         // 0–1
-    const windNorm = WIND_SCORES[r.wind] / 3;                    // 0–1
-    const trailNorm = TRAIL_SCORES[r.trail_conditions] / 3;      // 0–1
+    const snowNorm = normalizeSnowQuality(r.snow_quality);       // 0–1
+    const visNorm = normalizeVisibility(r.visibility);           // 0–1
+    const windNorm = normalizeWind(r.wind);                      // 0–1
+    const trailNorm = normalizeTrailConditions(r.trail_conditions); // 0–1
     totalScore += snowNorm * 0.4 + visNorm * 0.2 + windNorm * 0.2 + trailNorm * 0.2;
   }
   return totalScore / reports.length;

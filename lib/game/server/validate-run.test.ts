@@ -12,8 +12,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { decodeGhost, type DecodedGhost, type GhostSample } from "../replay/codec";
+import {
+  decodeGhost,
+  MAX_SPEED_CMS as CODEC_MAX_SPEED_CMS,
+  type DecodedGhost,
+  type GhostSample,
+} from "../replay/codec";
 import { COURSE_VERSION, PHYSICS_VERSION } from "../config/versions";
+import { MAX_TOP_SPEED_MULTIPLIER } from "../core/config";
+import { MAX_SPEED } from "../physics/constants";
 import {
   FIXTURE_SAMPLE_HZ,
   makeRunFixture,
@@ -24,6 +31,8 @@ import { verifyTicket, RunTicketError } from "./run-ticket";
 import { testKeyring, FOREIGN_TICKET_KEYS } from "./__fixtures__/run";
 import {
   canPersistRejection,
+  MAX_RUN_SPEED_CMS,
+  OVERSPEED_MARGIN_CMS,
   rejectionCodeForGhostError,
   rejectionCodeForTicketError,
   validateRun,
@@ -87,6 +96,42 @@ test("an impossible top speed is overspeed", () => {
     mutateSamples: (samples) => shift(samples, 200, { speedCms: 15_000 }),
   });
   assertRejected(result, "overspeed");
+});
+
+// ─── The speed ceiling is the physics ceiling ────────────────
+// The simulator clamps 3D velocity to `MAX_SPEED * topSpeedMultiplier`, and the
+// firm surface multiplies it by 1.05. A hand-written literal below that product
+// rejects honest full-tuck runs on firm snow, so the bound is derived.
+
+test("the run speed cap is derived from the simulator clamp, not a literal", () => {
+  const simulatorCeilingCms = MAX_SPEED * MAX_TOP_SPEED_MULTIPLIER * 100;
+  assert.ok(
+    MAX_RUN_SPEED_CMS >= simulatorCeilingCms,
+    `validator cap ${MAX_RUN_SPEED_CMS} is below the simulator ceiling ${simulatorCeilingCms}`,
+  );
+  assert.equal(
+    MAX_RUN_SPEED_CMS,
+    Math.ceil(simulatorCeilingCms) + OVERSPEED_MARGIN_CMS,
+    "the cap must stay ceil(simulator ceiling) + margin",
+  );
+});
+
+test("the codec's encoding range still exceeds the validator cap", () => {
+  assert.ok(
+    CODEC_MAX_SPEED_CMS > MAX_RUN_SPEED_CMS,
+    `codec range ${CODEC_MAX_SPEED_CMS} must clear the validator cap ${MAX_RUN_SPEED_CMS}`,
+  );
+});
+
+test("a run peaking just under the fastest surface's clamp is accepted", () => {
+  // 6050 cm/s: above the old 6000 literal, below the firm-surface clamp
+  // (58 m/s × 1.05 = 60.9 m/s). An honest full-tuck run reaches this.
+  const peakCms = 6_050;
+  assert.ok(peakCms > 6_000 && peakCms < MAX_SPEED * MAX_TOP_SPEED_MULTIPLIER * 100);
+  const result = runValidator({ mutateSamples: (samples) => spike(samples, 100, peakCms) });
+  assert.equal(result.rejectionCode, null, result.reason ?? "");
+  assert.equal(result.accepted, true);
+  assert.equal(result.metrics.maxSpeedCms, peakCms);
 });
 
 test("a speed that ramps faster than the accel envelope is impossible acceleration", () => {
@@ -275,6 +320,32 @@ function shift(samples: GhostSample[], from: number, delta: Partial<GhostSample>
       : s,
   );
 }
+
+/**
+ * Ramp the reported speed up to `peakCms`, hold it, and ramp back onto the
+ * fixture's own curve — all inside the accel envelope (dt = 0.1 s, so ±500 and
+ * −700 cm/s per step are 5 000 / 7 000 cm/s², under MAX_ACCEL / MAX_DECEL).
+ * Positions are untouched, so only the speed bounds are under test.
+ */
+function spike(samples: GhostSample[], from: number, peakCms: number): GhostSample[] {
+  const out = samples.map((s) => ({ ...s }));
+  let speed = out[from].speedCms;
+  let i = from;
+  while (i < out.length && speed < peakCms) {
+    speed = Math.min(peakCms, speed + 500);
+    out[i].speedCms = speed;
+    i++;
+  }
+  for (let hold = 0; hold < 3 && i < out.length; hold++, i++) out[i].speedCms = peakCms;
+  while (i < out.length && speed > samples[i].speedCms) {
+    speed = speed - 700;
+    if (speed <= samples[i].speedCms) break;
+    out[i].speedCms = speed;
+    i++;
+  }
+  return out;
+}
+
 
 function decodeGhostError(bytes: Uint8Array): RejectionCode | "decoded" {
   try {
