@@ -5,6 +5,8 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { ResortWithData, ConditionRating } from "@/lib/types";
+import { RATING_COLORS, OFF_SEASON_COLOR, ratingLabel } from "@/lib/theme-tokens";
+import { formatInches, parseConditions, timeAgo } from "@/lib/format";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -93,8 +95,10 @@ export function resortsToGeoJSON(
           liftsOpen: snow?.lifts_open ?? null,
           liftsTotal: snow?.lifts_total ?? null,
           camCount: resort.cams.length,
-          conditions: snow?.conditions 
-            ? (snow.conditions.includes("||") ? snow.conditions.split("||")[1] : snow.conditions)
+          // A stored string with no "||" is a bare tag list; the popup has
+          // always shown it verbatim rather than dropping the field.
+          conditions: snow?.conditions
+            ? parseConditions(snow.conditions).narrative ?? snow.conditions
             : null,
         },
       };
@@ -103,35 +107,16 @@ export function resortsToGeoJSON(
 }
 
 // ── Condition Colors ─────────────────────────────────────────
-
-// Earth palette — matches MapView markers and ConditionBadge
-const CONDITION_COLORS: Record<ConditionRating, string> = {
-  great: "#3c5a3a",   // pc-forest
-  good:  "#6d8a4a",   // pc-good (moss)
-  fair:  "#e2a740",   // pc-mustard
-  poor:  "#a93f20",   // pc-alpen-dk
-};
+//
+// The palette itself lives in lib/theme-tokens.ts, checked against
+// app/globals.css by lib/theme-tokens.test.ts. These are re-exported so the
+// map modules keep importing their colors from one place.
 
 export function conditionColor(rating: ConditionRating): string {
-  return CONDITION_COLORS[rating];
+  return RATING_COLORS[rating];
 }
 
-/** Neutral fill for off-season / closed markers and chips (hue-neutral bark). */
-export const OFF_SEASON_COLOR = "#b59b74";
-
-/** "3h ago" / "just now" from an ISO timestamp; null if absent/unparseable. */
-export function timeAgo(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return null;
-  const mins = Math.floor((Date.now() - then) / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
-}
+export { OFF_SEASON_COLOR, timeAgo };
 
 // ── Metric Display ───────────────────────────────────────────
 
@@ -141,14 +126,11 @@ export function metricValue(
 ): string {
   switch (metric) {
     case "baseDepth":
-      return props.baseDepth != null ? `${props.baseDepth}"` : "—";
+      return formatInches(props.baseDepth);
     case "snow24h":
-      return props.snow24h != null ? `${props.snow24h}"` : "—";
-    case "conditions": {
-      const label =
-        props.condRating.charAt(0).toUpperCase() + props.condRating.slice(1);
-      return label;
-    }
+      return formatInches(props.snow24h);
+    case "conditions":
+      return ratingLabel(props.condRating);
   }
 }
 

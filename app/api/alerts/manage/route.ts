@@ -1,26 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createSbFetch } from "@/lib/api/sb-fetch";
+import { jsonError, parseJsonBodyOrNull } from "@/lib/api/response";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-function sbFetch(path: string, init?: RequestInit) {
-  return fetch(`${SUPABASE_URL}/rest/v1${path}`, {
-    ...init,
-    headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
-}
+const sbFetch = createSbFetch();
 
 // GET /api/alerts/manage?token=xxx
 // Returns the subscriber's current preferences + all available resorts
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
   if (!token) {
-    return NextResponse.json({ error: "token is required" }, { status: 400 });
+    return jsonError("token is required", 400);
   }
 
   const subResp = await sbFetch(
@@ -28,7 +17,7 @@ export async function GET(request: NextRequest) {
   );
   const subscribers = subResp.ok ? await subResp.json() : [];
   if (!subscribers.length) {
-    return NextResponse.json({ error: "Invalid or expired token" }, { status: 404 });
+    return jsonError("Invalid or expired token", 404);
   }
   const subscriber = subscribers[0];
 
@@ -53,13 +42,17 @@ export async function GET(request: NextRequest) {
 // PUT /api/alerts/manage
 // Body: { token, resort_ids[], thresholds?: { [resort_id]: inches } }
 export async function PUT(request: NextRequest) {
-  const body = await request.json().catch(() => null);
+  const body = await parseJsonBodyOrNull<{
+    token?: string;
+    resort_ids?: string[];
+    thresholds?: Record<string, number>;
+  }>(request);
 
   if (!body?.token) {
-    return NextResponse.json({ error: "token is required" }, { status: 400 });
+    return jsonError("token is required", 400);
   }
   if (!Array.isArray(body?.resort_ids)) {
-    return NextResponse.json({ error: "resort_ids must be an array" }, { status: 400 });
+    return jsonError("resort_ids must be an array", 400);
   }
 
   const subResp = await sbFetch(
@@ -67,7 +60,7 @@ export async function PUT(request: NextRequest) {
   );
   const subscribers = subResp.ok ? await subResp.json() : [];
   if (!subscribers.length) {
-    return NextResponse.json({ error: "Invalid or expired token" }, { status: 404 });
+    return jsonError("Invalid or expired token", 404);
   }
   const subscriberId = subscribers[0].id;
 
@@ -93,7 +86,7 @@ export async function PUT(request: NextRequest) {
   });
 
   if (!insertResp.ok) {
-    return NextResponse.json({ error: "Failed to update preferences" }, { status: 500 });
+    return jsonError("Failed to update preferences", 500);
   }
 
   return NextResponse.json({ ok: true, resort_count: prefs.length });

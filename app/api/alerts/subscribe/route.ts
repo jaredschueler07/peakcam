@@ -1,21 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendWelcomeEmail, sendManageLinkEmail } from "@/lib/email";
 import { handleSubscribe, type SubscribeDeps } from "@/lib/alerts/subscribe-core";
+import { createSbFetch } from "@/lib/api/sb-fetch";
+import { parseJsonBodyOrNull } from "@/lib/api/response";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-function sbFetch(path: string, init?: RequestInit) {
-  return fetch(`${SUPABASE_URL}/rest/v1${path}`, {
-    ...init,
-    headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
-}
+const sbFetch = createSbFetch();
 
 const deps: SubscribeDeps = {
   async findSubscriberByEmail(email) {
@@ -80,7 +69,7 @@ const deps: SubscribeDeps = {
 };
 
 export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => null);
+  const body = await parseJsonBodyOrNull(request);
   const { status, body: json } = await handleSubscribe(body, deps);
   return NextResponse.json(json, { status });
 }

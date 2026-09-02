@@ -15,12 +15,8 @@
  *   npx tsx scripts/seed-openskistats.ts --dry-run
  */
 
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, "..");
+import { loadEnv, requireSupabaseEnv } from "./lib/env.mjs";
+import { sbSelect, sbUpsert } from "../lib/supabase-rest.js";
 
 // ─── Config ──────────────────────────────────────────────────
 
@@ -76,34 +72,10 @@ const MANUAL_OVERRIDES: Record<string, string> = {
   "cannon": "Cannon Mountain",
 };
 
-// ─── Load env ────────────────────────────────────────────────
+// ─── Load env (shared loader — see scripts/lib/env.mjs) ──────
 
-function loadEnv(filePath: string) {
-  if (!fs.existsSync(filePath)) return;
-  const lines = fs.readFileSync(filePath, "utf-8").split("\n");
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    const val = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, "");
-    if (key && !(key in process.env)) process.env[key] = val;
-  }
-}
-
-loadEnv(path.join(ROOT, ".env.local"));
-loadEnv(path.join(ROOT, ".env"));
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-if (!SUPABASE_URL || !SERVICE_KEY) {
-  console.error(
-    "Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local"
-  );
-  process.exit(1);
-}
+loadEnv();
+const SUPA = requireSupabaseEnv();
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -233,15 +205,11 @@ function countLifts(byType?: Record<string, { count: number }>): number {
 // ─── Supabase helpers ────────────────────────────────────────
 
 async function fetchResorts(): Promise<PeakCamResort[]> {
-  const url = `${SUPABASE_URL}/rest/v1/resorts?select=id,slug,name,lat,lng,website_url&is_active=eq.true`;
-  const res = await fetch(url, {
-    headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-    },
-  });
-  if (!res.ok) throw new Error(`Failed to fetch resorts: ${res.status}`);
-  return res.json();
+  return sbSelect<PeakCamResort>(
+    SUPA,
+    "/resorts?select=id,slug,name,lat,lng,website_url&is_active=eq.true",
+    { errorLabel: "Failed to fetch resorts" },
+  );
 }
 
 async function upsertMetadata(
@@ -260,21 +228,10 @@ async function upsertMetadata(
   // Batch in groups of 50
   for (let i = 0; i < records.length; i += 50) {
     const batch = records.slice(i, i + 50);
-    const url = `${SUPABASE_URL}/rest/v1/resort_metadata?on_conflict=resort_id`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: SERVICE_KEY,
-        Authorization: `Bearer ${SERVICE_KEY}`,
-        Prefer: "resolution=merge-duplicates",
-      },
-      body: JSON.stringify(batch),
+    await sbUpsert(SUPA, "resort_metadata", batch, {
+      onConflict: "resort_id",
+      errorLabel: "Upsert failed",
     });
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Upsert failed (${res.status}): ${body}`);
-    }
   }
 }
 

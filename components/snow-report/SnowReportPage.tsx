@@ -5,6 +5,9 @@ import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { ConditionBadge } from "@/components/ui/Badge";
 import type { ResortWithData } from "@/lib/types";
+import { CONDITION_ORDER, ratingLabel } from "@/lib/theme-tokens";
+import { POWDER_INCHES } from "@/lib/conditions-engine";
+import { formatInches } from "@/lib/format";
 
 type SortKey = "name" | "base" | "24h" | "48h" | "trails" | "lifts" | "conditions" | "pctNormal" | "trend";
 type SortDir = "asc" | "desc";
@@ -19,10 +22,6 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
   const hasTrend = useMemo(() => resorts.some(r => r.snow_report?.trend_7d != null), [resorts]);
   const hasTrails = useMemo(() => resorts.some(r => r.snow_report?.trails_open != null), [resorts]);
   const hasLifts = useMemo(() => resorts.some(r => r.snow_report?.lifts_open != null), [resorts]);
-
-  const CONDITION_ORDER: Record<string, number> = {
-    great: 0, good: 1, fair: 2, poor: 3,
-  };
 
   const sorted = useMemo(() => {
     let list = resorts.filter((r) => r.snow_report);
@@ -163,17 +162,17 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
                     <td className="px-3 py-3 text-text-muted hidden sm:table-cell">{resort.state}</td>
                     <td className="px-3 py-3 text-right">
                       <span className="text-powder font-bold tabular-nums">
-                        {snow.base_depth != null ? `${snow.base_depth}″` : "—"}
+                        {formatInches(snow.base_depth)}
                       </span>
                     </td>
                     <td className="px-3 py-3 text-right">
-                      <span className={`font-bold tabular-nums ${(snow.new_snow_24h ?? 0) >= 8 ? "text-cyan" : "text-text-subtle"}`}>
-                        {snow.new_snow_24h != null ? `${snow.new_snow_24h}″` : "—"}
+                      <span className={`font-bold tabular-nums ${(snow.new_snow_24h ?? 0) >= POWDER_INCHES ? "text-cyan" : "text-text-subtle"}`}>
+                        {formatInches(snow.new_snow_24h)}
                       </span>
                     </td>
                     <td className="px-3 py-3 text-right hidden md:table-cell">
                       <span className="text-text-subtle tabular-nums">
-                        {snow.new_snow_48h != null ? `${snow.new_snow_48h}″` : "—"}
+                        {formatInches(snow.new_snow_48h)}
                       </span>
                     </td>
                     {hasTrails && (
@@ -224,7 +223,7 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
                     <td className="px-3 py-3 text-center">
                       <ConditionBadge
                         rating={resort.cond_rating}
-                        label={resort.cond_rating.charAt(0).toUpperCase() + resort.cond_rating.slice(1)}
+                        label={ratingLabel(resort.cond_rating)}
                       />
                     </td>
                   </tr>

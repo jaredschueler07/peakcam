@@ -19,29 +19,9 @@
  *   0 8 * * * cd /path/to/peakcam && node scripts/powder-alert-check.mjs
  */
 
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { loadEnv } from "./lib/env.mjs";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, "..");
-
-function loadEnv(filePath) {
-  if (!fs.existsSync(filePath)) return;
-  const lines = fs.readFileSync(filePath, "utf-8").split("\n");
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    const val = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, "");
-    if (key && !(key in process.env)) process.env[key] = val;
-  }
-}
-
-loadEnv(path.join(ROOT, ".env.local"));
-loadEnv(path.join(ROOT, ".env"));
+loadEnv();
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 const CRON_SECRET = process.env.CRON_SECRET;

@@ -11,26 +11,9 @@
  * before calling the subscribe endpoint.
  */
 
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { loadEnv } from "./lib/env.mjs";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, "..");
-
-function loadEnv(file) {
-  if (!fs.existsSync(file)) return;
-  for (const line of fs.readFileSync(file, "utf-8").split("\n")) {
-    const t = line.trim();
-    if (!t || t.startsWith("#")) continue;
-    const eq = t.indexOf("=");
-    if (eq === -1) continue;
-    const k = t.slice(0, eq).trim();
-    const v = t.slice(eq + 1).trim().replace(/^["']|["']$/g, "");
-    if (k && !(k in process.env)) process.env[k] = v;
-  }
-}
-loadEnv(path.join(ROOT, ".env.local"));
+loadEnv();
 
 const SITE = process.env.SITE_URL || "https://www.peakcam.io";
 const CRON_SECRET = process.env.CRON_SECRET;

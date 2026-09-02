@@ -8,6 +8,7 @@ import { ResortDetailPage } from "@/components/resort/ResortDetailPage";
 import { camDisplayName } from "@/lib/cam-name";
 
 import { SITE_URL as BASE_URL } from "@/lib/site";
+import { parseConditions } from "@/lib/format";
 
 export const revalidate = 3600;
 
@@ -51,9 +52,11 @@ export async function generateMetadata({
   const resort = await getResortBySlug(slug);
   if (!resort) return {};
   const snow = resort.snow_report;
-  const conditionsNarrative = snow?.conditions
-    ? (snow.conditions.includes("||") ? snow.conditions.split("||")[1] : snow.conditions)
-    : "current conditions";
+  // A bare tag list has no narrative; the description falls back to the raw
+  // string rather than dropping the clause, as it always has.
+  const conditionsNarrative =
+    (snow?.conditions ? parseConditions(snow.conditions).narrative ?? snow.conditions : null) ??
+    "current conditions";
 
   const desc = snow
     ? `${resort.name} live cams — ${snow.base_depth ?? "?"}″ base, ${conditionsNarrative}. ${resort.cams.length} webcam${resort.cams.length !== 1 ? "s" : ""} available. Real-time snow report for ${resort.state}.`
@@ -137,7 +140,7 @@ export default async function ResortPage({
     if (snow.swe_in != null)
       amenityFeature.push({ "@type": "LocationFeatureSpecification", name: "Snow Water Equivalent", value: `${snow.swe_in} inches` });
     if (snow.conditions)
-      amenityFeature.push({ "@type": "LocationFeatureSpecification", name: "Current Conditions", value: snow.conditions.includes("||") ? snow.conditions.split("||")[1] : snow.conditions });
+      amenityFeature.push({ "@type": "LocationFeatureSpecification", name: "Current Conditions", value: parseConditions(snow.conditions).narrative ?? snow.conditions });
   }
 
   // Build VideoObject entries for YouTube webcams

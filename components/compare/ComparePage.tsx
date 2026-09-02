@@ -7,26 +7,13 @@ import Fuse from "fuse.js";
 import { X, Plus, Share2, Camera, ArrowLeft, AlertTriangle } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { MAX_COMPARE_RESORTS, buildCompareHref } from "@/lib/compare-params";
-import type { ResortWithData, ConditionRating } from "@/lib/types";
+import type { ResortWithData } from "@/lib/types";
+import { RATING_CHIP_CLASS, CONDITION_ORDER } from "@/lib/theme-tokens";
+import { formatInches, formatRatio, parseConditions } from "@/lib/format";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const MAX_RESORTS = MAX_COMPARE_RESORTS;
-
-// Poster condition palette (matches ConditionBadge)
-const conditionChip: Record<ConditionRating, string> = {
-  great: "bg-great text-cream-50 border-forest-dk",
-  good:  "bg-good text-cream-50 border-forest-dk",
-  fair:  "bg-fair text-ink border-bark-dk",
-  poor:  "bg-poor text-cream-50 border-bark-dk",
-};
-
-const CONDITION_ORDER: Record<ConditionRating, number> = {
-  great: 0,
-  good: 1,
-  fair: 2,
-  poor: 3,
-};
 
 const FUSE_OPTIONS = {
   keys: [
@@ -158,7 +145,7 @@ function ResortPicker({
               </div>
               {resort.snow_report?.base_depth != null && (
                 <span className="font-mono font-bold text-alpen-dk text-[12px] shrink-0 tabular-nums">
-                  {resort.snow_report.base_depth}&quot;
+                  {formatInches(resort.snow_report.base_depth)}
                 </span>
               )}
             </button>
@@ -178,7 +165,7 @@ function ResortColumnHeader({
   resort: ResortWithData;
   onRemove: () => void;
 }) {
-  const chipCls = resort.cond_rating ? conditionChip[resort.cond_rating] : null;
+  const chipCls = resort.cond_rating ? RATING_CHIP_CLASS[resort.cond_rating] : null;
   const thumb = getFirstCamThumbnail(resort);
   const activeCamCount = camsOf(resort).filter((c) => c.is_active).length;
 
@@ -356,31 +343,29 @@ export function ComparePage({
     {
       label: "BASE DEPTH",
       values: resorts.map((r, i) => ({
-        display: r.snow_report?.base_depth != null ? `${r.snow_report.base_depth}"` : "—",
+        display: formatInches(r.snow_report?.base_depth),
         isBest: isBestHigh(baseDepths[i], baseDepths),
       })),
     },
     {
       label: "24H SNOW",
       values: resorts.map((r, i) => ({
-        display: r.snow_report?.new_snow_24h != null ? `${r.snow_report.new_snow_24h}"` : "—",
+        display: formatInches(r.snow_report?.new_snow_24h),
         isBest: isBestHigh(snow24hVals[i], snow24hVals),
       })),
     },
     {
       label: "48H SNOW",
       values: resorts.map((r, i) => ({
-        display: r.snow_report?.new_snow_48h != null ? `${r.snow_report.new_snow_48h}"` : "—",
+        display: formatInches(r.snow_report?.new_snow_48h),
         isBest: isBestHigh(snow48hVals[i], snow48hVals),
       })),
     },
     {
       label: "TRAILS OPEN",
       values: resorts.map((r, i) => {
-        const o = r.snow_report?.trails_open;
-        const t = r.snow_report?.trails_total;
         return {
-          display: o != null && t != null ? `${o}/${t}` : "—",
+          display: formatRatio(r.snow_report?.trails_open, r.snow_report?.trails_total),
           isBest: isBestHigh(trailsRatios[i], trailsRatios),
         };
       }),
@@ -388,10 +373,8 @@ export function ComparePage({
     {
       label: "LIFTS OPEN",
       values: resorts.map((r, i) => {
-        const o = r.snow_report?.lifts_open;
-        const t = r.snow_report?.lifts_total;
         return {
-          display: o != null && t != null ? `${o}/${t}` : "—",
+          display: formatRatio(r.snow_report?.lifts_open, r.snow_report?.lifts_total),
           isBest: isBestHigh(liftsRatios[i], liftsRatios),
         };
       }),
@@ -402,11 +385,9 @@ export function ComparePage({
         display: (() => {
           const raw = r.snow_report?.conditions;
           if (!raw) return r.cond_rating?.toUpperCase() ?? "—";
-          if (raw.includes("||")) {
-            const [, narrative] = raw.split("||");
-            return narrative || raw;
-          }
-          return raw;
+          // No narrative stored: fall back to the raw string (a bare tag list)
+          // rather than blanking the row.
+          return parseConditions(raw).narrative ?? raw;
         })(),
         isBest: isBestLow(condRanks[i], condRanks),
       })),

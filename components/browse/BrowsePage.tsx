@@ -14,6 +14,8 @@ import { AuthModal } from "@/components/auth/AuthModal";
 import type { ResortWithData } from "@/lib/types";
 import type { RadarFrame } from "@/lib/weather-radar";
 import { isOffSeason } from "@/lib/map-utils";
+import { CONDITION_ORDER } from "@/lib/theme-tokens";
+import { POWDER_INCHES } from "@/lib/conditions-engine";
 // Curated popularity ranking — order matters, top of list = top of grid. Based
 // on brand recognition / skier visits; SA heroes featured for Andes season.
 // Shared with the 404 page, so it can't live in this "use client" module.
@@ -52,10 +54,6 @@ const SORT_LABEL: Record<SortOption, string> = {
 };
 
 // ── Constants ────────────────────────────────────────────────────────────────
-
-const CONDITION_ORDER: Record<string, number> = {
-  great: 0, good: 1, fair: 2, poor: 3,
-};
 
 /** Full-country state values (not US/CA abbreviations). */
 const SA_STATES = new Set(["Chile", "Argentina"]);
@@ -320,7 +318,7 @@ function FeaturedRow({ resorts }: { resorts: ResortWithData[] }) {
 
 function PowderAlert({ resorts }: { resorts: ResortWithData[] }) {
   const alerts = resorts
-    .filter((r) => (r.snow_report?.new_snow_24h ?? 0) >= 8)
+    .filter((r) => (r.snow_report?.new_snow_24h ?? 0) >= POWDER_INCHES)
     .sort((a, b) => (b.snow_report?.new_snow_24h ?? 0) - (a.snow_report?.new_snow_24h ?? 0))
     .slice(0, 4);
 
@@ -444,7 +442,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
       list = list.filter((r) => r.cond_rating === condFilter);
     }
     if (hasLiveCams) list = list.filter((r) => r.cams.some((c) => c.is_active));
-    if (freshSnow) list = list.filter((r) => (r.snow_report?.new_snow_24h ?? 0) >= 8);
+    if (freshSnow) list = list.filter((r) => (r.snow_report?.new_snow_24h ?? 0) >= POWDER_INCHES);
     if (showFavoritesOnly) list = list.filter((r) => isFavorite(r.id));
 
     if (sort === "popular") {

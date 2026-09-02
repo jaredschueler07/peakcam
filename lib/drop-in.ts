@@ -14,12 +14,14 @@ export interface DropInProfile {
   trailNames: readonly string[];
 }
 
-/** The pilot roster. Order is intentional — Portillo shipped first. */
-export const DROP_IN_RESORT_SLUGS: readonly DropInResortSlug[] = [
-  "ski-portillo",
-  "breckenridge",
-  "heavenly",
-];
+/**
+ * The pilot roster, derived from the profile table rather than re-listed. Order
+ * follows declaration order in lib/game/config/profiles.ts, which is intentional
+ * — Portillo shipped first.
+ */
+export const DROP_IN_RESORT_SLUGS: readonly DropInResortSlug[] = Object.keys(
+  DROP_IN_GAME_PROFILES,
+) as DropInResortSlug[];
 
 function toPublicProfile(slug: DropInResortSlug): DropInProfile {
   const gameProfile = DROP_IN_GAME_PROFILES[slug];
@@ -35,11 +37,9 @@ function toPublicProfile(slug: DropInResortSlug): DropInProfile {
   };
 }
 
-const PROFILES: Record<DropInResortSlug, DropInProfile> = {
-  "ski-portillo": toPublicProfile("ski-portillo"),
-  breckenridge: toPublicProfile("breckenridge"),
-  heavenly: toPublicProfile("heavenly"),
-};
+const PROFILES = Object.fromEntries(
+  DROP_IN_RESORT_SLUGS.map((slug) => [slug, toPublicProfile(slug)]),
+) as Record<DropInResortSlug, DropInProfile>;
 
 export { DROP_IN_GAME_PROFILES } from "./game/config/profiles";
 export type { DropInResortSlug, ResortGameProfile } from "./game/config/schema";

@@ -16,54 +16,30 @@
  * Writes: snowpack_daily, snow_reports, resorts.cond_rating
  */
 
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { getOpenMeteoSnapshot } from "../lib/open-meteo.js";
 import {
   computeConditions,
   type ConditionsInput,
-  type UserConditionReport,
 } from "../lib/conditions-engine.js";
 
-// ─── Load .env.local manually ────────────────────────────────────────────
+import { loadEnv, requireSupabaseEnv } from "./lib/env.mjs";
+import {
+  runScript,
+  runSnowSync,
+  type ResortOutcome,
+} from "./lib/snow-sync-driver.js";
+import { sbSelect, sbSelectOrEmpty } from "../lib/supabase-rest.js";
+import {
+  fetchUserReports,
+  insertSnowReport,
+  updateResortRating,
+  upsertSnowpackDaily,
+} from "../lib/pipeline/writes.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, "..");
+// ─── Env ──────────────────────────────────────────────────────────────────
 
-function loadEnv(filePath: string): void {
-  if (!fs.existsSync(filePath)) return;
-  const lines = fs.readFileSync(filePath, "utf-8").split("\n");
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    const val = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, "");
-    if (key && !(key in process.env)) process.env[key] = val;
-  }
-}
-
-loadEnv(path.join(ROOT, ".env.local"));
-loadEnv(path.join(ROOT, ".env"));
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!SUPABASE_URL || !SERVICE_KEY) {
-  console.error(
-    "Missing env vars. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local",
-  );
-  process.exit(1);
-}
-
-const supaHeaders = {
-  apikey: SERVICE_KEY,
-  Authorization: `Bearer ${SERVICE_KEY}`,
-  "Content-Type": "application/json",
-};
+loadEnv();
+const SUPA = requireSupabaseEnv();
 
 const STATION_ID = "open-meteo"; // synthetic station_id for snowpack_daily.station_id (not null)
 
@@ -76,10 +52,6 @@ const dryRun = args.includes("--dry-run");
 
 function fmtDate(d: Date): string {
   return d.toISOString().slice(0, 10);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────
@@ -95,12 +67,12 @@ interface ModelResort {
 // ─── Step 1: Fetch resorts with no SNOTEL station ─────────────────────────
 
 async function fetchResorts(): Promise<ModelResort[]> {
-  const url =
-    `${SUPABASE_URL}/rest/v1/resorts?select=id,name,lat,lng,resort_metadata(elevation_base_ft,elevation_summit_ft)` +
-    `&is_active=eq.true&snotel_station_id=is.null`;
-  const resp = await fetch(url, { headers: supaHeaders });
-  if (!resp.ok) throw new Error(`Supabase resorts fetch failed: ${resp.status}`);
-  return resp.json();
+  return sbSelect<ModelResort>(
+    SUPA,
+    `/resorts?select=id,name,lat,lng,resort_metadata(elevation_base_ft,elevation_summit_ft)` +
+      `&is_active=eq.true&snotel_station_id=is.null`,
+    { errorLabel: "Supabase resorts fetch failed" },
+  );
 }
 
 function resortElevationFt(resort: ModelResort): number | null {
@@ -115,219 +87,129 @@ function resortElevationFt(resort: ModelResort): number | null {
 // ─── Step 2: Depth history (last 7 days) ──────────────────────────────────
 
 async function fetchDepthHistory(resortId: string): Promise<(number | null)[]> {
-  const url =
-    `${SUPABASE_URL}/rest/v1/snowpack_daily?resort_id=eq.${resortId}&station_id=eq.${STATION_ID}` +
-    `&order=date.desc&limit=7&select=snow_depth_in`;
-  const resp = await fetch(url, { headers: supaHeaders });
-  if (!resp.ok) return [];
-  const rows: { snow_depth_in: number | null }[] = await resp.json();
+  const rows = await sbSelectOrEmpty<{ snow_depth_in: number | null }>(
+    SUPA,
+    `/snowpack_daily?resort_id=eq.${resortId}&station_id=eq.${STATION_ID}` +
+      `&order=date.desc&limit=7&select=snow_depth_in`,
+  );
   return rows.map((r) => r.snow_depth_in).reverse(); // oldest-first
 }
 
-// ─── Step 3: Recent user reports ──────────────────────────────────────────
-
-async function fetchUserReports(resortId: string): Promise<UserConditionReport[]> {
-  const cutoff = new Date(Date.now() - 24 * 3600_000).toISOString();
-  const url =
-    `${SUPABASE_URL}/rest/v1/user_conditions?resort_id=eq.${resortId}&is_flagged=eq.false&submitted_at=gte.${cutoff}` +
-    `&select=snow_quality,visibility,wind,trail_conditions`;
-  const resp = await fetch(url, { headers: supaHeaders });
-  if (!resp.ok) return [];
-  return await resp.json();
-}
-
-// ─── Step 4: Write helpers ─────────────────────────────────────────────────
-
-async function upsertSnowpackDaily(
-  resortId: string,
-  date: string,
-  snowDepthIn: number | null,
-): Promise<void> {
-  const body = {
-    resort_id: resortId,
-    station_id: STATION_ID,
-    date,
-    snow_depth_in: snowDepthIn != null ? Math.round(snowDepthIn) : null,
-    swe_in: null,
-  };
-
-  const resp = await fetch(`${SUPABASE_URL}/rest/v1/snowpack_daily`, {
-    method: "POST",
-    headers: { ...supaHeaders, Prefer: "resolution=merge-duplicates" },
-    body: JSON.stringify(body),
-  });
-
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`snowpack_daily upsert failed (${resp.status}): ${text}`);
-  }
-}
-
-async function insertSnowReport(
-  resortId: string,
-  snowDepthIn: number | null,
-  newSnow24hIn: number,
-  newSnow48hIn: number,
-  conditions: ReturnType<typeof computeConditions>,
-  snowingNow: boolean,
-): Promise<void> {
-  const conditionsString = `${conditions.tags.join(",")}||${conditions.narrative}`;
-
-  const body = {
-    resort_id: resortId,
-    base_depth: snowDepthIn != null ? Math.round(snowDepthIn) : null,
-    new_snow_24h: Math.round(newSnow24hIn),
-    new_snow_48h: Math.round(newSnow48hIn),
-    swe_in: null,
-    pct_of_normal: null, // no climatology for model-sync resorts
-    trend_7d: conditions.trend7d,
-    outlook: conditions.outlook,
-    auto_cond_rating: conditions.condRating,
-    conditions: conditionsString,
-    snowing_now: snowingNow,
-    source: "open_meteo",
-    updated_at: new Date().toISOString(),
-  };
-
-  const resp = await fetch(`${SUPABASE_URL}/rest/v1/snow_reports`, {
-    method: "POST",
-    headers: supaHeaders,
-    body: JSON.stringify(body),
-  });
-
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`snow_reports insert failed (${resp.status}): ${text}`);
-  }
-}
-
-async function updateResortRating(resortId: string, condRating: string): Promise<void> {
-  const resp = await fetch(`${SUPABASE_URL}/rest/v1/resorts?id=eq.${resortId}`, {
-    method: "PATCH",
-    headers: supaHeaders,
-    body: JSON.stringify({ cond_rating: condRating }),
-  });
-
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`resorts.cond_rating update failed (${resp.status}): ${text}`);
-  }
-}
+// ─── Steps 3 & 4: user reports + writes ───────────────────────────────────
+// fetchUserReports / upsertSnowpackDaily / insertSnowReport /
+// updateResortRating are shared with snotel-sync and the pipeline
+// orchestrator via lib/pipeline/writes.ts.
 
 // ─── Main ─────────────────────────────────────────────────────────────────
 
 const DEPTH_TREND_THRESHOLD_IN = 2.0; // vs. the 0.5in default tuned for SWE
 
-async function main(): Promise<void> {
-  console.log(`[model-sync] Starting model-based sync${dryRun ? " (DRY RUN)" : ""}...\n`);
+async function syncResort(resort: ModelResort): Promise<ResortOutcome> {
+  const elevationFt = resortElevationFt(resort);
+  const snapshot = await getOpenMeteoSnapshot(resort.lat, resort.lng, elevationFt);
 
-  const resorts = await fetchResorts();
-  console.log(`[model-sync] Found ${resorts.length} resorts without a SNOTEL station\n`);
-
-  let success = 0;
-  let failed = 0;
-  let noData = 0;
-
-  for (const resort of resorts) {
-    try {
-      const elevationFt = resortElevationFt(resort);
-      const snapshot = await getOpenMeteoSnapshot(resort.lat, resort.lng, elevationFt);
-
-      if (!snapshot) {
-        console.log(`  SKIP ${resort.name} — Open-Meteo unreachable`);
-        noData++;
-        await sleep(300);
-        continue;
-      }
-
-      const today = fmtDate(new Date());
-
-      if (!dryRun) {
-        await upsertSnowpackDaily(resort.id, today, snapshot.snowDepthIn);
-      }
-
-      const [depthHistory, userReports] = await Promise.all([
-        fetchDepthHistory(resort.id),
-        fetchUserReports(resort.id),
-      ]);
-
-      const conditionsInput: ConditionsInput = {
-        current: {
-          snowDepthIn: snapshot.snowDepthIn,
-          sweIn: null,
-          newSnow24h: snapshot.newSnow24hIn,
-          newSnow48h: snapshot.newSnow48hIn,
-        },
-        normals: {
-          medianSweIn: null,
-          pctile10SweIn: null,
-          pctile90SweIn: null,
-        },
-        history7d: {
-          // Depth values, not SWE — computeTrend doesn't care about units,
-          // only deltas, so this reuses the same field with a larger threshold.
-          // depthHistory is fetched AFTER today's snowpack_daily upsert above,
-          // so on a live run it already includes today's just-written depth
-          // as its newest entry (same as scripts/snotel-sync.ts's sweHistory
-          // usage) — do not append snapshot.snowDepthIn again here, or today
-          // gets double-counted and the 7-day window shrinks to 6 prior days.
-          sweValues: depthHistory,
-          thresholdIn: DEPTH_TREND_THRESHOLD_IN,
-        },
-        forecast: {
-          snowInchesNext48h: snapshot.forecastSnow48hIn,
-          maxHighTemp48h: snapshot.maxHighTemp48hF,
-        },
-        nwsGrid: {
-          skyCoverAvg: snapshot.skyCoverAvg,
-          windGustMax: snapshot.windGustMaxMph,
-          windChillAvg: snapshot.tempF ?? 32,
-          snowLevelAvg: snapshot.freezingLevelFt,
-          resortElevBase: elevationFt ?? 99999, // unknown elevation → suppress Rain at Base
-          iceAccumulationMax: 0, // Open-Meteo doesn't expose ice accumulation
-          probOfPrecipMax: 0, // approximated via skyCoverAvg/snow tags instead
-        },
-        userReports: userReports.length > 0 ? userReports : undefined,
-      };
-
-      const conditions = computeConditions(conditionsInput);
-
-      if (!dryRun) {
-        await insertSnowReport(
-          resort.id,
-          snapshot.snowDepthIn,
-          snapshot.newSnow24hIn,
-          snapshot.newSnow48hIn,
-          conditions,
-          snapshot.snowingNow,
-        );
-        await updateResortRating(resort.id, conditions.condRating);
-      }
-
-      console.log(
-        `  OK   ${resort.name} — ` +
-          `depth: ${snapshot.snowDepthIn ?? "?"}in, ` +
-          `24h: ${snapshot.newSnow24hIn}in, ` +
-          `rating: ${conditions.condRating}, ` +
-          `trend: ${conditions.trend7d}, ` +
-          `outlook: ${conditions.outlook}`,
-      );
-      success++;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`  FAIL ${resort.name} — ${msg}`);
-      failed++;
-    }
-
-    await sleep(300); // rate limit between resorts, matching snotel-sync.ts
+  if (!snapshot) {
+    return { status: "skip", log: `  SKIP ${resort.name} — Open-Meteo unreachable` };
   }
 
-  console.log(
-    `\n[model-sync] Done. ${success} synced, ${noData} no data, ${failed} failed (of ${resorts.length} total)`,
-  );
+  const today = fmtDate(new Date());
+
+  if (!dryRun) {
+    await upsertSnowpackDaily(SUPA, {
+      resort_id: resort.id,
+      station_id: STATION_ID,
+      date: today,
+      snow_depth_in:
+        snapshot.snowDepthIn != null ? Math.round(snapshot.snowDepthIn) : null,
+      swe_in: null,
+    });
+  }
+
+  const [depthHistory, userReports] = await Promise.all([
+    fetchDepthHistory(resort.id),
+    fetchUserReports(SUPA, resort.id),
+  ]);
+
+  const conditionsInput: ConditionsInput = {
+    current: {
+      snowDepthIn: snapshot.snowDepthIn,
+      sweIn: null,
+      newSnow24h: snapshot.newSnow24hIn,
+      newSnow48h: snapshot.newSnow48hIn,
+    },
+    normals: {
+      medianSweIn: null,
+      pctile10SweIn: null,
+      pctile90SweIn: null,
+    },
+    history7d: {
+      // Depth values, not SWE — computeTrend doesn't care about units,
+      // only deltas, so this reuses the same field with a larger threshold.
+      // depthHistory is fetched AFTER today's snowpack_daily upsert above,
+      // so on a live run it already includes today's just-written depth
+      // as its newest entry (same as scripts/snotel-sync.ts's sweHistory
+      // usage) — do not append snapshot.snowDepthIn again here, or today
+      // gets double-counted and the 7-day window shrinks to 6 prior days.
+      sweValues: depthHistory,
+      thresholdIn: DEPTH_TREND_THRESHOLD_IN,
+    },
+    forecast: {
+      snowInchesNext48h: snapshot.forecastSnow48hIn,
+      maxHighTemp48h: snapshot.maxHighTemp48hF,
+    },
+    nwsGrid: {
+      skyCoverAvg: snapshot.skyCoverAvg,
+      windGustMax: snapshot.windGustMaxMph,
+      windChillAvg: snapshot.tempF ?? 32,
+      snowLevelAvg: snapshot.freezingLevelFt,
+      resortElevBase: elevationFt ?? 99999, // unknown elevation → suppress Rain at Base
+      iceAccumulationMax: 0, // Open-Meteo doesn't expose ice accumulation
+      probOfPrecipMax: 0, // approximated via skyCoverAvg/snow tags instead
+    },
+    userReports: userReports.length > 0 ? userReports : undefined,
+  };
+
+  const conditions = computeConditions(conditionsInput);
+
+  if (!dryRun) {
+    await insertSnowReport(SUPA, {
+      resortId: resort.id,
+      baseDepthIn: snapshot.snowDepthIn,
+      newSnow24h: snapshot.newSnow24hIn,
+      newSnow48h: snapshot.newSnow48hIn,
+      sweIn: null,
+      pctOfNormal: null, // no climatology for model-sync resorts
+      trend7d: conditions.trend7d,
+      outlook: conditions.outlook,
+      condRating: conditions.condRating,
+      tags: conditions.tags,
+      narrative: conditions.narrative,
+      snowingNow: snapshot.snowingNow,
+      source: "open_meteo",
+    });
+    await updateResortRating(SUPA, resort.id, conditions.condRating);
+  }
+
+  return {
+    status: "ok",
+    log:
+      `  OK   ${resort.name} — ` +
+      `depth: ${snapshot.snowDepthIn ?? "?"}in, ` +
+      `24h: ${snapshot.newSnow24hIn}in, ` +
+      `rating: ${conditions.condRating}, ` +
+      `trend: ${conditions.trend7d}, ` +
+      `outlook: ${conditions.outlook}`,
+  };
 }
 
-main().catch((err) => {
-  console.error("[model-sync] Fatal:", err instanceof Error ? err.message : err);
-  process.exit(1);
-});
+runScript("model-sync", () =>
+  runSnowSync({
+    label: "model-sync",
+    startLine: `Starting model-based sync${dryRun ? " (DRY RUN)" : ""}...`,
+    foundLine: (n) => `Found ${n} resorts without a SNOTEL station`,
+    fetchResorts,
+    syncResort,
+    // rate limit between resorts, matching scripts/snotel-sync.ts
+    delayMs: 300,
+  }),
+);

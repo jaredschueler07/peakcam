@@ -2,15 +2,15 @@
 
 import { useState, useEffect, useRef } from "react";
 import type { MapMetric } from "@/lib/map-utils";
+import { RATING_COLORS, OFF_SEASON_COLOR, ratingLabel } from "@/lib/theme-tokens";
 
-// Categorical rating swatches — matches MapView marker colors.
-const RATING_ITEMS = [
-  { color: "#3c5a3a", label: "Great" },       // pc-forest
-  { color: "#6d8a4a", label: "Good" },        // pc-good (moss)
-  { color: "#e2a740", label: "Fair" },        // pc-mustard
-  { color: "#a93f20", label: "Poor" },        // pc-alpen-dk
-] as const;
-const OFF_SEASON = { color: "#b59b74", label: "Off-season" }; // neutral bark
+// Categorical rating swatches. Same palette object the markers paint from, so
+// a legend swatch can no longer disagree with the dot it explains. Best first.
+const RATING_ITEMS = (["great", "good", "fair", "poor"] as const).map((r) => ({
+  color: RATING_COLORS[r],
+  label: ratingLabel(r),
+}));
+const OFF_SEASON = { color: OFF_SEASON_COLOR, label: "Off-season" }; // neutral bark
 
 // Sequential ramp legend — mirrors MapView's METRIC_RAMP + RAMP_LIGHT..DARK.
 const RAMP_CSS = "linear-gradient(90deg, #dbe6d4, #1f3322)";
@@ -18,8 +18,8 @@ const METRIC_LEGEND: Record<
   Exclude<MapMetric, "conditions">,
   { title: string; max: string }
 > = {
-  baseDepth: { title: "Base depth", max: '100"+' },
-  snow24h: { title: "24h snow", max: '20"+' },
+  baseDepth: { title: "Base depth", max: "100″+" },
+  snow24h: { title: "24h snow", max: "20″+" },
 };
 
 interface MapLegendProps {
@@ -67,7 +67,7 @@ export default function MapLegend({ metric }: MapLegendProps) {
                 style={{ background: RAMP_CSS }}
               />
               <div className="flex justify-between font-mono text-[10px] text-bark tabular-nums">
-                <span>0&quot;</span>
+                <span>0″</span>
                 <span>{seq.max}</span>
               </div>
               <div className="flex items-center gap-2 pt-1.5 border-t-[1.5px] border-dashed border-bark/50">
@@ -104,10 +104,10 @@ export default function MapLegend({ metric }: MapLegendProps) {
         >
           <span className="flex items-center gap-1.5">
             <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
-              <circle cx="3" cy="3" r="2" fill="#3c5a3a" stroke="#2a1f14" strokeWidth="0.75" />
-              <circle cx="9" cy="3" r="2" fill="#6d8a4a" stroke="#2a1f14" strokeWidth="0.75" />
-              <circle cx="3" cy="9" r="2" fill="#e2a740" stroke="#2a1f14" strokeWidth="0.75" />
-              <circle cx="9" cy="9" r="2" fill="#a93f20" stroke="#2a1f14" strokeWidth="0.75" />
+              <circle cx="3" cy="3" r="2" fill={RATING_COLORS.great} stroke="#2a1f14" strokeWidth="0.75" />
+              <circle cx="9" cy="3" r="2" fill={RATING_COLORS.good} stroke="#2a1f14" strokeWidth="0.75" />
+              <circle cx="3" cy="9" r="2" fill={RATING_COLORS.fair} stroke="#2a1f14" strokeWidth="0.75" />
+              <circle cx="9" cy="9" r="2" fill={RATING_COLORS.poor} stroke="#2a1f14" strokeWidth="0.75" />
             </svg>
             Legend
           </span>

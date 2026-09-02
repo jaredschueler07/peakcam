@@ -30,7 +30,7 @@ import {
   seasonalDefaultViewState,
   OFF_SEASON_COLOR,
 } from "@/lib/map-utils";
-import { PC_BARK, PC_BARK_DK } from "@/lib/theme-tokens";
+import { PC_BARK, PC_BARK_DK, RATING_COLORS } from "@/lib/theme-tokens";
 import MapPopupCard from "./MapPopupCard";
 import MapControls from "./MapControls";
 import MapLegend from "./MapLegend";
@@ -302,7 +302,10 @@ export default function MapView({
   const circleColorExpr = useMemo(() => {
     const ratingColor = [
       "match", ["get", "condRating"],
-      "great", "#3c5a3a", "good", "#6d8a4a", "fair", "#e2a740", "poor", "#a93f20",
+      "great", RATING_COLORS.great,
+      "good", RATING_COLORS.good,
+      "fair", RATING_COLORS.fair,
+      "poor", RATING_COLORS.poor,
       PC_BARK,
     ];
     const byMetric =
@@ -515,12 +518,12 @@ export default function MapView({
                   ["all",
                     [">=", ["var", "g"], ["var", "o"]],
                     [">=", ["var", "g"], ["var", "f"]],
-                    [">=", ["var", "g"], ["var", "p"]]], "#3c5a3a",  /* great → forest */
+                    [">=", ["var", "g"], ["var", "p"]]], RATING_COLORS.great,
                   ["all",
                     [">=", ["var", "o"], ["var", "f"]],
-                    [">=", ["var", "o"], ["var", "p"]]], "#6d8a4a",  /* good → moss */
-                  [">=", ["var", "f"], ["var", "p"]], "#e2a740",     /* fair → mustard */
-                  "#a93f20",                                          /* poor → alpen-dk */
+                    [">=", ["var", "o"], ["var", "p"]]], RATING_COLORS.good,
+                  [">=", ["var", "f"], ["var", "p"]], RATING_COLORS.fair,
+                  RATING_COLORS.poor,
                 ],
               ],
               "circle-stroke-width": 2,

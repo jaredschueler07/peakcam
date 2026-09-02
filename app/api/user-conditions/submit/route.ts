@@ -6,6 +6,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { jsonError, parseJsonBody } from "@/lib/api/response";
 import { containsProfanity } from "@/lib/profanity";
 import { hasRecentReport } from "@/lib/user-conditions/rate-limit";
 import type { UserSnowQuality, UserVisibility, UserWind, UserTrailConditions } from "@/lib/types";
@@ -17,40 +18,38 @@ const TRAIL_CONDITIONS_VALUES: UserTrailConditions[] = ["groomed", "ungroomed", 
 
 export async function POST(request: NextRequest) {
   // 1. Parse body
-  let body: Record<string, unknown>;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const { resort_id, snow_quality, visibility, wind, trail_conditions, notes } = body as {
+  const parsed = await parseJsonBody<{
     resort_id: unknown;
     snow_quality: unknown;
     visibility: unknown;
     wind: unknown;
     trail_conditions: unknown;
     notes: unknown;
-  };
+  }>(request);
+  if (!parsed.ok) {
+    return jsonError("Invalid JSON", 400);
+  }
+
+  const { resort_id, snow_quality, visibility, wind, trail_conditions, notes } = parsed.value ?? {};
 
   // 2. Validate required fields
   if (!resort_id || typeof resort_id !== "string") {
-    return NextResponse.json({ error: "resort_id is required" }, { status: 400 });
+    return jsonError("resort_id is required", 400);
   }
   if (!SNOW_QUALITY_VALUES.includes(snow_quality as UserSnowQuality)) {
-    return NextResponse.json({ error: "Invalid snow_quality" }, { status: 400 });
+    return jsonError("Invalid snow_quality", 400);
   }
   if (!VISIBILITY_VALUES.includes(visibility as UserVisibility)) {
-    return NextResponse.json({ error: "Invalid visibility" }, { status: 400 });
+    return jsonError("Invalid visibility", 400);
   }
   if (!WIND_VALUES.includes(wind as UserWind)) {
-    return NextResponse.json({ error: "Invalid wind" }, { status: 400 });
+    return jsonError("Invalid wind", 400);
   }
   if (!TRAIL_CONDITIONS_VALUES.includes(trail_conditions as UserTrailConditions)) {
-    return NextResponse.json({ error: "Invalid trail_conditions" }, { status: 400 });
+    return jsonError("Invalid trail_conditions", 400);
   }
   if (notes !== undefined && notes !== null && typeof notes !== "string") {
-    return NextResponse.json({ error: "notes must be a string" }, { status: 400 });
+    return jsonError("notes must be a string", 400);
   }
 
   const notesText = typeof notes === "string" ? notes.slice(0, 500) : null;
@@ -60,7 +59,7 @@ export async function POST(request: NextRequest) {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    return jsonError("Authentication required", 401);
   }
 
   // 4. Rate limit — max 1 report per resort per user per hour.
@@ -68,18 +67,14 @@ export async function POST(request: NextRequest) {
   // is_flagged=true rows from the user, so an RLS-scoped check never sees a
   // profanity-flagged report and lets a flagged user submit without limit.
   // See lib/user-conditions/rate-limit.ts. The insert below stays RLS-scoped.
+  // Env defaults to the service-role pair; see lib/api/service-env.ts.
   const rateLimited = await hasRecentReport({
-    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
     resortId: resort_id,
     userId: user.id,
   });
 
   if (rateLimited) {
-    return NextResponse.json(
-      { error: "You already submitted a report here recently. Try again in an hour." },
-      { status: 429 }
-    );
+    return jsonError("You already submitted a report here recently. Try again in an hour.", 429);
   }
 
   // 5. Profanity check
@@ -101,7 +96,7 @@ export async function POST(request: NextRequest) {
 
   if (insertError) {
     console.error("[PeakCam] user_conditions insert error:", insertError.message);
-    return NextResponse.json({ error: "Failed to save report" }, { status: 500 });
+    return jsonError("Failed to save report", 500);
   }
 
   return NextResponse.json({ ok: true, flagged: isFlagged });

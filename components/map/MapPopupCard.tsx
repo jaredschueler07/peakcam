@@ -1,19 +1,13 @@
 "use client";
 
 import type { MouseEvent } from "react";
-import type { ResortWithData, ConditionRating } from "@/lib/types";
+import type { ResortWithData } from "@/lib/types";
 import { isOffSeason, timeAgo, OFF_SEASON_COLOR } from "@/lib/map-utils";
+import { RATING_CHIP_CLASS, ratingLabel } from "@/lib/theme-tokens";
+import { formatInches, formatRatio } from "@/lib/format";
 import { isDropInResort } from "@/lib/drop-in";
 import DropInLink from "@/components/drop-in/DropInLink";
 import MapCamPreview from "./MapCamPreview";
-
-// Condition chip palette — matches ConditionBadge
-const conditionChip: Record<ConditionRating, string> = {
-  great: "bg-great text-cream-50 border-forest-dk",
-  good:  "bg-good text-cream-50 border-forest-dk",
-  fair:  "bg-fair text-ink border-bark-dk",
-  poor:  "bg-poor text-cream-50 border-bark-dk",
-};
 
 interface MapPopupCardProps {
   resort: ResortWithData;
@@ -23,9 +17,8 @@ interface MapPopupCardProps {
 // Poster popup — paper bg is applied by the wrapping maplibregl popup CSS in globals.css
 export default function MapPopupCard({ resort, onViewResort }: MapPopupCardProps) {
   const snow = resort.snow_report;
-  const chipCls = conditionChip[resort.cond_rating] ?? "bg-cream-50 text-ink border-bark";
-  const ratingLabel =
-    resort.cond_rating.charAt(0).toUpperCase() + resort.cond_rating.slice(1);
+  const chipCls = RATING_CHIP_CLASS[resort.cond_rating] ?? "bg-cream-50 text-ink border-bark";
+  const label = ratingLabel(resort.cond_rating);
 
   const resortHref = `/resorts/${resort.slug}`;
   const updated = timeAgo(snow?.updated_at);
@@ -77,7 +70,7 @@ export default function MapPopupCard({ resort, onViewResort }: MapPopupCardProps
             <span
               className={`rounded-full border-[1.5px] px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] leading-tight ${chipCls}`}
             >
-              {ratingLabel}
+              {label}
             </span>
           )}
           {!offSeason && snow?.snowing_now && (
@@ -94,21 +87,19 @@ export default function MapPopupCard({ resort, onViewResort }: MapPopupCardProps
       <div className="grid grid-cols-3 gap-2 py-2 border-t-[1.5px] border-b-[1.5px] border-dashed border-bark/60 mb-3">
         <div className="text-center">
           <p className="font-display font-black text-ink text-xl leading-none tabular-nums">
-            {snow?.base_depth != null ? `${snow.base_depth}"` : "—"}
+            {formatInches(snow?.base_depth)}
           </p>
           <p className="pc-eyebrow mt-1" style={{ fontSize: 9.5 }}>Base</p>
         </div>
         <div className="text-center">
           <p className="font-display font-black text-alpen text-xl leading-none tabular-nums">
-            {snow?.new_snow_24h != null ? `${snow.new_snow_24h}"` : "—"}
+            {formatInches(snow?.new_snow_24h)}
           </p>
           <p className="pc-eyebrow mt-1" style={{ fontSize: 9.5 }}>24h</p>
         </div>
         <div className="text-center">
           <p className="font-display font-black text-ink text-xl leading-none tabular-nums">
-            {snow?.trails_open != null && snow?.trails_total != null
-              ? `${snow.trails_open}/${snow.trails_total}`
-              : "—"}
+            {formatRatio(snow?.trails_open, snow?.trails_total)}
           </p>
           <p className="pc-eyebrow mt-1" style={{ fontSize: 9.5 }}>Trails</p>
         </div>
