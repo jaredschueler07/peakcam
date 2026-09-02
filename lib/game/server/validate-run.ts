@@ -47,7 +47,8 @@
  */
 
 import { FIXED_HZ } from "../core/clock";
-import { simulationConfig, type SimulationConfig } from "../core/config";
+import { MAX_TOP_SPEED_MULTIPLIER, simulationConfig, type SimulationConfig } from "../core/config";
+import { MAX_SPEED } from "../physics/constants";
 import type { DecodedGhost, GhostDecodeError, GhostSample } from "../replay/codec";
 import { MAX_KEYFRAMES, POSE_AIRBORNE, POSE_CRASHED } from "../replay/codec";
 import type { RunTicketError, RunTicketPayload } from "./run-ticket";
@@ -133,11 +134,30 @@ export function rejectionCodeForGhostError(error: GhostDecodeError): RejectionCo
 // cheat that survives until re-simulation lands.
 
 /**
- * 60 m/s ≈ 216 km/h. Raised from 50 m/s (A5 fix round 1): full-tuck honest
- * procedural runs peak near 58 m/s; world-cup DH tops ~45 m/s, so 60 m/s still
- * rejects absurd teleports/speed hacks (3×+ overshoot).
+ * Headroom above the simulator's own ceiling, cm/s. Covers speed quantisation
+ * (the codec stores whole cm/s) and the sub-tick overshoot a keyframe can
+ * capture before the integrator's end-of-step clamp lands. 1 m/s is far too
+ * small to hide a speed hack — those overshoot by 3× or more.
  */
-export const MAX_RUN_SPEED_CMS = 6_000;
+export const OVERSPEED_MARGIN_CMS = 100;
+/**
+ * The peak speed a legal run may report, cm/s — **derived, not chosen**.
+ *
+ * Both integrators clamp 3D velocity to `MAX_SPEED * topSpeedMultiplier`
+ * (`lib/game/physics/integrator.ts`, `integrator-v2.ts`), and the surface table
+ * in `lib/game/core/config.ts` reaches 1.05 on firm snow. The old hand-written
+ * 6 000 cm/s literal sat *below* that product (58 × 1.05 = 60.9 m/s), so an
+ * honest full-tuck run on firm snow was rejected as `overspeed`. Deriving the
+ * bound keeps the validator in step with the physics: adding a faster surface
+ * widens this automatically. It stays a coarse floor on the physically
+ * possible — world-cup downhill tops ~45 m/s, so a speed hack still overshoots
+ * this by multiples.
+ *
+ * Ghost speed is planar (`hypot(vel.x, vel.z)` in the recorder) while the clamp
+ * is on 3D speed, so the bound is conservative by the vertical component.
+ */
+export const MAX_RUN_SPEED_CMS =
+  Math.ceil(MAX_SPEED * MAX_TOP_SPEED_MULTIPLIER * 100) + OVERSPEED_MARGIN_CMS;
 /**
  * 60 m/s² ≈ 6 g. Raised from 25 m/s² (A5 fix round 1): honest braked p95 ≈
  * 2520 cm/s²; honest full-tuck grounded peaks ≈ 5250 cm/s² on packed

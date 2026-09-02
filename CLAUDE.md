@@ -24,7 +24,7 @@ npm run seed-normals     # 30-year SNOTEL normals (run-once/annual)
 npm run cam-health       # Probe all cam URLs, stamp cams.last_checked_at
 ```
 
-Beware: `npm run liftie-sync` and `npm run snodas-sync` reference script files that do not exist (the logic lives in `lib/pipeline/fetchers/`). `npm run import-resorts` (the ts-node variant) is stale and truncates SNOTEL triplet IDs — use `:standalone`.
+There are no `liftie-sync` / `snodas-sync` npm scripts — that logic lives in `lib/pipeline/fetchers/` and runs only via `pipeline-sync`. `npm run import-resorts` (the ts-node variant) is stale and truncates SNOTEL triplet IDs — use `:standalone`.
 
 ## Architecture
 
@@ -65,7 +65,7 @@ Cam embeds are click-to-play by `embed_type`: `youtube` (autoplay+mute embed), `
 18 tables + 2 views, migrations `supabase/migrations/001–011`. Migrations are applied **by hand** (SQL Editor / MCP `apply_migration`) — there is no Supabase CLI config, numbering is documentation only, and 004/005 each have two files. RLS postures: public-read (catalog/snow tables), anon-insert (`condition_votes`, `agent_memory`), auth.uid()-scoped (`user_conditions`, `user_favorites`, `dashboard_layouts`), deny-all/service-role-only (alerts tables, `cam_reports`).
 
 Known live-DB drift from the repo migrations (verify against prod before trusting a migration file):
-- `user_conditions.snow_quality`: migration checks `icy/slush`; code and UI submit `crud/ice/spring`.
+- `user_conditions.snow_quality`: 004 checked `icy/slush` while code and UI submit `crud/ice/spring`; fixed by 016 (applied to prod 2026-09-02).
 - `latest_snow_reports` view was created as `SELECT *` in 001; columns added to `snow_reports` by 005/007 required manual view recreation in prod — no migration records it.
 - `cams` has no unique constraint: re-running the importer duplicates cam rows (`ignore-duplicates` is a no-op).
 
@@ -85,7 +85,7 @@ A self-contained arcade ski descent, live for three pilot resorts (`ski-portillo
 
 - `agents/` — 9-bot Slack "company" (`agents/loop.mjs`, polling + Anthropic API, shared memory in `agent_memory`). Runs via launchd but is effectively dormant.
 - `dashboard/` — standalone Express ops dashboard on port 3333. **Unauthenticated and can spawn `claude --dangerously-skip-permissions`** — never expose beyond localhost/LAN.
-- `generate-images.py` (repo root) — canonical brand-image generator (xAI Grok), driven by the user-level `peakcam-imagegen` skill; `scripts/generate-images.mjs` is its abandoned predecessor. Nothing in `public/images/` is referenced by app code.
+- `generate-images.py` (repo root) — canonical brand-image generator (xAI Grok), driven by the user-level `peakcam-imagegen` skill (its abandoned predecessor `scripts/generate-images.mjs` was removed Sept 2026). Nothing in `public/images/` is referenced by app code.
 
 ### Scheduling map
 

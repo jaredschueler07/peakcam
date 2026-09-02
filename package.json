@@ -7,9 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import tsx --test lib/*.test.ts 'lib/game/**/*.test.ts' scripts/*.test.ts tests/*.test.ts",
+    "test": "node --import tsx --test 'lib/**/*.test.ts' 'scripts/**/*.test.ts' 'scripts/**/*.test.mjs' 'tests/**/*.test.ts'",
     "drop-in:sync-three": "node scripts/sync-three.mjs",
     "bake-terrain": "tsx scripts/bake-resort.ts",
+    "bake-far-field": "tsx scripts/bake-far-field.ts",
     "validate-game-assets": "tsx scripts/validate-game-assets.ts",
     "import-resorts:standalone": "node scripts/import-resorts-standalone.mjs",
     "agents": "node agents/loop.mjs",
@@ -17,14 +18,10 @@
     "agents:extract-plugins": "for f in plugins/*.plugin; do name=$(basename \"$f\" .plugin); mkdir -p \"agents/plugins/$name\" && unzip -o \"$f\" -d \"agents/plugins/$name\"; done",
     "snotel-sync": "tsx scripts/snotel-sync.ts",
     "model-sync": "tsx scripts/model-sync.ts",
-    "liftie-sync": "tsx scripts/liftie-sync.ts",
-    "snodas-sync": "tsx scripts/snodas-sync.ts",
     "pipeline-sync": "tsx scripts/pipeline-sync.ts",
     "seed-normals": "tsx scripts/seed-snotel-normals.ts",
     "cam-health": "node scripts/cam-health-check.mjs",
-    "powder-alerts": "node scripts/powder-alert-check.mjs",
-    "generate-images": "node scripts/generate-images.mjs",
-    "generate-images:one": "node scripts/generate-images.mjs --name"
+    "powder-alerts": "node scripts/powder-alert-check.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.9.0",

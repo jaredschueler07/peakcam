@@ -7,18 +7,61 @@
 
 import type { SourceReading, BlendedResult, SourceName, ResortContext } from "./types";
 import { SOURCE_WEIGHTS } from "./types";
+import { PRECIP_PROB_KEY } from "./fetchers/nws";
 import {
   computeDimensionConfidence,
   computeOverallConfidence,
 } from "./confidence";
-import {
-  computeConditionRating,
-  computeTrend,
-  computeOutlook,
-  computePctOfNormal,
-  synthesizeGridData,
+import { computeConditions } from "../conditions-engine";
+import type {
+  ConditionsInput,
+  UserConditionReport,
 } from "../conditions-engine";
-import type { ConditionsInput } from "../conditions-engine";
+
+/**
+ * Elevation sentinel used when a resort's base elevation is unknown.
+ * Matches scripts/snotel-sync.ts and scripts/model-sync.ts: a value this high
+ * means the forecast snow level can never sit below the base, so the
+ * "Rain at Base" tag never fires on a guessed elevation.
+ */
+export const UNKNOWN_ELEV_FT = 99999;
+
+export interface BlendOptions {
+  /** Resort base elevation in feet. Null/undefined → UNKNOWN_ELEV_FT sentinel. */
+  resortElevBaseFt?: number | null;
+  /**
+   * Recent unflagged user condition reports for this resort. Feeds the
+   * conditions engine's 70/30 SNOTEL/user blend (needs ≥2 reports).
+   * When omitted, the blender falls back to the sample the user_reports
+   * fetcher stashes in its reading's raw_json.
+   */
+  userReports?: UserConditionReport[];
+}
+
+const USER_REPORT_QUALITIES = new Set(["powder", "packed", "crud", "ice", "spring"]);
+
+/**
+ * Recover individual user reports from the user_reports SourceReading.
+ * The fetcher stores a capped sample (5 reports) in raw_json alongside the
+ * aggregate quality_score, which is the only per-report signal that survives
+ * into the pipeline's reading format.
+ */
+function extractUserReports(readings: SourceReading[]): UserConditionReport[] {
+  const reading = readings.find((r) => r.source === "user_reports");
+  const raw = reading?.raw_json?.reports;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((r): r is UserConditionReport => {
+    if (typeof r !== "object" || r === null) return false;
+    const rec = r as Record<string, unknown>;
+    return (
+      typeof rec.snow_quality === "string" &&
+      USER_REPORT_QUALITIES.has(rec.snow_quality) &&
+      typeof rec.visibility === "string" &&
+      typeof rec.wind === "string" &&
+      typeof rec.trail_conditions === "string"
+    );
+  });
+}
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -57,11 +100,97 @@ function maxVal(values: number[]): number | null {
   return Math.max(...values);
 }
 
+// ── Conditions Engine Input ─────────────────────────────────
+
+/** The blended scalar values the conditions engine consumes. */
+export interface BlendedFields {
+  snow_depth_in: number | null;
+  swe_in: number | null;
+  new_snow_24h_in: number | null;
+  new_snow_48h_in: number | null;
+  forecast_snow_48h_in: number | null;
+  forecast_high_48h_f: number | null;
+}
+
+/**
+ * Build the ConditionsInput the conditions engine consumes, the same shape
+ * scripts/snotel-sync.ts and scripts/model-sync.ts build. Exported so the real
+ * base elevation and user-report wiring are directly testable.
+ */
+export function buildConditionsInput(
+  readings: SourceReading[],
+  blended: BlendedFields,
+  options: BlendOptions = {},
+): ConditionsInput {
+  const {
+    snow_depth_in,
+    swe_in,
+    new_snow_24h_in,
+    new_snow_48h_in,
+    forecast_snow_48h_in,
+    forecast_high_48h_f,
+  } = blended;
+
+  const userReports = options.userReports ?? extractUserReports(readings);
+
+  const condInput: ConditionsInput = {
+    current: {
+      snowDepthIn: snow_depth_in,
+      sweIn: swe_in,
+      newSnow24h: new_snow_24h_in ?? 0,
+      newSnow48h: new_snow_48h_in ?? 0,
+    },
+    normals: {
+      // No fetcher supplies 30-year normals: SourceReading has no median/
+      // percentile SWE fields, so pct_of_normal necessarily comes out null
+      // here. computeConditions() derives it from these, so it stays the one
+      // place that math lives.
+      medianSweIn: null,
+      pctile10SweIn: null,
+      pctile90SweIn: null,
+    },
+    history7d: {
+      sweValues: [], // Not available from single-day readings
+    },
+    forecast: {
+      snowInchesNext48h: forecast_snow_48h_in ?? 0,
+      maxHighTemp48h: forecast_high_48h_f ?? 32,
+    },
+    userReports: userReports.length > 0 ? userReports : undefined,
+  };
+
+  // Add NWS grid data if available
+  const nwsReading = readings.find((r) => r.source === "nws");
+  if (nwsReading) {
+    condInput.nwsGrid = {
+      skyCoverAvg: nwsReading.sky_cover_pct ?? 50,
+      windGustMax: nwsReading.wind_gust_mph ?? 0,
+      windChillAvg: nwsReading.temp_f ?? 32,
+      snowLevelAvg: nwsReading.snow_level_ft ?? 5000,
+      resortElevBase: options.resortElevBaseFt ?? UNKNOWN_ELEV_FT,
+      iceAccumulationMax: 0,
+      probOfPrecipMax: readPrecipProbability(nwsReading),
+    };
+  }
+
+  return condInput;
+}
+
+/**
+ * The NWS fetcher has no typed column for precipitation probability, so it
+ * stashes the 48h max under raw_json. Missing/invalid → 0 (tag stays off).
+ */
+function readPrecipProbability(reading: SourceReading): number {
+  const v = reading.raw_json?.[PRECIP_PROB_KEY];
+  return typeof v === "number" && Number.isFinite(v) ? v : 0;
+}
+
 // ── Main Blender ────────────────────────────────────────────
 
 export function blendReadings(
   readings: SourceReading[],
   resort_id: string,
+  options: BlendOptions = {},
 ): BlendedResult {
   const now = new Date().toISOString();
 
@@ -101,65 +230,36 @@ export function blendReadings(
   // ── Qualitative: average user report scores ───────────────
   const qualData = collectField(readings, "quality_score");
 
-  // ── Percent of normal ─────────────────────────────────────
-  // We don't have normals in the readings; compute from blended SWE
-  // against whatever the conditions engine has. For now pass null
-  // and let the conditions engine handle it if normals are provided.
-  const pct_of_normal: number | null = null;
+  // ── User reports ──────────────────────────────────────────
+  // Prefer reports handed in by the caller; otherwise recover the sample the
+  // user_reports fetcher stashes in raw_json. Either way they must reach the
+  // conditions engine, which applies the 70/30 SNOTEL/user blend.
+  const userReports = options.userReports ?? extractUserReports(readings);
 
   // ── Conditions Engine ─────────────────────────────────────
-  // Build a ConditionsInput from blended values
-  const condInput: ConditionsInput = {
-    current: {
-      snowDepthIn: snow_depth_in,
-      sweIn: swe_in,
-      newSnow24h: new_snow_24h_in ?? 0,
-      newSnow48h: new_snow_48h_in ?? 0,
+  const condInput = buildConditionsInput(
+    readings,
+    {
+      snow_depth_in,
+      swe_in,
+      new_snow_24h_in,
+      new_snow_48h_in,
+      forecast_snow_48h_in,
+      forecast_high_48h_f,
     },
-    normals: {
-      medianSweIn: null,
-      pctile10SweIn: null,
-      pctile90SweIn: null,
-    },
-    history7d: {
-      sweValues: [], // Not available from single-day readings
-    },
-    forecast: {
-      snowInchesNext48h: forecast_snow_48h_in ?? 0,
-      maxHighTemp48h: forecast_high_48h_f ?? 32,
-    },
-  };
-
-  // Add NWS grid data if available
-  const nwsReading = readings.find((r) => r.source === "nws");
-  if (nwsReading) {
-    condInput.nwsGrid = {
-      skyCoverAvg: nwsReading.sky_cover_pct ?? 50,
-      windGustMax: nwsReading.wind_gust_mph ?? 0,
-      windChillAvg: nwsReading.temp_f ?? 32,
-      snowLevelAvg: nwsReading.snow_level_ft ?? 5000,
-      resortElevBase: 5000, // Will be overridden by orchestrator with actual metadata
-      iceAccumulationMax: 0,
-      probOfPrecipMax: 0,
-    };
-  }
-
-  const condRating = computeConditionRating(
-    condInput.current.newSnow24h,
-    condInput.current.newSnow48h,
-    condInput.current.snowDepthIn,
-    pct_of_normal,
+    { ...options, userReports },
   );
 
-  const trend_7d = computeTrend(condInput.history7d.sweValues);
-
-  const { outlook, outlookLabel } = computeOutlook(
-    trend_7d,
-    condInput.forecast.snowInchesNext48h,
-    condInput.forecast.maxHighTemp48h,
-  );
-
-  const { tags, narrative } = synthesizeGridData(condInput);
+  const conditions = computeConditions(condInput);
+  const {
+    condRating,
+    pctOfNormal: pct_of_normal,
+    trend7d: trend_7d,
+    outlook,
+    outlookLabel,
+    tags,
+    narrative,
+  } = conditions;
 
   // ── Confidence Scores ─────────────────────────────────────
   const snowConfidence = computeDimensionConfidence(
@@ -234,8 +334,12 @@ export function blendReadings(
 export function blend(
   resort: ResortContext,
   readings: SourceReading[],
+  options: BlendOptions = {},
 ): BlendedResult {
-  return blendReadings(readings, resort.id);
+  return blendReadings(readings, resort.id, {
+    resortElevBaseFt: resort.metadata?.elevation_base_ft ?? null,
+    ...options,
+  });
 }
 
 // ── Empty Result ────────────────────────────────────────────

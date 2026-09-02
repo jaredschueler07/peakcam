@@ -7,6 +7,27 @@
 import { SourceReading, emptyReading, ResortContext } from "../types";
 import { getWeatherForecast } from "../../weather";
 
+/** Key under `raw_json` where the 48h max precipitation probability (%) is stored. */
+export const PRECIP_PROB_KEY = "precip_prob_max_pct";
+
+/**
+ * Max probability of precipitation (%) across the next `days` forecast periods.
+ * Returns null when no period carries a value. The blender reads this to decide
+ * whether "Rain at Base" is possible — a 0 here would silently suppress the tag.
+ */
+export function maxPrecipProbability(
+  periods: { precipProbability: number | null }[],
+  days = 2,
+): number | null {
+  let max: number | null = null;
+  for (const p of periods.slice(0, days)) {
+    const v = p.precipProbability;
+    if (v == null || !Number.isFinite(v)) continue;
+    max = max == null ? v : Math.max(max, v);
+  }
+  return max;
+}
+
 export async function fetchNws(
   resort: ResortContext,
 ): Promise<SourceReading | null> {
@@ -33,7 +54,10 @@ export async function fetchNws(
     reading.forecast_snow_48h_in = forecastSnow48h > 0 ? forecastSnow48h : null;
     reading.forecast_high_48h_f = forecastHigh48h > -999 ? forecastHigh48h : null;
     reading.source_confidence = 0.8;
-    reading.raw_json = { periods } as Record<string, unknown>;
+    reading.raw_json = {
+      periods,
+      [PRECIP_PROB_KEY]: maxPrecipProbability(periods),
+    } as Record<string, unknown>;
 
     return reading;
   } catch (err) {
