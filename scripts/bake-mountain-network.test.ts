@@ -30,3 +30,13 @@ test('junctions survive simplification of a straight source polyline',()=>{
  const baked=bakeMountainNetwork(cfg,input,field);
  assert.ok(baked.junctions!.some(j=>j.x===0&&j.y===0&&j.runIds.length===2));
 });
+
+test('clipped lifts preserve real terminals without creating boundary stations',()=>{
+  const input:OsmSource={elements:[{type:'way',id:70,tags:{name:'Clipped chair',aerialway:'chair_lift'},geometry:[geo(0,700),geo(0,0),geo(0,-400)]}]};
+  const lift=bakeMountainNetwork(cfg,input,field).lifts[0];
+  assert.equal(lift.complete,false);assert.equal(lift.stations!.length,1);
+  assert.deepEqual(lift.sourceEndpoints,[{x:0,y:700},{x:0,y:-400}]);
+  assert.equal(lift.stations![0].y,-400);assert.equal(lift.stations![0].sourceEndpoint,1);
+  const full=bakeMountainNetwork(cfg,{elements:[{...input.elements[0],geometry:[geo(0,400),geo(0,-400)]}]},field).lifts[0];
+  assert.equal(full.complete,true);assert.equal(full.stations!.length,2);
+});

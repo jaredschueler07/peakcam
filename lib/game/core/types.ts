@@ -55,6 +55,7 @@ export interface RealRun {
 export interface RealLift {
   /** False when the source line is clipped by this terrain pack. */
   readonly complete?: boolean;
+  readonly sourceEndpoints?: readonly {x:number;z:number}[];
   readonly id?: string;
   readonly sourceId?: string;
   readonly speedMps?: number;
@@ -89,6 +90,8 @@ export interface TerrainSampler {
   readonly realRuns?: readonly RealRun[];
   readonly mainLift?: RealLift | null;
   readonly realLifts?: readonly RealLift[];
+  /** Baked mapped-forest sites shared with terrain wells, in game coordinates. */
+  readonly treeSites?: readonly (RealRunPoint & { radiusM: number })[];
   height(x: number, z: number): number;
   normal(x: number, z: number, out: Vec3): Vec3;
   trailField(x: number, z: number): number;
