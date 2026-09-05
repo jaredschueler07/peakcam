@@ -285,6 +285,7 @@ export class GameRenderer {
     await this.postReady;
     if (this.disposed || !this.renderer.compileAsync) return;
     const seeded = this.quality.rung;
+    const warmup = { active: true };
     let timer: ReturnType<typeof setTimeout> | undefined;
     const budget = new Promise<void>((resolve) => {
       timer = setTimeout(resolve, this.options.prewarmTimeoutMs ?? PREWARM_TIMEOUT_MS);
@@ -292,23 +293,25 @@ export class GameRenderer {
     try {
       // A compileAsync that never settles must cost a stutter, not the run: the loading bar is
       // parked at 95% waiting on this, so it gets a budget and then we start regardless.
-      await Promise.race([this.compileRungs(seeded), budget]);
+      await Promise.race([this.compileRungs(seeded, warmup), budget]);
     } finally {
       clearTimeout(timer);
-      // If the budget won mid-sequence the rung can be left at 4; put it back.
-      if (!this.disposed && this.quality.rung !== seeded) this.applyQuality(seeded);
+      // Applying a compile tier does not mutate the governor. Always restore its live
+      // value, and revoke the continuation before a timed-out compile can settle.
+      warmup.active = false;
+      if (!this.disposed) this.applyQuality(this.quality.rung);
     }
   }
 
-  private async compileRungs(seeded: QualityRung): Promise<void> {
+  private async compileRungs(seeded: QualityRung, warmup: { active: boolean }): Promise<void> {
     if (seeded !== 4) {
       // Warm the expensive variants first, then come back to the rung we will actually start on —
       // restoring it last matters because CsmShadowsNode rebuilds its shadow node on a rung change,
       // so a compile taken before the restore would warm a node we then throw away.
       this.applyQuality(4);
       await this.renderer.compileAsync?.(this.built.scene, this.built.camera);
-      if (this.disposed) return;
-      this.applyQuality(seeded);
+      if (this.disposed || !warmup.active) return;
+      this.applyQuality(this.quality.rung);
     }
     await this.renderer.compileAsync?.(this.built.scene, this.built.camera);
   }
@@ -347,7 +350,24 @@ export class GameRenderer {
   resize(width: number, height: number): void { this.width = Math.max(1, width); this.height = Math.max(1, height); this.applySize(); }
   private applySize() { this.renderer.setPixelRatio(this.maxDpr * this.quality.pixelScale); this.renderer.setSize(this.width, this.height, false); this.post?.setSize(this.width, this.height); this.built.camera.aspect = this.width / this.height; this.built.camera.updateProjectionMatrix(); }
 
+  private surfaceTextureLoader: (() => void) | null = null;
+  private surfaceTextureLoadStarted = false;
+
+  setSurfaceTextureLoader(load: () => void): void {
+    if (this.disposed) return;
+    this.surfaceTextureLoader = load;
+    this.requestSurfaceTextures(this.quality.rung);
+  }
+
+  private requestSurfaceTextures(rung: QualityRung): void {
+    if (rung < 3 || !this.surfaceTextureLoader || this.surfaceTextureLoadStarted) return;
+    this.surfaceTextureLoadStarted = true;
+    this.surfaceTextureLoader();
+  }
+
   private applyQuality(rung: QualityRung): void {
+    this.built.setSkyQuality?.(rung); this.terrain.setQuality(rung);
+    this.requestSurfaceTextures(this.quality.rung);
     this.post?.setQuality(rung); this.csm.setQuality(rung); this.effects.setQuality(rung);
     // Snow glint is the top rung's signature, and it is the node path's to spend: the WebGL chain
     // reaches rung 4 on weaker hardware than WebGPU does, so it stays on the cheaper frame.
@@ -447,7 +467,7 @@ export class GameRenderer {
 
   get farFieldWedgesDrawn(): number { return this.farField?.visibleWedgeCount ?? 0; }
 
-  /** The rung seeded at construction; quality-gated callers read it before fetching an asset. */
+  /** The current governor rung; quality-gated callers read it before fetching an asset. */
   get rung(): QualityRung { return this.quality.rung; }
 
   /**
@@ -456,14 +476,18 @@ export class GameRenderer {
    * or below the rung `TerrainRenderer` gates on internally.
    */
   attachSurfaceTextures(surfaces: SurfaceTextures): void {
-    if (this.disposed) return;
+    if (this.disposed) { surfaces.snowNormal.dispose(); surfaces.snowRoughness.dispose(); return; }
     this.terrain.attachSurfaceTextures(surfaces);
   }
 
   /** Read-only handle for tests and debugging; the render loop owns everything in it. */
   get scene(): THREE.Scene { return this.built.scene; }
 
-  resources(): ResourceCounts { return resourceCounts(this.built.scene); }
+  resources(): ResourceCounts {
+    const counts = resourceCounts(this.built.scene);
+    counts.materials += this.terrain.inactiveMaterialCount;
+    return counts;
+  }
 
   private onContextLost = (event: Event) => { event.preventDefault(); this.contextLost = true; };
   private onContextRestored = () => { if (this.disposed) return; this.contextLost = false; this.renderer.resetState?.(); this.applySize(); };
@@ -477,6 +501,8 @@ export class GameRenderer {
     // `disposeObjectTree` releases them *and* reports them to the disposal audit. Disposing here
     // first would detach them silently and make the audit under-count.
     this.farField = null;
+    this.surfaceTextureLoader = null;
+    this.terrain.disposeInactiveMaterials(this.options.disposalAudit);
     disposeObjectTree(this.built.scene, this.options.disposalAudit); this.renderer.renderLists?.dispose(); this.renderer.dispose(); this.renderer.forceContextLoss?.();
   }
 }

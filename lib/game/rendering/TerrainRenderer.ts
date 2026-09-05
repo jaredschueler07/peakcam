@@ -98,6 +98,9 @@ export class TerrainRenderer {
   private centerZ = Infinity;
   private readonly detailNormal: THREE.Texture;
   private material: THREE.Material;
+  private readonly variants = new Map<number, THREE.Material>();
+  private surfaces: SurfaceTextures | null = null;
+  private disposed = false;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -106,8 +109,8 @@ export class TerrainRenderer {
     /** Present exactly on the WebGPU path; see `nodeFactories`. */
     private readonly nodes: NodeFactories | null = null,
     private readonly snowDebug = 0,
-    /** Seeded once at renderer construction; see `attachSurfaceTextures`. */
-    private readonly rung: QualityRung = 0,
+    /** Current effective quality, including temporary prewarm tiers. */
+    private rung: QualityRung = 0,
   ) {
     this.detailNormal = buildSnowDetailNormal(world.seed);
     // The node material is built from the same constants; only the shading language differs.
@@ -121,6 +124,14 @@ export class TerrainRenderer {
       polishSnowMaterial(material as THREE.MeshStandardMaterial, this.detailNormal, snowUniforms as SnowUniforms);
     }
     this.material = material;
+    this.variants.set(rung < 2 ? 0 : 2, material);
+    if (snowUniforms && nodes) {
+      const otherTier = rung < 2 ? 2 : 0;
+      this.variants.set(otherTier, nodes.snow.createSnowNodeMaterial(
+        this.detailNormal, snowUniforms as SnowNodeUniforms, snowDebug, null, otherTier,
+      ));
+    }
+    for (const variant of this.variants.values()) variant.userData.snowFallback = this.detailNormal;
     for (let index = 0; index < GRID_SIZE * GRID_SIZE; index += 1) {
         const mesh = new THREE.Mesh(new THREE.BufferGeometry(), material);
         mesh.receiveShadow = true;
@@ -129,27 +140,43 @@ export class TerrainRenderer {
     }
   }
 
-  /**
-   * Swap the procedural detail normal for the real KTX2 pair once `loadSurfaceTextures` resolves.
-   * WebGPU-only, and one-shot: this rebuilds the shared tile material exactly once, the moment the
-   * async texture load lands — never on a later governor rung change, matching how every other
-   * rung-gated setting (`GameRenderer.applyQuality`) tweaks uniforms in place rather than rebuilding
-   * a material. `rung` was captured once at construction for the same reason `createSnowNodeMaterial`
-   * treats it as fixed: below rung 3 the real surface is never wired in, so there is nothing to swap.
-   */
-  attachSurfaceTextures(surfaces: SurfaceTextures): void {
-    if (!this.nodes || !this.snowUniforms || this.rung < 3) return;
-    const next = this.nodes.snow.createSnowNodeMaterial(
-      this.detailNormal, this.snowUniforms as SnowNodeUniforms, this.snowDebug, surfaces, this.rung,
-    );
-    const previous = this.material;
+  /** Cache variants: downshifts remove texture nodes, upgrades reuse compiled materials. */
+  setQuality(rung: QualityRung): void {
+    this.rung = rung;
+    if (this.disposed || !this.nodes || !this.snowUniforms) return;
+    const tier = rung < 2 ? 0 : rung >= 3 && this.surfaces ? 3 : 2;
+    const next = this.variants.get(tier)!;
     this.material = next;
     for (const tile of this.tiles) tile.mesh.material = next;
-    previous.dispose();
-    // The procedural detail normal is orphaned by the swap — nothing in the new material's graph
-    // references it, and disposeObjectTree only walks materials still attached to the scene, so
-    // without this it would sit on the GPU for the rest of the session.
-    this.detailNormal.dispose();
+  }
+
+  attachSurfaceTextures(surfaces: SurfaceTextures): void {
+    if (this.disposed || !this.nodes || !this.snowUniforms || this.surfaces) {
+      if (surfaces !== this.surfaces) { surfaces.snowNormal.dispose(); surfaces.snowRoughness.dispose(); }
+      return;
+    }
+    this.surfaces = surfaces;
+    // Texture-backed graph construction belongs to the async arrival, never a governor frame.
+    this.variants.set(3, this.nodes.snow.createSnowNodeMaterial(
+      this.detailNormal, this.snowUniforms as SnowNodeUniforms, this.snowDebug, surfaces, 3,
+    ));
+    for (const variant of this.variants.values()) {
+      variant.userData.snowFallback = this.detailNormal;
+      variant.userData.snowSurfaceNormal = surfaces.snowNormal;
+      variant.userData.snowSurfaceRoughness = surfaces.snowRoughness;
+    }
+    this.setQuality(this.rung);
+  }
+
+  get inactiveMaterialCount(): number { return Math.max(0, this.variants.size - 1); }
+
+  /** Active material/textures belong to scene disposal; release only detached variants here. */
+  disposeInactiveMaterials(audit?: { material?(): void }): void {
+    this.disposed = true;
+    for (const material of this.variants.values()) {
+      if (material !== this.material) { material.dispose(); audit?.material?.(); }
+    }
+    this.variants.clear();
   }
 
   update(playerX: number, playerZ: number): void {
@@ -182,6 +209,11 @@ export class TerrainRenderer {
   }
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposeInactiveMaterials();
+    this.detailNormal.dispose();
+    this.surfaces?.snowNormal.dispose();
+    this.surfaces?.snowRoughness.dispose();
     for (const { mesh } of this.tiles) {
       this.scene.remove(mesh); mesh.geometry.dispose();
     }

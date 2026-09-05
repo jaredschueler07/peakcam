@@ -60,8 +60,8 @@ function build(options?: { reducedMotion?: boolean; antialias?: "smaa" | "fxaa";
 test("the rung policy matches what PostProcessing.setQuality does today", () => {
   // PostProcessing.ts:41-46 — effectPass rung>0, chromaticPass rung>0 && !reducedMotion,
   // bloom rung>=3, smaa rung>=2. `ao` joins the table at rung 3, `godrays` at rung 4.
-  assert.deepEqual(postChainPolicy(0, false), { chain: false, bloom: false, aa: false, chromatic: false, ao: false, godrays: false });
-  assert.deepEqual(postChainPolicy(1, false), { chain: true, bloom: false, aa: false, chromatic: true, ao: false, godrays: false });
+  assert.deepEqual(postChainPolicy(0, false), { chain: false, bloom: false, aa: true, chromatic: false, ao: false, godrays: false });
+  assert.deepEqual(postChainPolicy(1, false), { chain: true, bloom: false, aa: true, chromatic: true, ao: false, godrays: false });
   assert.deepEqual(postChainPolicy(2, false), { chain: true, bloom: false, aa: true, chromatic: true, ao: false, godrays: false });
   assert.deepEqual(postChainPolicy(3, false), { chain: true, bloom: true, aa: true, chromatic: true, ao: true, godrays: false });
   assert.deepEqual(postChainPolicy(4, false), { chain: true, bloom: true, aa: true, chromatic: true, ao: true, godrays: true });
@@ -110,13 +110,13 @@ test("quality changes flip uniforms without ever rebuilding the graph", () => {
   assert.equal(post.uniforms.aa.value, 1);
 
   post.setQuality(1);
-  assert.equal(post.uniforms.aa.value, 0);
+  assert.equal(post.uniforms.aa.value, 1);
   assert.equal(post.uniforms.chain.value, 1);
 
   post.setQuality(0);
-  assert.equal(post.uniforms.chain.value, 0, "rung 0 is the raw render");
+  assert.equal(post.uniforms.chain.value, 0, "rung 0 skips grading while retaining AA");
   assert.equal(post.uniforms.bloom.value, 0);
-  assert.equal(post.uniforms.aa.value, 0);
+  assert.equal(post.uniforms.aa.value, 1);
   assert.equal(post.uniforms.ao.value, 0);
   assert.equal(post.uniforms.godrays.value, 0);
 
