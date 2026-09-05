@@ -130,6 +130,13 @@ export function projectGravityOntoSlope(): void {
   temp.x -= temp2.x; temp.y -= temp2.y; temp.z -= temp2.z;
 }
 
+/** Arcade powder support: at most15cm of effective float above the DEM, fading into groomers. */
+function supportedHeight(world: SimulationWorld, x: number, z: number): number {
+  const height = world.terrain.height(x, z);
+  const env = world.config.physicsModel === "v2" ? world.config.environment : undefined;
+  return env ? height + env.powderDepthCm * 0.0015 * (1 - clamp01(world.terrain.trailField(x, z))) : height;
+}
+
 export function integrateWith(
   model: CarveModel,
   state: SimulationState, input: InputFrame, dt: number, world: SimulationWorld,
@@ -147,7 +154,7 @@ export function integrateWith(
   if (stepCrash(s, dt, world)) return;
 
   const flatSpeed = Math.hypot(s.vel.x, s.vel.z);
-  const groundHeight = world.terrain.height(s.pos.x, s.pos.z);
+  const groundHeight = supportedHeight(world, s.pos.x, s.pos.z);
   world.terrain.normal(s.pos.x, s.pos.z, normal);
   if (s.onGround && s.pos.y < groundHeight) s.pos.y = groundHeight;
 
@@ -220,7 +227,7 @@ export function integrateWith(
   }
 
   addScaledVector(s.pos, s.vel, dt);
-  const groundHeight2 = world.terrain.height(s.pos.x, s.pos.z);
+  const groundHeight2 = supportedHeight(world, s.pos.x, s.pos.z);
   if (s.onGround) {
     if (s.pos.y <= groundHeight2 + 0.34) s.pos.y = groundHeight2;
     else s.onGround = false;

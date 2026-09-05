@@ -114,7 +114,11 @@ const SCENARIOS: readonly Scenario[] = [
     { name: "morning-ice", powderDepthCm: 0, windSpeedMps: 0, morningIce: true },
     { name: "off-piste", powderDepthCm: 0, windSpeedMps: 0, morningIce: false },
   ].flatMap(({ name, ...environment }) => ["brakeSlalom", "jumpSpam"].map(tape => ({ name: `${name}-${tape}`, tape, ticks: 600, seed: 11,
-    environment: { ...environment, visibilityM: 800, northSign: -1 as const } }))),
+    environment: { ...environment, visibilityM: 800, northSign: environment.morningIce ? 1 as const : -1 as const },
+    prepare: (state: SimulationState, world: SimulationWorld) => {
+      if (!environment.morningIce) state.pos.x += 500;
+      state.pos.y = world.terrain.height(state.pos.x, state.pos.z);
+    } }))),
   { name: "glide", tape: "glide", ticks: 240, seed: 1 },
   { name: "tuck", tape: "tuck", ticks: 240, seed: 2 },
   { name: "carve", tape: "carve", ticks: 360, seed: 3 },

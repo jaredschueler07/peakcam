@@ -71,15 +71,20 @@ export function buildConditionsSnapshot(
   latestSnowReport: SnowReport | null,
   nwsForecast?: NwsForecast | null,
   physicsModel: PhysicsModel = physicsModelForRollout(),
-  localHour = 9,
+  localHour?: number,
+  now = Date.now(),
 ): ConditionsSnapshot {
+  const zones: Record<string, string> = { breckenridge: "America/Denver", heavenly: "America/Los_Angeles", "ski-portillo": "America/Santiago" };
+  const hour = localHour ?? Number(new Intl.DateTimeFormat("en-US", {
+    timeZone: zones[resort.slug] ?? "UTC", hour: "2-digit", hourCycle: "h23",
+  }).format(now));
   const period = nwsForecast?.[0];
   const windSpeedMps = Math.round(Math.min(40, Math.max(0, (period?.windSpeed ?? 0) * 0.44704)));
   const snowText = `${period?.condition ?? ""} ${period?.shortForecast ?? ""}`;
   const environment: SimulationEnvironment = {
     powderDepthCm: Math.round(Math.min(100, Math.max(0, (latestSnowReport?.new_snow_24h ?? 0) * 2.54))),
     windSpeedMps,
-    morningIce: localHour < 11 && (period?.low ?? period?.high ?? 40) <= 32,
+    morningIce: hour >= 6 && hour < 11 && (period?.low ?? period?.high ?? 40) <= 32,
     visibilityM: /blizzard|heavy.snow/i.test(snowText) ? 200 : /fog|snow/i.test(snowText) ? 800 : 20000,
     northSign: -1,
   };

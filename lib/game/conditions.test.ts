@@ -101,7 +101,7 @@ test("poor and explicitly icy conditions map to distinct hard-snow surfaces", ()
 });
 
 test("NWS snow selects the snowfall preset without changing packed surface", () => {
-  assert.deepEqual(buildConditionsSnapshot(resort, report, snowForecast), {
+  assert.deepEqual(buildConditionsSnapshot(resort, report, snowForecast, "v2", 7), {
     environment: { powderDepthCm: 8, windSpeedMps: 5, morningIce: true, visibilityM: 800, northSign: -1 },
     surface: "packed", physicsModel: "v2", weatherDefault: 1, powderDay: false,
     baseDepthIn: 64, snow24In: 3, stamp: "Packed powder", narrative: null,
@@ -117,7 +117,7 @@ test("missing live data uses the deterministic classic fallback", () => {
 });
 
 test("a forecast-only snapshot still starts in snowfall weather", () => {
-  assert.deepEqual(buildConditionsSnapshot(resort, null, snowForecast), {
+  assert.deepEqual(buildConditionsSnapshot(resort, null, snowForecast, "v2", 7), {
     environment: { powderDepthCm: 0, windSpeedMps: 5, morningIce: true, visibilityM: 800, northSign: -1 },
     surface: "packed", physicsModel: "v2", weatherDefault: 1, powderDay: false,
     baseDepthIn: null, snow24In: null, stamp: "Classic conditions", narrative: null,
@@ -129,4 +129,12 @@ test("physicsV2 defaults on with explicit offline v1 supported", () => {
   assert.equal(physicsModelForRollout(true), "v2");
   assert.equal(buildConditionsSnapshot(resort, report).physicsModel, "v2");
   assert.equal(buildConditionsSnapshot(resort, report, null, "v2").physicsModel, "v2");
+});
+
+test("Free Ride uses actual resort local hour for morning ice, including afternoon and night", () => {
+  const morning = Date.parse("2026-09-05T14:00:00Z"); // 07:00 at Heavenly
+  const afternoon = Date.parse("2026-09-05T21:00:00Z"); // 14:00 at Heavenly
+  assert.equal(buildConditionsSnapshot(resort, report, snowForecast, "v2", undefined, morning).environment?.morningIce, true);
+  assert.equal(buildConditionsSnapshot(resort, report, snowForecast, "v2", undefined, afternoon).environment?.morningIce, false);
+  assert.equal(buildConditionsSnapshot(resort, report, snowForecast, "v2", 1).environment?.morningIce, false);
 });

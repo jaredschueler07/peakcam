@@ -252,3 +252,15 @@ test("v2 strategy with the full v1 config preserves legacy fields", () => {
   });
   for (let i = 1; i < speeds.length; i++) assert.ok(speeds[i] > speeds[i - 1]);
 });
+
+test("deep powder provides deterministic off-piste float and no support pad on a groomer", () => {
+  for (const corridor of [0, 1]) {
+    const { state, world } = setupPlanarLanding();
+    state.onGround = true; state.pos.y = 0;
+    const environment = { powderDepthCm: 80, windSpeedMps: 0, morningIce: false, visibilityM: 20000, northSign: -1 as const };
+    const supportedWorld = { ...world, config: simulationConfig("powder", "v2", environment),
+      terrain: { ...world.terrain, height: () => 0, trailField: () => corridor } };
+    integrateSkierV2(state, input(), 0, supportedWorld);
+    assert.equal(state.pos.y, corridor ? 0 : 0.12);
+  }
+});
