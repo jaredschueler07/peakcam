@@ -234,6 +234,9 @@ export class NodePostProcessing {
   readonly aaInput: Vec4;
   readonly aaNode: ReturnType<typeof smaa> | ReturnType<typeof fxaa>;
   private policy = postChainPolicy(4, false);
+  private readonly scenePass: ReturnType<typeof pass>;
+  private ownedShadowStub: THREE.RenderTarget | null = null;
+  private disposed = false;
 
   constructor(
     renderer: Renderer,
@@ -242,7 +245,7 @@ export class NodePostProcessing {
     private readonly speed: { value: number },
     private readonly reducedMotion: boolean,
     /** The CSM key light — see `CsmShadowsNode.light`, the narrow accessor this reads. */
-    sunLight: THREE.DirectionalLight,
+    private readonly sunLight: THREE.DirectionalLight,
     readonly antialias: "smaa" | "fxaa" = "smaa",
   ) {
     // `renderer` is constructed with `antialias: true` (backend.ts), which without an override
@@ -258,7 +261,7 @@ export class NodePostProcessing {
     // the user actually sees.
     this.uniforms.near.value = camera.near;
     this.uniforms.far.value = camera.far;
-    const scenePass = pass(scene, camera, { samples: 0 });
+    const scenePass = this.scenePass = pass(scene, camera, { samples: 0 });
     const aberrated = aberrate(scenePass.getTextureNode(), this.uniforms);
 
     // GTAO is given depth but no normals, so it reconstructs them from depth in the shader. That is
@@ -352,7 +355,7 @@ export class NodePostProcessing {
       const stubDepthTexture = new THREE.DepthTexture(1, 1);
       stubDepthTexture.compareFunction = renderer.reversedDepthBuffer ? THREE.GreaterEqualCompare : THREE.LessEqualCompare;
       stubShadowMap.depthTexture = stubDepthTexture;
-      sunLight.shadow.map = stubShadowMap;
+      sunLight.shadow.map = this.ownedShadowStub = stubShadowMap;
     }
     this.godraysNode = godrays(scenePass.getTextureNode("depth"), camera, sunLight);
     this.godraysNode.density.value = GODRAYS_DENSITY;
@@ -475,13 +478,31 @@ export class NodePostProcessing {
   }
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
     this.pipeline.dispose();
     this.lut.dispose();
-    // RenderPipeline.dispose() only releases its own quad material — it never walks the graph — so
-    // both off-screen render targets have to be released here or every renderer re-init leaks them.
-    // `dispose()` is missing from the r185 typings for both node classes but present on both.
+    // RenderPipeline owns only its quad material, not its input graph. Delegate
+    // actual owning nodes to their r185 disposers (FXAA owns no extra targets).
+    this.scenePass.dispose();
+    (this.bloomNode as unknown as { dispose(): void }).dispose();
+    if (this.antialias === "smaa") (this.aaNode as unknown as { dispose(): void }).dispose();
     (this.aoNode as unknown as { dispose(): void }).dispose();
     (this.godraysNode as unknown as { dispose(): void }).dispose();
+    // RTTNode inherits Node.dispose(), which only emits an event in r185.
+    // Release its target/material explicitly; QuadMesh geometry is shared.
+    const input = this.aaInput as unknown as {
+      renderTarget: THREE.RenderTarget; _quadMesh: { material: THREE.Material };
+    };
+    input.renderTarget.dispose();
+    input._quadMesh.material.dispose();
+    // GTAO's disposer omits its per-instance generated noise texture.
+    (this.aoNode as unknown as { _noiseNode: { value: THREE.Texture } })._noiseNode.value.dispose();
+    if (this.ownedShadowStub) {
+      if (this.sunLight.shadow.map === this.ownedShadowStub) this.sunLight.shadow.map = null;
+      this.ownedShadowStub.dispose();
+      this.ownedShadowStub = null;
+    }
   }
 
   /** Cross-fades an optional stage in and out on the `aa` uniform without dropping it from the graph. */
