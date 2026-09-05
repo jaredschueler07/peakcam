@@ -385,7 +385,7 @@ test("an unsupported resort shows not-found and never mounts the game", async ({
   // on behavior until the status bug is fixed, then tighten to toBe(404).
   const response = await page.goto("/resorts/not-a-resort/drop-in");
   expect([200, 404]).toContain(response?.status() ?? 0);
-  await expect(page.getByText(/not found/i).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: /no Drop In at this address/i })).toBeVisible();
   await expect(page.getByRole("button", { name: /start descent/i })).toHaveCount(0);
 });
 

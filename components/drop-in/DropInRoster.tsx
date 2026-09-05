@@ -60,7 +60,7 @@ function RosterCard({ profile, compact }: { profile: DropInProfile; compact: boo
                 value={`${profile.summitElevationFt.toLocaleString()} ft`}
               />
             </dl>
-            <p className={`mt-4 ${LABEL}`}>Six runs, including</p>
+            <p className={`mt-4 ${LABEL}`}>Named runs, including</p>
             <p className="mt-1 font-mono text-[11.5px] leading-relaxed text-bark-dk">
               {profile.trailNames.slice(0, 3).join(" · ")}
             </p>
