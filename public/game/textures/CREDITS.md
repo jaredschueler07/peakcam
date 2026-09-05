@@ -26,3 +26,8 @@ Jeffrey-inspired crown in Heavenly. Species silhouette is art direction, not a
 botanical identification of the generic source needle texture. No texture is
 hotlinked at runtime. The superseded website preview and its retained source
 have been removed.
+
+The authored crown layout uses separated needle-bearing outer boughs, exposed
+inner branches and sparse lower limbs. Breckenridge's crown tapers upward from
+wide lower tiers; Heavenly's broader, irregular boughs leave a longer bare trunk.
+These silhouette choices and seed are reproducible in the bake script.

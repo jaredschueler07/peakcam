@@ -38,24 +38,39 @@ const width=1024,height=1024;
 const rng = (seed) => () => { seed=(Math.imul(seed,1664525)+1013904223)>>>0; return seed/4294967296; };
 const random=rng(7031), crowns=[], lines=[];
 for(let tree=0;tree<3;tree++){
-  const cx=170+tree*341,wide=tree===2,top=wide?135:35,bottom=wide?755:835;
+  const cx=170+tree*341,wide=tree===2,top=wide?135:35;
   const trunkWidth=wide?17:11;
   lines.push(`<path d="M${cx-trunkWidth/2} 1016 Q${cx-4} 650 ${cx-2} ${top} L${cx+2} ${top} Q${cx+7} 720 ${cx+trunkWidth/2} 1016Z" fill="url(#bark)"/>`);
   for(let y=top+15;y<995;y+=13){const x=cx+(random()-.5)*trunkWidth*.6;lines.push(`<path d="M${x} ${y}l-2 11" stroke="#312d25" stroke-width="1.3"/>`);}
-  for(let layer=0;layer<23;layer++){
-    const t=layer/22,y=top+35+t*(bottom-top-35);
-    const radius=(wide ? Math.sin(Math.pow(t,.65)*Math.PI)*112+12 : (20+104*t)*Math.min(1,(1.15-t)*3));
+  // Pine boughs are separated tiers, with visible woody inner branches.
+  // Only distal branches carry dense needles; leaving the trunk/negative gaps
+  // exposed prevents the continuous leafy column of a cypress/hedge silhouette.
+  const tiers=wide?8:13;
+  for(let layer=0;layer<tiers;layer++){
+    const t=layer/(tiers-1),y=wide?170+t*420:75+t*650;
+    const radius=wide ? 48+95*Math.sin(Math.PI*(.08+t*.86)) : 18+118*t;
     for(const side of [-1,1]){
-      const reach=radius*(.76+random()*.24),tipX=cx+side*reach;
-      const rise=12+random()*30,tipY=y-rise;
-      lines.push(`<path d="M${cx} ${y+8}Q${cx+side*reach*.48} ${y+7} ${tipX} ${tipY}" fill="none" stroke="#625745" stroke-width="${wide?3:2}"/>`);
-      const count=Math.ceil(reach/11)+2;
+      const reach=radius*(.8+random()*.2),tipX=cx+side*reach;
+      const rise=wide?35+random()*38:8+random()*18,offset=(random()-.5)*(wide?44:16),tipY=y-rise+offset;
+      lines.push(`<path d="M${cx} ${y+12}Q${cx+side*reach*.4} ${y+8} ${tipX} ${tipY}" fill="none" stroke="#625745" stroke-width="${wide?4:2.5}"/>`);
+      const count=wide?8:Math.max(3,Math.ceil(reach/19));
       for(let j=0;j<count;j++){
-        const along=(j+.3)/count;
-        for(let cluster=0;cluster<3;cluster++)crowns.push({x:cx+side*reach*along+(random()-.5)*22,y:y-rise*along+(random()-.5)*30,
-          angle:Math.round((side*(45+random()*90)+360)/15)%24,light:.78+random()*.5});
+        const along=.42+.58*(j+.3)/count;
+        const bx=cx+side*reach*along,by=y-rise*along+offset*along;
+        lines.push(`<path d="M${bx} ${by+4}l${side*14} -10" stroke="#73674c" stroke-width="1.3"/>`);
+        for(let cluster=0;cluster<(wide?3:2);cluster++)crowns.push({x:bx+(random()-.5)*(wide?20:12),y:by+(random()-.5)*(wide?21:10),
+          angle:Math.round((side*(72+random()*36)+360)/15)%24,light:.78+random()*.5});
       }
+      // A few upright shoots on upper tiers, keeping the leader recognizable.
+      if(layer<3)crowns.push({x:cx+side*reach*.18,y:y-17,angle:side>0?1:23,light:1.1});
     }
+  }
+  // Dead/exposed lower branches are common on mountain pines; sparse needles
+  // at the outer end keep lower limbs readable against snow.
+  for(let tier=0;tier<3;tier++)for(const side of [-1,1]){
+    const y=(wide?665:810)+tier*47,reach=(wide?90:112)*(1-tier*.19),x=cx+side*reach;
+    lines.push(`<path d="M${cx} ${y}Q${cx+side*reach*.6} ${y+13} ${x} ${y-7}" fill="none" stroke="#655746" stroke-width="2.6"/>`);
+    if(tier===0)for(let j=0;j<3;j++)crowns.push({x:x-side*j*13,y:y-11-j*3,angle:side>0?6:18,light:.9});
   }
   for(let i=0;i<9;i++)crowns.push({x:cx+(random()-.5)*18,y:top+16+i*5,angle:Math.floor(random()*3+23)%24,light:1.05});
 }
