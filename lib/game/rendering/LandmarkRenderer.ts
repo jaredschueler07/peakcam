@@ -1,11 +1,12 @@
 import * as THREE from "three";
 import type { ResortGameProfile } from "../config/schema";
 import type { TerrainSampler } from "../core/types";
+import baked from "../../../public/game/terrain/landmarks.json";
 
 export const LANDMARK_COORDINATES = {
   "ski-portillo": {
     lake: { x: -351, z: -2172, elevationM: 2849 },
-    hotel: { x: -41, z: -689 },
+    hotel: { x: baked.hotel.center[0], z: baked.hotel.center[1] },
   },
   heavenly: {
     lake: { x: -1450, z: -2920, elevationM: 1897 },
@@ -15,41 +16,65 @@ export const LANDMARK_COORDINATES = {
   },
 } as const;
 
-function fittedSpan(center: number, length: number, halfSizeM: number): {
-  center: number; length: number;
-} {
-  if (!Number.isFinite(halfSizeM)) return { center, length };
-  const fittedLength = Math.min(length, halfSizeM * 2);
-  const inset = fittedLength / 2;
-  return {
-    center: Math.max(-halfSizeM + inset, Math.min(halfSizeM - inset, center)),
-    length: fittedLength,
-  };
-}
+type LakeData = typeof baked.lakes[keyof typeof baked.lakes];
 
-function water(
-  terrain: TerrainSampler, x: number, z: number, elevationM: number,
-  width: number, depth: number, color: number,
-): THREE.Mesh {
-  const meta = (terrain as TerrainSampler & { meta?: { sizeM: number } }).meta;
-  const halfSizeM = meta ? meta.sizeM / 2 : Infinity;
-  const clippedX = fittedSpan(x, width, halfSizeM);
-  const clippedZ = fittedSpan(z, depth, halfSizeM);
-  const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(clippedX.length, clippedZ.length),
-    new THREE.MeshBasicMaterial({
-      color, transparent: true, opacity: 0.68, side: THREE.DoubleSide,
-      fog: true, depthWrite: false,
-    }),
-  );
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.position.set(
-    clippedX.center,
-    Math.min(elevationM, terrain.height(clippedX.center, clippedZ.center) - 0.5),
-    clippedZ.center,
-  );
-  mesh.userData.terrainFootprint = { halfX: clippedX.length / 2, halfZ: clippedZ.length / 2 };
+/** Small authored textures: no downloaded photo is shipped as an asset. */
+function facadeTexture(red:number,green:number,blue:number):THREE.DataTexture {
+  const size=32,data=new Uint8Array(size*size*4);
+  for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+    const at=(y*size+x)*4,frame=x>=7&&x<=24&&y>=7&&y<=24;
+    const glass=x>=9&&x<=22&&y>=9&&y<=22;
+    data[at]=glass?49:frame?230:red;data[at+1]=glass?79:frame?228:green;data[at+2]=glass?102:frame?205:blue;data[at+3]=255;
+  }
+  const texture=new THREE.DataTexture(data,size,size);texture.colorSpace=THREE.SRGBColorSpace;
+  texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.repeat.set(.25,1/3);texture.needsUpdate=true;return texture;
+}
+function detailTexture(normal:boolean):THREE.DataTexture {
+  const size=32,data=new Uint8Array(size*size*4);
+  for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+    const at=(y*size+x)*4,wave=Math.sin(x*.7+y*.4);
+    data[at]=normal?128+wave*19:224+wave*9;
+    data[at+1]=normal?128+Math.sin(x*.3-y*.8)*19:232+wave*9;
+    data[at+2]=normal?253:238+wave*9;data[at+3]=255;
+  }
+  const texture=new THREE.DataTexture(data,size,size);
+  if(!normal)texture.colorSpace=THREE.SRGBColorSpace;
+  texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.repeat.set(.075,.075);texture.needsUpdate=true;return texture;
+}
+function polygonShape(points:readonly number[][],cx=0,cz=0):THREE.Shape {
+  return new THREE.Shape(points.map(p=>new THREE.Vector2(p[0]-cx,-(p[1]-cz))));
+}
+function water(data:LakeData,color:number):THREE.Mesh {
+  const shape=polygonShape(data.outer);
+  for(const hole of data.holes)shape.holes.push(new THREE.Path(hole.map(p=>new THREE.Vector2(p[0],-p[1]))));
+  const geometry=new THREE.ShapeGeometry(shape);geometry.rotateX(-Math.PI/2);
+  const material=new THREE.MeshStandardMaterial({color,normalMap:detailTexture(true),normalScale:new THREE.Vector2(.2,.2),roughness:.22,metalness:.14,side:THREE.DoubleSide,fog:true});
+  const mesh=new THREE.Mesh(geometry,material);mesh.position.y=data.elevationM;
+  mesh.userData.sourceId=data.sourceId;mesh.userData.waterElevationSource=data.elevationSource;
+  mesh.userData.farFieldSupported=true;
+  // Real lakes extend beyond the streamed DEM tiles and are supported by the
+  // baked 30km mesh. Omitting terrainFootprint keeps their real far silhouette.
   return mesh;
+}
+function hotel(terrain:TerrainSampler):THREE.Group {
+  const data=baked.hotel,[cx,cz]=data.center,group=new THREE.Group();
+  group.name='portillo-hotel';group.position.set(cx,terrain.height(cx,cz),cz);
+  const yellow=new THREE.MeshStandardMaterial({map:facadeTexture(244,186,32),roughness:.85});
+  const timber=new THREE.MeshStandardMaterial({map:facadeTexture(121,73,36),roughness:.92});
+  const blue=new THREE.MeshStandardMaterial({map:facadeTexture(29,129,161),roughness:.82});
+  const roof=new THREE.MeshStandardMaterial({map:detailTexture(false),roughness:.95});
+  for(const [points,height,material] of [[data.main,data.mainHeightM,yellow],[data.annex,data.annexHeightM,timber]] as const){
+    const geometry=new THREE.ExtrudeGeometry(polygonShape(points,cx,cz),{depth:height,bevelEnabled:false,steps:1});
+    geometry.rotateX(-Math.PI/2);
+    const wing=new THREE.Mesh(geometry,[roof,material]);wing.castShadow=true;group.add(wing);
+  }
+  const tower=new THREE.Mesh(new THREE.BoxGeometry(data.tower.width,data.tower.height,data.tower.depth),[blue,blue,roof,roof,blue,blue]);
+  const towerUv=tower.geometry.getAttribute("uv") as THREE.BufferAttribute;
+  for(let i=0;i<towerUv.count;i++)towerUv.setXY(i,towerUv.getX(i)*data.tower.width,towerUv.getY(i)*data.tower.height);
+  tower.position.set(data.tower.x-cx,data.tower.height/2,data.tower.z-cz);tower.castShadow=true;group.add(tower);
+  const xs=data.footprint.map(p=>p[0]),zs=data.footprint.map(p=>p[1]);
+  group.userData.terrainFootprint={halfX:(Math.max(...xs)-Math.min(...xs))/2,halfZ:(Math.max(...zs)-Math.min(...zs))/2};
+  group.userData.sourceId=data.sourceId;group.userData.reference=data.reference;return group;
 }
 
 export function createLandmarks(profile: ResortGameProfile, terrain: TerrainSampler): THREE.Group {
@@ -58,30 +83,12 @@ export function createLandmarks(profile: ResortGameProfile, terrain: TerrainSamp
   group.userData.coordinates = coordinates;
   group.name = `${profile.slug}-landmarks`;
   if (profile.slug === "ski-portillo") {
-    const coordinates = LANDMARK_COORDINATES["ski-portillo"];
-    const lake = water(
-      terrain, coordinates.lake.x, coordinates.lake.z, coordinates.lake.elevationM,
-      700, 260, 0x2a9bb2,
-    );
-    lake.name = "portillo-lake";
-    const hotelGeometry = new THREE.BoxGeometry(48, 12, 24);
-    hotelGeometry.translate(0, 6, 0);
-    const hotel = new THREE.Mesh(
-      hotelGeometry,
-      new THREE.MeshStandardMaterial({ color: 0xf3b52d, roughness: 0.82, emissive: 0x9d5c08, emissiveIntensity: 0.12, fog: true }),
-    );
-    hotel.name = "portillo-hotel";
-    hotel.userData.terrainFootprint = { halfX: 24, halfZ: 12 };
-    hotel.position.set(coordinates.hotel.x, terrain.height(coordinates.hotel.x, coordinates.hotel.z), coordinates.hotel.z);
-    group.add(lake, hotel);
+    const lake = water(baked.lakes["ski-portillo"],0x338f9f);
+    lake.name="portillo-lake";
+    group.add(lake,hotel(terrain));
   } else if (profile.slug === "heavenly") {
-    const coordinates = LANDMARK_COORDINATES.heavenly;
-    const lake = water(
-      terrain, coordinates.lake.x, coordinates.lake.z, coordinates.lake.elevationM,
-      900, 360, 0x3b86aa,
-    );
-    lake.name = "heavenly-lake";
-    group.add(lake);
+    const lake = water(baked.lakes.heavenly,0x357da3);
+    lake.name="heavenly-lake";group.add(lake);
   } else {
     const coordinates = LANDMARK_COORDINATES.breckenridge;
     const glow = new THREE.Mesh(
