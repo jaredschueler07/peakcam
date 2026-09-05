@@ -81,7 +81,19 @@ export interface NearestTrail {
   on: boolean;
 }
 
+export interface RealJunction {
+  readonly id: string;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly heading: number;
+  readonly halfWidthM: number;
+  readonly choices: readonly {id:string;name:string;difficulty:string|null}[];
+}
+
 export interface TerrainSampler {
+  readonly junctions?: readonly RealJunction[];
+  nearbyJunction?(x:number,z:number,radiusM?:number):RealJunction|null;
   readonly kind: "procedural" | "real";
   readonly profile: ResortGameProfile;
   readonly seed: number;

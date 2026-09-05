@@ -47,6 +47,7 @@ import {
 } from "./formats";
 import { fbmWithGradient, type NoiseGradient } from "./noise-grad";
 import { buildRealCourse } from "./real-course";
+import { buildJunctions, nearestJunction } from "./junctions";
 import { RAMP_H, RAMP_LEN, RAMP_W } from "./heightfield";
 
 // ─── Options ─────────────────────────────────────────────────
@@ -384,6 +385,7 @@ export function createRealTerrain(
     return normalize(out);
   }
 
+  const junctions = buildJunctions(trails.junctions, runs, height);
   const nearestRunScratch = createNearestRun();
 
   function queryNearestRun(x: number, z: number, out: NearestRun): NearestRun {
@@ -424,6 +426,8 @@ export function createRealTerrain(
     realRuns: course.runs,
     mainLift: course.mainLift,
     realLifts: course.lifts,
+    junctions,
+    nearbyJunction: (x:number,z:number,radiusM=65) => nearestJunction(junctions,x,z,radiusM),
     treeSites: trailsData.detail?.treeWells.map(site => ({ x: site.x, y: height(site.x, -site.y), z: -site.y, radiusM: site.radiusM })),
     height,
     normal,
