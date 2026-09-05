@@ -88,6 +88,7 @@ export const runSubmissionSchema = z
   .object({
     ticket: ticketSchema,
     ghost: ghostBase64Schema,
+    inputTape: z.string().max(1152000).regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/).optional(),
     /** Keyframe rate the ghost was recorded at; cross-checked against the header. */
     tickHz: z.number().int().min(MIN_TICK_HZ).max(MAX_TICK_HZ),
     /** Client-reported; compared with the server's own derivation, not trusted. */

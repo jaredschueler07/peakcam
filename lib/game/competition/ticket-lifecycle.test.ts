@@ -203,3 +203,15 @@ test("an offline or Free Ski run falls back to the profile seed and stays unsubm
   const world = createWorld(profile, resolveRunSeed(null, profile.seed), proceduralTerrain(profile));
   assert.equal(world.seed, profile.seed);
 });
+
+test("reminted tickets must match every frozen environment value", () => {
+  const environment = { powderDepthCm: 20, windSpeedMps: 10, morningIce: true, visibilityM: 800, northSign: -1 as const };
+  const ticket = { ...fresh, physicsModel: "v2" as const, environment };
+  const config = { surface: ticket.surface, physicsModel: ticket.physicsModel, environment: { ...environment } };
+  assert.equal(ticketMatchesConfig(ticket, config), true);
+  for (const key of ["powderDepthCm", "windSpeedMps", "visibilityM"] as const) {
+    assert.equal(ticketMatchesConfig(ticket, { ...config, environment: { ...environment, [key]: environment[key] + 1 } }), false);
+  }
+  assert.equal(ticketMatchesConfig(ticket, { ...config, environment: { ...environment, morningIce: false } }), false);
+  assert.equal(ticketMatchesConfig(ticket, { ...config, environment: undefined }), false);
+});

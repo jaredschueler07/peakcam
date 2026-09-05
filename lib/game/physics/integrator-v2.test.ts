@@ -225,10 +225,10 @@ test("landing absorption timer counts down while suppressing obstacle collisions
   assert.equal(state.crash, 0);
 });
 
-test("v2 with the v1 carve table matches v1 dynamics for legacy fields", () => {
+test("v2 strategy with the full v1 config preserves legacy fields", () => {
   const v1World = createProceduralWorld(profile, profile.seed, simulationConfig("packed", "v1"));
   const v2World = createProceduralWorld(profile, profile.seed, {
-    ...simulationConfig("packed", "v2"), carve: simulationConfig("packed", "v1").carve,
+    ...simulationConfig("packed", "v1"),
   });
   const v1 = createSimulation(profile, profile.seed, v1World.terrain);
   const v2 = createSimulation(profile, profile.seed, v2World.terrain);
@@ -241,5 +241,26 @@ test("v2 with the v1 carve table matches v1 dynamics for legacy fields", () => {
     const v1Legacy = { ...v1, edgeAngle: 0, landingTimer: 0 };
     const v2Legacy = { ...v2, edgeAngle: 0, landingTimer: 0 };
     assert.deepEqual(v2Legacy, v1Legacy);
+  }
+});
+
+ test("v2 partial tuck gives intermediate acceleration, not full tuck thrust", () => {
+  const speeds = [0, 0.1, 0.5, 1].map(tuck => {
+    const { state, world } = setup();
+    integrateSkierV2(state, input({ tuck }), FIXED_DT, world);
+    return Math.hypot(state.vel.x, state.vel.z);
+  });
+  for (let i = 1; i < speeds.length; i++) assert.ok(speeds[i] > speeds[i - 1]);
+});
+
+test("deep powder provides deterministic off-piste float and no support pad on a groomer", () => {
+  for (const corridor of [0, 1]) {
+    const { state, world } = setupPlanarLanding();
+    state.onGround = true; state.pos.y = 0;
+    const environment = { powderDepthCm: 80, windSpeedMps: 0, morningIce: false, visibilityM: 20000, northSign: -1 as const };
+    const supportedWorld = { ...world, config: simulationConfig("powder", "v2", environment),
+      terrain: { ...world.terrain, height: () => 0, trailField: () => corridor } };
+    integrateSkierV2(state, input(), 0, supportedWorld);
+    assert.equal(state.pos.y, corridor ? 0 : 0.12);
   }
 });

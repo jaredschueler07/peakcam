@@ -16,7 +16,7 @@
  * recorder, and by the server-side submission path.
  */
 
-export const PHYSICS_VERSION = 1;
+export const PHYSICS_VERSION = 2;
 /**
  * 2 — the Phase 1 DEM upgrade re-baked every heightfield from a real elevation
  * source (Portillo Copernicus GLO-30, Breckenridge 3DEP 1 m lidar, Heavenly

@@ -1,3 +1,6 @@
+import { resetRankedStart } from "../core/ranked-start";
+import { resetSimulationOnTerrain } from "../core/run-lifecycle";
+import { InputTapeRecorder } from "../replay/input-tape";
 import type { ResortGameProfile } from "../config/schema";
 import { COURSE_VERSION, PHYSICS_VERSION } from "../config/versions";
 import { FIXED_DT, MAX_FRAME_DT, MAX_STEPS_PER_FRAME } from "../core/clock";
@@ -28,6 +31,8 @@ import type { SurfaceTextures } from "../rendering/surfaceTextures";
 import type { QualityRung } from "../rendering/QualityController";
 
 interface FinishedRunRecording {
+  score?: number;
+  inputTape?: Uint8Array;
   samples: GhostSample[];
   encoded: Uint8Array;
 }
@@ -136,6 +141,8 @@ export class GameRuntime {
   private activated = false;
   private readonly ghostRecorder: GhostRecorder;
   private readonly recordingArm = new CompetitiveRecordingArm();
+  private ranked = false;
+  private readonly inputTape = new InputTapeRecorder();
   private finishedRun: FinishedRunRecording | null = null;
   /** Reused listener payload — avoids allocating `{speed,carve,...}` every HUD tick. */
   private readonly listenerScratch = { speed: 0, carve: 0, onGround: false, liftRide: 0 };
@@ -158,14 +165,24 @@ export class GameRuntime {
     backend?: RendererBackend,
     /** Node-material pipeline, required alongside a WebGPU backend; see `nodeFactories`. */
     nodeFactories?: NodeFactories | null,
+    trailId?: string,
+    mode: "free_ski" | "time_trial" | "score_attack" = "free_ski",
   ) {
+    this.ranked = mode !== "free_ski";
+    const config = { ...simulationConfigForConditions(conditions, physicsModel), allowLifts: mode === "free_ski" };
     this.world = createWorld(
       profile,
       runSeed,
       terrain,
-      simulationConfigForConditions(conditions, physicsModel),
+      config,
     );
     this.state = createSimulation(profile, runSeed, terrain);
+    if (trailId && terrain.kind === "real") {
+      const selected = terrain.realRuns?.findIndex(run => run.id === trailId) ?? -1;
+      if (selected < 0) throw new Error("Selected run is absent from terrain");
+      this.state.selectedTrail = selected;
+      resetSimulationOnTerrain(this.state, terrain);
+    }
     const spawnRun = terrain.kind === "real" ? terrain.realRuns?.[this.state.selectedTrail] : undefined;
     if (spawnArcM !== undefined && Number.isFinite(spawnArcM) && spawnRun) {
       spawnOnRunAtArcLength(this.state, spawnRun, spawnArcM, terrain);
@@ -219,9 +236,12 @@ export class GameRuntime {
   restart(): void { this.input.setAction("restart", true); this.input.setAction("restart", false); this.resume(); }
 
   beginCompetitiveRecording(): void {
+    this.ranked = true;
     this.finishedRun = null;
     this.ui.setRunRecordingAvailable(false);
+    this.inputTape.reset();
     this.recordingArm.arm(this.state.time, (nowSimTime) => {
+      resetRankedStart(this.state, this.world);
       this.ghostRecorder.begin(nowSimTime);
       this.ghostRecorder.sample(this.state, nowSimTime);
     });
@@ -255,7 +275,7 @@ export class GameRuntime {
   /** Which renderer backend the run is actually using. */
   get backendKind(): "webgpu" | "webgl" { return this.renderer.backendKind; }
 
-  takeFinishedRun(): { samples: GhostSample[]; encoded: Uint8Array } | null {
+  takeFinishedRun(): FinishedRunRecording | null {
     const run = this.finishedRun;
     this.finishedRun = null;
     this.ui.setRunRecordingAvailable(false);
@@ -272,7 +292,7 @@ export class GameRuntime {
     if (this.input.consumePausePressed()) {
       if (this.paused) this.resume(); else this.pause();
     }
-    if (this.input.consumeLiftPressed() && this.state.liftRide <= 0) {
+    if (this.input.consumeLiftPressed() && !this.ranked && this.world.terrain.kind !== "real" && this.state.liftRide <= 0) {
       beginLiftRide(this.state); this.audio.playLift();
     }
     const weather = this.input.consumeWeatherPressed();
@@ -287,11 +307,16 @@ export class GameRuntime {
       this.accumulator += frameDt;
       let steps = 0;
       while (this.accumulator >= FIXED_DT && steps < MAX_STEPS_PER_FRAME) {
-        const events = stepSimulation(this.state, this.input.nextFrame(), FIXED_DT, this.world);
+        const frame = this.input.nextFrame();
+        if (this.ranked) frame.trailPressed = false;
+        if (this.ghostRecorder.recording && !frame.restartPressed && !frame.trailPressed) this.inputTape.record(frame);
+        const events = stepSimulation(this.state, frame, FIXED_DT, this.world);
         this.audio.playSimulationEvents(events);
         if (events.reset) {
+          this.inputTape.reset();
           const resetAction = this.recordingArm.onReset(this.state.time, this.ghostRecorder, events.liftFinished);
           if (resetAction === "started" || resetAction === "discarded") {
+            resetRankedStart(this.state, this.world);
             this.ghostRecorder.sample(this.state, this.state.time);
           }
           if (resetAction === "discarded" || resetAction === "lift-discarded") {
@@ -305,6 +330,8 @@ export class GameRuntime {
             if (samples) {
               this.finishedRun = {
                 samples,
+                inputTape: this.inputTape.finish(),
+                score: Math.round(this.state.score),
                 encoded: encodeGhost(samples, {
                   physicsVersion: PHYSICS_VERSION,
                   courseVersion: COURSE_VERSION,

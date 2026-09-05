@@ -93,9 +93,13 @@ export function needsRemint(state: TicketState, nowMs: number): boolean {
  */
 export function ticketMatchesConfig(
   ticket: RunSessionTicket,
-  config: Pick<SimulationConfig, "surface" | "physicsModel">,
+  config: Pick<SimulationConfig, "surface" | "physicsModel" | "environment">,
 ): boolean {
-  return ticket.surface === config.surface && ticket.physicsModel === config.physicsModel;
+  const a = ticket.environment, b = config.environment;
+  const sameEnvironment = a === b || Boolean(a && b &&
+    a.powderDepthCm === b.powderDepthCm && a.windSpeedMps === b.windSpeedMps &&
+    a.morningIce === b.morningIce && a.visibilityM === b.visibilityM && a.northSign === b.northSign);
+  return ticket.surface === config.surface && ticket.physicsModel === config.physicsModel && sameEnvironment;
 }
 
 /**
@@ -115,7 +119,7 @@ export function ticketMatchesConfig(
  */
 export function ticketForConfig(
   state: TicketState,
-  config: Pick<SimulationConfig, "surface" | "physicsModel">,
+  config: Pick<SimulationConfig, "surface" | "physicsModel" | "environment">,
   nowMs: number,
 ): RunSessionTicket | null {
   const ticket = usableTicket(state, nowMs);
@@ -129,7 +133,7 @@ export function ticketForConfig(
  * Stricter than {@link usableTicket}: the ticket's seed, snow surface, and
  * physics model must equal the running world's config. A restart resets the simulation
  * but does not rebuild the world, so a ticket minted afterwards can describe a
- * different course — the Daily Line seed rotates at midnight UTC, and a session
+ * different course — the Daily Line seed rotates on the resort local date, and a session
  * spanning that boundary would otherwise submit a run against a course it never
  * skied (`seed_mismatch`, and a leaderboard entry that is simply wrong).
  *
@@ -139,7 +143,7 @@ export function ticketForConfig(
 export function ticketForWorld(
   state: TicketState,
   runSeed: number | null | undefined,
-  config: Pick<SimulationConfig, "surface" | "physicsModel">,
+  config: Pick<SimulationConfig, "surface" | "physicsModel" | "environment">,
   nowMs: number,
 ): RunSessionTicket | null {
   if (runSeed === null || runSeed === undefined) return null;
