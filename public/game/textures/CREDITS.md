@@ -1,16 +1,28 @@
 # Drop In forest assets
 
-`pine-atlas.webp` is an offline resized orthographic render of **Pine Tree 01**,
-by Rico Cilliers (modeling) and Rob Tuytel (photography), Poly Haven, **CC0**.
+`pine-atlas.webp` is an original offline assembly of seeded trunks, branch paths
+and foliage cards. Needle imagery comes from the **actual downloadable CC0
+texture files** of **Pine Tree 01**, Poly Haven, by Rico Cilliers (modeling) and
+Rob Tuytel (photography). No website example render is included or used as input.
 
-- Asset/license: https://polyhaven.com/a/pine_tree_01
-- License policy: https://docs.polyhaven.com/en/faq
-- Source: https://cdn.polyhaven.com/asset_img/renders/pine_tree_01/orth_front.png
-- Retrieved 2026-09-05. Source PNG retained in scripts/data/textures.
-- Rebuild: `node scripts/bake-forest-assets.mjs` (sharp ships with Next.js).
-- Powered by Poly Haven (metadata was inspected using their API).
+- Asset: https://polyhaven.com/a/pine_tree_01
+- Asset license: https://polyhaven.com/license (CC0 assets; website example renders are excluded).
+- Catalogue: https://api.polyhaven.com/files/pine_tree_01
+- Diffuse source: https://dl.polyhaven.org/file/ph-assets/Models/png/1k/pine_tree_01/pine_tree_01_twig_diff_1k.png
+  - MD5 `a4fa4a55aab9231915a4023ea9841577`; 3,208,228 bytes.
+- Alpha source: https://dl.polyhaven.org/file/ph-assets/Models/png/1k/pine_tree_01/pine_tree_01_twig_alpha_1k.png
+  - MD5 `641911a5a3f543911dad04ebb26e7bca`; 351,928 bytes.
+- Retrieved 2026-09-05. Both original texture files are retained in `scripts/data/textures`.
+- Rebuild: `node scripts/bake-forest-assets.mjs`. This verifies source checksums,
+  extracts the twig alpha island, authors tree structures with a fixed seed,
+  composites the textured foliage offline and writes the runtime WebP. Sharp is
+  supplied by the existing Next.js dependency.
+- `pine-atlas-assembly.svg` records the original authored trunk/branch paths;
+  the bake script records foliage placement. Both are PeakCam-authored work.
 
-Runtime uses crossed alpha-tested impostors: slender crown in Breckenridge,
-broader crown in Heavenly. These are art-directed pine silhouettes; the source
-asset does not certify lodgepole or Jeffrey pine species. Botanical specificity
-remains an art acceptance limitation. No textures are hotlinked at runtime.
+Runtime uses crossed alpha-tested impostors and three non-overlapping atlas
+cells: slender lodgepole-inspired crowns in Breckenridge, a broader
+Jeffrey-inspired crown in Heavenly. Species silhouette is art direction, not a
+botanical identification of the generic source needle texture. No texture is
+hotlinked at runtime. The superseded website preview and its retained source
+have been removed.

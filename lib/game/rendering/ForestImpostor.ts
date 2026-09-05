@@ -4,8 +4,8 @@ import * as THREE from "three";
 export function createForestGeometry(wideCrown: boolean): THREE.BufferGeometry {
   const width = wideCrown ? 5.3 : 3.3;
   const height = wideCrown ? 8.2 : 9;
-  const u0 = wideCrown ? 0.64 : 0;
-  const u1 = wideCrown ? 1 : 0.365;
+  const u0 = wideCrown ? 2 / 3 : 0;
+  const u1 = wideCrown ? 1 : 1 / 3;
   const positions: number[] = [], normals: number[] = [], uvs: number[] = [];
   for (let card = 0; card < 2; card++) {
     const plane = new THREE.PlaneGeometry(width, height).toNonIndexed();
