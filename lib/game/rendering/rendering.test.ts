@@ -11,7 +11,8 @@ import { CameraController } from "./CameraController";
 import { QualityController, seedQualityRung } from "./QualityController";
 import { createGhostPose, GhostRenderer, sampleGhostAt } from "./GhostRenderer";
 import { GameRenderer, shouldInitializePostProcessing, type RendererBackend } from "./Renderer";
-import type { ResourceCounts } from "./resources";
+import { disposeObjectTree, type ResourceCounts } from "./resources";
+import { LiftRenderer } from "./LiftRenderer";
 import { buildPosterLut, buildSnowDetailNormal } from "./SnowMaterial";
 import { chromaticAberrationOffset } from "./MotionEffects";
 import { configureSceneMaterials } from "./Renderer";
@@ -1063,4 +1064,33 @@ test("spawn immunity never makes the player's skier disappear", () => {
   assert.ok(triangles <= 56, `rock repeats ${triangles} triangles per colour/shadow pass`);
   assert.ok((rock.material as THREE.MeshStandardMaterial).map, "stone detail remains textured");
   assert.ok(rock.castShadow, "geometry savings retain rock contact shadows");
+});
+
+
+test("empty lift carrier batches skip colour and shadow traversal and restore when active", () => {
+  const profile = DROP_IN_GAME_PROFILES.breckenridge;
+  const terrain = createProceduralWorld(profile, 12).terrain;
+  const points = [{ x: 0, y: 0, z: 0 }, { x: 0, y: 100, z: 200 }];
+  const scene = new THREE.Scene();
+  const renderer = new LiftRenderer(scene, { ...terrain, realLifts: [{
+    kind: "real", name: "Test chair", type: "chair_lift", lengthM: 224, points,
+    stations: points.map(point => ({ ...point, radiusM: 7 })),
+  }] });
+  const mesh = scene.children.find(object => object instanceof THREE.InstancedMesh) as THREE.InstancedMesh;
+  assert.ok(mesh); assert.equal(mesh.count, 0); assert.equal(mesh.visible, false);
+  const state = createSimulation(profile, 12);
+  state.pos.x = 0; state.pos.z = 0;
+  renderer.update(state);
+  assert.ok(mesh.count > 0); assert.equal(mesh.visible, true); assert.equal(mesh.castShadow, true);
+  state.pos.x = 10000; state.pos.z = 10000;
+  renderer.update(state);
+  assert.equal(mesh.count, 0); assert.equal(mesh.visible, false);
+  state.liftIndex = 0; state.liftDistanceM = 50;
+  renderer.update(state);
+  assert.equal(mesh.count, 1, "occupied carrier remains even beyond proximity culling");
+  assert.equal(mesh.visible, true);
+  state.liftIndex = -1; state.pos.x = 0; state.pos.z = 0;
+  renderer.update(state);
+  assert.ok(mesh.count > 0); assert.equal(mesh.visible, true);
+  disposeObjectTree(scene);
 });

@@ -81,7 +81,7 @@ export class LiftRenderer {
         for(let i=0;i<seats;i++)parts.push(box((i-(seats-1)/2)*0.5,-2.6,0,0.46,0.15,0.8));
         geometry=merge(parts);
       }
-      const mesh=new THREE.InstancedMesh(geometry,paint,capacity);mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);mesh.frustumCulled=false;mesh.castShadow=true;scene.add(mesh);this.batches.set(key,{mesh,count:0});
+      const mesh=new THREE.InstancedMesh(geometry,paint,capacity);mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);mesh.frustumCulled=false;mesh.castShadow=true;mesh.count=0;mesh.visible=false;scene.add(mesh);this.batches.set(key,{mesh,count:0});
     }
   }
   update(state:SimulationState):void {
@@ -104,6 +104,6 @@ export class LiftRenderer {
         sampleLiftPath(line.path,state.liftDistanceM,sample);object.position.set(sample.x,sample.y,sample.z);object.rotation.set(0,sample.heading,0);object.updateMatrix();matrix.copy(object.matrix);batch.mesh.setMatrixAt(batch.count++,matrix);
       }
     }
-    for(const batch of this.batches.values()){batch.mesh.count=batch.count;batch.mesh.instanceMatrix.needsUpdate=true;}
+    for(const batch of this.batches.values()){batch.mesh.count=batch.count;batch.mesh.visible=batch.count>0;batch.mesh.instanceMatrix.needsUpdate=true;}
   }
 }
