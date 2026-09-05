@@ -53,6 +53,8 @@ export interface RealRun {
 }
 
 export interface RealLift {
+  /** False when the source line is clipped by this terrain pack. */
+  readonly complete?: boolean;
   readonly id?: string;
   readonly sourceId?: string;
   readonly speedMps?: number;
@@ -132,6 +134,10 @@ export interface SimulationState {
   crouch: number;
   jumpCharge: number;
   selectedTrail: number;
+  liftIndex: number;
+  liftProgress: number;
+  liftDistanceM: number;
+  liftCooldown: number;
   liftRide: number;
   liftFromZ: number;
   liftToZ: number;

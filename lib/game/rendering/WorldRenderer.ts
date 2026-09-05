@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { LiftRenderer } from "./LiftRenderer";
 import type { ResortGameProfile } from "../config/schema";
 import type { SimulationState, SimulationWorld } from "../core/types";
 import { GATE_SPACING, LIFT_OFFSET } from "../physics/constants";
@@ -116,6 +117,7 @@ export class WorldRenderer {
   private readonly tree: THREE.InstancedMesh; private readonly rock: THREE.InstancedMesh; private readonly markers: THREE.InstancedMesh;
   private readonly gates: THREE.Group[] = []; private readonly ramps: THREE.Group[] = [];
   private readonly lift = new THREE.Group(); private readonly towers: THREE.Group[] = []; private readonly chairs: THREE.Group[] = [];
+  private readonly realLiftRenderer: LiftRenderer | null;
   private readonly cableGeometry = new THREE.BufferGeometry();
   private readonly landmarks: THREE.Group | null;
   private propX = Infinity; private propZ = Infinity; private furnitureZ = Infinity; private furnitureTimer = 0;
@@ -155,7 +157,8 @@ export class WorldRenderer {
     scene.add(this.tree, this.rock, this.markers);
     this.landmarks = world.terrain.kind === "real" ? createLandmarks(profile, world.terrain) : null;
     if (this.landmarks) scene.add(this.landmarks);
-    this.buildGates(); this.buildRamps(); this.buildLift();
+    this.realLiftRenderer = world.terrain.kind === "real" ? new LiftRenderer(scene, world.terrain) : null;
+    this.buildGates(); this.buildRamps(); if (!this.realLiftRenderer) this.buildLift();
   }
 
   private buildGates() {
@@ -231,7 +234,8 @@ export class WorldRenderer {
       this.furnitureTimer = 0.25; this.furnitureZ = state.pos.z;
       this.updateMarkers(state.pos.z); this.updateGates(state); this.updateRamps(state);
     }
-    this.updateLift(state.pos.z, state.time);
+    if (this.realLiftRenderer) this.realLiftRenderer.update(state);
+    else this.updateLift(state.pos.z, state.time);
   }
 
   private updateLandmarks(playerX: number, playerZ: number): void {

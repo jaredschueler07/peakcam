@@ -22,6 +22,8 @@ export interface SimulationEnvironment {
 }
 
 export interface SimulationConfig {
+  /** Explicit Free Ride opt-in; ranked worlds never enable boarding. */
+  readonly allowLifts?: boolean;
   readonly environment?: SimulationEnvironment;
   readonly surface: SurfaceKind;
   readonly topSpeedMultiplier: number;
