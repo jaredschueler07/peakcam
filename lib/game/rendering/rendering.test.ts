@@ -524,7 +524,7 @@ test("mount/unmount ten times disposes every node-material resource too (WebGPU)
   // The node path swaps materials one-for-one but replaces both THREE.Points clouds with instanced
   // quad meshes, so it carries the same counts — if a factory ever stops registering its texture on
   // userData, `collectResources` goes blind to it and this equality is what catches the leak.
-  assert.deepEqual(webgpu, { ...webgl, geometries: webgl.geometries + 1, materials: webgl.materials + 1 }, "the node scene retains one inactive sky for thermal transitions");
+  assert.deepEqual(webgpu, { ...webgl, geometries: webgl.geometries + 1, materials: webgl.materials + 2 }, "the node scene retains an inactive sky and snow material for thermal transitions");
   assert.ok(webgpu.textures >= 3, `sky/snow detail plus both particle sprites, got ${webgpu.textures}`);
 });
 

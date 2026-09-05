@@ -285,6 +285,7 @@ export class GameRenderer {
     await this.postReady;
     if (this.disposed || !this.renderer.compileAsync) return;
     const seeded = this.quality.rung;
+    const warmup = { active: true };
     let timer: ReturnType<typeof setTimeout> | undefined;
     const budget = new Promise<void>((resolve) => {
       timer = setTimeout(resolve, this.options.prewarmTimeoutMs ?? PREWARM_TIMEOUT_MS);
@@ -292,23 +293,25 @@ export class GameRenderer {
     try {
       // A compileAsync that never settles must cost a stutter, not the run: the loading bar is
       // parked at 95% waiting on this, so it gets a budget and then we start regardless.
-      await Promise.race([this.compileRungs(seeded), budget]);
+      await Promise.race([this.compileRungs(seeded, warmup), budget]);
     } finally {
       clearTimeout(timer);
-      // If the budget won mid-sequence the rung can be left at 4; put it back.
-      if (!this.disposed && this.quality.rung !== seeded) this.applyQuality(seeded);
+      // Applying a compile tier does not mutate the governor. Always restore its live
+      // value, and revoke the continuation before a timed-out compile can settle.
+      warmup.active = false;
+      if (!this.disposed) this.applyQuality(this.quality.rung);
     }
   }
 
-  private async compileRungs(seeded: QualityRung): Promise<void> {
+  private async compileRungs(seeded: QualityRung, warmup: { active: boolean }): Promise<void> {
     if (seeded !== 4) {
       // Warm the expensive variants first, then come back to the rung we will actually start on —
       // restoring it last matters because CsmShadowsNode rebuilds its shadow node on a rung change,
       // so a compile taken before the restore would warm a node we then throw away.
       this.applyQuality(4);
       await this.renderer.compileAsync?.(this.built.scene, this.built.camera);
-      if (this.disposed) return;
-      this.applyQuality(seeded);
+      if (this.disposed || !warmup.active) return;
+      this.applyQuality(this.quality.rung);
     }
     await this.renderer.compileAsync?.(this.built.scene, this.built.camera);
   }
@@ -480,7 +483,11 @@ export class GameRenderer {
   /** Read-only handle for tests and debugging; the render loop owns everything in it. */
   get scene(): THREE.Scene { return this.built.scene; }
 
-  resources(): ResourceCounts { return resourceCounts(this.built.scene); }
+  resources(): ResourceCounts {
+    const counts = resourceCounts(this.built.scene);
+    counts.materials += this.terrain.inactiveMaterialCount;
+    return counts;
+  }
 
   private onContextLost = (event: Event) => { event.preventDefault(); this.contextLost = true; };
   private onContextRestored = () => { if (this.disposed) return; this.contextLost = false; this.renderer.resetState?.(); this.applySize(); };

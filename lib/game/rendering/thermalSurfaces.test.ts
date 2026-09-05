@@ -64,3 +64,25 @@ test("late snow textures stay unsampled at rung1, return on upgrade, and dispose
   terrain.attachSurfaceTextures(late);
   assert.equal(lateDisposals, 2);
 });
+
+test("governor transitions select prepared materials without constructing a node graph", () => {
+  const factories = staticNodeFactories();
+  let builds = 0;
+  const nodes = { ...factories, snow: { ...factories.snow, createSnowNodeMaterial: (...args: Parameters<typeof factories.snow.createSnowNodeMaterial>) => {
+    builds++;
+    return factories.snow.createSnowNodeMaterial(...args);
+  } } };
+  for (const seeded of [0, 4] as const) {
+    const scene = new THREE.Scene();
+    const terrain = new TerrainRenderer(scene, createProceduralWorld(profile, profile.seed), nodes.snow.createSnowNodeUniforms(), nodes, 0, seeded);
+    const prepared = builds;
+    assert.equal(terrain.inactiveMaterialCount, 1);
+    for (const rung of [4, 1, 4, 0, 2, 3, 1] as const) terrain.setQuality(rung);
+    assert.equal(builds, prepared, "including the first low/high transitions from either initial tier");
+    terrain.attachSurfaceTextures({ snowNormal: new THREE.Texture(), snowRoughness: new THREE.Texture() });
+    assert.equal(builds, prepared + 1, "only async attachment constructs the real-surface graph");
+    for (const rung of [4, 1, 4, 0, 2, 3, 1] as const) terrain.setQuality(rung);
+    assert.equal(builds, prepared + 1);
+    terrain.dispose();
+  }
+});

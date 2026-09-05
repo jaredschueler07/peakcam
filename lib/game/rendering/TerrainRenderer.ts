@@ -109,7 +109,7 @@ export class TerrainRenderer {
     /** Present exactly on the WebGPU path; see `nodeFactories`. */
     private readonly nodes: NodeFactories | null = null,
     private readonly snowDebug = 0,
-    /** Seeded once at renderer construction; see `attachSurfaceTextures`. */
+    /** Current effective quality, including temporary prewarm tiers. */
     private rung: QualityRung = 0,
   ) {
     this.detailNormal = buildSnowDetailNormal(world.seed);
@@ -125,6 +125,13 @@ export class TerrainRenderer {
     }
     this.material = material;
     this.variants.set(rung < 2 ? 0 : 2, material);
+    if (snowUniforms && nodes) {
+      const otherTier = rung < 2 ? 2 : 0;
+      this.variants.set(otherTier, nodes.snow.createSnowNodeMaterial(
+        this.detailNormal, snowUniforms as SnowNodeUniforms, snowDebug, null, otherTier,
+      ));
+    }
+    for (const variant of this.variants.values()) variant.userData.snowFallback = this.detailNormal;
     for (let index = 0; index < GRID_SIZE * GRID_SIZE; index += 1) {
         const mesh = new THREE.Mesh(new THREE.BufferGeometry(), material);
         mesh.receiveShadow = true;
@@ -138,20 +145,8 @@ export class TerrainRenderer {
     this.rung = rung;
     if (this.disposed || !this.nodes || !this.snowUniforms) return;
     const tier = rung < 2 ? 0 : rung >= 3 && this.surfaces ? 3 : 2;
-    let next = this.variants.get(tier);
-    if (!next) {
-      next = this.nodes.snow.createSnowNodeMaterial(
-        this.detailNormal, this.snowUniforms as SnowNodeUniforms, this.snowDebug, this.surfaces, tier as QualityRung,
-      );
-      this.variants.set(tier, next);
-    }
+    const next = this.variants.get(tier)!;
     this.material = next;
-    // Ownership metadata includes inactive textures so scene teardown finds every retained map.
-    next.userData.snowFallback = this.detailNormal;
-    if (this.surfaces) {
-      next.userData.snowSurfaceNormal = this.surfaces.snowNormal;
-      next.userData.snowSurfaceRoughness = this.surfaces.snowRoughness;
-    }
     for (const tile of this.tiles) tile.mesh.material = next;
   }
 
@@ -161,8 +156,19 @@ export class TerrainRenderer {
       return;
     }
     this.surfaces = surfaces;
+    // Texture-backed graph construction belongs to the async arrival, never a governor frame.
+    this.variants.set(3, this.nodes.snow.createSnowNodeMaterial(
+      this.detailNormal, this.snowUniforms as SnowNodeUniforms, this.snowDebug, surfaces, 3,
+    ));
+    for (const variant of this.variants.values()) {
+      variant.userData.snowFallback = this.detailNormal;
+      variant.userData.snowSurfaceNormal = surfaces.snowNormal;
+      variant.userData.snowSurfaceRoughness = surfaces.snowRoughness;
+    }
     this.setQuality(this.rung);
   }
+
+  get inactiveMaterialCount(): number { return Math.max(0, this.variants.size - 1); }
 
   /** Active material/textures belong to scene disposal; release only detached variants here. */
   disposeInactiveMaterials(audit?: { material?(): void }): void {
