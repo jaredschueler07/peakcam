@@ -156,7 +156,7 @@ export interface PostChainPolicy {
 
 /** The rung ladder from `PostProcessing.setQuality`, lifted out so it cannot drift. */
 export function postChainPolicy(rung: QualityRung, reducedMotion: boolean): PostChainPolicy {
-  return { chain: rung > 0, bloom: rung >= 3, aa: rung >= 2, chromatic: rung > 0 && !reducedMotion, ao: rung >= 3, godrays: rung >= 4 };
+  return { chain: rung > 0, bloom: rung >= 3, aa: true, chromatic: rung > 0 && !reducedMotion, ao: rung >= 3, godrays: rung >= 4 };
 }
 
 export interface PostChainUniforms {
@@ -234,6 +234,9 @@ export class NodePostProcessing {
   readonly aaInput: Vec4;
   readonly aaNode: ReturnType<typeof smaa> | ReturnType<typeof fxaa>;
   private policy = postChainPolicy(4, false);
+  private readonly scenePass: ReturnType<typeof pass>;
+  private ownedShadowStub: THREE.RenderTarget | null = null;
+  private disposed = false;
 
   constructor(
     renderer: Renderer,
@@ -242,7 +245,7 @@ export class NodePostProcessing {
     private readonly speed: { value: number },
     private readonly reducedMotion: boolean,
     /** The CSM key light — see `CsmShadowsNode.light`, the narrow accessor this reads. */
-    sunLight: THREE.DirectionalLight,
+    private readonly sunLight: THREE.DirectionalLight,
     readonly antialias: "smaa" | "fxaa" = "smaa",
   ) {
     // `renderer` is constructed with `antialias: true` (backend.ts), which without an override
@@ -258,7 +261,7 @@ export class NodePostProcessing {
     // the user actually sees.
     this.uniforms.near.value = camera.near;
     this.uniforms.far.value = camera.far;
-    const scenePass = pass(scene, camera, { samples: 0 });
+    const scenePass = this.scenePass = pass(scene, camera, { samples: 0 });
     const aberrated = aberrate(scenePass.getTextureNode(), this.uniforms);
 
     // GTAO is given depth but no normals, so it reconstructs them from depth in the shader. That is
@@ -352,7 +355,7 @@ export class NodePostProcessing {
       const stubDepthTexture = new THREE.DepthTexture(1, 1);
       stubDepthTexture.compareFunction = renderer.reversedDepthBuffer ? THREE.GreaterEqualCompare : THREE.LessEqualCompare;
       stubShadowMap.depthTexture = stubDepthTexture;
-      sunLight.shadow.map = stubShadowMap;
+      sunLight.shadow.map = this.ownedShadowStub = stubShadowMap;
     }
     this.godraysNode = godrays(scenePass.getTextureNode("depth"), camera, sunLight);
     this.godraysNode.density.value = GODRAYS_DENSITY;
@@ -420,11 +423,19 @@ export class NodePostProcessing {
       asVec4(renderOutput(node, THREE.NoToneMapping, renderer.outputColorSpace));
     let output: Vec4;
     if (antialias === "smaa") {
-      this.aaInput = asVec4(convertToTexture(shaded));
+      this.aaInput = asVec4(convertToTexture(shaded, null, null, { type: THREE.HalfFloatType, depthBuffer: false }));
       this.aaNode = smaa(this.aaInput);
+      // r185 SMAA defaults every intermediate to RGBA16F. Edge flags and blend
+      // weights are bounded [0,1], matching the reference SMAA UNORM8 buffers.
+      // Keep the colour blend/input half-float to avoid quantising the poster sky.
+      const targets = this.aaNode as unknown as {
+        _renderTargetEdges: THREE.RenderTarget; _renderTargetWeights: THREE.RenderTarget;
+      };
+      targets._renderTargetEdges.texture.type = THREE.UnsignedByteType;
+      targets._renderTargetWeights.texture.type = THREE.UnsignedByteType;
       output = encodeOnly(this.blend(this.aaInput, asVec4(this.aaNode)));
     } else {
-      this.aaInput = asVec4(convertToTexture(encodeOnly(shaded)));
+      this.aaInput = asVec4(convertToTexture(encodeOnly(shaded), null, null, { type: THREE.UnsignedByteType, depthBuffer: false }));
       this.aaNode = fxaa(this.aaInput);
       output = this.blend(this.aaInput, asVec4(this.aaNode));
     }
@@ -442,7 +453,7 @@ export class NodePostProcessing {
     this.policy = postChainPolicy(rung, this.reducedMotion);
     this.uniforms.chain.value = this.policy.chain ? 1 : 0;
     this.uniforms.bloom.value = this.policy.chain && this.policy.bloom ? 1 : 0;
-    this.uniforms.aa.value = this.policy.chain && this.policy.aa ? 1 : 0;
+    this.uniforms.aa.value = this.policy.aa ? 1 : 0;
     this.uniforms.ao.value = this.policy.chain && this.policy.ao ? 1 : 0;
     // Zeroing the uniform hides bloom but the mip chain would still render every frame; muting
     // updateBefore skips that work without touching the compiled graph. The AO buffer is the more
@@ -460,22 +471,38 @@ export class NodePostProcessing {
     // The node frame owns its own timing; the argument is kept only for arity parity with the
     // WebGL PostProcessing, whose composer.render(dt) drove effect animation.
     void deltaTime;
-    const [x, y] = this.policy.chromatic
-      ? chromaticAberrationOffset(this.speed.value, this.reducedMotion)
-      : [0, 0];
+    const [x, y] = chromaticAberrationOffset(this.speed.value, !this.policy.chromatic);
     this.uniforms.aberration.value.set(x, y);
     this.uniforms.godrays.value = this.policy.chain && this.policy.godrays ? sunFrameProximity(this.camera) : 0;
     this.pipeline.render();
   }
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
     this.pipeline.dispose();
     this.lut.dispose();
-    // RenderPipeline.dispose() only releases its own quad material — it never walks the graph — so
-    // both off-screen render targets have to be released here or every renderer re-init leaks them.
-    // `dispose()` is missing from the r185 typings for both node classes but present on both.
+    // RenderPipeline owns only its quad material, not its input graph. Delegate
+    // actual owning nodes to their r185 disposers (FXAA owns no extra targets).
+    this.scenePass.dispose();
+    (this.bloomNode as unknown as { dispose(): void }).dispose();
+    if (this.antialias === "smaa") (this.aaNode as unknown as { dispose(): void }).dispose();
     (this.aoNode as unknown as { dispose(): void }).dispose();
     (this.godraysNode as unknown as { dispose(): void }).dispose();
+    // RTTNode inherits Node.dispose(), which only emits an event in r185.
+    // Release its target/material explicitly; QuadMesh geometry is shared.
+    const input = this.aaInput as unknown as {
+      renderTarget: THREE.RenderTarget; _quadMesh: { material: THREE.Material };
+    };
+    input.renderTarget.dispose();
+    input._quadMesh.material.dispose();
+    // GTAO's disposer omits its per-instance generated noise texture.
+    (this.aoNode as unknown as { _noiseNode: { value: THREE.Texture } })._noiseNode.value.dispose();
+    if (this.ownedShadowStub) {
+      if (this.sunLight.shadow.map === this.ownedShadowStub) this.sunLight.shadow.map = null;
+      this.ownedShadowStub.dispose();
+      this.ownedShadowStub = null;
+    }
   }
 
   /** Cross-fades an optional stage in and out on the `aa` uniform without dropping it from the graph. */

@@ -48,7 +48,7 @@ test("listener updates carry the complete conditions and simulation state", () =
   audio.start();
   audio.updateListener({ speed: 22, carve: 0.6, onGround: false, liftRide: 2 }, "ice", 0.8, 100);
   assert.deepEqual(engine.listenerState, {
-    speed: 22, carve: 0.6, airborne: true, surface: "ice",
+    speed: 22, carve: 0.6, edgeAngle: 0, airborne: true, surface: "ice",
     windLevel: 0.8, liftProximity: 1,
   });
 });

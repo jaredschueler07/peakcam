@@ -60,8 +60,8 @@ function build(options?: { reducedMotion?: boolean; antialias?: "smaa" | "fxaa";
 test("the rung policy matches what PostProcessing.setQuality does today", () => {
   // PostProcessing.ts:41-46 — effectPass rung>0, chromaticPass rung>0 && !reducedMotion,
   // bloom rung>=3, smaa rung>=2. `ao` joins the table at rung 3, `godrays` at rung 4.
-  assert.deepEqual(postChainPolicy(0, false), { chain: false, bloom: false, aa: false, chromatic: false, ao: false, godrays: false });
-  assert.deepEqual(postChainPolicy(1, false), { chain: true, bloom: false, aa: false, chromatic: true, ao: false, godrays: false });
+  assert.deepEqual(postChainPolicy(0, false), { chain: false, bloom: false, aa: true, chromatic: false, ao: false, godrays: false });
+  assert.deepEqual(postChainPolicy(1, false), { chain: true, bloom: false, aa: true, chromatic: true, ao: false, godrays: false });
   assert.deepEqual(postChainPolicy(2, false), { chain: true, bloom: false, aa: true, chromatic: true, ao: false, godrays: false });
   assert.deepEqual(postChainPolicy(3, false), { chain: true, bloom: true, aa: true, chromatic: true, ao: true, godrays: false });
   assert.deepEqual(postChainPolicy(4, false), { chain: true, bloom: true, aa: true, chromatic: true, ao: true, godrays: true });
@@ -110,13 +110,13 @@ test("quality changes flip uniforms without ever rebuilding the graph", () => {
   assert.equal(post.uniforms.aa.value, 1);
 
   post.setQuality(1);
-  assert.equal(post.uniforms.aa.value, 0);
+  assert.equal(post.uniforms.aa.value, 1);
   assert.equal(post.uniforms.chain.value, 1);
 
   post.setQuality(0);
-  assert.equal(post.uniforms.chain.value, 0, "rung 0 is the raw render");
+  assert.equal(post.uniforms.chain.value, 0, "rung 0 skips grading while retaining AA");
   assert.equal(post.uniforms.bloom.value, 0);
-  assert.equal(post.uniforms.aa.value, 0);
+  assert.equal(post.uniforms.aa.value, 1);
   assert.equal(post.uniforms.ao.value, 0);
   assert.equal(post.uniforms.godrays.value, 0);
 
@@ -382,4 +382,47 @@ test("godrays get a shadow map with a comparison sampler even under CSM", () => 
       || depthTexture?.compareFunction === THREE.GreaterEqualCompare,
     `the depth texture declares a compare function so a comparison sampler is bound — got ${depthTexture?.compareFunction}`,
   );
+});
+
+ test("AA avoids depth attachments and uses bounded formats for SMAA flags and weights", () => {
+  for (const antialias of ["smaa", "fxaa"] as const) {
+    const { post } = build({ antialias });
+    const input = post.aaInput as unknown as { renderTarget: THREE.RenderTarget };
+    assert.equal(input.renderTarget.depthBuffer, false);
+    assert.equal(input.renderTarget.texture.type, antialias === "smaa" ? THREE.HalfFloatType : THREE.UnsignedByteType);
+    if (antialias === "smaa") {
+      const node = post.aaNode as unknown as { _renderTargetEdges: THREE.RenderTarget; _renderTargetWeights: THREE.RenderTarget; _renderTargetBlend: THREE.RenderTarget };
+      assert.equal(node._renderTargetEdges.texture.type, THREE.UnsignedByteType);
+      assert.equal(node._renderTargetWeights.texture.type, THREE.UnsignedByteType);
+      assert.equal(node._renderTargetBlend.texture.type, THREE.HalfFloatType, "retain smooth linear colour gradients");
+    }
+    post.dispose();
+  }
+});
+
+test("post chains release every owned target and material exactly once on remount", () => {
+  type Resource = THREE.RenderTarget | THREE.Texture | THREE.Material;
+  for (const antialias of ["smaa", "fxaa"] as const) {
+    for (let mount = 0; mount < 2; mount++) {
+      const { post, sunLight } = build({ antialias });
+      const internals = post as unknown as { scenePass: { renderTarget: THREE.RenderTarget } };
+      const input = post.aaInput as unknown as { renderTarget: THREE.RenderTarget; _quadMesh: { material: THREE.Material } };
+      const bloom = post.bloomNode as unknown as { _renderTargetBright: THREE.RenderTarget; _renderTargetsHorizontal: THREE.RenderTarget[]; _renderTargetsVertical: THREE.RenderTarget[] };
+      const ao = post.aoNode as unknown as { _aoRenderTarget: THREE.RenderTarget; _material: THREE.Material; _noiseNode: { value: THREE.Texture } };
+      const rays = post.godraysNode as unknown as { _godraysRenderTarget: THREE.RenderTarget; _material: THREE.Material };
+      const resources: Resource[] = [post.lut, internals.scenePass.renderTarget, input.renderTarget, input._quadMesh.material,
+        bloom._renderTargetBright, ...bloom._renderTargetsHorizontal, ...bloom._renderTargetsVertical,
+        ao._aoRenderTarget, ao._material, ao._noiseNode.value, rays._godraysRenderTarget, rays._material, sunLight.shadow.map!];
+      if (antialias === "smaa") {
+        const aa = post.aaNode as unknown as Record<string, Resource>;
+        for (const name of ["_renderTargetEdges", "_renderTargetWeights", "_renderTargetBlend", "_areaTexture", "_searchTexture", "_materialEdges", "_materialWeights", "_materialBlend"]) resources.push(aa[name]);
+      }
+      const counts = resources.map(resource => {
+        const counter = { value: 0 }; resource.addEventListener("dispose", () => counter.value++); return counter;
+      });
+      post.dispose(); post.dispose();
+      assert.ok(counts.every(counter => counter.value === 1), `${antialias} mount ${mount}: ${counts.map(counter => counter.value)}`);
+      assert.equal(sunLight.shadow.map, null, "a later chain must allocate a fresh owned stub");
+    }
+  }
 });

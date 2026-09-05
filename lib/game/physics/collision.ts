@@ -6,6 +6,7 @@ import { trailCenter } from "../terrain/trails";
 import { nearestPointOnRun } from "../terrain/real-course";
 import { GATE_SPACING } from "./constants";
 
+const runPointScratch = { distance: 0, progressM: 0, x: 0, z: 0 };
 const forwardScratch: Vec3 = { x: 0, y: 0, z: 0 };
 const flatScratch: Vec3 = { x: 0, y: 0, z: 0 };
 const nearestScratch = { i: 0, t: null!, d: 0, dx: 0, on: false };
@@ -113,7 +114,7 @@ function distanceToMovementSegment(state: SimulationState, x: number, z: number)
 function checkRealGates(state: SimulationState, world: SimulationWorld): void {
   const run = world.terrain.realRuns?.[state.selectedTrail];
   if (!run) return;
-  const hit = nearestPointOnRun(run, state.pos.x, state.pos.z);
+  const hit = nearestPointOnRun(run, state.pos.x, state.pos.z, runPointScratch);
   const previous = state.courseProgress;
   state.prevCourseProgress = previous;
   state.courseProgress = hit.progressM;

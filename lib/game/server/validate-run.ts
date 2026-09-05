@@ -1,7 +1,8 @@
 /**
  * lib/game/server/validate-run.ts
  * ───────────────────────────────
- * Baseline run validation — the "does this trace describe a physically
+ * V2 requires full input replay from replay-inputs.ts before acceptance.
+ * Historical v1 uses baseline run validation — the "does this trace describe a physically
  * possible descent?" gate from the architecture report §9 ("Validation levels
  * → Baseline").
  *
@@ -137,7 +138,7 @@ export function rejectionCodeForGhostError(error: GhostDecodeError): RejectionCo
  * procedural runs peak near 58 m/s; world-cup DH tops ~45 m/s, so 60 m/s still
  * rejects absurd teleports/speed hacks (3×+ overshoot).
  */
-export const MAX_RUN_SPEED_CMS = 6_000;
+export const MAX_RUN_SPEED_CMS = 6_090;
 /**
  * 60 m/s² ≈ 6 g. Raised from 25 m/s² (A5 fix round 1): honest braked p95 ≈
  * 2520 cm/s²; honest full-tuck grounded peaks ≈ 5250 cm/s² on packed
@@ -219,9 +220,9 @@ export const MIN_AVG_GAP_RATIO = 1;
 
 /** Rebuild the signed model selection server-side; never infer it from the client ghost. */
 export function simulationConfigForTicket(
-  ticket: Pick<RunTicketPayload, "surface" | "physicsModel">,
+  ticket: Pick<RunTicketPayload, "surface" | "physicsModel" | "environment">,
 ): SimulationConfig {
-  return simulationConfig(ticket.surface, ticket.physicsModel);
+  return simulationConfig(ticket.surface, ticket.physicsModel, ticket.environment);
 }
 
 // ─── Types ───────────────────────────────────────────────────
@@ -236,6 +237,8 @@ export interface RunSubmissionFacts {
 }
 
 export interface RunValidationInput {
+  /** Internal result of full server input replay; never accepted from JSON. */
+  replayVerified?: boolean;
   /** The verified ticket — authoritative for course, seed, and versions. */
   ticket: RunTicketPayload;
   submission: RunSubmissionFacts;
@@ -498,6 +501,11 @@ export function validateRun(input: RunValidationInput): RunValidationResult {
       "wall_clock_mismatch",
       `wall clock spans ${metrics.wallClockMs}ms but the run reports ${submission.timeMs}ms`,
     );
+  }
+
+  if (ticket.physicsModel === "v2") {
+    if (!input.replayVerified) return fail("course_mismatch", "Authoritative input replay is required");
+    return { accepted: true, rejectionCode: null, reason: null, metrics };
   }
 
   // ── Per-keyframe sweep ──

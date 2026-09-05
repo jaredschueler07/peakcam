@@ -60,6 +60,15 @@ export default function ModeSelect({
               aria-checked={active}
               data-mode={card.mode}
               onClick={() => onSelect(card.mode)}
+              tabIndex={active ? 0 : -1}
+              onKeyDown={(event) => {
+                const direction = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+                if (!direction) return;
+                event.preventDefault();
+                const next = CARDS[(CARDS.indexOf(card) + direction + CARDS.length) % CARDS.length];
+                onSelect(next.mode);
+                event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`[data-mode="${next.mode}"]`)?.focus();
+              }}
               className={[
                 "rounded-lg border-[1.5px] border-ink px-4 py-3 text-left transition-transform",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink",

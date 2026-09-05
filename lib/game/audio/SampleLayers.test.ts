@@ -225,3 +225,20 @@ test("the decoded buffer is kept for playback", async () => {
   const source = ctx.nodesOfKind("bufferSource").at(-1) as unknown as { buffer: unknown };
   assert.equal(source.buffer, buffer);
 });
+
+test("continuous levels fade existing loops without creating new sources", async () => {
+  const { ctx, layers } = setup();
+  await layers.loadLayers(MANIFEST, fakeFetch());
+  layers.setLayerLevel("wind-alpine", 0, true);
+  layers.play("wind-alpine");
+  const count = ctx.nodesOfKind("bufferSource").length;
+  const gain = (ctx.nodesOfKind("gain") as FakeGainNode[])[0].gain;
+  assert.equal(gain.value, 0);
+  layers.setLayerLevel("wind-alpine", 0.5);
+  assert.equal(gain.scheduled, 0.4);
+  layers.setLayerLevel("wind-alpine", 100);
+  assert.equal(gain.scheduled, 0.8);
+  layers.setLayerLevel("wind-alpine", -1);
+  assert.equal(gain.scheduled, 0);
+  assert.equal(ctx.nodesOfKind("bufferSource").length, count);
+});

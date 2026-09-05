@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState } from "react";
+import { useDialogFocus } from "./useDialogFocus";
 import { useStore } from "zustand";
 import type { StoreApi } from "zustand/vanilla";
 
@@ -28,6 +29,7 @@ export interface ResultsCompetition {
   mode: CompetitiveRunMode;
   resortSlug: string;
   trailId: string;
+  conditionsDate?: string;
   /** Consumes the runtime's recording; called once per results screen. */
   takeRecording(): FinishedRunRecording | null;
   onRaceGhost(ghost: DecodedGhost, runId: string): void;
@@ -53,12 +55,15 @@ export default function ResultsDialog({
   store,
   onRestart,
   competition = null,
+  conditionsLabel,
 }: {
   store: StoreApi<HudState>;
   onRestart(): void;
   competition?: ResultsCompetition | null;
+  conditionsLabel?: string;
 }) {
   const show = useStore(store, (state) => state.status === "results");
+  const runName = useStore(store, (state) => state.trailName);
   const score = useStore(store, (state) => state.score);
   const time = useStore(store, (state) => state.elapsedSeconds);
   const [open, setOpen] = useState<OpenRun | null>(null);
@@ -98,6 +103,8 @@ export default function ResultsDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show]);
 
+  const dialogRef = useDialogFocus(show && !dismissed);
+
   if (!show || dismissed) return null;
 
   const outcome = resultsOutcome({
@@ -111,6 +118,8 @@ export default function ResultsDialog({
 
   return (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
       className="absolute inset-0 z-30 flex items-center justify-center bg-ink/60 p-6"
       role="dialog"
       aria-modal="true"
@@ -119,7 +128,8 @@ export default function ResultsDialog({
     >
       <div className="pc-paper max-h-full w-full max-w-md overflow-y-auto rounded-lg border-[1.5px] border-ink p-6 text-center shadow-stamp-lg">
         <p className="pc-eyebrow">Run complete</p>
-        <h2 id="results-title" className="pc-display text-4xl">Your line</h2>
+        <h2 id="results-title" className="pc-display text-4xl">{runName}</h2>
+        {conditionsLabel && <p className="mt-2 text-sm text-bark-dk">{conditionsLabel}</p>}
         <p className="mt-3 font-mono">{score.toLocaleString()} pts · {time.toFixed(1)}s</p>
 
         {/* Outcome 1 — submitted. Rendered from the response we hold, never
@@ -168,6 +178,7 @@ export default function ResultsDialog({
             resortSlug={competition.resortSlug}
             mode={competition.mode}
             trailId={competition.trailId}
+            conditionsDate={competition.conditionsDate}
             highlightRunId={submitted?.accepted ? submitted.runId : null}
             onRaceGhost={competition.onRaceGhost}
             racedRunId={competition.racedRunId}

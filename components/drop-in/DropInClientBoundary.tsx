@@ -4,6 +4,8 @@ import dynamic from "next/dynamic";
 import type { ResortGameProfile } from "@/lib/game/config/schema";
 import type { ConditionsSnapshot } from "@/lib/game/conditions";
 
+import type { CourseChoice } from "@/lib/game/config/course-choices";
+
 const DropInGame = dynamic(() => import("./DropInGame"), {
   ssr: false,
   loading: () => (
@@ -13,9 +15,10 @@ const DropInGame = dynamic(() => import("./DropInGame"), {
   ),
 });
 
-export default function DropInClientBoundary({ profile, conditions }: {
+export default function DropInClientBoundary({ profile, conditions, courseChoices }: {
   profile: ResortGameProfile;
   conditions: ConditionsSnapshot;
+  courseChoices: readonly CourseChoice[];
 }) {
-  return <DropInGame profile={profile} conditions={conditions} />;
+  return <DropInGame profile={profile} conditions={conditions} courseChoices={courseChoices} />;
 }

@@ -1,3 +1,4 @@
+import { installE2eDebug } from "./e2e-debug";
 import * as THREE from "three";
 import type { ResortGameProfile } from "../config/schema";
 import { GameRuntime, type RuntimeAnalytics } from "./GameRuntime";
@@ -16,6 +17,7 @@ import type { ConditionsSnapshot } from "../conditions";
 import type { PhysicsModel } from "../core/config";
 import type { RuntimeAudio } from "./RuntimeAudio";
 import { createRendererBackend, resolveBackendKind } from "../rendering/backend";
+import type { NodeFactories } from "../rendering/nodeFactories";
 import { loadNodeFactories } from "../rendering/nodeFactories";
 import type { RendererBackend } from "../rendering/Renderer";
 import { loadSurfaceTextures, type SurfaceTextures } from "../rendering/surfaceTextures";
@@ -36,6 +38,8 @@ interface RuntimeSurfaceTexturesConsumer {
 }
 
 export interface CreateGameOptions {
+  trailId?: string;
+  mode?: "free_ski" | "time_trial" | "score_attack";
   canvas: HTMLCanvasElement;
   profile: ResortGameProfile;
   uiBridge: UiBridge;
@@ -82,26 +86,79 @@ export async function loadTerrainForRuntime(
   }
 }
 
+/** Parallel startup ownership: a late backend is released after cancellation or a peer failure. */
+export async function loadStartupResources(
+  loadTerrain: (signal: AbortSignal) => Promise<TerrainSource>,
+  createBackend: () => Promise<RendererBackend | undefined>,
+  createNodes: () => Promise<NodeFactories>,
+  signal?: AbortSignal,
+): Promise<{ source: TerrainSource; backend: RendererBackend | undefined; nodeFactories: NodeFactories | null }> {
+  const controller = new AbortController();
+  const relayAbort = () => controller.abort(signal?.reason);
+  if (signal?.aborted) relayAbort(); else signal?.addEventListener("abort", relayAbort, { once: true });
+  let backend: RendererBackend | undefined, released = false;
+  const release = () => { if (backend && !released) { released = true; backend.dispose(); } };
+  let rejectAbort: (reason: unknown) => void = () => {};
+  const onAbort = () => { release(); rejectAbort(controller.signal.reason); };
+  controller.signal.addEventListener("abort", onAbort, { once: true });
+  try {
+    controller.signal.throwIfAborted();
+    const aborted = new Promise<never>((_resolve, reject) => { rejectAbort = reject; });
+    const terrainPromise = Promise.resolve().then(() => { controller.signal.throwIfAborted(); return loadTerrain(controller.signal); });
+    const rendererPromise = Promise.resolve().then(() => { controller.signal.throwIfAborted(); return createBackend(); }).then(async value => {
+      backend = value;
+      if (controller.signal.aborted) { release(); controller.signal.throwIfAborted(); }
+      const nodeFactories = backend?.backendKind === "webgpu" ? await createNodes() : null;
+      controller.signal.throwIfAborted();
+      return nodeFactories;
+    });
+    const [source, nodeFactories] = await Promise.race([Promise.all([terrainPromise, rendererPromise]), aborted]);
+    controller.signal.throwIfAborted();
+    return { source, backend, nodeFactories };
+  } catch (reason) {
+    controller.abort(reason); release(); throw reason;
+  } finally {
+    signal?.removeEventListener("abort", relayAbort);
+    // A non-cancellable GPU init that returns later still checks the aborted
+    // controller in rendererPromise and releases its own late backend.
+    controller.signal.removeEventListener("abort", onAbort);
+  }
+}
+
 export async function createGame(options: CreateGameOptions): Promise<GameRuntime> {
   void THREE.REVISION;
   const startedAt = performance.now();
-  const source = await loadTerrainForRuntime(
-    options.profile, options.uiBridge, options.analytics, new TerrainAssetLoader(), options.signal,
+  let assetLoadMs = 0;
+  const { source, backend, nodeFactories } = await loadStartupResources(
+    async signal => {
+      const source = await loadTerrainForRuntime(options.profile, options.uiBridge, options.analytics, new TerrainAssetLoader(), signal);
+      assetLoadMs = performance.now() - startedAt;
+      return source;
+    },
+    () => selectRendererBackend(options.canvas), loadNodeFactories, options.signal,
   );
-  const assetLoadMs = performance.now() - startedAt;
-  const backend = await selectRendererBackend(options.canvas);
-  // The node materials and the 2.1 MB `three/webgpu` behind them are a separate chunk; fetch it
-  // only once this session is known to have actually got a WebGPU device, not merely asked for one.
-  const nodeFactories = backend?.backendKind === "webgpu" ? await loadNodeFactories() : null;
-  const runtime = new GameRuntime(
-    options.canvas, options.profile, options.uiBridge, options.analytics, source.sampler,
-    options.conditions, options.physicsModel, options.audio, assetLoadMs, options.seed, options.spawnArcM, backend,
-    nodeFactories,
-  );
-  void runtime.startWhenWarm();
-  void attachFarFieldWhenReady(runtime, options);
-  void attachSurfaceTexturesWhenReady(runtime, backend);
-  return runtime;
+  let runtime: GameRuntime | undefined;
+  const abortRuntime = () => runtime?.dispose();
+  try {
+    options.signal?.throwIfAborted();
+    runtime = new GameRuntime(
+      options.canvas, options.profile, options.uiBridge, options.analytics, source.sampler,
+      options.conditions, options.physicsModel, options.audio, assetLoadMs, options.seed, options.spawnArcM, backend,
+      nodeFactories, options.trailId, options.mode,
+    );
+    options.signal?.addEventListener("abort", abortRuntime, { once: true });
+    const cleanup = installE2eDebug(window as Window & { __dropInDebug?: import("./e2e-debug").DropInDebugApi }, location.search, () => runtime!.createDebugApi());
+    if (cleanup) runtime.setDebugCleanup(cleanup);
+    void attachFarFieldWhenReady(runtime, options);
+    runtime.setSurfaceTextureLoader(() => { void attachSurfaceTexturesWhenReady(runtime!, backend); });
+    // Preserve the shader readiness gate; parallel I/O must never report ready early.
+    await runtime.startWhenWarm();
+    options.signal?.throwIfAborted();
+    return runtime;
+  } catch (reason) {
+    if (runtime) runtime.dispose(); else backend?.dispose();
+    throw reason;
+  } finally { options.signal?.removeEventListener("abort", abortRuntime); }
 }
 
 /**
@@ -134,11 +191,8 @@ export async function attachFarFieldWhenReady(
  * untouched — `loadSurfaceTextures` already returns `null` rather than throwing, and the extra
  * try/catch here is defence in depth against `createGameTextureLoader` itself misbehaving.
  *
- * Gated twice before a single byte is fetched: WebGPU only (`GameTextureLoader` needs a KTX2-
- * capable backend, and `SnowNodeMaterial` only wires the real surface into the WebGPU node
- * path), and rung 3+ (`runtime.rung`, seeded once at construction like every other quality-ladder
- * setting) — a low-end device that will never render the real surface has no reason to spend the
- * bandwidth fetching it.
+ * Requested once when live quality first reaches rung3; low-rung sessions defer the
+ * download. A downshift during the load retains the maps without sampling them.
  */
 export async function attachSurfaceTexturesWhenReady(
   runtime: RuntimeSurfaceTexturesConsumer,

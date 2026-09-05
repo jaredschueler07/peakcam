@@ -45,7 +45,7 @@ test("createSnowNodeUniforms seeds the same defaults SceneFactory used for the G
 test("snow node material carries poster uniforms and triplanar detail", () => {
   const uniforms = createSnowNodeUniforms();
   const detail = buildSnowDetailNormal(7);
-  const material = createSnowNodeMaterial(detail, uniforms);
+  const material = createSnowNodeMaterial(detail, uniforms, 0, null, 2);
 
   assert.equal(material.isNodeMaterial, true);
   assert.ok(material instanceof MeshStandardNodeMaterial, "Task 6 can drop it in where MeshStandardMaterial was");
@@ -61,7 +61,7 @@ test("snow node material carries poster uniforms and triplanar detail", () => {
 test("the node graphs reach the detail texture and every snow uniform", () => {
   const uniforms = createSnowNodeUniforms();
   const detail = buildSnowDetailNormal(5);
-  const material = createSnowNodeMaterial(detail, uniforms);
+  const material = createSnowNodeMaterial(detail, uniforms, 0, null, 2);
 
   const normalNodes = collectNodes(material.normalNode);
   const sampled = [...normalNodes].filter((node) => (node as { value?: unknown }).value === detail);
@@ -100,7 +100,7 @@ test("real snow maps replace the procedural detail only at rung 3 and above", ()
   for (const rung of [0, 1, 2] as const) {
     const material = createSnowNodeMaterial(procedural, createSnowNodeUniforms(), 0, surfaces, rung);
     const normalNodes = collectNodes(material.normalNode);
-    assert.equal([...normalNodes].filter((node) => (node as { value?: unknown }).value === procedural).length, 6);
+    assert.equal([...normalNodes].filter((node) => (node as { value?: unknown }).value === procedural).length, rung < 2 ? 0 : 6);
     assert.equal([...normalNodes].some((node) => (node as { value?: unknown }).value === surfaces.snowNormal), false);
     assert.equal(material.roughnessNode, null, `rung ${rung} keeps today's scalar roughness`);
   }
