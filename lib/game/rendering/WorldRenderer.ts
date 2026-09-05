@@ -128,6 +128,7 @@ export class WorldRenderer {
   private readonly landmarks: THREE.Group | null;
   private readonly trailSigns: TrailSigns | null;
   private propX = Infinity; private propZ = Infinity; private furnitureZ = Infinity; private furnitureTimer = 0;
+  private markerTileX = Infinity; private markerTileZ = Infinity;
 
   constructor(private readonly scene: THREE.Scene, private readonly profile: ResortGameProfile, private readonly world: SimulationWorld) {
     const treeGeometry = createForestGeometry(profile.slug === "heavenly");
@@ -235,9 +236,13 @@ export class WorldRenderer {
     this.updateLandmarks(state.pos.x, state.pos.z);
     this.updateProps(state.pos.x, state.pos.z);
     this.furnitureTimer -= dt;
-    if (this.furnitureTimer <= 0 || Math.abs(state.pos.z - this.furnitureZ) > 60) {
+    const markerTileX = Math.floor(state.pos.x / TILE_SIZE), markerTileZ = Math.floor(state.pos.z / TILE_SIZE);
+    const markerWindowChanged = this.world.terrain.kind === "real" &&
+      (markerTileX !== this.markerTileX || markerTileZ !== this.markerTileZ);
+    if (this.furnitureTimer <= 0 || Math.abs(state.pos.z - this.furnitureZ) > 60 || markerWindowChanged) {
       this.furnitureTimer = 0.25; this.furnitureZ = state.pos.z;
-      this.updateMarkers(state.pos.z); this.updateGates(state); this.updateRamps(state);
+      this.markerTileX = markerTileX; this.markerTileZ = markerTileZ;
+      this.updateMarkers(state.pos.x, state.pos.z); this.updateGates(state); this.updateRamps(state);
     }
     if (this.realLiftRenderer) this.realLiftRenderer.update(state);
     else this.updateLift(state.pos.z, state.time);
@@ -275,24 +280,30 @@ export class WorldRenderer {
     this.tree.count = trees; this.rock.count = rocks; this.tree.instanceMatrix.needsUpdate = this.rock.instanceMatrix.needsUpdate = true;
   }
 
-  private updateMarkers(playerZ: number) {
+  private updateMarkers(playerX: number, playerZ: number) {
     if (this.world.terrain.kind === "real" && this.world.terrain.realRuns) {
       let count = 0;
+      const cx = Math.floor(playerX / TILE_SIZE), cz = Math.floor(playerZ / TILE_SIZE);
+      const minimumX = (cx - GRID_HALF) * TILE_SIZE, maximumX = (cx + GRID_HALF + 1) * TILE_SIZE;
+      const minimumZ = (cz - Z_TILES_BEHIND) * TILE_SIZE, maximumZ = (cz + GRID_SIZE - Z_TILES_BEHIND) * TILE_SIZE;
       const total = this.world.terrain.realRuns.reduce((sum, run) => sum + run.lengthM, 0);
       const spacing = Math.max(20, total / 220);
       for (const run of this.world.terrain.realRuns) {
-        for (let distanceM = 0; distanceM <= run.lengthM && count + 1 < 460; distanceM += spacing) {
+        for (let distanceM = 0; distanceM <= run.lengthM && count < 460; distanceM += spacing) {
           const point = pointAtArcLength(run.points, distanceM, arcScratch);
           for (const side of [-1, 1]) {
             const x = point.x + Math.cos(point.heading) * side * run.halfWidthM;
             const z = point.z - Math.sin(point.heading) * side * run.halfWidthM;
+            // Cull before consuming capacity: earlier distant runs must never
+            // starve a later run beside the skier. Arc spacing stays canonical.
+            if (x < minimumX || x > maximumX || z < minimumZ || z > maximumZ || count >= 460) continue;
             quaternion.setFromAxisAngle(axisZ, Math.sin(distanceM * 0.3) * 0.09);
             matrix.compose(position.set(x, this.world.terrain.height(x, z), z), quaternion, scale.set(1, 1, 1));
             this.markers.setMatrixAt(count++, matrix);
           }
         }
       }
-      this.markers.count = count; this.markers.instanceMatrix.needsUpdate = true;
+      this.markers.count = count; this.markers.visible = count > 0; this.markers.instanceMatrix.needsUpdate = true;
       return;
     }
     let count = 0;
