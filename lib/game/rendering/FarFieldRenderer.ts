@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { DecodedFarField } from "../terrain/far-field-format";
+import { GRID_HALF, GRID_SIZE, TILE_SIZE, Z_TILES_BEHIND } from "./nearFieldReach";
 import type { NodeFactories } from "./nodeFactories";
 
 /**
@@ -96,6 +97,7 @@ export class FarFieldRenderer {
   /** Per-wedge visibility from the last `update()`; a scratch, not a fresh array. */
   readonly visibility: Uint8Array;
 
+  readonly nearBounds = new THREE.Vector4(0, 0, 0, 0);
   private readonly meshes: THREE.Mesh[] = [];
   private visible = 0;
   private disposed = false;
@@ -106,7 +108,7 @@ export class FarFieldRenderer {
     private readonly opts: FarFieldOptions,
   ) {
     this.material = opts.nodes
-      ? opts.nodes.snow.createFarFieldNodeMaterial(new THREE.Color(FAR_FIELD_COLOR))
+      ? opts.nodes.snow.createFarFieldNodeMaterial(new THREE.Color(FAR_FIELD_COLOR), this.nearBounds)
       : new THREE.MeshStandardMaterial({
         color: FAR_FIELD_COLOR, roughness: 1, metalness: 0, flatShading: false, dithering: true,
         // See createFarFieldNodeMaterial: the far field underlies the near-field tiles from
@@ -114,6 +116,21 @@ export class FarFieldRenderer {
         polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
       });
     opts.configureMaterial?.(this.material);
+    if (!opts.nodes) {
+      const material = this.material as THREE.MeshStandardMaterial;
+      const previous = material.onBeforeCompile;
+      const previousKey = material.customProgramCacheKey.bind(material);
+      const key = previousKey();
+      material.customProgramCacheKey = () => `${key}:streamed-terrain-cutout-v3`;
+      material.onBeforeCompile = (shader, renderer) => {
+        previous.call(material, shader, renderer);
+        shader.uniforms.uNearBounds = { value: this.nearBounds };
+        shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nvarying vec2 vFarXZ;")
+          .replace("#include <worldpos_vertex>", "#include <worldpos_vertex>\nvFarXZ=(modelMatrix*vec4(transformed,1.)).xz;");
+        shader.fragmentShader = shader.fragmentShader.replace("#include <common>", "#include <common>\nuniform vec4 uNearBounds; varying vec2 vFarXZ;")
+          .replace("#include <clipping_planes_fragment>", "#include <clipping_planes_fragment>\nif(vFarXZ.x>uNearBounds.x&&vFarXZ.y>uNearBounds.y&&vFarXZ.x<uNearBounds.z&&vFarXZ.y<uNearBounds.w)discard;");
+      };
+    }
 
     this.visibility = new Uint8Array(asset.wedges.length);
 
@@ -164,7 +181,14 @@ export class FarFieldRenderer {
    * A wedge's box spans its azimuth sector from the inner rim to 30 km, so sectors behind the
    * camera fail the test outright — which is where the ~4-of-16 draw estimate comes from.
    */
-  update(cameraPosition: THREE.Vector3, frustum: THREE.Frustum): void {
+  update(cameraPosition: THREE.Vector3, frustum: THREE.Frustum, player?: { x: number; z: number }): void {
+    if (player) {
+      // Coarse far-field triangles can sit metres above the edited DEM. Depth
+      // bias cannot fix that: remove them exactly where streamed tiles exist.
+      const x = Math.floor(player.x / TILE_SIZE), z = Math.floor(player.z / TILE_SIZE);
+      this.nearBounds.set((x-GRID_HALF)*TILE_SIZE+1, (z-Z_TILES_BEHIND)*TILE_SIZE+1,
+        (x+GRID_HALF+1)*TILE_SIZE-1, (z-Z_TILES_BEHIND+GRID_SIZE)*TILE_SIZE-1);
+    }
     void cameraPosition; // The boxes are world-space; the frustum already carries the camera.
     let visible = 0;
     for (let i = 0; i < this.meshes.length; i += 1) {

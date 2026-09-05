@@ -114,6 +114,8 @@ export class SkierRenderer {
         this.armL.rotation.x = this.armR.rotation.x = -0.9;
       }
     }
-    this.root.visible = state.liftIndex >= 0 || state.invuln <= 0 || Math.floor(state.invuln * 12) % 2 === 0;
+    // Spawn/recovery immunity belongs to collision handling. Hiding the whole
+    // skier made the first750ms capture and active turns randomly disappear.
+    this.root.visible = true;
   }
 }

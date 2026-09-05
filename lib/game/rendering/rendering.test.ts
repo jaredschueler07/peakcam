@@ -1030,3 +1030,25 @@ test("cycling weather mid-run re-derives the physical sky's parameters, not just
   weather.apply(0);
   assert.equal(sky.turbidity.value, clear.turbidity, "cycling back to the same preset reproduces the same parameters");
 });
+
+test("far field cuts out the exact streamed tile footprint as the skier changes tiles", () => {
+  const far = new FarFieldRenderer(new THREE.Scene(), farFieldAsset(), { nodes: staticNodeFactories() });
+  const frustum = new THREE.Frustum();
+  far.update(new THREE.Vector3(), frustum, { x: 210, z: -10 });
+  assert.deepEqual(far.nearBounds.toArray(), [-199, -399, 799, 599]);
+  assert.ok((far.material as unknown as { maskNode: unknown }).maskNode);
+  far.update(new THREE.Vector3(), frustum, { x: -1, z: 201 });
+  assert.deepEqual(far.nearBounds.toArray(), [-599, 1, 399, 999]);
+  far.dispose();
+});
+
+
+test("spawn immunity never makes the player's skier disappear", () => {
+  const world = createProceduralWorld(DROP_IN_GAME_PROFILES.breckenridge, 42);
+  const state = createSimulation(world.profile, world.seed, world.terrain);
+  const skier = new SkierRenderer(new THREE.Scene());
+  for (const immunity of [1, 0.9, 0.75, 0.4, 0]) {
+    state.invuln = immunity; skier.update(state, world.terrain, 1 / 60);
+    assert.equal(skier.root.visible, true);
+  }
+});

@@ -185,9 +185,14 @@ export function createSnowNodeMaterial(
  * near/far seam matches; `userData.heightFog` is left unset for the same reason on the WebGL
  * twin. Shadows are irrelevant out here — the cascade's `maxFar` is 460 m.
  */
-export function createFarFieldNodeMaterial(color: THREE.Color): MeshStandardNodeMaterial {
+export function createFarFieldNodeMaterial(color: THREE.Color, nearBounds?: THREE.Vector4): MeshStandardNodeMaterial {
   const material = new MeshStandardNodeMaterial();
   material.color = color;
+  if (nearBounds) {
+    const bounds = uniform(nearBounds);
+    material.maskNode = positionWorld.x.lessThanEqual(bounds.x).or(positionWorld.z.lessThanEqual(bounds.y))
+      .or(positionWorld.x.greaterThanEqual(bounds.z)).or(positionWorld.z.greaterThanEqual(bounds.w));
+  }
   material.roughness = 1;
   material.metalness = 0;
   material.flatShading = false;

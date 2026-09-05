@@ -420,7 +420,7 @@ export class GameRenderer {
       this.built.camera.updateMatrixWorld();
       this.farFieldMatrix.multiplyMatrices(this.built.camera.projectionMatrix, this.built.camera.matrixWorldInverse);
       this.farFieldFrustum.setFromProjectionMatrix(this.farFieldMatrix);
-      this.farField.update(this.built.camera.position, this.farFieldFrustum);
+      this.farField.update(this.built.camera.position, this.farFieldFrustum, state.pos);
     }
     this.effects.update(state, this.built.camera, dt, this.weather.current.snow, this.weather.current.wind);
     this.built.atmosphereUniforms.referenceHeight.value = state.pos.y;
