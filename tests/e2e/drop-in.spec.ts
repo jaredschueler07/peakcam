@@ -652,3 +652,44 @@ test("game dialogs keep keyboard focus inside and mode radios support arrows", a
   await expect(resume).toBeVisible();
   await resume.click();
 });
+
+test.describe("steering direction", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+  for (const control of ["ArrowLeft", "ArrowRight", "a", "d", "touch-left", "touch-right"]) {
+    test(`${control} turns toward the requested side of the chase view`, async ({ page }) => {
+      const direction = ["ArrowLeft", "a", "touch-left"].includes(control) ? -1 : 1;
+      const errors: string[] = [];
+      page.on("pageerror", error => errors.push(error.message));
+      await page.goto(dropInUrl("/resorts/breckenridge/drop-in?e2edebug=1"));
+      await page.getByRole("button", { name: /start descent/i }).click();
+      await expect(page.locator("[data-drop-in-state='running']")).toBeVisible();
+      const snapshot = () => page.evaluate(() => (window as Window & {
+        __dropInDebug?: { snapshot(): { yaw: number; debugMutated: boolean; backend: string } };
+      }).__dropInDebug!.snapshot());
+      const before = await snapshot();
+      if (control.startsWith("touch")) {
+        const cdp = await page.context().newCDPSession(page);
+        const pad = await page.getByText("Drag to carve", { exact: true }).boundingBox();
+        expect(pad).not.toBeNull();
+        const origin = { x: pad!.x + pad!.width / 2, y: pad!.y + pad!.height / 2, id: 1 };
+        await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [origin] });
+        await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ ...origin, x: origin.x + direction * 64 }] });
+        await page.waitForTimeout(200);
+        await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+        await cdp.detach();
+      } else {
+        await page.keyboard.down(control);
+        await page.waitForTimeout(200);
+        await page.keyboard.up(control);
+      }
+      const after = await snapshot();
+      // Camera-right = (-cos(yaw), 0, sin(yaw)); dot the heading change with it.
+      const visibleTurn = -Math.sin(after.yaw - before.yaw);
+      expect(visibleTurn * direction).toBeGreaterThan(0.05);
+      expect(after.debugMutated).toBe(false);
+      expect(after.backend).toBe(test.info().project.name === "chromium-webgpu" ? "webgpu" : "webgl");
+      expect(errors).toEqual([]);
+      await page.screenshot({ path: test.info().outputPath(`${control}.png`) });
+    });
+  }
+});

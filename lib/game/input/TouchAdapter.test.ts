@@ -47,14 +47,14 @@ for (const order of ["tuck-first", "steer-first"] as const) {
       f.event("pointermove", 1, 132);
       const frame = f.input.nextFrame();
       assert.equal(frame.tuck, 1);
-      assert.ok(Math.abs(frame.steer - (0.5 - 0.12) / 0.88) < 1e-12);
+      assert.ok(Math.abs(frame.steer + (0.5 - 0.12) / 0.88) < 1e-12);
       assert.deepEqual(f.captures, [1], "parent never takes the button's pointer capture");
       f.event("pointermove", 2, 180, true);
       f.event("pointerup", 2, 180, true);
       assert.equal(f.input.nextFrame().steer, frame.steer);
       f.adapter.setAction("tuck", false);
       f.event("pointermove", 1, 36);
-      assert.equal(f.input.nextFrame().steer, -1);
+      assert.equal(f.input.nextFrame().steer, 1);
       f.event("pointerup", 1, 36);
       assert.equal(f.input.nextFrame().steer, 0);
       assert.equal(f.captured.size, 0);
@@ -70,7 +70,7 @@ test("additional steering pointers cannot steal capture; cancel, clear and dispo
     f.event("pointermove", 3, 144);
     assert.equal(f.input.nextFrame().steer, 0);
     f.event("pointermove", 1, 164);
-    assert.equal(f.input.nextFrame().steer, 1);
+    assert.equal(f.input.nextFrame().steer, -1);
     f.event("pointercancel", 1, 164);
     assert.equal(f.input.nextFrame().steer, 0);
     assert.equal(f.captured.size, 0);
