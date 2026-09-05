@@ -46,7 +46,7 @@ test("runtime terrain loading reports analytics and falls back to the parity sam
   }
 });
 
-test("the loaded runtime scene drapes and bounds Portillo landmarks against its moving terrain window", async () => {
+test("the loaded scene streams the sourced hotel while retaining far-field lake support", async () => {
   const profile = DROP_IN_GAME_PROFILES["ski-portillo"];
   const bridge = new UiBridge(profile);
   const source = await loadTerrainForRuntime(profile, bridge, {
@@ -64,15 +64,16 @@ test("the loaded runtime scene drapes and bounds Portillo landmarks against its 
   assert.ok(landmarks instanceof THREE.Group);
   const hotel = landmarks.children.find((child) => child.name === "portillo-hotel");
   const lake = landmarks.children.find((child) => child.name === "portillo-lake");
-  assert.ok(hotel instanceof THREE.Mesh && hotel.geometry instanceof THREE.BoxGeometry);
-  assert.ok(lake instanceof THREE.Mesh && lake.geometry instanceof THREE.PlaneGeometry);
+  assert.ok(hotel instanceof THREE.Group);
+  assert.ok(lake instanceof THREE.Mesh && lake.geometry instanceof THREE.ShapeGeometry);
   assert.ok(Math.abs(hotel.position.y - source.sampler.height(hotel.position.x, hotel.position.z)) <= 0.5);
-  assert.ok(hotel.geometry.parameters.width <= 60, "hotel silhouette must not clip into a viewport wedge");
+  assert.ok(hotel.userData.terrainFootprint.halfX * 2 <= 110, "hotel bounds follow the sourced footprint");
   assert.equal(hotel.visible, false, "hotel must hide while its supporting terrain tile is absent");
-  assert.equal(lake.visible, false, "lake must hide while its supporting terrain tile is absent");
+  assert.equal(lake.userData.farFieldSupported, true);
+  assert.equal(lake.visible, true, "lake remains supported by the baked far field beyond streamed tiles");
 
-  state.pos.x = -300;
-  state.pos.z = -700;
+  state.pos.x = hotel.position.x;
+  state.pos.z = hotel.position.z;
   renderer.update(state, 0);
   assert.equal(hotel.visible, true, "grounded hotel appears once its terrain is in the streaming window");
 });
@@ -262,4 +263,70 @@ test("missing or failed surface textures leave the run untouched", async () => {
     async () => { throw new Error("KTX2 decode failed"); },
   );
   assert.equal(attachedCount, 0, "nothing should attach, and nothing should throw");
+});
+
+import { loadStartupResources } from "./createGame";
+import type { TerrainSource } from "../terrain/terrain-source";
+import type { NodeFactories } from "../rendering/nodeFactories";
+function deferred<T>() { let resolve!: (value: T) => void, reject!: (reason: unknown) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; }
+const sourceStub = { kind: "real" } as TerrainSource;
+const nodesStub = {} as NodeFactories;
+function backendStub() { let disposed = 0; return { backend: { backendKind: "webgpu", dispose() { disposed++; } } as RendererBackend, disposed: () => disposed }; }
+
+test("terrain and GPU start independently; node loading overlaps the still-pending terrain", async () => {
+  const terrain = deferred<TerrainSource>(), backend = deferred<RendererBackend>();
+  const order: string[] = [], gpu = backendStub();
+  const pending = loadStartupResources(() => { order.push("terrain"); return terrain.promise; }, () => { order.push("gpu"); return backend.promise; }, async () => { order.push("nodes"); return nodesStub; });
+  await Promise.resolve(); assert.deepEqual(order, ["terrain", "gpu"]);
+  backend.resolve(gpu.backend); await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.deepEqual(order, ["terrain", "gpu", "nodes"]);
+  terrain.resolve(sourceStub);
+  const result = await pending;
+  assert.equal(result.source, sourceStub); assert.equal(result.backend, gpu.backend); assert.equal(gpu.disposed(), 0);
+});
+
+test("terrain failure disposes a late successfully initialized GPU exactly once", async () => {
+  const terrain = deferred<TerrainSource>(), backend = deferred<RendererBackend>(), gpu = backendStub();
+  let nodes = 0;
+  const pending = loadStartupResources(() => terrain.promise, () => backend.promise, async () => { nodes++; return nodesStub; });
+  terrain.reject(new Error("terrain failed"));
+  await assert.rejects(pending, /terrain failed/);
+  backend.resolve(gpu.backend); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(gpu.disposed(), 1); assert.equal(nodes, 0);
+});
+
+test("node rejection cancels terrain and releases its initialized backend", async () => {
+  const gpu = backendStub(); let terrainSignal: AbortSignal | undefined;
+  const pending = loadStartupResources(signal => { terrainSignal = signal; return new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(signal.reason))); }, async () => gpu.backend, async () => { throw new Error("node chunk failed"); });
+  await assert.rejects(pending, /node chunk failed/);
+  assert.equal(gpu.disposed(), 1); assert.equal(terrainSignal?.aborted, true);
+});
+
+test("abort returns promptly during uncancellable init and disposes the late backend", async () => {
+  const controller = new AbortController(), backend = deferred<RendererBackend>(), gpu = backendStub();
+  const pending = loadStartupResources(async () => sourceStub, () => backend.promise, async () => nodesStub, controller.signal);
+  await Promise.resolve(); controller.abort();
+  await assert.rejects(pending, { name: "AbortError" });
+  backend.resolve(gpu.backend); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(gpu.disposed(), 1);
+});
+
+test("WebGL fallback never requests node factories and pre-abort starts nothing", async () => {
+  let nodes = 0, starts = 0;
+  const result = await loadStartupResources(async () => sourceStub, async () => undefined, async () => { nodes++; return nodesStub; });
+  assert.equal(result.nodeFactories, null); assert.equal(nodes, 0);
+  const controller = new AbortController(); controller.abort();
+  await assert.rejects(loadStartupResources(async () => { starts++; return sourceStub; }, async () => { starts++; return undefined; }, async () => nodesStub, controller.signal), { name: "AbortError" });
+  assert.equal(starts, 0);
+});
+
+test("abort while node factories load promptly releases GPU; successful handoff transfers ownership", async () => {
+  const controller = new AbortController(), nodes = deferred<NodeFactories>(), gpu = backendStub();
+  const pending = loadStartupResources(async () => sourceStub, async () => gpu.backend, () => nodes.promise, controller.signal);
+  await new Promise(resolve => setImmediate(resolve)); controller.abort();
+  await assert.rejects(pending, { name: "AbortError" }); assert.equal(gpu.disposed(), 1);
+  nodes.resolve(nodesStub); await new Promise(resolve => setImmediate(resolve)); assert.equal(gpu.disposed(), 1);
+  const owner = new AbortController(), transferred = backendStub();
+  await loadStartupResources(async () => sourceStub, async () => transferred.backend, async () => nodesStub, owner.signal);
+  owner.abort(); assert.equal(transferred.disposed(), 0, "runtime now owns the backend and its lifetime");
 });

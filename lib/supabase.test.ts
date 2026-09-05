@@ -82,7 +82,11 @@ test("withFetchTimeout causes the fetch to reject once the timeout elapses", asy
   }) as typeof fetch;
 
   const wrapped = withFetchTimeout(neverSettles, 10); // 10ms — fast for the test
-  await assert.rejects(() => wrapped("https://example.com"));
+  // AbortSignal.timeout uses an unreferenced timer in Node. The mocked fetch
+  // has no socket to keep the loop alive as a real request would.
+  const keepAlive = setInterval(() => {}, 1000);
+  try { await assert.rejects(() => wrapped("https://example.com")); }
+  finally { clearInterval(keepAlive); }
 });
 
 type Result = { data: unknown; error: unknown };

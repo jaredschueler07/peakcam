@@ -1,3 +1,4 @@
+import { resortMorning } from "../ranked-conditions";
 /**
  * lib/game/server/handlers/leaderboard.ts
  * ───────────────────────────────────────
@@ -44,6 +45,7 @@ export const LEADERBOARD_SWR_SECONDS = 300;
 
 export const leaderboardQuerySchema = z
   .object({
+    conditionsDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     resort: z.string().min(1).max(64),
     mode: competitiveRunModeSchema,
     trailId: z.string().min(1).max(64),
@@ -68,6 +70,7 @@ export async function handleGetLeaderboard(
 ): Promise<Response> {
   const params = new URL(request.url).searchParams;
   const parsed = leaderboardQuerySchema.safeParse({
+    ...(params.get("conditionsDate") ? { conditionsDate: params.get("conditionsDate") } : {}),
     resort: params.get("resort") ?? undefined,
     mode: params.get("mode") ?? undefined,
     trailId: params.get("trailId") ?? undefined,
@@ -103,6 +106,7 @@ export async function handleGetLeaderboard(
     courseVersion: COURSE_VERSION,
     limit,
     order: leaderboardOrder(mode),
+    ...(mode === "score_attack" ? { conditionsDate: parsed.data.conditionsDate ?? resortMorning(Date.now(), resort).date } : {}),
   });
 
   const projected: PublicLeaderboardRow[] = rows.map((row, index) => ({

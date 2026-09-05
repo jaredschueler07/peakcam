@@ -180,12 +180,21 @@ export class AudioEngine {
     Object.assign(this.listener, state);
     this.listener.speed = Math.max(0, this.listener.speed);
     this.listener.carve = clamp01(this.listener.carve);
+    this.listener.edgeAngle = clamp01(this.listener.edgeAngle ?? 0);
     this.listener.windLevel = clamp01(this.listener.windLevel);
     this.listener.liftProximity = clamp01(this.listener.liftProximity);
     if (!this.graph || !this.enabled) return false;
     if (nowMs - this.lastListenerUpdateMs < LISTENER_UPDATE_MS) return false;
     this.lastListenerUpdateMs = nowMs;
     this.graph.bank.setListenerState(this.listener);
+    const speed = clamp01(this.listener.speed / 55);
+    const edge = this.listener.airborne ? 0 : clamp01(this.listener.carve * 0.7 + (this.listener.edgeAngle ?? 0) * 0.3) * speed;
+    const powder = this.listener.surface === "powder";
+    this.graph.samples.setLayerLevel("carve-packed", powder ? 0 : edge * (this.listener.surface === "ice" ? 1 : 0.7));
+    this.graph.samples.setLayerLevel("carve-powder", powder ? edge : 0);
+    this.graph.samples.setLayerLevel("wind-bed", 0.1 + speed * 0.45 + this.listener.windLevel * 0.35);
+    this.graph.samples.setLayerLevel("wind-gust", this.listener.windLevel * (0.2 + speed * 0.3));
+    this.graph.samples.setLayerLevel("lift-hum", this.listener.liftProximity);
     return true;
   }
 

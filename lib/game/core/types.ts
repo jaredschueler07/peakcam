@@ -35,6 +35,11 @@ export interface RealRamp {
 }
 
 export interface RealRun {
+  readonly id?: string;
+  readonly sourceId?: string;
+  readonly topElevationM?: number;
+  readonly bottomElevationM?: number;
+  readonly grooming?: string | null;
   readonly kind: "real";
   readonly sourceIndex: number;
   readonly name: string;
@@ -48,6 +53,16 @@ export interface RealRun {
 }
 
 export interface RealLift {
+  /** False when the source line is clipped by this terrain pack. */
+  readonly complete?: boolean;
+  readonly sourceEndpoints?: readonly {x:number;z:number}[];
+  readonly id?: string;
+  readonly sourceId?: string;
+  readonly speedMps?: number;
+  readonly speedSource?: "osm" | "type-default";
+  readonly occupancy?: number | null;
+  readonly towers?: readonly RealRunPoint[];
+  readonly stations?: readonly (RealRunPoint & { radiusM: number })[];
   readonly kind: "real";
   readonly name: string;
   readonly type: string;
@@ -67,13 +82,28 @@ export interface NearestTrail {
   on: boolean;
 }
 
+export interface RealJunction {
+  readonly id: string;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly heading: number;
+  readonly halfWidthM: number;
+  readonly choices: readonly {id:string;name:string;difficulty:string|null}[];
+}
+
 export interface TerrainSampler {
+  readonly junctions?: readonly RealJunction[];
+  nearbyJunction?(x:number,z:number,radiusM?:number):RealJunction|null;
   readonly kind: "procedural" | "real";
   readonly profile: ResortGameProfile;
   readonly seed: number;
   readonly noiseOffset: Readonly<{ x: number; z: number }>;
   readonly realRuns?: readonly RealRun[];
   readonly mainLift?: RealLift | null;
+  readonly realLifts?: readonly RealLift[];
+  /** Baked mapped-forest sites shared with terrain wells, in game coordinates. */
+  readonly treeSites?: readonly (RealRunPoint & { radiusM: number })[];
   height(x: number, z: number): number;
   normal(x: number, z: number, out: Vec3): Vec3;
   trailField(x: number, z: number): number;
@@ -119,6 +149,10 @@ export interface SimulationState {
   crouch: number;
   jumpCharge: number;
   selectedTrail: number;
+  liftIndex: number;
+  liftProgress: number;
+  liftDistanceM: number;
+  liftCooldown: number;
   liftRide: number;
   liftFromZ: number;
   liftToZ: number;

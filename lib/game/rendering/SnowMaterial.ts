@@ -76,16 +76,16 @@ export interface SnowUniforms {
 }
 
 export function polishSnowMaterial(material: THREE.MeshStandardMaterial, detailNormal: THREE.Texture, uniforms: SnowUniforms): void {
-  material.customProgramCacheKey = () => "peakcam-snow-p6-v1";
+  material.customProgramCacheKey = () => "peakcam-snow-v3-corduroy";
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, { uSnowDetail: { value: detailNormal }, uSnowHorizon: uniforms.horizon, uSnowGlint: uniforms.glint, uSnowTrack: uniforms.track });
     shader.vertexShader = shader.vertexShader
-      .replace("#include <common>", "#include <common>\nvarying vec3 vSnowWorldPosition; varying vec3 vSnowWorldNormal;")
-      .replace("#include <worldpos_vertex>", "#include <worldpos_vertex>\nvSnowWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz; vSnowWorldNormal = normalize(mat3(modelMatrix) * objectNormal);");
+      .replace("#include <common>", "#include <common>\nattribute float groomed; varying float vGroomed; varying vec3 vSnowWorldPosition; varying vec3 vSnowWorldNormal;")
+      .replace("#include <worldpos_vertex>", "#include <worldpos_vertex>\nvGroomed = groomed; vSnowWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz; vSnowWorldNormal = normalize(mat3(modelMatrix) * objectNormal);");
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", `#include <common>
 uniform sampler2D uSnowDetail; uniform vec3 uSnowHorizon; uniform float uSnowGlint; uniform vec4 uSnowTrack;
-varying vec3 vSnowWorldPosition; varying vec3 vSnowWorldNormal;
+varying float vGroomed; varying vec3 vSnowWorldPosition; varying vec3 vSnowWorldNormal;
 float snowHash(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453); }
 vec3 snowFlake(vec3 p){ return normalize(vec3(snowHash(p)-.5,snowHash(p+17.3)-.5,snowHash(p+41.7)-.5)); }
 float segmentDistance(vec2 p,vec2 a,vec2 b){ vec2 pa=p-a,ba=b-a; return length(pa-ba*clamp(dot(pa,ba)/max(dot(ba,ba),.001),0.,1.)); }`)
@@ -96,7 +96,8 @@ vec3 snowN1=texture2D(uSnowDetail,vSnowWorldPosition.yz/0.35).xyz*2.-1.;
 snowN1=snowN1*snowWeights.x+(texture2D(uSnowDetail,vSnowWorldPosition.xz/0.35).xyz*2.-1.)*snowWeights.y+(texture2D(uSnowDetail,vSnowWorldPosition.xy/0.35).xyz*2.-1.)*snowWeights.z;
 vec3 snowN2=texture2D(uSnowDetail,vSnowWorldPosition.yz/3.).xyz*2.-1.;
 snowN2=snowN2*snowWeights.x+(texture2D(uSnowDetail,vSnowWorldPosition.xz/3.).xyz*2.-1.)*snowWeights.y+(texture2D(uSnowDetail,vSnowWorldPosition.xy/3.).xyz*2.-1.)*snowWeights.z;
-normal=normalize(normal+mat3(viewMatrix)*mix(snowN2,snowN1,snowNear)*mix(.08,.22,snowNear));`)
+float corduroy=sin(vSnowWorldPosition.x*62.83185)*.12*vGroomed*(1.-smoothstep(8.,32.,snowDistance));
+normal=normalize(normal+mat3(viewMatrix)*(mix(snowN2,snowN1,snowNear)*mix(.08,.22,snowNear)+vec3(corduroy,0.,0.)));`)
       .replace("#include <opaque_fragment>", `
 vec3 snowN=normalize(vSnowWorldNormal), snowV=normalize(cameraPosition-vSnowWorldPosition), snowL=normalize(vec3(-.46,.62,-.64));
 float snowWrap=clamp((dot(snowN,snowL)+.5)/1.5,0.,1.);

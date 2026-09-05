@@ -27,7 +27,7 @@
  */
 
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
-import type { PhysicsModel, SurfaceKind } from "../core/config";
+import type { PhysicsModel, SurfaceKind, SimulationEnvironment } from "../core/config";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -39,6 +39,8 @@ export const MAX_TICKET_TTL_MS = 30 * 60 * 1000;
 
 /** What the caller asks the server to bind into a ticket. */
 export interface RunTicketClaims {
+  environment?: SimulationEnvironment;
+  conditionsDate?: string;
   resortSlug: string;
   mode: "time_trial" | "score_attack";
   trailId: string;

@@ -1,7 +1,7 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 import type { ResortGameProfile } from "../config/schema";
 import type { SimulationState } from "../core/types";
-import type { TerrainSampler } from "../core/types";
+import type { RealLift, TerrainSampler } from "../core/types";
 
 export type GameStatus = "loading" | "ready" | "running" | "paused" | "results" | "error";
 export type RuntimeEvent =
@@ -23,6 +23,13 @@ export interface HudState {
   combo: number;
   trailIndex: number;
   trailName: string;
+  trailTopFeet: number | null;
+  trailBottomFeet: number | null;
+  liftName: string | null;
+  liftSecondsRemaining: number;
+  liftProgress: number;
+  lifts: readonly RealLift[];
+  junctionPrompt: string | null;
   crashReason: "TREE" | "ROCK" | "LANDING" | null;
   position: Readonly<{ x: number; z: number }>;
   error: string | null;
@@ -36,6 +43,8 @@ type Listener = (event: RuntimeEvent) => void;
 export class UiBridge {
   readonly store: StoreApi<HudState>;
   private readonly listeners = new Set<Listener>();
+  private terrain: TerrainSampler | null = null;
+  private readonly junctionLabels = new Map<string, string>();
   private lastPublishMs = -Infinity;
   private trailNames: readonly string[];
   private trailPolylines: ReadonlyArray<readonly Readonly<{ x: number; z: number }>[]> = [];
@@ -46,6 +55,7 @@ export class UiBridge {
       status: "loading", speedKmh: 0, elapsedSeconds: 0, verticalFeet: 0,
       altitudeFeet: profile.summitFt, score: 0, best: 0, combo: 1,
       trailIndex: 0, trailName: profile.trails[0].name, crashReason: null,
+      trailTopFeet: null, trailBottomFeet: null, liftName: null, liftSecondsRemaining: 0, liftProgress: 0, lifts: [], junctionPrompt: null,
       position: { x: 0, z: 0 }, error: null, loadingProgress: 0, trailPolyline: [],
       runRecording: false,
     }));
@@ -55,11 +65,19 @@ export class UiBridge {
     if (nowMs - this.lastPublishMs < 1000 / 15) return false;
     this.lastPublishMs = nowMs;
     const verticalMetres = Math.max(0, state.startY - state.pos.y);
+    const run = this.terrain?.realRuns?.[state.selectedTrail];
+    const junction = this.terrain?.nearbyJunction?.(state.pos.x, state.pos.z, 65);
     this.store.setState({
+      junctionPrompt: junction && state.liftIndex < 0 ? this.junctionLabels.get(junction.id) ?? null : null,
+      liftProgress: state.liftProgress ?? 0,
+      trailTopFeet: run ? run.points[0].y * 3.28084 : null,
+      trailBottomFeet: run ? run.points[run.points.length - 1].y * 3.28084 : null,
+      liftName: state.liftRide > 0 ? this.terrain?.realLifts?.[state.liftIndex]?.name ?? this.terrain?.mainLift?.name ?? "Lift" : null,
+      liftSecondsRemaining: state.liftRide,
       speedKmh: Math.round(Math.hypot(state.vel.x, state.vel.z) * 3.6),
       elapsedSeconds: state.time,
       verticalFeet: verticalMetres * 3.28084,
-      altitudeFeet: this.profile.summitFt - verticalMetres * 3.28084,
+      altitudeFeet: this.terrain?.kind === "real" ? state.pos.y * 3.28084 : this.profile.summitFt - verticalMetres * 3.28084,
       score: state.score,
       best: state.best,
       combo: state.combo,
@@ -76,6 +94,10 @@ export class UiBridge {
     this.store.setState({ status: "loading", loadingProgress: Math.max(0, Math.min(1, progress)) });
   }
   configureTerrain(terrain: TerrainSampler): void {
+    this.terrain = terrain;
+    this.junctionLabels.clear();
+    for (const junction of terrain.junctions ?? []) this.junctionLabels.set(junction.id, junction.choices.map(choice => choice.name).join(" · "));
+    this.store.setState({ lifts: terrain.realLifts ?? [] });
     if (terrain.kind === "real" && terrain.realRuns) {
       this.trailNames = terrain.realRuns.map((run) => run.name);
       this.trailPolylines = terrain.realRuns.map((run) => run.points.map(({ x, z }) => ({ x, z })));

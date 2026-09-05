@@ -8,8 +8,23 @@ import type { QualityRung } from "./QualityController";
 import { buildPosterLut } from "./SnowMaterial";
 import { chromaticAberrationOffset } from "./MotionEffects";
 
+interface UpdatableEffect {
+  update(renderer: THREE.WebGLRenderer, inputBuffer: THREE.WebGLRenderTarget, deltaTime: number): void;
+}
+
+/** BlendFunction.SKIP omits only composition in postprocessing 6.39.4; its
+ * EffectPass still calls update. Keep inactive offscreen passes unrendered.
+ * Installed once, with explicit arguments to avoid a per-frame rest array. */
+export function gateEffectUpdate(effect: UpdatableEffect, active: () => boolean): void {
+  const update = effect.update;
+  effect.update = function(renderer, inputBuffer, deltaTime): void {
+    if (active()) update.call(this, renderer, inputBuffer, deltaTime);
+  };
+}
+
 export class PostProcessing {
   private readonly composer: EffectComposer;
+  private rung: QualityRung = 4;
   private readonly effectPass: EffectPass;
   // ChromaticAberrationEffect is a convolution effect in postprocessing 6.x —
   // it cannot be merged into the shared EffectPass ("Convolution effects
@@ -29,6 +44,8 @@ export class PostProcessing {
     this.lutEffect = new LUT3DEffect(this.lut);
     this.vignette = new VignetteEffect({ offset: 0.35, darkness: 0.5 });
     this.smaa = new SMAAEffect({ preset: SMAAPreset.MEDIUM });
+    gateEffectUpdate(this.bloom, () => this.rung >= 3);
+    gateEffectUpdate(this.smaa, () => this.rung >= 2);
     this.chromatic = new ChromaticAberrationEffect({ radialModulation: true, modulationOffset: 0.15, offset: new THREE.Vector2() });
     this.effectPass = new EffectPass(camera, this.bloom, this.lutEffect, this.vignette, this.smaa);
     this.composer.addPass(this.effectPass);
@@ -39,6 +56,7 @@ export class PostProcessing {
   setSize(width: number, height: number): void { this.composer.setSize(width, height); }
 
   setQuality(rung: QualityRung): void {
+    this.rung = rung;
     this.effectPass.enabled = rung > 0;
     this.chromaticPass.enabled = rung > 0 && !this.reducedMotion;
     this.bloom.blendMode.blendFunction = rung >= 3 ? BlendFunction.SCREEN : BlendFunction.SKIP;

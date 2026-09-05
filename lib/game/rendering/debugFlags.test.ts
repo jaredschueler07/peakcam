@@ -27,7 +27,7 @@ test("the debug flags parse from a query string and default to off", () => {
 
 test("each snowdbg step removes one more term from the node graph", () => {
   const detail = buildSnowDetailNormal(3);
-  const build = (mode: number) => createSnowNodeMaterial(detail, createSnowNodeUniforms(), mode);
+  const build = (mode: number) => createSnowNodeMaterial(detail, createSnowNodeUniforms(), mode, null, 2);
   const overridesOutput = (material: THREE.Material) =>
     Object.getPrototypeOf(material).setupOutput !== MeshStandardNodeMaterial.prototype.setupOutput;
 
@@ -98,7 +98,7 @@ test("csmdbg partitions the light from the cascades", () => {
     assert.equal((shadows.light.shadow.shadowNode as unknown as { cascades: number }).cascades, 1);
   });
   withFlag("", (shadows) => {
-    assert.equal((shadows.light.shadow.shadowNode as unknown as { cascades: number }).cascades, 3);
+    assert.equal((shadows.light.shadow.shadowNode as unknown as { cascades: number }).cascades, 2);
   });
 });
 

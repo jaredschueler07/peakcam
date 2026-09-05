@@ -1,3 +1,4 @@
+import { prepareLiftPath } from "./lifts";
 import type { ResortGameProfile } from "../config/schema";
 import { integrateSkier, preparePhysicsStep } from "../physics/integrator";
 import { integrateSkierV2 } from "../physics/integrator-v2";
@@ -11,6 +12,7 @@ import type { InputFrame, SimulationState, SimulationWorld, TerrainSampler } fro
 export function createSimulation(
   profile: ResortGameProfile, seed: number, terrain?: TerrainSampler,
 ): SimulationState {
+  for (const lift of terrain?.realLifts ?? []) prepareLiftPath(lift, terrain!.height);
   const state = createSkierState();
   resetSimulationOnTerrain(state, terrain ?? createProceduralTerrain(profile, seed), 0);
   state.events.reset = false;

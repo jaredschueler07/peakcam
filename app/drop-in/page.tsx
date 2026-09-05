@@ -22,7 +22,7 @@ const RESORT_NAMES = roster.map((p) => p.name).join(", ");
 export const metadata: Metadata = {
   title: "Drop In — Arcade Ski Descents",
   description:
-    `Drop In is PeakCam's arcade ski descent: a procedurally built run down a real mountain, ` +
+    `Drop In is PeakCam's arcade ski descent: real terrain, named trails and rideable lifts, ` +
     `in your browser, no download and no account. Live in beta at ${RESORT_COUNT} resorts — ${RESORT_NAMES}.`,
   keywords: [
     "ski game browser",
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     siteName: "PeakCam",
     title: "Drop In — Arcade Ski Descents | PeakCam",
     description:
-      `Ski a procedurally built descent of a real mountain in your browser. ` +
+      `Ski mapped trails on a real mountain in your browser. ` +
       `Beta at ${RESORT_COUNT} resorts: ${RESORT_NAMES}.`,
     // Declared explicitly: a route that exports its own `openGraph` object
     // replaces the parent's wholesale, so the root app/opengraph-image.tsx is
@@ -59,21 +59,21 @@ export const metadata: Metadata = {
 const HOW_IT_WORKS = [
   {
     icon: MountainSnow,
-    title: "A real mountain, roughly",
+    title: "Find your mountain",
     body:
-      "Each descent is seeded from the resort's own numbers — summit elevation, lift-served vertical, and six runs named after the real ones. Same seed every time, so the hill you learn is the hill you get.",
+      "Explore real elevation data and mapped trails, from alpine bowls to groomed runs. Choose a run by name, follow the junction signs, and ski into a lift's base station for another Free Ride lap.",
   },
   {
     icon: Gamepad2,
     title: "Carve, tuck, send",
     body:
-      "Mouse or A/D to carve, W to tuck, S to brake, Space to jump. T switches trail, G rides the lift back up, 1–3 changes the weather, Esc releases the cursor. On a phone, the same controls sit under your thumbs.",
+      "Use the arrow keys to carve, tuck and brake, Space to jump, and Esc to pause. Mouse steering is optional. On a phone, the controls sit under your thumbs.",
   },
   {
     icon: Timer,
     title: "Nothing to install",
     body:
-      "It runs in the browser on a WebGL canvas — no download, no plugin, no account. Close the tab when the storm clears and go check the cams instead.",
+      "Play directly in your browser — no download or plugin. Explore in Free Ride, race a Time Trial, or take on the resort's Daily Line.",
   },
 ];
 
@@ -97,10 +97,9 @@ export default function DropInHubPage() {
             </p>
             <p className="mt-5 max-w-2xl text-[15px] leading-relaxed text-ink/85">
               Between storms there&rsquo;s nothing to watch on a webcam. So we
-              built a run you can ski instead: a procedural descent of a real
-              resort — its vertical, its summit, its trail names — rendered in
-              your browser on a WebGL canvas. No download, no account, no score
-              to defend. It&rsquo;s live at{" "}
+              built a mountain you can ski instead: real terrain, named trails
+              and lifts you can ride, rendered in your browser. Explore at your
+              own pace or chase a leaderboard time. It&rsquo;s live at{" "}
               <strong className="font-bold">{RESORT_COUNT} resorts</strong> while
               we build more.
             </p>

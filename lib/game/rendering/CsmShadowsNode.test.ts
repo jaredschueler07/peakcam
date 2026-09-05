@@ -36,14 +36,14 @@ test("light is a public accessor onto the CSM's real directional light, for call
   assert.equal(shadows.light.shadow.shadowNode, shadowNodeOf(shadows), "it is the light the cascades actually shadow from, not a decoy");
 });
 
-test("the cascade policy is one cascade on mobile or below rung 3, three otherwise", () => {
+test("the cascade policy is one cascade on mobile or below rung 3, two otherwise", () => {
   for (const rung of [0, 1, 2, 3, 4] as const) {
     assert.equal(cascadeCountFor(true, rung), 1, `mobile rung ${rung} stays at one cascade`);
   }
   assert.equal(cascadeCountFor(false, 0), 1);
   assert.equal(cascadeCountFor(false, 2), 1);
-  assert.equal(cascadeCountFor(false, 3), 3);
-  assert.equal(cascadeCountFor(false, 4), 3);
+  assert.equal(cascadeCountFor(false, 3), 2);
+  assert.equal(cascadeCountFor(false, 4), 2);
 });
 
 test("CsmShadowsNode is drop-in compatible with CsmShadows", () => {
@@ -75,14 +75,14 @@ test("construction puts one shadow-casting light in the scene, aimed down the su
   assert.ok(direction.distanceTo(SUN_DIRECTION.clone().negate()) < 1e-9, "light travels along -SUN_DIRECTION");
 
   assert.equal(shadows.light.shadow.bias, -0.0009);
-  assert.equal(shadows.light.shadow.mapSize.width, 2048);
-  assert.equal(shadows.light.shadow.mapSize.height, 2048);
+  assert.equal(shadows.light.shadow.mapSize.width, 1536);
+  assert.equal(shadows.light.shadow.mapSize.height, 1536);
 });
 
 test("the shadow node carries the CSM configuration and stays uninitialised until first render", () => {
   const { shadows } = build(false);
   const node = shadowNodeOf(shadows);
-  assert.equal(node.cascades, 3);
+  assert.equal(node.cascades, 2);
   assert.equal(node.maxFar, 250);
   assert.equal(node.mode, "practical");
   assert.equal(node.light, shadows.light);
@@ -100,7 +100,7 @@ test("the shadow node carries the CSM configuration and stays uninitialised unti
 test("a quality change rebuilds the shadow node, because cascade count is constructor-time", () => {
   const { shadows } = build(false);
   const initial = shadowNodeOf(shadows);
-  assert.equal(initial.cascades, 3);
+  assert.equal(initial.cascades, 2);
 
   shadows.setQuality(2);
   const lowered = shadowNodeOf(shadows);
@@ -113,7 +113,7 @@ test("a quality change rebuilds the shadow node, because cascade count is constr
   shadows.setQuality(4);
   const restored = shadowNodeOf(shadows);
   assert.notEqual(restored, lowered);
-  assert.equal(restored.cascades, 3);
+  assert.equal(restored.cascades, 2);
 });
 
 test("mobile never rebuilds, since every rung maps to a single cascade", () => {

@@ -32,6 +32,9 @@ const UNIQUE_VIOLATION = "23505";
 // ─── Write side ──────────────────────────────────────────────
 
 export interface RunInsert {
+  conditionsDate?: string;
+  conditionsSnapshot?: unknown;
+  inputTape?: Uint8Array;
   resortId: string;
   userId: string | null;
   /** Sanitised nickname, or `null` for an unnamed run. */
@@ -86,6 +89,9 @@ export function createRunWriter(client: SupabaseClient): RunWriter {
         .from("drop_in_runs")
         .insert({
           resort_id: run.resortId,
+          ...(run.conditionsDate ? { conditions_date: run.conditionsDate } : {}),
+          ...(run.conditionsSnapshot ? { conditions_snapshot: run.conditionsSnapshot } : {}),
+          ...(run.inputTape ? { input_tape: toByteaHex(run.inputTape) } : {}),
           user_id: run.userId,
           display_name: run.displayName,
           mode: run.mode,
@@ -126,6 +132,7 @@ export function createRunWriter(client: SupabaseClient): RunWriter {
 // ─── Read side ───────────────────────────────────────────────
 
 export interface LeaderboardQuery {
+  conditionsDate?: string;
   resortId: string;
   mode: CompetitiveRunMode;
   trailId: string;
@@ -191,6 +198,7 @@ export function createLeaderboardReader(client: SupabaseClient): LeaderboardRead
         .eq("trail_id", query.trailId)
         .eq("physics_version", query.physicsVersion)
         .eq("course_version", query.courseVersion);
+      if (query.conditionsDate) builder = builder.eq("conditions_date", query.conditionsDate);
 
       for (const { column, ascending } of query.order) {
         builder = builder.order(column, { ascending });

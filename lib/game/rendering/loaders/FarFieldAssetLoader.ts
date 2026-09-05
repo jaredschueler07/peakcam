@@ -1,3 +1,5 @@
+import { decodeFarFieldLod } from "../../terrain/far-field-lod";
+import { COURSE_VERSION } from "../../config/versions";
 import type { DropInResortSlug } from "../../config/schema";
 import {
   decodeFarField,
@@ -54,18 +56,39 @@ export class FarFieldAssetLoader {
     else options.signal?.addEventListener("abort", relayAbort, { once: true });
     const warn = options.onWarn ?? ((message: string) => console.warn(message));
 
+    let lodDeadline: ReturnType<typeof setTimeout> | undefined;
     try {
-      const url = farFieldAssetUrl(slug);
+      const url = `${farFieldAssetUrl(slug)}?course=${COURSE_VERSION}`;
       // Read into a local first: `this.fetcher(...)` would call it as a method, and an
       // unbound `fetch` rejects a non-global receiver. See the constructor.
       const fetcher = this.fetcher;
-      const response = await fetcher(url, { signal: controller.signal });
+      // Optional topology downloads alongside PCFF. Failures never discard the
+      // valid full horizon; the shared abort signal still cancels both requests.
+      const fullResponse = fetcher(url, { signal: controller.signal });
+      const optionalLod = Promise.race([
+        fetcher(`/game/terrain/${slug}.far-lod.json?course=${COURSE_VERSION}`, { signal: controller.signal })
+          .then(response => response.ok ? response.json() as Promise<unknown> : null)
+          .catch(() => null),
+        new Promise<null>(resolve => { lodDeadline = setTimeout(() => resolve(null), 1500); }),
+      ]);
+      const response = await fullResponse;
       if (!response.ok) {
         warn(`[Drop In] no far field for ${slug} (${response.status}); keeping the ridge bands`);
         return null;
       }
-      const asset = decodeFarField(new Uint8Array(await response.arrayBuffer()));
+      const bytes = await response.arrayBuffer();
+      const asset = decodeFarField(new Uint8Array(bytes));
       validateFarFieldForResort(asset.meta, { slug, ...options.expect });
+      const candidate = await optionalLod;
+      if (controller.signal.aborted) throw controller.signal.reason;
+      if (candidate) {
+        try {
+          const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+          const fingerprint = Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
+          asset.lodIndices = decodeFarFieldLod(candidate, asset, fingerprint) ?? undefined;
+        } catch { /* Optional LOD cannot break an otherwise valid horizon. */ }
+      }
+      if (controller.signal.aborted) throw controller.signal.reason;
       return asset;
     } catch (error) {
       // An abort is the caller's own doing, not a bad asset — let it through.
@@ -76,6 +99,9 @@ export class FarFieldAssetLoader {
       );
       return null;
     } finally {
+      clearTimeout(lodDeadline);
+      // Cancel any optional request still pending after fallback/deadline.
+      controller.abort();
       options.signal?.removeEventListener("abort", relayAbort);
       if (this.controller === controller) this.controller = null;
     }

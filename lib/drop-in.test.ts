@@ -40,7 +40,7 @@ test("supported resorts receive a stable encoded game URL", () => {
   assert.strictEqual(isDropInResort("heavenly"), true);
   assert.strictEqual(
     getDropInGameUrl("heavenly"),
-    "/drop-in/engine.html?resort=heavenly",
+    "/resorts/heavenly/drop-in",
   );
   assert.strictEqual(getDropInGameUrl("not a resort"), null);
 });
