@@ -29,14 +29,31 @@ export function buildTrackNormal(): THREE.DataTexture {
   for (let x = 0; x < width; x++) {
     const u = x / (width - 1);
     let slope = 0;
-    for (const center of [0.16, 0.84]) {
+    for (const center of [0.27, 0.73]) {
       const d = (u - center) / 0.065;
-      slope += d * Math.exp(-d * d) * 2.2;
+      slope += d * Math.exp(-d * d) * 0.5;
     }
     const length = Math.hypot(slope, 1);
     data[x * 4] = Math.round((slope / length * 0.5 + 0.5) * 255);
     data[x * 4 + 1] = 128;
     data[x * 4 + 2] = Math.round((1 / length * 0.5 + 0.5) * 255);
+    data[x * 4 + 3] = 255;
+  }
+  const texture = new THREE.DataTexture(data, width, 1);
+  texture.magFilter = THREE.LinearFilter; texture.needsUpdate = true;
+  return texture;
+}
+
+/** Only the two ~12 cm ski grooves cover snow; the ribbon center stays clear.
+ * Alpha maps sample green, so store the mask in RGB rather than only alpha. */
+export function buildTrackAlpha(): THREE.DataTexture {
+  const width = 128, data = new Uint8Array(width * 4);
+  for (let x = 0; x < width; x++) {
+    const u = x / (width - 1);
+    const distance = Math.min(Math.abs(u - 0.27), Math.abs(u - 0.73));
+    const edge = Math.max(0, Math.min(1, (0.075 - distance) / 0.035));
+    const alpha = Math.round(edge * edge * (3 - 2 * edge) * 255);
+    data[x * 4] = data[x * 4 + 1] = data[x * 4 + 2] = alpha;
     data[x * 4 + 3] = 255;
   }
   const texture = new THREE.DataTexture(data, width, 1);
@@ -123,7 +140,7 @@ export class EffectsRenderer {
     const uvs = new Float32Array(TRACK_QUADS * 12);
     for (let i = 0; i < TRACK_QUADS; i++) uvs.set([0,0,1,0,0,1,1,0,1,1,0,1], i * 12);
     this.trackGeometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
-    const tracks = new THREE.Mesh(this.trackGeometry, new THREE.MeshStandardMaterial({ color: 0xe2eafa, normalMap: buildTrackNormal(), roughness: 0.76, transparent: true, opacity: 0.72, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -3 })); tracks.frustumCulled = false; tracks.renderOrder = 1; scene.add(tracks);
+    const tracks = new THREE.Mesh(this.trackGeometry, new THREE.MeshStandardMaterial({ color: 0xf7faff, normalMap: buildTrackNormal(), alphaMap: buildTrackAlpha(), roughness: 0.9, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -3 })); tracks.frustumCulled = false; tracks.renderOrder = 1; scene.add(tracks);
   }
 
   update(state: SimulationState, camera: THREE.Camera, dt: number, snowCount: number, wind: number) {
