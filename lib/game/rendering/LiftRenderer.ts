@@ -21,11 +21,15 @@ function finishTexture(): THREE.DataTexture {
 }
 interface Line { lift:RealLift; path:LiftPath; count:number; key:string; static:THREE.Group }
 interface Batch { mesh:THREE.InstancedMesh; count:number }
+// Six-metre station labels stop being readable beyond this range. Keep the
+// terminal/cable geometry under the existing line visibility policy.
+export const STATION_LABEL_DISTANCE_M = 350;
 /** All moving carriers share instances by type/seat count. Geometry, textures,
  * station names and cables are created once; frame updates allocate nothing. */
 export class LiftRenderer {
   private readonly lines:Line[]=[];
   private readonly batches=new Map<string,Batch>();
+  private readonly stationLabels: { mesh: THREE.Mesh; x: number; z: number }[] = [];
   private readonly texture=finishTexture();
   constructor(scene:THREE.Scene, terrain:TerrainSampler){
     const metal=new THREE.MeshStandardMaterial({map:this.texture,color:0x708899,roughness:0.65,metalness:0.5});
@@ -64,7 +68,8 @@ export class LiftRenderer {
         const canvas=document.createElement('canvas');canvas.width=512;canvas.height=128;
         const ctx=canvas.getContext('2d')!;ctx.fillStyle='#132c3a';ctx.fillRect(0,0,512,128);ctx.fillStyle='#fff9df';ctx.textAlign='center';ctx.font='bold 32px sans-serif';ctx.fillText(lift.name,256,51,490);ctx.font='22px sans-serif';ctx.fillText(top?'UNLOAD →':'SKI IN TO BOARD',256,95);
         const nameMap=new THREE.CanvasTexture(canvas);nameMap.colorSpace=THREE.SRGBColorSpace;
-        const sign=new THREE.Mesh(new THREE.PlaneGeometry(6,1.5),new THREE.MeshBasicMaterial({map:nameMap,side:THREE.DoubleSide}));sign.position.set(0,4.8,-2.1);station.add(sign);
+        const sign=new THREE.Mesh(new THREE.PlaneGeometry(6,1.5),new THREE.MeshBasicMaterial({map:nameMap,side:THREE.DoubleSide}));sign.name="lift-station-label";sign.position.set(0,4.8,-2.1);sign.visible=false;station.add(sign);
+        this.stationLabels.push({mesh:sign,x:station.position.x,z:station.position.z});
         }
         group.add(station);
       }
@@ -85,6 +90,10 @@ export class LiftRenderer {
     }
   }
   update(state:SimulationState):void {
+    for(const label of this.stationLabels){
+      const dx=label.x-state.pos.x,dz=label.z-state.pos.z;
+      label.mesh.visible=dx*dx+dz*dz<=STATION_LABEL_DISTANCE_M*STATION_LABEL_DISTANCE_M;
+    }
     for(const batch of this.batches.values())batch.count=0;
     for(let index=0;index<this.lines.length;index++){
       const line=this.lines[index],batch=this.batches.get(line.key)!;
