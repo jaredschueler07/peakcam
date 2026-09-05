@@ -189,6 +189,7 @@ export interface TrailsFile {
   unit: number;
   /** OSM difficulty convention the `d` values follow. */
   convention?: "north_america" | "europe";
+  detail?: { version: number; seed: number; treeWells: Array<TrailPoint & { radiusM: number }>; description: string };
   junctions?: NetworkJunction[];
   forests?: ForestPolygon[];
   provenance?: { source: string; retrievedAt: string; gaps: string[] };
@@ -219,7 +220,7 @@ export interface LiftMetadata {
   occupancy?: number | null;
   speedMps?: number;
   speedSource?: "osm" | "type-default";
-  towers?: TrailPoint[];
+  towers?: Array<TrailPoint & { elevationM?: number }>;
   stations?: Array<TrailPoint & { elevationM: number; radiusM: number }>;
 }
 export interface RawRun extends RawPolyline, RunMetadata {

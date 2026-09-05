@@ -3,12 +3,14 @@
  * Run: npx tsx scripts/bake-mountain-network.ts [all|slug] [--verify]
  */
 import fs from 'node:fs';
+import { PNG } from 'pngjs';
+import { bakeMountainDetail } from './bake-mountain-detail';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { brotliCompressSync, brotliDecompressSync, constants } from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { clipPolylineToBox, rdp, type Pt } from './bake-resort';
-import { decodeHeightfield, encodeDelta, sampleHeightBilinear, type TerrainMeta, type TrailsFile, type RawRun, type RawLift, type Heightfield } from '../lib/game/terrain/formats';
+import { decodeHeightfield, encodeDelta, sampleHeightBilinear, quantizeHeight, type TerrainMeta, type TrailsFile, type RawRun, type RawLift, type Heightfield } from '../lib/game/terrain/formats';
 import { RESORT_BAKE_CONFIGS, mPerDegLon, M_PER_DEG_LAT, type ResortBakeConfig } from '../lib/game/terrain/resorts';
 import { createRealTerrain } from '../lib/game/terrain/real-heightfield';
 import { DROP_IN_GAME_PROFILES } from '../lib/game/config/profiles';
@@ -24,6 +26,7 @@ export function bakeMountainNetwork(cfg: ResortBakeConfig, source: OsmSource, fi
   const project = (g:{lat:number;lon:number}): Pt => [rounded((g.lon-cfg.center[1])*mPerDegLon(cfg.center[0])),rounded((g.lat-cfg.center[0])*M_PER_DEG_LAT)];
   const elev = (p:Pt) => rounded(sampleHeightBilinear(field,...p));
   const file: TrailsFile = {v:2,center:cfg.center,sizeM:cfg.sizeM,unit:0.1,convention:cfg.convention,runs:[],lifts:[],junctions:[],forests:[],provenance:{source:'OpenStreetMap / Overpass cached out geom; ODbL 1.0',retrievedAt:source.osm3s?.timestamp_osm_base ?? 'unknown',gaps:['Widths without OSM width use difficulty defaults; missing grooming uses difficulty inference.', 'Lift speed without OSM aerialway:speed uses documented type defaults; occupancy remains null when unmapped.', 'Station bounds are 12 m gameplay loading zones around source line endpoints, not surveyed building footprints.', 'Closed piste areas retain their boundary; playable descent follows the shorter high-to-low boundary arc, not a surveyed centreline.', 'Forest multipolygon relations are not included; only closed ways wholly inside the DEM are retained.']}};
+  const vertices=new Map<string,{x:number;y:number;runIds:Set<string>}>();
   const nodes = new Map(source.elements.filter(e=>e.type==='node').map(e=>[e.id,e]));
   for(const el of [...source.elements].sort((a,b)=>a.id-b.id)) {
     if(el.type!=='way'||!el.geometry||el.geometry.length<2)continue;
@@ -44,6 +47,7 @@ export function bakeMountainNetwork(cfg: ResortBakeConfig, source: OsmSource, fi
         if(tags.gladed==='yes')run.gl=1;
         if(tags.oneway==='yes'||tags['piste:oneway']==='yes')run.o=1;
         file.runs.push(run);
+        for(const [px,py] of piece){const x=Math.round(px*10),y=Math.round(py*10),key=`${x},${y}`,v=vertices.get(key)??{x:x/10,y:y/10,runIds:new Set<string>()};v.runIds.add(run.id!);vertices.set(key,v);}
       }else{
         const speed=Number.parseFloat(tags['aerialway:speed']??''), occupancy=Number.parseInt(tags['aerialway:occupancy']??'',10);
         const lift:RawLift={...common,t:tags.aerialway,occupancy:Number.isFinite(occupancy)?occupancy:null,speedMps:Number.isFinite(speed)&&speed>0?speed:DEFAULT_SPEEDS[tags.aerialway],speedSource:Number.isFinite(speed)&&speed>0?'osm':'type-default',towers:[],stations:[simplified[0],simplified.at(-1)!].map(p=>({x:p[0],y:p[1],elevationM:elev(p),radiusM:12}))};
@@ -55,8 +59,6 @@ export function bakeMountainNetwork(cfg: ResortBakeConfig, source: OsmSource, fi
   file.runs.sort((a,b)=>(b.topElevationM??0)-(a.topElevationM??0)||(a.id!<b.id!?-1:1));
   // Shared source vertices establish topology. No invented junctions between
   // visually close but grade-separated trails.
-  const vertices=new Map<string,{x:number;y:number;runIds:Set<string>}>();
-  for(const run of file.runs){let x=0,y=0;for(let i=0;i<run.p.length;i+=2){x+=run.p[i];y+=run.p[i+1];const key=`${x},${y}`,v=vertices.get(key)??{x:x/10,y:y/10,runIds:new Set<string>()};v.runIds.add(run.id!);vertices.set(key,v);}}
   for(const [key,v] of vertices)if(v.runIds.size>1)file.junctions!.push({id:`junction:${key}`,x:v.x,y:v.y,runIds:[...v.runIds].sort()});
   return file;
 }
@@ -65,13 +67,24 @@ export function runBake(slug:string,verify=false):void{
   const cfg=RESORT_BAKE_CONFIGS[slug];if(!cfg)throw new Error(`Unknown resort ${slug}`);
   const dir=path.resolve('public/game/terrain'), sourceBytes=fs.readFileSync(`scripts/data/osm/${slug}.json.br`), source=JSON.parse(brotliDecompressSync(sourceBytes).toString()) as OsmSource;
   const meta=JSON.parse(fs.readFileSync(`${dir}/${slug}.meta.json`,'utf8')) as TerrainMeta;
-  const bytes=brotliDecompressSync(fs.readFileSync(`${dir}/${slug}.height.u16.br`));
+  const bytes=brotliDecompressSync(fs.readFileSync(`scripts/data/dem/${slug}.height.u16.br`));
   const buffer=bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength) as ArrayBuffer;
-  const network=bakeMountainNetwork(cfg,source,decodeHeightfield(buffer,meta));
-  const terrain=createRealTerrain(buffer,meta,network,{profile:DROP_IN_GAME_PROFILES[slug as DropInResortSlug]});
+  const field=decodeHeightfield(buffer,meta);
+  const network=bakeMountainNetwork(cfg,source,field);
+  const profile=DROP_IN_GAME_PROFILES[slug as DropInResortSlug];
+  const detailed=bakeMountainDetail(field,network,profile.terrainSeed);
+  const baked=Buffer.alloc(bytes.length);
+  let maxCode=0;
+  for(let i=0;i<detailed.length;i++){const code=quantizeHeight(detailed[i],meta.minZ,meta.quantum);baked.writeUInt16LE(code,i*2);maxCode=Math.max(maxCode,code);}
+  meta.maxZ=meta.minZ+maxCode*meta.quantum;
+  const terrain=createRealTerrain(baked.buffer.slice(baked.byteOffset,baked.byteOffset+baked.byteLength) as ArrayBuffer,meta,network,{profile});
   const catalog={version:3,slug,sourceSha256:createHash('sha256').update(sourceBytes).digest('hex'),runs:terrain.realRuns!.map((r,index)=>({index,id:r.id,name:r.name,difficulty:r.difficulty,sourceIndex:r.sourceIndex,topElevationM:rounded(r.points[0].y),bottomElevationM:rounded(r.points.at(-1)!.y),lengthM:rounded(r.lengthM),widthM:r.halfWidthM*2})),lifts:network.lifts.map(l=>({id:l.id,name:l.n,type:l.t})),gaps:network.provenance!.gaps};
   const json=Buffer.from(JSON.stringify(network));const output=new Map<string,Buffer>([[`${slug}.trails.json`,json],[`${slug}.trails.json.br`,brotliCompressSync(json,{params:{[constants.BROTLI_PARAM_QUALITY]:11}})],[`${slug}.network.json`,Buffer.from(JSON.stringify(catalog))]]);
-  const packSize = fs.statSync(`${dir}/${slug}.height.u16.br`).size + fs.statSync(`${dir}/${slug}.far.bin.br`).size + output.get(`${slug}.trails.json.br`)!.length + brotliCompressSync(output.get(`${slug}.network.json`)!).length;
+  output.set(`${slug}.meta.json`,Buffer.from(JSON.stringify(meta,null,2)+"\n"));
+  output.set(`${slug}.height.u16.br`,brotliCompressSync(baked,{params:{[constants.BROTLI_PARAM_QUALITY]:11}}));
+  const png=new PNG({width:meta.grid,height:meta.grid,colorType:0,bitDepth:16,inputHasAlpha:false});png.data=baked;
+  output.set(`${slug}.height.png`,PNG.sync.write(png,{colorType:0,bitDepth:16,inputColorType:0,deflateLevel:9}));
+  const packSize = output.get(`${slug}.height.u16.br`)!.length + fs.statSync(`${dir}/${slug}.far.bin.br`).size + output.get(`${slug}.trails.json.br`)!.length + brotliCompressSync(output.get(`${slug}.network.json`)!).length;
   if (packSize > 1.5 * 1024 * 1024) throw new Error(`Terrain budget exceeded: ${packSize}`);
   for(const [name,data]of output){if(verify){if(!fs.readFileSync(`${dir}/${name}`).equals(data))throw new Error(`Non-reproducible ${name}`);}else fs.writeFileSync(`${dir}/${name}`,data);}
   console.log(`${slug}: ${catalog.runs.length} selectable pieces, ${network.runs.length} runs, ${network.lifts.length} lifts, ${network.junctions!.length} junctions, ${network.forests!.length} forest polygons`);

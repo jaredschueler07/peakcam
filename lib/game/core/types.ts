@@ -53,6 +53,13 @@ export interface RealRun {
 }
 
 export interface RealLift {
+  readonly id?: string;
+  readonly sourceId?: string;
+  readonly speedMps?: number;
+  readonly speedSource?: "osm" | "type-default";
+  readonly occupancy?: number | null;
+  readonly towers?: readonly RealRunPoint[];
+  readonly stations?: readonly (RealRunPoint & { radiusM: number })[];
   readonly kind: "real";
   readonly name: string;
   readonly type: string;
@@ -79,6 +86,7 @@ export interface TerrainSampler {
   readonly noiseOffset: Readonly<{ x: number; z: number }>;
   readonly realRuns?: readonly RealRun[];
   readonly mainLift?: RealLift | null;
+  readonly realLifts?: readonly RealLift[];
   height(x: number, z: number): number;
   normal(x: number, z: number, out: Vec3): Vec3;
   trailField(x: number, z: number): number;
