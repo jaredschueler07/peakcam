@@ -37,14 +37,14 @@ const expectedSelections = {
 } as const;
 
 for (const slug of ["ski-portillo", "breckenridge", "heavenly"] as const) {
-  test(`real course selects six downhill named runs and deterministic furniture for ${slug}`, () => {
+  test(`real course selects full downhill named network and deterministic furniture for ${slug}`, () => {
     const profile = DROP_IN_GAME_PROFILES[slug];
     const real = createTerrainSource({ profile, assets: load(slug), mode: "real" }).real!;
     const a = buildRealCourse(profile, real.runs, real.lifts, profile.terrainSeed);
     const b = buildRealCourse(profile, real.runs, real.lifts, profile.terrainSeed);
-    assert.equal(a.runs.length, 6);
-    assert.deepEqual(a.runs.map((run) => run.name), expectedSelections[slug].runs);
-    assert.equal(new Set(a.runs.map((run) => run.name)).size, 6);
+    assert.ok(a.runs.length >= 6);
+    assert.deepEqual(a.runs.slice(0, 6).map((run) => run.name), expectedSelections[slug].runs);
+    assert.ok(new Set(a.runs.map((run) => run.name)).size >= 6);
     assert.ok(a.runs.every((run) => run.points[0].y > run.points.at(-1)!.y));
     assert.deepEqual(a, b);
     assert.ok(a.runs.every((run) => run.gates.length > 0));

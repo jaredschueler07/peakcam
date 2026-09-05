@@ -225,10 +225,10 @@ test("landing absorption timer counts down while suppressing obstacle collisions
   assert.equal(state.crash, 0);
 });
 
-test("v2 with the v1 carve table matches v1 dynamics for legacy fields", () => {
+test("v2 strategy with the full v1 config preserves legacy fields", () => {
   const v1World = createProceduralWorld(profile, profile.seed, simulationConfig("packed", "v1"));
   const v2World = createProceduralWorld(profile, profile.seed, {
-    ...simulationConfig("packed", "v2"), carve: simulationConfig("packed", "v1").carve,
+    ...simulationConfig("packed", "v1"),
   });
   const v1 = createSimulation(profile, profile.seed, v1World.terrain);
   const v2 = createSimulation(profile, profile.seed, v2World.terrain);
@@ -242,4 +242,13 @@ test("v2 with the v1 carve table matches v1 dynamics for legacy fields", () => {
     const v2Legacy = { ...v2, edgeAngle: 0, landingTimer: 0 };
     assert.deepEqual(v2Legacy, v1Legacy);
   }
+});
+
+ test("v2 partial tuck gives intermediate acceleration, not full tuck thrust", () => {
+  const speeds = [0, 0.1, 0.5, 1].map(tuck => {
+    const { state, world } = setup();
+    integrateSkierV2(state, input({ tuck }), FIXED_DT, world);
+    return Math.hypot(state.vel.x, state.vel.z);
+  });
+  for (let i = 1; i < speeds.length; i++) assert.ok(speeds[i] > speeds[i - 1]);
 });

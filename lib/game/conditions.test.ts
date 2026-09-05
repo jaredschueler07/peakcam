@@ -88,7 +88,8 @@ test("only the first separator splits, so a narrative may contain pipes", () => 
 
 test("eight inches in 24 hours takes priority and produces the powder-day snapshot", () => {
   assert.deepEqual(buildConditionsSnapshot(resort, { ...report, new_snow_24h: 8 }, null), {
-    surface: "powder", physicsModel: "v1", weatherDefault: 0, powderDay: true,
+    environment: { powderDepthCm: 20, windSpeedMps: 0, morningIce: false, visibilityM: 20000, northSign: -1 },
+    surface: "powder", physicsModel: "v2", weatherDefault: 0, powderDay: true,
     baseDepthIn: 64, snow24In: 8, stamp: "POWDER DAY", narrative: null,
   });
 });
@@ -101,28 +102,31 @@ test("poor and explicitly icy conditions map to distinct hard-snow surfaces", ()
 
 test("NWS snow selects the snowfall preset without changing packed surface", () => {
   assert.deepEqual(buildConditionsSnapshot(resort, report, snowForecast), {
-    surface: "packed", physicsModel: "v1", weatherDefault: 1, powderDay: false,
+    environment: { powderDepthCm: 8, windSpeedMps: 5, morningIce: true, visibilityM: 800, northSign: -1 },
+    surface: "packed", physicsModel: "v2", weatherDefault: 1, powderDay: false,
     baseDepthIn: 64, snow24In: 3, stamp: "Packed powder", narrative: null,
   });
 });
 
 test("missing live data uses the deterministic classic fallback", () => {
   assert.deepEqual(buildConditionsSnapshot(resort, null, null), {
-    surface: "packed", physicsModel: "v1", weatherDefault: 0, powderDay: false,
+    environment: { powderDepthCm: 0, windSpeedMps: 0, morningIce: false, visibilityM: 20000, northSign: -1 },
+    surface: "packed", physicsModel: "v2", weatherDefault: 0, powderDay: false,
     baseDepthIn: null, snow24In: null, stamp: "Classic conditions", narrative: null,
   });
 });
 
 test("a forecast-only snapshot still starts in snowfall weather", () => {
   assert.deepEqual(buildConditionsSnapshot(resort, null, snowForecast), {
-    surface: "packed", physicsModel: "v1", weatherDefault: 1, powderDay: false,
+    environment: { powderDepthCm: 0, windSpeedMps: 5, morningIce: true, visibilityM: 800, northSign: -1 },
+    surface: "packed", physicsModel: "v2", weatherDefault: 1, powderDay: false,
     baseDepthIn: null, snow24In: null, stamp: "Classic conditions", narrative: null,
   });
 });
 
-test("physicsV2 is rollout-selected but remains off before the feel gate", () => {
+test("physicsV2 defaults on with explicit offline v1 supported", () => {
   assert.equal(physicsModelForRollout(false), "v1");
   assert.equal(physicsModelForRollout(true), "v2");
-  assert.equal(buildConditionsSnapshot(resort, report).physicsModel, "v1");
+  assert.equal(buildConditionsSnapshot(resort, report).physicsModel, "v2");
   assert.equal(buildConditionsSnapshot(resort, report, null, "v2").physicsModel, "v2");
 });

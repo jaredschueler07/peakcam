@@ -12,7 +12,17 @@ export interface CarveParams {
   readonly landingWindow: number;  // seconds of landing absorption
 }
 
+export interface SimulationEnvironment {
+  readonly powderDepthCm: number;
+  readonly windSpeedMps: number;
+  readonly morningIce: boolean;
+  readonly visibilityM: number;
+  /** North-facing slope sign in local game Z (southern hemisphere still geographic north). */
+  readonly northSign: 1 | -1;
+}
+
 export interface SimulationConfig {
+  readonly environment?: SimulationEnvironment;
   readonly surface: SurfaceKind;
   readonly topSpeedMultiplier: number;
   readonly gripMultiplier: number;
@@ -81,7 +91,8 @@ const V2_CONFIGS: Readonly<Record<SurfaceKind, SimulationConfig>> = {
 };
 
 export function simulationConfig(
-  surface: SurfaceKind = "packed", model: PhysicsModel = "v1",
+  surface: SurfaceKind = "packed", model: PhysicsModel = "v1", environment?: SimulationEnvironment,
 ): SimulationConfig {
-  return model === "v2" ? V2_CONFIGS[surface] : SURFACE_CONFIGS[surface];
+  const base = model === "v2" ? V2_CONFIGS[surface] : SURFACE_CONFIGS[surface];
+  return environment && model === "v2" ? { ...base, environment } : base;
 }

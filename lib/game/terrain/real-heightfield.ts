@@ -43,7 +43,7 @@ import type { NearestTrail, TerrainSampler, Vec3 } from "../core/types";
 import { createGridSample, sampleGridBicubic } from "./bicubic";
 import {
   decodeHeightfield, decodeTrails, HEIGHTFIELD_ORIENTATION,
-  type Heightfield, type TerrainMeta, type Trails, type TrailsFile,
+  type Heightfield, type TerrainMeta, type Trails, type TrailsFile, type RunMetadata, type LiftMetadata,
 } from "./formats";
 import { fbmWithGradient, type NoiseGradient } from "./noise-grad";
 import { buildRealCourse, nearestPointOnRun } from "./real-course";
@@ -96,7 +96,7 @@ export interface DrapedPoint {
   z: number;
 }
 
-export interface DrapedRun {
+export interface DrapedRun extends RunMetadata {
   name: string | null;
   difficulty: string | null;
   grooming: string | null;
@@ -108,7 +108,7 @@ export interface DrapedRun {
   points: DrapedPoint[];
 }
 
-export interface DrapedLift {
+export interface DrapedLift extends LiftMetadata {
   name: string | null;
   type: string;
   points: DrapedPoint[];
@@ -230,17 +230,19 @@ export function createRealTerrain(
   }
 
   const runs: DrapedRun[] = trails.runs.map((run) => ({
+    ...run,
     name: run.name,
     difficulty: run.difficulty,
     grooming: run.grooming,
     gladed: run.gladed,
     oneway: run.oneway,
-    groomed: !run.gladed && run.grooming !== "backcountry",
-    halfWidthM: corridorHalfWidthM,
+    groomed: !run.gladed && !["backcountry", "mogul", "no"].includes(run.grooming ?? "") && (run.grooming !== null || !["advanced", "expert", "freeride"].includes(run.difficulty ?? "")),
+    halfWidthM: run.widthM ? run.widthM / 2 : corridorHalfWidthM,
     points: drape(run.points),
   }));
 
   const lifts: DrapedLift[] = trails.lifts.map((lift) => ({
+    ...lift,
     name: lift.name,
     type: lift.type,
     points: drape(lift.points),
@@ -416,10 +418,12 @@ export function createRealTerrain(
         out.d = Infinity; out.dx = 0; out.on = false;
         return out;
       }
-      let bestI = 0, bestDistance = Infinity, bestX = 0;
+      let bestI = 0, bestDistance = Infinity, bestClearance = Infinity, bestX = 0;
       for (let i = 0; i < course.runs.length; i += 1) {
         const hit = nearestPointOnRun(course.runs[i], x, z);
-        if (hit.distance < bestDistance) {
+        const clearance = hit.distance - course.runs[i].halfWidthM * 1.2;
+        if (clearance < bestClearance) {
+          bestClearance = clearance;
           bestI = i; bestDistance = hit.distance; bestX = hit.x;
         }
       }
