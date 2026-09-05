@@ -426,3 +426,36 @@ test("failed compilation restores the current governor tier before rejecting", a
   assert.equal((internals.built.sky as unknown as { isSkyMesh?: boolean }).isSkyMesh, undefined);
   renderer.dispose();
 });
+
+for (const backendKind of ["webgl", "webgpu"] as const) test(`${backendKind}: debug draw counters include shadows, scene and every post pass once per frame`, () => {
+  const backend = new FakeBackend(backendKind);
+  let resets = 0;
+  const info = {
+    autoReset: true,
+    render: { calls: 0, drawCalls: 0, triangles: 0 },
+    memory: { geometries: 4 },
+    reset() { resets++; if (backendKind === "webgl") this.render.calls = 0; this.render.drawCalls = 0; this.render.triangles = 0; },
+  };
+  Object.assign(backend, { info });
+  backend.render = () => {
+    if (info.autoReset) info.reset();
+    info.render.calls++; info.render.drawCalls++; info.render.triangles += 10;
+  };
+  const { renderer, state, world } = buildRenderer(backend);
+  assert.equal(info.autoReset, false);
+  // The scene test uses a synchronous post double to model the real shadow/scene/fullscreen chain.
+  const internals = renderer as unknown as { csm: { update(): void }; post: { render(dt: number): void; dispose(): void } | null };
+  internals.csm.update = () => backend.render();
+  internals.post = { render: () => { backend.render(); backend.render(); backend.render(); }, dispose() {} };
+  renderer.render(state, world, 1 / 60, 0);
+  assert.equal(resets, 1);
+  let snapshot = renderer.debugRendererInfo() as { frameDrawCalls: number; frameTriangles: number; render: { calls: number } };
+  assert.equal(snapshot.frameDrawCalls, 4); assert.equal(snapshot.frameTriangles, 40);
+  renderer.render(state, world, 1 / 60, 0);
+  assert.equal(resets, 2);
+  snapshot = renderer.debugRendererInfo() as typeof snapshot;
+  assert.equal(snapshot.frameDrawCalls, 4, "frame totals never accumulate across RAFs");
+  assert.equal(snapshot.frameTriangles, 40);
+  assert.equal(snapshot.render.calls, backendKind === "webgpu" ? 8 : 4, "WebGPU lifetime calls are not mislabeled as per-frame draw calls");
+  renderer.dispose();
+});
