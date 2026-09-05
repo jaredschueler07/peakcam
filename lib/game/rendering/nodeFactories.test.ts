@@ -3,7 +3,7 @@ import test from "node:test";
 import fs from "node:fs";
 import path from "node:path";
 
-import { loadNodeFactories } from "./nodeFactories";
+import { createNodeFactoriesLoader, loadNodeFactories } from "./nodeFactories";
 import { staticNodeFactories } from "./nodeFactories.fixture";
 
 const GAME_ROOT = path.join(process.cwd(), "lib", "game");
@@ -69,4 +69,25 @@ test("loadNodeFactories resolves the same module set the fixture assembles, and 
   assert.equal(typeof loaded.particles.createParticleNodeMaterial, "function");
   assert.equal(typeof loaded.csm.CsmShadowsNode, "function");
   assert.equal(await loadNodeFactories(), loaded, "the modules are fetched once per session");
+});
+
+
+test("a failed speculative node load is shared, then Start can retry and cache success", async () => {
+  let attempts = 0;
+  const modules = staticNodeFactories();
+  const failure = new Error("temporary chunk download failure");
+  const load = createNodeFactoriesLoader(async () => {
+    attempts++;
+    if (attempts === 1) throw failure;
+    return modules;
+  });
+  const speculative = load();
+  assert.equal(load(), speculative, "concurrent callers share the in-flight request");
+  await assert.rejects(speculative, (error) => error === failure);
+  const start = load();
+  assert.notEqual(start, speculative);
+  assert.equal(load(), start);
+  assert.equal(await start, modules);
+  assert.equal(load(), start, "successful promise remains cached");
+  assert.equal(attempts, 2);
 });

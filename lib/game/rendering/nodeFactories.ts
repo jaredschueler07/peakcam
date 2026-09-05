@@ -20,24 +20,33 @@ export interface NodeFactories {
   readonly csm: typeof import("./CsmShadowsNode");
 }
 
-let pending: Promise<NodeFactories> | null = null;
+/** Share in-flight/successful module loads, but let Start retry a failed poster prefetch. */
+export function createNodeFactoriesLoader(load: () => Promise<NodeFactories>): () => Promise<NodeFactories> {
+  let pending: Promise<NodeFactories> | null = null;
+  return () => {
+    pending ??= Promise.resolve().then(load).catch((error: unknown) => {
+      pending = null;
+      throw error;
+    });
+    return pending;
+  };
+}
 
 /**
  * Resolves the node pipeline, fetching its chunk on first call. Cached, because a session builds
  * the scene once but `Renderer` and `createGame` both want the same module instances — two
  * `CSMShadowNode` copies would be two different classes to `instanceof`.
  */
-export function loadNodeFactories(): Promise<NodeFactories> {
+export const loadNodeFactories = createNodeFactoriesLoader(() => {
   // The renderer needs this chain before prewarm too. Start its module request
   // beside the material modules, while terrain/GPU startup is already in flight.
   // Preserve optional post failure semantics: Renderer owns its normal fallback.
-  if (!pending) void import("./NodePostProcessing").catch(() => {});
-  pending ??= Promise.all([
+  void import("./NodePostProcessing").catch(() => {});
+  return Promise.all([
     import("./SkyNodeMaterial"),
     import("./SnowNodeMaterial"),
     import("./AtmosphereNode"),
     import("./ParticleNodeMaterial"),
     import("./CsmShadowsNode"),
   ]).then(([sky, snow, atmosphere, particles, csm]) => ({ sky, snow, atmosphere, particles, csm }));
-  return pending;
-}
+});
