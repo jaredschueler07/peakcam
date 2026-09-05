@@ -40,6 +40,8 @@ import PauseDialog from "./hud/PauseDialog";
 import ResultsDialog from "./hud/ResultsDialog";
 import TouchControls from "./input/TouchControls";
 
+import type { CourseChoice } from "@/lib/game/config/course-choices";
+
 type ShellPhase = "poster" | "loading" | "playing" | "error";
 
 /**
@@ -92,9 +94,10 @@ function ErrorPoster({ profile, message }: { profile: ResortGameProfile; message
 
 const AUDIO_STORAGE_KEY = "drop-in-audio";
 
-export default function DropInGame({ profile, conditions }: {
+export default function DropInGame({ profile, conditions, courseChoices }: {
   profile: ResortGameProfile;
   conditions: ConditionsSnapshot;
+  courseChoices: readonly CourseChoice[];
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const runtimeRef = useRef<GameRuntime | null>(null);
@@ -116,7 +119,8 @@ export default function DropInGame({ profile, conditions }: {
 
   // The server derives legal trail ids from the profile, and a run always drops
   // in on the first trail, so that is the course we ask a ticket for.
-  const trailId = useMemo(() => trailIdFromName(profile.trails[0].name), [profile]);
+  const [trailId, setTrailId] = useState(() => courseChoices[0]?.id ?? trailIdFromName(profile.trails[0].name));
+  const selectedCourse = courseChoices.find((course) => course.id === trailId);
   const physicsModel = resolveRuntimePhysicsModel(conditions.physicsModel);
   const [mode, setMode] = useState<DropInModeChoice>("free_ski");
   const [ticketState, setTicketState] = useState<TicketState>(NO_TICKET);
@@ -152,7 +156,7 @@ export default function DropInGame({ profile, conditions }: {
    * are skiing — across a UTC-day rollover the Daily Line seed moves, and that
    * run has to finish offline.
    */
-  const mintTicket = (choice: CompetitiveRunMode, duringPlay = false) => {
+  const mintTicket = (choice: CompetitiveRunMode, duringPlay = false, requestedTrailId = trailId) => {
     sessionAbortRef.current?.abort();
     const controller = new AbortController();
     sessionAbortRef.current = controller;
@@ -162,7 +166,7 @@ export default function DropInGame({ profile, conditions }: {
       {
         resortSlug: profile.slug,
         mode: choice,
-        trailId,
+        trailId: requestedTrailId,
         surface: conditions.surface,
         physicsModel: physicsModelForSessionRequest(conditions),
       },
@@ -252,9 +256,10 @@ export default function DropInGame({ profile, conditions }: {
   const dailyCourseName = useMemo(() => {
     const held = ticketState.status === "ready" ? ticketState.ticket : null;
     const id = held?.mode === "score_attack" ? held.trailId : trailId;
-    return profile.trails.find((trail) => trailIdFromName(trail.name) === id)?.name
+    return courseChoices.find((course) => course.id === id)?.name
+      ?? profile.trails.find((trail) => trailIdFromName(trail.name) === id)?.name
       ?? profile.trails[0].name;
-  }, [profile, ticketState, trailId]);
+  }, [profile, courseChoices, ticketState, trailId]);
 
   /** Drop the loaded ghost. See the lifetime rule on `raceGhost`. */
   const clearGhost = () => {
@@ -334,6 +339,7 @@ export default function DropInGame({ profile, conditions }: {
           canvas, profile, uiBridge: bridge, signal: controller.signal, conditions, physicsModel, audio,
           // The ghost header carries world.seed; it must equal the ticket seed
           // or the server rejects the submission with seed_mismatch.
+          ...{ trailId: runTicketRef.current?.trailId ?? trailId },
           seed: resolveRunSeed(runTicketRef.current, profile.seed),
           // Test-only start offset (`?e2espawn=<metres>`). The run it produces
           // finishes through real physics but is refused by the server
@@ -529,6 +535,18 @@ export default function DropInGame({ profile, conditions }: {
                 pending={ticketState.status === "requesting" ? session.mode : null}
                 notice={sessionNotice}
               />
+              <label className="mx-auto mt-4 block max-w-md text-left text-xs font-bold text-ink">
+                Named run
+                <select aria-label="Named run" value={mode === "score_attack" && ticketState.status === "ready" ? ticketState.ticket.trailId : trailId} disabled={mode === "score_attack"} onChange={(event) => {
+                  const id = event.target.value;
+                  setTrailId(id); clearGhost();
+                  applyTicketState(NO_TICKET);
+                  if (modeRef.current === "time_trial") mintTicket("time_trial", false, id);
+                }} className="mt-1 min-h-11 w-full rounded border-[1.5px] border-ink bg-cream-50 px-3 text-sm focus-visible:ring-2 focus-visible:ring-alpen">
+                  {courseChoices.map((course) => <option key={course.id} value={course.id}>{course.name} · {course.difficulty ?? "unrated"} · {Math.round(course.lengthM)} m</option>)}
+                </select>
+                {selectedCourse && <span className="mt-1 block font-normal">{Math.round(selectedCourse.topElevationM * 3.28084).toLocaleString()} → {Math.round(selectedCourse.bottomElevationM * 3.28084).toLocaleString()} ft</span>}
+              </label>
               <button autoFocus onClick={start} className="mt-7 rounded-full border-[1.5px] border-ink bg-alpen px-8 py-3 font-bold uppercase tracking-wide text-cream-50 shadow-stamp transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink">
                 Start descent
               </button>
@@ -539,6 +557,7 @@ export default function DropInGame({ profile, conditions }: {
         {phase === "loading" && <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-ink/50" role="status"><span className="pc-eyebrow rounded-full bg-cream-50 px-4 py-2 text-ink">Loading real mountain… {Math.round(loadingProgress * 100)}%</span></div>}
         {phase === "playing" && runtime && <><DropInHUD store={bridge.store} audioEnabled={audioEnabled} onToggleAudio={toggleAudio} onPause={() => runtime.pause()} /><TouchControls adapter={runtime.touch} /><PauseDialog store={bridge.store} onResume={() => runtime.resume()} onRestart={() => restartRun(runtime)} /><ResultsDialog
           store={bridge.store}
+          conditionsLabel={`${conditions.stamp} · ${conditions.surface}`}
           onRestart={() => restartRun(runtime)}
           // Free Ski passes null, which is what removes the leaderboard,
           // submission and ghost surfaces entirely rather than disabling them.

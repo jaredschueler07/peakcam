@@ -54,12 +54,15 @@ export default function ResultsDialog({
   store,
   onRestart,
   competition = null,
+  conditionsLabel,
 }: {
   store: StoreApi<HudState>;
   onRestart(): void;
   competition?: ResultsCompetition | null;
+  conditionsLabel?: string;
 }) {
   const show = useStore(store, (state) => state.status === "results");
+  const runName = useStore(store, (state) => state.trailName);
   const score = useStore(store, (state) => state.score);
   const time = useStore(store, (state) => state.elapsedSeconds);
   const [open, setOpen] = useState<OpenRun | null>(null);
@@ -124,7 +127,8 @@ export default function ResultsDialog({
     >
       <div className="pc-paper max-h-full w-full max-w-md overflow-y-auto rounded-lg border-[1.5px] border-ink p-6 text-center shadow-stamp-lg">
         <p className="pc-eyebrow">Run complete</p>
-        <h2 id="results-title" className="pc-display text-4xl">Your line</h2>
+        <h2 id="results-title" className="pc-display text-4xl">{runName}</h2>
+        {conditionsLabel && <p className="mt-2 text-sm text-bark-dk">{conditionsLabel}</p>}
         <p className="mt-3 font-mono">{score.toLocaleString()} pts · {time.toFixed(1)}s</p>
 
         {/* Outcome 1 — submitted. Rendered from the response we hold, never

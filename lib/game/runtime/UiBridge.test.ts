@@ -39,3 +39,23 @@ test("finished recording availability is surfaced and can be cleared", () => {
   bridge.setRunRecordingAvailable(false);
   assert.equal(bridge.store.getState().runRecording, false);
 });
+
+test("real mountain HUD reports DEM altitude instead of a profile-relative summit", () => {
+  const profile = DROP_IN_GAME_PROFILES.heavenly;
+  const state = createSimulation(profile, profile.seed);
+  const bridge = new UiBridge(profile);
+  const terrain = {
+    kind: "real" as const, profile, seed: profile.seed, noiseOffset: { x: 0, z: 0 },
+    realRuns: [{kind: "real" as const, name: "Gunbarrel", sourceIndex: 0, difficulty: "advanced", halfWidthM: 14,
+      points: [{x: 0, y: 2600, z: 0}, {x: 0, y: 2200, z: 1000}], lengthM: 1000, finishM: 1000, gates: [], ramps: []}],
+    height: () => 2600, normal: (_x: number, _z: number, out: {x:number;y:number;z:number}) => out,
+    trailField: () => 1, nearestTrail: (_x: number, _z: number, out: import("../core/types").NearestTrail) => out,
+  };
+  bridge.configureTerrain(terrain);
+  state.pos.y = 2500; state.startY = 2600;
+  bridge.publish(state, 0);
+  const hud = bridge.store.getState();
+  assert.equal(hud.altitudeFeet, 2500 * 3.28084);
+  assert.equal(hud.trailTopFeet, 2600 * 3.28084);
+  assert.equal(hud.trailBottomFeet, 2200 * 3.28084);
+});

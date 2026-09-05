@@ -23,6 +23,10 @@ export interface HudState {
   combo: number;
   trailIndex: number;
   trailName: string;
+  trailTopFeet: number | null;
+  trailBottomFeet: number | null;
+  liftName: string | null;
+  liftSecondsRemaining: number;
   crashReason: "TREE" | "ROCK" | "LANDING" | null;
   position: Readonly<{ x: number; z: number }>;
   error: string | null;
@@ -36,6 +40,7 @@ type Listener = (event: RuntimeEvent) => void;
 export class UiBridge {
   readonly store: StoreApi<HudState>;
   private readonly listeners = new Set<Listener>();
+  private terrain: TerrainSampler | null = null;
   private lastPublishMs = -Infinity;
   private trailNames: readonly string[];
   private trailPolylines: ReadonlyArray<readonly Readonly<{ x: number; z: number }>[]> = [];
@@ -46,6 +51,7 @@ export class UiBridge {
       status: "loading", speedKmh: 0, elapsedSeconds: 0, verticalFeet: 0,
       altitudeFeet: profile.summitFt, score: 0, best: 0, combo: 1,
       trailIndex: 0, trailName: profile.trails[0].name, crashReason: null,
+      trailTopFeet: null, trailBottomFeet: null, liftName: null, liftSecondsRemaining: 0,
       position: { x: 0, z: 0 }, error: null, loadingProgress: 0, trailPolyline: [],
       runRecording: false,
     }));
@@ -55,11 +61,16 @@ export class UiBridge {
     if (nowMs - this.lastPublishMs < 1000 / 15) return false;
     this.lastPublishMs = nowMs;
     const verticalMetres = Math.max(0, state.startY - state.pos.y);
+    const run = this.terrain?.realRuns?.[state.selectedTrail];
     this.store.setState({
+      trailTopFeet: run ? run.points[0].y * 3.28084 : null,
+      trailBottomFeet: run ? run.points[run.points.length - 1].y * 3.28084 : null,
+      liftName: state.liftRide > 0 ? this.terrain?.mainLift?.name ?? "Lift" : null,
+      liftSecondsRemaining: state.liftRide,
       speedKmh: Math.round(Math.hypot(state.vel.x, state.vel.z) * 3.6),
       elapsedSeconds: state.time,
       verticalFeet: verticalMetres * 3.28084,
-      altitudeFeet: this.profile.summitFt - verticalMetres * 3.28084,
+      altitudeFeet: this.terrain?.kind === "real" ? state.pos.y * 3.28084 : this.profile.summitFt - verticalMetres * 3.28084,
       score: state.score,
       best: state.best,
       combo: state.combo,
@@ -76,6 +87,7 @@ export class UiBridge {
     this.store.setState({ status: "loading", loadingProgress: Math.max(0, Math.min(1, progress)) });
   }
   configureTerrain(terrain: TerrainSampler): void {
+    this.terrain = terrain;
     if (terrain.kind === "real" && terrain.realRuns) {
       this.trailNames = terrain.realRuns.map((run) => run.name);
       this.trailPolylines = terrain.realRuns.map((run) => run.points.map(({ x, z }) => ({ x, z })));

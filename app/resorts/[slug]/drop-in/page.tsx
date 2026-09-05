@@ -16,6 +16,11 @@ import { PHYSICS_V2_ROLLOUT_ENABLED, physicsModelForRollout } from "@/lib/game/c
 
 import { SITE_URL as BASE_URL } from "@/lib/site";
 
+import breckenridgeNetwork from "@/public/game/terrain/breckenridge.network.json";
+import heavenlyNetwork from "@/public/game/terrain/heavenly.network.json";
+import portilloNetwork from "@/public/game/terrain/ski-portillo.network.json";
+const courseNetworks = { breckenridge: breckenridgeNetwork, heavenly: heavenlyNetwork, "ski-portillo": portilloNetwork };
+
 export const revalidate = 3600;
 
 // The pilot roster is static and tiny — prerender all three. Everything else is
@@ -137,6 +142,7 @@ export default async function DropInPage({
       <DropInClientBoundary
         profile={DROP_IN_GAME_PROFILES[slug as keyof typeof DROP_IN_GAME_PROFILES]}
         conditions={conditions}
+        courseChoices={courseNetworks[slug as keyof typeof courseNetworks].runs}
       />
     </main>
   );

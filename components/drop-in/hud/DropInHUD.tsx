@@ -1,5 +1,6 @@
 "use client";
 
+import LiftStatus from "./LiftStatus";
 import type { StoreApi } from "zustand/vanilla";
 import type { HudState } from "@/lib/game/runtime/UiBridge";
 import MinimapCanvas from "./MinimapCanvas";
@@ -17,8 +18,9 @@ export default function DropInHUD({ store, audioEnabled, onToggleAudio, onPause 
   return (
     <div className="pointer-events-none absolute inset-0 z-10 px-3 pb-3 pt-16 sm:px-5 sm:pb-5">
       <div className="flex items-start justify-between gap-3"><Speedometer store={store} /><TrailStatus store={store} /></div>
+      <LiftStatus store={store} />
       <div className="absolute bottom-36 sm:bottom-4 left-1/2 -translate-x-1/2"><RunStatus store={store} /></div>
-      <div className="absolute right-4 top-20 hidden sm:block"><MinimapCanvas store={store} /></div>
+      <div className="absolute right-4 top-52 hidden sm:block"><MinimapCanvas store={store} /></div>
       <button type="button" onClick={onPause} className="pointer-events-auto absolute left-4 top-32 min-h-11 rounded-full border-[1.5px] border-ink bg-cream-50 px-4 text-sm font-bold text-ink shadow-stamp-sm focus-visible:ring-2 focus-visible:ring-alpen" aria-label="Pause game">Pause</button>
       <p className="absolute left-4 top-48 hidden max-w-sm rounded bg-cream-50/90 px-2 py-1 text-xs text-ink sm:block">← → carve · ↑ tuck · ↓ brake · Space jump · Esc pause</p>
       <button
