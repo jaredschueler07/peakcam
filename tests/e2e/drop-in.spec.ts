@@ -390,9 +390,9 @@ test("an unsupported resort shows not-found and never mounts the game", async ({
 });
 
 test("keyboard-only start reaches a running canvas with a ticking HUD", async ({ page }) => {
-  await page.goto(dropInUrl(V2_URL));
   const heightfieldRequest = page.waitForRequest((request) =>
     new URL(request.url()).pathname.endsWith("/game/terrain/heavenly.height.u16.br"));
+  await page.goto(dropInUrl(V2_URL));
   // Enter may land before hydration attaches the poster's key listener —
   // keep pressing until the shell reacts. Still exercises keyboard-only start.
   await expect
