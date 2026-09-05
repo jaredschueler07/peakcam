@@ -372,9 +372,10 @@ test("[gate] play → submit → board: a finished run posts and appears on the 
   expect(body.timeMs as number).toBeGreaterThan(0);
 });
 
-test("the default engine remains the v1 iframe", async ({ page }) => {
+test("the public route defaults to the native game without an engine query", async ({ page }) => {
   await page.goto("/resorts/heavenly/drop-in");
-  await expect(page.locator("iframe[title*='Drop In']")).toHaveCount(1);
+  await expect(page.locator("iframe")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /start descent/i })).toBeVisible();
 });
 
 test("an unsupported resort shows not-found and never mounts the game", async ({ page }) => {
@@ -391,7 +392,7 @@ test("an unsupported resort shows not-found and never mounts the game", async ({
 test("keyboard-only start reaches a running canvas with a ticking HUD", async ({ page }) => {
   await page.goto(dropInUrl(V2_URL));
   const heightfieldRequest = page.waitForRequest((request) =>
-    request.url().endsWith("/game/terrain/heavenly.height.u16.br"));
+    new URL(request.url()).pathname.endsWith("/game/terrain/heavenly.height.u16.br"));
   // Enter may land before hydration attaches the poster's key listener —
   // keep pressing until the shell reacts. Still exercises keyboard-only start.
   await expect
