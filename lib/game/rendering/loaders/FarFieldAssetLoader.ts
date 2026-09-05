@@ -1,3 +1,4 @@
+import { COURSE_VERSION } from "../../config/versions";
 import type { DropInResortSlug } from "../../config/schema";
 import {
   decodeFarField,
@@ -55,7 +56,7 @@ export class FarFieldAssetLoader {
     const warn = options.onWarn ?? ((message: string) => console.warn(message));
 
     try {
-      const url = farFieldAssetUrl(slug);
+      const url = `${farFieldAssetUrl(slug)}?course=${COURSE_VERSION}`;
       // Read into a local first: `this.fetcher(...)` would call it as a method, and an
       // unbound `fetch` rejects a non-global receiver. See the constructor.
       const fetcher = this.fetcher;

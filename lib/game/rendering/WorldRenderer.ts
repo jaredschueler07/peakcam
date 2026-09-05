@@ -9,6 +9,7 @@ import { trailCenter } from "../terrain/trails";
 import { pointAtArcLength } from "../terrain/real-course";
 import { treeDebugEnabled } from "./debugFlags";
 import { createLandmarks } from "./LandmarkRenderer";
+import { TrailSigns } from "./TrailSigns";
 import { TILE_SIZE } from "./TerrainRenderer";
 import { GRID_HALF, GRID_SIZE, Z_TILES_BEHIND } from "./nearFieldReach";
 
@@ -118,6 +119,7 @@ export class WorldRenderer {
   private readonly lift = new THREE.Group(); private readonly towers: THREE.Group[] = []; private readonly chairs: THREE.Group[] = [];
   private readonly cableGeometry = new THREE.BufferGeometry();
   private readonly landmarks: THREE.Group | null;
+  private readonly trailSigns: TrailSigns | null;
   private propX = Infinity; private propZ = Infinity; private furnitureZ = Infinity; private furnitureTimer = 0;
 
   constructor(private readonly scene: THREE.Scene, private readonly profile: ResortGameProfile, private readonly world: SimulationWorld) {
@@ -155,6 +157,8 @@ export class WorldRenderer {
     scene.add(this.tree, this.rock, this.markers);
     this.landmarks = world.terrain.kind === "real" ? createLandmarks(profile, world.terrain) : null;
     if (this.landmarks) scene.add(this.landmarks);
+    this.trailSigns = world.terrain.kind === "real" ? new TrailSigns(world.terrain) : null;
+    if (this.trailSigns) scene.add(this.trailSigns.group);
     this.buildGates(); this.buildRamps(); this.buildLift();
   }
 
@@ -224,6 +228,7 @@ export class WorldRenderer {
   }
 
   update(state: SimulationState, dt: number): void {
+    this.trailSigns?.update(state);
     this.updateLandmarks(state.pos.x, state.pos.z);
     this.updateProps(state.pos.x, state.pos.z);
     this.furnitureTimer -= dt;

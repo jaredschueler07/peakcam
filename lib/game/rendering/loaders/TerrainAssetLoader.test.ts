@@ -1,3 +1,4 @@
+import { COURSE_VERSION } from "../../config/versions";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { HEIGHTFIELD_ORIENTATION, type TerrainMeta, type TrailsFile } from "../../terrain/formats";
@@ -18,9 +19,9 @@ const trails: TrailsFile = {
 test("terrain loader fetches the three public pack files and reports byte-weighted progress", async () => {
   const requested: string[] = [];
   const bodyByUrl = new Map<string, BodyInit>([
-    ["/game/terrain/heavenly.meta.json", JSON.stringify(meta)],
-    ["/game/terrain/heavenly.trails.json", JSON.stringify(trails)],
-    ["/game/terrain/heavenly.height.u16.br", new Uint8Array(8)],
+    [`/game/terrain/heavenly.meta.json?course=${COURSE_VERSION}`, JSON.stringify(meta)],
+    [`/game/terrain/heavenly.trails.json?course=${COURSE_VERSION}`, JSON.stringify(trails)],
+    [`/game/terrain/heavenly.height.u16.br?course=${COURSE_VERSION}`, new Uint8Array(8)],
   ]);
   const progress: number[] = [];
   const loader = new TerrainAssetLoader(async (input) => {
@@ -33,9 +34,9 @@ test("terrain loader fetches the three public pack files and reports byte-weight
   const assets = await loader.load("heavenly", { onProgress: (value) => progress.push(value) });
 
   assert.deepEqual(requested, [
-    "/game/terrain/heavenly.meta.json",
-    "/game/terrain/heavenly.trails.json",
-    "/game/terrain/heavenly.height.u16.br",
+    `/game/terrain/heavenly.meta.json?course=${COURSE_VERSION}`,
+    `/game/terrain/heavenly.trails.json?course=${COURSE_VERSION}`,
+    `/game/terrain/heavenly.height.u16.br?course=${COURSE_VERSION}`,
   ]);
   assert.equal(assets.heightfield.byteLength, 8);
   assert.equal(assets.meta.slug, "heavenly");
@@ -60,9 +61,9 @@ test("the terrain fetcher is also invoked with a receiver real fetch accepts", a
   // exactly as it broke FarFieldAssetLoader — a browser-only `TypeError: Illegal invocation` that
   // no plain-function fake can see. Pin it here so the refactor fails in CI instead.
   const bodies = new Map<string, BodyInit>([
-    ["/game/terrain/heavenly.meta.json", JSON.stringify(meta)],
-    ["/game/terrain/heavenly.trails.json", JSON.stringify(trails)],
-    ["/game/terrain/heavenly.height.u16.br", new Uint8Array(8)],
+    [`/game/terrain/heavenly.meta.json?course=${COURSE_VERSION}`, JSON.stringify(meta)],
+    [`/game/terrain/heavenly.trails.json?course=${COURSE_VERSION}`, JSON.stringify(trails)],
+    [`/game/terrain/heavenly.height.u16.br?course=${COURSE_VERSION}`, new Uint8Array(8)],
   ]);
   const recorded = receiverCheckingFetch((url) => new Response(bodies.get(url) ?? "", { status: bodies.has(url) ? 200 : 404 }));
 

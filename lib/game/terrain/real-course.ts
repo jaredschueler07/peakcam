@@ -10,7 +10,7 @@ const RUN_MAP: Record<string, readonly string[]> = {
 };
 
 export interface ArcPoint extends RealRunPoint { heading: number }
-export interface RealCourse { runs: RealRun[]; mainLift: RealLift | null }
+export interface RealCourse { runs: RealRun[]; lifts: RealLift[]; mainLift: RealLift | null }
 
 export function polylineLength(points: readonly RealRunPoint[]): number {
   let length = 0;
@@ -136,36 +136,58 @@ function makeRun(run: DrapedRun, sourceIndex: number, seed: number): RealRun {
   return {
     ...run,
     kind: "real", sourceIndex, name: run.name ?? `Run ${sourceIndex + 1}`,
+    topElevationM: points[0].y, bottomElevationM: points.at(-1)!.y,
     difficulty: run.difficulty, halfWidthM: run.halfWidthM, points, lengthM,
     finishM: lengthM, gates, ramps,
   };
 }
 
-function selectMainLift(profile: ResortGameProfile, lifts: readonly DrapedLift[]): RealLift | null {
-  const eligible = lifts.filter((lift) => profile.slug === "ski-portillo"
+function makeLift(lift: DrapedLift): RealLift {
+  const points = lift.points.map(point => ({ ...point }));
+  const reversed = points[0].y > points.at(-1)!.y;
+  if (reversed) points.reverse();
+  const stations = lift.stations?.map(station => ({x:station.x,y:station.elevationM,z:-station.y,radiusM:station.radiusM}));
+  if (reversed) stations?.reverse();
+  return {
+    kind: "real", id: lift.id, sourceId: lift.sourceId,
+    complete: lift.complete,
+    sourceEndpoints: lift.sourceEndpoints?.map(p => ({x:p.x,z:-p.y})),
+    name: lift.name ?? "Unnamed lift", type: lift.type,
+    points, lengthM: polylineLength(points), speedMps: lift.speedMps,
+    speedSource: lift.speedSource, occupancy: lift.occupancy,
+    // DrapedLift's raw metadata retains the documented asset ENU frame.
+    // Full runtime lifts expose game coordinates throughout.
+    towers: lift.towers?.map(tower => {
+      let elevation = points[0].y, distance = Infinity;
+      for (let i=1;i<points.length;i++) {
+        const a=points[i-1], b=points[i], dx=b.x-a.x, dz=b.z-a.z;
+        const t=Math.max(0,Math.min(1,((tower.x-a.x)*dx+(-tower.y-a.z)*dz)/(dx*dx+dz*dz||1)));
+        const d=Math.hypot(tower.x-a.x-dx*t,-tower.y-a.z-dz*t);
+        if(d<distance){distance=d;elevation=a.y+(b.y-a.y)*t;}
+      }
+      return {x:tower.x,y:tower.elevationM ?? elevation,z:-tower.y};
+    }),
+    stations,
+  };
+}
+function selectMainLift(profile: ResortGameProfile, lifts: readonly RealLift[]): RealLift | null {
+  const eligible = lifts.filter(lift => lift.complete !== false).filter((lift) => profile.slug === "ski-portillo"
     ? lift.type === "platter"
     : lift.type === "chair_lift" || lift.type === "gondola");
-  let best: DrapedLift | null = null, bestLength = -1;
-  for (const lift of eligible) {
-    const length = polylineLength(lift.points);
-    if (length > bestLength) { best = lift; bestLength = length; }
-  }
-  if (!best) return null;
-  const points = best.points.map((point) => ({ ...point }));
-  if (points[0].y > points.at(-1)!.y) points.reverse();
-  return {
-    kind: "real", name: best.name ?? "Main Lift", type: best.type,
-    points, lengthM: bestLength,
-  };
+  let best: RealLift | null = null;
+  for (const lift of eligible) if (!best || lift.lengthM > best.lengthM) best = lift;
+  return best;
 }
 
 export function buildRealCourse(
   profile: ResortGameProfile, runs: readonly DrapedRun[], lifts: readonly DrapedLift[], seed: number,
 ): RealCourse {
   const selected = selectRuns(profile, runs);
+  const realLifts = lifts.filter(lift => lift.points.length >= 2).map(makeLift);
   return {
     runs: selected.map((run, index) => makeRun(run, runs.indexOf(run), seed + index * 7919)),
-    mainLift: selectMainLift(profile, lifts),
+    lifts: realLifts,
+    mainLift: selectMainLift(profile, realLifts),
   };
 }
 
