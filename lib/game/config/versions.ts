@@ -24,4 +24,5 @@ export const PHYSICS_VERSION = 1;
  * and shifted one gate. `PHYSICS_VERSION` deliberately stays 1: the
  * deterministic core is byte-for-byte unchanged, only the ground it runs over.
  */
-export const COURSE_VERSION = 2;
+// 3 — full mountain network, explicit widths/grooming and baked terrain detail.
+export const COURSE_VERSION = 3;
