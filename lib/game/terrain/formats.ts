@@ -189,6 +189,9 @@ export interface TrailsFile {
   unit: number;
   /** OSM difficulty convention the `d` values follow. */
   convention?: "north_america" | "europe";
+  junctions?: NetworkJunction[];
+  forests?: ForestPolygon[];
+  provenance?: { source: string; retrievedAt: string; gaps: string[] };
   runs: RawRun[];
   lifts: RawLift[];
 }
@@ -200,7 +203,26 @@ export interface RawPolyline {
   p: number[];
 }
 
-export interface RawRun extends RawPolyline {
+export interface NetworkJunction { id: string; x: number; y: number; runIds: string[] }
+export interface ForestPolygon { sourceId: string; points: TrailPoint[] }
+export interface RunMetadata {
+  id?: string;
+  sourceId?: string;
+  widthM?: number;
+  widthSource?: "osm" | "difficulty-default";
+  topElevationM?: number;
+  bottomElevationM?: number;
+}
+export interface LiftMetadata {
+  id?: string;
+  sourceId?: string;
+  occupancy?: number | null;
+  speedMps?: number;
+  speedSource?: "osm" | "type-default";
+  towers?: TrailPoint[];
+  stations?: Array<TrailPoint & { elevationM: number; radiusM: number }>;
+}
+export interface RawRun extends RawPolyline, RunMetadata {
   /** `piste:difficulty`. */
   d?: string | null;
   /** `piste:grooming`. */
@@ -211,7 +233,7 @@ export interface RawRun extends RawPolyline {
   o?: 1;
 }
 
-export interface RawLift extends RawPolyline {
+export interface RawLift extends RawPolyline, LiftMetadata {
   /** `aerialway` value (chair_lift, gondola, platter, …). */
   t: string;
 }
@@ -223,7 +245,7 @@ export interface TrailPoint {
   y: number;
 }
 
-export interface Run {
+export interface Run extends RunMetadata {
   name: string | null;
   difficulty: string | null;
   grooming: string | null;
@@ -232,7 +254,7 @@ export interface Run {
   points: TrailPoint[];
 }
 
-export interface Lift {
+export interface Lift extends LiftMetadata {
   name: string | null;
   type: string;
   points: TrailPoint[];
@@ -243,6 +265,8 @@ export interface Trails {
   center: [number, number];
   sizeM: number;
   convention: "north_america" | "europe" | null;
+  junctions: NetworkJunction[];
+  forests: ForestPolygon[];
   runs: Run[];
   lifts: Lift[];
 }
@@ -297,7 +321,10 @@ export function decodeTrails(json: TrailsFile): Trails {
     center: json.center,
     sizeM: json.sizeM,
     convention: json.convention ?? null,
+    junctions: json.junctions ?? [],
+    forests: json.forests ?? [],
     runs: json.runs.map((r) => ({
+      ...runMetadata(r),
       name: r.n,
       difficulty: r.d ?? null,
       grooming: r.g ?? null,
@@ -306,6 +333,7 @@ export function decodeTrails(json: TrailsFile): Trails {
       points: decodePolyline(r.p, unit),
     })),
     lifts: json.lifts.map((l) => ({
+      ...liftMetadata(l),
       name: l.n,
       type: l.t,
       points: decodePolyline(l.p, unit),
@@ -313,3 +341,6 @@ export function decodeTrails(json: TrailsFile): Trails {
   };
 }
 import type { DemSource } from "../../../scripts/dem/sources";
+
+function runMetadata({ n: _n, p: _p, d: _d, g: _g, gl: _gl, o: _o, ...metadata }: RawRun): RunMetadata { return metadata; }
+function liftMetadata({ n: _n, p: _p, t: _t, ...metadata }: RawLift): LiftMetadata { return metadata; }
