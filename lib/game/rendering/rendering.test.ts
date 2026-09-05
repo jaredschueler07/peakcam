@@ -1131,3 +1131,45 @@ test("station labels cull individually beyond 350m while terminal geometry stays
     else Reflect.deleteProperty(globalThis, "document");
   }
 });
+
+test("mapped markers stream exact terrain bounds without distant runs consuming capacity", () => {
+  const positions: number[][] = [];
+  const markers = { count: 0, visible: true, instanceMatrix: { needsUpdate: false },
+    setMatrixAt(index: number, value: THREE.Matrix4) { positions[index] = [value.elements[12], value.elements[14]]; } };
+  const run = (x: number) => ({ lengthM: 400, halfWidthM: 10,
+    points: [{ x, y: 0, z: 0 }, { x, y: 0, z: 400 }] });
+  // Hundreds of distant runs would fill the old instance cap before the last local one.
+  const fake = { markers, world: { terrain: { kind: "real", height: () => 0,
+    realRuns: [...Array.from({ length: 240 }, (_, i) => run(10000 + i * 30)), run(0)] } } };
+  const update = (WorldRenderer.prototype as unknown as { updateMarkers(x: number, z: number): void }).updateMarkers;
+  update.call(fake, 0, 0);
+  const nearby = positions.slice(0, markers.count);
+  assert.ok(nearby.length > 0);
+  assert.ok(nearby.every(([x, z]) => x >= -400 && x <= 600 && z >= -200 && z <= 800));
+  assert.ok(nearby.every(([x]) => Math.abs(x) === 10), "later local run is not starved");
+  update.call(fake, -10000, -10000);
+  assert.equal(markers.count, 0); assert.equal(markers.visible, false);
+  update.call(fake, 0, 0);
+  assert.equal(markers.visible, true);
+  assert.deepEqual(positions.slice(0, markers.count), nearby, "streaming restores canonical arc positions");
+  // A side pole can cross the terrain edge while its paired pole remains supported.
+  fake.world.terrain.realRuns = [run(595)];
+  update.call(fake, 0, 0);
+  assert.ok(markers.count > 0);
+  assert.ok(positions.slice(0, markers.count).every(([x]) => x === 585));
+});
+
+test("procedural marker placement remains independent of player X", () => {
+  const positions: number[][] = [];
+  const profile = DROP_IN_GAME_PROFILES.breckenridge;
+  const fake = { profile, world: createProceduralWorld(profile, 12), markers: {
+    count: 0, instanceMatrix: { needsUpdate: false },
+    setMatrixAt(index: number, value: THREE.Matrix4) { positions[index] = value.elements.slice(); },
+  } };
+  const update = (WorldRenderer.prototype as unknown as { updateMarkers(x: number, z: number): void }).updateMarkers;
+  update.call(fake, 0, 250);
+  const original = positions.slice(0, fake.markers.count);
+  assert.ok(original.length > 0);
+  update.call(fake, 10000, 250);
+  assert.deepEqual(positions.slice(0, fake.markers.count), original);
+});
