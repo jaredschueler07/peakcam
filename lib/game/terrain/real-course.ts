@@ -105,6 +105,14 @@ function selectRuns(profile: ResortGameProfile, inventory: readonly DrapedRun[])
     used.add(index);
     selected.push(inventory[index]);
   }
+  // Preserve familiar first choices; append every usable named source piece.
+  for (let i = 0; i < inventory.length; i += 1) {
+    const run = inventory[i];
+    if (used.has(i) || !run.name || run.points.length < 2) continue;
+    const points = trimFlatStart(downhill(run.points));
+    if (polylineLength(points) < 100 || points[0].y - points.at(-1)!.y < 5) continue;
+    selected.push(run);
+  }
   return selected;
 }
 
@@ -126,6 +134,7 @@ function makeRun(run: DrapedRun, sourceIndex: number, seed: number): RealRun {
     distanceM += 380 + random() * 100;
   }
   return {
+    ...run,
     kind: "real", sourceIndex, name: run.name ?? `Run ${sourceIndex + 1}`,
     difficulty: run.difficulty, halfWidthM: run.halfWidthM, points, lengthM,
     finishM: lengthM, gates, ramps,

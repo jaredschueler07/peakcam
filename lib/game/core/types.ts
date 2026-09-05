@@ -35,6 +35,11 @@ export interface RealRamp {
 }
 
 export interface RealRun {
+  readonly id?: string;
+  readonly sourceId?: string;
+  readonly topElevationM?: number;
+  readonly bottomElevationM?: number;
+  readonly grooming?: string | null;
   readonly kind: "real";
   readonly sourceIndex: number;
   readonly name: string;
