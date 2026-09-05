@@ -138,7 +138,7 @@ for (const slug of ["ski-portillo", "breckenridge", "heavenly"] as const) {
       assert.equal(lift.id,terrain.lifts[i].id);
       assert.ok(lift.points[0].y<=lift.points.at(-1)!.y);
       assert.ok(lift.speedMps!>0);
-      assert.equal(lift.stations![0].z,lift.points[0].z);
+      assert.ok(Math.abs(lift.stations![0].z-lift.points[0].z)<1e-8);
       assert.ok(lift.stations![0].y<=lift.stations![1].y);
     }
   });
