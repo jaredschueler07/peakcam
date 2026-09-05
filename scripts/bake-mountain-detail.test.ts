@@ -45,3 +45,14 @@ test('tree wells respect explicit DEM treeline and avoid trail corridors',()=>{
     assert.ok(Math.abs(p.x)>=14*1.2+6);
   }
 });
+
+ test('mapped forest planting uses dense repeatable 30m cells with bounded jitter',()=>{
+  const woods:TrailsFile={...trails,runs:[],forests:[{sourceId:'wood',points:[{x:-240,y:240},{x:240,y:240},{x:240,y:-240},{x:-240,y:-240},{x:-240,y:240}]}]};
+  const other=structuredClone(woods);
+  bakeMountainDetail(field,woods,19,4000);bakeMountainDetail(field,other,19,4000);
+  assert.deepEqual(woods.detail!.treeWells,other.detail!.treeWells);
+  assert.equal(woods.detail!.treeWells.length,256);
+  for(const site of woods.detail!.treeWells){
+    for(const value of [site.x,site.y])assert.ok(Math.abs(value-(-220+Math.round((value+220)/30)*30))<=5.01);
+  }
+});
