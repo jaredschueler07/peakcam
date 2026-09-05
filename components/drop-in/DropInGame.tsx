@@ -364,6 +364,10 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
           },
         });
         if (cancelled) { created.dispose(); return; }
+        // Audio is already unlocked by Start and procedural feedback is live.
+        // Fetch the sample layers after graphics are ready so their downloads
+        // and decoding do not compete with the first-frame module requests.
+        void audio.loadSamples(controller.signal);
         setGfxBackend(created.backendKind);
         // Arm before the first simulation step: the runtime owns begin timing,
         // and at t=0 arming starts the recorder immediately. Free Ski never
@@ -407,7 +411,6 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
     const audio = new RuntimeAudio();
     audio.start(enabled, frozen.conditions.surface);
     audio.playUi("confirm");
-    void audio.loadSamples(controller.signal);
     teardownRef.current = controller;
     audioRef.current = audio;
     setAudioEnabled(enabled);
