@@ -103,9 +103,12 @@ export async function createGame(options: CreateGameOptions): Promise<GameRuntim
   );
   const cleanup = installE2eDebug(window as Window & { __dropInDebug?: import("./e2e-debug").DropInDebugApi }, location.search, () => runtime.createDebugApi());
   if (cleanup) runtime.setDebugCleanup(cleanup);
-  void runtime.startWhenWarm();
   void attachFarFieldWhenReady(runtime, options);
   runtime.setSurfaceTextureLoader(() => { void attachSurfaceTexturesWhenReady(runtime, backend); });
+  // The shell reports ready as soon as this promise resolves. Keep its loading
+  // screen up until the runtime can draw, rather than exposing an empty canvas
+  // while the first WebGPU pipelines compile.
+  await runtime.startWhenWarm();
   return runtime;
 }
 
