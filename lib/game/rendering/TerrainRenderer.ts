@@ -287,6 +287,27 @@ export class TerrainRenderer {
     this.applyTileVisibility();
   }
 
+  /** Exact active triangle interpolation for visual contact only. The physics
+   * sampler remains bicubic; this reads the already-built Float32 mesh heights. */
+  sampleRenderedHeight(x: number, z: number): number {
+    const ix = Math.floor(x / TILE_SIZE), iz = Math.floor(z / TILE_SIZE);
+    for (const tile of this.tiles) {
+      if (tile.x !== ix || tile.z !== iz) continue;
+      const stride = this.rung < 2 ? 2 : 1, spacing = CELL_SIZE * stride;
+      const localX = x - ix * TILE_SIZE, localZ = z - iz * TILE_SIZE;
+      const col = Math.min(TILE_RESOLUTION - stride, Math.floor(localX / spacing) * stride);
+      const row = Math.min(TILE_RESOLUTION - stride, Math.floor(localZ / spacing) * stride);
+      const u = (localX - col * CELL_SIZE) / spacing, v = (localZ - row * CELL_SIZE) / spacing;
+      const n = TILE_RESOLUTION + 1, a = row * n + col;
+      const positions = tile.mesh.geometry.getAttribute("position");
+      const ha = positions.getY(a), hb = positions.getY(a + stride);
+      const hc = positions.getY(a + n * stride), hd = positions.getY(a + n * stride + stride);
+      return u + v <= 1 ? ha + (hb - ha) * u + (hc - ha) * v
+        : hd + (hc - hd) * (1 - u) + (hb - hd) * (1 - v);
+    }
+    return this.world.terrain.height(x, z);
+  }
+
   private rebuild(tile: Tile, ix: number, iz: number): void {
     tile.x = ix; tile.z = iz;
     tile.mesh.geometry.dispose();

@@ -452,7 +452,7 @@ export class GameRenderer {
         if (quality.rung !== from) this.options.onQualityChange?.({ reason: "governor", from, to: quality.rung });
       }
     }
-    this.terrain.update(state.pos.x, state.pos.z); this.worldRenderer.update(state, dt); this.skier.update(state, world.terrain, dt); this.ghost.update(state.time, world.terrain);
+    this.terrain.update(state.pos.x, state.pos.z); this.worldRenderer.update(state, dt); this.skier.update(state, world.terrain, dt, this.terrain); this.ghost.update(state.time, world.terrain);
     this.cameraController.update(state, world.terrain, dt, tuck);
     if (this.farField) {
       // Scratch matrix and frustum, reused: the cull is 16 box tests and zero allocation.

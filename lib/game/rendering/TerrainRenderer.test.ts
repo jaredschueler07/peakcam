@@ -184,3 +184,27 @@ test("low window movement refreshes bounds and disposes replaced geometry exactl
   assert.equal(low.geometry.boundingBox!.min.x, 0);
   terrain.dispose();
 });
+
+test("rendered height matches actual index triangles at high and low quality, including negative tile coordinates", () => {
+  const world = createProceduralWorld(profile, profile.seed), scene = new THREE.Scene();
+  const terrain = new TerrainRenderer(scene, world, undefined, null, 0, 4);
+  terrain.update(-75, -315);
+  for (const rung of [4, 1] as const) {
+    terrain.setQuality(rung);
+    const { high, low } = terrainMeshes(scene), meshes = rung === 4 ? high : [low];
+    const point = new THREE.Vector2();
+    for (const mesh of meshes) {
+      const p = mesh.geometry.getAttribute("position"), indices = mesh.geometry.index!;
+      // Centroids test both alternating triangle orientations across the window.
+      for (let i = 0; i < indices.count; i += 591) {
+        const a = indices.getX(i), b = indices.getX(i + 1), c = indices.getX(i + 2);
+        point.set((p.getX(a) + p.getX(b) + p.getX(c)) / 3 + mesh.position.x,
+          (p.getZ(a) + p.getZ(b) + p.getZ(c)) / 3 + mesh.position.z);
+        const expected = (p.getY(a) + p.getY(b) + p.getY(c)) / 3;
+        assert.ok(Math.abs(terrain.sampleRenderedHeight(point.x, point.y) - expected) < 1e-8);
+      }
+    }
+  }
+  assert.equal(terrain.sampleRenderedHeight(10000, 10000), world.terrain.height(10000, 10000));
+  terrain.dispose();
+});
