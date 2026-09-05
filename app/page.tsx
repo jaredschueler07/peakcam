@@ -1,3 +1,4 @@
+import { hasFreshSnowForecast } from "@/lib/snow-forecast";
 import { SITE_URL } from "@/lib/site";
 import { Suspense } from "react";
 import { getAllResorts } from "@/lib/supabase";
@@ -71,9 +72,9 @@ export default async function Home() {
     .flatMap((r) => r.cams.filter((c) => c.is_active))
     .slice(0, 4);
 
-  // Snow cams — resorts where it's currently snowing, pick best cam per resort
+  // Snow cams — resorts with a fresh hourly snow forecast, pick best cam per resort
   const snowCams = resorts
-    .filter((r) => r.snow_report?.snowing_now)
+    .filter((r) => hasFreshSnowForecast(r.snow_report))
     .map((r) => {
       // Prefer YouTube > iframe > image for best live experience
       const activeCams = r.cams.filter((c) => c.is_active);

@@ -1,5 +1,7 @@
 "use client";
 
+import { useForecastTime } from "@/lib/use-forecast-time";
+import { hasCurrentSnowForecast } from "@/lib/snow-forecast";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
@@ -323,6 +325,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
   const activeCams = resort.cams.filter((c) => c.is_active);
   const embeddableCams = activeCams.filter((c) => c.embed_type !== "link");
   const snow = resort.snow_report;
+  const forecastTime = useForecastTime();
   const isUS = resort.country === "US";
   const { user, isFavorite, toggle: toggleFav } = useFavorites();
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -352,13 +355,13 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
             All Resorts
           </Link>
 
-          {snow?.snowing_now && (
+          {hasCurrentSnowForecast(hourlyData, forecastTime ?? NaN) && (
             <div className="flex items-center gap-2 px-3 py-1.5 mb-4 bg-cyan/10 border border-cyan/30 rounded-lg w-fit">
               <svg className="w-4 h-4 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M12 2v4m0 12v4m-6.93-2.93l2.83-2.83m8.2-8.2l2.83-2.83M2 12h4m12 0h4m-2.93 6.93l-2.83-2.83m-8.2-8.2L4.07 5.07" />
               </svg>
-              <span className="text-cyan text-sm font-semibold">Snowing Now</span>
+              <span className="text-cyan text-sm font-semibold">Snow forecast</span>
             </div>
           )}
 

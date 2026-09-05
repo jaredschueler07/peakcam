@@ -1,5 +1,7 @@
 "use client";
 
+import { useForecastTime } from "@/lib/use-forecast-time";
+import { hasFreshSnowForecast } from "@/lib/snow-forecast";
 import { useState } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
@@ -16,8 +18,10 @@ interface SnowCamsProps {
   snowCams: SnowCam[];
 }
 
-// "Snowing now" — paper strip, alpen snowflake badge, stamped cam cards
-export function SnowCams({ snowCams }: SnowCamsProps) {
+// "Snow forecast" — paper strip, alpen snowflake badge, stamped cam cards
+export function SnowCams({ snowCams: candidates }: SnowCamsProps) {
+  const forecastTime = useForecastTime();
+  const snowCams = candidates.filter(({ resort }) => hasFreshSnowForecast(resort.snow_report, forecastTime ?? NaN));
   const [loadedCams, setLoadedCams] = useState<Set<string>>(new Set());
 
   if (snowCams.length === 0) return null;
@@ -38,10 +42,10 @@ export function SnowCams({ snowCams }: SnowCamsProps) {
             </span>
             <div>
               <div className="pc-eyebrow" style={{ color: "var(--pc-bark)" }}>
-                Right now
+                Hourly weather outlook
               </div>
               <h2 className="font-display font-black text-3xl md:text-4xl text-ink leading-[0.95] tracking-[-0.02em]">
-                Snowing <em className="text-alpen italic font-bold">now</em>.
+                Snow <em className="text-alpen italic font-bold">forecast</em>.
               </h2>
             </div>
           </div>
@@ -53,6 +57,8 @@ export function SnowCams({ snowCams }: SnowCamsProps) {
             </span>
           </div>
         </div>
+
+        <p className="text-bark text-sm mb-6">Snow is forecast for the current hour. Check the cams for what’s falling on the mountain.</p>
 
         {/* Cam grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -71,7 +77,7 @@ export function SnowCams({ snowCams }: SnowCamsProps) {
         {snowCams.length > 6 && (
           <div className="text-center mt-6">
             <span className="font-mono text-[12px] text-bark uppercase tracking-[0.12em]">
-              + {snowCams.length - 6} more resorts with active snow
+              + {snowCams.length - 6} more resorts with snow forecast
             </span>
           </div>
         )}
@@ -149,12 +155,12 @@ function SnowCamCard({
           </button>
         )}
 
-        {/* SNOWING badge — alpen stamp */}
+        {/* Snow forecast badge — alpen stamp */}
         <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-0.5
                         bg-alpen text-cream-50 border-[1.5px] border-ink rounded-full
                         shadow-[2px_2px_0_#2a1f14] font-bold text-[11px] uppercase tracking-[0.14em]">
           <Snowflake size={11} strokeWidth={2.5} />
-          Snowing
+          Snow forecast
         </div>
 
         {/* Live indicator */}

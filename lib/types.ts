@@ -81,7 +81,7 @@ export interface SnowReport {
   trend_7d: SnowTrend | null;
   outlook: SnowOutlook | null;
   auto_cond_rating: ConditionRating | null;
-  snowing_now: boolean;
+  snowing_now: boolean;          // legacy name: current-hour snow forecast, not an observation
 }
 
 // ── Snowpack & Conditions Engine Types ───────────────────────

@@ -138,7 +138,7 @@ function buildFixture(): OpenMeteoResponse {
 }
 
 test("parseSnapshot computes depth, new-snow windows, and grid fields", () => {
-  const snap = parseSnapshot(buildFixture());
+  const snap = parseSnapshot(buildFixture(), Date.parse("2026-07-12T12:30:00Z"));
   assert.ok(Math.abs(snap.snowDepthIn! - 19.7) < 0.2); // 50cm ≈ 19.69in
   // All snow-inch fields are rounded to 1 decimal by the implementation
   // (Math.round(x * 10) / 10) — match that rounding in the expected value,
@@ -174,4 +174,27 @@ test("parseHourly returns the next 48 hours shaped as HourlyWeather", () => {
   assert.strictEqual(hourly[0].condition, "light-snow");
   assert.strictEqual(hourly[0].windDirection, "E");
   assert.strictEqual(hourly[0].snowInches, Math.round(cmToInches(1) * 10) / 10);
+});
+
+
+test("snow forecast selects the resort-local current hour, not the server hour or nearest future hour", () => {
+  const data = buildFixture();
+  data.utc_offset_seconds = -7 * 3600;
+  data.hourly.time = ["2026-07-12T11:00", "2026-07-12T12:00"];
+  data.hourly.snowfall = [0, 1];
+  assert.equal(parseSnapshot(data, Date.parse("2026-07-12T18:45:00Z")).snowingNow, false);
+  assert.equal(parseSnapshot(data, Date.parse("2026-07-12T19:15:00Z")).snowingNow, true);
+  assert.equal(parseSnapshot(data, Date.parse("2026-07-12T20:00:00Z")).snowingNow, false);
+  assert.equal(parseSnapshot(data, Date.parse("2026-07-11T18:00:00Z")).snowingNow, false);
+  assert.equal(parseHourly(data)[0].time, "2026-07-12T19:00:00.000Z");
+});
+
+test("model snowfall needs a snow weather code and adequate probability", () => {
+  const data = buildFixture();
+  data.hourly.weathercode.fill(66); // freezing rain is not snow
+  const now = Date.parse("2026-07-12T12:30:00Z");
+  assert.equal(parseSnapshot(data, now).snowingNow, false);
+  data.hourly.weathercode.fill(71);
+  data.hourly.precipitation_probability.fill(20);
+  assert.equal(parseSnapshot(data, now).snowingNow, false);
 });

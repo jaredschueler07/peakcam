@@ -1,5 +1,6 @@
 import type { WeatherPeriod, HourlyWeather } from "./types";
 import { windChill } from "./weather";
+import { hasCurrentSnowForecast } from "./snow-forecast";
 
 // ─────────────────────────────────────────────────────────────
 // Open-Meteo API helpers — free, keyless, global weather model.
@@ -119,6 +120,7 @@ interface OpenMeteoDailyBlock {
 }
 
 export interface OpenMeteoResponse {
+  utc_offset_seconds?: number;
   elevation: number;
   hourly: OpenMeteoHourlyBlock;
   daily: OpenMeteoDailyBlock;
@@ -188,19 +190,18 @@ function avgWindow(arr: number[], start: number, count: number): number {
   return n > 0 ? total / n : 0;
 }
 
-/** Index of the hourly entry closest to right now (for "is it snowing" precision, vs. NOW_IDX's day-boundary alignment). */
-function findCurrentHourIndex(times: string[]): number {
-  const now = Date.now();
-  let closest = 0;
-  let closestDiff = Infinity;
-  for (let i = 0; i < times.length; i++) {
-    const diff = Math.abs(new Date(times[i]).getTime() - now);
-    if (diff < closestDiff) {
-      closestDiff = diff;
-      closest = i;
-    }
-  }
-  return closest;
+/** Open-Meteo returns resort-local wall times; never parse them in the server timezone. */
+function hourlyTime(data: OpenMeteoResponse, time: string): string {
+  const utcMs = Date.parse(`${time}Z`) - (data.utc_offset_seconds ?? 0) * 1000;
+  return new Date(utcMs).toISOString();
+}
+
+/** Only the interval containing now qualifies; never pick a stale or future nearest hour. */
+function findCurrentHourIndex(data: OpenMeteoResponse, nowMs: number): number {
+  return data.hourly.time.findIndex((time) => {
+    const start = Date.parse(hourlyTime(data, time));
+    return start <= nowMs && nowMs < start + 3600_000;
+  });
 }
 
 // ── Snapshot (current conditions, for the conditions engine) ──
@@ -218,7 +219,7 @@ export interface OpenMeteoSnapshot {
   snowingNow: boolean;
 }
 
-export function parseSnapshot(data: OpenMeteoResponse): OpenMeteoSnapshot {
+export function parseSnapshot(data: OpenMeteoResponse, nowMs = Date.now()): OpenMeteoSnapshot {
   const h = data.hourly;
   const nowIdx = Math.min(NOW_IDX, h.time.length - 1);
 
@@ -232,8 +233,13 @@ export function parseSnapshot(data: OpenMeteoResponse): OpenMeteoSnapshot {
   const freezingLevelM = h.freezing_level_height[nowIdx];
   const tempC = h.temperature_2m[nowIdx];
 
-  const currentIdx = findCurrentHourIndex(h.time);
-  const snowingNow = (h.snowfall[currentIdx] ?? 0) > 0;
+  const currentIdx = findCurrentHourIndex(data, nowMs);
+  const snowingNow = currentIdx >= 0 && (h.snowfall[currentIdx] ?? 0) > 0
+    && hasCurrentSnowForecast([{
+      time: hourlyTime(data, h.time[currentIdx]),
+      shortForecast: weatherCodeToLabel(h.weathercode[currentIdx]),
+      precipProbability: h.precipitation_probability[currentIdx] ?? 0,
+    }], nowMs);
 
   return {
     snowDepthIn: snowDepthM != null ? Math.round(metersToInches(snowDepthM) * 10) / 10 : null,
@@ -291,7 +297,7 @@ export function parseHourly(data: OpenMeteoResponse): HourlyWeather[] {
     const windSpeed = Math.round(kmhToMph(h.wind_speed_10m[i]));
 
     hourly.push({
-      time: `${h.time[i]}:00`, // Open-Meteo returns "YYYY-MM-DDTHH:MM" without seconds
+      time: hourlyTime(data, h.time[i]),
       temperature: temp,
       windSpeed,
       windDirection: degreesToCompass(h.wind_direction_10m[i]),

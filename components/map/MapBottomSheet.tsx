@@ -1,5 +1,7 @@
 "use client";
 
+import { useForecastTime } from "@/lib/use-forecast-time";
+import { hasFreshSnowForecast } from "@/lib/snow-forecast";
 import type { ResortWithData, ConditionRating } from "@/lib/types";
 import { isOffSeason, timeAgo, OFF_SEASON_COLOR } from "@/lib/map-utils";
 import { isDropInResort } from "@/lib/drop-in";
@@ -32,6 +34,7 @@ export default function MapBottomSheet({
 }: MapBottomSheetProps) {
   useBodyScrollLock(true);
   const snow = resort.snow_report;
+  const forecastTime = useForecastTime();
   const camCount = resort.cams.length;
   const chipCls = conditionChip[resort.cond_rating] ?? "bg-cream-50 text-ink border-bark";
   const ratingLabel =
@@ -97,9 +100,9 @@ export default function MapBottomSheet({
                   {ratingLabel}
                 </span>
               )}
-              {!offSeason && snow?.snowing_now && (
+              {!offSeason && hasFreshSnowForecast(snow, forecastTime ?? NaN) && (
                 <span className="inline-flex items-center gap-1 rounded-full border-[1.5px] border-ink bg-sky px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] leading-tight text-ink">
-                  <span aria-hidden>❄</span> Snowing
+                  <span aria-hidden>❄</span> Snow forecast
                 </span>
               )}
             </div>

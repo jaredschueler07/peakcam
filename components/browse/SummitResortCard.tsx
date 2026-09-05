@@ -1,5 +1,7 @@
 "use client";
 
+import { useForecastTime } from "@/lib/use-forecast-time";
+import { hasFreshSnowForecast } from "@/lib/snow-forecast";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
@@ -138,6 +140,7 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
   const reducedMotion = useReducedMotion();
   const entrance = animate && !reducedMotion;
   const snow = resort.snow_report;
+  const forecastTime = useForecastTime();
   const baseDepth = snow?.base_depth ?? 0;
   const snow24h = snow?.new_snow_24h ?? 0;
   const snow48h = snow?.new_snow_48h ?? 0;
@@ -154,7 +157,7 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
   // and suppress the snowing badge. Lazy-initialized so the impure new Date()
   // runs once per mount, not on every hover-triggered grid re-render.
   const [offSeason] = useState(() => isOffSeason(resort.lat, new Date()));
-  const isSnowing = (snow?.snowing_now ?? false) && !offSeason;
+  const hasSnowForecast = hasFreshSnowForecast(snow, forecastTime ?? NaN) && !offSeason;
 
   return (
     <motion.div
@@ -179,12 +182,12 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
           </div>
         )}
 
-        {/* Snowing now badge */}
-        {isSnowing && !isFresh && (
+        {/* Snow forecast badge */}
+        {hasSnowForecast && !isFresh && (
           <div className="absolute top-4 right-4 z-10 px-3 py-1 bg-ink text-cream-50
             border-[1.5px] border-ink rounded-full font-mono font-bold text-[10.5px]
             tracking-[0.14em] uppercase flex items-center gap-1">
-            <Snowflake size={11} strokeWidth={2.5} /> Snowing
+            <Snowflake size={11} strokeWidth={2.5} /> Snow forecast
           </div>
         )}
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { useForecastTime } from "@/lib/use-forecast-time";
+import { hasFreshSnowForecast } from "@/lib/snow-forecast";
 import type { MouseEvent } from "react";
 import type { ResortWithData, ConditionRating } from "@/lib/types";
 import { isOffSeason, timeAgo, OFF_SEASON_COLOR } from "@/lib/map-utils";
@@ -23,6 +25,7 @@ interface MapPopupCardProps {
 // Poster popup — paper bg is applied by the wrapping maplibregl popup CSS in globals.css
 export default function MapPopupCard({ resort, onViewResort }: MapPopupCardProps) {
   const snow = resort.snow_report;
+  const forecastTime = useForecastTime();
   const chipCls = conditionChip[resort.cond_rating] ?? "bg-cream-50 text-ink border-bark";
   const ratingLabel =
     resort.cond_rating.charAt(0).toUpperCase() + resort.cond_rating.slice(1);
@@ -80,11 +83,11 @@ export default function MapPopupCard({ resort, onViewResort }: MapPopupCardProps
               {ratingLabel}
             </span>
           )}
-          {!offSeason && snow?.snowing_now && (
+          {!offSeason && hasFreshSnowForecast(snow, forecastTime ?? NaN) && (
             /* pale "sky/snow" pill, ink text — deliberately NOT a rating hue
                so it never collides with the forest "great" chip above it. */
             <span className="inline-flex items-center gap-1 rounded-full border-[1.5px] border-ink bg-sky px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] leading-tight text-ink">
-              <span aria-hidden>❄</span> Snowing
+              <span aria-hidden>❄</span> Snow forecast
             </span>
           )}
         </div>

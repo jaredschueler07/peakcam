@@ -14,6 +14,8 @@
  * Writes: snowpack_daily, snow_reports, resorts.cond_rating
  */
 
+import { hasCurrentSnowForecast } from "../lib/snow-forecast.js";
+import { getHourlyForecast } from "../lib/weather.js";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -333,8 +335,6 @@ async function fetchUserReports(
 
 // ─── Step 8: Fetch NWS forecast summary & Grid Data ────────────────────────
 
-const SNOW_KEYWORDS = ["snow", "blizzard", "flurr", "wintry", "sleet", "freezing"];
-
 interface ForecastSummary {
   snowInchesNext48h: number;
   maxHighTemp48h: number;
@@ -386,13 +386,11 @@ async function fetchNwsForecast(
           maxHigh = Math.max(maxHigh, p.temperature);
         }
       }
-
-      // Detect if it's currently snowing from the first (current) period
-      if (periods.length > 0) {
-        const currentForecast = periods[0].shortForecast.toLowerCase();
-        snowingNow = SNOW_KEYWORDS.some((kw) => currentForecast.includes(kw));
-      }
     }
+
+    // A broad day/night summary is not evidence for the current hour.
+    // Missing hourly data deliberately leaves the forecast badge off.
+    snowingNow = hasCurrentSnowForecast(await getHourlyForecast(lat, lng));
 
     // Step 3: fetch Grid Data (for tags/narrative)
     let gridData = null;
