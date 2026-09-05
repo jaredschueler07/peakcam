@@ -15,7 +15,7 @@ for (const slug of ['breckenridge', 'heavenly', 'ski-portillo']) test(`${slug} f
   const lod = bakeFarLod(asset, sidecar.bands, sidecar.innerRadiusM, hash);
   assert.equal(JSON.stringify(lod), fs.readFileSync(`${base}.far-lod.json`, 'utf8'));
   assert.ok(brotliCompressSync(Buffer.from(JSON.stringify(lod))).length < 12_000);
-  assert.ok(lod.wedges.reduce((sum, w) => sum + w.indices.length / 3, 0) < 30_000);
+  assert.ok(lod.wedges.reduce((sum, w) => sum + w.indices.length / 3, 0) < 20_000);
   assert.ok(decodeFarFieldLod(lod, asset, hash));
   let start = 0, previous = 0;
   const rings = buildRingRadii(sidecar.innerRadiusM, asset.meta.radiusM, sidecar.bands).map(radius => {

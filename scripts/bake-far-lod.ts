@@ -37,7 +37,7 @@ export function bakeFarLod(asset: DecodedFarField, bands: RingBand[], innerRadiu
       const ring = rings[row]; let max = 0;
       for (let j = 1; j <= ring.segments; j++) if (wedge.positions[(ring.start + j) * 3 + 1] > wedge.positions[(ring.start + max) * 3 + 1]) max = j;
       const columns = new Set<number>([0, ring.segments, max]);
-      for (let j = 0; j <= ring.segments; j += 2) columns.add(j);
+      for (let j = 0; j <= ring.segments; j += 3) columns.add(j);
       return { ...ring, columns: [...columns].sort((a, b) => a - b) };
     });
     const indices: number[] = [];
@@ -51,7 +51,7 @@ export function bakeFarLod(asset: DecodedFarField, bands: RingBand[], innerRadiu
     }
     return { vertexCount: count, indices };
   });
-  if (wedges.reduce((total, w) => total + w.indices.length / 3, 0) >= 30_000) throw new Error('Far LOD exceeds 30k triangle budget');
+  if (wedges.reduce((total, w) => total + w.indices.length / 3, 0) >= 20_000) throw new Error('Far LOD exceeds 20k triangle budget');
   return { version: 1, slug: asset.meta.slug, sourceSha256, radialRows: selectedRows, wedges };
 }
 
