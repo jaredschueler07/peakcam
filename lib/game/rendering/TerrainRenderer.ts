@@ -99,12 +99,24 @@ export function buildTileGeometry(terrain: TerrainSampler, ix: number, iz: numbe
  * sample. Uniform stride includes all tile edges, so adjacent tiles cannot crack.
  * The retained high tiles remain the authority; this never resamples physics.
  */
-function buildLowTileBatch(tiles: readonly Tile[]): THREE.BufferGeometry {
+interface LowTileBuffers {
+  position: Float32Array; normal: Float32Array; color: Float32Array;
+  groomed: Float32Array; indices: Uint32Array;
+}
+
+function allocateLowTileBuffers(): LowTileBuffers {
+  const count = GRID_SIZE * GRID_SIZE * (TILE_RESOLUTION + 1) ** 2;
+  return { position: new Float32Array(count * 3), normal: new Float32Array(count * 3),
+    color: new Float32Array(count * 3), groomed: new Float32Array(count),
+    indices: new Uint32Array(GRID_SIZE * GRID_SIZE * (TILE_RESOLUTION / 2) ** 2 * 6) };
+}
+
+function buildLowTileBatch(tiles: readonly Tile[], buffers: LowTileBuffers): THREE.BufferGeometry {
   const n = TILE_RESOLUTION + 1, verticesPerTile = n * n;
   const geometry = new THREE.BufferGeometry();
-  for (const name of ["position", "normal", "color", "groomed"]) {
+  for (const name of ["position", "normal", "color", "groomed"] as const) {
     const itemSize = tiles[0].mesh.geometry.getAttribute(name).itemSize;
-    const values = new Float32Array(tiles.length * verticesPerTile * itemSize);
+    const values = buffers[name];
     for (let t = 0; t < tiles.length; t++) {
       const tile = tiles[t], source = tile.mesh.geometry.getAttribute(name) as THREE.BufferAttribute;
       const offset = t * verticesPerTile * itemSize;
@@ -118,7 +130,7 @@ function buildLowTileBatch(tiles: readonly Tile[]): THREE.BufferGeometry {
     }
     geometry.setAttribute(name, new THREE.BufferAttribute(values, itemSize));
   }
-  const indices = new Uint32Array(tiles.length * (TILE_RESOLUTION / 2) ** 2 * 6);
+  const indices = buffers.indices;
   let at = 0;
   for (let t = 0; t < tiles.length; t++) {
     const offset = t * verticesPerTile;
@@ -138,6 +150,9 @@ function buildLowTileBatch(tiles: readonly Tile[]): THREE.BufferGeometry {
 export class TerrainRenderer {
   private readonly tiles: Tile[] = [];
   private readonly lowMesh: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
+  // Reserve the bounded 2.84 MiB cache at construction. A thermal downshift
+  // must not add this retained allocation midway through active play.
+  private readonly lowBuffers = allocateLowTileBuffers();
   private lowGeometryDirty = true;
   private centerX = Infinity;
   private centerZ = Infinity;
@@ -211,7 +226,7 @@ export class TerrainRenderer {
   }
 
   private rebuildLowBatch(): void {
-    const next = buildLowTileBatch(this.tiles);
+    const next = buildLowTileBatch(this.tiles, this.lowBuffers);
     this.lowMesh.geometry.dispose();
     this.lowMesh.geometry = next;
     this.lowGeometryDirty = false;

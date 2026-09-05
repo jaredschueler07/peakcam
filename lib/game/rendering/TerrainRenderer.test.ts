@@ -163,3 +163,24 @@ test("low window movement refreshes bounds and disposes replaced geometry exactl
     assert.ok(counts.every(c => c.value === 1)); assert.equal(scene.children.length, 0);
   }
 });
+
+ test("low-tier backing stores are reserved at construction and reused across later downshifts and windows", () => {
+  const world = createProceduralWorld(profile, profile.seed), scene = new THREE.Scene();
+  const terrain = new TerrainRenderer(scene, world, undefined, null, 0, 3);
+  const buffers = (terrain as unknown as { lowBuffers: Record<string, Float32Array | Uint32Array> }).lowBuffers;
+  const saved = { ...buffers };
+  assert.equal(Object.values(buffers).reduce((bytes, buffer) => bytes + buffer.byteLength, 0), 2_976_000);
+  assert.ok(Object.values(buffers).every(buffer => buffer.every(value => value === 0)), "only storage is reserved, no terrain work at construction");
+  const { low } = terrainMeshes(scene);
+  assert.equal(low.geometry.index, null); assert.equal(low.visible, false);
+  terrain.update(0, 0);
+  assert.equal(low.geometry.index, null, "high-tier warmup does not build the low mesh");
+  terrain.setQuality(1);
+  for (const name of ["position", "normal", "color", "groomed"]) assert.equal(low.geometry.getAttribute(name).array, saved[name]);
+  assert.equal(low.geometry.index!.array, saved.indices);
+  terrain.setQuality(4); terrain.update(401, 201); terrain.setQuality(1);
+  for (const name of ["position", "normal", "color", "groomed"]) assert.equal(low.geometry.getAttribute(name).array, saved[name]);
+  assert.equal(low.geometry.index!.array, saved.indices);
+  assert.equal(low.geometry.boundingBox!.min.x, 0);
+  terrain.dispose();
+});
