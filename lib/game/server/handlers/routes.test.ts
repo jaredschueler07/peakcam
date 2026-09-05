@@ -1,3 +1,4 @@
+import { fixedTrialConditions } from "../ranked-conditions";
 /**
  * Route Handler behaviour, exercised by calling the handlers directly with
  * hand-rolled stubs — no Next.js runtime, no database, no env.
@@ -138,7 +139,7 @@ test("a session request mints a ticket the server can verify", async () => {
       surface: "ice",
       physicsModel: "v1",
     }),
-    { keyring: () => keyring, currentUserId: async () => null, limiter: permissiveLimiter(), now: () => now },
+    { dailyConditions: async () => fixedTrialConditions(), keyring: () => keyring, currentUserId: async () => null, limiter: permissiveLimiter(), now: () => now },
   );
 
   assert.equal(response.status, 201);
@@ -147,8 +148,8 @@ test("a session request mints a ticket the server can verify", async () => {
   const body = await response.json();
   assert.equal(body.resortSlug, FIXTURE_RESORT_SLUG);
   assert.equal(body.trailId, trailId);
-  assert.equal(body.surface, "ice");
-  assert.equal(body.physicsModel, "v1");
+  assert.equal(body.surface, "packed");
+  assert.equal(body.physicsModel, "v2");
   assert.equal(body.physicsVersion, PHYSICS_VERSION);
   assert.equal(body.courseVersion, COURSE_VERSION);
   // The rate the client must record at. Bound to the recorder's own constant,
@@ -160,8 +161,8 @@ test("a session request mints a ticket the server can verify", async () => {
   const payload = verifyTicket(body.ticket, keyring, { now });
   assert.equal(payload.seed, body.seed, "the ticket must bind the seed it advertised");
   assert.equal(payload.trailId, trailId);
-  assert.equal(payload.surface, "ice");
-  assert.equal(payload.physicsModel, "v1");
+  assert.equal(payload.surface, "packed");
+  assert.equal(payload.physicsModel, "v2");
   assert.equal(payload.userId, undefined, "an anonymous session binds no user");
   assert.equal(payload.exp - payload.iat, 30 * 60 * 1000);
   assert.equal(new Date(body.expiresAt).getTime(), payload.exp);
@@ -179,14 +180,14 @@ test("the seed is chosen server-side and ignores anything the client sends", asy
       trailId,
       seed: 7,
     }),
-    { keyring: () => keyring, currentUserId: async () => null, limiter: permissiveLimiter(), now: () => now },
+    { dailyConditions: async () => fixedTrialConditions(), keyring: () => keyring, currentUserId: async () => null, limiter: permissiveLimiter(), now: () => now },
   );
 
   // `.strict()` on the schema: an unexpected field is a 400, not a silent drop.
   assert.equal(response.status, 400);
 });
 
-test("a direct physicsV2 session request is refused while the rollout flag is off", async () => {
+test("a direct physicsV2 session request uses the enabled rollout", async () => {
   const response = await handleCreateSession(
     postRequest(sessionUrl, {
       resortSlug: FIXTURE_RESORT_SLUG,
@@ -202,7 +203,7 @@ test("a direct physicsV2 session request is refused while the rollout flag is of
       now: () => Date.UTC(2026, 6, 15, 17, 0, 0),
     },
   );
-  assert.ok(response.status >= 400 && response.status < 500);
+  assert.equal(response.status, 201);
 });
 
 test("a signed-in session binds the user id into the ticket", async () => {
@@ -217,6 +218,7 @@ test("a signed-in session binds the user id into the ticket", async () => {
     }),
     {
       keyring: () => keyring,
+      dailyConditions: async () => fixedTrialConditions(),
       currentUserId: async () => USER_UUID,
       limiter: permissiveLimiter(),
       now: () => now,
@@ -542,7 +544,7 @@ test("a run whose keyframe count cannot satisfy the table CHECK is 422, not a 50
 test("an oversized body is refused before it is parsed", async () => {
   const fixture = makeRunFixture();
   const response = await handleSubmitRun(
-    postRequest(runsUrl, { ...submissionBody(fixture), nickname: "x".repeat(200_000) }),
+    postRequest(runsUrl, { ...submissionBody(fixture), nickname: "x".repeat(1_500_000) }),
     runDeps(stubWriter(), fixture.nowMs),
   );
 
@@ -773,4 +775,37 @@ test("a missing, rejected, or non-uuid run all answer the same 404", async () =>
   });
   assert.equal(notAUuid.status, 404);
   assert.deepEqual(await missing.json(), await notAUuid.json(), "no oracle for run existence");
+});
+
+test("Daily Line signs the server snapshot and ignores client-selected ice", async () => {
+  const keyring = testKeyring();
+  const now = Date.UTC(2026, 8, 6, 1);
+  const conditions = { ...fixedTrialConditions(), surface: "powder" as const, conditionsDate: "2026-09-05",
+    environment: { ...fixedTrialConditions().environment, powderDepthCm: 40, windSpeedMps: 12 } };
+  const response = await handleCreateSession(postRequest(sessionUrl, {
+    resortSlug: FIXTURE_RESORT_SLUG, mode: "score_attack", trailId: resolveCourseOrThrow().trailId, surface: "ice", physicsModel: "v1",
+  }), { keyring: () => keyring, currentUserId: async () => null, limiter: permissiveLimiter(), now: () => now, dailyConditions: async () => conditions });
+  assert.equal(response.status, 201);
+  const body = await response.json();
+  const signed = verifyTicket(body.ticket, keyring, { now });
+  assert.equal(signed.surface, "powder"); assert.equal(signed.physicsModel, "v2");
+  assert.deepEqual(signed.environment, conditions.environment);
+  assert.equal(signed.conditionsDate, "2026-09-05");
+  assert.deepEqual(body.environment, signed.environment);
+});
+test("Daily Line without a persisted morning snapshot returns503", async () => {
+  const response = await handleCreateSession(postRequest(sessionUrl, {
+    resortSlug: FIXTURE_RESORT_SLUG, mode: "score_attack", trailId: resolveCourseOrThrow().trailId,
+  }), { keyring: testKeyring, currentUserId: async () => null, limiter: permissiveLimiter(), now: Date.now });
+  assert.equal(response.status, 503);
+});
+
+test("Daily leaderboard uses the frozen conditions date supplied by its ticketed client", async () => {
+  const reader = stubReader();
+  const query = new URLSearchParams({ resort: FIXTURE_RESORT_SLUG, mode: "score_attack", trailId: resolveCourseOrThrow().trailId, conditionsDate: "2026-09-05" });
+  const response = await handleGetLeaderboard(new Request(`https://example.test/api/drop-in/leaderboard?${query}`), {
+    reader: () => reader, currentUserId: async () => null,
+  });
+  assert.equal(response.status, 200);
+  assert.equal(reader.queries[0].conditionsDate, "2026-09-05");
 });

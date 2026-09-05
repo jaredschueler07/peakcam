@@ -18,7 +18,8 @@
 import { z } from "zod";
 
 import { COURSE_VERSION, PHYSICS_VERSION } from "../../config/versions";
-import { PHYSICS_V2_ROLLOUT_ENABLED } from "../../config/physics-rollout";
+import { physicsModelForRollout } from "../../config/physics-rollout";
+import { fixedTrialConditions, type RankedConditions } from "../ranked-conditions";
 import type { PhysicsModel, SurfaceKind } from "../../core/config";
 import { GHOST_SAMPLE_HZ } from "../../replay/recorder";
 import { competitiveRunModeSchema } from "../run-schema";
@@ -48,13 +49,14 @@ export const sessionRequestSchema = z
 export interface SessionsHandlerDeps {
   /** Parsed `DROP_IN_TICKET_KEYS`. Throws when unset — a 500, not a 400. */
   keyring: () => TicketKeyring;
+  dailyConditions?: (slug: string, now: number) => Promise<RankedConditions>;
   /** Supabase `auth.users.id`, or `null` for an anonymous run. */
   currentUserId: () => Promise<string | null>;
   limiter: RateLimiter;
   now: () => number;
 }
 
-export interface SessionResponseBody {
+export interface SessionResponseBody extends Partial<RankedConditions> {
   ticket: string;
   seed: number;
   resortSlug: string;
@@ -103,10 +105,8 @@ export async function handleCreateSession(
     });
   }
 
-  const { resortSlug, mode, trailId, surface, physicsModel } = parsed.data;
-  if (physicsModel === "v2" && !PHYSICS_V2_ROLLOUT_ENABLED) {
-    return jsonError(400, "physicsV2 is not enabled for run sessions");
-  }
+  const { resortSlug, mode, trailId } = parsed.data;
+  const physicsModel = physicsModelForRollout();
   const course = resolveCourse(resortSlug, trailId);
   if (!course) {
     return jsonError(404, "Unknown resort or trail");
@@ -122,7 +122,17 @@ export async function handleCreateSession(
   }
 
   const now = deps.now();
-  const seed = courseSeed(mode, resortSlug, trailId, COURSE_VERSION, utcDateStamp(now));
+  let conditions: RankedConditions;
+  try {
+    if (mode === "score_attack") {
+      if (!deps.dailyConditions) throw new Error("Morning snapshot provider unavailable");
+      conditions = await deps.dailyConditions(resortSlug, now);
+    } else conditions = fixedTrialConditions();
+  } catch {
+    return jsonError(503, "Daily Line morning conditions are not available yet");
+  }
+  const { surface, environment, conditionsDate } = conditions;
+  const seed = courseSeed(mode, resortSlug, trailId, COURSE_VERSION, mode === "score_attack" ? conditionsDate : utcDateStamp(now));
   const userId = (await deps.currentUserId()) ?? undefined;
 
   const ticket = issueTicket(
@@ -131,7 +141,7 @@ export async function handleCreateSession(
       mode,
       trailId,
       seed,
-      surface,
+      surface, environment, conditionsDate,
       physicsModel,
       physicsVersion: PHYSICS_VERSION,
       courseVersion: COURSE_VERSION,
@@ -146,7 +156,7 @@ export async function handleCreateSession(
     resortSlug,
     mode,
     trailId,
-    surface,
+    surface, environment, conditionsDate,
     physicsModel,
     physicsVersion: PHYSICS_VERSION,
     courseVersion: COURSE_VERSION,

@@ -27,6 +27,13 @@ export const RUN_SESSIONS_ENDPOINT = "/api/drop-in/sessions";
 /** Mirrors `SessionResponseBody` in lib/game/server/handlers/sessions.ts. */
 export const runSessionTicketSchema = z
   .object({
+    environment: z.object({
+      powderDepthCm: z.number().int().min(0).max(100),
+      windSpeedMps: z.number().int().min(0).max(40),
+      morningIce: z.boolean(), visibilityM: z.number().int().min(100).max(20000),
+      northSign: z.union([z.literal(1), z.literal(-1)]),
+    }).optional(),
+    conditionsDate: z.string().optional(),
     ticket: z.string().min(1),
     seed: z.number().finite(),
     resortSlug: z.string().min(1),

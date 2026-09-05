@@ -169,9 +169,10 @@ export function buildRealCourse(
   };
 }
 
+export interface NearestRunPoint { distance: number; progressM: number; x: number; z: number }
 export function nearestPointOnRun(
-  run: RealRun, x: number, z: number,
-): { distance: number; progressM: number; x: number; z: number } {
+  run: RealRun, x: number, z: number, out?: NearestRunPoint,
+): NearestRunPoint {
   let bestDistance = Infinity, bestProgress = 0, bestX = 0, bestZ = 0, progress = 0;
   for (let i = 1; i < run.points.length; i += 1) {
     const a = run.points[i - 1], b = run.points[i];
@@ -185,7 +186,9 @@ export function nearestPointOnRun(
     }
     progress += segmentLength;
   }
-  return { distance: bestDistance, progressM: bestProgress, x: bestX, z: bestZ };
+  const result = out ?? { distance: 0, progressM: 0, x: 0, z: 0 };
+  result.distance = bestDistance; result.progressM = bestProgress; result.x = bestX; result.z = bestZ;
+  return result;
 }
 
 /**

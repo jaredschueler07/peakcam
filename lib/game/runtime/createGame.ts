@@ -36,6 +36,8 @@ interface RuntimeSurfaceTexturesConsumer {
 }
 
 export interface CreateGameOptions {
+  trailId?: string;
+  mode?: "free_ski" | "time_trial" | "score_attack";
   canvas: HTMLCanvasElement;
   profile: ResortGameProfile;
   uiBridge: UiBridge;
@@ -96,7 +98,7 @@ export async function createGame(options: CreateGameOptions): Promise<GameRuntim
   const runtime = new GameRuntime(
     options.canvas, options.profile, options.uiBridge, options.analytics, source.sampler,
     options.conditions, options.physicsModel, options.audio, assetLoadMs, options.seed, options.spawnArcM, backend,
-    nodeFactories,
+    nodeFactories, options.trailId, options.mode,
   );
   void runtime.startWhenWarm();
   void attachFarFieldWhenReady(runtime, options);

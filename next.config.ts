@@ -122,6 +122,10 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // The ranked validator opens the same committed packs as the browser.
+  outputFileTracingIncludes: {
+    "/api/drop-in/*": ["./public/game/terrain/*.height.u16.br", "./public/game/terrain/*.meta.json", "./public/game/terrain/*.trails.json", "./public/game/terrain/*.network.json"],
+  },
   images: {
     domains: [],
   },
