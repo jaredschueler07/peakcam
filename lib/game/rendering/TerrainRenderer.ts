@@ -32,6 +32,7 @@ export function buildTileGeometry(terrain: TerrainSampler, ix: number, iz: numbe
   const positions = new Float32Array(n * n * 3);
   const normals = new Float32Array(n * n * 3);
   const colors = new Float32Array(n * n * 3);
+  const groomedMask = new Float32Array(n * n);
   const indices = new Uint32Array(TILE_RESOLUTION * TILE_RESOLUTION * 6);
   const ox = ix * TILE_SIZE, oz = iz * TILE_SIZE;
   const paddedSize = TILE_RESOLUTION + 3;
@@ -59,6 +60,7 @@ export function buildTileGeometry(terrain: TerrainSampler, ix: number, iz: numbe
 
       const steep = clamp01((1 - ny) * 2.55);
       const groomed = terrain.trailField(worldX, worldZ);
+      groomedMask[j * n + i] = groomed;
       const grain = fbm(worldX * 0.021, worldZ * 0.021, 2);
       const sparkle = vnoise(worldX * 0.55, worldZ * 0.55);
       colorScratch.copy(C_SNOW);
@@ -87,6 +89,7 @@ export function buildTileGeometry(terrain: TerrainSampler, ix: number, iz: numbe
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  geometry.setAttribute("groomed", new THREE.BufferAttribute(groomedMask, 1));
   geometry.setIndex(new THREE.BufferAttribute(indices, 1));
   geometry.computeBoundingSphere();
   return geometry;
