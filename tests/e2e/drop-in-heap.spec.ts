@@ -9,7 +9,9 @@ import { expect, test } from "@playwright/test";
  * play window must stay under 2 MB — retained growth means a per-frame leak.
  */
 
-const V2_URL = "/resorts/heavenly/drop-in";
+// CI uses headless Chromium: exercise its working WebGL renderer explicitly,
+// rather than silently measuring an unsupported software WebGPU adapter.
+const V2_URL = "/resorts/heavenly/drop-in?gfx=webgl";
 const HEAP_GROWTH_BUDGET_BYTES = 2 * 1024 * 1024;
 const PLAY_MS = 10_000;
 
@@ -66,6 +68,7 @@ test("active play retains under 2 MB of JS heap over 10s after GC", async ({ pag
   await page.goto(V2_URL);
   await page.getByRole("button", { name: /start descent/i }).click();
   await expect(page.locator("[data-drop-in-state='running'] canvas[data-testid='drop-in-canvas']")).toBeVisible();
+  await expect(page.locator("[data-drop-in-gfx='webgl']")).toHaveCount(1);
 
   // Warm-up: let the first-frame terrain/post-processing settle, then sample.
   await holdActivePlay(page, PLAY_MS);
