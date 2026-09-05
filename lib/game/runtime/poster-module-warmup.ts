@@ -1,4 +1,5 @@
 import { loadWebGPUBackendModule, resolveBackendKind } from "../rendering/backend";
+import { loadNodeFactories } from "../rendering/nodeFactories";
 
 interface PosterModuleLoaders {
   runtime(): Promise<unknown>;
@@ -6,7 +7,9 @@ interface PosterModuleLoaders {
 }
 const moduleLoaders: PosterModuleLoaders = {
   runtime: () => import("./createGame"),
-  webgpu: loadWebGPUBackendModule,
+  // These imports only evaluate modules. Materials, effects, contexts and
+  // devices are still constructed by the normal Start path.
+  webgpu: () => Promise.all([loadWebGPUBackendModule(), loadNodeFactories()]),
 };
 
 /** Dedicated game-poster effect only. Imports code; never constructs a runtime/GPU or starts a run.
