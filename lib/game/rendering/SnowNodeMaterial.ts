@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { MeshStandardNodeMaterial } from "three/webgpu";
 import {
-  abs, cameraPosition, cameraViewMatrix, clamp, diffuseColor, dot, float, floor, fract, length, max,
+  abs, attribute, cameraPosition, cameraViewMatrix, clamp, diffuseColor, dot, float, floor, fract, length, max,
   mix, normalize, normalView, normalWorld, positionWorld, pow, sin, smoothstep, step, texture,
   uniform, vec3, vec4,
 } from "three/tsl";
@@ -74,7 +74,11 @@ function snowNormalNode(detailNormal: THREE.Texture): Vec3 {
   ).mul(2).sub(1);
   // mat3(viewMatrix) * detail — a w of 0 drops the translation column.
   const detailView = cameraViewMatrix.mul(vec4(detail, 0)).xyz;
-  return normalize(normalView.add(detailView.mul(mix(0.08, 0.22, near))));
+  const corduroy = sin(positionWorld.x.mul(62.83185)).mul(0.12)
+    .mul(attribute("groomed", "float"))
+    .mul(float(1).sub(smoothstep(8, 32, length(positionWorld.sub(cameraPosition)))));
+  const cordView = cameraViewMatrix.mul(vec4(corduroy, 0, 0, 0)).xyz;
+  return normalize(normalView.add(detailView.mul(mix(0.08, 0.22, near))).add(cordView));
 }
 
 function snowRoughnessNode(roughness: THREE.Texture): Float {

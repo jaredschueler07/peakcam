@@ -4,7 +4,7 @@ import { mulberry32 } from "../core/rng";
 import type { QualityRung } from "./QualityController";
 import type { NodeFactories } from "./nodeFactories";
 
-const SPRAY_MAX = 900, SNOW_MAX = 3600, SNOW_BOX = 130, TRACK_QUADS = 1600;
+const SPRAY_MAX = 900, SNOW_MAX = 3600, SNOW_BOX = 130, TRACK_QUADS = 4096;
 const pointVertex = "attribute float aAlpha;attribute float aSize;uniform float uScale;varying float vA;void main(){vA=aAlpha;vec4 mv=modelViewMatrix*vec4(position,1.);gl_PointSize=aSize*uScale/max(1.,-mv.z);gl_Position=projectionMatrix*mv;}";
 const pointFragment = "uniform sampler2D uTex;uniform vec3 uColor;varying float vA;void main(){vec4 t=texture2D(uTex,gl_PointCoord);float a=t.a*vA;if(a<.012)discard;gl_FragColor=vec4(uColor,a);}";
 /**
@@ -23,6 +23,27 @@ function radialTexture(): THREE.DataTexture {
   const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat); texture.needsUpdate = true; texture.colorSpace = THREE.SRGBColorSpace; return texture;
 }
 
+/** Tangent-space twin ski grooves: lighting changes across the compressed snow. */
+export function buildTrackNormal(): THREE.DataTexture {
+  const width = 128, data = new Uint8Array(width * 4);
+  for (let x = 0; x < width; x++) {
+    const u = x / (width - 1);
+    let slope = 0;
+    for (const center of [0.16, 0.84]) {
+      const d = (u - center) / 0.065;
+      slope += d * Math.exp(-d * d) * 2.2;
+    }
+    const length = Math.hypot(slope, 1);
+    data[x * 4] = Math.round((slope / length * 0.5 + 0.5) * 255);
+    data[x * 4 + 1] = 128;
+    data[x * 4 + 2] = Math.round((1 / length * 0.5 + 0.5) * 255);
+    data[x * 4 + 3] = 255;
+  }
+  const texture = new THREE.DataTexture(data, width, 1);
+  texture.magFilter = THREE.LinearFilter; texture.needsUpdate = true;
+  return texture;
+}
+
 export class EffectsRenderer {
   private readonly random: () => number;
   private readonly sprayPosition = new Float32Array(SPRAY_MAX * 3); private readonly sprayVelocity = new Float32Array(SPRAY_MAX * 3);
@@ -30,6 +51,9 @@ export class EffectsRenderer {
   private readonly sprayAlpha = new Float32Array(SPRAY_MAX); private readonly spraySize = new Float32Array(SPRAY_MAX); private readonly sprayGeometry: THREE.BufferGeometry;
   private readonly snowPosition = new Float32Array(SNOW_MAX * 3); private readonly snowAlpha = new Float32Array(SNOW_MAX); private readonly snowSize = new Float32Array(SNOW_MAX); private readonly snowSeed = new Float32Array(SNOW_MAX); private readonly snowGeometry: THREE.BufferGeometry;
   private readonly trackPosition = new Float32Array(TRACK_QUADS * 18); private readonly trackGeometry = new THREE.BufferGeometry();
+  private readonly trackNormals = new Float32Array(TRACK_QUADS * 18);
+  private readonly trackNormal = { x: 0, y: 1, z: 0 };
+  private lastTime = 0;
   private sprayHead = 0; private trackHead = 0; private trackUsed = 0;
   /** Scalar track ring — avoids allocating a `{lx,lz,rx,rz}` object every ground frame. */
   private trackHasPrevious = false;
@@ -95,16 +119,21 @@ export class EffectsRenderer {
     const snowMaterial = this.pointMaterial(0xffffff, 240);
     const snowfall = this.particleCloud(this.snowGeometry, snowMaterial); snowfall.frustumCulled = false; scene.add(snowfall);
     this.trackGeometry.setAttribute("position", new THREE.BufferAttribute(this.trackPosition, 3)); this.trackGeometry.setDrawRange(0, 0);
-    const tracks = new THREE.Mesh(this.trackGeometry, new THREE.MeshBasicMaterial({ color: 0x9fb8d6, transparent: true, opacity: 0.42, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -3 })); tracks.frustumCulled = false; tracks.renderOrder = 1; scene.add(tracks);
+    this.trackGeometry.setAttribute("normal", new THREE.BufferAttribute(this.trackNormals, 3));
+    const uvs = new Float32Array(TRACK_QUADS * 12);
+    for (let i = 0; i < TRACK_QUADS; i++) uvs.set([0,0,1,0,0,1,1,0,1,1,0,1], i * 12);
+    this.trackGeometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+    const tracks = new THREE.Mesh(this.trackGeometry, new THREE.MeshStandardMaterial({ color: 0xe2eafa, normalMap: buildTrackNormal(), roughness: 0.76, transparent: true, opacity: 0.72, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -3 })); tracks.frustumCulled = false; tracks.renderOrder = 1; scene.add(tracks);
   }
 
   update(state: SimulationState, camera: THREE.Camera, dt: number, snowCount: number, wind: number) {
-    if (state.events.reset) this.clearTracks();
+    if (state.time < this.lastTime) this.clearTracks();
+    this.lastTime = state.time;
     const speed = Math.hypot(state.vel.x, state.vel.z);
     if (this.quality > 0 && state.onGround && state.crash <= 0 && speed > 5) {
       const intensity = Math.min(1, state.carve * 1.5) * Math.min(1, speed / 20), count = Math.min(8, Math.floor((intensity * 7 + (speed > 26 ? 1 : 0)) * this.sprayDepthMultiplier));
       const fx = Math.sin(state.yaw), fz = Math.cos(state.yaw), rx = fz, rz = -fx, side = -Math.sign(state.lean || 0.001);
-      for (let i = 0; i < count; i += 1) { const off = (this.random() - 0.5) * 0.9 + side * 0.35; this.emitSpray(state.pos.x + rx * off - fx * 0.8, state.pos.y + 0.08 + this.random() * 0.25, state.pos.z + rz * off - fz * 0.8, rx * side * (2 + intensity * 9) - fx * speed * 0.16 + (this.random() - 0.5) * 2, 1.4 + this.random() * 3.4 * (0.4 + intensity), rz * side * (2 + intensity * 9) - fz * speed * 0.16 + (this.random() - 0.5) * 2, 1.4 + this.random() * 2.4, 0.45 + this.random() * 0.5); }
+      for (let i = 0; i < count; i += 1) { const off = (this.random() - 0.5) * 0.9 + side * 0.35; this.emitSpray(state.pos.x + rx * off - fx * 0.8, state.pos.y + 0.08 + this.random() * 0.25, state.pos.z + rz * off - fz * 0.8, rx * side * (2 + intensity * 9) - fx * speed * 0.16 + (this.random() - 0.5) * 2, 1.4 + this.random() * 3.4 * (0.4 + intensity), rz * side * (2 + intensity * 9) - fz * speed * 0.16 + (this.random() - 0.5) * 2, 0.12 + this.random() * 0.26, 0.32 + this.random() * 0.4); }
     }
     this.updateSpray(dt); this.updateSnow(dt, state.time, camera.position, snowCount * (0.35 + this.quality * 0.1625) * this.densityScale(), wind); this.updateTracks(state);
   }
@@ -123,7 +152,7 @@ export class EffectsRenderer {
       if (this.sprayLife[i] <= 0) { this.sprayAlpha[i] = 0; continue; }
       const p = i * 3;
       this.sprayLife[i] -= dt;
-      this.sprayVelocity[p + 1] -= 7 * dt;
+      this.sprayVelocity[p + 1] -= 9.81 * dt;
       this.sprayVelocity[p] *= 1 - 1.9 * dt;
       this.sprayVelocity[p + 2] *= 1 - 1.9 * dt;
       this.sprayPosition[p] += this.sprayVelocity[p] * dt;
@@ -131,13 +160,13 @@ export class EffectsRenderer {
       this.sprayPosition[p + 2] += this.sprayVelocity[p + 2] * dt;
       const k = Math.max(0, this.sprayLife[i] / this.sprayMaxLife[i]);
       this.sprayAlpha[i] = k * k * 0.9;
-      this.spraySize[i] += dt * 2.2;
+      this.spraySize[i] *= 1 - dt * 0.25;
     }
     for (let a = 0; a < this.sprayAttrs.length; a += 1) this.sprayGeometry.getAttribute(this.sprayAttrs[a]).needsUpdate = true;
   }
   private updateSnow(dt: number, time: number, camera: THREE.Vector3, requested: number, wind: number) { const count = Math.min(this.reducedMotion ? 320 : SNOW_MAX, requested | 0), half = SNOW_BOX * 0.5; this.setVisibleParticles(this.snowGeometry, count); for (let i = 0; i < count; i += 1) { const p = i * 3; this.snowPosition[p + 1] -= (5.5 + this.snowSize[i] * 3.2) * dt; this.snowPosition[p] += Math.sin(time * 0.9 + this.snowSeed[i]) * 3.4 * dt + wind * dt; this.snowPosition[p + 2] += Math.cos(time * 0.7 + this.snowSeed[i]) * 2.2 * dt; const dx = this.snowPosition[p] - camera.x, dy = this.snowPosition[p + 1] - camera.y, dz = this.snowPosition[p + 2] - camera.z; if (dx > half) this.snowPosition[p] -= SNOW_BOX; else if (dx < -half) this.snowPosition[p] += SNOW_BOX; if (dz > half) this.snowPosition[p + 2] -= SNOW_BOX; else if (dz < -half) this.snowPosition[p + 2] += SNOW_BOX; if (dy < -20) this.snowPosition[p + 1] += SNOW_BOX * 0.8; else if (dy > SNOW_BOX * 0.7) this.snowPosition[p + 1] -= SNOW_BOX * 0.8; } this.snowGeometry.getAttribute(this.centreAttr).needsUpdate = true; }
   private updateTracks(state: SimulationState) {
-    if (!state.onGround || state.crash > 0) { this.trackHasPrevious = false; return; }
+    if (!state.onGround || state.crash > 0 || state.liftRide > 0) { this.trackHasPrevious = false; return; }
     const fx = Math.sin(state.yaw), fz = Math.cos(state.yaw), rx = fz, rz = -fx, width = 0.42;
     const lx = state.pos.x - rx * width, lz = state.pos.z - rz * width;
     const nrx = state.pos.x + rx * width, nrz = state.pos.z + rz * width;
@@ -153,8 +182,12 @@ export class EffectsRenderer {
   }
   private writeTrackVertex(offset: number, x: number, z: number): void {
     this.trackPosition[offset] = x;
-    this.trackPosition[offset + 1] = this.terrain.height(x, z) + 0.07;
+    this.trackPosition[offset + 1] = this.terrain.height(x, z) + 0.025;
     this.trackPosition[offset + 2] = z;
+    this.terrain.normal(x, z, this.trackNormal);
+    this.trackNormals[offset] = this.trackNormal.x;
+    this.trackNormals[offset + 1] = this.trackNormal.y;
+    this.trackNormals[offset + 2] = this.trackNormal.z;
   }
   private pushTrackQuad(
     alx: number, alz: number, arx: number, arz: number,
@@ -172,6 +205,7 @@ export class EffectsRenderer {
     this.trackUsed = Math.min(this.trackUsed + 1, TRACK_QUADS);
     this.trackGeometry.setDrawRange(0, this.trackUsed * 6);
     this.trackGeometry.getAttribute("position").needsUpdate = true;
+    this.trackGeometry.getAttribute("normal").needsUpdate = true;
   }
   private clearTracks() {
     this.trackHead = 0; this.trackUsed = 0; this.trackHasPrevious = false;
