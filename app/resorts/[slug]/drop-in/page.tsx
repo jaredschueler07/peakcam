@@ -1,3 +1,5 @@
+import { preload } from "react-dom";
+import { terrainAssetUrls } from "@/lib/game/config/terrain-assets";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
@@ -128,6 +130,9 @@ export default async function DropInPage({
     );
   }
 
+  // This route alone hints the selected terrain pack, before poster hydration.
+  // Fetch/CORS credentials match TerrainAssetLoader, allowing preload reuse.
+  for (const href of Object.values(terrainAssetUrls(slug as keyof typeof DROP_IN_GAME_PROFILES))) preload(href, { as: "fetch", crossOrigin: "anonymous" });
   const resort = await getResortBySlug(slug);
   const forecast = resort ? await getWeatherForecast(resort.lat, resort.lng) : null;
   const physicsModel = physicsModelForRollout(PHYSICS_V2_ROLLOUT_ENABLED);
