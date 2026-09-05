@@ -54,9 +54,21 @@ export class CameraController {
     private readonly preset: CameraPreset = CAMERA_PRESETS.classic,
   ) {
     this.reducedMotion = reducedMotion ?? (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-    // The seed is the shipped `+5 / -9` expressed against the preset, so a far preset does not
-    // whip in from the skier's face on the first frames. Classic reproduces 5 and 9 exactly.
-    this.position.set(state.pos.x, state.pos.y + preset.heightBase + 1.5, state.pos.z - (preset.backBase + 0.4));
+    // Start at the actual chase pose. Real runs can face any heading; seeding a fixed
+    // south-facing offset makes shader warmup duration decide the first visible composition.
+    const speed = Math.hypot(state.vel.x, state.vel.z);
+    const forwardX = Math.sin(state.yaw), forwardZ = Math.cos(state.yaw);
+    const back = preset.backBase + clamp01(speed / BACK_SPEED_REF) * preset.backSpeedGain;
+    this.position.set(
+      state.pos.x - forwardX * back,
+      state.pos.y + preset.heightBase + clamp01(speed / HEIGHT_SPEED_REF) * preset.heightSpeedGain + (state.onGround ? 0 : preset.airLift),
+      state.pos.z - forwardZ * back,
+    );
+    this.camera.position.copy(this.position);
+    this.target.set(state.pos.x + forwardX * preset.lookAheadM, state.pos.y + preset.lookHeightM, state.pos.z + forwardZ * preset.lookAheadM);
+    this.camera.lookAt(this.target);
+    this.camera.fov = preset.fovBase;
+    this.camera.updateProjectionMatrix();
   }
 
   update(state: SimulationState, terrain: TerrainSampler, dt: number, tuck: number): void {
