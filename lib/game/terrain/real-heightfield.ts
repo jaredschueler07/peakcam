@@ -46,7 +46,7 @@ import {
   type Heightfield, type TerrainMeta, type Trails, type TrailsFile, type RunMetadata, type LiftMetadata,
 } from "./formats";
 import { fbmWithGradient, type NoiseGradient } from "./noise-grad";
-import { buildRealCourse, nearestPointOnRun } from "./real-course";
+import { buildRealCourse } from "./real-course";
 import { RAMP_H, RAMP_LEN, RAMP_W } from "./heightfield";
 
 // ─── Options ─────────────────────────────────────────────────
@@ -245,15 +245,32 @@ export function createRealTerrain(
     ...lift,
     name: lift.name,
     type: lift.type,
+    towers: lift.towers?.map(tower => ({...tower, elevationM: macroHeight(tower.x, -tower.y)})),
+    stations: lift.stations?.map(station => ({...station, elevationM: macroHeight(station.x, -station.y)})),
     points: drape(lift.points),
   }));
   const course = buildRealCourse(profile, runs, lifts, seed);
 
+  // Furniture and named trails are indexed once. A height/normal sample near
+  // one run must not walk every feature on the mountain.
+  const rampKey = (x:number,z:number) => (x+32768)*65536+z+32768;
+  const rampBuckets = new Map<number, typeof course.runs[number]["ramps"][number][]>();
+  for (const run of course.runs) for (const feature of run.ramps) {
+    const reach = RAMP_LEN + RAMP_W + 4;
+    for (let bx = Math.floor((feature.x-reach)/120); bx <= Math.floor((feature.x+reach)/120); bx += 1) {
+      for (let bz = Math.floor((feature.z-reach)/120); bz <= Math.floor((feature.z+reach)/120); bz += 1) {
+        const key = rampKey(bx,bz), bucket = rampBuckets.get(key) ?? [];
+        bucket.push(feature); rampBuckets.set(key, bucket);
+      }
+    }
+  }
+  const courseIndex = createCourseIndex(course.runs);
   const ramp = { value: 0, dx: 0, dz: 0 };
   function sampleRamps(x: number, z: number): void {
     ramp.value = 0; ramp.dx = 0; ramp.dz = 0;
-    for (const run of course.runs) {
-      for (const feature of run.ramps) {
+    const features = rampBuckets.get(rampKey(Math.floor(x/120),Math.floor(z/120)));
+    if (!features) return;
+    for (const feature of features) {
         const dx = x - feature.x, dz = z - feature.z;
         const forwardX = Math.sin(feature.heading), forwardZ = Math.cos(feature.heading);
         const rightX = Math.cos(feature.heading), rightZ = -Math.sin(feature.heading);
@@ -280,7 +297,6 @@ export function createRealTerrain(
         const acrossDerivative = RAMP_H * shape * lateralDerivative;
         ramp.dx += alongDerivative * forwardX + acrossDerivative * rightX;
         ramp.dz += alongDerivative * forwardZ + acrossDerivative * rightZ;
-      }
     }
   }
 
@@ -407,6 +423,7 @@ export function createRealTerrain(
     lifts,
     realRuns: course.runs,
     mainLift: course.mainLift,
+    realLifts: course.lifts,
     height,
     normal,
     macroHeight,
@@ -418,18 +435,10 @@ export function createRealTerrain(
         out.d = Infinity; out.dx = 0; out.on = false;
         return out;
       }
-      let bestI = 0, bestDistance = Infinity, bestClearance = Infinity, bestX = 0;
-      for (let i = 0; i < course.runs.length; i += 1) {
-        const hit = nearestPointOnRun(course.runs[i], x, z);
-        const clearance = hit.distance - course.runs[i].halfWidthM * 1.2;
-        if (clearance < bestClearance) {
-          bestClearance = clearance;
-          bestI = i; bestDistance = hit.distance; bestX = hit.x;
-        }
-      }
-      const run = course.runs[bestI];
-      out.i = bestI; out.t = { kind: "real", run }; out.d = bestDistance;
-      out.dx = x - bestX; out.on = bestDistance <= run.halfWidthM;
+      courseIndex.query(x, z);
+      const run = course.runs[courseIndex.i];
+      out.i = courseIndex.i; out.t = courseIndex.geometries[courseIndex.i]; out.d = courseIndex.distance;
+      out.dx = x - courseIndex.x; out.on = courseIndex.distance <= run.halfWidthM;
       return out;
     },
     nearestRun: (x: number, z: number, out: NearestRun = nearestRunScratch) =>
@@ -542,4 +551,46 @@ function buildSegmentIndex(runs: readonly DrapedRun[], falloffM: number): Segmen
     },
   };
   return index;
+}
+
+/** A spatial lookup using exact segment distances and conservative expanded
+ * buckets. The uncommon far-off-piste fallback retains exact nearest semantics.
+ * Numeric bucket keys and reusable hit fields keep the frame path allocation-free.
+ */
+function createCourseIndex(runs: readonly import("../core/types").RealRun[]) {
+  const segments: Array<{ax:number;az:number;bx:number;bz:number;i:number}> = [];
+  const buckets = new Map<number, number[]>();
+  const key = (x:number,z:number) => (x + 32768) * 65536 + z + 32768;
+  const radius = 160, cell = 120;
+  let maxWidth = 0;
+  for (let i=0;i<runs.length;i++) {
+    maxWidth=Math.max(maxWidth,runs[i].halfWidthM*1.2);
+    const points=runs[i].points;
+    for(let j=1;j<points.length;j++) {
+      const a=points[j-1],b=points[j],index=segments.length;
+      segments.push({ax:a.x,az:a.z,bx:b.x,bz:b.z,i});
+      for(let x=Math.floor((Math.min(a.x,b.x)-radius)/cell);x<=Math.floor((Math.max(a.x,b.x)+radius)/cell);x++) {
+        for(let z=Math.floor((Math.min(a.z,b.z)-radius)/cell);z<=Math.floor((Math.max(a.z,b.z)+radius)/cell);z++) {
+          const k=key(x,z),bucket=buckets.get(k)??[];bucket.push(index);buckets.set(k,bucket);
+        }
+      }
+    }
+  }
+  const geometries = runs.map(run => ({kind:"real" as const,run}));
+  const result={i:0,distance:Infinity,x:0,geometries,query};
+  let queryX=0, queryZ=0, clearance=Infinity;
+  function query(x:number,z:number):void {
+    queryX=x;queryZ=z;clearance=Infinity;
+    result.i=0;result.distance=Infinity;result.x=0;
+    const bucket=buckets.get(key(Math.floor(x/cell),Math.floor(z/cell)));
+    if(bucket)for(let j=0;j<bucket.length;j++)inspect(bucket[j]);
+    // Any omitted segment is at least radius away. Its widest corridor cannot
+    // beat this hit unless the hit exceeds radius minus that maximum width.
+    if(clearance>radius-maxWidth)for(let j=0;j<segments.length;j++)inspect(j);
+  }
+  function inspect(index:number):void {
+      const s=segments[index],d=distanceToSegment(queryX,queryZ,s.ax,s.az,s.bx,s.bz),c=d-runs[s.i].halfWidthM*1.2;
+      if(c<clearance || (c===clearance&&s.i<result.i)){clearance=c;result.i=s.i;result.distance=d;result.x=closestX;}
+  }
+  return result;
 }

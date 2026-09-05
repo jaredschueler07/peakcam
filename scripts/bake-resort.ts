@@ -14,6 +14,7 @@
  *   npx tsx scripts/bake-resort.ts all --verify          # re-bake, hash-compare
  *   npx tsx scripts/bake-resort.ts ski-portillo --source=copernicus
  *   npx tsx scripts/bake-resort.ts all --skip-trails     # DEM only
+ *   npx tsx scripts/bake-resort.ts all --network-only   # cached OSM + DEM, v3 relief
  *
  * Outputs (public/game/terrain/):
  *   <slug>.height.u16       raw little-endian uint16, row-major N→S, W→E —
@@ -812,6 +813,11 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const target = args.find((a) => !a.startsWith("--"));
   const verify = args.includes("--verify");
+  if (args.includes("--network-only")) {
+    const { runBake } = await import("./bake-mountain-network");
+    for (const slug of target && target !== "all" ? [target] : RESORT_SLUGS) runBake(slug, verify);
+    return;
+  }
   const skipTrails = args.includes("--skip-trails");
   const sourceArg = args.find((a) => a.startsWith("--source="))?.split("=")[1] ?? "designed";
 

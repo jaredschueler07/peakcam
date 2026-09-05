@@ -109,3 +109,37 @@ for (const slug of ["ski-portillo", "breckenridge", "heavenly"] as const) {
     }
   });
 }
+
+test("full-network spatial lookup agrees with exhaustive corridor clearance", () => {
+  const profile = DROP_IN_GAME_PROFILES.breckenridge;
+  const terrain = createTerrainSource({ profile, assets: load("breckenridge"), mode: "real" }).sampler;
+  const runs = terrain.realRuns!;
+  const out: import("../core/types").NearestTrail = { i: -1, t: {kind:"real",run:runs[0]}, d: Infinity, dx: 0, on: false };
+  for (let i=0;i<80;i++) {
+    const x=-3000+(i*1789%6000), z=-3000+(i*997%6000);
+    let expected=0, best=Infinity;
+    for(let j=0;j<runs.length;j++) {
+      const clearance=nearestPointOnRun(runs[j],x,z).distance-runs[j].halfWidthM*1.2;
+      if(clearance<best){best=clearance;expected=j;}
+    }
+    terrain.nearestTrail(x,z,out);
+    assert.equal(out.i,expected,`nearest corridor at ${x},${z}`);
+    assert.ok(Math.abs(out.d-nearestPointOnRun(runs[expected],x,z).distance)<1e-8);
+  }
+});
+
+for (const slug of ["ski-portillo", "breckenridge", "heavenly"] as const) {
+  test(`all ${slug} runtime lifts expose uphill game-coordinate paths and metadata`, () => {
+    const terrain=createTerrainSource({profile:DROP_IN_GAME_PROFILES[slug],assets:load(slug),mode:"real"}).real!;
+    assert.equal(terrain.realLifts!.length,terrain.lifts.length);
+    assert.ok(terrain.realLifts!.includes(terrain.mainLift!));
+    for(let i=0;i<terrain.realLifts!.length;i++) {
+      const lift=terrain.realLifts![i];
+      assert.equal(lift.id,terrain.lifts[i].id);
+      assert.ok(lift.points[0].y<=lift.points.at(-1)!.y);
+      assert.ok(lift.speedMps!>0);
+      assert.equal(lift.stations![0].z,lift.points[0].z);
+      assert.ok(lift.stations![0].y<=lift.stations![1].y);
+    }
+  });
+}

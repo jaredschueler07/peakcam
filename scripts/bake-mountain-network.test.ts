@@ -21,3 +21,12 @@ test('network clips disconnected source pieces, IDs survive source ordering, hei
  assert.ok(a.junctions!.some(j=>j.runIds.includes('osm:way:10:0')&&j.runIds.includes('osm:way:20:0')));
  const lift=a.lifts[0];assert.equal(lift.occupancy,4);assert.equal(lift.speedSource,'type-default');assert.equal(lift.towers!.length,1);assert.ok(lift.stations![0].elevationM<lift.stations![1].elevationM);
 });
+
+test('junctions survive simplification of a straight source polyline',()=>{
+ const input:OsmSource={elements:[
+  {type:'way',id:1,tags:{name:'Straight','piste:type':'downhill'},geometry:[geo(0,400),geo(0,0),geo(0,-400)]},
+  {type:'way',id:2,tags:{name:'Join','piste:type':'downhill'},geometry:[geo(200,200),geo(0,0)]},
+ ]};
+ const baked=bakeMountainNetwork(cfg,input,field);
+ assert.ok(baked.junctions!.some(j=>j.x===0&&j.y===0&&j.runIds.length===2));
+});
