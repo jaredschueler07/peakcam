@@ -7,6 +7,8 @@ import { RAMP_LEN, RAMP_SPACING, RAMP_W } from "../terrain/heightfield";
 import { hash2 } from "../terrain/noise";
 import { trailCenter } from "../terrain/trails";
 import { pointAtArcLength } from "../terrain/real-course";
+import { createStoneTexture } from "./StoneTexture";
+import { createForestGeometry, createForestMaterial } from "./ForestImpostor";
 import { treeDebugEnabled } from "./debugFlags";
 import { createLandmarks } from "./LandmarkRenderer";
 import { TILE_SIZE } from "./TerrainRenderer";
@@ -23,18 +25,21 @@ const transform = (x: number, y: number, z: number, sx = 1, sy = 1, sz = 1) =>
   new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion(), new THREE.Vector3(sx, sy, sz));
 
 export function mergeParts(parts: Part[]): THREE.BufferGeometry {
-  const positions: number[] = [], normals: number[] = [], colors: number[] = [];
+  const positions: number[] = [], normals: number[] = [], colors: number[] = [], uvs: number[] = [];
   for (const part of parts) {
     const geometry = part.geometry.index ? part.geometry.toNonIndexed() : part.geometry.clone();
     geometry.applyMatrix4(part.matrix); geometry.computeVertexNormals();
+    const uv = geometry.getAttribute("uv");
     const p = geometry.getAttribute("position"), n = geometry.getAttribute("normal"), color = new THREE.Color(part.color);
     for (let i = 0; i < p.count; i += 1) {
+      uvs.push(uv?.getX(i) ?? p.getX(i), uv?.getY(i) ?? p.getZ(i));
       positions.push(p.getX(i), p.getY(i), p.getZ(i)); normals.push(n.getX(i), n.getY(i), n.getZ(i)); colors.push(color.r, color.g, color.b);
     }
     geometry.dispose(); part.geometry.dispose();
   }
   const output = new THREE.BufferGeometry();
   output.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  output.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
   output.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
   output.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3)); output.computeBoundingSphere(); return output;
 }
@@ -121,14 +126,7 @@ export class WorldRenderer {
   private propX = Infinity; private propZ = Infinity; private furnitureZ = Infinity; private furnitureTimer = 0;
 
   constructor(private readonly scene: THREE.Scene, private readonly profile: ResortGameProfile, private readonly world: SimulationWorld) {
-    const forest = profile.forest;
-    const treeGeometry = mergeParts([
-      { geometry: new THREE.CylinderGeometry(0.17, 0.30, 2.4, 6), color: forest.trunk, matrix: transform(0, 1.2, 0) },
-      { geometry: new THREE.ConeGeometry(1.75, 3.7, 8), color: forest.cone[0], matrix: transform(0, 2.7, 0) },
-      { geometry: new THREE.ConeGeometry(1.35, 3.2, 8), color: forest.cone[1], matrix: transform(0, 4.5, 0) },
-      { geometry: new THREE.ConeGeometry(0.92, 2.6, 8), color: forest.cone[2], matrix: transform(0, 6.1, 0) },
-      { geometry: new THREE.ConeGeometry(0.62, 1.7, 8), color: forest.cap, matrix: transform(0, 7.4, 0) },
-    ]);
+    const treeGeometry = createForestGeometry(profile.slug === "heavenly");
     const rockBase = new THREE.IcosahedronGeometry(1, 1);
     const rockPositions = rockBase.getAttribute("position") as THREE.BufferAttribute;
     for (let i = 0; i < rockPositions.count; i += 1) {
@@ -142,8 +140,8 @@ export class WorldRenderer {
     ]);
     // ?treedbg=1 drops the vertex-colour multiply so a shot can tell "colours lost" from "never applied".
     const propColors = !treeDebugEnabled();
-    this.tree = new THREE.InstancedMesh(treeGeometry, new THREE.MeshStandardMaterial({ vertexColors: propColors, roughness: 0.94 }), 2600);
-    this.rock = new THREE.InstancedMesh(rockGeometry, new THREE.MeshStandardMaterial({ vertexColors: propColors, roughness: 0.95, metalness: 0.03 }), 900);
+    this.tree = new THREE.InstancedMesh(treeGeometry, createForestMaterial(), 2600);
+    this.rock = new THREE.InstancedMesh(rockGeometry, new THREE.MeshStandardMaterial({ map: createStoneTexture(), vertexColors: propColors, roughness: 0.95, metalness: 0.03 }), 900);
     this.tree.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.rock.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.tree.frustumCulled = this.rock.frustumCulled = false; this.tree.castShadow = this.rock.castShadow = true;
     const markerGeometry = mergeParts([
