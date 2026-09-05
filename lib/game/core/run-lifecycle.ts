@@ -55,6 +55,7 @@ export function resetSimulationOnTerrain(
   state.pos.x = x0; state.pos.y = terrain.height(x0, startZ); state.pos.z = startZ;
   state.vel.x = Math.sin(yaw) * 15; state.vel.y = 0; state.vel.z = Math.cos(yaw) * 15;
   state.yaw = yaw; state.onGround = true; state.airTime = 0; state.spin = 0;
+  state.liftIndex = -1; state.liftProgress = 0; state.liftDistanceM = 0; state.liftCooldown = 0; state.liftRide = 0;
   state.edgeAngle = 0; state.landingTimer = 0;
   state.crash = 0; state.best = Math.max(state.best, state.score); state.score = 0;
   state.combo = 1; state.comboTimer = 0; state.time = 0; state.startY = state.pos.y;
