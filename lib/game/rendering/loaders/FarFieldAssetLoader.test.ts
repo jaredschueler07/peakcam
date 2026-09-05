@@ -1,3 +1,4 @@
+import { COURSE_VERSION } from "../../config/versions";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -43,7 +44,7 @@ function responding(body: Uint8Array | null, status = 200) {
 test("loads the far field from the brotli-encoded path and validates the resort", async () => {
   const { fetcher, calls } = responding(asset());
   const loaded = await new FarFieldAssetLoader(fetcher).load("ski-portillo", { expect: EXPECT });
-  assert.equal(calls[0], "/game/terrain/ski-portillo.far.bin.br");
+  assert.equal(calls[0], `/game/terrain/ski-portillo.far.bin.br?course=${COURSE_VERSION}`);
   assert.ok(loaded);
   assert.equal(loaded.meta.slug, "ski-portillo");
   assert.equal(loaded.wedges.length, 4);
