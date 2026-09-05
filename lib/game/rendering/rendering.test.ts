@@ -12,7 +12,7 @@ import { QualityController, seedQualityRung } from "./QualityController";
 import { createGhostPose, GhostRenderer, sampleGhostAt } from "./GhostRenderer";
 import { GameRenderer, shouldInitializePostProcessing, type RendererBackend } from "./Renderer";
 import { disposeObjectTree, type ResourceCounts } from "./resources";
-import { LiftRenderer } from "./LiftRenderer";
+import { LiftRenderer, STATION_LABEL_DISTANCE_M } from "./LiftRenderer";
 import { buildPosterLut, buildSnowDetailNormal } from "./SnowMaterial";
 import { chromaticAberrationOffset } from "./MotionEffects";
 import { configureSceneMaterials } from "./Renderer";
@@ -1093,4 +1093,41 @@ test("empty lift carrier batches skip colour and shadow traversal and restore wh
   renderer.update(state);
   assert.ok(mesh.count > 0); assert.equal(mesh.visible, true);
   disposeObjectTree(scene);
+});
+
+
+test("station labels cull individually beyond 350m while terminal geometry stays present", () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "document");
+  Object.defineProperty(globalThis, "document", { configurable: true, value: {
+    createElement: () => ({ width: 0, height: 0, getContext: () => ({ fillRect() {}, fillText() {} }) }),
+  } });
+  const scene = new THREE.Scene();
+  try {
+    const profile = DROP_IN_GAME_PROFILES.breckenridge;
+    const terrain = createProceduralWorld(profile, 12).terrain;
+    const points = [{ x: 0, y: 0, z: 0 }, { x: 0, y: 200, z: 2000 }];
+    const renderer = new LiftRenderer(scene, { ...terrain, realLifts: [{
+      kind: "real", name: "Long chair", type: "chair_lift", lengthM: 2010, points,
+      stations: points.map(point => ({ ...point, radiusM: 7 })),
+    }] });
+    const labels: THREE.Object3D[] = [];
+    scene.traverse(object => { if (object.name === "lift-station-label") labels.push(object); });
+    assert.equal(labels.length, 2);
+    const state = createSimulation(profile, 12);
+    state.pos.x = 0; state.pos.z = 0;
+    renderer.update(state);
+    assert.equal(labels[0].visible, true); assert.equal(labels[1].visible, false);
+    assert.equal(labels[1].parent?.visible, true, "distant terminal geometry remains available");
+    state.pos.x = STATION_LABEL_DISTANCE_M; renderer.update(state);
+    assert.equal(labels[0].visible, true, "distance boundary is inclusive");
+    state.pos.x += 1; renderer.update(state);
+    assert.equal(labels[0].visible, false);
+    state.pos.x = 0; state.pos.z = 2000; renderer.update(state);
+    assert.equal(labels[0].visible, false); assert.equal(labels[1].visible, true);
+    assert.equal(labels[0].parent?.visible, true);
+  } finally {
+    disposeObjectTree(scene);
+    if (descriptor) Object.defineProperty(globalThis, "document", descriptor);
+    else Reflect.deleteProperty(globalThis, "document");
+  }
 });
