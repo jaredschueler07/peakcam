@@ -102,6 +102,18 @@ export class SkierRenderer {
       this.skiL.rotation.set(state.onGround ? 0 : 0.16, -state.lean * 0.1, state.lean * 0.42);
       this.skiR.rotation.copy(this.skiL.rotation); this.head.rotation.y = state.lean * 0.35;
     }
-    this.root.visible = state.invuln <= 0 || Math.floor(state.invuln * 12) % 2 === 0;
+    if (state.liftIndex >= 0) {
+      const lift = terrain.realLifts?.[state.liftIndex];
+      const seated = lift && !/platter|drag_lift|t-bar|j-bar|rope_tow|magic_carpet/.test(lift.type);
+      this.root.quaternion.setFromAxisAngle(UP, state.yaw);
+      this.body.position.y = 0;
+      this.body.rotation.set(0, 0, 0);
+      if (seated) {
+        this.legL.rotation.x = this.legR.rotation.x = -1.15;
+        this.skiL.rotation.x = this.skiR.rotation.x = 0.35;
+        this.armL.rotation.x = this.armR.rotation.x = -0.9;
+      }
+    }
+    this.root.visible = state.liftIndex >= 0 || state.invuln <= 0 || Math.floor(state.invuln * 12) % 2 === 0;
   }
 }

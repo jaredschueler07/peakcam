@@ -20,8 +20,8 @@ import {
 import type { SimulationConfig } from "../core/config";
 import { resetSimulation } from "../core/run-lifecycle";
 import type { InputFrame, SimulationState, SimulationWorld, Vec3 } from "../core/types";
+import { stepRealLifts } from "../core/lifts";
 import { trailCenter } from "../terrain/trails";
-import { pointAtArcLength } from "../terrain/real-course";
 import { checkGates, checkObstacleCollision } from "./collision";
 import { GRAVITY, LIFT_DURATION, LIFT_OFFSET, MAX_SPEED } from "./constants";
 
@@ -31,7 +31,6 @@ const right: Vec3 = { x: 0, y: 0, z: 0 };
 export const normal: Vec3 = { x: 0, y: 1, z: 0 };
 export const temp: Vec3 = { x: 0, y: 0, z: 0 };
 export const temp2: Vec3 = { x: 0, y: 0, z: 0 };
-const liftArcScratch = { x: 0, y: 0, z: 0, heading: 0 };
 
 /** Grounded-solve inputs, in the skier's own forward/right frame. */
 export interface CarveContext {
@@ -83,22 +82,15 @@ function stepLiftRide(s: SimulationState, dt: number, world: SimulationWorld): b
   s.liftRide = Math.max(0, s.liftRide - dt);
   const progress = 1 - s.liftRide / LIFT_DURATION;
   const eased = progress * progress * (3 - 2 * progress);
-  const realLift = world.terrain.kind === "real" ? world.terrain.mainLift : null;
-  if (realLift) {
-    const point = pointAtArcLength(realLift.points, realLift.lengthM * eased, liftArcScratch);
-    s.pos.x = point.x; s.pos.y = point.y + 12.8; s.pos.z = point.z;
-    s.yaw = point.heading + Math.PI;
-  } else {
-    const z = lerp(s.liftFromZ, s.liftToZ, eased);
-    const x = liftX(world, z);
-    s.pos.x = x; s.pos.y = cableY(world, z) - 2.7; s.pos.z = z;
-    s.yaw = Math.PI;
-  }
+  const z = lerp(s.liftFromZ, s.liftToZ, eased);
+  const x = liftX(world, z);
+  s.pos.x = x; s.pos.y = cableY(world, z) - 2.7; s.pos.z = z;
+  s.yaw = Math.PI;
   s.vel.x = 0; s.vel.y = 0; s.vel.z = 0;
   s.onGround = false;
   if (s.liftRide <= 0) {
     const best = Math.max(s.best, s.score);
-    resetSimulation(s, world, realLift ? 0 : s.liftToZ);
+    resetSimulation(s, world, s.liftToZ);
     s.best = best; s.events.liftFinished = true;
   }
   return true;
@@ -143,7 +135,7 @@ export function integrateWith(
 ): void {
   const s = state;
   const cfg = world.config;
-  if (stepLiftRide(s, dt, world)) return;
+  if (world.terrain.kind === "real" ? stepRealLifts(s, dt, world) : stepLiftRide(s, dt, world)) return;
 
   model.preStep(s, dt);
 
