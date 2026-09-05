@@ -1,3 +1,4 @@
+import { sampleSensoryState, sensoryLocalHour, type SensoryState } from "./sensory-state";
 import { resetRankedStart } from "../core/ranked-start";
 import { resetSimulationOnTerrain } from "../core/run-lifecycle";
 import { InputTapeRecorder } from "../replay/input-tape";
@@ -145,7 +146,9 @@ export class GameRuntime {
   private readonly inputTape = new InputTapeRecorder();
   private finishedRun: FinishedRunRecording | null = null;
   /** Reused listener payload — avoids allocating `{speed,carve,...}` every HUD tick. */
-  private readonly listenerScratch = { speed: 0, carve: 0, onGround: false, liftRide: 0 };
+  private readonly sensoryScratch: SensoryState = { surface: "packed", windLevel: 0, liftProximity: 0, signContact: false };
+  private signClatterAt = -Infinity;
+  private readonly listenerScratch = { speed: 0, carve: 0, edgeAngle: 0, liftProximity: 0, onGround: false, liftRide: 0 };
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -193,7 +196,7 @@ export class GameRuntime {
       if (!this.activated) { this.activated = true; analytics.controlActivated(scheme); }
     });
     const sceneStartedAt = performance.now();
-    this.renderer = new GameRenderer(canvas, profile, this.world, this.state, { backend, nodeFactories });
+    this.renderer = new GameRenderer(canvas, profile, this.world, this.state, { backend, nodeFactories, localHour: sensoryLocalHour(profile.slug, mode) });
     this.renderer.setWeather(startingWeatherIndex(conditions));
     this.sceneBuildMs = performance.now() - sceneStartedAt;
     this.keyboard = new KeyboardAdapter(this.input);
@@ -312,6 +315,7 @@ export class GameRuntime {
         if (this.ghostRecorder.recording && !frame.restartPressed && !frame.trailPressed) this.inputTape.record(frame);
         const events = stepSimulation(this.state, frame, FIXED_DT, this.world);
         this.audio.playSimulationEvents(events);
+        if (events.landed) this.renderer.noteLanding(events.landingKind);
         if (events.reset) {
           this.inputTape.reset();
           const resetAction = this.recordingArm.onReset(this.state.time, this.ghostRecorder, events.liftFinished);
@@ -355,13 +359,17 @@ export class GameRuntime {
       if (this.ui.publish(this.state, nowMs)) {
         const weatherPreset = this.world.profile.weather[this.weatherIndex];
         this.listenerScratch.speed = Math.hypot(this.state.vel.x, this.state.vel.z);
+        const sensory = sampleSensoryState(this.state, this.world, weatherPreset.wind, this.sensoryScratch);
+        if (sensory.signContact && nowMs - this.signClatterAt > 1200) { this.audio.playSignClatter(); this.signClatterAt = nowMs; }
         this.listenerScratch.carve = this.state.carve;
+        this.listenerScratch.edgeAngle = this.state.edgeAngle;
+        this.listenerScratch.liftProximity = sensory.liftProximity;
         this.listenerScratch.onGround = this.state.onGround;
         this.listenerScratch.liftRide = this.state.liftRide;
         this.audio.updateListener(
           this.listenerScratch,
-          this.conditions.surface,
-          Math.min(1, weatherPreset.wind / 15),
+          sensory.surface,
+          sensory.windLevel,
           nowMs,
         );
       }

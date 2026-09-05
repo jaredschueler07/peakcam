@@ -23,3 +23,15 @@ test("the first camera frame starts behind arbitrary run headings without startu
     assert.ok(camera.position.distanceTo(initial) < 1e-9, "a stationary pose needs no initial settling frames");
   }
 });
+
+test("landing impulse distinguishes hard contact and honors reduced motion", () => {
+  const profile = DROP_IN_GAME_PROFILES.breckenridge, world = createProceduralWorld(profile, profile.seed);
+  const state = createSimulation(profile, profile.seed);
+  const hard = new CameraController(new THREE.PerspectiveCamera(), state, false);
+  const soft = new CameraController(new THREE.PerspectiveCamera(), state, false);
+  const reduced = new CameraController(new THREE.PerspectiveCamera(), state, true);
+  hard.noteLanding("hard"); soft.noteLanding("soft"); reduced.noteLanding("hard");
+  for (let i = 0; i < 10; i++) for (const controller of [hard, soft, reduced]) controller.update(state, world.terrain, 1 / 120, 0);
+  assert.ok(hard.motionAmplitude > soft.motionAmplitude);
+  assert.equal(reduced.motionAmplitude, 0);
+});
