@@ -13,6 +13,8 @@ import type { InputFrame, SimulationState, SimulationWorld } from "../core/types
 import { onLand } from "./collision";
 import { integrateWith, type CarveModel, type CarveContext, type CarveOutcome } from "./integrator-core";
 
+const outcome: CarveOutcome = { forwardVelocity: 0, rightVelocity: 0 };
+
 const V1_MODEL: CarveModel = {
   preStep(): void {},
 
@@ -30,7 +32,8 @@ const V1_MODEL: CarveModel = {
     const drag = 0.10 + brake * 0.90 - tuck * 0.05;
     const airDrag = (tuck ? 0.0030 : 0.0055) * forwardVelocity * Math.abs(forwardVelocity);
     const newForwardVelocity = forwardVelocity - drag * forwardVelocity * dt - airDrag * dt;
-    return { forwardVelocity: newForwardVelocity, rightVelocity: newRightVelocity };
+    outcome.forwardVelocity = newForwardVelocity; outcome.rightVelocity = newRightVelocity;
+    return outcome;
   },
 
   land(s: SimulationState, world: SimulationWorld, impact: number): void {

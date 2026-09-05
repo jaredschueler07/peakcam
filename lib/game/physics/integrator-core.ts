@@ -35,20 +35,22 @@ const liftArcScratch = { x: 0, y: 0, z: 0, heading: 0 };
 
 /** Grounded-solve inputs, in the skier's own forward/right frame. */
 export interface CarveContext {
-  readonly steer: number;
-  readonly tuck: number;
-  readonly brake: number;
-  readonly dt: number;
-  readonly flatSpeed: number;
-  readonly forwardVelocity: number;
-  readonly rightVelocity: number;
+  steer: number;
+  tuck: number;
+  brake: number;
+  dt: number;
+  flatSpeed: number;
+  forwardVelocity: number;
+  rightVelocity: number;
 }
 
 /** Velocities after the edge solve, still in the forward/right frame. */
 export interface CarveOutcome {
-  readonly forwardVelocity: number;
-  readonly rightVelocity: number;
+  forwardVelocity: number;
+  rightVelocity: number;
 }
+
+const carveContext: CarveContext = { steer: 0, tuck: 0, brake: 0, dt: 0, flatSpeed: 0, forwardVelocity: 0, rightVelocity: 0 };
 
 /** The three places the two physics models genuinely disagree. */
 export interface CarveModel {
@@ -166,21 +168,34 @@ export function integrateWith(
     const fallLine = fallLineMagnitude > 1e-4
       ? (forward.x * temp.x + forward.z * temp.z) / fallLineMagnitude : 1;
     const assist = clamp01(fallLine * 1.5 + 0.25);
-    const carved = model.carve(s, cfg, {
-      steer, tuck, brake, dt, flatSpeed,
-      forwardVelocity: dot(s.vel, forward),
-      rightVelocity: dot(s.vel, right),
-    });
-    const newRightVelocity = carved.rightVelocity;
+    carveContext.steer = steer; carveContext.tuck = tuck; carveContext.brake = brake;
+    carveContext.dt = dt; carveContext.flatSpeed = flatSpeed;
+    carveContext.forwardVelocity = dot(s.vel, forward); carveContext.rightVelocity = dot(s.vel, right);
+    const carved = model.carve(s, cfg, carveContext);
+    let newRightVelocity = carved.rightVelocity;
     let newForwardVelocity = carved.forwardVelocity;
 
-    if (tuck) newForwardVelocity += 6.2 * dt;
+    if (tuck) newForwardVelocity += 6.2 * dt * (cfg.physicsModel === "v2" ? tuck : 1);
     if (!brake && newForwardVelocity < 14) {
       newForwardVelocity += (14 - newForwardVelocity) * 2.2 * assist * dt;
     }
     if (brake) newForwardVelocity -= 6 * dt * Math.sign(newForwardVelocity);
     if (newForwardVelocity < 0) newForwardVelocity *= 0.5;
     if (!brake && newForwardVelocity < 5) newForwardVelocity += 4.5 * assist * dt;
+
+    if (cfg.physicsModel === "v2" && cfg.environment) {
+      const env = cfg.environment;
+      const corridor = clamp01(world.terrain.trailField(s.pos.x, s.pos.z));
+      const offPiste = 1 - corridor;
+      if (env.morningIce && normal.z * env.northSign > 0.08) {
+        // Recover lateral slip removed by the edge solve on shaded groomers.
+        newRightVelocity += (carveContext.rightVelocity - newRightVelocity) * corridor * 0.65;
+      }
+      // Depth adds progressive drag and buoyant support away from groomed corridors.
+      newForwardVelocity *= Math.exp(-(0.12 * offPiste + env.powderDepthCm * 0.004 * offPiste) * dt);
+      const exposure = clamp01((1 - normal.y) * 3);
+      newForwardVelocity *= Math.exp(-env.windSpeedMps * exposure * 0.006 * dt);
+    }
 
     s.vel.x = forward.x * newForwardVelocity + right.x * newRightVelocity;
     s.vel.z = forward.z * newForwardVelocity + right.z * newRightVelocity;

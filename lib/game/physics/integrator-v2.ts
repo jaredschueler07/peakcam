@@ -21,6 +21,8 @@ import {
 /** Cosine of the fall-line half-angle that still counts as a clean landing. */
 const CLEAN_LANDING_COS = Math.cos(25 * Math.PI / 180);
 
+const outcome: CarveOutcome = { forwardVelocity: 0, rightVelocity: 0 };
+
 const V2_MODEL: CarveModel = {
   preStep(s: SimulationState, dt: number): void {
     if (s.landingTimer > 0) s.landingTimer = Math.max(0, s.landingTimer - dt);
@@ -33,7 +35,7 @@ const V2_MODEL: CarveModel = {
   carve(s: SimulationState, cfg: SimulationConfig, ctx: CarveContext): CarveOutcome {
     const { steer, tuck, brake, dt, flatSpeed, forwardVelocity, rightVelocity } = ctx;
     const drag = 0.10 + brake * 0.90 - tuck * 0.05;
-    const airDrag = (tuck ? 0.0030 : 0.0055) * forwardVelocity * Math.abs(forwardVelocity);
+    const airDrag = (cfg.physicsModel === "v2" ? 0.0055 - 0.0025 * tuck : tuck ? 0.0030 : 0.0055) * forwardVelocity * Math.abs(forwardVelocity);
     const edgeTarget = clamp(Math.abs(steer), 0, 1);
     const lagRate = 1 / Math.max(cfg.carve.turnInLag, 1e-3);
     s.edgeAngle += (edgeTarget - s.edgeAngle) * (1 - Math.exp(-lagRate * dt));
@@ -44,7 +46,8 @@ const V2_MODEL: CarveModel = {
     const skid = clamp01(Math.abs(rightVelocity) / 13) * (1 - s.edgeAngle);
     const newForwardVelocity = forwardVelocity - (drag + skid * cfg.carve.skidDrag) * forwardVelocity * dt - airDrag * dt;
     s.carve = damp(s.carve, clamp01(Math.abs(rightVelocity) / 13) * (0.35 + s.edgeAngle * 0.65), 9, dt);
-    return { forwardVelocity: newForwardVelocity, rightVelocity: newRightVelocity };
+    outcome.forwardVelocity = newForwardVelocity; outcome.rightVelocity = newRightVelocity;
+    return outcome;
   },
 
   land(s: SimulationState, world: SimulationWorld, impact: number): void {
@@ -57,8 +60,12 @@ const V2_MODEL: CarveModel = {
         (flatVelocityMagnitude * fallLineMagnitude) : 1;
     const cleanLanding = fallLine >= CLEAN_LANDING_COS;
     if (cleanLanding) s.landingTimer = world.config.carve.landingWindow;
+    const environment = world.config.environment;
+    const powderAbsorption = environment
+      ? 1 + environment.powderDepthCm * 0.004 * (1 - clamp01(world.terrain.trailField(s.pos.x, s.pos.z))) : 1;
+    if (environment && !cleanLanding) { s.vel.x *= 0.82; s.vel.z *= 0.82; }
     onLand(s, cleanLanding ? impact * 0.72 : impact,
-      world.config.landingImpactThresholdMultiplier);
+      world.config.landingImpactThresholdMultiplier * powderAbsorption);
   },
 
   obstaclesActive(s: SimulationState): boolean {

@@ -22,7 +22,7 @@ import { fileURLToPath } from "node:url";
 
 import type { ResortGameProfile, ResortTrail } from "../config/schema";
 import { FIXED_DT } from "../core/clock";
-import { simulationConfig, type PhysicsModel, type SurfaceKind } from "../core/config";
+import { simulationConfig, type PhysicsModel, type SimulationEnvironment, type SurfaceKind } from "../core/config";
 import { beginLiftRide } from "../core/run-lifecycle";
 import { mulberry32 } from "../core/rng";
 import { createSimulation } from "../core/simulation";
@@ -98,6 +98,7 @@ const TAPES: Readonly<Record<string, (i: number, random: () => number) => InputF
 type TapeName = keyof typeof TAPES;
 
 interface Scenario {
+  readonly environment?: SimulationEnvironment;
   readonly name: string;
   readonly tape: TapeName;
   readonly ticks: number;
@@ -107,6 +108,13 @@ interface Scenario {
 }
 
 const SCENARIOS: readonly Scenario[] = [
+  ...[
+    { name: "deep-powder", powderDepthCm: 80, windSpeedMps: 0, morningIce: false },
+    { name: "ridge-wind", powderDepthCm: 0, windSpeedMps: 30, morningIce: false },
+    { name: "morning-ice", powderDepthCm: 0, windSpeedMps: 0, morningIce: true },
+    { name: "off-piste", powderDepthCm: 0, windSpeedMps: 0, morningIce: false },
+  ].flatMap(({ name, ...environment }) => ["brakeSlalom", "jumpSpam"].map(tape => ({ name: `${name}-${tape}`, tape, ticks: 600, seed: 11,
+    environment: { ...environment, visibilityM: 800, northSign: -1 as const } }))),
   { name: "glide", tape: "glide", ticks: 240, seed: 1 },
   { name: "tuck", tape: "tuck", ticks: 240, seed: 2 },
   { name: "carve", tape: "carve", ticks: 360, seed: 3 },
@@ -163,7 +171,7 @@ function runScenario(
   model: PhysicsModel, surface: SurfaceKind, scenario: Scenario,
 ): number[][] {
   const world = createProceduralWorld(
-    GOLDEN_PROFILE, GOLDEN_PROFILE.seed, simulationConfig(surface, model),
+    GOLDEN_PROFILE, GOLDEN_PROFILE.seed, simulationConfig(surface, model, scenario.environment),
   );
   const state = createSimulation(GOLDEN_PROFILE, GOLDEN_PROFILE.seed, world.terrain);
   scenario.prepare?.(state, world);
