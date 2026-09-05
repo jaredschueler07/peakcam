@@ -30,8 +30,8 @@ export class CsmShadows {
   constructor(private readonly camera: THREE.PerspectiveCamera, scene: THREE.Scene, private readonly mobile: boolean, weather: ResortWeather, visual: VisualWeatherPreset) {
     this.sunIntensity = weather.sun;
     this.csm = new CSM({
-      camera, parent: scene, cascades: mobile ? 1 : 3, mode: "practical", maxFar: 250,
-      shadowMapSize: mobile ? 1024 : 2048, lightDirection: SUN_DIRECTION.clone().negate(),
+      camera, parent: scene, cascades: mobile ? 1 : 2, mode: "practical", maxFar: 250,
+      shadowMapSize: mobile ? 1024 : 1536, lightDirection: SUN_DIRECTION.clone().negate(),
       lightIntensity: weather.sun, shadowBias: -0.0009, lightFar: 520, lightMargin: 120,
     });
     this.csm.fade = !mobile;
@@ -63,7 +63,7 @@ export class CsmShadows {
     if (!this.mobile && fullCascades !== this.fullCascades) {
       this.fullCascades = fullCascades;
       if (fullCascades) this.csm.mode = "practical";
-      else { this.csm.mode = "custom"; this.csm.customSplitsCallback = (_count, _near, _far, target) => target.push(1, 1, 1); }
+      else { this.csm.mode = "custom"; this.csm.customSplitsCallback = (_count, _near, _far, target) => target.push(1, 1); }
       this.updateFrustums();
     }
     this.applyLightBudget();

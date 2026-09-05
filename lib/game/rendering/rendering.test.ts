@@ -898,7 +898,7 @@ test("raising the camera far plane for the far field leaves the shadow cascades 
     return boxes;
   };
   const legacy = boxesFor(CSM_FAR_REFERENCE);
-  assert.ok(legacy.length >= 3, `expected 3 cascades, got ${legacy.length}`);
+  assert.ok(legacy.length === 2, `expected 2 cascades, got ${legacy.length}`);
   assert.deepEqual(boxesFor(CAMERA_FAR), legacy, "the far field changed the shadow cascades");
 
   // The measurement is live, not vacuous: below the reference the pin is a no-op and the fade
@@ -1051,4 +1051,16 @@ test("spawn immunity never makes the player's skier disappear", () => {
     state.invuln = immunity; skier.update(state, world.terrain, 1 / 60);
     assert.equal(skier.root.visible, true);
   }
+});
+
+ test("textured rock batches stay within the repeated shadow geometry budget", () => {
+  const scene = new THREE.Scene();
+  const world = createProceduralWorld(profile, profile.seed);
+  new WorldRenderer(scene, profile, world);
+  const rock = scene.children.find(object => object instanceof THREE.InstancedMesh && object.instanceMatrix.count === 900) as THREE.InstancedMesh;
+  assert.ok(rock);
+  const triangles = (rock.geometry.index?.count ?? rock.geometry.getAttribute("position").count) / 3;
+  assert.ok(triangles <= 56, `rock repeats ${triangles} triangles per colour/shadow pass`);
+  assert.ok((rock.material as THREE.MeshStandardMaterial).map, "stone detail remains textured");
+  assert.ok(rock.castShadow, "geometry savings retain rock contact shadows");
 });

@@ -131,7 +131,9 @@ export class WorldRenderer {
 
   constructor(private readonly scene: THREE.Scene, private readonly profile: ResortGameProfile, private readonly world: SimulationWorld) {
     const treeGeometry = createForestGeometry(profile.slug === "heavenly");
-    const rockBase = new THREE.IcosahedronGeometry(1, 1);
+    // Distorted textured 20-face rocks keep their silhouette without repeating
+    // 80 base triangles per instance in every cascade and the colour pass.
+    const rockBase = new THREE.IcosahedronGeometry(1, 0);
     const rockPositions = rockBase.getAttribute("position") as THREE.BufferAttribute;
     for (let i = 0; i < rockPositions.count; i += 1) {
       const radius = 0.72 + hash2(i * 13, i * 7) * 0.62;
@@ -140,7 +142,7 @@ export class WorldRenderer {
     rockBase.computeVertexNormals();
     const rockGeometry = mergeParts([
       { geometry: rockBase, color: 0x50535b, matrix: transform(0, 0.55, 0) },
-      { geometry: new THREE.SphereGeometry(0.82, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.42), color: 0xeef5ff, matrix: transform(0, 1.05, 0, 1.05, 0.7, 1.05) },
+      { geometry: new THREE.SphereGeometry(0.82, 6, 3, 0, Math.PI * 2, 0, Math.PI * 0.42), color: 0xeef5ff, matrix: transform(0, 1.05, 0, 1.05, 0.7, 1.05) },
     ]);
     // ?treedbg=1 drops the vertex-colour multiply so a shot can tell "colours lost" from "never applied".
     const propColors = !treeDebugEnabled();

@@ -15,6 +15,8 @@ export interface ShadowSystem {
   dispose(): void;
 }
 
+// Two 1536px cascades retain 250m coverage while cutting shadow-map pixels
+// by 62.5% versus three 2048px maps; low/mobile quality retains one cascade.
 const MAX_FAR = 250;
 const SHADOW_BIAS = -0.0009;
 const LIGHT_FAR = 520;
@@ -22,7 +24,7 @@ const LIGHT_MARGIN = 120;
 
 /** Cascade count is fixed at construction, so this is what decides when a rebuild is needed. */
 export function cascadeCountFor(mobile: boolean, rung: QualityRung): number {
-  return mobile || rung < 3 ? 1 : 3;
+  return mobile || rung < 3 ? 1 : 2;
 }
 
 /**
@@ -52,7 +54,7 @@ export class CsmShadowsNode implements ShadowSystem {
     // `?csmdbg=1` keeps the light but drops the shadow node entirely, partitioning "the light is
     // wrong" from "the cascades are wrong" in a single frame.
     this.light.castShadow = csmDebugMode() !== CSM_DEBUG.NO_SHADOW;
-    this.light.shadow.mapSize.set(mobile ? 1024 : 2048, mobile ? 1024 : 2048);
+    this.light.shadow.mapSize.set(mobile ? 1024 : 1536, mobile ? 1024 : 1536);
     this.light.shadow.bias = SHADOW_BIAS;
     this.light.shadow.camera.far = LIGHT_FAR;
     // CSMShadowNode derives the light direction from target minus position, and parents its
