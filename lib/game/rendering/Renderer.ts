@@ -347,7 +347,24 @@ export class GameRenderer {
   resize(width: number, height: number): void { this.width = Math.max(1, width); this.height = Math.max(1, height); this.applySize(); }
   private applySize() { this.renderer.setPixelRatio(this.maxDpr * this.quality.pixelScale); this.renderer.setSize(this.width, this.height, false); this.post?.setSize(this.width, this.height); this.built.camera.aspect = this.width / this.height; this.built.camera.updateProjectionMatrix(); }
 
+  private surfaceTextureLoader: (() => void) | null = null;
+  private surfaceTextureLoadStarted = false;
+
+  setSurfaceTextureLoader(load: () => void): void {
+    if (this.disposed) return;
+    this.surfaceTextureLoader = load;
+    this.requestSurfaceTextures(this.quality.rung);
+  }
+
+  private requestSurfaceTextures(rung: QualityRung): void {
+    if (rung < 3 || !this.surfaceTextureLoader || this.surfaceTextureLoadStarted) return;
+    this.surfaceTextureLoadStarted = true;
+    this.surfaceTextureLoader();
+  }
+
   private applyQuality(rung: QualityRung): void {
+    this.built.setSkyQuality?.(rung); this.terrain.setQuality(rung);
+    this.requestSurfaceTextures(this.quality.rung);
     this.post?.setQuality(rung); this.csm.setQuality(rung); this.effects.setQuality(rung);
     // Snow glint is the top rung's signature, and it is the node path's to spend: the WebGL chain
     // reaches rung 4 on weaker hardware than WebGPU does, so it stays on the cheaper frame.
@@ -447,7 +464,7 @@ export class GameRenderer {
 
   get farFieldWedgesDrawn(): number { return this.farField?.visibleWedgeCount ?? 0; }
 
-  /** The rung seeded at construction; quality-gated callers read it before fetching an asset. */
+  /** The current governor rung; quality-gated callers read it before fetching an asset. */
   get rung(): QualityRung { return this.quality.rung; }
 
   /**
@@ -456,7 +473,7 @@ export class GameRenderer {
    * or below the rung `TerrainRenderer` gates on internally.
    */
   attachSurfaceTextures(surfaces: SurfaceTextures): void {
-    if (this.disposed) return;
+    if (this.disposed) { surfaces.snowNormal.dispose(); surfaces.snowRoughness.dispose(); return; }
     this.terrain.attachSurfaceTextures(surfaces);
   }
 
@@ -477,6 +494,8 @@ export class GameRenderer {
     // `disposeObjectTree` releases them *and* reports them to the disposal audit. Disposing here
     // first would detach them silently and make the audit under-count.
     this.farField = null;
+    this.surfaceTextureLoader = null;
+    this.terrain.disposeInactiveMaterials(this.options.disposalAudit);
     disposeObjectTree(this.built.scene, this.options.disposalAudit); this.renderer.renderLists?.dispose(); this.renderer.dispose(); this.renderer.forceContextLoss?.();
   }
 }
