@@ -1,4 +1,7 @@
 import { expect, test } from "@playwright/test";
+import { COURSE_VERSION, PHYSICS_VERSION } from "../../lib/game/config/versions";
+import portilloCourses from "../../public/game/terrain/ski-portillo.network.json";
+import heavenlyCourses from "../../public/game/terrain/heavenly.network.json";
 import { GHOST_SAMPLE_HZ } from "../../lib/game/replay/recorder";
 
 const V2_URL = "/resorts/heavenly/drop-in";
@@ -147,9 +150,9 @@ test("a ticketed competitive run starts and reports itself submittable", async (
         trailId: body.trailId,
         surface: body.surface,
         physicsModel: body.physicsModel,
-        physicsVersion: 1,
-        courseVersion: 1,
-        tickHz: 10,
+        physicsVersion: PHYSICS_VERSION,
+        courseVersion: COURSE_VERSION,
+        tickHz: GHOST_SAMPLE_HZ,
         expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
       }),
     });
@@ -189,12 +192,12 @@ test("a run started before its ticket arrives stays offline, and never claims to
         seed: 987654321,
         resortSlug: "heavenly",
         mode: "time_trial",
-        trailId: "gunbarrel",
+        trailId: heavenlyCourses.runs[0].id,
         surface: "packed",
-        physicsModel: "v1",
-        physicsVersion: 1,
-        courseVersion: 1,
-        tickHz: 10,
+        physicsModel: "v2",
+        physicsVersion: PHYSICS_VERSION,
+        courseVersion: COURSE_VERSION,
+        tickHz: GHOST_SAMPLE_HZ,
         expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
       }),
     });
@@ -265,12 +268,12 @@ test("[gate] play → submit → board: a finished run posts and appears on the 
         seed: TICKET_SEED,
         resortSlug: "ski-portillo",
         mode: "time_trial",
-        trailId: "roca-jack",
+        trailId: portilloCourses.runs[0].id,
         surface: requested.surface,
         physicsModel: requested.physicsModel,
-        physicsVersion: 1,
-        courseVersion: 1,
-        tickHz: 10,
+        physicsVersion: PHYSICS_VERSION,
+        courseVersion: COURSE_VERSION,
+        tickHz: GHOST_SAMPLE_HZ,
         expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
       }),
     });
@@ -287,9 +290,9 @@ test("[gate] play → submit → board: a finished run posts and appears on the 
         timeMs: 42_000,
         score: 2864,
         mode: "time_trial",
-        trailId: "roca-jack",
-        physicsVersion: 1,
-        courseVersion: 1,
+        trailId: portilloCourses.runs[0].id,
+        physicsVersion: PHYSICS_VERSION,
+        courseVersion: COURSE_VERSION,
         displayName: NICKNAME,
       }),
     });
@@ -302,18 +305,18 @@ test("[gate] play → submit → board: a finished run posts and appears on the 
       body: JSON.stringify({
         resortSlug: "ski-portillo",
         mode: "time_trial",
-        trailId: "roca-jack",
-        physicsVersion: 1,
-        courseVersion: 1,
+        trailId: portilloCourses.runs[0].id,
+        physicsVersion: PHYSICS_VERSION,
+        courseVersion: COURSE_VERSION,
         rows: [{
           id: RUN_ID,
           rank: 1,
           mode: "time_trial",
-          trailId: "roca-jack",
+          trailId: portilloCourses.runs[0].id,
           timeMs: 42_000,
           score: 2864,
-          physicsVersion: 1,
-          courseVersion: 1,
+          physicsVersion: PHYSICS_VERSION,
+          courseVersion: COURSE_VERSION,
           displayName: NICKNAME,
           isSelf: true,
           hasGhost: true,
@@ -360,7 +363,7 @@ test("[gate] play → submit → board: a finished run posts and appears on the 
   expect(typeof body.ghost).toBe("string");
   expect((body.ghost as string).length).toBeGreaterThan(64);
   // NB: the client reads this from the ghost header (GHOST_SAMPLE_HZ = 30), not
-  // from the ticket — the sessions route advertises tickHz: 10. See the note to
+  // from the ticket — the sessions route advertises tickHz: GHOST_SAMPLE_HZ. See the note to
   // the lead; asserting the constant rather than a literal so this spec tracks
   // whichever value the recorder actually writes.
   expect(body.tickHz).toBe(GHOST_SAMPLE_HZ);
@@ -644,4 +647,7 @@ test("game dialogs keep keyboard focus inside and mode radios support arrows", a
   await expect(resume).toBeFocused();
   await resume.click();
   await expect(page.getByRole("button", { name: "Pause game" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(resume).toBeVisible();
+  await resume.click();
 });

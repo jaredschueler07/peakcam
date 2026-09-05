@@ -160,7 +160,7 @@ export class GameRuntime {
     /** Ticket seed for a competitive run; the profile seed otherwise. */
     readonly runSeed: number = profile.seed,
     /** Test-only start offset along the course; see `spawnOnRunAtArcLength`. */
-    spawnArcM?: number,
+    private readonly spawnArcM?: number,
     /** Prepared async renderer backend; omitted only by legacy direct-construction tests. */
     backend?: RendererBackend,
     /** Node-material pipeline, required alongside a WebGPU backend; see `nodeFactories`. */
@@ -242,6 +242,11 @@ export class GameRuntime {
     this.inputTape.reset();
     this.recordingArm.arm(this.state.time, (nowSimTime) => {
       resetRankedStart(this.state, this.world);
+      // Debug start offsets exercise the shell finish flow. Input replay always
+      // starts at the canonical gate, so these recordings cannot rank on the server.
+      const run = this.world.terrain.realRuns?.[this.state.selectedTrail];
+      if (run && this.spawnArcM !== undefined && Number.isFinite(this.spawnArcM))
+        spawnOnRunAtArcLength(this.state, run, this.spawnArcM, this.world.terrain);
       this.ghostRecorder.begin(nowSimTime);
       this.ghostRecorder.sample(this.state, nowSimTime);
     });
