@@ -1173,3 +1173,33 @@ test("procedural marker placement remains independent of player X", () => {
   update.call(fake, 10000, 250);
   assert.deepEqual(positions.slice(0, fake.markers.count), original);
 });
+
+test("batched ski shells retain all transformed geometry and dispose shared ownership once", () => {
+  const scene = new THREE.Scene();
+  new SkierRenderer(scene);
+  const shells: THREE.Mesh[] = [];
+  scene.traverse(object => { if (object instanceof THREE.Mesh && object.name === "ski-shell") shells.push(object); });
+  assert.equal(shells.length, 2);
+  assert.equal(shells[0].geometry, shells[1].geometry);
+  assert.equal(shells[0].material, shells[1].material);
+  for (const shell of shells) {
+    assert.equal(shell.parent?.children.length, 2, "orange shell plus separate dark binding");
+    assert.equal(shell.castShadow, false, "preserve the original ski shadow policy");
+  }
+  const originals = [new THREE.BoxGeometry(0.16, 0.055, 1.86),
+    new THREE.ConeGeometry(0.09, 0.30, 6).rotateX(Math.PI / 2).translate(0, 0.05, 1.02),
+    new THREE.ConeGeometry(0.09, 0.30, 6).rotateX(-Math.PI / 2).translate(0, 0.03, -1)];
+  const merged = shells[0].geometry;
+  assert.equal(merged.index!.count, originals.reduce((sum, geometry) => sum + geometry.index!.count, 0));
+  for (const name of ["position", "normal", "uv"]) {
+    const expected = originals.flatMap(geometry => Array.from(geometry.getAttribute(name).array));
+    assert.deepEqual(Array.from(merged.getAttribute(name).array), expected, `${name} stays identical after static transforms`);
+  }
+  merged.computeBoundingBox();
+  const expectedBounds = new THREE.Box3();
+  for (const geometry of originals) { geometry.computeBoundingBox(); expectedBounds.union(geometry.boundingBox!); geometry.dispose(); }
+  assert.deepEqual(merged.boundingBox, expectedBounds);
+  let released = 0; merged.addEventListener("dispose", () => released++);
+  disposeObjectTree(scene);
+  assert.equal(released, 1);
+});

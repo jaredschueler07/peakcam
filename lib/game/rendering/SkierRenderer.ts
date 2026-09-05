@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { SimulationState, TerrainSampler, Vec3 } from "../core/types";
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -51,12 +52,20 @@ export class SkierRenderer {
     this.legL.position.set(-0.17, 0.86, 0); this.legR.position.set(0.17, 0.86, 0);
     const bootL = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.24, 0.36), material(0x2b3444, 0.5));
     const bootR = bootL.clone(); bootL.position.set(-0.17, 0.16, 0.02); bootR.position.set(0.17, 0.16, 0.02);
-    const skiGeometry = new THREE.BoxGeometry(0.16, 0.055, 1.86), tipGeometry = new THREE.ConeGeometry(0.09, 0.30, 6);
+    // These three orange pieces move as one ski. Bake their fixed transforms
+    // into one shared geometry, retaining every vertex, normal and silhouette.
+    const skiParts = [
+      new THREE.BoxGeometry(0.16, 0.055, 1.86),
+      new THREE.ConeGeometry(0.09, 0.30, 6).rotateX(Math.PI / 2).translate(0, 0.05, 1.02),
+      new THREE.ConeGeometry(0.09, 0.30, 6).rotateX(-Math.PI / 2).translate(0, 0.03, -1),
+    ];
+    const skiGeometry = mergeGeometries(skiParts)!;
+    for (const part of skiParts) part.dispose();
     const makeSki = () => {
-      const group = new THREE.Group(), plank = new THREE.Mesh(skiGeometry, ski), tip = new THREE.Mesh(tipGeometry, ski), tail = tip.clone();
-      tip.rotation.x = Math.PI / 2; tip.position.set(0, 0.05, 1.02); tail.rotation.x = -Math.PI / 2; tail.position.set(0, 0.03, -1);
+      const group = new THREE.Group(), shell = new THREE.Mesh(skiGeometry, ski);
+      shell.name = "ski-shell";
       const binding = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.09, 0.34), dark); binding.position.y = 0.06;
-      group.add(plank, tip, tail, binding); return group;
+      group.add(shell, binding); return group;
     };
     this.skiL = makeSki(); this.skiR = makeSki();
     const makePole = () => {
