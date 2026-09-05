@@ -35,6 +35,13 @@ const sunPositionScratch = new THREE.Vector3();
 
 export interface RendererBackend {
   readonly backendKind: "webgpu" | "webgl";
+  readonly info?: {
+    autoReset: boolean;
+    reset(): void;
+    render?: { calls?: number; drawCalls?: number; triangles?: number; points?: number; lines?: number };
+    memory?: unknown;
+    calls?: number;
+  };
   // WebGLRenderer declares this as plain `string` in @types/three 0.185, so a
   // narrower ColorSpace here would reject the real renderer.
   outputColorSpace: string;
@@ -187,6 +194,9 @@ export class GameRenderer {
       }),
       { backendKind: "webgl" as const },
     );
+    // Our RAF owns a complete scene + shadow + post frame. Per-render-call reset
+    // otherwise leaves only the final fullscreen triangle in renderer.info.
+    if (this.renderer.info) this.renderer.info.autoReset = false;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace; this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     // Not gated on NODE_ENV, like ?e2ecanvas: the browser matrix is shot against a production build,
@@ -391,8 +401,12 @@ export class GameRenderer {
   }
 
   debugRendererInfo(): unknown {
-    const info = (this.renderer as unknown as { info?: { render?: unknown; memory?: unknown; calls?: number } }).info;
-    return info ? JSON.parse(JSON.stringify({ render: info.render, memory: info.memory, calls: info.calls })) : null;
+    const info = this.renderer.info;
+    return info ? JSON.parse(JSON.stringify({ render: info.render, memory: info.memory, calls: info.calls,
+      // WebGPU render.calls is lifetime render invocations; drawCalls is the per-frame draw budget.
+      frameDrawCalls: this.renderer.backendKind === "webgpu" ? info.render?.drawCalls : info.render?.calls,
+      frameTriangles: info.render?.triangles,
+    })) : null;
   }
 
   get backendKind(): "webgpu" | "webgl" { return this.renderer.backendKind; }
@@ -406,6 +420,9 @@ export class GameRenderer {
 
   render(state: SimulationState, world: SimulationWorld, dt: number, tuck: number, frameMs = dt * 1000): void {
     if (this.disposed || this.contextLost) return;
+    // Both initialized Three backends render synchronously here (not renderAsync).
+    // Reset before CSM/scene/post work; all passes accumulate until the next RAF.
+    this.renderer.info?.reset();
     this.adaptTime += dt; this.elapsed += dt;
     if (frameMs > 0) {
       if (this.frameTimes.length < 36_000) this.frameTimes.push(frameMs);
