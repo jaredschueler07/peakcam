@@ -95,8 +95,50 @@ export function buildTileGeometry(terrain: TerrainSampler, ix: number, iz: numbe
   return geometry;
 }
 
+/** Low tier shares the high tiles' exact attributes, selecting every second grid
+ * sample. Uniform stride includes all tile edges, so adjacent tiles cannot crack.
+ * The retained high tiles remain the authority; this never resamples physics.
+ */
+function buildLowTileBatch(tiles: readonly Tile[]): THREE.BufferGeometry {
+  const n = TILE_RESOLUTION + 1, verticesPerTile = n * n;
+  const geometry = new THREE.BufferGeometry();
+  for (const name of ["position", "normal", "color", "groomed"]) {
+    const itemSize = tiles[0].mesh.geometry.getAttribute(name).itemSize;
+    const values = new Float32Array(tiles.length * verticesPerTile * itemSize);
+    for (let t = 0; t < tiles.length; t++) {
+      const tile = tiles[t], source = tile.mesh.geometry.getAttribute(name) as THREE.BufferAttribute;
+      const offset = t * verticesPerTile * itemSize;
+      values.set(source.array, offset);
+      if (name === "position") {
+        for (let vertex = 0; vertex < verticesPerTile; vertex++) {
+          values[offset + vertex * 3] += tile.mesh.position.x;
+          values[offset + vertex * 3 + 2] += tile.mesh.position.z;
+        }
+      }
+    }
+    geometry.setAttribute(name, new THREE.BufferAttribute(values, itemSize));
+  }
+  const indices = new Uint32Array(tiles.length * (TILE_RESOLUTION / 2) ** 2 * 6);
+  let at = 0;
+  for (let t = 0; t < tiles.length; t++) {
+    const offset = t * verticesPerTile;
+    for (let row = 0; row < TILE_RESOLUTION; row += 2) {
+      for (let col = 0; col < TILE_RESOLUTION; col += 2) {
+        const a = offset + row * n + col, b = a + 2, c = a + n * 2, d = c + 2;
+        indices[at++] = a; indices[at++] = c; indices[at++] = b;
+        indices[at++] = b; indices[at++] = c; indices[at++] = d;
+      }
+    }
+  }
+  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+  geometry.computeBoundingBox(); geometry.computeBoundingSphere();
+  return geometry;
+}
+
 export class TerrainRenderer {
   private readonly tiles: Tile[] = [];
+  private readonly lowMesh: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
+  private lowGeometryDirty = true;
   private centerX = Infinity;
   private centerZ = Infinity;
   private readonly detailNormal: THREE.Texture;
@@ -141,16 +183,38 @@ export class TerrainRenderer {
         scene.add(mesh);
         this.tiles.push({ mesh, x: Infinity, z: Infinity });
     }
+    this.lowMesh = new THREE.Mesh(new THREE.BufferGeometry(), material);
+    this.lowMesh.name = "terrain-low";
+    this.lowMesh.receiveShadow = true;
+    this.scene.add(this.lowMesh);
+    this.applyTileVisibility();
   }
 
   /** Cache variants: downshifts remove texture nodes, upgrades reuse compiled materials. */
   setQuality(rung: QualityRung): void {
+    if (this.disposed) return;
     this.rung = rung;
-    if (this.disposed || !this.nodes || !this.snowUniforms) return;
-    const tier = rung < 2 ? 0 : rung >= 3 && this.surfaces ? 3 : 2;
-    const next = this.variants.get(tier)!;
-    this.material = next;
-    for (const tile of this.tiles) tile.mesh.material = next;
+    if (this.nodes && this.snowUniforms) {
+      const tier = rung < 2 ? 0 : rung >= 3 && this.surfaces ? 3 : 2;
+      const next = this.variants.get(tier)!;
+      this.material = next;
+      for (const tile of this.tiles) tile.mesh.material = next;
+      this.lowMesh.material = next;
+    }
+    if (rung < 2 && this.lowGeometryDirty && Number.isFinite(this.centerX)) this.rebuildLowBatch();
+    this.applyTileVisibility();
+  }
+
+  private applyTileVisibility(): void {
+    for (const tile of this.tiles) tile.mesh.visible = this.rung >= 2;
+    this.lowMesh.visible = this.rung < 2 && this.lowMesh.geometry.index !== null;
+  }
+
+  private rebuildLowBatch(): void {
+    const next = buildLowTileBatch(this.tiles);
+    this.lowMesh.geometry.dispose();
+    this.lowMesh.geometry = next;
+    this.lowGeometryDirty = false;
   }
 
   attachSurfaceTextures(surfaces: SurfaceTextures): void {
@@ -183,6 +247,7 @@ export class TerrainRenderer {
   }
 
   update(playerX: number, playerZ: number): void {
+    if (this.disposed) return;
     const cx = Math.floor(playerX / TILE_SIZE), cz = Math.floor(playerZ / TILE_SIZE);
     if (cx === this.centerX && cz === this.centerZ) return;
     this.centerX = cx; this.centerZ = cz;
@@ -202,6 +267,9 @@ export class TerrainRenderer {
         keep.add(i); this.rebuild(tile, wanted[i][0], wanted[i][1]); break;
       }
     }
+    this.lowGeometryDirty = true;
+    if (this.rung < 2) this.rebuildLowBatch();
+    this.applyTileVisibility();
   }
 
   private rebuild(tile: Tile, ix: number, iz: number): void {
@@ -220,6 +288,7 @@ export class TerrainRenderer {
     for (const { mesh } of this.tiles) {
       this.scene.remove(mesh); mesh.geometry.dispose();
     }
+    this.scene.remove(this.lowMesh); this.lowMesh.geometry.dispose();
     this.material.dispose();
     this.tiles.length = 0;
   }
