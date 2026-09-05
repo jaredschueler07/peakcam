@@ -8,6 +8,8 @@ the public default and removes the old iframe engine. It has **not been deployed
 The primary checkout and its snowing-now changes remain separate.
 A follow-up corrects inverted steering across keyboard, touch, mouse and gamepad;
 12 actual browser direction checks pass on WebGL/WebGPU.
+The HUD also includes a descent meter with percent down and vertical feet left;
+desktop and narrow-phone visual/reset checks pass in the development preview.
 
 The full mapped trail catalog, baked terrain detail, physical lift laps, default
 physics v2, signed environmental conditions and authoritative input replay are

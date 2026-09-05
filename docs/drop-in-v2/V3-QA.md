@@ -137,3 +137,15 @@ controller now sends the corrected physical direction.
 
 Full Imperial Bowl descents also pass with both keyboard and two-finger touch
 on WebGL using the corrected controls: 2/2, no browser errors or debug mutations.
+
+## Descent meter follow-up
+
+The bottom statistics panel now shows vertical descent percentage and remaining
+vertical feet to the selected run's bottom. Browser checks at desktop 1365×900
+WebGPU and mobile 390×844 / 320×740 WebGL pass start/advance/restart, layout
+clearance and zero page errors. Screenshots were inspected. Reproduction:
+`node .superpowers/sdd/V3-PLAN/descent-meter-qa.mjs` against port 3113.
+TypeScript and ESLint pass. Full production builds twice passed compilation but
+failed unrelated prerender queries with Supabase timeouts; this follow-up was
+visually checked on the isolated development server, not a completed production
+build. Earlier production performance numbers above are baseline evidence.
