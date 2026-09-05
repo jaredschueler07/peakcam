@@ -7,17 +7,19 @@ import type { SimulationEvents } from "../core/events";
 type ListenerSource = Readonly<{
   speed: number;
   carve: number;
+  edgeAngle?: number;
+  liftProximity?: number;
   onGround: boolean;
   liftRide: number;
 }>;
 
 export class RuntimeAudio {
   private engine: AudioEngine | null = null;
-  private surface: SurfaceKind = "packed";
   /** Reused Partial<ListenerState> for setListenerState — no per-HUD-tick object. */
   private readonly listenerPartial = {
     speed: 0,
     carve: 0,
+    edgeAngle: 0,
     airborne: false,
     surface: "packed" as SurfaceKind,
     windLevel: 0,
@@ -27,7 +29,7 @@ export class RuntimeAudio {
   constructor(private readonly createEngine: () => AudioEngine = () => new AudioEngine()) {}
 
   start(enabled = true, surface: SurfaceKind = "packed"): boolean {
-    this.surface = surface;
+    this.listenerPartial.surface = surface;
     if (!this.engine) this.engine = this.createEngine();
     this.engine.setEnabled(enabled);
     const initialized = this.engine.init();
@@ -47,7 +49,10 @@ export class RuntimeAudio {
     const report = await engine.loadSampleLayers(toSampleManifest(file), fetchImpl, signal);
     if (!report.anyLoaded || signal.aborted) return;
     engine.sampleLayers?.play("wind-bed");
-    engine.sampleLayers?.play(this.surface === "powder" ? "carve-powder" : "carve-packed");
+    for (const layer of ["carve-powder", "carve-packed", "lift-hum", "wind-gust"]) {
+      engine.sampleLayers?.setLayerLevel(layer, 0, true);
+      engine.sampleLayers?.play(layer);
+    }
   }
 
   updateListener(
@@ -59,10 +64,11 @@ export class RuntimeAudio {
     const partial = this.listenerPartial;
     partial.speed = state.speed;
     partial.carve = state.carve;
+    partial.edgeAngle = state.edgeAngle ?? 0;
     partial.airborne = !state.onGround;
     partial.surface = surface;
     partial.windLevel = windLevel;
-    partial.liftProximity = state.liftRide > 0 ? 1 : 0;
+    partial.liftProximity = state.liftProximity ?? (state.liftRide > 0 ? 1 : 0);
     this.engine?.setListenerState(partial, nowMs);
   }
 
@@ -73,8 +79,11 @@ export class RuntimeAudio {
     if (events.gatePassed) this.play("gate", { variant: "hit" });
     if (events.gateMissed) this.play("gate", { variant: "miss" });
     if (events.trickLanded) this.play("trick");
-    if (events.liftFinished) this.engine?.sampleLayers?.stop("lift-hum");
+    // Station proximity, including the unload terminal, owns the continuous hum.
   }
+
+  /** Existing CC0 impact layer doubles as a post clatter; no simulation collision. */
+  playSignClatter(): void { if (this.engine?.isEnabled) this.engine.sampleLayers?.play("crash-impact"); }
 
   playLift(): void { this.play("lift"); this.engine?.sampleLayers?.play("lift-hum"); }
   playUi(variant: "confirm" | "back"): void { this.play("ui", { variant }); }

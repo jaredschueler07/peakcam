@@ -199,7 +199,7 @@ export class ProceduralSoundBank {
     const t = this.ctx.currentTime;
     const sp = clamp01(state.speed / SPEED_REFERENCE_MPS);
     const wind = clamp01(state.windLevel);
-    const carve = clamp01(state.carve);
+    const carve = clamp01(Math.max(state.carve, (state.edgeAngle ?? 0) * sp));
 
     // v1: 0.02 + sp * 0.30 / 320 + sp * 950, plus the ambient weather term.
     this.windGain.gain.setTargetAtTime(0.02 + sp * 0.3 + wind * (0.03 + sp * 0.12), t, 0.12);

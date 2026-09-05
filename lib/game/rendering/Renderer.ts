@@ -64,6 +64,7 @@ export interface QualityChangeEvent {
 }
 
 interface RendererOptions {
+  localHour?: number;
   backend?: RendererBackend;
   devicePixelRatio?: number;
   reducedMotion?: boolean;
@@ -218,7 +219,8 @@ export class GameRenderer {
       this.built.camera, state, this.reducedMotion,
       options.cameraPreset ?? CAMERA_PRESETS[cameraPresetName()],
     );
-    this.weather = new WeatherRenderer(profile, this.built, this.renderer);
+    const debugWeather = typeof location !== "undefined" && new URLSearchParams(location.search).has("weather");
+    this.weather = new WeatherRenderer(profile, this.built, this.renderer, debugWeather ? undefined : world.config.environment, debugWeather ? 12 : options.localHour);
     this.built.atmosphereUniforms.referenceHeight.value = state.pos.y;
     this.csm = nodes
       ? new nodes.csm.CsmShadowsNode(this.built.camera, this.built.scene, this.mobile, this.weather.current, visualWeatherPreset(this.weather.index))
@@ -381,6 +383,8 @@ export class GameRenderer {
   /** Attach a decoded replay to render alongside the live skier, or `null` to clear it. */
   setGhost(ghost: DecodedGhost | null): void { this.ghost.setGhost(ghost); }
 
+  noteLanding(kind: "soft" | "hard" | null): void { this.cameraController.noteLanding(kind); }
+
   setWeather(index: number): void { if (index < 0) this.weather.cycle(); else this.weather.apply(index); this.csm.setWeather(this.weather.current, visualWeatherPreset(this.weather.index)); this.applyQuality(this.quality.rung); }
 
   render(state: SimulationState, world: SimulationWorld, dt: number, tuck: number, frameMs = dt * 1000): void {
@@ -422,7 +426,7 @@ export class GameRenderer {
       this.farFieldFrustum.setFromProjectionMatrix(this.farFieldMatrix);
       this.farField.update(this.built.camera.position, this.farFieldFrustum, state.pos);
     }
-    this.effects.update(state, this.built.camera, dt, this.weather.current.snow, this.weather.current.wind);
+    this.effects.update(state, this.built.camera, dt, this.weather.current.snow, this.weather.windSpeed);
     this.built.atmosphereUniforms.referenceHeight.value = state.pos.y;
     this.built.skyUniforms.uTime.value += dt;
     const fx = Math.sin(state.yaw), fz = Math.cos(state.yaw);

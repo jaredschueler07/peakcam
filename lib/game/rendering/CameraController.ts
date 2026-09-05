@@ -39,6 +39,11 @@ export class CameraController {
   private shake = 0;
   private shakeVelocity = 0;
   private roll = 0;
+  private landingImpulse = 0;
+
+  noteLanding(kind: "soft" | "hard" | null): void {
+    if (!this.reducedMotion) this.landingImpulse = Math.max(this.landingImpulse, kind === "soft" ? 0.035 : 0.24);
+  }
   readonly speedUniform: THREE.IUniform<number> = { value: 0 };
 
   get motionAmplitude(): number { return this.shake; }
@@ -73,6 +78,7 @@ export class CameraController {
 
   update(state: SimulationState, terrain: TerrainSampler, dt: number, tuck: number): void {
     this.elapsed += dt;
+    this.landingImpulse *= Math.exp(-8 * dt);
     const speed = Math.hypot(state.vel.x, state.vel.z);
     const speed01 = clamp01(speed / 58);
     this.speedUniform.value = damp(this.speedUniform.value, speed01, 7.5, dt);
@@ -101,7 +107,7 @@ export class CameraController {
     this.position.y = damp(this.position.y, desiredY, lambda * 1.35, dt);
     this.position.z = damp(this.position.z, desiredZ, lambda, dt);
     this.position.y = Math.max(this.position.y, terrain.height(this.position.x, this.position.z) + preset.floorClearance);
-    const targetShake = this.reducedMotion ? 0 : (state.crash > 0 ? state.crash * 0.06 : this.speedUniform.value * this.speedUniform.value * 0.036);
+    const targetShake = this.reducedMotion ? 0 : (state.crash > 0 ? state.crash * 0.06 : this.speedUniform.value * this.speedUniform.value * 0.036) + this.landingImpulse;
     criticalSpring(this.shake, this.shakeVelocity, targetShake, 2.2, dt, springOut);
     this.shake = springOut.value; this.shakeVelocity = springOut.velocity;
     this.camera.position.set(
@@ -117,7 +123,7 @@ export class CameraController {
     this.camera.lookAt(this.target);
     const fovRamp = this.reducedMotion ? preset.fovSpeedGain / 2 : preset.fovSpeedGain;
     this.camera.fov = damp(this.camera.fov, preset.fovBase + this.speedUniform.value * fovRamp, 5.2, dt);
-    const targetRoll = this.reducedMotion ? 0 : THREE.MathUtils.clamp((-state.lean * 0.055 - tuck * state.lean * 0.012) * this.speedUniform.value, -0.065, 0.065);
+    const targetRoll = this.reducedMotion ? 0 : THREE.MathUtils.clamp((-state.lean * (0.04 + state.edgeAngle * 0.025) - tuck * state.lean * 0.012) * this.speedUniform.value, -0.065, 0.065);
     this.roll = damp(this.roll, targetRoll, 9, dt);
     this.camera.rotateZ(this.roll);
     this.camera.updateProjectionMatrix();
