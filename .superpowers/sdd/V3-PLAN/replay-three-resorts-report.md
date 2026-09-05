@@ -18,3 +18,9 @@ For every run, the actual reviewed `handleSubmitRun` accepts the signed request 
 Three additional tests compare every committed mapped tree site's client/server collision chunk (positions, radii, scales and rotations) and verify the actual site is represented. Empty inventories remain explicit. Reviewed source path: both runtime and ranked server call `createWorld`; mapped forest buckets are seeded identically and consumed through shared `getChunk` by physics collision. Final world merge leaves signed config/environment unchanged. Sensory clipping only affects rendering (fog/visibility retention); it does not change the simulation, tape, or replay.
 
 Validation:27 tests pass in the expanded replay suite; TypeScript no-emit and ESLint for changed test pass. No GPU/browser was launched. These prove a representative selectable run per resort for both input classes, not every possible trail or human-playability/device-input acceptance. Fixed Time Trial environment tested here; existing snapshot/replay environment tests cover authority and mutation rejection.
+
+## Final dense-forest revalidation
+
+Mergedbfb3196 (including sourced landmarks16dde38) in7e0d2a1. Actual final inventories are6,130 Breckenridge tree sites,7,331 Heavenly sites and0 Portillo sites. The same full mapped-tree client/server chunk comparison passes for every site. All six honest HTTP201 times/scores in the table remain unchanged and all tamper cases still reject.
+
+Combined run:170/170 pass =27 three-resort replay tests +137 golden tests (136 trajectories plus coverage, including all historical v1 cases) +6 lift tests. Lift traversal tests exercise all72 eligible complete lifts (34 Breckenridge,23 Heavenly,15 Portillo), their own genuine endpoints and shared sampled cable path. No production code or fixtures changed for this revalidation. TypeScript no-emit passes. No GPU or device-performance claim.
