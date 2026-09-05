@@ -102,7 +102,7 @@ export function stepRealLifts(s: SimulationState, dt: number, world: SimulationW
       if(!path || lift.complete===false || lift.stations?.length!==2)continue;
       const p=path.points[0],radius=Math.min(12,lift.stations?.[0]?.radiusM??7);
       if(Math.hypot(s.pos.x-p.x,s.pos.z-p.z)<=radius && Math.abs(s.pos.y-(p.y-RIDER_DROP_M))<3){
-        s.liftIndex=i;s.liftDistanceM=0;s.liftProgress=0;break;
+        s.liftIndex=i;s.liftDistanceM=0;s.liftProgress=0;s.jumpCharge=0;break;
       }
     }
   }
@@ -113,7 +113,7 @@ export function stepRealLifts(s: SimulationState, dt: number, world: SimulationW
   s.liftProgress=s.liftDistanceM/path.lengthM;s.liftRide=(path.lengthM-s.liftDistanceM)/liftSpeed(lift);
   const p=sampleLiftPath(path,s.liftDistanceM,scratch);
   s.pos.x=p.x;s.pos.y=p.y-RIDER_DROP_M;s.pos.z=p.z;s.yaw=p.heading;
-  s.vel.x=0;s.vel.y=0;s.vel.z=0;s.onGround=path.surface;s.carve=0;s.edgeAngle=0;s.lean=0;s.crouch=0;s.airTime=0;s.crash=0;
+  s.vel.x=0;s.vel.y=0;s.vel.z=0;s.onGround=path.surface;s.jumpCharge=0;s.carve=0;s.edgeAngle=0;s.lean=0;s.crouch=0;s.airTime=0;s.crash=0;
   s.prevX=s.pos.x;s.prevZ=s.pos.z;
   if(s.liftDistanceM>=path.lengthM){
     s.liftIndex=-1;s.liftRide=0;s.liftCooldown=5;s.onGround=true;s.invuln=2;

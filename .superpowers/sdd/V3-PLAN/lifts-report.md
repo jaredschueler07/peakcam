@@ -22,3 +22,7 @@
 - Station ramps use the real DEM terminal surface, rather than new fabricated ramp coordinates. Source does not identify a separate unload-ramp polygon.
 - Shared textured procedural carrier/station geometry is authored in this repository; no downloaded assets or new licensing obligations. Signs are canvas textures; carrier paint uses an authored deterministic ribbed texture.
 - Occupied carrier is represented explicitly at ride distance. Unoccupied carrier spacing is decorative; loading does not wait for a global scheduled chair arrival. This preserves immediate auto-boarding with continuous actual line-speed travel.
+
+## Review correction
+
+Merged terrain correction `46f4bad` with the `complete` field retained once. Boarding/ride now clears `jumpCharge`, preventing a held jump released on the lift from triggering after unload. Inventory regression charges 0.4 seconds before each board, rides, then applies a neutral fixed step after unload and verifies no jump event. All 72 source lines remain complete with both genuine stations (34/23/15); tests assert these counts rather than silently skipping an empty inventory. 143 lift/golden tests and TypeScript pass after the merge and correction.

@@ -5,6 +5,7 @@ import { brotliDecompressSync } from "node:zlib";
 import { DROP_IN_GAME_PROFILES } from "../config/profiles";
 import { createTerrainSource } from "../terrain/terrain-source";
 import { createWorld } from "../terrain/obstacles";
+import { stepSimulation } from "./simulation";
 import { createSkierState } from "../physics/skier";
 import { simulationConfig } from "./config";
 import { prepareLiftPath, sampleLiftPath, stepRealLifts, liftSpeed, RIDER_DROP_M } from "./lifts";
@@ -20,16 +21,21 @@ for(const slug of ['breckenridge','heavenly','ski-portillo'] as const){
     const world=createWorld(profile,profile.seed,source.sampler,{...simulationConfig('packed','v2'),allowLifts:true});
     createSimulation(profile,profile.seed,source.sampler);
     assert.ok(source.sampler.realLifts!.length>1);
+    let ridden=0;
     for(const lift of source.sampler.realLifts!){
       if(lift.complete===false || lift.stations?.length!==2)continue;
+      ridden++;
+      assert.equal(lift.stations!.length,2);
       // Isolate overlapping station zones when checking each inventory entry.
       const isolated={...world,terrain:{...source.sampler,realLifts:[lift]}};
       const path=prepareLiftPath(lift),s=createSkierState();
+      s.jumpCharge=0.4;
       const base=path.points[0],top=path.points.at(-1)!;
       for(const p of path.points) assert.ok(p.y-RIDER_DROP_M>=source.sampler.height(p.x,p.z)-0.2, `${lift.name}: cable/rider above terrain`);
       Object.assign(s.pos,{x:base.x,y:base.y-RIDER_DROP_M,z:base.z});
       assert.equal(stepRealLifts(s,1/120,isolated),true,lift.name);
       assert.equal(s.liftIndex,0,lift.name);
+      assert.equal(s.jumpCharge,0,"boarding clears a pending jump release");
       assert.equal(s.liftDistanceM,liftSpeed(lift)/120);
       sampleLiftPath(path,s.liftDistanceM,point);
       assert.equal(s.pos.y,point.y-RIDER_DROP_M);
@@ -40,7 +46,11 @@ for(const slug of ['breckenridge','heavenly','ski-portillo'] as const){
       assert.ok(s.events.liftFinished && s.onGround);assert.equal(s.liftProgress,1);
       assert.ok(Math.hypot(first.x-base.x,first.z-base.z)<0.1,'no teleport to summit');
       assert.ok(s.liftCooldown>0);
+      assert.equal(s.jumpCharge,0);
+      stepSimulation(s,{steer:0,tuck:0,brake:0,jumpHeld:false,jumpPressed:false,restartPressed:false,trailPressed:false},1/120,isolated);
+      assert.equal(s.events.jumped,false,"a neutral unload cannot release a pre-boarding jump");
     }
+    assert.equal(ridden,{breckenridge:34,heavenly:23,"ski-portillo":15}[slug]);
   });
 }
 
