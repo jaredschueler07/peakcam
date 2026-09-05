@@ -206,7 +206,7 @@ export class GameRenderer {
     const navigatorLike = typeof navigator === "undefined" ? undefined : navigator as Navigator & { deviceMemory?: number };
     const signals = options.qualitySignals ?? { hardwareConcurrency: navigatorLike?.hardwareConcurrency, deviceMemory: navigatorLike?.deviceMemory, coarsePointer: typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches, dpr: this.maxDpr };
     this.mobile = signals.coarsePointer;
-    this.quality = new QualityController(seedQualityRung(signals));
+    this.quality = new QualityController(seedQualityRung(signals, this.renderer.backendKind));
     const snowDebug = snowDebugMode();
     // `nodes` is the one backend switch the scene needs: it is non-null exactly on WebGPU, and
     // carries the node-material factories that only that path fetches.
