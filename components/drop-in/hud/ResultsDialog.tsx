@@ -29,6 +29,7 @@ export interface ResultsCompetition {
   mode: CompetitiveRunMode;
   resortSlug: string;
   trailId: string;
+  conditionsDate?: string;
   /** Consumes the runtime's recording; called once per results screen. */
   takeRecording(): FinishedRunRecording | null;
   onRaceGhost(ghost: DecodedGhost, runId: string): void;
@@ -177,6 +178,7 @@ export default function ResultsDialog({
             resortSlug={competition.resortSlug}
             mode={competition.mode}
             trailId={competition.trailId}
+            conditionsDate={competition.conditionsDate}
             highlightRunId={submitted?.accepted ? submitted.runId : null}
             onRaceGhost={competition.onRaceGhost}
             racedRunId={competition.racedRunId}

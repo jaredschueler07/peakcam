@@ -19,7 +19,6 @@ import {
   NO_TICKET,
   needsRemint,
   resolveRunSeed,
-  ticketForConfig,
   ticketForWorld,
   ticketReducer,
   usableTicket,
@@ -40,6 +39,7 @@ import PauseDialog from "./hud/PauseDialog";
 import ResultsDialog from "./hud/ResultsDialog";
 import TouchControls from "./input/TouchControls";
 
+import { freezeConditions } from "@/lib/game/competition/freeze-conditions";
 import type { CourseChoice } from "@/lib/game/config/course-choices";
 
 type ShellPhase = "poster" | "loading" | "playing" | "error";
@@ -125,6 +125,10 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
   const [mode, setMode] = useState<DropInModeChoice>("free_ski");
   const [ticketState, setTicketState] = useState<TicketState>(NO_TICKET);
   /** The ticket this descent was actually seeded from; frozen at start. */
+  const [playedConditions, setPlayedConditions] = useState(conditions);
+  const playedConditionsRef = useRef(conditions);
+  const playedTrailRef = useRef(trailId);
+  const playedDateRef = useRef<string | undefined>(undefined);
   const [runTicket, setRunTicket] = useState<RunSessionTicket | null>(null);
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   /** The leaderboard row whose ghost is loaded into the renderer, if any. */
@@ -194,7 +198,7 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
           runtimeRef.current?.world.config ?? { surface: conditions.surface, physicsModel },
           Date.now(),
         );
-        if (!forThisRun) {
+        if (!forThisRun || forThisRun.trailId !== playedTrailRef.current) {
           applyTicketState({ status: "offline" });
           freezeRunTicket(null);
           setSessionNotice(OFFLINE_NOTICE);
@@ -214,7 +218,7 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
   const session: DropInRunSession = useMemo(
     () => ({
       mode,
-      trailId,
+      trailId: phase === "poster" ? trailId : playedTrailRef.current,
       ticket: runTicket,
       offline: mode !== "free_ski" && runTicket === null,
       markSubmitted: () => {
@@ -224,7 +228,7 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
         freezeRunTicket(null);
       },
     }),
-    [mode, trailId, runTicket],
+    [mode, trailId, runTicket, phase],
   );
 
   /**
@@ -336,10 +340,11 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
         const { createGame } = await import("@/lib/game/runtime/createGame");
         if (cancelled) return;
         const created = await createGame({
-          canvas, profile, uiBridge: bridge, signal: controller.signal, conditions, physicsModel, audio,
+          canvas, profile, uiBridge: bridge, signal: controller.signal, conditions: playedConditionsRef.current, physicsModel, audio,
+          mode: modeRef.current,
           // The ghost header carries world.seed; it must equal the ticket seed
           // or the server rejects the submission with seed_mismatch.
-          ...{ trailId: runTicketRef.current?.trailId ?? trailId },
+          trailId: playedTrailRef.current,
           seed: resolveRunSeed(runTicketRef.current, profile.seed),
           // Test-only start offset (`?e2espawn=<metres>`). The run it produces
           // finishes through real physics but is refused by the server
@@ -368,7 +373,7 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
         track(EVENTS.DROP_IN_STARTED, {
           resort: profile.slug, engine: "v2",
           mode: modeRef.current === "free_ski" ? "free_ride" : modeRef.current,
-          surface: conditions.surface, powder_day: conditions.powderDay,
+          surface: playedConditionsRef.current.surface, powder_day: playedConditionsRef.current.powderDay,
         });
       } catch (reason) {
         if (cancelled) return;
@@ -383,29 +388,18 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
 
   const start = () => {
     if (teardownRef.current) return;
-    // Freeze the ticket now: the world is about to be built from its seed, and
-    // one that arrives later cannot retroactively describe this run. A request
-    // still in flight (or an expired ticket) therefore starts offline rather
-    // than making the player wait — the run is recorded, just not submitted.
-    //
-    // Checked against the config this world will actually use, not just
-    // readiness. Under `?phys=v2` with the rollout off the server mints a v1
-    // ticket while the runtime builds a v2 world, and freezing on readiness
-    // alone submitted that v2 run to the v1 board. No world exists yet, so
-    // there is no seed to compare — that check lands on the restart path.
-    const frozen = modeRef.current === "free_ski"
-      ? null
-      : ticketForConfig(
-          ticketStateRef.current,
-          { surface: conditions.surface, physicsModel },
-          Date.now(),
-        );
-    freezeRunTicket(frozen);
-    if (modeRef.current !== "free_ski" && !frozen) setSessionNotice(OFFLINE_NOTICE);
+    const frozen = freezeConditions(conditions, ticketStateRef.current, physicsModel,
+      profile.slug, modeRef.current, trailId, Date.now());
+    freezeRunTicket(frozen.ticket);
+    playedConditionsRef.current = frozen.conditions;
+    playedTrailRef.current = frozen.trailId;
+    playedDateRef.current = frozen.ticket?.conditionsDate;
+    setPlayedConditions(frozen.conditions);
+    if (modeRef.current !== "free_ski" && !frozen.ticket) setSessionNotice(OFFLINE_NOTICE);
     const controller = new AbortController();
     const enabled = localStorage.getItem(AUDIO_STORAGE_KEY) !== "off";
     const audio = new RuntimeAudio();
-    audio.start(enabled, conditions.surface);
+    audio.start(enabled, frozen.conditions.surface);
     audio.playUi("confirm");
     void audio.loadSamples(controller.signal);
     teardownRef.current = controller;
@@ -429,7 +423,8 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
       } else {
         // Must match the world we are still skiing — a restart does not rebuild
         // it, so an otherwise-valid ticket for another seed is not usable here.
-        freezeRunTicket(ticketForWorld(ticketStateRef.current, active.runSeed, active.world.config, now));
+        const replacement = ticketForWorld(ticketStateRef.current, active.runSeed, active.world.config, now);
+        freezeRunTicket(replacement?.trailId === playedTrailRef.current ? replacement : null);
       }
       active.beginCompetitiveRecording();
     }
@@ -557,7 +552,7 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
         {phase === "loading" && <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-ink/50" role="status"><span className="pc-eyebrow rounded-full bg-cream-50 px-4 py-2 text-ink">Loading real mountain… {Math.round(loadingProgress * 100)}%</span></div>}
         {phase === "playing" && runtime && <><DropInHUD store={bridge.store} audioEnabled={audioEnabled} onToggleAudio={toggleAudio} onPause={() => runtime.pause()} /><TouchControls adapter={runtime.touch} /><PauseDialog store={bridge.store} onResume={() => runtime.resume()} onRestart={() => restartRun(runtime)} /><ResultsDialog
           store={bridge.store}
-          conditionsLabel={`${conditions.stamp} · ${conditions.surface}`}
+          conditionsLabel={`${playedConditions.stamp} · ${playedConditions.surface}`}
           onRestart={() => restartRun(runtime)}
           // Free Ski passes null, which is what removes the leaderboard,
           // submission and ghost surfaces entirely rather than disabling them.
@@ -566,6 +561,7 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
             mode: session.mode,
             resortSlug: profile.slug,
             trailId: session.trailId,
+            conditionsDate: playedDateRef.current,
             // The runtime hands over its recording once; the dialog takes it
             // when it opens and holds it for the life of the results screen.
             takeRecording: () => runtimeRef.current?.takeFinishedRun() ?? null,
