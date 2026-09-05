@@ -1,5 +1,6 @@
 "use client";
 
+import { warmPosterModules } from "@/lib/game/runtime/poster-module-warmup";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -104,6 +105,11 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
   const audioRef = useRef<RuntimeAudio | null>(null);
   const teardownRef = useRef<AbortController | null>(null);
   const [phase, setPhase] = useState<ShellPhase>("poster");
+  useEffect(() => {
+    const controller = new AbortController();
+    void warmPosterModules(location.search, "gpu" in navigator, controller.signal);
+    return () => controller.abort();
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [runtime, setRuntime] = useState<GameRuntime | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);

@@ -28,6 +28,10 @@ let pending: Promise<NodeFactories> | null = null;
  * `CSMShadowNode` copies would be two different classes to `instanceof`.
  */
 export function loadNodeFactories(): Promise<NodeFactories> {
+  // The renderer needs this chain before prewarm too. Start its module request
+  // beside the material modules, while terrain/GPU startup is already in flight.
+  // Preserve optional post failure semantics: Renderer owns its normal fallback.
+  if (!pending) void import("./NodePostProcessing").catch(() => {});
   pending ??= Promise.all([
     import("./SkyNodeMaterial"),
     import("./SnowNodeMaterial"),
