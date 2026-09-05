@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type { QualityRung } from "./QualityController";
 import type { DecodedFarField } from "../terrain/far-field-format";
 import { GRID_HALF, GRID_SIZE, TILE_SIZE, Z_TILES_BEHIND } from "./nearFieldReach";
 import type { NodeFactories } from "./nodeFactories";
@@ -99,6 +100,8 @@ export class FarFieldRenderer {
 
   readonly nearBounds = new THREE.Vector4(0, 0, 0, 0);
   private readonly meshes: THREE.Mesh[] = [];
+  private readonly highGeometries: THREE.BufferGeometry[] = [];
+  private readonly lowGeometries: THREE.BufferGeometry[] = [];
   private visible = 0;
   private disposed = false;
 
@@ -143,6 +146,29 @@ export class FarFieldRenderer {
       // The asset carries no normals — 3 floats per vertex is a third of the payload for something
       // derivable. Computed once here, never per frame.
       geometry.computeVertexNormals();
+      this.highGeometries.push(geometry);
+      const lowIndices = asset.lodIndices?.[wedge.index];
+      if (lowIndices) {
+        const low = new THREE.BufferGeometry();
+        low.setAttribute("position", geometry.getAttribute("position"));
+        low.setAttribute("normal", geometry.getAttribute("normal"));
+        low.setIndex(new THREE.BufferAttribute(lowIndices, 1));
+        // Each geometry owns an index buffer. Swapping geometry.index directly
+        // strands the inactive GPU buffer when Three disposes only the last one.
+        // Either active geometry's scene disposal releases the pair; shared
+        // position/normal buffers are no longer used after this terminal event.
+        let released = false;
+        const releasePair = () => {
+          if (released) return;
+          released = true;
+          geometry.removeEventListener("dispose", releaseHigh);
+          low.removeEventListener("dispose", releaseLow);
+        };
+        const releaseHigh = () => { if (!released) { releasePair(); low.dispose(); } };
+        const releaseLow = () => { if (!released) { releasePair(); geometry.dispose(); } };
+        geometry.addEventListener("dispose", releaseHigh); low.addEventListener("dispose", releaseLow);
+        this.lowGeometries.push(low);
+      } else this.lowGeometries.push(geometry);
 
       const mesh = new THREE.Mesh(geometry, this.material);
       mesh.castShadow = false;
@@ -167,6 +193,13 @@ export class FarFieldRenderer {
     scene.add(this.group);
 
     if (opts.fallback) opts.fallback.visible = false;
+  }
+
+  /** Index topology only: geometry attributes, shader, clipping and bounds stay fixed. */
+  setQuality(rung: QualityRung): void {
+    if (this.disposed) return;
+    const geometries = rung < 2 ? this.lowGeometries : this.highGeometries;
+    for (let i = 0; i < this.meshes.length; i++) this.meshes[i].geometry = geometries[i];
   }
 
   /** Wedges drawn after the last {@link update}. */
@@ -208,6 +241,7 @@ export class FarFieldRenderer {
     this.group.clear();
     this.scene.remove(this.group);
     this.meshes.length = 0;
+    this.highGeometries.length = 0; this.lowGeometries.length = 0;
     // Put the fallback horizon back, so a route change that rebuilds without an asset is not
     // left staring at empty sky.
     if (this.opts.fallback) this.opts.fallback.visible = true;

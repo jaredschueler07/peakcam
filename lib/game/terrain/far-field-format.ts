@@ -215,6 +215,8 @@ export interface DecodedFarFieldMeta extends FarFieldMeta {
 }
 
 export interface DecodedFarField {
+  /** Optional validated topology-only visual LOD, referencing the same positions. */
+  lodIndices?: Uint32Array[];
   meta: DecodedFarFieldMeta;
   wedges: FarFieldWedge[];
 }

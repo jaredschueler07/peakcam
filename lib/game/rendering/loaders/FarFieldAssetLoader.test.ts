@@ -124,3 +124,21 @@ test("the default fetcher survives being called as a method", () => {
   // A bound function ignores its receiver, which is exactly the property being asserted.
   assert.equal(loader.fetcher.name, "bound fetch");
 });
+
+test("optional far LOD loads alongside PCFF and rejects corrupt or stale topology without losing the horizon", async () => {
+  const bytes = asset();
+  const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes.slice().buffer)), byte => byte.toString(16).padStart(2, "0")).join("");
+  const good = { version: 1, slug: "ski-portillo", sourceSha256: hash, wedges: Array.from({ length: 4 }, () => ({ vertexCount: 3, indices: [0, 1, 2] })) };
+  for (const candidate of [good, { ...good, sourceSha256: "stale" }, { ...good, wedges: [{ vertexCount: 3, indices: [0, 1, 999] }] }, null]) {
+    const calls: string[] = [];
+    const loader = new FarFieldAssetLoader(async input => {
+      const url = String(input); calls.push(url);
+      return url.includes("far-lod")
+        ? { ok: candidate !== null, json: async () => candidate } as Response
+        : { ok: true, arrayBuffer: async () => bytes.slice().buffer } as Response;
+    });
+    const loaded = await loader.load("ski-portillo", { expect: EXPECT });
+    assert.ok(loaded); assert.equal(calls.length, 2);
+    assert.equal(Boolean(loaded.lodIndices), candidate === good);
+  }
+});

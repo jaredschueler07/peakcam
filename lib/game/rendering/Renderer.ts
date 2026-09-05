@@ -382,6 +382,7 @@ export class GameRenderer {
     this.built.setSkyQuality?.(rung); this.terrain.setQuality(rung);
     this.requestSurfaceTextures(this.quality.rung);
     this.post?.setQuality(rung); this.csm.setQuality(rung); this.effects.setQuality(rung);
+    this.farField?.setQuality(rung);
     // Snow glint is the top rung's signature, and it is the node path's to spend: the WebGL chain
     // reaches rung 4 on weaker hardware than WebGPU does, so it stays on the cheaper frame.
     const topRung = rung >= 4 && this.renderer.backendKind === "webgpu";
@@ -501,6 +502,7 @@ export class GameRenderer {
         addHeightFog(material, this.built.atmosphereUniforms as Parameters<typeof addHeightFog>[1]);
       },
     });
+    this.farField.setQuality(this.quality.rung);
   }
 
   get farFieldWedgesDrawn(): number { return this.farField?.visibleWedgeCount ?? 0; }

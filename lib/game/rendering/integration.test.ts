@@ -459,3 +459,19 @@ for (const backendKind of ["webgl", "webgpu"] as const) test(`${backendKind}: de
   assert.equal(snapshot.render.calls, backendKind === "webgpu" ? 8 : 4, "WebGPU lifetime calls are not mislabeled as per-frame draw calls");
   renderer.dispose();
 });
+
+for (const kind of ["webgl", "webgpu"] as const) test(`${kind}: late far-field attachment uses the current low tier and restores full topology`, () => {
+  const { renderer } = buildRenderer(new FakeBackend(kind));
+  renderer.debugSetQuality(1);
+  renderer.attachFarField({
+    meta: { formatVersion: 1, slug: "ski-portillo", radiusM: 30000, wedgeCount: 1, centre: [-32.842, -70.129], demSource: "fixture", bakedAt: "fixture" },
+    wedges: [{ index: 0, azimuthStartRad: 0, azimuthEndRad: Math.PI / 2, minY: 0, maxY: 1,
+      positions: new Float32Array([0, 0, 0, 0, 1, -100, 100, 0, 0, 100, 1, -100]), indices: new Uint32Array([0, 1, 2, 1, 3, 2]) }],
+    lodIndices: [new Uint32Array([0, 1, 2])],
+  });
+  const group = renderer.scene.getObjectByName("far-field")!;
+  const mesh = group.children[0] as THREE.Mesh;
+  assert.equal(mesh.geometry.index!.count, 3);
+  renderer.debugSetQuality(4); assert.equal(mesh.geometry.index!.count, 6);
+  renderer.dispose();
+});
