@@ -35,6 +35,13 @@ const sunPositionScratch = new THREE.Vector3();
 
 export interface RendererBackend {
   readonly backendKind: "webgpu" | "webgl";
+  readonly info?: {
+    autoReset: boolean;
+    reset(): void;
+    render?: { calls?: number; drawCalls?: number; triangles?: number; points?: number; lines?: number };
+    memory?: unknown;
+    calls?: number;
+  };
   // WebGLRenderer declares this as plain `string` in @types/three 0.185, so a
   // narrower ColorSpace here would reject the real renderer.
   outputColorSpace: string;
@@ -64,6 +71,7 @@ export interface QualityChangeEvent {
 }
 
 interface RendererOptions {
+  localHour?: number;
   backend?: RendererBackend;
   devicePixelRatio?: number;
   reducedMotion?: boolean;
@@ -145,6 +153,7 @@ export class GameRenderer {
   private readonly cameraController: CameraController;
   private readonly weather: WeatherRenderer;
   private readonly quality: QualityController;
+  private debugQualityPinned = false;
   private readonly csm: ShadowSystem;
   private post: PostChain | null = null;
   private readonly postReady: Promise<void>;
@@ -185,6 +194,9 @@ export class GameRenderer {
       }),
       { backendKind: "webgl" as const },
     );
+    // Our RAF owns a complete scene + shadow + post frame. Per-render-call reset
+    // otherwise leaves only the final fullscreen triangle in renderer.info.
+    if (this.renderer.info) this.renderer.info.autoReset = false;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace; this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     // Not gated on NODE_ENV, like ?e2ecanvas: the browser matrix is shot against a production build,
@@ -194,7 +206,7 @@ export class GameRenderer {
     const navigatorLike = typeof navigator === "undefined" ? undefined : navigator as Navigator & { deviceMemory?: number };
     const signals = options.qualitySignals ?? { hardwareConcurrency: navigatorLike?.hardwareConcurrency, deviceMemory: navigatorLike?.deviceMemory, coarsePointer: typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches, dpr: this.maxDpr };
     this.mobile = signals.coarsePointer;
-    this.quality = new QualityController(seedQualityRung(signals));
+    this.quality = new QualityController(seedQualityRung(signals, this.renderer.backendKind));
     const snowDebug = snowDebugMode();
     // `nodes` is the one backend switch the scene needs: it is non-null exactly on WebGPU, and
     // carries the node-material factories that only that path fetches.
@@ -218,7 +230,8 @@ export class GameRenderer {
       this.built.camera, state, this.reducedMotion,
       options.cameraPreset ?? CAMERA_PRESETS[cameraPresetName()],
     );
-    this.weather = new WeatherRenderer(profile, this.built, this.renderer);
+    const debugWeather = typeof location !== "undefined" && new URLSearchParams(location.search).has("weather");
+    this.weather = new WeatherRenderer(profile, this.built, this.renderer, debugWeather ? undefined : world.config.environment, debugWeather ? 12 : options.localHour);
     this.built.atmosphereUniforms.referenceHeight.value = state.pos.y;
     this.csm = nodes
       ? new nodes.csm.CsmShadowsNode(this.built.camera, this.built.scene, this.mobile, this.weather.current, visualWeatherPreset(this.weather.index))
@@ -285,6 +298,7 @@ export class GameRenderer {
     await this.postReady;
     if (this.disposed || !this.renderer.compileAsync) return;
     const seeded = this.quality.rung;
+    const warmup = { active: true };
     let timer: ReturnType<typeof setTimeout> | undefined;
     const budget = new Promise<void>((resolve) => {
       timer = setTimeout(resolve, this.options.prewarmTimeoutMs ?? PREWARM_TIMEOUT_MS);
@@ -292,23 +306,25 @@ export class GameRenderer {
     try {
       // A compileAsync that never settles must cost a stutter, not the run: the loading bar is
       // parked at 95% waiting on this, so it gets a budget and then we start regardless.
-      await Promise.race([this.compileRungs(seeded), budget]);
+      await Promise.race([this.compileRungs(seeded, warmup), budget]);
     } finally {
       clearTimeout(timer);
-      // If the budget won mid-sequence the rung can be left at 4; put it back.
-      if (!this.disposed && this.quality.rung !== seeded) this.applyQuality(seeded);
+      // Applying a compile tier does not mutate the governor. Always restore its live
+      // value, and revoke the continuation before a timed-out compile can settle.
+      warmup.active = false;
+      if (!this.disposed) this.applyQuality(this.quality.rung);
     }
   }
 
-  private async compileRungs(seeded: QualityRung): Promise<void> {
+  private async compileRungs(seeded: QualityRung, warmup: { active: boolean }): Promise<void> {
     if (seeded !== 4) {
       // Warm the expensive variants first, then come back to the rung we will actually start on —
       // restoring it last matters because CsmShadowsNode rebuilds its shadow node on a rung change,
       // so a compile taken before the restore would warm a node we then throw away.
       this.applyQuality(4);
       await this.renderer.compileAsync?.(this.built.scene, this.built.camera);
-      if (this.disposed) return;
-      this.applyQuality(seeded);
+      if (this.disposed || !warmup.active) return;
+      this.applyQuality(this.quality.rung);
     }
     await this.renderer.compileAsync?.(this.built.scene, this.built.camera);
   }
@@ -347,8 +363,26 @@ export class GameRenderer {
   resize(width: number, height: number): void { this.width = Math.max(1, width); this.height = Math.max(1, height); this.applySize(); }
   private applySize() { this.renderer.setPixelRatio(this.maxDpr * this.quality.pixelScale); this.renderer.setSize(this.width, this.height, false); this.post?.setSize(this.width, this.height); this.built.camera.aspect = this.width / this.height; this.built.camera.updateProjectionMatrix(); }
 
+  private surfaceTextureLoader: (() => void) | null = null;
+  private surfaceTextureLoadStarted = false;
+
+  setSurfaceTextureLoader(load: () => void): void {
+    if (this.disposed) return;
+    this.surfaceTextureLoader = load;
+    this.requestSurfaceTextures(this.quality.rung);
+  }
+
+  private requestSurfaceTextures(rung: QualityRung): void {
+    if (rung < 3 || !this.surfaceTextureLoader || this.surfaceTextureLoadStarted) return;
+    this.surfaceTextureLoadStarted = true;
+    this.surfaceTextureLoader();
+  }
+
   private applyQuality(rung: QualityRung): void {
+    this.built.setSkyQuality?.(rung); this.terrain.setQuality(rung);
+    this.requestSurfaceTextures(this.quality.rung);
     this.post?.setQuality(rung); this.csm.setQuality(rung); this.effects.setQuality(rung);
+    this.farField?.setQuality(rung);
     // Snow glint is the top rung's signature, and it is the node path's to spend: the WebGL chain
     // reaches rung 4 on weaker hardware than WebGPU does, so it stays on the cheaper frame.
     const topRung = rung >= 4 && this.renderer.backendKind === "webgpu";
@@ -356,15 +390,40 @@ export class GameRenderer {
   }
 
   /** Which backend actually initialised — surfaced to the DOM so e2e can assert the matrix. */
+  /** Opt-in debug caller only; pin the complete quality ladder for repeatable thermal inspection. */
+  debugSetQuality(rung: QualityRung | null): void {
+    this.debugQualityPinned = rung !== null;
+    if (rung !== null) {
+      this.quality.rung = rung;
+      this.quality.pixelScale = 1;
+      this.applyQuality(rung); this.applySize();
+    }
+    this.frameTimes.length = 0;
+  }
+
+  debugRendererInfo(): unknown {
+    const info = this.renderer.info;
+    return info ? JSON.parse(JSON.stringify({ render: info.render, memory: info.memory, calls: info.calls,
+      // WebGPU render.calls is lifetime render invocations; drawCalls is the per-frame draw budget.
+      frameDrawCalls: this.renderer.backendKind === "webgpu" ? info.render?.drawCalls : info.render?.calls,
+      frameTriangles: info.render?.triangles,
+    })) : null;
+  }
+
   get backendKind(): "webgpu" | "webgl" { return this.renderer.backendKind; }
 
   /** Attach a decoded replay to render alongside the live skier, or `null` to clear it. */
   setGhost(ghost: DecodedGhost | null): void { this.ghost.setGhost(ghost); }
 
+  noteLanding(kind: "soft" | "hard" | null): void { this.cameraController.noteLanding(kind); }
+
   setWeather(index: number): void { if (index < 0) this.weather.cycle(); else this.weather.apply(index); this.csm.setWeather(this.weather.current, visualWeatherPreset(this.weather.index)); this.applyQuality(this.quality.rung); }
 
   render(state: SimulationState, world: SimulationWorld, dt: number, tuck: number, frameMs = dt * 1000): void {
     if (this.disposed || this.contextLost) return;
+    // Both initialized Three backends render synchronously here (not renderAsync).
+    // Reset before CSM/scene/post work; all passes accumulate until the next RAF.
+    this.renderer.info?.reset();
     this.adaptTime += dt; this.elapsed += dt;
     if (frameMs > 0) {
       if (this.frameTimes.length < 36_000) this.frameTimes.push(frameMs);
@@ -374,7 +433,7 @@ export class GameRenderer {
     // One gate, not two: this used to sit inside a 0.5s fps-counter tick left over from the
     // observe(fps) ladder, whose counters nothing read once the governor replaced it — and whose
     // only surviving effect was to round the adapt period up to 1.5s.
-    if (this.adaptTime >= 1.4) {
+    if (!this.debugQualityPinned && this.adaptTime >= 1.4) {
       this.adaptTime = 0;
       // The governor replaces the twitchy observe(fps) ladder: sharing `rung` with both live
       // would let the fast path undo a governor step inside a single tick.
@@ -393,16 +452,16 @@ export class GameRenderer {
         if (quality.rung !== from) this.options.onQualityChange?.({ reason: "governor", from, to: quality.rung });
       }
     }
-    this.terrain.update(state.pos.x, state.pos.z); this.worldRenderer.update(state, dt); this.skier.update(state, world.terrain, dt); this.ghost.update(state.time, world.terrain);
+    this.terrain.update(state.pos.x, state.pos.z); this.worldRenderer.update(state, dt); this.skier.update(state, world.terrain, dt, this.terrain); this.ghost.update(state.time, world.terrain);
     this.cameraController.update(state, world.terrain, dt, tuck);
     if (this.farField) {
       // Scratch matrix and frustum, reused: the cull is 16 box tests and zero allocation.
       this.built.camera.updateMatrixWorld();
       this.farFieldMatrix.multiplyMatrices(this.built.camera.projectionMatrix, this.built.camera.matrixWorldInverse);
       this.farFieldFrustum.setFromProjectionMatrix(this.farFieldMatrix);
-      this.farField.update(this.built.camera.position, this.farFieldFrustum);
+      this.farField.update(this.built.camera.position, this.farFieldFrustum, state.pos);
     }
-    this.effects.update(state, this.built.camera, dt, this.weather.current.snow, this.weather.current.wind);
+    this.effects.update(state, this.built.camera, dt, this.weather.current.snow, this.weather.windSpeed);
     this.built.atmosphereUniforms.referenceHeight.value = state.pos.y;
     this.built.skyUniforms.uTime.value += dt;
     const fx = Math.sin(state.yaw), fz = Math.cos(state.yaw);
@@ -443,11 +502,12 @@ export class GameRenderer {
         addHeightFog(material, this.built.atmosphereUniforms as Parameters<typeof addHeightFog>[1]);
       },
     });
+    this.farField.setQuality(this.quality.rung);
   }
 
   get farFieldWedgesDrawn(): number { return this.farField?.visibleWedgeCount ?? 0; }
 
-  /** The rung seeded at construction; quality-gated callers read it before fetching an asset. */
+  /** The current governor rung; quality-gated callers read it before fetching an asset. */
   get rung(): QualityRung { return this.quality.rung; }
 
   /**
@@ -456,14 +516,18 @@ export class GameRenderer {
    * or below the rung `TerrainRenderer` gates on internally.
    */
   attachSurfaceTextures(surfaces: SurfaceTextures): void {
-    if (this.disposed) return;
+    if (this.disposed) { surfaces.snowNormal.dispose(); surfaces.snowRoughness.dispose(); return; }
     this.terrain.attachSurfaceTextures(surfaces);
   }
 
   /** Read-only handle for tests and debugging; the render loop owns everything in it. */
   get scene(): THREE.Scene { return this.built.scene; }
 
-  resources(): ResourceCounts { return resourceCounts(this.built.scene); }
+  resources(): ResourceCounts {
+    const counts = resourceCounts(this.built.scene);
+    counts.materials += this.terrain.inactiveMaterialCount;
+    return counts;
+  }
 
   private onContextLost = (event: Event) => { event.preventDefault(); this.contextLost = true; };
   private onContextRestored = () => { if (this.disposed) return; this.contextLost = false; this.renderer.resetState?.(); this.applySize(); };
@@ -477,6 +541,8 @@ export class GameRenderer {
     // `disposeObjectTree` releases them *and* reports them to the disposal audit. Disposing here
     // first would detach them silently and make the audit under-count.
     this.farField = null;
+    this.surfaceTextureLoader = null;
+    this.terrain.disposeInactiveMaterials(this.options.disposalAudit);
     disposeObjectTree(this.built.scene, this.options.disposalAudit); this.renderer.renderLists?.dispose(); this.renderer.dispose(); this.renderer.forceContextLoss?.();
   }
 }

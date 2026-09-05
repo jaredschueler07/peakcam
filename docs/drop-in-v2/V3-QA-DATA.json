@@ -1,0 +1,600 @@
+{
+  "recordedDate": "2026-09-05",
+  "gameplayCommit": "aed2b3d",
+  "baseCommit": "de795d42c0195809b1164795d06f140e4ab46266",
+  "hardware": {
+    "chip": "Apple M4",
+    "cpuCores": 10,
+    "memoryGB": 16,
+    "displayHz": 120,
+    "browser": "149.0.7827.55",
+    "physicalAndroidTested": false
+  },
+  "checks": {
+    "unitPassed": 1099,
+    "browserPassed": 43,
+    "typecheck": true,
+    "productionBuild": true,
+    "pureImportFences": {
+      "errors": 0,
+      "warnings": 9
+    },
+    "unchangedLuminanceGuardsPassed": 6
+  },
+  "heap": {
+    "baselineBytes": 44132066,
+    "afterBytes": 44585413,
+    "growthBytes": 453347,
+    "budgetBytes": 2097152,
+    "intervalSeconds": 10
+  },
+  "coldLoad": {
+    "browserVersion": "149.0.7827.55",
+    "profile": {
+      "downloadMbps": 10,
+      "uploadMbps": 1,
+      "latencyMs": 100,
+      "cacheDisabled": true
+    },
+    "posterMs": 2006,
+    "clickedMs": 2474,
+    "readyMs": 2780,
+    "backend": "webgpu",
+    "errors": [],
+    "terrainRequests": [
+      "http://127.0.0.1:3113/game/terrain/breckenridge.meta.json?course=3",
+      "http://127.0.0.1:3113/game/terrain/breckenridge.trails.json?course=3",
+      "http://127.0.0.1:3113/game/terrain/breckenridge.height.u16.br?course=3",
+      "http://127.0.0.1:3113/game/terrain/breckenridge.far.bin.br?course=3",
+      "http://127.0.0.1:3113/game/terrain/breckenridge.far-lod.json?course=3"
+    ]
+  },
+  "stormSamples": [
+    {
+      "resort": "breckenridge",
+      "backend": "webgpu",
+      "rung": 4,
+      "dpr": 1,
+      "tier": "desktop",
+      "p50FrameMs": 8.299999999999272,
+      "p95FrameMs": 9.899999999999636,
+      "drawCalls": 142,
+      "triangles": 218893,
+      "textureBytes": 115188580,
+      "browserErrors": []
+    },
+    {
+      "resort": "heavenly",
+      "backend": "webgpu",
+      "rung": 4,
+      "dpr": 1,
+      "tier": "desktop",
+      "p50FrameMs": 8.299999999999272,
+      "p95FrameMs": 9.800000000000182,
+      "drawCalls": 102,
+      "triangles": 188394,
+      "textureBytes": 117988180,
+      "browserErrors": []
+    },
+    {
+      "resort": "ski-portillo",
+      "backend": "webgpu",
+      "rung": 4,
+      "dpr": 1,
+      "tier": "desktop",
+      "p50FrameMs": 8.299999999999272,
+      "p95FrameMs": 10,
+      "drawCalls": 126,
+      "triangles": 311900,
+      "textureBytes": 114493800,
+      "browserErrors": []
+    },
+    {
+      "resort": "breckenridge",
+      "backend": "webgl",
+      "rung": 1,
+      "dpr": 2,
+      "tier": "mobile",
+      "p50FrameMs": 8.299999999999272,
+      "p95FrameMs": 9.900000000001455,
+      "drawCalls": 73,
+      "triangles": 119769,
+      "textureBytes": null,
+      "browserErrors": []
+    },
+    {
+      "resort": "heavenly",
+      "backend": "webgl",
+      "rung": 1,
+      "dpr": 2,
+      "tier": "mobile",
+      "p50FrameMs": 8.299999999999272,
+      "p95FrameMs": 10.100000000002183,
+      "drawCalls": 59,
+      "triangles": 96292,
+      "textureBytes": null,
+      "browserErrors": []
+    },
+    {
+      "resort": "ski-portillo",
+      "backend": "webgl",
+      "rung": 1,
+      "dpr": 2,
+      "tier": "mobile",
+      "p50FrameMs": 8.299999999999272,
+      "p95FrameMs": 10,
+      "drawCalls": 72,
+      "triangles": 148889,
+      "textureBytes": null,
+      "browserErrors": []
+    }
+  ],
+  "clearSamples": [
+    {
+      "resort": "breckenridge",
+      "backend": "webgl",
+      "rung": 3,
+      "dpr": 1,
+      "tier": "desktop",
+      "p50FrameMs": 8.299999999999272,
+      "p95FrameMs": 9.899999999997817,
+      "drawCalls": 141,
+      "triangles": 212132,
+      "textureBytes": null,
+      "browserErrors": []
+    },
+    {
+      "resort": "heavenly",
+      "backend": "webgl",
+      "rung": 3,
+      "dpr": 1,
+      "tier": "desktop",
+      "p50FrameMs": 8.299999999999272,
+      "p95FrameMs": 10,
+      "drawCalls": 101,
+      "triangles": 180621,
+      "textureBytes": null,
+      "browserErrors": []
+    },
+    {
+      "resort": "ski-portillo",
+      "backend": "webgl",
+      "rung": 3,
+      "dpr": 1,
+      "tier": "desktop",
+      "p50FrameMs": 8.299999999999272,
+      "p95FrameMs": 9.899999999997817,
+      "drawCalls": 125,
+      "triangles": 305001,
+      "textureBytes": null,
+      "browserErrors": []
+    },
+    {
+      "resort": "breckenridge",
+      "backend": "webgpu",
+      "rung": 4,
+      "dpr": 1,
+      "tier": "desktop",
+      "p50FrameMs": 8.299999999999272,
+      "p95FrameMs": 9.900000000001455,
+      "drawCalls": 142,
+      "triangles": 213671,
+      "textureBytes": 115188580,
+      "browserErrors": []
+    },
+    {
+      "resort": "heavenly",
+      "backend": "webgpu",
+      "rung": 4,
+      "dpr": 1,
+      "tier": "desktop",
+      "p50FrameMs": 8.299999999999272,
+      "p95FrameMs": 10,
+      "drawCalls": 102,
+      "triangles": 182310,
+      "textureBytes": 117988180,
+      "browserErrors": []
+    },
+    {
+      "resort": "ski-portillo",
+      "backend": "webgpu",
+      "rung": 4,
+      "dpr": 1,
+      "tier": "desktop",
+      "p50FrameMs": 8.299999999999272,
+      "p95FrameMs": 10,
+      "drawCalls": 126,
+      "triangles": 306400,
+      "textureBytes": 114493800,
+      "browserErrors": []
+    }
+  ],
+  "fullRunMatrix": {
+    "method": "Actual keyboard or CDP multi-touch from course top; UI competitive session issuance mocked; no deployed submission. Real authenticated handler acceptance tested separately.",
+    "passed": 36,
+    "runs": [
+      {
+        "id": "breckenridge/free_ski/webgl/keyboard",
+        "runIndex": 1,
+        "finished": true,
+        "simulationSeconds": 22.674999999999354,
+        "backend": "webgl",
+        "debugMutated": false,
+        "mockSession": false,
+        "browserErrors": []
+      },
+      {
+        "id": "breckenridge/free_ski/webgl/touch",
+        "runIndex": 1,
+        "finished": true,
+        "simulationSeconds": 21.46666666666609,
+        "backend": "webgl",
+        "debugMutated": false,
+        "mockSession": false,
+        "browserErrors": []
+      },
+      {
+        "id": "breckenridge/free_ski/webgpu/keyboard",
+        "runIndex": 1,
+        "finished": true,
+        "simulationSeconds": 21.658333333332745,
+        "backend": "webgpu",
+        "debugMutated": false,
+        "mockSession": false,
+        "browserErrors": []
+      },
+      {
+        "id": "breckenridge/free_ski/webgpu/touch",
+        "runIndex": 1,
+        "finished": true,
+        "simulationSeconds": 20.674999999999468,
+        "backend": "webgpu",
+        "debugMutated": false,
+        "mockSession": false,
+        "browserErrors": []
+      },
+      {
+        "id": "breckenridge/time_trial/webgl/keyboard",
+        "runIndex": 1,
+        "finished": true,
+        "simulationSeconds": 21.124999999999442,
+        "backend": "webgl",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "breckenridge/time_trial/webgl/touch",
+        "runIndex": 1,
+        "finished": true,
+        "simulationSeconds": 20.76666666666613,
+        "backend": "webgl",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "breckenridge/time_trial/webgpu/keyboard",
+        "runIndex": 1,
+        "finished": true,
+        "simulationSeconds": 21.34999999999943,
+        "backend": "webgpu",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "breckenridge/time_trial/webgpu/touch",
+        "runIndex": 1,
+        "finished": true,
+        "simulationSeconds": 20.691666666666134,
+        "backend": "webgpu",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "breckenridge/score_attack/webgl/keyboard",
+        "runIndex": 1,
+        "finished": true,
+        "simulationSeconds": 21.591666666666082,
+        "backend": "webgl",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "breckenridge/score_attack/webgl/touch",
+        "runIndex": 1,
+        "finished": true,
+        "simulationSeconds": 21.61666666666608,
+        "backend": "webgl",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "breckenridge/score_attack/webgpu/keyboard",
+        "runIndex": 1,
+        "finished": true,
+        "simulationSeconds": 21.433333333332758,
+        "backend": "webgpu",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "breckenridge/score_attack/webgpu/touch",
+        "runIndex": 1,
+        "finished": true,
+        "simulationSeconds": 21.741666666666074,
+        "backend": "webgpu",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "heavenly/free_ski/webgl/keyboard",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 10.28333333333339,
+        "backend": "webgl",
+        "debugMutated": false,
+        "mockSession": false,
+        "browserErrors": []
+      },
+      {
+        "id": "heavenly/free_ski/webgl/touch",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 10.066666666666736,
+        "backend": "webgl",
+        "debugMutated": false,
+        "mockSession": false,
+        "browserErrors": []
+      },
+      {
+        "id": "heavenly/free_ski/webgpu/keyboard",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 10.008333333333406,
+        "backend": "webgpu",
+        "debugMutated": false,
+        "mockSession": false,
+        "browserErrors": []
+      },
+      {
+        "id": "heavenly/free_ski/webgpu/touch",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 10.116666666666733,
+        "backend": "webgpu",
+        "debugMutated": false,
+        "mockSession": false,
+        "browserErrors": []
+      },
+      {
+        "id": "heavenly/time_trial/webgl/keyboard",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 9.975000000000074,
+        "backend": "webgl",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "heavenly/time_trial/webgl/touch",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 10.433333333333382,
+        "backend": "webgl",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "heavenly/time_trial/webgpu/keyboard",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 10.325000000000054,
+        "backend": "webgpu",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "heavenly/time_trial/webgpu/touch",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 10.391666666666717,
+        "backend": "webgpu",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "heavenly/score_attack/webgl/keyboard",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 10.025000000000071,
+        "backend": "webgl",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "heavenly/score_attack/webgl/touch",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 10.391666666666717,
+        "backend": "webgl",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "heavenly/score_attack/webgpu/keyboard",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 10.125000000000066,
+        "backend": "webgpu",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "heavenly/score_attack/webgpu/touch",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 10.058333333333403,
+        "backend": "webgpu",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "ski-portillo/free_ski/webgl/keyboard",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 8.800000000000141,
+        "backend": "webgl",
+        "debugMutated": false,
+        "mockSession": false,
+        "browserErrors": []
+      },
+      {
+        "id": "ski-portillo/free_ski/webgl/touch",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 8.808333333333474,
+        "backend": "webgl",
+        "debugMutated": false,
+        "mockSession": false,
+        "browserErrors": []
+      },
+      {
+        "id": "ski-portillo/free_ski/webgpu/keyboard",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 8.850000000000138,
+        "backend": "webgpu",
+        "debugMutated": false,
+        "mockSession": false,
+        "browserErrors": []
+      },
+      {
+        "id": "ski-portillo/free_ski/webgpu/touch",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 8.858333333333471,
+        "backend": "webgpu",
+        "debugMutated": false,
+        "mockSession": false,
+        "browserErrors": []
+      },
+      {
+        "id": "ski-portillo/time_trial/webgl/keyboard",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 8.816666666666807,
+        "backend": "webgl",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "ski-portillo/time_trial/webgl/touch",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 8.808333333333474,
+        "backend": "webgl",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "ski-portillo/time_trial/webgpu/keyboard",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 8.816666666666807,
+        "backend": "webgpu",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "ski-portillo/time_trial/webgpu/touch",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 8.850000000000138,
+        "backend": "webgpu",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "ski-portillo/score_attack/webgl/keyboard",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 9.308333333333445,
+        "backend": "webgl",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "ski-portillo/score_attack/webgl/touch",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 8.800000000000141,
+        "backend": "webgl",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "ski-portillo/score_attack/webgpu/keyboard",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 8.82500000000014,
+        "backend": "webgpu",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      },
+      {
+        "id": "ski-portillo/score_attack/webgpu/touch",
+        "runIndex": 2,
+        "finished": true,
+        "simulationSeconds": 8.841666666666805,
+        "backend": "webgpu",
+        "debugMutated": false,
+        "mockSession": true,
+        "browserErrors": []
+      }
+    ]
+  },
+  "liftTraversal": {
+    "method": "Accelerated browser fixed ticks with proximity boarding and genuine terminal unloading",
+    "passed": 72,
+    "maxEndpointErrorM": 5.084229945850415e-13,
+    "byResort": {
+      "breckenridge": 34,
+      "heavenly": 23,
+      "ski-portillo": 15
+    },
+    "carrierCaptures": [
+      "chair",
+      "gondola",
+      "platter"
+    ]
+  },
+  "limitations": [
+    "Mobile emulation ran on M4; Android FPS and GPU memory unverified.",
+    "WebGL exposes texture counts, not measured texture bytes.",
+    "GPU counters are sampled views, not all possible viewpoints.",
+    "Human keyboard/phone feel and audio listening sign-off remain.",
+    "No push, deployment, production migration, cron configuration or production leaderboard writes."
+  ]
+}

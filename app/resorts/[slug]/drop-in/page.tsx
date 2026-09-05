@@ -1,14 +1,14 @@
+import { preload } from "react-dom";
+import { terrainAssetUrls } from "@/lib/game/config/terrain-assets";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import {
   DROP_IN_RESORT_SLUGS,
-  getDropInGameUrl,
   getDropInProfile,
   DROP_IN_GAME_PROFILES,
 } from "@/lib/drop-in";
 import { getResortBySlug, lookupResortNameBySlug } from "@/lib/supabase";
-import DropInFrame from "@/components/drop-in/DropInFrame";
 import DropInClientBoundary from "@/components/drop-in/DropInClientBoundary";
 import DropInUnavailable from "@/components/drop-in/DropInUnavailable";
 import { Header } from "@/components/layout/Header";
@@ -17,6 +17,11 @@ import { buildConditionsSnapshot } from "@/lib/game/conditions";
 import { PHYSICS_V2_ROLLOUT_ENABLED, physicsModelForRollout } from "@/lib/game/config/physics-rollout";
 
 import { SITE_URL as BASE_URL } from "@/lib/site";
+
+import breckenridgeNetwork from "@/public/game/terrain/breckenridge.network.json";
+import heavenlyNetwork from "@/public/game/terrain/heavenly.network.json";
+import portilloNetwork from "@/public/game/terrain/ski-portillo.network.json";
+const courseNetworks = { breckenridge: breckenridgeNetwork, heavenly: heavenlyNetwork, "ski-portillo": portilloNetwork };
 
 export const revalidate = 3600;
 
@@ -49,7 +54,7 @@ export async function generateMetadata({
 
   const title = `Drop In — Ski ${profile.name}`;
   const description =
-    `Drop In and ski ${profile.name} — a procedural arcade descent with six runs ` +
+    `Drop In and ski ${profile.name} — an arcade descent on real mountain terrain, with named runs ` +
     `(${profile.trailNames.slice(0, 3).join(", ")} and more), ` +
     `${profile.verticalDropFt.toLocaleString()} feet of vertical from a ` +
     `${profile.summitElevationFt.toLocaleString()}-foot summit.`;
@@ -79,14 +84,11 @@ export async function generateMetadata({
 
 export default async function DropInPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ engine?: string | string[] }>;
 }) {
   const { slug } = await params;
   const profile = getDropInProfile(slug);
-  const gameUrl = getDropInGameUrl(slug);
 
   // Off the pilot roster. Two very different situations share this URL shape:
   // a resort we cover but haven't built a descent for (Vail — by far the common
@@ -101,7 +103,7 @@ export default async function DropInPage({
   // `getResortBySlug` (three round trips for cams and a snow report this page
   // never renders), and it reports "couldn't check" separately from "no such
   // resort" — the distinction the fail-safe below depends on.
-  if (!profile || !gameUrl) {
+  if (!profile) {
     const lookup = await lookupResortNameBySlug(slug);
 
     // Genuinely unknown slug — a true 404, handled by the sibling
@@ -128,11 +130,9 @@ export default async function DropInPage({
     );
   }
 
-  const { engine } = await searchParams;
-  if (engine !== "v2") {
-    return <main id="main-content"><DropInFrame profile={profile} gameUrl={gameUrl} /></main>;
-  }
-
+  // This route alone hints the selected terrain pack, before poster hydration.
+  // Fetch/CORS credentials match TerrainAssetLoader, allowing preload reuse.
+  for (const href of Object.values(terrainAssetUrls(slug as keyof typeof DROP_IN_GAME_PROFILES))) preload(href, { as: "fetch", crossOrigin: "anonymous" });
   const resort = await getResortBySlug(slug);
   const forecast = resort ? await getWeatherForecast(resort.lat, resort.lng) : null;
   const physicsModel = physicsModelForRollout(PHYSICS_V2_ROLLOUT_ENABLED);
@@ -147,6 +147,7 @@ export default async function DropInPage({
       <DropInClientBoundary
         profile={DROP_IN_GAME_PROFILES[slug as keyof typeof DROP_IN_GAME_PROFILES]}
         conditions={conditions}
+        courseChoices={courseNetworks[slug as keyof typeof courseNetworks].runs}
       />
     </main>
   );

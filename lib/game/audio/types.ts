@@ -100,6 +100,8 @@ export interface ListenerState {
   speed: number;
   /** Carve intensity, 0..1. */
   carve: number;
+  /** Edge angle augments slip chatter without changing simulation. */
+  edgeAngle?: number;
   /** True while the rider is off the snow — mutes the edge layer. */
   airborne: boolean;
   /** Snow surface under the rider. */

@@ -177,6 +177,15 @@ export class SampleLayers {
     return true;
   }
 
+  /** Modulate an existing loop without allocating or restarting its source. */
+  setLayerLevel(name: string, level: number, immediate = false): void {
+    const layer = this.layers.get(name);
+    if (!layer || this.disposed) return;
+    const gain = clamp(level, 0, 1) * clamp(layer.spec.gain ?? 1, 0, 2);
+    if (immediate) layer.gain.gain.setValueAtTime(gain, this.ctx.currentTime);
+    else layer.gain.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.08);
+  }
+
   stop(name: string): void {
     const layer = this.layers.get(name);
     if (!layer?.source) return;

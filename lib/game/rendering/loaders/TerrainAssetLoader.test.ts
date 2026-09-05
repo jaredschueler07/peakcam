@@ -1,3 +1,4 @@
+import { COURSE_VERSION } from "../../config/versions";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { HEIGHTFIELD_ORIENTATION, type TerrainMeta, type TrailsFile } from "../../terrain/formats";
@@ -18,9 +19,9 @@ const trails: TrailsFile = {
 test("terrain loader fetches the three public pack files and reports byte-weighted progress", async () => {
   const requested: string[] = [];
   const bodyByUrl = new Map<string, BodyInit>([
-    ["/game/terrain/heavenly.meta.json", JSON.stringify(meta)],
-    ["/game/terrain/heavenly.trails.json", JSON.stringify(trails)],
-    ["/game/terrain/heavenly.height.u16.br", new Uint8Array(8)],
+    [`/game/terrain/heavenly.meta.json?course=${COURSE_VERSION}`, JSON.stringify(meta)],
+    [`/game/terrain/heavenly.trails.json?course=${COURSE_VERSION}`, JSON.stringify(trails)],
+    [`/game/terrain/heavenly.height.u16.br?course=${COURSE_VERSION}`, new Uint8Array(8)],
   ]);
   const progress: number[] = [];
   const loader = new TerrainAssetLoader(async (input) => {
@@ -33,9 +34,9 @@ test("terrain loader fetches the three public pack files and reports byte-weight
   const assets = await loader.load("heavenly", { onProgress: (value) => progress.push(value) });
 
   assert.deepEqual(requested, [
-    "/game/terrain/heavenly.meta.json",
-    "/game/terrain/heavenly.trails.json",
-    "/game/terrain/heavenly.height.u16.br",
+    `/game/terrain/heavenly.meta.json?course=${COURSE_VERSION}`,
+    `/game/terrain/heavenly.trails.json?course=${COURSE_VERSION}`,
+    `/game/terrain/heavenly.height.u16.br?course=${COURSE_VERSION}`,
   ]);
   assert.equal(assets.heightfield.byteLength, 8);
   assert.equal(assets.meta.slug, "heavenly");
@@ -60,9 +61,9 @@ test("the terrain fetcher is also invoked with a receiver real fetch accepts", a
   // exactly as it broke FarFieldAssetLoader — a browser-only `TypeError: Illegal invocation` that
   // no plain-function fake can see. Pin it here so the refactor fails in CI instead.
   const bodies = new Map<string, BodyInit>([
-    ["/game/terrain/heavenly.meta.json", JSON.stringify(meta)],
-    ["/game/terrain/heavenly.trails.json", JSON.stringify(trails)],
-    ["/game/terrain/heavenly.height.u16.br", new Uint8Array(8)],
+    [`/game/terrain/heavenly.meta.json?course=${COURSE_VERSION}`, JSON.stringify(meta)],
+    [`/game/terrain/heavenly.trails.json?course=${COURSE_VERSION}`, JSON.stringify(trails)],
+    [`/game/terrain/heavenly.height.u16.br?course=${COURSE_VERSION}`, new Uint8Array(8)],
   ]);
   const recorded = receiverCheckingFetch((url) => new Response(bodies.get(url) ?? "", { status: bodies.has(url) ? 200 : 404 }));
 
@@ -76,4 +77,33 @@ test("the terrain fetcher is also invoked with a receiver real fetch accepts", a
 test("the terrain loader's default fetcher survives being called as a method", () => {
   const loader = new TerrainAssetLoader() as unknown as { fetcher: { name: string } };
   assert.equal(loader.fetcher.name, "bound fetch");
+});
+
+test("height and trails begin while metadata is unresolved, using matching preload fetch credentials", async () => {
+  const pending = new Map<string, (response: Response) => void>();
+  const loader = new TerrainAssetLoader((input, init) => {
+    assert.equal(init?.mode, "cors"); assert.equal(init?.credentials, "same-origin");
+    return new Promise(resolve => pending.set(String(input), resolve));
+  });
+  const promise = loader.load("heavenly");
+  assert.equal(pending.size, 3, "metadata must not gate either large request");
+  pending.get(`/game/terrain/heavenly.height.u16.br?course=${COURSE_VERSION}`)!(new Response(new Uint8Array(8)));
+  pending.get(`/game/terrain/heavenly.trails.json?course=${COURSE_VERSION}`)!(new Response(JSON.stringify(trails)));
+  pending.get(`/game/terrain/heavenly.meta.json?course=${COURSE_VERSION}`)!(new Response(JSON.stringify(meta)));
+  assert.equal((await promise).heightfield.byteLength, 8);
+});
+
+test("a failed pack response cancels both peer requests and pre-abort fetches nothing", async () => {
+  const peerSignals: AbortSignal[] = [];
+  const loader = new TerrainAssetLoader((input, init) => {
+    if (String(input).includes("meta.json")) return Promise.resolve(new Response("missing", { status: 404 }));
+    peerSignals.push(init!.signal!);
+    return new Promise((_resolve, reject) => init!.signal!.addEventListener("abort", () => reject(init!.signal!.reason), { once: true }));
+  });
+  await assert.rejects(loader.load("heavenly"), /404/);
+  assert.equal(peerSignals.length, 2); assert.ok(peerSignals.every(signal => signal.aborted));
+  const controller = new AbortController(); controller.abort();
+  let calls = 0;
+  await assert.rejects(new TerrainAssetLoader(async () => { calls++; return new Response(); }).load("heavenly", { signal: controller.signal }), { name: "AbortError" });
+  assert.equal(calls, 0);
 });

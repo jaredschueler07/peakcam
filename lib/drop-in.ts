@@ -66,7 +66,7 @@ export function isDropInResort(slug: string): boolean {
 
 export function getDropInGameUrl(slug: string): string | null {
   if (!isDropInResort(slug)) return null;
-  return `/drop-in/engine.html?resort=${encodeURIComponent(slug)}`;
+  return getDropInHref(slug);
 }
 
 export function getDropInHref(slug: string): string | null {

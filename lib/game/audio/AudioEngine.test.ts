@@ -149,7 +149,7 @@ test("setListenerState merges partial updates and clamps them", () => {
   engine.setListenerState({ speed: 20, surface: "ice" }, 0);
   engine.setListenerState({ carve: 4, windLevel: -1, speed: -5 }, 1000);
   assert.deepEqual({ ...engine.listenerState }, {
-    speed: 0, carve: 1, airborne: false, surface: "ice", windLevel: 0, liftProximity: 0,
+    speed: 0, carve: 1, edgeAngle: 0, airborne: false, surface: "ice", windLevel: 0, liftProximity: 0,
   });
 });
 

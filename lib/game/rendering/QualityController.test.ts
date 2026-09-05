@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { QualityController, recoveryThresholdMs } from "./QualityController";
+import { QualityController, recoveryThresholdMs, seedQualityRung } from "./QualityController";
 
 const BUDGET = 1000 / 45;
 const OVER = BUDGET + 4;
@@ -105,4 +105,13 @@ test("the fast-loop observe(fps) API is unaffected by governor state", () => {
   const quality = new QualityController(3);
   feed(quality, OVER, 0, 4);
   assert.deepEqual(quality.observe(44), { rung: 2, pixelScale: 1, changed: true });
+});
+
+test("WebGL seeds exactly one rung below the same WebGPU device, clamped at zero", () => {
+  for (const hardwareConcurrency of [2, 4, 8, 12]) for (const deviceMemory of [2, 4, 8]) for (const coarsePointer of [false, true]) for (const dpr of [1, 2, 3]) {
+    const signals = { hardwareConcurrency, deviceMemory, coarsePointer, dpr };
+    assert.equal(seedQualityRung(signals, "webgl"), Math.max(0, seedQualityRung(signals, "webgpu") - 1));
+  }
+  assert.equal(seedQualityRung({ hardwareConcurrency: 12, deviceMemory: 8, coarsePointer: false, dpr: 1 }, "webgpu"), 4);
+  assert.equal(seedQualityRung({ hardwareConcurrency: 12, deviceMemory: 8, coarsePointer: false, dpr: 1 }, "webgl"), 3);
 });

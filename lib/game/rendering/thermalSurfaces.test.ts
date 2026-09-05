@@ -1,0 +1,88 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import * as THREE from "three";
+import { DROP_IN_GAME_PROFILES } from "../config/profiles";
+import { createProceduralWorld } from "../terrain/obstacles";
+import { createScene } from "./SceneFactory";
+import { TerrainRenderer } from "./TerrainRenderer";
+import { staticNodeFactories } from "./nodeFactories.fixture";
+import { disposeObjectTree } from "./resources";
+
+const profile = DROP_IN_GAME_PROFILES.breckenridge;
+
+test("sky 4→1→4 removes the physical draw and reuses both weather-linked variants", () => {
+  const built = createScene(profile, 1, staticNodeFactories(), 4);
+  const physical = built.sky;
+  built.setSkyQuality!(1);
+  const gradient = built.sky;
+  assert.notEqual(gradient, physical);
+  assert.equal(physical.visible, false);
+  assert.equal(gradient.visible, true);
+  built.skyUniforms.uTop.value.setHex(0x112233);
+  built.setSkyQuality!(4);
+  assert.equal(built.sky, physical);
+  assert.equal(physical.visible, true);
+  assert.equal(gradient.visible, false);
+  built.setSkyQuality!(1);
+  assert.equal(built.sky, gradient);
+  assert.equal(built.skyUniforms.uTop.value.getHex(), 0x112233);
+  disposeObjectTree(built.scene);
+});
+
+test("late snow textures stay unsampled at rung1, return on upgrade, and dispose exactly once", () => {
+  const nodes = staticNodeFactories();
+  const built = createScene(profile, 1, nodes, 4);
+  const terrain = new TerrainRenderer(built.scene, createProceduralWorld(profile, profile.seed), built.snowUniforms as ConstructorParameters<typeof TerrainRenderer>[2], nodes, 0, 4);
+  const material = () => (built.scene.children.find((object) => object instanceof THREE.Mesh && object.receiveShadow) as THREE.Mesh).material as THREE.Material & { normalNode: unknown; roughnessNode: unknown };
+  terrain.setQuality(1);
+  const cheap = material();
+  assert.equal(cheap.normalNode, null);
+  const surfaces = { snowNormal: new THREE.Texture(), snowRoughness: new THREE.Texture() };
+  let normalDisposals = 0, roughnessDisposals = 0;
+  surfaces.snowNormal.addEventListener("dispose", () => { normalDisposals++; });
+  surfaces.snowRoughness.addEventListener("dispose", () => { roughnessDisposals++; });
+  terrain.attachSurfaceTextures(surfaces);
+  assert.equal(material(), cheap);
+  assert.equal(material().normalNode, null);
+  assert.equal(material().roughnessNode, null);
+  terrain.setQuality(4);
+  const high = material();
+  assert.ok(high.normalNode);
+  assert.ok(high.roughnessNode);
+  terrain.setQuality(1);
+  assert.equal(material(), cheap);
+  terrain.setQuality(4);
+  assert.equal(material(), high);
+  terrain.disposeInactiveMaterials();
+  disposeObjectTree(built.scene);
+  assert.equal(normalDisposals, 1);
+  assert.equal(roughnessDisposals, 1);
+  const late = { snowNormal: new THREE.Texture(), snowRoughness: new THREE.Texture() };
+  let lateDisposals = 0;
+  late.snowNormal.addEventListener("dispose", () => { lateDisposals++; });
+  late.snowRoughness.addEventListener("dispose", () => { lateDisposals++; });
+  terrain.attachSurfaceTextures(late);
+  assert.equal(lateDisposals, 2);
+});
+
+test("governor transitions select prepared materials without constructing a node graph", () => {
+  const factories = staticNodeFactories();
+  let builds = 0;
+  const nodes = { ...factories, snow: { ...factories.snow, createSnowNodeMaterial: (...args: Parameters<typeof factories.snow.createSnowNodeMaterial>) => {
+    builds++;
+    return factories.snow.createSnowNodeMaterial(...args);
+  } } };
+  for (const seeded of [0, 4] as const) {
+    const scene = new THREE.Scene();
+    const terrain = new TerrainRenderer(scene, createProceduralWorld(profile, profile.seed), nodes.snow.createSnowNodeUniforms(), nodes, 0, seeded);
+    const prepared = builds;
+    assert.equal(terrain.inactiveMaterialCount, 1);
+    for (const rung of [4, 1, 4, 0, 2, 3, 1] as const) terrain.setQuality(rung);
+    assert.equal(builds, prepared, "including the first low/high transitions from either initial tier");
+    terrain.attachSurfaceTextures({ snowNormal: new THREE.Texture(), snowRoughness: new THREE.Texture() });
+    assert.equal(builds, prepared + 1, "only async attachment constructs the real-surface graph");
+    for (const rung of [4, 1, 4, 0, 2, 3, 1] as const) terrain.setQuality(rung);
+    assert.equal(builds, prepared + 1);
+    terrain.dispose();
+  }
+});

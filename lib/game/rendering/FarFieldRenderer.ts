@@ -1,5 +1,7 @@
 import * as THREE from "three";
+import type { QualityRung } from "./QualityController";
 import type { DecodedFarField } from "../terrain/far-field-format";
+import { GRID_HALF, GRID_SIZE, TILE_SIZE, Z_TILES_BEHIND } from "./nearFieldReach";
 import type { NodeFactories } from "./nodeFactories";
 
 /**
@@ -96,7 +98,10 @@ export class FarFieldRenderer {
   /** Per-wedge visibility from the last `update()`; a scratch, not a fresh array. */
   readonly visibility: Uint8Array;
 
+  readonly nearBounds = new THREE.Vector4(0, 0, 0, 0);
   private readonly meshes: THREE.Mesh[] = [];
+  private readonly highGeometries: THREE.BufferGeometry[] = [];
+  private readonly lowGeometries: THREE.BufferGeometry[] = [];
   private visible = 0;
   private disposed = false;
 
@@ -106,7 +111,7 @@ export class FarFieldRenderer {
     private readonly opts: FarFieldOptions,
   ) {
     this.material = opts.nodes
-      ? opts.nodes.snow.createFarFieldNodeMaterial(new THREE.Color(FAR_FIELD_COLOR))
+      ? opts.nodes.snow.createFarFieldNodeMaterial(new THREE.Color(FAR_FIELD_COLOR), this.nearBounds)
       : new THREE.MeshStandardMaterial({
         color: FAR_FIELD_COLOR, roughness: 1, metalness: 0, flatShading: false, dithering: true,
         // See createFarFieldNodeMaterial: the far field underlies the near-field tiles from
@@ -114,6 +119,21 @@ export class FarFieldRenderer {
         polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
       });
     opts.configureMaterial?.(this.material);
+    if (!opts.nodes) {
+      const material = this.material as THREE.MeshStandardMaterial;
+      const previous = material.onBeforeCompile;
+      const previousKey = material.customProgramCacheKey.bind(material);
+      const key = previousKey();
+      material.customProgramCacheKey = () => `${key}:streamed-terrain-cutout-v3`;
+      material.onBeforeCompile = (shader, renderer) => {
+        previous.call(material, shader, renderer);
+        shader.uniforms.uNearBounds = { value: this.nearBounds };
+        shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nvarying vec2 vFarXZ;")
+          .replace("#include <worldpos_vertex>", "#include <worldpos_vertex>\nvFarXZ=(modelMatrix*vec4(transformed,1.)).xz;");
+        shader.fragmentShader = shader.fragmentShader.replace("#include <common>", "#include <common>\nuniform vec4 uNearBounds; varying vec2 vFarXZ;")
+          .replace("#include <clipping_planes_fragment>", "#include <clipping_planes_fragment>\nif(vFarXZ.x>uNearBounds.x&&vFarXZ.y>uNearBounds.y&&vFarXZ.x<uNearBounds.z&&vFarXZ.y<uNearBounds.w)discard;");
+      };
+    }
 
     this.visibility = new Uint8Array(asset.wedges.length);
 
@@ -126,6 +146,29 @@ export class FarFieldRenderer {
       // The asset carries no normals — 3 floats per vertex is a third of the payload for something
       // derivable. Computed once here, never per frame.
       geometry.computeVertexNormals();
+      this.highGeometries.push(geometry);
+      const lowIndices = asset.lodIndices?.[wedge.index];
+      if (lowIndices) {
+        const low = new THREE.BufferGeometry();
+        low.setAttribute("position", geometry.getAttribute("position"));
+        low.setAttribute("normal", geometry.getAttribute("normal"));
+        low.setIndex(new THREE.BufferAttribute(lowIndices, 1));
+        // Each geometry owns an index buffer. Swapping geometry.index directly
+        // strands the inactive GPU buffer when Three disposes only the last one.
+        // Either active geometry's scene disposal releases the pair; shared
+        // position/normal buffers are no longer used after this terminal event.
+        let released = false;
+        const releasePair = () => {
+          if (released) return;
+          released = true;
+          geometry.removeEventListener("dispose", releaseHigh);
+          low.removeEventListener("dispose", releaseLow);
+        };
+        const releaseHigh = () => { if (!released) { releasePair(); low.dispose(); } };
+        const releaseLow = () => { if (!released) { releasePair(); geometry.dispose(); } };
+        geometry.addEventListener("dispose", releaseHigh); low.addEventListener("dispose", releaseLow);
+        this.lowGeometries.push(low);
+      } else this.lowGeometries.push(geometry);
 
       const mesh = new THREE.Mesh(geometry, this.material);
       mesh.castShadow = false;
@@ -152,6 +195,13 @@ export class FarFieldRenderer {
     if (opts.fallback) opts.fallback.visible = false;
   }
 
+  /** Index topology only: geometry attributes, shader, clipping and bounds stay fixed. */
+  setQuality(rung: QualityRung): void {
+    if (this.disposed) return;
+    const geometries = rung < 2 ? this.lowGeometries : this.highGeometries;
+    for (let i = 0; i < this.meshes.length; i++) this.meshes[i].geometry = geometries[i];
+  }
+
   /** Wedges drawn after the last {@link update}. */
   get visibleWedgeCount(): number { return this.visible; }
 
@@ -164,7 +214,14 @@ export class FarFieldRenderer {
    * A wedge's box spans its azimuth sector from the inner rim to 30 km, so sectors behind the
    * camera fail the test outright — which is where the ~4-of-16 draw estimate comes from.
    */
-  update(cameraPosition: THREE.Vector3, frustum: THREE.Frustum): void {
+  update(cameraPosition: THREE.Vector3, frustum: THREE.Frustum, player?: { x: number; z: number }): void {
+    if (player) {
+      // Coarse far-field triangles can sit metres above the edited DEM. Depth
+      // bias cannot fix that: remove them exactly where streamed tiles exist.
+      const x = Math.floor(player.x / TILE_SIZE), z = Math.floor(player.z / TILE_SIZE);
+      this.nearBounds.set((x-GRID_HALF)*TILE_SIZE+1, (z-Z_TILES_BEHIND)*TILE_SIZE+1,
+        (x+GRID_HALF+1)*TILE_SIZE-1, (z-Z_TILES_BEHIND+GRID_SIZE)*TILE_SIZE-1);
+    }
     void cameraPosition; // The boxes are world-space; the frustum already carries the camera.
     let visible = 0;
     for (let i = 0; i < this.meshes.length; i += 1) {
@@ -184,6 +241,7 @@ export class FarFieldRenderer {
     this.group.clear();
     this.scene.remove(this.group);
     this.meshes.length = 0;
+    this.highGeometries.length = 0; this.lowGeometries.length = 0;
     // Put the fallback horizon back, so a route change that rebuilds without an asset is not
     // left staring at empty sky.
     if (this.opts.fallback) this.opts.fallback.visible = true;

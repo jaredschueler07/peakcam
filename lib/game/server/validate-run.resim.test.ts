@@ -74,6 +74,7 @@ function validateHonestEndToEnd(kind: HonestKind, resimFlag: boolean) {
     const elapsed = spanMs(ghost);
     const fixture = makeRunFixture({ ghostMeta: { sampleHz, seed } });
     const ticket = verifyTicket(fixture.ticket, fixture.keyring, { now: fixture.nowMs });
+    ticket.physicsVersion = ghost.meta.physicsVersion; ticket.courseVersion = ghost.meta.courseVersion; ticket.seed = ghost.meta.seed;
     return validateRun({
       ticket,
       submission: {
@@ -250,6 +251,7 @@ test("DROP_IN_RESIM=1: validateRun rejects a teleport via the resim path", () =>
     const elapsed = spanMs(tampered);
     const fixture = makeRunFixture({ ghostMeta: { sampleHz, seed } });
     const ticket = verifyTicket(fixture.ticket, fixture.keyring, { now: fixture.nowMs });
+    ticket.physicsVersion = ghost.meta.physicsVersion; ticket.courseVersion = ghost.meta.courseVersion; ticket.seed = ghost.meta.seed;
     const result = validateRun({
       ticket,
       submission: {
