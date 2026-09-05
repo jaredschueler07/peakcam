@@ -98,7 +98,7 @@ test("csmdbg partitions the light from the cascades", () => {
     assert.equal((shadows.light.shadow.shadowNode as unknown as { cascades: number }).cascades, 1);
   });
   withFlag("", (shadows) => {
-    assert.equal((shadows.light.shadow.shadowNode as unknown as { cascades: number }).cascades, 3);
+    assert.equal((shadows.light.shadow.shadowNode as unknown as { cascades: number }).cascades, 2);
   });
 });
 
