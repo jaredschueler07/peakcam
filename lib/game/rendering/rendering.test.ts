@@ -1173,3 +1173,37 @@ test("procedural marker placement remains independent of player X", () => {
   update.call(fake, 10000, 250);
   assert.deepEqual(positions.slice(0, fake.markers.count), original);
 });
+
+test("lift cable batches preserve both spans and upload only when visible lines change", () => {
+  const profile = DROP_IN_GAME_PROFILES.breckenridge;
+  const terrain = createProceduralWorld(profile, 12).terrain;
+  const scene = new THREE.Scene();
+  const lifts = [0, 1800].map(x => ({ kind: "real" as const, name: `Chair ${x}`, type: "chair_lift", lengthM: 224,
+    points: [{ x, y: 0, z: 0 }, { x, y: 100, z: 200 }], stations: [] }));
+  const renderer = new LiftRenderer(scene, { ...terrain, height: () => 0, realLifts: lifts });
+  const cables = scene.getObjectByName("lift-cables") as THREE.LineSegments;
+  assert.ok(cables); assert.equal(scene.children.filter(object => object instanceof THREE.LineSegments).length, 1);
+  assert.equal(cables.visible, false);
+  const state = createSimulation(profile, 12); state.pos.x = 0; state.pos.z = 0;
+  renderer.update(state);
+  const position = cables.geometry.getAttribute("position") as THREE.BufferAttribute;
+  const first = Array.from(position.array.slice(0, cables.geometry.drawRange.count * 3));
+  assert.ok(first.length > 0);
+  assert.ok(first.some((value, index) => index % 3 === 0 && value > 3), "return cable retains its lateral offset");
+  const version = position.version;
+  state.time += 10; renderer.update(state);
+  assert.equal(position.version, version, "moving carriers do not re-upload static cable data");
+  state.pos.x = 900; renderer.update(state);
+  assert.equal(cables.geometry.drawRange.count * 3, first.length * 2);
+  assert.deepEqual(Array.from(position.array.slice(0, first.length)), first);
+  const second = Array.from(position.array.slice(first.length, first.length * 2));
+  assert.deepEqual(second, first.map((value, index) => index % 3 === 0 ? Math.fround(value + 1800) : value));
+  state.pos.x = 1800; renderer.update(state);
+  assert.deepEqual(Array.from(position.array.slice(0, cables.geometry.drawRange.count * 3)), second);
+  state.pos.x = 5000; renderer.update(state);
+  assert.equal(cables.visible, false); assert.equal(cables.geometry.drawRange.count, 0);
+  state.pos.x = 0; renderer.update(state);
+  assert.deepEqual(Array.from(position.array.slice(0, cables.geometry.drawRange.count * 3)), first);
+  let disposed = 0; cables.geometry.addEventListener("dispose", () => disposed++);
+  disposeObjectTree(scene); assert.equal(disposed, 1);
+});
