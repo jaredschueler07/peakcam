@@ -1,3 +1,4 @@
+import { COURSE_VERSION } from "../lib/game/config/versions";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -477,8 +478,10 @@ test("the baked filename, the loader's URL and the next.config brotli route all 
   // The defect this pins: the baker emitted `<slug>-far.bin.br` while the loader
   // fetched `<slug>.far.bin.br`. A 404 degrades silently to the ridge bands, so
   // the drift was invisible from a browser — it looked like a working fallback.
-  assert.equal(requested[0], farFieldAssetUrl(slug));
-  assert.equal(path.basename(requested[0]), written.find((f) => f.endsWith(".br")));
+  const url = new URL(requested[0], "https://peakcam.local");
+  assert.equal(url.pathname, farFieldAssetUrl(slug));
+  assert.equal(url.searchParams.get("course"), String(COURSE_VERSION));
+  assert.equal(path.basename(url.pathname), written.find((f) => f.endsWith(".br")));
 
   // 3. What Next serves it as. Without the `Content-Encoding: br` header the browser
   // hands the loader compressed bytes and `decodeFarField` rejects them as bad magic.

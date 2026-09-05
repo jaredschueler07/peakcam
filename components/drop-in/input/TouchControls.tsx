@@ -4,7 +4,7 @@ import type { TouchAdapter } from "@/lib/game/input/TouchAdapter";
 import type { InputAction } from "@/lib/game/input/types";
 
 const actions: Array<[Exclude<InputAction, "pause">, string]> = [
-  ["tuck", "Tuck"], ["brake", "Brake"], ["jump", "Jump"], ["trail", "Trail"], ["lift", "Lift"], ["restart", "Restart"],
+  ["tuck", "Tuck"], ["brake", "Brake"], ["jump", "Jump"], ["trail", "Trail"], ["restart", "Restart"],
 ];
 
 export default function TouchControls({ adapter }: { adapter: TouchAdapter }) {
