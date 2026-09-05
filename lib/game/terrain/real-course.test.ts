@@ -50,7 +50,8 @@ for (const slug of ["ski-portillo", "breckenridge", "heavenly"] as const) {
     assert.ok(a.runs.every((run) => run.gates.length > 0));
     assert.ok(a.runs.every((run) => run.finishM === run.lengthM));
     assert.ok(a.mainLift && a.mainLift.points.length >= 2);
-    assert.equal(a.mainLift.name, expectedSelections[slug].lift);
+    assert.notEqual(a.mainLift.complete, false);
+    assert.equal(a.mainLift.lengthM, Math.max(...a.lifts.filter(lift => lift.complete !== false && (slug === "ski-portillo" ? lift.type === "platter" : lift.type === "chair_lift" || lift.type === "gondola")).map(lift => lift.lengthM)));
   });
 }
 
@@ -138,8 +139,28 @@ for (const slug of ["ski-portillo", "breckenridge", "heavenly"] as const) {
       assert.equal(lift.id,terrain.lifts[i].id);
       assert.ok(lift.points[0].y<=lift.points.at(-1)!.y);
       assert.ok(lift.speedMps!>0);
-      assert.ok(Math.abs(lift.stations![0].z-lift.points[0].z)<1e-8);
-      assert.ok(lift.stations![0].y<=lift.stations![1].y);
+      if (lift.complete) {
+        assert.equal(lift.stations!.length,2);
+        assert.ok(Math.abs(lift.stations![0].z-lift.points[0].z)<1e-8);
+        assert.ok(lift.stations![0].y<=lift.stations![1].y);
+      } else assert.ok(lift.stations!.length < 2);
+    }
+  });
+}
+
+for (const slug of ["ski-portillo", "breckenridge", "heavenly"] as const) {
+  test(`${slug} tree sites correspond exactly to baked forest wells`,()=>{
+    const assets=load(slug);
+    const terrain=createTerrainSource({profile:DROP_IN_GAME_PROFILES[slug],assets,mode:"real"}).real!;
+    const wells=assets.trails.detail!.treeWells;
+    assert.equal(terrain.treeSites!.length,wells.length);
+    assert.equal(wells.length===0,slug==="ski-portillo");
+    for(let i=0;i<wells.length;i++){
+      const site=terrain.treeSites![i];
+      assert.equal(site.x,wells[i].x);assert.equal(site.z,-wells[i].y);
+      assert.equal(site.radiusM,wells[i].radiusM);
+      assert.equal(site.y,terrain.height(site.x,site.z));
+      assert.ok(site.y<=assets.trails.detail!.treeLineElevationM!+3,'baked relief remains close to the engineering treeline');
     }
   });
 }

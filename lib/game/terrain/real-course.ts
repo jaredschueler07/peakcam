@@ -150,6 +150,8 @@ function makeLift(lift: DrapedLift): RealLift {
   if (reversed) stations?.reverse();
   return {
     kind: "real", id: lift.id, sourceId: lift.sourceId,
+    complete: lift.complete,
+    sourceEndpoints: lift.sourceEndpoints?.map(p => ({x:p.x,z:-p.y})),
     name: lift.name ?? "Unnamed lift", type: lift.type,
     points, lengthM: polylineLength(points), speedMps: lift.speedMps,
     speedSource: lift.speedSource, occupancy: lift.occupancy,
@@ -169,7 +171,7 @@ function makeLift(lift: DrapedLift): RealLift {
   };
 }
 function selectMainLift(profile: ResortGameProfile, lifts: readonly RealLift[]): RealLift | null {
-  const eligible = lifts.filter((lift) => profile.slug === "ski-portillo"
+  const eligible = lifts.filter(lift => lift.complete !== false).filter((lift) => profile.slug === "ski-portillo"
     ? lift.type === "platter"
     : lift.type === "chair_lift" || lift.type === "gondola");
   let best: RealLift | null = null;

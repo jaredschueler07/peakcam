@@ -424,6 +424,7 @@ export function createRealTerrain(
     realRuns: course.runs,
     mainLift: course.mainLift,
     realLifts: course.lifts,
+    treeSites: trailsData.detail?.treeWells.map(site => ({ x: site.x, y: height(site.x, -site.y), z: -site.y, radiusM: site.radiusM })),
     height,
     normal,
     macroHeight,

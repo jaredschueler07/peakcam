@@ -189,7 +189,7 @@ export interface TrailsFile {
   unit: number;
   /** OSM difficulty convention the `d` values follow. */
   convention?: "north_america" | "europe";
-  detail?: { version: number; seed: number; treeWells: Array<TrailPoint & { radiusM: number }>; description: string };
+  detail?: { version: number; seed: number; treeLineElevationM?: number; treeWells: Array<TrailPoint & { radiusM: number }>; description: string };
   junctions?: NetworkJunction[];
   forests?: ForestPolygon[];
   provenance?: { source: string; retrievedAt: string; gaps: string[] };
@@ -215,13 +215,17 @@ export interface RunMetadata {
   bottomElevationM?: number;
 }
 export interface LiftMetadata {
+  /** False if any part of the source line lies outside the DEM. */
+  complete?: boolean;
+  /** Original source endpoints, even outside the DEM; no clamped elevation claims. */
+  sourceEndpoints?: TrailPoint[];
   id?: string;
   sourceId?: string;
   occupancy?: number | null;
   speedMps?: number;
   speedSource?: "osm" | "type-default";
   towers?: Array<TrailPoint & { elevationM?: number }>;
-  stations?: Array<TrailPoint & { elevationM: number; radiusM: number }>;
+  stations?: Array<TrailPoint & { elevationM: number; radiusM: number; sourceEndpoint?: 0 | 1 }>;
 }
 export interface RawRun extends RawPolyline, RunMetadata {
   /** `piste:difficulty`. */

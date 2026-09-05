@@ -23,3 +23,25 @@ test('baked relief normals match the same interpolated physical height',()=>{
   assert.ok(Math.abs(dx-(high-low)/(2*eps))<1e-5);
  }
 });
+
+test('a wide groomer retains its cut and excludes a closer narrow black corridor',()=>{
+  const wide:TrailsFile={...trails,runs:[{n:'Wide groomer',g:'classic',widthM:70,p:encodeDelta([[0,2300],[0,-2300]])}]};
+  const mixed:TrailsFile={...wide,runs:[...wide.runs,{n:'Narrow black',g:'backcountry',widthM:8,p:encodeDelta([[160,2300],[160,-2300]])}]};
+  const groomer=bakeMountainDetail(field,structuredClone(wide),17);
+  const overlap=bakeMountainDetail(field,structuredClone(mixed),17);
+  for(let r=10;r<110;r++)for(let c=60;c<72;c++)assert.equal(overlap[r*width+c],groomer[r*width+c]);
+});
+
+test('tree wells respect explicit DEM treeline and avoid trail corridors',()=>{
+  const wooded:TrailsFile={...trails,forests:[{sourceId:'osm:way:wood',points:[{x:-240,y:240},{x:240,y:240},{x:240,y:-240},{x:-240,y:-240},{x:-240,y:240}]}]};
+  const full=structuredClone(wooded),below=structuredClone(wooded),none=structuredClone(wooded);
+  bakeMountainDetail(field,full,17,4000);bakeMountainDetail(field,below,17,2950);bakeMountainDetail(field,none,17,0);
+  assert.ok(full.detail!.treeWells.length>below.detail!.treeWells.length);
+  assert.ok(below.detail!.treeWells.length>0);assert.equal(none.detail!.treeWells.length,0);
+  assert.equal(below.detail!.treeLineElevationM,2950);
+  for(const p of below.detail!.treeWells){
+    const col=(p.x+256)/4,row=(256-p.y)/4;
+    assert.ok(sampleGridBicubic(field,col,row,createGridSample()).value<=2950.01);
+    assert.ok(Math.abs(p.x)>=14*1.2+6);
+  }
+});

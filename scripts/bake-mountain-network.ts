@@ -25,7 +25,7 @@ const rounded = (v:number) => Math.round(v*10)/10;
 export function bakeMountainNetwork(cfg: ResortBakeConfig, source: OsmSource, field: Heightfield): TrailsFile {
   const project = (g:{lat:number;lon:number}): Pt => [rounded((g.lon-cfg.center[1])*mPerDegLon(cfg.center[0])),rounded((g.lat-cfg.center[0])*M_PER_DEG_LAT)];
   const elev = (p:Pt) => rounded(sampleHeightBilinear(field,...p));
-  const file: TrailsFile = {v:2,center:cfg.center,sizeM:cfg.sizeM,unit:0.1,convention:cfg.convention,runs:[],lifts:[],junctions:[],forests:[],provenance:{source:'OpenStreetMap / Overpass cached out geom; ODbL 1.0',retrievedAt:source.osm3s?.timestamp_osm_base ?? 'unknown',gaps:['Widths without OSM width use difficulty defaults; missing grooming uses difficulty inference.', 'Lift speed without OSM aerialway:speed uses documented type defaults; occupancy remains null when unmapped.', 'Station bounds are 12 m gameplay loading zones around source line endpoints, not surveyed building footprints.', 'Closed piste areas retain their boundary; playable descent follows the shorter high-to-low boundary arc, not a surveyed centreline.', 'Forest multipolygon relations are not included; only closed ways wholly inside the DEM are retained.']}};
+  const file: TrailsFile = {v:2,center:cfg.center,sizeM:cfg.sizeM,unit:0.1,convention:cfg.convention,runs:[],lifts:[],junctions:[],forests:[],provenance:{source:'OpenStreetMap / Overpass cached out geom; ODbL 1.0',retrievedAt:source.osm3s?.timestamp_osm_base ?? 'unknown',gaps:['Widths without OSM width use difficulty defaults; missing grooming uses difficulty inference.', 'Lift speed without OSM aerialway:speed uses documented type defaults; occupancy remains null when unmapped.', 'Station bounds are 12 m gameplay zones at actual source terminals only. Incomplete clipped lines are explicitly non-rideable and preserve source endpoints.', 'Closed piste areas retain their boundary; playable descent follows the shorter high-to-low boundary arc, not a surveyed centreline.', 'Forest multipolygon relations are not included; only closed ways wholly inside the DEM are retained.']}};
   const vertices=new Map<string,{x:number;y:number;runIds:Set<string>}>();
   const nodes = new Map(source.elements.filter(e=>e.type==='node').map(e=>[e.id,e]));
   for(const el of [...source.elements].sort((a,b)=>a.id-b.id)) {
@@ -50,7 +50,15 @@ export function bakeMountainNetwork(cfg: ResortBakeConfig, source: OsmSource, fi
         for(const [px,py] of piece){const x=Math.round(px*10),y=Math.round(py*10),key=`${x},${y}`,v=vertices.get(key)??{x:x/10,y:y/10,runIds:new Set<string>()};v.runIds.add(run.id!);vertices.set(key,v);}
       }else{
         const speed=Number.parseFloat(tags['aerialway:speed']??''), occupancy=Number.parseInt(tags['aerialway:occupancy']??'',10);
-        const lift:RawLift={...common,t:tags.aerialway,occupancy:Number.isFinite(occupancy)?occupancy:null,speedMps:Number.isFinite(speed)&&speed>0?speed:DEFAULT_SPEEDS[tags.aerialway],speedSource:Number.isFinite(speed)&&speed>0?'osm':'type-default',towers:[],stations:[simplified[0],simplified.at(-1)!].map(p=>({x:p[0],y:p[1],elevationM:elev(p),radiusM:12}))};
+        const lift:RawLift={...common,t:tags.aerialway,occupancy:Number.isFinite(occupancy)?occupancy:null,speedMps:Number.isFinite(speed)&&speed>0?speed:DEFAULT_SPEEDS[tags.aerialway],speedSource:Number.isFinite(speed)&&speed>0?'osm':'type-default',complete:points.every(p=>p.every(v=>Math.abs(v)<=cfg.sizeM/2)),
+          sourceEndpoints:[points[0],points.at(-1)!].map(([x,y])=>({x,y})),
+          towers:[],stations:[]};
+        // A clipped line boundary is not a station. Retain only actual source
+        // endpoints coinciding with this piece; incompleteness disables riding.
+        for (const terminal of [simplified[0], simplified.at(-1)!]) {
+          const sourceEndpoint = [points[0], points.at(-1)!].findIndex(p => Math.hypot(p[0]-terminal[0],p[1]-terminal[1]) < 0.15);
+          if (sourceEndpoint >= 0) lift.stations!.push({x:terminal[0],y:terminal[1],elevationM:elev(terminal),radiusM:12,sourceEndpoint:sourceEndpoint as 0 | 1});
+        }
         for(const nodeId of el.nodes??[]){const node=nodes.get(nodeId);if(node?.tags?.aerialway==='pylon'&&node.lat!==undefined&&node.lon!==undefined){const [x,y]=project({lat:node.lat,lon:node.lon});if(Math.abs(x)<=cfg.sizeM/2&&Math.abs(y)<=cfg.sizeM/2)lift.towers!.push({x,y});}}
         file.lifts.push(lift);
       }
@@ -72,7 +80,7 @@ export function runBake(slug:string,verify=false):void{
   const field=decodeHeightfield(buffer,meta);
   const network=bakeMountainNetwork(cfg,source,field);
   const profile=DROP_IN_GAME_PROFILES[slug as DropInResortSlug];
-  const detailed=bakeMountainDetail(field,network,profile.terrainSeed);
+  const detailed=bakeMountainDetail(field,network,profile.terrainSeed,cfg.treeLineElevationM);
   const baked=Buffer.alloc(bytes.length);
   let maxCode=0;
   for(let i=0;i<detailed.length;i++){const code=quantizeHeight(detailed[i],meta.minZ,meta.quantum);baked.writeUInt16LE(code,i*2);maxCode=Math.max(maxCode,code);}
