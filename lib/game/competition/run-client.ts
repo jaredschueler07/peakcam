@@ -150,9 +150,11 @@ export interface SubmittableRunSession {
 
 /** What `GameRuntime.takeFinishedRun()` hands back. */
 export interface FinishedRunRecording {
+  score?: number;
   samples: readonly GhostSample[];
   /** PCGH bytes, already encoded by the runtime. */
   encoded: Uint8Array;
+  inputTape?: Uint8Array;
 }
 
 export interface RunClientFailure {
@@ -257,7 +259,7 @@ export async function submitRun(
   const ticket = session.ticket;
   if (ticket === null) return { status: "skipped", reason: "no_ticket" };
 
-  const timeMs = runTimeMsFromSamples(recording.samples);
+  const timeMs = recording.inputTape ? Math.round(recording.inputTape.length / 4 / 120 * 1000) : runTimeMsFromSamples(recording.samples);
   // A run outside the server's own bounds cannot be accepted; sending it would
   // burn the ticket for a guaranteed 400 (or 413).
   if (timeMs < MIN_SUBMITTABLE_TIME_MS || timeMs > MAX_SUBMITTABLE_TIME_MS) {
@@ -279,13 +281,14 @@ export async function submitRun(
   const body = {
     ticket: ticket.ticket,
     ghost: ghostToBase64(recording.encoded),
+    ...(recording.inputTape ? { inputTape: ghostToBase64(recording.inputTape) } : {}),
     // From the ghost's own header — see `ghostSampleHz`. Never `ticket.tickHz`:
     // it says 10 while the recorder writes 30, and the validator compares this
     // field against the header, so echoing the ticket would fail every honest
     // run as `tick_hz_mismatch`.
     tickHz: ghostSampleHz(recording.encoded),
     timeMs,
-    score: Math.max(0, Math.round(options.score)),
+    score: Math.max(0, Math.round(recording.score ?? options.score)),
     startedAt: new Date(finishedAtMs - timeMs).toISOString(),
     finishedAt: new Date(finishedAtMs).toISOString(),
     // Omitted rather than empty: the schema wants ≥1 character or nothing.
@@ -405,6 +408,7 @@ export function resultsOutcome(input: {
 // ─── fetchLeaderboard ────────────────────────────────────────
 
 export interface LeaderboardInput {
+  conditionsDate?: string;
   resortSlug: string;
   /** The trail the board is keyed on — `trailId` on the wire. */
   courseId: string;
@@ -426,6 +430,7 @@ export async function fetchLeaderboard(
     mode: input.mode,
     trailId: input.courseId,
     limit: String(LEADERBOARD_LIMIT),
+    ...(input.conditionsDate ? { conditionsDate: input.conditionsDate } : {}),
   });
 
   const response = await getJson(`${LEADERBOARD_ENDPOINT}?${query}`, options, "leaderboard");

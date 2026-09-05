@@ -1,3 +1,4 @@
+import { rankedTerrain } from "./ranked-terrain";
 /**
  * lib/game/server/courses.ts
  * ──────────────────────────
@@ -108,6 +109,13 @@ export function trailIdsForResort(resortSlug: string): string[] {
 
 /** The course, or `null` when the resort or trail does not exist. */
 export function resolveCourse(resortSlug: string, trailId: string): ServerCourse | null {
+  if (isResortSlug(resortSlug) && trailId.startsWith("osm:")) {
+    const run = rankedTerrain(resortSlug).realRuns?.find(run => run.id === trailId);
+    if (!run) return null;
+    return { resortSlug, trailId, trailName: run.name, halfSizeM: RESORT_BAKE_CONFIGS[resortSlug].sizeM / 2,
+      startZ: run.points[0].z, finishZ: run.points[run.points.length - 1].z };
+  }
+
   if (!isResortSlug(resortSlug)) return null;
 
   const profile = DROP_IN_GAME_PROFILES[resortSlug];

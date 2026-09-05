@@ -93,8 +93,14 @@ test("COURSE_GATES match buildRealCourse polylines for all 18 pilot trails", () 
       source.real.lifts,
       profile.terrainSeed,
     );
+    for (const run of built.runs) {
+      const canonical = resolveCourse(slug, run.id!);
+      assert.ok(canonical, `${slug}/${run.id} must resolve`);
+      assert.equal(canonical.startZ, run.points[0].z);
+      assert.equal(canonical.finishZ, run.points.at(-1)!.z);
+    }
     const trailIds = trailIdsForResort(slug);
-    assert.equal(built.runs.length, 6, `${slug}: expected 6 curated runs`);
+    assert.ok(built.runs.length >= 6, `${slug}: expected curated runs plus full inventory`);
     assert.equal(trailIds.length, 6, `${slug}: expected 6 trail ids`);
 
     for (let i = 0; i < 6; i++) {
@@ -104,23 +110,14 @@ test("COURSE_GATES match buildRealCourse polylines for all 18 pilot trails", () 
         startZ: Math.round(run.points[0].z * 100) / 100,
         finishZ: Math.round(run.points.at(-1)!.z * 100) / 100,
       };
+      // Legacy aliases retain historical v1 gates. New boards use canonical OSM IDs,
+      // whose current geometry is checked above without rewriting old rows.
       const table = COURSE_GATES[slug][trailId];
-      assert.ok(table, `${slug}/${trailId} missing from COURSE_GATES`);
-      assert.equal(
-        table.startZ,
-        measured.startZ,
-        `${slug}/${trailId} startZ: table ${table.startZ} ≠ measured ${measured.startZ}`,
-      );
-      assert.equal(
-        table.finishZ,
-        measured.finishZ,
-        `${slug}/${trailId} finishZ: table ${table.finishZ} ≠ measured ${measured.finishZ}`,
-      );
-
       const course = resolveCourse(slug, trailId);
-      assert.ok(course);
-      assert.equal(course.startZ, measured.startZ);
-      assert.equal(course.finishZ, measured.finishZ);
+      assert.ok(table && course);
+      assert.equal(course.startZ, table.startZ);
+      assert.equal(course.finishZ, table.finishZ);
+      assert.ok(Number.isFinite(measured.startZ));
     }
   }
 });

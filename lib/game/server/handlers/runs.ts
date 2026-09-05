@@ -1,3 +1,4 @@
+import { replayInputs } from "../replay-inputs";
 /**
  * lib/game/server/handlers/runs.ts
  * ────────────────────────────────
@@ -50,8 +51,8 @@ import {
 } from "../validate-run";
 import { jsonError, jsonOk, rateLimitHeaders, readJsonBody } from "./http";
 
-/** Ghost blobs dominate the body; the report's initial limit is ~128 KB. */
-export const MAX_RUN_BODY_BYTES = 128 * 1024 + 4 * 1024;
+/** Bounded four-byte120Hz input tape plus existing128KB ghost, both base64. */
+export const MAX_RUN_BODY_BYTES = 1400 * 1024;
 /** Submissions are once per ticket anyway; this only blunts spray. */
 export const RUN_RATE_LIMIT = 12;
 export const RUN_RATE_WINDOW_MS = 5 * 60 * 1000;
@@ -132,6 +133,10 @@ export async function handleSubmitRun(
     );
   }
 
+  if (ticket.physicsVersion !== PHYSICS_VERSION || ticket.courseVersion !== COURSE_VERSION) {
+    return jsonError(409, "This challenge uses an older course or physics version; start a new run");
+  }
+
   // A ticket issued to a signed-in player is spendable only by that player.
   // Anonymous tickets stay anonymous even if the player signs in mid-run —
   // binding them late would let one account harvest another's tickets.
@@ -170,9 +175,23 @@ export async function handleSubmitRun(
     });
   }
 
+  let replayVerified = false;
+  if (ticket.physicsModel === "v2") {
+    if (!submission.inputTape) return jsonError(422, "Ranked v2 runs require an input tape");
+    try {
+      const replay = replayInputs(ticket, new Uint8Array(Buffer.from(submission.inputTape, "base64")), ghost);
+      if (!replay.accepted || replay.score !== submission.score || replay.timeMs !== submission.timeMs) {
+        return jsonError(422, "Run does not match authoritative input replay", { extra: { rejectionCode: "course_mismatch" } });
+      }
+      replayVerified = true;
+    } catch {
+      return jsonError(503, "Authoritative terrain replay is unavailable");
+    }
+  }
+
   // ── 3. Baseline validation ──
 
-  const result = validateRun({ ticket, submission, ghost, course });
+  const result = validateRun({ ticket, submission, ghost, course, replayVerified });
   if (!result.accepted) {
     console.warn(
       `[drop-in/runs] rejected ${ticket.resortSlug}/${ticket.trailId} ` +
@@ -200,6 +219,9 @@ export async function handleSubmitRun(
 
   const insert = await writer.insertRun({
     resortId,
+    ...(ticket.mode === "score_attack" && ticket.conditionsDate ? { conditionsDate: ticket.conditionsDate } : {}),
+    conditionsSnapshot: ticket.environment,
+    ...(submission.inputTape ? { inputTape: new Uint8Array(Buffer.from(submission.inputTape, "base64")) } : {}),
     userId: ticket.userId ?? userId ?? null,
     displayName,
     mode: ticket.mode,
