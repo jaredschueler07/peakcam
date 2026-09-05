@@ -6,12 +6,15 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import * as THREE from "../public/drop-in/three.module.js";
+// The retired iframe is no longer executable. Replay its frozen fixtures through
+// the pure TypeScript compatibility integrator; never rewrite expected v1 data.
+import { DROP_IN_GAME_PROFILES as rawProfiles } from "../lib/game/config/profiles.ts";
+import { createProceduralWorld } from "../lib/game/terrain/obstacles.ts";
+import { createSimulation, stepSimulation } from "../lib/game/core/simulation.ts";
+import { simulationConfig } from "../lib/game/core/config.ts";
+import { mulberry32 } from "../lib/game/core/rng.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const enginePath = path.join(root, "public", "drop-in", "engine.html");
-const engineSource = readFileSync(enginePath, "utf8");
-
 export const V1_RESORT_SLUGS = [
   "ski-portillo",
   "breckenridge",
@@ -31,232 +34,22 @@ const TERRAIN_Z_MIN = 0;
 const TERRAIN_Z_MAX = 4000;
 const RANDOM_POINT_COUNT = 200;
 
-function findBalancedEnd(source, start, open, close) {
-  let depth = 0;
-  let quote = null;
-  let escaped = false;
-  let lineComment = false;
-  let blockComment = false;
-
-  for (let index = start; index < source.length; index += 1) {
-    const char = source[index];
-    const next = source[index + 1];
-
-    if (lineComment) {
-      if (char === "\n") lineComment = false;
-      continue;
-    }
-    if (blockComment) {
-      if (char === "*" && next === "/") {
-        blockComment = false;
-        index += 1;
-      }
-      continue;
-    }
-    if (quote) {
-      if (escaped) escaped = false;
-      else if (char === "\\") escaped = true;
-      else if (char === quote) quote = null;
-      continue;
-    }
-    if (char === "/" && next === "/") {
-      lineComment = true;
-      index += 1;
-      continue;
-    }
-    if (char === "/" && next === "*") {
-      blockComment = true;
-      index += 1;
-      continue;
-    }
-    if (char === "'" || char === '"' || char === "`") {
-      quote = char;
-      continue;
-    }
-    if (char === open) depth += 1;
-    if (char === close) {
-      depth -= 1;
-      if (depth === 0) return index + 1;
-    }
-  }
-  throw new Error(`Unbalanced ${open}${close} block at offset ${start}`);
-}
-
-function extractObjectInitializer(constName) {
-  const marker = `const ${constName} =`;
-  const declarationStart = engineSource.indexOf(marker);
-  if (declarationStart < 0) throw new Error(`Missing ${marker}`);
-  const objectStart = engineSource.indexOf("{", declarationStart + marker.length);
-  const objectEnd = findBalancedEnd(engineSource, objectStart, "{", "}");
-  return engineSource.slice(objectStart, objectEnd);
-}
-
-function extractFunction(functionName) {
-  const marker = `function ${functionName}`;
-  const functionStart = engineSource.indexOf(marker);
-  if (functionStart < 0) throw new Error(`Missing ${marker}`);
-  const bodyStart = engineSource.indexOf("{", functionStart + marker.length);
-  const functionEnd = findBalancedEnd(engineSource, bodyStart, "{", "}");
-  return engineSource.slice(functionStart, functionEnd);
-}
-
-const rawProfiles = Function(
-  `"use strict"; return (${extractObjectInitializer("RESORT_PROFILES")});`,
-)();
-
-export function readV1ResortProfiles() {
-  return structuredClone(rawProfiles);
-}
-
-const extractedFunctions = [
-  "hashInt",
-  "mulberry32",
-  "vnoise",
-  "fbm",
-  "trailCenter",
-  "trailField",
-  "nearestTrail",
-  "rampHeight",
-  "baseHeight",
-  "terrainHeight",
-  "terrainNormal",
-  "getChunk",
-  "forEachObstacleNear",
-  "gateAt",
-  "liftX",
-  "towerBaseY",
-  "cableY",
-  "resetRun",
-  "physics",
-  "onLand",
-  "doCrash",
-  "bumpCombo",
-  "addScore",
-  "checkGates",
-].map(extractFunction).join("\n\n");
-
 function createEngineRuntime(profile) {
-  const buildRuntime = Function(
-    "THREE",
-    "PROFILE",
-    `
-      "use strict";
-      const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
-      const clamp01 = (v) => v < 0 ? 0 : (v > 1 ? 1 : v);
-      const lerp = (a, b, t) => a + (b - a) * t;
-      const smoothstep = (t) => { t = clamp01(t); return t * t * (3 - 2 * t); };
-      const damp = (a, b, lambda, dt) => lerp(a, b, 1 - Math.exp(-lambda * dt));
-      const TAU = Math.PI * 2;
-      const hash2 = (x, y) => hashInt(x, y) / 4294967295;
-
-      const FALL = PROFILE.fall;
-      const RELIEF = PROFILE.relief;
-      const NOISE_OFF = (() => {
-        const rng = mulberry32(PROFILE.seed);
-        return { x: 1000 + rng() * 90000, z: 1000 + rng() * 90000 };
-      })();
-      const TRAILS = PROFILE.trails.map((trail) => ({ ...trail }));
-      const FOREST = PROFILE.forest;
-      const _n = new THREE.Vector3();
-      const RAMP_SPACING = 430, RAMP_LEN = 22, RAMP_W = 10.5, RAMP_H = 7.0;
-
-      const CHUNK = 120;
-      const chunkCache = new Map();
-      const GATE_SPACING = 96;
-      const passedGates = new Set();
-      const LIFT_OFF = 78;
-
-      const keys = Object.create(null);
-      let mouseSteer = 0;
-      const state = {
-        started: false,
-        pos: new THREE.Vector3(),
-        vel: new THREE.Vector3(),
-        yaw: 0,
-        onGround: true,
-        airTime: 0,
-        spin: 0,
-        crash: 0,
-        score: 0, best: 0,
-        combo: 1, comboTimer: 0,
-        time: 0,
-        startY: 0,
-        carve: 0,
-        lean: 0,
-        crouch: 0,
-        jumpCharge: 0,
-        selectedTrail: 0,
-        liftRide: 0,
-        liftFromZ: 0,
-        liftToZ: 0,
-        invuln: 0,
-        lastGateZ: -1e9,
-        distance: 0
-      };
-      const _fwd = new THREE.Vector3(), _right = new THREE.Vector3(),
-            _nrm = new THREE.Vector3(), _tmp = new THREE.Vector3(), _tmp2 = new THREE.Vector3();
-      const GRAVITY = 26.5;
-      const camPos = new THREE.Vector3(0, 10, -14);
-
-      const Sound = { burst() {}, blip() {} };
-      const noop = () => {};
-      const clearTracks = noop;
-      const updateTiles = noop;
-      const updateProps = noop;
-      const updateMarkers = noop;
-      const updateGates = noop;
-      const updateRamps = noop;
-      const emitSpray = noop;
-      const popup = noop;
-      const requestAnimationFrame = noop;
-      const style = Object.create(null);
-      const document = {
-        getElementById() {
-          return { style, querySelector() { return { textContent: "" }; } };
-        }
-      };
-
-      let prevZ = 0, prevX = 0;
-
-      ${extractedFunctions}
-
-      function applyInput(input) {
-        for (const key of Object.keys(keys)) delete keys[key];
-        for (const [key, value] of Object.entries(input)) keys[key] = value;
-      }
-
-      function step(input, dt) {
-        applyInput(input);
-        state.time += dt;
-        if (state.comboTimer > 0) {
-          state.comboTimer -= dt;
-          if (state.comboTimer <= 0) state.combo = 1;
-        }
-        physics(dt);
-      }
-
-      return {
-        fbm,
-        hashInt,
-        mulberry32,
-        nearestTrail,
-        physics,
-        rampHeight,
-        resetRun,
-        state,
-        step,
-        terrainHeight,
-        terrainNormal,
-        trailCenter,
-        trailField,
-        vnoise,
-      };
-    `,
-  );
-
-  const runtime = buildRuntime(THREE, profile);
-  runtime.resetRun(0);
-  return runtime;
+  const world = createProceduralWorld(profile, profile.seed, simulationConfig("packed", "v1"));
+  const state = createSimulation(profile, profile.seed, world.terrain);
+  return {
+    state, mulberry32,
+    terrainHeight: (x, z) => world.terrain.height(x, z),
+    terrainNormal: (x, z, out) => world.terrain.normal(x, z, out),
+    step(keys, dt) {
+      stepSimulation(state, {
+        steer: (keys.d ? 1 : 0) - (keys.a ? 1 : 0),
+        tuck: keys.w ? 1 : 0, brake: keys.s ? 1 : 0,
+        jumpHeld: Boolean(keys[" "]), jumpPressed: false,
+        restartPressed: false, trailPressed: false,
+      }, dt, world);
+    },
+  };
 }
 
 const inputTraces = [
@@ -311,7 +104,7 @@ function stateHash(state) {
 }
 
 function sampleTerrain(runtime, profile) {
-  const normal = new THREE.Vector3();
+  const normal = { x: 0, y: 1, z: 0 };
   const grid = [];
   for (let zIndex = 0; zIndex < TERRAIN_GRID_SIZE; zIndex += 1) {
     const z = TERRAIN_Z_MIN +

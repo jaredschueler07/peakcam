@@ -30,6 +30,9 @@ const webgpuProjects = process.env.PLAYWRIGHT_WEBGPU === "1"
     }]
   : [];
 
+const gamePort = process.env.DROP_IN_TEST_PORT ?? "3113";
+const gameBaseUrl = `http://127.0.0.1:${gamePort}`;
+
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 30_000,
@@ -38,7 +41,7 @@ export default defineConfig({
   retries: 0,
   reporter: "line",
   use: {
-    baseURL: "http://127.0.0.1:3100",
+    baseURL: gameBaseUrl,
     trace: "retain-on-failure",
     ...devices["Desktop Chrome"],
   },
@@ -61,8 +64,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run dev -- --hostname 127.0.0.1 --port 3100",
-    url: "http://127.0.0.1:3100",
+    command: `npm run start -- --hostname 127.0.0.1 --port ${gamePort}`,
+    url: gameBaseUrl,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

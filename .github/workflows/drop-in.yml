@@ -1,0 +1,42 @@
+name: Drop In
+on:
+  pull_request:
+  push:
+    branches: [main, feat/drop-in-v3]
+permissions:
+  contents: read
+concurrency:
+  group: drop-in-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  game:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CI: 'true'
+      DROP_IN_TEST_PORT: '3113'
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Check simulation import fences
+        run: npx eslint lib/game/core lib/game/physics lib/game/terrain
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npx tsc --noEmit
+      - name: Production WebGL and heap gates
+        run: npx playwright test --project=chromium --project=chromium-heap
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: drop-in-browser-failures
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 14
