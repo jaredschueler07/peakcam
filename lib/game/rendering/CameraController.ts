@@ -65,12 +65,13 @@ export class CameraController {
     const speed01 = clamp01(speed / 58);
     this.speedUniform.value = damp(this.speedUniform.value, speed01, 7.5, dt);
     if (state.liftRide > 0) {
-      const desiredX = state.pos.x + 6.8, desiredY = state.pos.y + 3.2, desiredZ = state.pos.z + 8.5;
+      const fx = Math.sin(state.yaw), fz = Math.cos(state.yaw);
+      const desiredX = state.pos.x - fx * 7 + fz * 4, desiredY = state.pos.y + 3.2, desiredZ = state.pos.z - fz * 7 - fx * 4;
       this.position.x = damp(this.position.x, desiredX, 4.2, dt);
       this.position.y = damp(this.position.y, desiredY, 4.2, dt);
       this.position.z = damp(this.position.z, desiredZ, 4.2, dt);
       this.camera.position.copy(this.position);
-      this.target.set(state.pos.x, state.pos.y + 0.6, state.pos.z - 5);
+      this.target.set(state.pos.x + fx * 5, state.pos.y + 0.6, state.pos.z + fz * 5);
       this.camera.lookAt(this.target);
       this.camera.fov = damp(this.camera.fov, 58, 4, dt);
       this.camera.updateProjectionMatrix();

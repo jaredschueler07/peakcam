@@ -21,3 +21,22 @@ test('network clips disconnected source pieces, IDs survive source ordering, hei
  assert.ok(a.junctions!.some(j=>j.runIds.includes('osm:way:10:0')&&j.runIds.includes('osm:way:20:0')));
  const lift=a.lifts[0];assert.equal(lift.occupancy,4);assert.equal(lift.speedSource,'type-default');assert.equal(lift.towers!.length,1);assert.ok(lift.stations![0].elevationM<lift.stations![1].elevationM);
 });
+
+test('junctions survive simplification of a straight source polyline',()=>{
+ const input:OsmSource={elements:[
+  {type:'way',id:1,tags:{name:'Straight','piste:type':'downhill'},geometry:[geo(0,400),geo(0,0),geo(0,-400)]},
+  {type:'way',id:2,tags:{name:'Join','piste:type':'downhill'},geometry:[geo(200,200),geo(0,0)]},
+ ]};
+ const baked=bakeMountainNetwork(cfg,input,field);
+ assert.ok(baked.junctions!.some(j=>j.x===0&&j.y===0&&j.runIds.length===2));
+});
+
+test('clipped lifts preserve real terminals without creating boundary stations',()=>{
+  const input:OsmSource={elements:[{type:'way',id:70,tags:{name:'Clipped chair',aerialway:'chair_lift'},geometry:[geo(0,700),geo(0,0),geo(0,-400)]}]};
+  const lift=bakeMountainNetwork(cfg,input,field).lifts[0];
+  assert.equal(lift.complete,false);assert.equal(lift.stations!.length,1);
+  assert.deepEqual(lift.sourceEndpoints,[{x:0,y:700},{x:0,y:-400}]);
+  assert.equal(lift.stations![0].y,-400);assert.equal(lift.stations![0].sourceEndpoint,1);
+  const full=bakeMountainNetwork(cfg,{elements:[{...input.elements[0],geometry:[geo(0,400),geo(0,-400)]}]},field).lifts[0];
+  assert.equal(full.complete,true);assert.equal(full.stations!.length,2);
+});

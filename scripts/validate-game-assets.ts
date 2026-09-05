@@ -230,7 +230,7 @@ function validateResort(cfg: ResortBakeConfig): Report {
   // ── trails ─────────────────────────────────────────────────
   const trailsBuf = readAsset(`${cfg.slug}.trails.json`);
   const trailsJson = JSON.parse(trailsBuf.toString("utf8")) as TrailsFile;
-  r.check(trailsJson.v === 1, "trails version");
+  r.check(trailsJson.v === 1 || trailsJson.v === 2, "trails version");
   r.check(
     trailsJson.sizeM === cfg.sizeM &&
       trailsJson.center[0] === cfg.center[0] &&
@@ -275,7 +275,11 @@ function validateResort(cfg: ResortBakeConfig): Report {
   const trailsBr = readAsset(`${cfg.slug}.trails.json.br`);
   r.check(zlib.brotliDecompressSync(trailsBr).equals(trailsBuf), "trails.json.br decompresses to the JSON bytes");
 
-  const packBytes = br.length + trailsBr.length;
+  const catalogPath = path.join(ASSET_DIR, `${cfg.slug}.network.json`);
+  const catalogBytes = fs.existsSync(catalogPath) ? zlib.brotliCompressSync(fs.readFileSync(catalogPath)).length : 0;
+  const farPath = path.join(ASSET_DIR, `${cfg.slug}.far.bin.br`);
+  const farBytes = fs.existsSync(farPath) ? fs.statSync(farPath).size : 0;
+  const packBytes = br.length + trailsBr.length + catalogBytes + farBytes;
   r.check(
     packBytes <= PACK_BUDGET_BYTES,
     "runtime pack inside budget",

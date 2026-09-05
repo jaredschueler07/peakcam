@@ -1,3 +1,4 @@
+import { COURSE_VERSION } from "../../config/versions";
 import type { DropInResortSlug } from "../../config/schema";
 import type { TerrainMeta, TrailsFile } from "../../terrain/formats";
 import type { RealTerrainAssets } from "../../terrain/terrain-source";
@@ -44,7 +45,7 @@ export class TerrainAssetLoader {
     };
     try {
       const base = `/game/terrain/${slug}`;
-      const metaResponse = await checked(this.fetcher, `${base}.meta.json`, controller.signal);
+      const metaResponse = await checked(this.fetcher, `${base}.meta.json?course=${COURSE_VERSION}`, controller.signal);
       const metaText = await metaResponse.text();
       const meta = JSON.parse(metaText) as TerrainMeta;
       const metaBytes = new TextEncoder().encode(metaText).byteLength;
@@ -53,13 +54,13 @@ export class TerrainAssetLoader {
       const estimatedTotal = metaBytes + heightBytes + estimatedTrailBytes;
       emit(metaBytes / estimatedTotal);
 
-      const trailsPromise = checked(this.fetcher, `${base}.trails.json`, controller.signal)
+      const trailsPromise = checked(this.fetcher, `${base}.trails.json?course=${COURSE_VERSION}`, controller.signal)
         .then(async (response) => {
           const text = await response.text();
           emit((metaBytes + new TextEncoder().encode(text).byteLength) / estimatedTotal);
           return JSON.parse(text) as TrailsFile;
         });
-      const heightPromise = checked(this.fetcher, `${base}.height.u16.br`, controller.signal)
+      const heightPromise = checked(this.fetcher, `${base}.height.u16.br?course=${COURSE_VERSION}`, controller.signal)
         .then(async (response) => {
           if (!response.body) return response.arrayBuffer();
           const reader = response.body.getReader();
