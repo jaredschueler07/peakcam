@@ -78,3 +78,32 @@ test("the terrain loader's default fetcher survives being called as a method", (
   const loader = new TerrainAssetLoader() as unknown as { fetcher: { name: string } };
   assert.equal(loader.fetcher.name, "bound fetch");
 });
+
+test("height and trails begin while metadata is unresolved, using matching preload fetch credentials", async () => {
+  const pending = new Map<string, (response: Response) => void>();
+  const loader = new TerrainAssetLoader((input, init) => {
+    assert.equal(init?.mode, "cors"); assert.equal(init?.credentials, "same-origin");
+    return new Promise(resolve => pending.set(String(input), resolve));
+  });
+  const promise = loader.load("heavenly");
+  assert.equal(pending.size, 3, "metadata must not gate either large request");
+  pending.get(`/game/terrain/heavenly.height.u16.br?course=${COURSE_VERSION}`)!(new Response(new Uint8Array(8)));
+  pending.get(`/game/terrain/heavenly.trails.json?course=${COURSE_VERSION}`)!(new Response(JSON.stringify(trails)));
+  pending.get(`/game/terrain/heavenly.meta.json?course=${COURSE_VERSION}`)!(new Response(JSON.stringify(meta)));
+  assert.equal((await promise).heightfield.byteLength, 8);
+});
+
+test("a failed pack response cancels both peer requests and pre-abort fetches nothing", async () => {
+  const peerSignals: AbortSignal[] = [];
+  const loader = new TerrainAssetLoader((input, init) => {
+    if (String(input).includes("meta.json")) return Promise.resolve(new Response("missing", { status: 404 }));
+    peerSignals.push(init!.signal!);
+    return new Promise((_resolve, reject) => init!.signal!.addEventListener("abort", () => reject(init!.signal!.reason), { once: true }));
+  });
+  await assert.rejects(loader.load("heavenly"), /404/);
+  assert.equal(peerSignals.length, 2); assert.ok(peerSignals.every(signal => signal.aborted));
+  const controller = new AbortController(); controller.abort();
+  let calls = 0;
+  await assert.rejects(new TerrainAssetLoader(async () => { calls++; return new Response(); }).load("heavenly", { signal: controller.signal }), { name: "AbortError" });
+  assert.equal(calls, 0);
+});

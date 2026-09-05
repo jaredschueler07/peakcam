@@ -1,4 +1,4 @@
-import { COURSE_VERSION } from "../../config/versions";
+import { terrainAssetUrls } from "../../config/terrain-assets";
 import type { DropInResortSlug } from "../../config/schema";
 import type { TerrainMeta, TrailsFile } from "../../terrain/formats";
 import type { RealTerrainAssets } from "../../terrain/terrain-source";
@@ -11,7 +11,7 @@ export interface TerrainLoadOptions {
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 async function checked(fetcher: FetchLike, url: string, signal: AbortSignal): Promise<Response> {
-  const response = await fetcher(url, { signal });
+  const response = await fetcher(url, { signal, mode: "cors", credentials: "same-origin" });
   if (!response.ok) throw new Error(`terrain asset request failed (${response.status}) for ${url}`);
   return response;
 }
@@ -40,44 +40,48 @@ export class TerrainAssetLoader {
     const report = options.onProgress ?? (() => {});
     let lastProgress = 0;
     const emit = (value: number) => {
+      if (controller.signal.aborted) return;
       lastProgress = Math.max(lastProgress, Math.min(1, value));
       report(lastProgress);
     };
     try {
-      const base = `/game/terrain/${slug}`;
-      const metaResponse = await checked(this.fetcher, `${base}.meta.json?course=${COURSE_VERSION}`, controller.signal);
-      const metaText = await metaResponse.text();
-      const meta = JSON.parse(metaText) as TerrainMeta;
-      const metaBytes = new TextEncoder().encode(metaText).byteLength;
-      const heightBytes = meta.grid * meta.grid * 2;
-      const estimatedTrailBytes = 32 * 1024;
-      const estimatedTotal = metaBytes + heightBytes + estimatedTrailBytes;
-      emit(metaBytes / estimatedTotal);
-
-      const trailsPromise = checked(this.fetcher, `${base}.trails.json?course=${COURSE_VERSION}`, controller.signal)
-        .then(async (response) => {
-          const text = await response.text();
-          emit((metaBytes + new TextEncoder().encode(text).byteLength) / estimatedTotal);
-          return JSON.parse(text) as TrailsFile;
-        });
-      const heightPromise = checked(this.fetcher, `${base}.height.u16.br?course=${COURSE_VERSION}`, controller.signal)
-        .then(async (response) => {
-          if (!response.body) return response.arrayBuffer();
-          const reader = response.body.getReader();
-          const chunks: Uint8Array[] = []; let loaded = 0;
+      controller.signal.throwIfAborted();
+      const urls = terrainAssetUrls(slug);
+      // All three URLs are versioned and known before metadata arrives. Start them
+      // together; metadata only refines the progress denominator, never gates I/O.
+      let metaBytes = 0, trailBytes = 0, loadedHeight = 0, heightBytes = 2049 * 2049 * 2;
+      const progress = () => emit(Math.min(0.99, (metaBytes + trailBytes + loadedHeight) / (metaBytes + Math.max(trailBytes, 32 * 1024) + heightBytes)));
+      const metaPromise = checked(this.fetcher, urls.meta, controller.signal).then(async response => {
+        const text = await response.text(), meta = JSON.parse(text) as TerrainMeta;
+        metaBytes = new TextEncoder().encode(text).byteLength;
+        heightBytes = meta.grid * meta.grid * 2;
+        progress(); return meta;
+      });
+      const trailsPromise = checked(this.fetcher, urls.trails, controller.signal).then(async response => {
+        const text = await response.text(); trailBytes = new TextEncoder().encode(text).byteLength;
+        progress(); return JSON.parse(text) as TrailsFile;
+      });
+      const heightPromise = checked(this.fetcher, urls.height, controller.signal).then(async response => {
+        if (!response.body) { const result = await response.arrayBuffer(); loadedHeight = result.byteLength; progress(); return result; }
+        const reader = response.body.getReader(), chunks: Uint8Array[] = [];
+        try {
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            chunks.push(value); loaded += value.byteLength;
-            emit((metaBytes + Math.min(heightBytes, loaded)) / estimatedTotal);
+            chunks.push(value); loadedHeight += value.byteLength; progress();
           }
-          const output = new Uint8Array(loaded); let offset = 0;
-          for (const chunk of chunks) { output.set(chunk, offset); offset += chunk.byteLength; }
-          return output.buffer;
-        });
-      const [trails, heightfield] = await Promise.all([trailsPromise, heightPromise]);
+        } finally { reader.releaseLock(); }
+        const output = new Uint8Array(loadedHeight); let offset = 0;
+        for (const chunk of chunks) { output.set(chunk, offset); offset += chunk.byteLength; }
+        return output.buffer;
+      });
+      const [meta, trails, heightfield] = await Promise.all([metaPromise, trailsPromise, heightPromise]);
+      controller.signal.throwIfAborted();
       emit(1);
       return { heightfield, meta, trails };
+    } catch (reason) {
+      controller.abort(reason);
+      throw reason;
     } finally {
       options.signal?.removeEventListener("abort", relayAbort);
       if (this.controller === controller) this.controller = null;
