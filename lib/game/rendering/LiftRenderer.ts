@@ -19,7 +19,7 @@ function finishTexture(): THREE.DataTexture {
   }
   const texture=new THREE.DataTexture(data,size,size);texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.needsUpdate=true;texture.colorSpace=THREE.SRGBColorSpace;return texture;
 }
-interface Line { lift:RealLift; path:LiftPath; count:number; key:string; static:THREE.Group }
+interface Line { lift:RealLift; path:LiftPath; count:number; key:string; static:THREE.Group; cable:Float32Array }
 interface Batch { mesh:THREE.InstancedMesh; count:number }
 // Six-metre station labels stop being readable beyond this range. Keep the
 // terminal/cable geometry under the existing line visibility policy.
@@ -31,6 +31,9 @@ export class LiftRenderer {
   private readonly batches=new Map<string,Batch>();
   private readonly stationLabels: { mesh: THREE.Mesh; x: number; z: number }[] = [];
   private readonly texture=finishTexture();
+  private readonly cables: THREE.LineSegments;
+  private readonly cablePositions: Float32Array;
+  private cablesDirty = true;
   constructor(scene:THREE.Scene, terrain:TerrainSampler){
     const metal=new THREE.MeshStandardMaterial({map:this.texture,color:0x708899,roughness:0.65,metalness:0.5});
     const paint=new THREE.MeshStandardMaterial({map:this.texture,color:0xdc652b,roughness:0.55,metalness:0.2});
@@ -42,15 +45,14 @@ export class LiftRenderer {
       const count=key==='shuttle'?1:path.surface?Math.ceil(path.lengthM/35):Math.ceil(path.lengthM/28);
       capacities.set(key,(capacities.get(key)??0)+count*2+1);
       const group=new THREE.Group();scene.add(group);
-      this.lines.push({lift,path,count,key,static:group});
+      group.visible=false;
       group.userData.liftId=lift.id;group.userData.name=lift.name;
       group.userData.occupancySource=lift.occupancy==null?'visual-default': 'osm';
       const cable:number[]=[];
       for(const side of [0,3.8])for(let i=1;i<path.points.length;i++){
         for(const at of [i-1,i]){sampleLiftPath(path,path.distances[at],sample,side);cable.push(sample.x,sample.y,sample.z);}
       }
-      const cableGeometry=new THREE.BufferGeometry();cableGeometry.setAttribute('position',new THREE.Float32BufferAttribute(cable,3));
-      group.add(new THREE.LineSegments(cableGeometry,new THREE.LineBasicMaterial({color:0x3b4853})));
+      this.lines.push({lift,path,count,key,static:group,cable:new Float32Array(cable)});
       for(let i=1;i<path.supports.length-1;i++){
         const p=path.supports[i],ground=terrain.height(p.x,p.z),height=Math.max(1,p.y-ground);
         const next=path.supports[i+1],heading=Math.atan2(next.x-p.x,next.z-p.z);
@@ -74,6 +76,12 @@ export class LiftRenderer {
         group.add(station);
       }
     }
+    this.cablePositions=new Float32Array(this.lines.reduce((sum,line)=>sum+line.cable.length,0));
+    const cableGeometry=new THREE.BufferGeometry();
+    cableGeometry.setAttribute("position",new THREE.BufferAttribute(this.cablePositions,3).setUsage(THREE.DynamicDrawUsage));
+    cableGeometry.setDrawRange(0,0);
+    this.cables=new THREE.LineSegments(cableGeometry,new THREE.LineBasicMaterial({color:0x3b4853}));
+    this.cables.name="lift-cables";this.cables.frustumCulled=false;this.cables.visible=false;scene.add(this.cables);
     if(towerParts.length){const towers=new THREE.Mesh(merge(towerParts),metal);towers.castShadow=true;scene.add(towers);}
     for(const [key,capacity] of capacities){
       let geometry:THREE.BufferGeometry;
@@ -99,6 +107,7 @@ export class LiftRenderer {
       const line=this.lines[index],batch=this.batches.get(line.key)!;
       let nearby=false;
       for(const p of line.path.supports)if(Math.hypot(p.x-state.pos.x,p.z-state.pos.z)<1200){nearby=true;break;}
+      if(line.static.visible!==nearby)this.cablesDirty=true;
       line.static.visible=nearby;if(!nearby && state.liftIndex!==index)continue;
       for(let i=0;i<line.count*2;i++){
         const side=i%2,travel=state.time*liftSpeed(line.lift)+(i>>1)*line.path.lengthM/line.count;
@@ -112,6 +121,14 @@ export class LiftRenderer {
       if(state.liftIndex===index){
         sampleLiftPath(line.path,state.liftDistanceM,sample);object.position.set(sample.x,sample.y,sample.z);object.rotation.set(0,sample.heading,0);object.updateMatrix();matrix.copy(object.matrix);batch.mesh.setMatrixAt(batch.count++,matrix);
       }
+    }
+    // Exact original segments, compacted only when line eligibility changes.
+    // A single shared draw replaces one identical-material draw per lift.
+    if(this.cablesDirty){
+      let offset=0;
+      for(const line of this.lines)if(line.static.visible){this.cablePositions.set(line.cable,offset);offset+=line.cable.length;}
+      this.cables.geometry.setDrawRange(0,offset/3);this.cables.visible=offset>0;
+      this.cables.geometry.getAttribute("position").needsUpdate=true;this.cablesDirty=false;
     }
     for(const batch of this.batches.values()){batch.mesh.count=batch.count;batch.mesh.visible=batch.count>0;batch.mesh.instanceMatrix.needsUpdate=true;}
   }
