@@ -39,30 +39,28 @@ for (const slug of ["ski-portillo", "breckenridge", "heavenly"] as const) {
 test("Portillo hotel landmark is anchored at the real sampler height", () => {
   const terrain = loadRealTerrain("ski-portillo");
   const group = createLandmarks(DROP_IN_GAME_PROFILES["ski-portillo"], terrain);
-  const hotel = group.children.find((child) =>
-    child instanceof THREE.Mesh && child.geometry instanceof THREE.BoxGeometry);
-  assert.ok(hotel instanceof THREE.Mesh);
+  const hotel = group.getObjectByName("portillo-hotel");
+  assert.ok(hotel instanceof THREE.Group);
+  assert.equal(hotel.children.length,3);
   const { x, z } = LANDMARK_COORDINATES["ski-portillo"].hotel;
   assert.ok(Math.abs(hotel.position.y - terrain.height(x, z)) <= 0.5,
     `hotel y=${hotel.position.y}, terrain y=${terrain.height(x, z)}`);
 });
 
 for (const slug of ["ski-portillo", "heavenly"] as const) {
-  test(`${slug} water stays fogged, below terrain, and inside the real heightfield bbox`, () => {
-    const terrain = loadRealTerrain(slug);
-    const group = createLandmarks(DROP_IN_GAME_PROFILES[slug], terrain);
-    const lake = group.children.find((child) =>
-      child instanceof THREE.Mesh && child.geometry instanceof THREE.PlaneGeometry);
+  test(`${slug} lake follows a sourced polygon within the baked far-field support`, () => {
+    const terrain=loadRealTerrain(slug),group=createLandmarks(DROP_IN_GAME_PROFILES[slug],terrain);
+    const lake=group.children.find(child=>child.name.endsWith("-lake"));
     assert.ok(lake instanceof THREE.Mesh);
-    assert.ok(lake.material instanceof THREE.MeshBasicMaterial);
-    assert.equal(lake.material.fog, true);
-    const width = lake.geometry.parameters.width;
-    const depth = lake.geometry.parameters.height;
-    const half = terrain.meta.sizeM / 2;
-    assert.ok(lake.position.x - width / 2 >= -half);
-    assert.ok(lake.position.x + width / 2 <= half);
-    assert.ok(lake.position.z - depth / 2 >= -half);
-    assert.ok(lake.position.z + depth / 2 <= half);
-    assert.ok(lake.position.y <= terrain.height(lake.position.x, lake.position.z));
+    assert.ok(lake.geometry instanceof THREE.ShapeGeometry);
+    assert.ok(lake.material instanceof THREE.MeshStandardMaterial);
+    assert.equal(lake.material.fog,true);assert.equal(lake.material.depthTest,true);
+    assert.ok(lake.material.normalMap instanceof THREE.DataTexture);
+    const p=lake.geometry.getAttribute("position");assert.ok(p.count>12);
+    for(let i=0;i<p.count;i++)assert.ok(Math.hypot(p.getX(i),p.getZ(i))<=29501);
+    assert.equal(lake.userData.farFieldSupported,true);
+    assert.equal(lake.userData.terrainFootprint,undefined,'real distant lakes must not be culled as near-field props');
+    assert.match(lake.userData.sourceId,/^osm:(way|relation):/);
+    assert.ok(lake.position.y>1800&&lake.position.y<2900);
   });
 }

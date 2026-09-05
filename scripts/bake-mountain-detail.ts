@@ -30,16 +30,16 @@ export function bakeMountainDetail(field:Heightfield,network:TrailsFile,seed:num
   }
   const random=mulberry32(seed),phase=random()*Math.PI*2;
   const wells:Array<{x:number;y:number;radiusM:number}>=[];
-  // Sparse designed tree positions inside mapped closed woods only. At 4–6m
+  // Designed 30m planting grid with ±5m jitter inside mapped closed woods. At 4–6m
   // DEM resolution the wells have a 6m radius; individual ski-scale holes are
   // not representable and are deliberately not claimed.
   for(const forest of decoded.forests){
     const p=forest.points;if(p.length<4)continue;
     const xs=p.map(v=>v.x),ys=p.map(v=>v.y),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
     const inside=(x:number,y:number)=>{let hit=false;for(let i=0,j=p.length-1;i<p.length;j=i++){if((p[i].y>y)!==(p[j].y>y)&&x<(p[j].x-p[i].x)*(y-p[i].y)/(p[j].y-p[i].y)+p[i].x)hit=!hit;}return hit;};
-    for (let y = minY+20; y < maxY; y += 90) {
-      for (let x = minX+20; x < maxX; x += 90) {
-        const wx = x+(random()-.5)*30, wy = y+(random()-.5)*30;
+    for (let y = minY+20; y < maxY; y += 30) {
+      for (let x = minX+20; x < maxX; x += 30) {
+        const wx = x+(random()-.5)*10, wy = y+(random()-.5)*10;
         // Engineering DEM ceiling, not an inferred species or botanical survey.
         const belowTreeLine = sampleHeightBilinear(field,wx,wy) <= treeLineElevationM;
         if (inside(wx,wy) && belowTreeLine && clearsCorridors(wx,wy)) {

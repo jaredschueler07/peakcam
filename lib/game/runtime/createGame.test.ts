@@ -46,7 +46,7 @@ test("runtime terrain loading reports analytics and falls back to the parity sam
   }
 });
 
-test("the loaded runtime scene drapes and bounds Portillo landmarks against its moving terrain window", async () => {
+test("the loaded scene streams the sourced hotel while retaining far-field lake support", async () => {
   const profile = DROP_IN_GAME_PROFILES["ski-portillo"];
   const bridge = new UiBridge(profile);
   const source = await loadTerrainForRuntime(profile, bridge, {
@@ -64,15 +64,16 @@ test("the loaded runtime scene drapes and bounds Portillo landmarks against its 
   assert.ok(landmarks instanceof THREE.Group);
   const hotel = landmarks.children.find((child) => child.name === "portillo-hotel");
   const lake = landmarks.children.find((child) => child.name === "portillo-lake");
-  assert.ok(hotel instanceof THREE.Mesh && hotel.geometry instanceof THREE.BoxGeometry);
-  assert.ok(lake instanceof THREE.Mesh && lake.geometry instanceof THREE.PlaneGeometry);
+  assert.ok(hotel instanceof THREE.Group);
+  assert.ok(lake instanceof THREE.Mesh && lake.geometry instanceof THREE.ShapeGeometry);
   assert.ok(Math.abs(hotel.position.y - source.sampler.height(hotel.position.x, hotel.position.z)) <= 0.5);
-  assert.ok(hotel.geometry.parameters.width <= 60, "hotel silhouette must not clip into a viewport wedge");
+  assert.ok(hotel.userData.terrainFootprint.halfX * 2 <= 110, "hotel bounds follow the sourced footprint");
   assert.equal(hotel.visible, false, "hotel must hide while its supporting terrain tile is absent");
-  assert.equal(lake.visible, false, "lake must hide while its supporting terrain tile is absent");
+  assert.equal(lake.userData.farFieldSupported, true);
+  assert.equal(lake.visible, true, "lake remains supported by the baked far field beyond streamed tiles");
 
-  state.pos.x = -300;
-  state.pos.z = -700;
+  state.pos.x = hotel.position.x;
+  state.pos.z = hotel.position.z;
   renderer.update(state, 0);
   assert.equal(hotel.visible, true, "grounded hotel appears once its terrain is in the streaming window");
 });
