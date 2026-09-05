@@ -9,7 +9,7 @@ import { expect, test } from "@playwright/test";
  * play window must stay under 2 MB — retained growth means a per-frame leak.
  */
 
-const V2_URL = "/resorts/heavenly/drop-in?engine=v2";
+const V2_URL = "/resorts/heavenly/drop-in";
 const HEAP_GROWTH_BUDGET_BYTES = 2 * 1024 * 1024;
 const PLAY_MS = 10_000;
 

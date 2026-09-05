@@ -537,7 +537,7 @@ export default function DropInGame({ profile, conditions }: {
         )}
         {(phase === "loading" || phase === "playing") && <canvas ref={canvasRef} data-testid="drop-in-canvas" className="block h-full w-full touch-none" aria-label={`${profile.name} ski game`} />}
         {phase === "loading" && <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-ink/50" role="status"><span className="pc-eyebrow rounded-full bg-cream-50 px-4 py-2 text-ink">Loading real mountain… {Math.round(loadingProgress * 100)}%</span></div>}
-        {phase === "playing" && runtime && <><DropInHUD store={bridge.store} audioEnabled={audioEnabled} onToggleAudio={toggleAudio} /><TouchControls adapter={runtime.touch} /><PauseDialog store={bridge.store} onResume={() => runtime.resume()} onRestart={() => restartRun(runtime)} /><ResultsDialog
+        {phase === "playing" && runtime && <><DropInHUD store={bridge.store} audioEnabled={audioEnabled} onToggleAudio={toggleAudio} onPause={() => runtime.pause()} /><TouchControls adapter={runtime.touch} /><PauseDialog store={bridge.store} onResume={() => runtime.resume()} onRestart={() => restartRun(runtime)} /><ResultsDialog
           store={bridge.store}
           onRestart={() => restartRun(runtime)}
           // Free Ski passes null, which is what removes the leaderboard,

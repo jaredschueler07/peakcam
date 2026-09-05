@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState } from "react";
+import { useDialogFocus } from "./useDialogFocus";
 import { useStore } from "zustand";
 import type { StoreApi } from "zustand/vanilla";
 
@@ -98,6 +99,8 @@ export default function ResultsDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show]);
 
+  const dialogRef = useDialogFocus(show && !dismissed);
+
   if (!show || dismissed) return null;
 
   const outcome = resultsOutcome({
@@ -111,6 +114,8 @@ export default function ResultsDialog({
 
   return (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
       className="absolute inset-0 z-30 flex items-center justify-center bg-ink/60 p-6"
       role="dialog"
       aria-modal="true"

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { GHOST_SAMPLE_HZ } from "../../lib/game/replay/recorder";
 
-const V2_URL = "/resorts/heavenly/drop-in?engine=v2";
+const V2_URL = "/resorts/heavenly/drop-in";
 
 /**
  * Every drop-in URL goes through here so the backend is pinned per project rather than copied into
@@ -116,7 +116,7 @@ test("phys=v2 boots, advances the HUD, and stays out of a crash loop", async ({ 
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await page.goto(dropInUrl(`${V2_URL}&phys=v2`));
+  await page.goto(dropInUrl(`${V2_URL}?phys=v2`));
   await page.getByRole("button", { name: /start descent/i }).click();
 
   const shell = page.locator("[data-drop-in-state='running'][data-drop-in-physics='v2']");
@@ -329,7 +329,7 @@ test("[gate] play → submit → board: a finished run posts and appears on the 
   // physics, producing real recorder samples. Nothing about the finish is
   // faked, and the resulting ghost is refused by the server validator's
   // start-zone and minimum-distance checks.
-  await page.goto(dropInUrl("/resorts/ski-portillo/drop-in?engine=v2&e2espawn=-40"));
+  await page.goto(dropInUrl("/resorts/ski-portillo/drop-in?e2espawn=-40"));
   await page.getByRole("radio", { name: /time trial/i }).click();
 
   const shell = page.locator("[data-drop-in-state]");
@@ -379,7 +379,7 @@ test("an unsupported resort shows not-found and never mounts the game", async ({
   // notFound() pages currently stream with HTTP 200 (soft-404) — confirmed on
   // production /resorts/<bad-slug> too, so it is not a v2 regression. Assert
   // on behavior until the status bug is fixed, then tighten to toBe(404).
-  const response = await page.goto("/resorts/not-a-resort/drop-in?engine=v2");
+  const response = await page.goto("/resorts/not-a-resort/drop-in");
   expect([200, 404]).toContain(response?.status() ?? 0);
   await expect(page.getByText(/not found/i).first()).toBeVisible();
   await expect(page.getByRole("button", { name: /start descent/i })).toHaveCount(0);
@@ -541,7 +541,7 @@ for (const { slug, maxMean, minStdev } of LUMINANCE_BUDGETS) {
     // comes from the live NWS forecast and the latest snow report — so the guard
     // silently measured a different picture depending on the real weather at a
     // real resort that day. See the note above the budgets.
-    await page.goto(dropInUrl(`/resorts/${slug}/drop-in?engine=v2&e2ecanvas&weather=0`));
+    await page.goto(dropInUrl(`/resorts/${slug}/drop-in?e2ecanvas&weather=0`));
     await page.getByRole("button", { name: /start descent/i }).click();
     await expect(page.locator("[data-drop-in-state='running'] canvas[data-testid='drop-in-canvas']")).toBeVisible();
     await page.waitForTimeout(750);
@@ -623,4 +623,25 @@ test("leaving the game by the in-app Conditions link unmounts the runtime withou
   // asynchronously to surface as a pageerror before asserting.
   await page.waitForTimeout(500);
   expect(errors).toEqual([]);
+});
+
+test("game dialogs keep keyboard focus inside and mode radios support arrows", async ({ page }) => {
+  await page.goto(dropInUrl(V2_URL));
+  const free = page.getByRole("radio", { name: /free ski/i });
+  await free.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("radio", { name: /time trial/i })).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await expect(free).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("button", { name: /start descent/i }).click();
+  await expect(page.locator("[data-drop-in-state='running']")).toBeVisible();
+  await page.getByRole("button", { name: "Pause game" }).click();
+  const resume = page.getByRole("button", { name: "Resume", exact: true });
+  await expect(resume).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(page.getByRole("button", { name: "Restart", exact: true })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(resume).toBeFocused();
+  await resume.click();
+  await expect(page.getByRole("button", { name: "Pause game" })).toBeFocused();
 });
