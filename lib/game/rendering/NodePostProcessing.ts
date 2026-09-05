@@ -420,11 +420,19 @@ export class NodePostProcessing {
       asVec4(renderOutput(node, THREE.NoToneMapping, renderer.outputColorSpace));
     let output: Vec4;
     if (antialias === "smaa") {
-      this.aaInput = asVec4(convertToTexture(shaded));
+      this.aaInput = asVec4(convertToTexture(shaded, null, null, { type: THREE.HalfFloatType, depthBuffer: false }));
       this.aaNode = smaa(this.aaInput);
+      // r185 SMAA defaults every intermediate to RGBA16F. Edge flags and blend
+      // weights are bounded [0,1], matching the reference SMAA UNORM8 buffers.
+      // Keep the colour blend/input half-float to avoid quantising the poster sky.
+      const targets = this.aaNode as unknown as {
+        _renderTargetEdges: THREE.RenderTarget; _renderTargetWeights: THREE.RenderTarget;
+      };
+      targets._renderTargetEdges.texture.type = THREE.UnsignedByteType;
+      targets._renderTargetWeights.texture.type = THREE.UnsignedByteType;
       output = encodeOnly(this.blend(this.aaInput, asVec4(this.aaNode)));
     } else {
-      this.aaInput = asVec4(convertToTexture(encodeOnly(shaded)));
+      this.aaInput = asVec4(convertToTexture(encodeOnly(shaded), null, null, { type: THREE.UnsignedByteType, depthBuffer: false }));
       this.aaNode = fxaa(this.aaInput);
       output = this.blend(this.aaInput, asVec4(this.aaNode));
     }

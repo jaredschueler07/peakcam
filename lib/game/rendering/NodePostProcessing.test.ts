@@ -383,3 +383,19 @@ test("godrays get a shadow map with a comparison sampler even under CSM", () => 
     `the depth texture declares a compare function so a comparison sampler is bound — got ${depthTexture?.compareFunction}`,
   );
 });
+
+ test("AA avoids depth attachments and uses bounded formats for SMAA flags and weights", () => {
+  for (const antialias of ["smaa", "fxaa"] as const) {
+    const { post } = build({ antialias });
+    const input = post.aaInput as unknown as { renderTarget: THREE.RenderTarget };
+    assert.equal(input.renderTarget.depthBuffer, false);
+    assert.equal(input.renderTarget.texture.type, antialias === "smaa" ? THREE.HalfFloatType : THREE.UnsignedByteType);
+    if (antialias === "smaa") {
+      const node = post.aaNode as unknown as { _renderTargetEdges: THREE.RenderTarget; _renderTargetWeights: THREE.RenderTarget; _renderTargetBlend: THREE.RenderTarget };
+      assert.equal(node._renderTargetEdges.texture.type, THREE.UnsignedByteType);
+      assert.equal(node._renderTargetWeights.texture.type, THREE.UnsignedByteType);
+      assert.equal(node._renderTargetBlend.texture.type, THREE.HalfFloatType, "retain smooth linear colour gradients");
+    }
+    post.dispose();
+  }
+});
