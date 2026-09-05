@@ -98,15 +98,16 @@ try {
         const target = pointAtArcLength(run.points, last.courseProgress + 30);
         const heading = Math.atan2(target.x - last.pos.x, target.z - last.pos.z);
         const angle = Math.atan2(Math.sin(heading - last.yaw), Math.cos(heading - last.yaw));
+        // Positive world yaw is screen-left in the chase view.
         if (row.input === 'keyboard') {
-          const desired = Math.abs(angle) < 0.02 ? 0 : Math.sign(angle);
+          const desired = Math.abs(angle) < 0.02 ? 0 : -Math.sign(angle);
           if (desired !== steering) {
             if (steering) await page.keyboard.up(steering < 0 ? 'a' : 'd');
             if (desired) await page.keyboard.down(desired < 0 ? 'a' : 'd');
             steering = desired;
           }
         } else {
-          const analog = Math.abs(angle) < 0.02 ? 0 : Math.sign(angle);
+          const analog = Math.abs(angle) < 0.02 ? 0 : -Math.sign(angle);
           await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ ...touchOrigin, x: Math.round(touchOrigin.x + analog * 64) }, tuckPoint] });
         }
         await page.waitForTimeout(25);

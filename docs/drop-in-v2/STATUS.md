@@ -6,6 +6,8 @@ Drop In v3 is implemented on the isolated `feat/drop-in-v3` integration branch
 in `.worktrees/drop-in-v3`, based on `de795d4`. This branch makes the native game
 the public default and removes the old iframe engine. It has **not been deployed**.
 The primary checkout and its snowing-now changes remain separate.
+A follow-up corrects inverted steering across keyboard, touch, mouse and gamepad;
+12 actual browser direction checks pass on WebGL/WebGPU.
 
 The full mapped trail catalog, baked terrain detail, physical lift laps, default
 physics v2, signed environmental conditions and authoritative input replay are

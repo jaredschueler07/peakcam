@@ -123,3 +123,17 @@ tops, across every mode/backend/input combination; it does not ski every catalog
 trail. Lift traversal intentionally uses accelerated fixed ticks. Renderer probes
 pin quality and weather. These methods are separate from the unmodified-input
 full-run matrix and the server replay unit tests.
+
+## Steering follow-up
+
+The baseline measurements above describe `aed2b3d`. A later input-only correction
+maps screen-right-positive adapter values to the simulator's opposite yaw sign.
+Physics and serialized tape conventions are unchanged. All eight camera-relative
+direction regression cases failed before the fix, then passed at five headings
+for keyboard, touch, pointer and gamepad. Focused input/physics/replay tests pass
+180/180, and actual arrow/A/D/touch direction checks pass 12/12 across WebGL and
+WebGPU. TypeScript, ESLint and the rebuilt production app pass. The full-run QA
+controller now sends the corrected physical direction.
+
+Full Imperial Bowl descents also pass with both keyboard and two-finger touch
+on WebGL using the corrected controls: 2/2, no browser errors or debug mutations.
