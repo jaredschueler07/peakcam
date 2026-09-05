@@ -1,3 +1,4 @@
+import { installE2eDebug } from "./e2e-debug";
 import * as THREE from "three";
 import type { ResortGameProfile } from "../config/schema";
 import { GameRuntime, type RuntimeAnalytics } from "./GameRuntime";
@@ -100,6 +101,8 @@ export async function createGame(options: CreateGameOptions): Promise<GameRuntim
     options.conditions, options.physicsModel, options.audio, assetLoadMs, options.seed, options.spawnArcM, backend,
     nodeFactories, options.trailId, options.mode,
   );
+  const cleanup = installE2eDebug(window as Window & { __dropInDebug?: import("./e2e-debug").DropInDebugApi }, location.search, () => runtime.createDebugApi());
+  if (cleanup) runtime.setDebugCleanup(cleanup);
   void runtime.startWhenWarm();
   void attachFarFieldWhenReady(runtime, options);
   runtime.setSurfaceTextureLoader(() => { void attachSurfaceTexturesWhenReady(runtime, backend); });

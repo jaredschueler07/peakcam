@@ -1,3 +1,5 @@
+import { prepareLiftPath, RIDER_DROP_M } from "../core/lifts";
+import type { DropInDebugApi } from "./e2e-debug";
 import { sampleSensoryState, sensoryLocalHour, type SensoryState } from "./sensory-state";
 import { resetRankedStart } from "../core/ranked-start";
 import { resetSimulationOnTerrain } from "../core/run-lifecycle";
@@ -143,6 +145,8 @@ export class GameRuntime {
   private readonly ghostRecorder: GhostRecorder;
   private readonly recordingArm = new CompetitiveRecordingArm();
   private ranked = false;
+  private debugMutated = false;
+  private debugCleanup?: () => void;
   private readonly inputTape = new InputTapeRecorder();
   private finishedRun: FinishedRunRecording | null = null;
   /** Reused listener payload — avoids allocating `{speed,carve,...}` every HUD tick. */
@@ -239,6 +243,7 @@ export class GameRuntime {
   restart(): void { this.input.setAction("restart", true); this.input.setAction("restart", false); this.resume(); }
 
   beginCompetitiveRecording(): void {
+    if (this.debugMutated) throw new Error("Debug-mutated sessions cannot record ranked runs; create a fresh session");
     this.ranked = true;
     this.finishedRun = null;
     this.ui.setRunRecordingAvailable(false);
@@ -385,10 +390,72 @@ export class GameRuntime {
 
   private weatherIndex: number = startingWeatherIndex(this.conditions);
 
+  /** Only createGame's explicit e2edebug query installs this API on window. */
+  createDebugApi(): DropInDebugApi {
+    const assertLive = () => { if (this.disposed) throw new Error("Runtime disposed"); };
+    const assertFree = () => {
+      assertLive();
+      if (this.ranked) throw new Error("Debug movement is Free Ride only");
+      this.debugMutated = true;
+      this.finishedRun = null;
+    };
+    return {
+      snapshot: () => {
+        assertLive();
+        const s = this.state;
+        return { pos: { ...s.pos }, vel: { ...s.vel }, yaw: s.yaw, time: s.time,
+          liftIndex: s.liftIndex, liftProgress: s.liftProgress, liftDistanceM: s.liftDistanceM,
+          courseProgress: s.courseProgress, selectedTrail: s.selectedTrail, finished: s.finished,
+          onGround: s.onGround, crash: s.crash, ranked: this.ranked, paused: this.paused,
+          debugMutated: this.debugMutated, backend: this.renderer.backendKind,
+          performance: { ...this.renderer.performanceSummary(), rendererInfo: this.renderer.debugRendererInfo() },
+          runs: this.world.terrain.realRuns?.map((r, index) => ({ index, id: r.id, name: r.name, lengthM: r.lengthM })),
+          lifts: this.world.terrain.realLifts?.map((l, index) => ({ index, id: l.id, name: l.name, type: l.type, complete: l.complete, stations: l.stations?.map(p => ({ ...p })) })),
+        };
+      },
+      setQuality: (rung) => {
+        assertLive();
+        if (rung !== null && (!Number.isInteger(rung) || rung < 0 || rung > 4)) throw new Error("Quality must be 0..4 or null");
+        this.renderer.debugSetQuality(rung as QualityRung | null);
+      },
+      selectRun: (index) => {
+        assertFree();
+        if (!Number.isInteger(index) || !this.world.terrain.realRuns?.[index]) throw new Error("Invalid run index");
+        this.state.selectedTrail = index; resetRankedStart(this.state, this.world); this.input.clearHeld();
+      },
+      spawnAtLift: (index) => {
+        assertFree();
+        const lift = this.world.terrain.realLifts?.[index];
+        if (!Number.isInteger(index) || !lift || lift.complete === false || lift.stations?.length !== 2) throw new Error("Lift lacks genuine complete terminals");
+        resetRankedStart(this.state, this.world);
+        const path = prepareLiftPath(lift, this.world.terrain.height), base = path.points[0], next = path.points[1];
+        Object.assign(this.state.pos, { x: base.x, y: base.y - RIDER_DROP_M, z: base.z });
+        Object.assign(this.state.vel, { x: 0, y: 0, z: 0 });
+        this.state.yaw = Math.atan2(next.x - base.x, next.z - base.z);
+        this.state.onGround = true; this.input.clearHeld();
+      },
+      stepTicks: (count, controls = {}) => {
+        assertFree();
+        if (!Number.isInteger(count) || count < 1 || count > 12000) throw new Error("Tick count must be 1..12000");
+        this.pause(); this.accumulator = 0;
+        const clamp = (x: number, lo: number) => Math.max(lo, Math.min(1, Number.isFinite(x) ? x : 0));
+        const input = { steer: Math.round(clamp(controls.steer ?? 0, -1) * 127) / 127,
+          tuck: Math.round(clamp(controls.tuck ?? 0, 0) * 255) / 255, brake: Math.round(clamp(controls.brake ?? 0, 0) * 255) / 255,
+          jumpHeld: controls.jumpHeld === true, jumpPressed: false, restartPressed: false, trailPressed: false };
+        for (let i = 0; i < count; i++) stepSimulation(this.state, input, FIXED_DT, this.world);
+        this.renderer.render(this.state, this.world, 1 / 60, this.state.crouch, 0);
+      },
+      resume: () => { assertFree(); this.resume(); },
+    };
+  }
+
+  setDebugCleanup(cleanup: () => void): void { this.debugCleanup = cleanup; }
+
   setAudioEnabled(enabled: boolean): void { this.audio.setEnabled(enabled); }
 
   dispose(): void {
     if (this.disposed) return; this.disposed = true;
+    this.debugCleanup?.(); this.debugCleanup = undefined;
     if (this.raf) cancelAnimationFrame(this.raf); this.raf = 0;
     window.removeEventListener("resize", this.onResize);
     window.removeEventListener("blur", this.onBlur);

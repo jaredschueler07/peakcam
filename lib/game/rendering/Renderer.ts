@@ -146,6 +146,7 @@ export class GameRenderer {
   private readonly cameraController: CameraController;
   private readonly weather: WeatherRenderer;
   private readonly quality: QualityController;
+  private debugQualityPinned = false;
   private readonly csm: ShadowSystem;
   private post: PostChain | null = null;
   private readonly postReady: Promise<void>;
@@ -378,6 +379,22 @@ export class GameRenderer {
   }
 
   /** Which backend actually initialised — surfaced to the DOM so e2e can assert the matrix. */
+  /** Opt-in debug caller only; pin the complete quality ladder for repeatable thermal inspection. */
+  debugSetQuality(rung: QualityRung | null): void {
+    this.debugQualityPinned = rung !== null;
+    if (rung !== null) {
+      this.quality.rung = rung;
+      this.quality.pixelScale = 1;
+      this.applyQuality(rung); this.applySize();
+    }
+    this.frameTimes.length = 0;
+  }
+
+  debugRendererInfo(): unknown {
+    const info = (this.renderer as unknown as { info?: { render?: unknown; memory?: unknown; calls?: number } }).info;
+    return info ? JSON.parse(JSON.stringify({ render: info.render, memory: info.memory, calls: info.calls })) : null;
+  }
+
   get backendKind(): "webgpu" | "webgl" { return this.renderer.backendKind; }
 
   /** Attach a decoded replay to render alongside the live skier, or `null` to clear it. */
@@ -398,7 +415,7 @@ export class GameRenderer {
     // One gate, not two: this used to sit inside a 0.5s fps-counter tick left over from the
     // observe(fps) ladder, whose counters nothing read once the governor replaced it — and whose
     // only surviving effect was to round the adapt period up to 1.5s.
-    if (this.adaptTime >= 1.4) {
+    if (!this.debugQualityPinned && this.adaptTime >= 1.4) {
       this.adaptTime = 0;
       // The governor replaces the twitchy observe(fps) ladder: sharing `rung` with both live
       // would let the fast path undo a governor step inside a single tick.
