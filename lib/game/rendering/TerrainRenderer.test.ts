@@ -38,8 +38,8 @@ test("attachSurfaceTextures swaps every tile onto the real KTX2 pair at rung 3+,
   assert.notEqual(after, before, "a new compiled material carries the real surface");
   assert.equal(after.userData.snowDetail, real.snowNormal);
   assert.equal(after.userData.snowRoughness, real.snowRoughness);
-  assert.equal(materialDisposed, true, "the procedural material is released, not leaked");
-  assert.equal(proceduralTextureDisposed, true, "the orphaned procedural detail normal is released too");
+  assert.equal(materialDisposed, false, "the procedural material remains cached for downshift");
+  assert.equal(proceduralTextureDisposed, false, "the procedural normal remains available at rung2");
   for (const child of scene.children) {
     if (child instanceof THREE.Mesh) assert.equal(child.material, after, "every tile shares the one swapped material");
   }

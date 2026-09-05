@@ -67,6 +67,7 @@ export interface GameScene {
    * common ancestor; nothing downstream reads the concrete geometry type.
    */
   sky: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
+  setSkyQuality?: (rung: QualityRung) => void;
   skyUniforms: SkyUniformSet;
   /**
    * Present only when the physical sky (`SkyMesh`, rung 2+ WebGPU) is mounted. `skyUniforms` alone
@@ -120,10 +121,8 @@ function makeRidge(radius: number, height: number, seed: number, low: number, hi
  * the node-material chunk (`loadNodeFactories()`), and `null` is the WebGL path with its GLSL
  * `ShaderMaterial` sky and `FogExp2`.
  *
- * `rung` is the *seeded* quality rung (`QualityController.rung` at construction time), not a live
- * value the sky re-reads later: the physical `SkyMesh` is a full-screen shader, expensive enough
- * that which sky mounts is a scene-build-time decision rather than something the governor swaps
- * mid-run, the way it does post-processing or shadow cascades.
+ * Sky variants are retained and switched by visibility so thermal transitions shed
+ * the physical fragment shader without rebuilding it. Both share weather updates.
  */
 export function createScene(profile: ResortGameProfile, aspect: number, nodes: NodeFactories | null = null, rung: QualityRung = 0): GameScene {
   const weather = profile.weather[0], visual = visualWeatherPreset(0), scene = new THREE.Scene();
@@ -146,7 +145,7 @@ export function createScene(profile: ResortGameProfile, aspect: number, nodes: N
   // A full-screen physical sky is real GPU cost; rungs 0-1 exist for hardware that can't spend it,
   // so they keep the gradient even on WebGPU. See SkyNodeMaterial.createPhysicalSky for why the
   // preset's colours drive the model's parameters rather than tinting its output.
-  const physicalSky = nodes && rung >= 2 ? nodes.sky.createPhysicalSky(skySeed) : null;
+  const physicalSky = nodes ? nodes.sky.createPhysicalSky(skySeed) : null;
   const updatePhysicalSky = nodes && physicalSky
     ? (seed: SkyNodeSeed) => nodes.sky.applyPhysicalSkyParams(physicalSky.mesh, seed)
     : undefined;
@@ -156,9 +155,7 @@ export function createScene(profile: ResortGameProfile, aspect: number, nodes: N
     uCloud: { value: new THREE.Color(visual.cloud) }, uCloudiness: { value: visual.cloudiness }, uTime: { value: 0 },
     uSun: { value: new THREE.Color(visual.sunCol) }, uSunDir: { value: SUN_DIRECTION.clone() }, uHaze: { value: weather.haze },
   };
-  const sky: THREE.Mesh<THREE.BufferGeometry, THREE.Material> = physicalSky
-    ? physicalSky.mesh
-    : nodes && skyNodeUniforms
+  const gradientSky: THREE.Mesh<THREE.BufferGeometry, THREE.Material> = nodes && skyNodeUniforms
     ? new THREE.Mesh(skyGeometry, nodes.sky.createSkyNodeMaterial(skyNodeUniforms) as THREE.Material)
     : new THREE.Mesh(skyGeometry, new THREE.ShaderMaterial({
     uniforms: skyUniforms, side: THREE.BackSide, depthWrite: false, fog: false,
@@ -167,7 +164,19 @@ export function createScene(profile: ResortGameProfile, aspect: number, nodes: N
 float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+1.),f.x),f.y);}
 void main(){vec3 d=normalize(vDir);float t=clamp(d.y*.5+.5,0.,1.);vec3 c=mix(uHorizon,uMid,smoothstep(.12,.55,t));c=mix(c,uTop,smoothstep(.48,1.,t));vec2 p=normalize(d.xz)*2.5+uTime*vec2(.006,.002);float clouds=n(p*1.7)*.68+n(p*4.1+9.)*.32;float band=smoothstep(.02,.2,d.y)*(1.-smoothstep(.52,.86,d.y));c=mix(c,uCloud,smoothstep(.48,.7,clouds)*band*uCloudiness);float s=max(dot(d,normalize(uSunDir)),0.);c+=uSun*pow(s,180.)*1.7+c*uSun*pow(s,7.)*.08;c=mix(c,uHorizon,uHaze*pow(1.-t,2.));gl_FragColor=vec4(c,1.);}`,
   }));
-  sky.renderOrder = -10; sky.frustumCulled = false; scene.add(sky);
+  let sky = gradientSky;
+  gradientSky.renderOrder = -10; gradientSky.frustumCulled = false; scene.add(gradientSky);
+  if (physicalSky) {
+    physicalSky.mesh.renderOrder = -10; physicalSky.mesh.frustumCulled = false;
+    scene.add(physicalSky.mesh);
+  }
+  const setSkyQuality = (next: QualityRung) => {
+    const usePhysical = physicalSky !== null && next >= 2;
+    gradientSky.visible = !usePhysical;
+    if (physicalSky) physicalSky.mesh.visible = usePhysical;
+    sky = usePhysical ? physicalSky!.mesh : gradientSky;
+  };
+  setSkyQuality(rung);
   const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(46, 18, 12), new THREE.MeshBasicMaterial({ color: 0xfff6de, fog: false, transparent: true, opacity: 0.95 }));
   const sunGlow = new THREE.Mesh(new THREE.SphereGeometry(140, 16, 10), new THREE.MeshBasicMaterial({ color: 0xffe6b0, fog: false, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false }));
   sunDisc.renderOrder = sunGlow.renderOrder = -9; scene.add(sunDisc, sunGlow);
@@ -200,5 +209,5 @@ void main(){vec3 d=normalize(vDir);float t=clamp(d.y*.5+.5,0.,1.);vec3 c=mix(uHo
     (scene as THREE.Scene & { fogNode?: unknown }).fogNode =
       nodes.atmosphere.createAtmosphereFog(atmosphereUniforms as Parameters<NodeFactories["atmosphere"]["createAtmosphereFog"]>[0]);
   }
-  return { scene, camera, sky, skyUniforms, updatePhysicalSky, sun, hemi, ambient, sunDisc, sunGlow, peaks, snowUniforms, atmosphereUniforms };
+  return { scene, camera, get sky() { return sky; }, setSkyQuality, skyUniforms, updatePhysicalSky, sun, hemi, ambient, sunDisc, sunGlow, peaks, snowUniforms, atmosphereUniforms };
 }

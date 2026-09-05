@@ -265,6 +265,8 @@ export class GameRuntime {
    * already under way on the procedural detail normal, and a rung below 3 (or the WebGL path)
    * simply never calls this — see `attachSurfaceTexturesWhenReady` in createGame.ts.
    */
+  setSurfaceTextureLoader(load: () => void): void { this.renderer.setSurfaceTextureLoader(load); }
+
   attachSurfaceTextures(surfaces: SurfaceTextures): void { this.renderer.attachSurfaceTextures(surfaces); }
 
   /** The quality rung seeded at construction; `attachSurfaceTexturesWhenReady` gates on it before fetching. */

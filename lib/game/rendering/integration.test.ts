@@ -351,3 +351,78 @@ test("a lost WebGPU device stops the render loop the way a lost WebGL context do
   assert.equal(backend.rendered, before, "no frames are drawn into a dead device");
   renderer.dispose();
 });
+
+test("warmup timeout restores actual low-tier surfaces and late compilation cannot undo the live governor", async () => {
+  let complete!: () => void;
+  let started!: () => void;
+  const firstCompile = new Promise<void>((resolve) => { complete = resolve; });
+  const compiling = new Promise<void>((resolve) => { started = resolve; });
+  let calls = 0;
+  const backend = Object.assign(new FakeBackend("webgpu"), {
+    compileAsync: () => { calls++; started(); return firstCompile; },
+  });
+  const world = createProceduralWorld(profile, profile.seed);
+  const renderer = new GameRenderer(fakeCanvas(), profile, world, createSimulation(profile, profile.seed), {
+    backend, devicePixelRatio: 1, reducedMotion: true, prewarmTimeoutMs: 10, nodeFactories: NODES,
+    qualitySignals: { hardwareConcurrency: 2, deviceMemory: 2, coarsePointer: true, dpr: 1 },
+  });
+  const internals = renderer as unknown as {
+    quality: { rung: 0 | 1 | 2 | 3 | 4 };
+    applyQuality(rung: number): void;
+    built: ReturnType<typeof createScene>;
+  };
+  const terrainMaterial = () => (renderer.scene.children.find((object) => object instanceof THREE.Mesh && object.receiveShadow) as THREE.Mesh).material as THREE.Material & { normalNode: unknown };
+  const warming = renderer.prewarm();
+  await compiling;
+  assert.equal((internals.built.sky as unknown as { isSkyMesh: boolean }).isSkyMesh, true);
+  await warming;
+  assert.equal(internals.built.sky.visible, true);
+  assert.equal((internals.built.sky as unknown as { isSkyMesh?: boolean }).isSkyMesh, undefined);
+  assert.equal(terrainMaterial().normalNode, null, "timeout restores effective samples, not just the rung counter");
+  internals.quality.rung = 3;
+  internals.applyQuality(3);
+  const liveSky = internals.built.sky;
+  const liveSnow = terrainMaterial();
+  complete();
+  await firstCompile;
+  await Promise.resolve();
+  assert.equal(calls, 1, "timed-out compilation cannot schedule another compile");
+  assert.equal(internals.built.sky, liveSky);
+  assert.equal(terrainMaterial(), liveSnow);
+  renderer.dispose();
+});
+
+test("a compile completing after disposal does not restore materials or schedule more work", async () => {
+  let complete!: () => void;
+  let started!: () => void;
+  const deferred = new Promise<void>((resolve) => { complete = resolve; });
+  const compiling = new Promise<void>((resolve) => { started = resolve; });
+  let calls = 0;
+  const backend = Object.assign(new FakeBackend("webgpu"), {
+    compileAsync: () => { calls++; started(); return deferred; },
+  });
+  const { renderer } = buildRenderer(backend);
+  const internals = renderer as unknown as { quality: { rung: number }; applyQuality(rung: number): void };
+  internals.quality.rung = 1;
+  const warming = renderer.prewarm();
+  await compiling;
+  renderer.dispose();
+  internals.applyQuality = () => { assert.fail("disposed renderer must never restore a warmup tier"); };
+  complete();
+  await warming;
+  assert.equal(calls, 1);
+  assert.deepEqual(renderer.resources(), { geometries: 0, materials: 0, textures: 0 });
+});
+
+test("failed compilation restores the current governor tier before rejecting", async () => {
+  const failure = new Error("compile failed");
+  const backend = Object.assign(new FakeBackend("webgpu"), {
+    compileAsync: async () => { throw failure; },
+  });
+  const { renderer } = buildRenderer(backend);
+  const internals = renderer as unknown as { quality: { rung: number }; built: ReturnType<typeof createScene> };
+  internals.quality.rung = 1;
+  await assert.rejects(renderer.prewarm(), failure);
+  assert.equal((internals.built.sky as unknown as { isSkyMesh?: boolean }).isSkyMesh, undefined);
+  renderer.dispose();
+});

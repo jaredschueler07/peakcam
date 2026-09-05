@@ -165,7 +165,7 @@ export function createSnowNodeMaterial(
   material.dithering = true;
   const useRealSurface = rung >= 3 && surfaces !== null;
   const selectedNormal = useRealSurface ? surfaces.snowNormal : detailNormal;
-  if (mode < SNOW_DEBUG.NO_DETAIL_NORMAL) material.normalNode = snowNormalNode(selectedNormal);
+  if (rung >= 2 && mode < SNOW_DEBUG.NO_DETAIL_NORMAL) material.normalNode = snowNormalNode(selectedNormal);
   if (useRealSurface) material.roughnessNode = snowRoughnessNode(surfaces.snowRoughness);
   material.userData.snowDetail = selectedNormal;
   material.userData.snowRoughness = useRealSurface ? surfaces.snowRoughness : null;

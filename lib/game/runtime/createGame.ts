@@ -102,7 +102,7 @@ export async function createGame(options: CreateGameOptions): Promise<GameRuntim
   );
   void runtime.startWhenWarm();
   void attachFarFieldWhenReady(runtime, options);
-  void attachSurfaceTexturesWhenReady(runtime, backend);
+  runtime.setSurfaceTextureLoader(() => { void attachSurfaceTexturesWhenReady(runtime, backend); });
   return runtime;
 }
 
@@ -136,11 +136,8 @@ export async function attachFarFieldWhenReady(
  * untouched — `loadSurfaceTextures` already returns `null` rather than throwing, and the extra
  * try/catch here is defence in depth against `createGameTextureLoader` itself misbehaving.
  *
- * Gated twice before a single byte is fetched: WebGPU only (`GameTextureLoader` needs a KTX2-
- * capable backend, and `SnowNodeMaterial` only wires the real surface into the WebGPU node
- * path), and rung 3+ (`runtime.rung`, seeded once at construction like every other quality-ladder
- * setting) — a low-end device that will never render the real surface has no reason to spend the
- * bandwidth fetching it.
+ * Requested once when live quality first reaches rung3; low-rung sessions defer the
+ * download. A downshift during the load retains the maps without sampling them.
  */
 export async function attachSurfaceTexturesWhenReady(
   runtime: RuntimeSurfaceTexturesConsumer,
