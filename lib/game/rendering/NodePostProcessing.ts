@@ -156,7 +156,7 @@ export interface PostChainPolicy {
 
 /** The rung ladder from `PostProcessing.setQuality`, lifted out so it cannot drift. */
 export function postChainPolicy(rung: QualityRung, reducedMotion: boolean): PostChainPolicy {
-  return { chain: rung > 0, bloom: rung >= 3, aa: rung >= 2, chromatic: rung > 0 && !reducedMotion, ao: rung >= 3, godrays: rung >= 4 };
+  return { chain: rung > 0, bloom: rung >= 3, aa: true, chromatic: rung > 0 && !reducedMotion, ao: rung >= 3, godrays: rung >= 4 };
 }
 
 export interface PostChainUniforms {
@@ -442,7 +442,7 @@ export class NodePostProcessing {
     this.policy = postChainPolicy(rung, this.reducedMotion);
     this.uniforms.chain.value = this.policy.chain ? 1 : 0;
     this.uniforms.bloom.value = this.policy.chain && this.policy.bloom ? 1 : 0;
-    this.uniforms.aa.value = this.policy.chain && this.policy.aa ? 1 : 0;
+    this.uniforms.aa.value = this.policy.aa ? 1 : 0;
     this.uniforms.ao.value = this.policy.chain && this.policy.ao ? 1 : 0;
     // Zeroing the uniform hides bloom but the mip chain would still render every frame; muting
     // updateBefore skips that work without touching the compiled graph. The AO buffer is the more
@@ -460,9 +460,7 @@ export class NodePostProcessing {
     // The node frame owns its own timing; the argument is kept only for arity parity with the
     // WebGL PostProcessing, whose composer.render(dt) drove effect animation.
     void deltaTime;
-    const [x, y] = this.policy.chromatic
-      ? chromaticAberrationOffset(this.speed.value, this.reducedMotion)
-      : [0, 0];
+    const [x, y] = chromaticAberrationOffset(this.speed.value, !this.policy.chromatic);
     this.uniforms.aberration.value.set(x, y);
     this.uniforms.godrays.value = this.policy.chain && this.policy.godrays ? sunFrameProximity(this.camera) : 0;
     this.pipeline.render();
