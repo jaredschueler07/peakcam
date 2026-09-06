@@ -7,6 +7,7 @@ import { createProceduralTerrain } from "./heightfield";
 import { fbm } from "./noise";
 
 export const CHUNK_SIZE = 120;
+const forestChunks = new WeakMap<SimulationWorld, Map<string, Obstacle[]>>();
 const normalScratch: Vec3 = { x: 0, y: 1, z: 0 };
 
 export function createProceduralWorld(
@@ -19,7 +20,21 @@ export function createWorld(
   profile: ResortGameProfile, seed: number, terrain: SimulationWorld["terrain"],
   config: SimulationConfig = simulationConfig(),
 ): SimulationWorld {
-  return { profile, seed, terrain, config, chunks: new Map() };
+  const world: SimulationWorld = { profile, seed, terrain, config, chunks: new Map() };
+  if (terrain.kind === "real" && terrain.treeSites) {
+    const buckets = new Map<string, Obstacle[]>();
+    for (const site of terrain.treeSites) {
+      const key = `${Math.floor(site.x / CHUNK_SIZE)}:${Math.floor(site.z / CHUNK_SIZE)}`;
+      const random = mulberry32(hashInt(Math.round(site.x * 10) + seed, Math.round(site.z * 10)));
+      const scale = (0.72 + random() * 1.05) * profile.forest.treeScale;
+      const obstacle: Obstacle = { x: site.x, y: site.y, z: site.z, s: scale,
+        r: 1.15 * Math.min(1.6, scale), rot: random() * TAU, type: "tree" };
+      const bucket = buckets.get(key);
+      if (bucket) bucket.push(obstacle); else buckets.set(key, [obstacle]);
+    }
+    forestChunks.set(world, buckets);
+  }
+  return world;
 }
 
 export function getChunk(world: SimulationWorld, cx: number, cz: number): Obstacle[] {
@@ -47,6 +62,7 @@ export function getChunk(world: SimulationWorld, cx: number, cz: number): Obstac
     else {
       if (density < profile.forest.treeline) continue;
       if (random() > clamp01((density - (profile.forest.treeline - 0.04)) * 3.1)) continue;
+      if (terrain.kind === "real" && terrain.treeSites) continue;
       type = "tree";
     }
     if (type === "rock" && random() > profile.forest.rockKeep) continue;
@@ -63,6 +79,8 @@ export function getChunk(world: SimulationWorld, cx: number, cz: number): Obstac
       r,
     });
   }
+  const forest = forestChunks.get(world)?.get(key);
+  if (forest) for (const tree of forest) chunk.push(tree);
   world.chunks.set(key, chunk);
   if (world.chunks.size > 700) {
     let count = 0;

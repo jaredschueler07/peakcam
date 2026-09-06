@@ -14,6 +14,8 @@
 import type { DemSource } from "../../../scripts/dem/sources";
 
 export interface ResortBakeConfig {
+  /** Engineering forest placement ceiling, metres; not a botanical survey. */
+  treeLineElevationM: number;
   slug: string;
   name: string;
   /** Box centre `[lat, lon]`, degrees. */
@@ -49,6 +51,7 @@ export function mPerDegLon(lat: number): number {
 export const RESORT_BAKE_CONFIGS: Record<string, ResortBakeConfig> = {
   "ski-portillo": {
     slug: "ski-portillo",
+    treeLineElevationM: 0,
     name: "Portillo",
     center: [-32.842, -70.129],
     sizeM: 4096,
@@ -60,6 +63,7 @@ export const RESORT_BAKE_CONFIGS: Record<string, ResortBakeConfig> = {
   },
   breckenridge: {
     slug: "breckenridge",
+    treeLineElevationM: 3500,
     name: "Breckenridge",
     center: [39.4749, -106.081],
     sizeM: 6144,
@@ -70,6 +74,7 @@ export const RESORT_BAKE_CONFIGS: Record<string, ResortBakeConfig> = {
   },
   heavenly: {
     slug: "heavenly",
+    treeLineElevationM: 3050,
     name: "Heavenly",
     center: [38.9404, -119.912],
     sizeM: 6144,

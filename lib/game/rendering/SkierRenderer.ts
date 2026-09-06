@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { SimulationState, TerrainSampler, Vec3 } from "../core/types";
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -7,6 +8,9 @@ const TUMBLE_AXIS = new THREE.Vector3(0.6, 0.4, 0.7).normalize();
 const normal: Vec3 = { x: 0, y: 1, z: 0 };
 const normalVec = new THREE.Vector3();
 const upScratch = new THREE.Vector3();
+const contactScratch = new THREE.Vector3();
+const SKI_CONTACT_Z = [-0.93, 0, 0.93] as const;
+export interface RenderedGroundSampler { sampleRenderedHeight(x: number, z: number): number }
 
 const material = (color: THREE.ColorRepresentation, roughness = 0.7, metalness = 0, emissive: THREE.ColorRepresentation = 0) => {
   const result = new THREE.MeshStandardMaterial({ color, roughness, metalness, emissive, emissiveIntensity: emissive ? 0.35 : 0 });
@@ -24,6 +28,7 @@ function limb(length: number, radius: number, mat: THREE.Material) {
 export class SkierRenderer {
   readonly root = new THREE.Group();
   private readonly body = new THREE.Group();
+  private readonly feet = new THREE.Group();
   private readonly head = new THREE.Group();
   private readonly armL: THREE.Group; private readonly armR: THREE.Group;
   private readonly legL: THREE.Group; private readonly legR: THREE.Group;
@@ -50,13 +55,22 @@ export class SkierRenderer {
     this.legL = limb(0.62, 0.13, dark); this.legR = limb(0.62, 0.13, dark);
     this.legL.position.set(-0.17, 0.86, 0); this.legR.position.set(0.17, 0.86, 0);
     const bootL = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.24, 0.36), material(0x2b3444, 0.5));
+    bootL.name = "ski-boot";
     const bootR = bootL.clone(); bootL.position.set(-0.17, 0.16, 0.02); bootR.position.set(0.17, 0.16, 0.02);
-    const skiGeometry = new THREE.BoxGeometry(0.16, 0.055, 1.86), tipGeometry = new THREE.ConeGeometry(0.09, 0.30, 6);
+    // These three orange pieces move as one ski. Bake their fixed transforms
+    // into one shared geometry, retaining every vertex, normal and silhouette.
+    const skiParts = [
+      new THREE.BoxGeometry(0.16, 0.055, 1.86),
+      new THREE.ConeGeometry(0.09, 0.30, 6).rotateX(Math.PI / 2).translate(0, 0.05, 1.02),
+      new THREE.ConeGeometry(0.09, 0.30, 6).rotateX(-Math.PI / 2).translate(0, 0.03, -1),
+    ];
+    const skiGeometry = mergeGeometries(skiParts)!;
+    for (const part of skiParts) part.dispose();
     const makeSki = () => {
-      const group = new THREE.Group(), plank = new THREE.Mesh(skiGeometry, ski), tip = new THREE.Mesh(tipGeometry, ski), tail = tip.clone();
-      tip.rotation.x = Math.PI / 2; tip.position.set(0, 0.05, 1.02); tail.rotation.x = -Math.PI / 2; tail.position.set(0, 0.03, -1);
+      const group = new THREE.Group(), shell = new THREE.Mesh(skiGeometry, ski);
+      shell.name = "ski-shell";
       const binding = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.09, 0.34), dark); binding.position.y = 0.06;
-      group.add(plank, tip, tail, binding); return group;
+      group.add(shell, binding); return group;
     };
     this.skiL = makeSki(); this.skiR = makeSki();
     const makePole = () => {
@@ -66,11 +80,14 @@ export class SkierRenderer {
     };
     this.poleL = makePole(); this.poleR = makePole();
     this.poleL.position.set(-0.42, 1.16, 0.06); this.poleR.position.set(0.42, 1.16, 0.06);
-    this.body.add(torso, chest, this.head, this.armL, this.armR, this.legL, this.legR, bootL, bootR, this.skiL, this.skiR, this.poleL, this.poleR);
-    this.root.add(this.body); scene.add(this.root);
+    this.body.name = "skier-body"; this.feet.name = "skier-feet";
+    this.body.add(torso, chest, this.head, this.armL, this.armR, this.legL, this.legR, this.poleL, this.poleR);
+    // Skis/boots inherit terrain alignment and yaw, never the torso's tuck dip.
+    this.feet.add(bootL, bootR, this.skiL, this.skiR);
+    this.root.add(this.body, this.feet); scene.add(this.root);
   }
 
-  update(state: SimulationState, terrain: TerrainSampler, dt: number): void {
+  update(state: SimulationState, terrain: TerrainSampler, dt: number, renderedGround?: RenderedGroundSampler): void {
     this.root.position.set(state.pos.x, state.pos.y, state.pos.z);
     terrain.normal(state.pos.x, state.pos.z, normal);
     normalVec.set(normal.x, normal.y, normal.z);
@@ -102,6 +119,43 @@ export class SkierRenderer {
       this.skiL.rotation.set(state.onGround ? 0 : 0.16, -state.lean * 0.1, state.lean * 0.42);
       this.skiR.rotation.copy(this.skiL.rotation); this.head.rotation.y = state.lean * 0.35;
     }
-    this.root.visible = state.invuln <= 0 || Math.floor(state.invuln * 12) % 2 === 0;
+    if (state.liftIndex >= 0) {
+      const lift = terrain.realLifts?.[state.liftIndex];
+      const seated = lift && !/platter|drag_lift|t-bar|j-bar|rope_tow|magic_carpet/.test(lift.type);
+      this.root.quaternion.setFromAxisAngle(UP, state.yaw);
+      this.body.position.y = 0;
+      this.body.rotation.set(0, 0, 0);
+      if (seated) {
+        this.legL.rotation.x = this.legR.rotation.x = -1.15;
+        this.skiL.rotation.x = this.skiR.rotation.x = 0.35;
+        this.armL.rotation.x = this.armR.rotation.x = -0.9;
+      }
+    }
+    if (renderedGround && state.onGround && state.liftIndex < 0 && state.crash <= 0) {
+      const supportOffset = state.pos.y - terrain.height(state.pos.x, state.pos.z);
+      this.root.position.y = renderedGround.sampleRenderedHeight(state.pos.x, state.pos.z) + supportOffset;
+      // Preserve the physical ground normal and each ski's edge pose. A small
+      // footprint check covers the different slopes of raster triangles versus
+      // the analytic normal, without changing collision, camera or recorded pose.
+      const clearance = Math.max(this.skiClearance(this.skiL, renderedGround, supportOffset),
+        this.skiClearance(this.skiR, renderedGround, supportOffset));
+      this.root.position.y += Math.max(0, clearance);
+    }
+    // Spawn/recovery immunity belongs to collision handling. Hiding the whole
+    // skier made the first750ms capture and active turns randomly disappear.
+    this.root.visible = true;
   }
+
+  private skiClearance(ski: THREE.Group, ground: RenderedGroundSampler, supportOffset: number): number {
+    ski.updateMatrix();
+    let clearance = 0;
+    for (const z of SKI_CONTACT_Z) for (let side = -1; side <= 1; side += 2) {
+      contactScratch.set(side * 0.08, -0.0275, z).applyMatrix4(ski.matrix)
+        .applyQuaternion(this.root.quaternion).add(this.root.position);
+      clearance = Math.max(clearance, ground.sampleRenderedHeight(contactScratch.x, contactScratch.z)
+        + supportOffset + 0.01 - contactScratch.y);
+    }
+    return clearance;
+  }
+
 }

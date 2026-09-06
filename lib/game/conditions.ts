@@ -1,9 +1,10 @@
 import type { Resort, SnowReport, WeatherPeriod } from "../types";
-import type { PhysicsModel, SurfaceKind } from "./core/config";
+import type { PhysicsModel, SurfaceKind, SimulationEnvironment } from "./core/config";
 import { physicsModelForRollout } from "./config/physics-rollout";
 
 export interface ConditionsSnapshot {
   readonly surface: SurfaceKind;
+  readonly environment?: SimulationEnvironment;
   readonly physicsModel: PhysicsModel;
   readonly weatherDefault: 0 | 1 | 2;
   readonly powderDay: boolean;
@@ -44,7 +45,7 @@ function splitConditions(raw: string | null | undefined): {
   return { tags, narrative: narrative === "" ? null : narrative };
 }
 
-type NwsForecast = readonly Pick<WeatherPeriod, "condition" | "shortForecast" | "windSpeed" | "windGust">[];
+type NwsForecast = readonly (Pick<WeatherPeriod, "condition" | "shortForecast" | "windSpeed" | "windGust"> & Partial<Pick<WeatherPeriod, "high" | "low">>)[];
 type ConditionsResort = Pick<Resort, "slug" | "cond_rating">;
 
 function isSnowing(forecast: NwsForecast | null | undefined): boolean {
@@ -70,10 +71,26 @@ export function buildConditionsSnapshot(
   latestSnowReport: SnowReport | null,
   nwsForecast?: NwsForecast | null,
   physicsModel: PhysicsModel = physicsModelForRollout(),
+  localHour?: number,
+  now = Date.now(),
 ): ConditionsSnapshot {
+  const zones: Record<string, string> = { breckenridge: "America/Denver", heavenly: "America/Los_Angeles", "ski-portillo": "America/Santiago" };
+  const hour = localHour ?? Number(new Intl.DateTimeFormat("en-US", {
+    timeZone: zones[resort.slug] ?? "UTC", hour: "2-digit", hourCycle: "h23",
+  }).format(now));
+  const period = nwsForecast?.[0];
+  const windSpeedMps = Math.round(Math.min(40, Math.max(0, (period?.windSpeed ?? 0) * 0.44704)));
+  const snowText = `${period?.condition ?? ""} ${period?.shortForecast ?? ""}`;
+  const environment: SimulationEnvironment = {
+    powderDepthCm: Math.round(Math.min(100, Math.max(0, (latestSnowReport?.new_snow_24h ?? 0) * 2.54))),
+    windSpeedMps,
+    morningIce: hour >= 6 && hour < 11 && (period?.low ?? period?.high ?? 40) <= 32,
+    visibilityM: /blizzard|heavy.snow/i.test(snowText) ? 200 : /fog|snow/i.test(snowText) ? 800 : 20000,
+    northSign: -1,
+  };
   if (!latestSnowReport) {
     return {
-      surface: "packed", physicsModel, weatherDefault: isSnowing(nwsForecast) ? 1 : 0, powderDay: false,
+      surface: "packed", environment, physicsModel, weatherDefault: isSnowing(nwsForecast) ? 1 : 0, powderDay: false,
       baseDepthIn: null, snow24In: null, stamp: "Classic conditions", narrative: null,
     };
   }
@@ -84,6 +101,7 @@ export function buildConditionsSnapshot(
   return {
     surface: powderDay ? "powder" : conditionSurface(resort, latestSnowReport),
     physicsModel,
+    environment,
     weatherDefault: isSnowing(nwsForecast) || latestSnowReport.snowing_now ? 1 : 0,
     powderDay,
     baseDepthIn: latestSnowReport.base_depth,

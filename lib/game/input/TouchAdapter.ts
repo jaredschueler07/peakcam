@@ -8,7 +8,10 @@ export class TouchAdapter implements InputAdapter {
 
   constructor(private readonly element: HTMLElement, private readonly input: InputManager) {}
   private down = (event: PointerEvent) => {
-    if (event.pointerType !== "touch" || event.clientX > window.innerWidth * 0.55) return;
+    const target = event.target as Element | null;
+    if (event.pointerType !== "touch" || this.pointerId !== null ||
+        event.clientX > window.innerWidth * 0.55 ||
+        target?.closest?.("button,a,input,select,textarea,[role=button],[contenteditable]:not([contenteditable=false])")) return;
     this.pointerId = event.pointerId; this.originX = event.clientX;
     this.element.setPointerCapture?.(event.pointerId);
   };
@@ -17,7 +20,7 @@ export class TouchAdapter implements InputAdapter {
   };
   private up = (event: PointerEvent) => {
     if (this.pointerId !== event.pointerId) return;
-    this.pointerId = null; this.input.setAnalog("touch", 0);
+    this.clear();
   };
   setAction(action: Exclude<InputAction, "pause">, held: boolean): void { this.input.setAction(action, held, "touch"); }
   setActive(active: boolean): void {
@@ -27,8 +30,16 @@ export class TouchAdapter implements InputAdapter {
     this.element[method]("pointermove", this.move as EventListener);
     this.element[method]("pointerup", this.up as EventListener);
     this.element[method]("pointercancel", this.up as EventListener);
+    this.element[method]("lostpointercapture", this.up as EventListener);
     if (!active) this.clear();
   }
-  clear(): void { this.pointerId = null; this.input.setAnalog("touch", 0); }
+  clear(): void {
+    const pointerId = this.pointerId;
+    this.pointerId = null;
+    this.input.setAnalog("touch", 0);
+    if (pointerId !== null && this.element.hasPointerCapture?.(pointerId)) {
+      this.element.releasePointerCapture(pointerId);
+    }
+  }
   dispose(): void { this.setActive(false); }
 }

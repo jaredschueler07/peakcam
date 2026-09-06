@@ -32,11 +32,16 @@ type BackendContract = Omit<RendererBackend, "backendKind">;
 const _webgpuSatisfiesBackend: (renderer: WebGPURendererType) => BackendContract = (renderer) => renderer;
 void _webgpuSatisfiesBackend;
 
+/** Module-only warmup: evaluates renderer code but never requests an adapter/device or context. */
+export function loadWebGPUBackendModule(): Promise<typeof import("three/webgpu")> {
+  return import("three/webgpu");
+}
+
 export async function createRendererBackend(
   canvas: HTMLCanvasElement,
   kind: RendererBackendKind,
 ): Promise<RendererBackend> {
-  const { WebGPURenderer } = await import("three/webgpu");
+  const { WebGPURenderer } = await loadWebGPUBackendModule();
   const renderer = new WebGPURenderer({
     canvas,
     antialias: true,

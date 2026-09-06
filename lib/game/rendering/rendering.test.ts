@@ -11,7 +11,8 @@ import { CameraController } from "./CameraController";
 import { QualityController, seedQualityRung } from "./QualityController";
 import { createGhostPose, GhostRenderer, sampleGhostAt } from "./GhostRenderer";
 import { GameRenderer, shouldInitializePostProcessing, type RendererBackend } from "./Renderer";
-import type { ResourceCounts } from "./resources";
+import { disposeObjectTree, type ResourceCounts } from "./resources";
+import { LiftRenderer, STATION_LABEL_DISTANCE_M } from "./LiftRenderer";
 import { buildPosterLut, buildSnowDetailNormal } from "./SnowMaterial";
 import { chromaticAberrationOffset } from "./MotionEffects";
 import { configureSceneMaterials } from "./Renderer";
@@ -524,7 +525,7 @@ test("mount/unmount ten times disposes every node-material resource too (WebGPU)
   // The node path swaps materials one-for-one but replaces both THREE.Points clouds with instanced
   // quad meshes, so it carries the same counts — if a factory ever stops registering its texture on
   // userData, `collectResources` goes blind to it and this equality is what catches the leak.
-  assert.deepEqual(webgpu, webgl, "the node scene holds the same resource shape as the GLSL one");
+  assert.deepEqual(webgpu, { ...webgl, geometries: webgl.geometries + 1, materials: webgl.materials + 2 }, "the node scene retains an inactive sky and snow material for thermal transitions");
   assert.ok(webgpu.textures >= 3, `sky/snow detail plus both particle sprites, got ${webgpu.textures}`);
 });
 
@@ -551,7 +552,7 @@ test("the WebGPU scene really is built from node materials, so the audit above c
     }
   });
   // "NodeMaterial" is SkyMesh's own material (rung 2+ mounts the physical sky, not the gradient).
-  assert.deepEqual([...kinds].sort(), ["NodeMaterial", "PointsNodeMaterial", "SnowStandardNodeMaterial"]);
+  assert.deepEqual([...kinds].sort(), ["MeshBasicNodeMaterial", "NodeMaterial", "PointsNodeMaterial", "SnowStandardNodeMaterial"]);
   assert.equal(sprites.size, 3, "snow detail normal plus a radial sprite per particle cloud");
   renderer.dispose();
   assert.deepEqual(renderer.resources(), { geometries: 0, materials: 0, textures: 0 });
@@ -898,7 +899,7 @@ test("raising the camera far plane for the far field leaves the shadow cascades 
     return boxes;
   };
   const legacy = boxesFor(CSM_FAR_REFERENCE);
-  assert.ok(legacy.length >= 3, `expected 3 cascades, got ${legacy.length}`);
+  assert.ok(legacy.length === 2, `expected 2 cascades, got ${legacy.length}`);
   assert.deepEqual(boxesFor(CAMERA_FAR), legacy, "the far field changed the shadow cascades");
 
   // The measurement is live, not vacuous: below the reference the pin is a no-op and the fade
@@ -1029,4 +1030,210 @@ test("cycling weather mid-run re-derives the physical sky's parameters, not just
   // And back to clear: proves this isn't a one-shot "second preset always wins" artefact.
   weather.apply(0);
   assert.equal(sky.turbidity.value, clear.turbidity, "cycling back to the same preset reproduces the same parameters");
+});
+
+test("far field cuts out the exact streamed tile footprint as the skier changes tiles", () => {
+  const far = new FarFieldRenderer(new THREE.Scene(), farFieldAsset(), { nodes: staticNodeFactories() });
+  const frustum = new THREE.Frustum();
+  far.update(new THREE.Vector3(), frustum, { x: 210, z: -10 });
+  assert.deepEqual(far.nearBounds.toArray(), [-199, -399, 799, 599]);
+  assert.ok((far.material as unknown as { maskNode: unknown }).maskNode);
+  far.update(new THREE.Vector3(), frustum, { x: -1, z: 201 });
+  assert.deepEqual(far.nearBounds.toArray(), [-599, 1, 399, 999]);
+  far.dispose();
+});
+
+
+test("spawn immunity never makes the player's skier disappear", () => {
+  const world = createProceduralWorld(DROP_IN_GAME_PROFILES.breckenridge, 42);
+  const state = createSimulation(world.profile, world.seed, world.terrain);
+  const skier = new SkierRenderer(new THREE.Scene());
+  for (const immunity of [1, 0.9, 0.75, 0.4, 0]) {
+    state.invuln = immunity; skier.update(state, world.terrain, 1 / 60);
+    assert.equal(skier.root.visible, true);
+  }
+});
+
+ test("textured rock batches stay within the repeated shadow geometry budget", () => {
+  const scene = new THREE.Scene();
+  const world = createProceduralWorld(profile, profile.seed);
+  new WorldRenderer(scene, profile, world);
+  const rock = scene.children.find(object => object instanceof THREE.InstancedMesh && object.instanceMatrix.count === 900) as THREE.InstancedMesh;
+  assert.ok(rock);
+  const triangles = (rock.geometry.index?.count ?? rock.geometry.getAttribute("position").count) / 3;
+  assert.ok(triangles <= 56, `rock repeats ${triangles} triangles per colour/shadow pass`);
+  assert.ok((rock.material as THREE.MeshStandardMaterial).map, "stone detail remains textured");
+  assert.ok(rock.castShadow, "geometry savings retain rock contact shadows");
+});
+
+
+test("empty lift carrier batches skip colour and shadow traversal and restore when active", () => {
+  const profile = DROP_IN_GAME_PROFILES.breckenridge;
+  const terrain = createProceduralWorld(profile, 12).terrain;
+  const points = [{ x: 0, y: 0, z: 0 }, { x: 0, y: 100, z: 200 }];
+  const scene = new THREE.Scene();
+  const renderer = new LiftRenderer(scene, { ...terrain, realLifts: [{
+    kind: "real", name: "Test chair", type: "chair_lift", lengthM: 224, points,
+    stations: points.map(point => ({ ...point, radiusM: 7 })),
+  }] });
+  const mesh = scene.children.find(object => object instanceof THREE.InstancedMesh) as THREE.InstancedMesh;
+  assert.ok(mesh); assert.equal(mesh.count, 0); assert.equal(mesh.visible, false);
+  const state = createSimulation(profile, 12);
+  state.pos.x = 0; state.pos.z = 0;
+  renderer.update(state);
+  assert.ok(mesh.count > 0); assert.equal(mesh.visible, true); assert.equal(mesh.castShadow, true);
+  state.pos.x = 10000; state.pos.z = 10000;
+  renderer.update(state);
+  assert.equal(mesh.count, 0); assert.equal(mesh.visible, false);
+  state.liftIndex = 0; state.liftDistanceM = 50;
+  renderer.update(state);
+  assert.equal(mesh.count, 1, "occupied carrier remains even beyond proximity culling");
+  assert.equal(mesh.visible, true);
+  state.liftIndex = -1; state.pos.x = 0; state.pos.z = 0;
+  renderer.update(state);
+  assert.ok(mesh.count > 0); assert.equal(mesh.visible, true);
+  disposeObjectTree(scene);
+});
+
+
+test("station labels cull individually beyond 350m while terminal geometry stays present", () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "document");
+  Object.defineProperty(globalThis, "document", { configurable: true, value: {
+    createElement: () => ({ width: 0, height: 0, getContext: () => ({ fillRect() {}, fillText() {} }) }),
+  } });
+  const scene = new THREE.Scene();
+  try {
+    const profile = DROP_IN_GAME_PROFILES.breckenridge;
+    const terrain = createProceduralWorld(profile, 12).terrain;
+    const points = [{ x: 0, y: 0, z: 0 }, { x: 0, y: 200, z: 2000 }];
+    const renderer = new LiftRenderer(scene, { ...terrain, realLifts: [{
+      kind: "real", name: "Long chair", type: "chair_lift", lengthM: 2010, points,
+      stations: points.map(point => ({ ...point, radiusM: 7 })),
+    }] });
+    const labels: THREE.Object3D[] = [];
+    scene.traverse(object => { if (object.name === "lift-station-label") labels.push(object); });
+    assert.equal(labels.length, 2);
+    const state = createSimulation(profile, 12);
+    state.pos.x = 0; state.pos.z = 0;
+    renderer.update(state);
+    assert.equal(labels[0].visible, true); assert.equal(labels[1].visible, false);
+    assert.equal(labels[1].parent?.visible, true, "distant terminal geometry remains available");
+    state.pos.x = STATION_LABEL_DISTANCE_M; renderer.update(state);
+    assert.equal(labels[0].visible, true, "distance boundary is inclusive");
+    state.pos.x += 1; renderer.update(state);
+    assert.equal(labels[0].visible, false);
+    state.pos.x = 0; state.pos.z = 2000; renderer.update(state);
+    assert.equal(labels[0].visible, false); assert.equal(labels[1].visible, true);
+    assert.equal(labels[0].parent?.visible, true);
+  } finally {
+    disposeObjectTree(scene);
+    if (descriptor) Object.defineProperty(globalThis, "document", descriptor);
+    else Reflect.deleteProperty(globalThis, "document");
+  }
+});
+
+test("mapped markers stream exact terrain bounds without distant runs consuming capacity", () => {
+  const positions: number[][] = [];
+  const markers = { count: 0, visible: true, instanceMatrix: { needsUpdate: false },
+    setMatrixAt(index: number, value: THREE.Matrix4) { positions[index] = [value.elements[12], value.elements[14]]; } };
+  const run = (x: number) => ({ lengthM: 400, halfWidthM: 10,
+    points: [{ x, y: 0, z: 0 }, { x, y: 0, z: 400 }] });
+  // Hundreds of distant runs would fill the old instance cap before the last local one.
+  const fake = { markers, world: { terrain: { kind: "real", height: () => 0,
+    realRuns: [...Array.from({ length: 240 }, (_, i) => run(10000 + i * 30)), run(0)] } } };
+  const update = (WorldRenderer.prototype as unknown as { updateMarkers(x: number, z: number): void }).updateMarkers;
+  update.call(fake, 0, 0);
+  const nearby = positions.slice(0, markers.count);
+  assert.ok(nearby.length > 0);
+  assert.ok(nearby.every(([x, z]) => x >= -400 && x <= 600 && z >= -200 && z <= 800));
+  assert.ok(nearby.every(([x]) => Math.abs(x) === 10), "later local run is not starved");
+  update.call(fake, -10000, -10000);
+  assert.equal(markers.count, 0); assert.equal(markers.visible, false);
+  update.call(fake, 0, 0);
+  assert.equal(markers.visible, true);
+  assert.deepEqual(positions.slice(0, markers.count), nearby, "streaming restores canonical arc positions");
+  // A side pole can cross the terrain edge while its paired pole remains supported.
+  fake.world.terrain.realRuns = [run(595)];
+  update.call(fake, 0, 0);
+  assert.ok(markers.count > 0);
+  assert.ok(positions.slice(0, markers.count).every(([x]) => x === 585));
+});
+
+test("procedural marker placement remains independent of player X", () => {
+  const positions: number[][] = [];
+  const profile = DROP_IN_GAME_PROFILES.breckenridge;
+  const fake = { profile, world: createProceduralWorld(profile, 12), markers: {
+    count: 0, instanceMatrix: { needsUpdate: false },
+    setMatrixAt(index: number, value: THREE.Matrix4) { positions[index] = value.elements.slice(); },
+  } };
+  const update = (WorldRenderer.prototype as unknown as { updateMarkers(x: number, z: number): void }).updateMarkers;
+  update.call(fake, 0, 250);
+  const original = positions.slice(0, fake.markers.count);
+  assert.ok(original.length > 0);
+  update.call(fake, 10000, 250);
+  assert.deepEqual(positions.slice(0, fake.markers.count), original);
+});
+
+test("batched ski shells retain all transformed geometry and dispose shared ownership once", () => {
+  const scene = new THREE.Scene();
+  new SkierRenderer(scene);
+  const shells: THREE.Mesh[] = [];
+  scene.traverse(object => { if (object instanceof THREE.Mesh && object.name === "ski-shell") shells.push(object); });
+  assert.equal(shells.length, 2);
+  assert.equal(shells[0].geometry, shells[1].geometry);
+  assert.equal(shells[0].material, shells[1].material);
+  for (const shell of shells) {
+    assert.equal(shell.parent?.children.length, 2, "orange shell plus separate dark binding");
+    assert.equal(shell.castShadow, false, "preserve the original ski shadow policy");
+  }
+  const originals = [new THREE.BoxGeometry(0.16, 0.055, 1.86),
+    new THREE.ConeGeometry(0.09, 0.30, 6).rotateX(Math.PI / 2).translate(0, 0.05, 1.02),
+    new THREE.ConeGeometry(0.09, 0.30, 6).rotateX(-Math.PI / 2).translate(0, 0.03, -1)];
+  const merged = shells[0].geometry;
+  assert.equal(merged.index!.count, originals.reduce((sum, geometry) => sum + geometry.index!.count, 0));
+  for (const name of ["position", "normal", "uv"]) {
+    const expected = originals.flatMap(geometry => Array.from(geometry.getAttribute(name).array));
+    assert.deepEqual(Array.from(merged.getAttribute(name).array), expected, `${name} stays identical after static transforms`);
+  }
+  merged.computeBoundingBox();
+  const expectedBounds = new THREE.Box3();
+  for (const geometry of originals) { geometry.computeBoundingBox(); expectedBounds.union(geometry.boundingBox!); geometry.dispose(); }
+  assert.deepEqual(merged.boundingBox, expectedBounds);
+  let released = 0; merged.addEventListener("dispose", () => released++);
+  disposeObjectTree(scene);
+  assert.equal(released, 1);
+});
+
+test("lift cable batches preserve both spans and upload only when visible lines change", () => {
+  const profile = DROP_IN_GAME_PROFILES.breckenridge;
+  const terrain = createProceduralWorld(profile, 12).terrain;
+  const scene = new THREE.Scene();
+  const lifts = [0, 1800].map(x => ({ kind: "real" as const, name: `Chair ${x}`, type: "chair_lift", lengthM: 224,
+    points: [{ x, y: 0, z: 0 }, { x, y: 100, z: 200 }], stations: [] }));
+  const renderer = new LiftRenderer(scene, { ...terrain, height: () => 0, realLifts: lifts });
+  const cables = scene.getObjectByName("lift-cables") as THREE.LineSegments;
+  assert.ok(cables); assert.equal(scene.children.filter(object => object instanceof THREE.LineSegments).length, 1);
+  assert.equal(cables.visible, false);
+  const state = createSimulation(profile, 12); state.pos.x = 0; state.pos.z = 0;
+  renderer.update(state);
+  const position = cables.geometry.getAttribute("position") as THREE.BufferAttribute;
+  const first = Array.from(position.array.slice(0, cables.geometry.drawRange.count * 3));
+  assert.ok(first.length > 0);
+  assert.ok(first.some((value, index) => index % 3 === 0 && value > 3), "return cable retains its lateral offset");
+  const version = position.version;
+  state.time += 10; renderer.update(state);
+  assert.equal(position.version, version, "moving carriers do not re-upload static cable data");
+  state.pos.x = 900; renderer.update(state);
+  assert.equal(cables.geometry.drawRange.count * 3, first.length * 2);
+  assert.deepEqual(Array.from(position.array.slice(0, first.length)), first);
+  const second = Array.from(position.array.slice(first.length, first.length * 2));
+  assert.deepEqual(second, first.map((value, index) => index % 3 === 0 ? Math.fround(value + 1800) : value));
+  state.pos.x = 1800; renderer.update(state);
+  assert.deepEqual(Array.from(position.array.slice(0, cables.geometry.drawRange.count * 3)), second);
+  state.pos.x = 5000; renderer.update(state);
+  assert.equal(cables.visible, false); assert.equal(cables.geometry.drawRange.count, 0);
+  state.pos.x = 0; renderer.update(state);
+  assert.deepEqual(Array.from(position.array.slice(0, cables.geometry.drawRange.count * 3)), first);
+  let disposed = 0; cables.geometry.addEventListener("dispose", () => disposed++);
+  disposeObjectTree(scene); assert.equal(disposed, 1);
 });

@@ -29,6 +29,7 @@ export interface LeaderboardPanelProps {
   resortSlug: string;
   mode: CompetitiveRunMode;
   trailId: string;
+  conditionsDate?: string;
   /**
    * The run just submitted, if any. Highlighted and used to report placement —
    * the submission route answers before the board is re-read, so a rank only
@@ -59,6 +60,7 @@ export default function LeaderboardPanel({
   resortSlug,
   mode,
   trailId,
+  conditionsDate,
   highlightRunId = null,
   onRaceGhost,
   racedRunId = null,
@@ -84,7 +86,7 @@ export default function LeaderboardPanel({
   // succeeds, and the board read at the end of the run predates that row.
   useEffect(() => {
     const controller = new AbortController();
-    void fetchLeaderboard({ resortSlug, courseId: trailId, mode }, { signal: controller.signal })
+    void fetchLeaderboard({ resortSlug, courseId: trailId, mode, conditionsDate }, { signal: controller.signal })
       .then((result) => {
         if (controller.signal.aborted) return;
         if (isRunClientFailure(result)) {
@@ -106,7 +108,7 @@ export default function LeaderboardPanel({
         );
       });
     return () => controller.abort();
-  }, [resortSlug, trailId, mode, reloadKey, highlightRunId]);
+  }, [resortSlug, trailId, mode, conditionsDate, reloadKey, highlightRunId]);
 
   useEffect(() => () => {
     cancelViewTrackRef.current?.();

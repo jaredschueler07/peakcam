@@ -56,7 +56,10 @@ export class InputManager {
       }
     }
     const frame: InputFrame = {
-      steer: clamp(steer),
+      // Adapters use screen-right-positive input. The simulation faces +Z at
+      // yaw 0, so positive yaw rotates left in the chase view. Convert once,
+      // before recording, to preserve the simulation/input-tape convention.
+      steer: steer === 0 ? 0 : -clamp(steer),
       tuck: this.held.get("tuck") ? 1 : 0,
       brake: this.held.get("brake") ? 1 : 0,
       jumpHeld: this.held.get("jump") ?? false,

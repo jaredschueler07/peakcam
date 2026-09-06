@@ -1,5 +1,32 @@
 # Drop In v2 — Build Status
 
+## Current overhaul — 2026-09-05
+
+Drop In v3 is implemented on the isolated `feat/drop-in-v3` integration branch
+in `.worktrees/drop-in-v3`, based on `de795d4`. This branch makes the native game
+the public default and removes the old iframe engine. A [Vercel preview](https://peakcam-30bdi0pzu-jaredschuelerspotify-3622s-projects.vercel.app/resorts/breckenridge/drop-in) is ready from `67cf51e`; it has **not been deployed to production**.
+The primary checkout and its snowing-now changes remain separate.
+A follow-up corrects inverted steering across keyboard, touch, mouse and gamepad;
+12 actual browser direction checks pass on WebGL/WebGPU.
+The HUD also includes a descent meter with percent down and vertical feet left;
+desktop and narrow-phone visual/reset checks pass in the development preview.
+
+The full mapped trail catalog, baked terrain detail, physical lift laps, default
+physics v2, signed environmental conditions and authoritative input replay are
+integrated. Forest assets, sourced lake/hotel silhouettes, snow relief, sensory
+feedback, named HUD, focus handling and PR CI are also implemented. Independent
+reviews found and fixed contract, licensing, rendering and lifecycle issues.
+
+Local validation passed: **1,099 unit tests, 43 browser tests, 36 full real-input
+runs and all 72 lift traversals**. All six unchanged luminance guards pass. Final
+GPU samples meet desktop draw/triangle/texture budgets and mobile-emulation
+draw/triangle budgets; cold 4G navigation-to-ready is 2.78 seconds. See
+[V3-QA.md](V3-QA.md) for measurements and reproduction, and
+[SESSION-2026-09-05.md](SESSION-2026-09-05.md) for the implementation record.
+Actual Android performance and memory, subjective keyboard/phone feel, and production
+migration/configuration remain release gates. The historical sections below describe
+earlier releases, not the current branch's default behavior.
+
 > Session logs: `SESSION-2026-08-02.md` (phases 8/11/12 + visual program + security + email).
 > Original session log 2026-08-01 (design + phases 0–7 and 9 in one day). Orchestrator: Claude
 > (Fable 5) verifying every gate; implementation: Codex gpt-5.6-sol + Claude Opus

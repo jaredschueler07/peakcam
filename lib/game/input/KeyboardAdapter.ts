@@ -1,9 +1,11 @@
 import type { InputManager } from "./InputManager";
 import type { InputAdapter } from "./types";
 
-const ignoredTarget = (target: EventTarget | null): boolean => {
+const ignoredTarget = (target: EventTarget | null, key: string): boolean => {
   if (!(target instanceof Element)) return false;
-  return Boolean(target.closest("input, textarea, select, button, [role='dialog'], [contenteditable='true']"));
+  if (target.closest("input, textarea, select, [role='dialog'], [contenteditable='true']")) return true;
+  const button = target.closest("button");
+  return Boolean(button && (!button.hasAttribute("data-gameplay-control") || key === " " || key === "Enter"));
 };
 
 export class KeyboardAdapter implements InputAdapter {
@@ -17,7 +19,7 @@ export class KeyboardAdapter implements InputAdapter {
   ) {}
 
   private onKeyDown = (event: KeyboardEvent) => {
-    if (ignoredTarget(event.target)) return;
+    if (ignoredTarget(event.target, event.key)) return;
     const key = event.key.toLowerCase();
     if (["arrowleft", "arrowright", "arrowup", "arrowdown", " "].includes(key)) event.preventDefault();
     if (key === "a" || key === "arrowleft") this.left = true;

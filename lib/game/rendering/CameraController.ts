@@ -39,6 +39,11 @@ export class CameraController {
   private shake = 0;
   private shakeVelocity = 0;
   private roll = 0;
+  private landingImpulse = 0;
+
+  noteLanding(kind: "soft" | "hard" | null): void {
+    if (!this.reducedMotion) this.landingImpulse = Math.max(this.landingImpulse, kind === "soft" ? 0.035 : 0.24);
+  }
   readonly speedUniform: THREE.IUniform<number> = { value: 0 };
 
   get motionAmplitude(): number { return this.shake; }
@@ -54,23 +59,37 @@ export class CameraController {
     private readonly preset: CameraPreset = CAMERA_PRESETS.classic,
   ) {
     this.reducedMotion = reducedMotion ?? (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-    // The seed is the shipped `+5 / -9` expressed against the preset, so a far preset does not
-    // whip in from the skier's face on the first frames. Classic reproduces 5 and 9 exactly.
-    this.position.set(state.pos.x, state.pos.y + preset.heightBase + 1.5, state.pos.z - (preset.backBase + 0.4));
+    // Start at the actual chase pose. Real runs can face any heading; seeding a fixed
+    // south-facing offset makes shader warmup duration decide the first visible composition.
+    const speed = Math.hypot(state.vel.x, state.vel.z);
+    const forwardX = Math.sin(state.yaw), forwardZ = Math.cos(state.yaw);
+    const back = preset.backBase + clamp01(speed / BACK_SPEED_REF) * preset.backSpeedGain;
+    this.position.set(
+      state.pos.x - forwardX * back,
+      state.pos.y + preset.heightBase + clamp01(speed / HEIGHT_SPEED_REF) * preset.heightSpeedGain + (state.onGround ? 0 : preset.airLift),
+      state.pos.z - forwardZ * back,
+    );
+    this.camera.position.copy(this.position);
+    this.target.set(state.pos.x + forwardX * preset.lookAheadM, state.pos.y + preset.lookHeightM, state.pos.z + forwardZ * preset.lookAheadM);
+    this.camera.lookAt(this.target);
+    this.camera.fov = preset.fovBase;
+    this.camera.updateProjectionMatrix();
   }
 
   update(state: SimulationState, terrain: TerrainSampler, dt: number, tuck: number): void {
     this.elapsed += dt;
+    this.landingImpulse *= Math.exp(-8 * dt);
     const speed = Math.hypot(state.vel.x, state.vel.z);
     const speed01 = clamp01(speed / 58);
     this.speedUniform.value = damp(this.speedUniform.value, speed01, 7.5, dt);
     if (state.liftRide > 0) {
-      const desiredX = state.pos.x + 6.8, desiredY = state.pos.y + 3.2, desiredZ = state.pos.z + 8.5;
+      const fx = Math.sin(state.yaw), fz = Math.cos(state.yaw);
+      const desiredX = state.pos.x - fx * 7 + fz * 4, desiredY = state.pos.y + 3.2, desiredZ = state.pos.z - fz * 7 - fx * 4;
       this.position.x = damp(this.position.x, desiredX, 4.2, dt);
       this.position.y = damp(this.position.y, desiredY, 4.2, dt);
       this.position.z = damp(this.position.z, desiredZ, 4.2, dt);
       this.camera.position.copy(this.position);
-      this.target.set(state.pos.x, state.pos.y + 0.6, state.pos.z - 5);
+      this.target.set(state.pos.x + fx * 5, state.pos.y + 0.6, state.pos.z + fz * 5);
       this.camera.lookAt(this.target);
       this.camera.fov = damp(this.camera.fov, 58, 4, dt);
       this.camera.updateProjectionMatrix();
@@ -88,7 +107,7 @@ export class CameraController {
     this.position.y = damp(this.position.y, desiredY, lambda * 1.35, dt);
     this.position.z = damp(this.position.z, desiredZ, lambda, dt);
     this.position.y = Math.max(this.position.y, terrain.height(this.position.x, this.position.z) + preset.floorClearance);
-    const targetShake = this.reducedMotion ? 0 : (state.crash > 0 ? state.crash * 0.06 : this.speedUniform.value * this.speedUniform.value * 0.036);
+    const targetShake = this.reducedMotion ? 0 : (state.crash > 0 ? state.crash * 0.06 : this.speedUniform.value * this.speedUniform.value * 0.036) + this.landingImpulse;
     criticalSpring(this.shake, this.shakeVelocity, targetShake, 2.2, dt, springOut);
     this.shake = springOut.value; this.shakeVelocity = springOut.velocity;
     this.camera.position.set(
@@ -104,7 +123,7 @@ export class CameraController {
     this.camera.lookAt(this.target);
     const fovRamp = this.reducedMotion ? preset.fovSpeedGain / 2 : preset.fovSpeedGain;
     this.camera.fov = damp(this.camera.fov, preset.fovBase + this.speedUniform.value * fovRamp, 5.2, dt);
-    const targetRoll = this.reducedMotion ? 0 : THREE.MathUtils.clamp((-state.lean * 0.055 - tuck * state.lean * 0.012) * this.speedUniform.value, -0.065, 0.065);
+    const targetRoll = this.reducedMotion ? 0 : THREE.MathUtils.clamp((-state.lean * (0.04 + state.edgeAngle * 0.025) - tuck * state.lean * 0.012) * this.speedUniform.value, -0.065, 0.065);
     this.roll = damp(this.roll, targetRoll, 9, dt);
     this.camera.rotateZ(this.roll);
     this.camera.updateProjectionMatrix();

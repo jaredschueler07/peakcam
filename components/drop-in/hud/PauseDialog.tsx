@@ -1,14 +1,16 @@
 "use client";
 
+import { useDialogFocus } from "./useDialogFocus";
 import { useStore } from "zustand";
 import type { StoreApi } from "zustand/vanilla";
 import type { HudState } from "@/lib/game/runtime/UiBridge";
 
 export default function PauseDialog({ store, onResume, onRestart }: { store: StoreApi<HudState>; onResume(): void; onRestart(): void }) {
   const paused = useStore(store, (state) => state.status === "paused");
+  const dialogRef = useDialogFocus(paused);
   if (!paused) return null;
   return (
-    <div className="absolute inset-0 z-30 flex items-center justify-center bg-ink/60 p-6" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+    <div ref={dialogRef} tabIndex={-1} className="absolute inset-0 z-30 flex items-center justify-center bg-ink/60 p-6" role="dialog" aria-modal="true" aria-labelledby="pause-title">
       <div className="pc-paper max-w-sm rounded-lg border-[1.5px] border-ink p-6 text-center shadow-stamp-lg">
         <p className="pc-eyebrow">Run held</p><h2 id="pause-title" className="pc-display mt-1 text-4xl">Paused</h2>
         <p className="mt-3 text-sm text-bark-dk">WASD or arrows steer. Hold W to tuck, S to brake, and Space to jump.</p>

@@ -13,14 +13,14 @@ export interface QualityState {
   changed: boolean;
 }
 
-export function seedQualityRung(signals: DeviceQualitySignals): QualityRung {
+export function seedQualityRung(signals: DeviceQualitySignals, backend: "webgpu" | "webgl" = "webgpu"): QualityRung {
   const cores = signals.hardwareConcurrency ?? 4;
   const memory = signals.deviceMemory ?? 4;
-  if (cores <= 2 || memory <= 2) return 0;
-  if (signals.coarsePointer && (cores <= 4 || memory <= 4 || signals.dpr > 2)) return 1;
-  if (cores < 8 || memory < 8) return 2;
-  if (signals.dpr > 1.5) return 3;
-  return 4;
+  const rung: QualityRung = cores <= 2 || memory <= 2 ? 0
+    : signals.coarsePointer && (cores <= 4 || memory <= 4 || signals.dpr > 2) ? 1
+    : cores < 8 || memory < 8 ? 2 : signals.dpr > 1.5 ? 3 : 4;
+  // Same scene and thermal ladder; WebGL starts one rung below the device's WebGPU seed.
+  return backend === "webgl" ? Math.max(0, rung - 1) as QualityRung : rung;
 }
 
 /** Seconds of continuous over-budget frames before the governor gives up a rung. */

@@ -351,3 +351,127 @@ test("a lost WebGPU device stops the render loop the way a lost WebGL context do
   assert.equal(backend.rendered, before, "no frames are drawn into a dead device");
   renderer.dispose();
 });
+
+test("warmup timeout restores actual low-tier surfaces and late compilation cannot undo the live governor", async () => {
+  let complete!: () => void;
+  let started!: () => void;
+  const firstCompile = new Promise<void>((resolve) => { complete = resolve; });
+  const compiling = new Promise<void>((resolve) => { started = resolve; });
+  let calls = 0;
+  const backend = Object.assign(new FakeBackend("webgpu"), {
+    compileAsync: () => { calls++; started(); return firstCompile; },
+  });
+  const world = createProceduralWorld(profile, profile.seed);
+  const renderer = new GameRenderer(fakeCanvas(), profile, world, createSimulation(profile, profile.seed), {
+    backend, devicePixelRatio: 1, reducedMotion: true, prewarmTimeoutMs: 10, nodeFactories: NODES,
+    qualitySignals: { hardwareConcurrency: 2, deviceMemory: 2, coarsePointer: true, dpr: 1 },
+  });
+  const internals = renderer as unknown as {
+    quality: { rung: 0 | 1 | 2 | 3 | 4 };
+    applyQuality(rung: number): void;
+    built: ReturnType<typeof createScene>;
+  };
+  const terrainMaterial = () => (renderer.scene.children.find((object) => object instanceof THREE.Mesh && object.receiveShadow) as THREE.Mesh).material as THREE.Material & { normalNode: unknown };
+  const warming = renderer.prewarm();
+  await compiling;
+  assert.equal((internals.built.sky as unknown as { isSkyMesh: boolean }).isSkyMesh, true);
+  await warming;
+  assert.equal(internals.built.sky.visible, true);
+  assert.equal((internals.built.sky as unknown as { isSkyMesh?: boolean }).isSkyMesh, undefined);
+  assert.equal(terrainMaterial().normalNode, null, "timeout restores effective samples, not just the rung counter");
+  internals.quality.rung = 3;
+  internals.applyQuality(3);
+  const liveSky = internals.built.sky;
+  const liveSnow = terrainMaterial();
+  complete();
+  await firstCompile;
+  await Promise.resolve();
+  assert.equal(calls, 1, "timed-out compilation cannot schedule another compile");
+  assert.equal(internals.built.sky, liveSky);
+  assert.equal(terrainMaterial(), liveSnow);
+  renderer.dispose();
+});
+
+test("a compile completing after disposal does not restore materials or schedule more work", async () => {
+  let complete!: () => void;
+  let started!: () => void;
+  const deferred = new Promise<void>((resolve) => { complete = resolve; });
+  const compiling = new Promise<void>((resolve) => { started = resolve; });
+  let calls = 0;
+  const backend = Object.assign(new FakeBackend("webgpu"), {
+    compileAsync: () => { calls++; started(); return deferred; },
+  });
+  const { renderer } = buildRenderer(backend);
+  const internals = renderer as unknown as { quality: { rung: number }; applyQuality(rung: number): void };
+  internals.quality.rung = 1;
+  const warming = renderer.prewarm();
+  await compiling;
+  renderer.dispose();
+  internals.applyQuality = () => { assert.fail("disposed renderer must never restore a warmup tier"); };
+  complete();
+  await warming;
+  assert.equal(calls, 1);
+  assert.deepEqual(renderer.resources(), { geometries: 0, materials: 0, textures: 0 });
+});
+
+test("failed compilation restores the current governor tier before rejecting", async () => {
+  const failure = new Error("compile failed");
+  const backend = Object.assign(new FakeBackend("webgpu"), {
+    compileAsync: async () => { throw failure; },
+  });
+  const { renderer } = buildRenderer(backend);
+  const internals = renderer as unknown as { quality: { rung: number }; built: ReturnType<typeof createScene> };
+  internals.quality.rung = 1;
+  await assert.rejects(renderer.prewarm(), failure);
+  assert.equal((internals.built.sky as unknown as { isSkyMesh?: boolean }).isSkyMesh, undefined);
+  renderer.dispose();
+});
+
+for (const backendKind of ["webgl", "webgpu"] as const) test(`${backendKind}: debug draw counters include shadows, scene and every post pass once per frame`, () => {
+  const backend = new FakeBackend(backendKind);
+  let resets = 0;
+  const info = {
+    autoReset: true,
+    render: { calls: 0, drawCalls: 0, triangles: 0 },
+    memory: { geometries: 4 },
+    reset() { resets++; if (backendKind === "webgl") this.render.calls = 0; this.render.drawCalls = 0; this.render.triangles = 0; },
+  };
+  Object.assign(backend, { info });
+  backend.render = () => {
+    if (info.autoReset) info.reset();
+    info.render.calls++; info.render.drawCalls++; info.render.triangles += 10;
+  };
+  const { renderer, state, world } = buildRenderer(backend);
+  assert.equal(info.autoReset, false);
+  // The scene test uses a synchronous post double to model the real shadow/scene/fullscreen chain.
+  const internals = renderer as unknown as { csm: { update(): void }; post: { render(dt: number): void; dispose(): void } | null };
+  internals.csm.update = () => backend.render();
+  internals.post = { render: () => { backend.render(); backend.render(); backend.render(); }, dispose() {} };
+  renderer.render(state, world, 1 / 60, 0);
+  assert.equal(resets, 1);
+  let snapshot = renderer.debugRendererInfo() as { frameDrawCalls: number; frameTriangles: number; render: { calls: number } };
+  assert.equal(snapshot.frameDrawCalls, 4); assert.equal(snapshot.frameTriangles, 40);
+  renderer.render(state, world, 1 / 60, 0);
+  assert.equal(resets, 2);
+  snapshot = renderer.debugRendererInfo() as typeof snapshot;
+  assert.equal(snapshot.frameDrawCalls, 4, "frame totals never accumulate across RAFs");
+  assert.equal(snapshot.frameTriangles, 40);
+  assert.equal(snapshot.render.calls, backendKind === "webgpu" ? 8 : 4, "WebGPU lifetime calls are not mislabeled as per-frame draw calls");
+  renderer.dispose();
+});
+
+for (const kind of ["webgl", "webgpu"] as const) test(`${kind}: late far-field attachment uses the current low tier and restores full topology`, () => {
+  const { renderer } = buildRenderer(new FakeBackend(kind));
+  renderer.debugSetQuality(1);
+  renderer.attachFarField({
+    meta: { formatVersion: 1, slug: "ski-portillo", radiusM: 30000, wedgeCount: 1, centre: [-32.842, -70.129], demSource: "fixture", bakedAt: "fixture" },
+    wedges: [{ index: 0, azimuthStartRad: 0, azimuthEndRad: Math.PI / 2, minY: 0, maxY: 1,
+      positions: new Float32Array([0, 0, 0, 0, 1, -100, 100, 0, 0, 100, 1, -100]), indices: new Uint32Array([0, 1, 2, 1, 3, 2]) }],
+    lodIndices: [new Uint32Array([0, 1, 2])],
+  });
+  const group = renderer.scene.getObjectByName("far-field")!;
+  const mesh = group.children[0] as THREE.Mesh;
+  assert.equal(mesh.geometry.index!.count, 3);
+  renderer.debugSetQuality(4); assert.equal(mesh.geometry.index!.count, 6);
+  renderer.dispose();
+});

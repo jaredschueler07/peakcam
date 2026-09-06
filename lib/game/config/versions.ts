@@ -16,7 +16,7 @@
  * recorder, and by the server-side submission path.
  */
 
-export const PHYSICS_VERSION = 1;
+export const PHYSICS_VERSION = 2;
 /**
  * 2 — the Phase 1 DEM upgrade re-baked every heightfield from a real elevation
  * source (Portillo Copernicus GLO-30, Breckenridge 3DEP 1 m lidar, Heavenly
@@ -24,4 +24,5 @@ export const PHYSICS_VERSION = 1;
  * and shifted one gate. `PHYSICS_VERSION` deliberately stays 1: the
  * deterministic core is byte-for-byte unchanged, only the ground it runs over.
  */
-export const COURSE_VERSION = 2;
+// 3 — full mountain network, explicit widths/grooming and baked terrain detail.
+export const COURSE_VERSION = 3;

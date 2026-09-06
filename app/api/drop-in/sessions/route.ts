@@ -9,6 +9,7 @@
 // tested without mocking Next module resolution; this file is the adapter that
 // supplies the production dependencies.
 
+import { dailyMorningConditions } from "@/lib/game/server/morning-snapshot";
 import type { NextRequest } from "next/server";
 
 import { handleCreateSession } from "@/lib/game/server/handlers/sessions";
@@ -25,6 +26,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest): Promise<Response> {
   return handleCreateSession(request, {
     keyring: ticketKeyring,
+    dailyConditions: dailyMorningConditions,
     currentUserId,
     limiter: sessionLimiter,
     now: () => Date.now(),

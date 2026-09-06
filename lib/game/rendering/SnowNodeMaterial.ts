@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { MeshStandardNodeMaterial } from "three/webgpu";
 import {
-  abs, cameraPosition, cameraViewMatrix, clamp, diffuseColor, dot, float, floor, fract, length, max,
+  abs, attribute, cameraPosition, cameraViewMatrix, clamp, diffuseColor, dot, float, floor, fract, length, max,
   mix, normalize, normalView, normalWorld, positionWorld, pow, sin, smoothstep, step, texture,
   uniform, vec3, vec4,
 } from "three/tsl";
@@ -74,7 +74,11 @@ function snowNormalNode(detailNormal: THREE.Texture): Vec3 {
   ).mul(2).sub(1);
   // mat3(viewMatrix) * detail — a w of 0 drops the translation column.
   const detailView = cameraViewMatrix.mul(vec4(detail, 0)).xyz;
-  return normalize(normalView.add(detailView.mul(mix(0.08, 0.22, near))));
+  const corduroy = sin(positionWorld.x.mul(62.83185)).mul(0.12)
+    .mul(attribute("groomed", "float"))
+    .mul(float(1).sub(smoothstep(8, 32, length(positionWorld.sub(cameraPosition)))));
+  const cordView = cameraViewMatrix.mul(vec4(corduroy, 0, 0, 0)).xyz;
+  return normalize(normalView.add(detailView.mul(mix(0.08, 0.22, near))).add(cordView));
 }
 
 function snowRoughnessNode(roughness: THREE.Texture): Float {
@@ -165,7 +169,7 @@ export function createSnowNodeMaterial(
   material.dithering = true;
   const useRealSurface = rung >= 3 && surfaces !== null;
   const selectedNormal = useRealSurface ? surfaces.snowNormal : detailNormal;
-  if (mode < SNOW_DEBUG.NO_DETAIL_NORMAL) material.normalNode = snowNormalNode(selectedNormal);
+  if (rung >= 2 && mode < SNOW_DEBUG.NO_DETAIL_NORMAL) material.normalNode = snowNormalNode(selectedNormal);
   if (useRealSurface) material.roughnessNode = snowRoughnessNode(surfaces.snowRoughness);
   material.userData.snowDetail = selectedNormal;
   material.userData.snowRoughness = useRealSurface ? surfaces.snowRoughness : null;
@@ -185,9 +189,14 @@ export function createSnowNodeMaterial(
  * near/far seam matches; `userData.heightFog` is left unset for the same reason on the WebGL
  * twin. Shadows are irrelevant out here — the cascade's `maxFar` is 460 m.
  */
-export function createFarFieldNodeMaterial(color: THREE.Color): MeshStandardNodeMaterial {
+export function createFarFieldNodeMaterial(color: THREE.Color, nearBounds?: THREE.Vector4): MeshStandardNodeMaterial {
   const material = new MeshStandardNodeMaterial();
   material.color = color;
+  if (nearBounds) {
+    const bounds = uniform(nearBounds);
+    material.maskNode = positionWorld.x.lessThanEqual(bounds.x).or(positionWorld.z.lessThanEqual(bounds.y))
+      .or(positionWorld.x.greaterThanEqual(bounds.z)).or(positionWorld.z.greaterThanEqual(bounds.w));
+  }
   material.roughness = 1;
   material.metalness = 0;
   material.flatShading = false;
