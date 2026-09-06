@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { Modal } from "@/components/ui/Modal";
 import { Play, Pause } from "lucide-react";
 import type { MapMetric } from "@/lib/map-utils";
 import { metricLabel } from "@/lib/map-utils";
@@ -47,30 +49,10 @@ export default function MapControls({
   variant,
   className,
 }: MapControlsProps) {
+  const [layersOpen, setLayersOpen] = useState(false);
   const positionClass = className ?? (variant === "fullpage" ? "top-14 left-3 max-[400px]:top-16" : "top-3 left-3");
 
-  return (
-    <div className={`absolute z-10 flex flex-col gap-2 ${positionClass}`}>
-      {/* Metric toggle row */}
-      <div className="flex bg-cream-50 border-[1.5px] border-ink rounded-full p-1 gap-0.5 shadow-stamp-sm">
-        {METRICS.map((m) => {
-          const isActive = metric === m;
-          return (
-            <button
-              key={m}
-              onClick={() => onMetricChange(m)}
-              className={`px-3 py-1 pointer-coarse:min-h-10 pointer-coarse:px-4 text-[11.5px] font-bold rounded-full border-[1.5px] transition-colors duration-150 uppercase tracking-[0.06em] ${
-                isActive
-                  ? "bg-ink text-cream-50 border-ink"
-                  : "border-transparent text-bark hover:text-ink"
-              }`}
-            >
-              {metricLabel(m)}
-            </button>
-          );
-        })}
-      </div>
-
+  const layers = <>
       {/* Weather layer selector — radar (precipitation echo) or satellite
           (GOES-East clouds). Mutually exclusive; tapping the active one turns
           it off. Radar has no coverage in Chile — satellite is the Andes
@@ -81,9 +63,9 @@ export default function MapControls({
             onClick={() => onWeatherLayerChange(weatherLayer === "radar" ? "off" : "radar")}
             aria-pressed={weatherLayer === "radar"}
             title="Precipitation radar (RainViewer) — no radar coverage in Chile; use Satellite there"
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 pointer-coarse:min-h-11 pointer-coarse:px-4 rounded-full border-[1.5px] text-[11.5px] font-bold uppercase tracking-[0.06em] transition-[transform,box-shadow] duration-100 ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 min-h-11 pointer-coarse:px-4 rounded-full border-[1.5px] text-[11.5px] font-bold uppercase tracking-[0.06em] transition-[transform,box-shadow] duration-100 ${
               weatherLayer === "radar"
-                ? "bg-alpen text-cream-50 border-ink shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]"
+                ? "bg-alpen-dk text-cream-50 border-ink shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]"
                 : "bg-cream-50 text-ink border-ink shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]"
             }`}
           >
@@ -93,16 +75,17 @@ export default function MapControls({
         )}
         <button
           onClick={() => onWeatherLayerChange(weatherLayer === "satellite" ? "off" : "satellite")}
+          aria-label="Satellite"
           aria-pressed={weatherLayer === "satellite"}
           title="GOES-East satellite (NASA GIBS) — clouds over the whole Americas, updated every 10 min"
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 pointer-coarse:min-h-11 pointer-coarse:px-4 rounded-full border-[1.5px] text-[11.5px] font-bold uppercase tracking-[0.06em] transition-[transform,box-shadow] duration-100 ${
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 min-h-11 pointer-coarse:px-4 rounded-full border-[1.5px] text-[11.5px] font-bold uppercase tracking-[0.06em] transition-[transform,box-shadow] duration-100 ${
             weatherLayer === "satellite"
-              ? "bg-alpen text-cream-50 border-ink shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]"
+              ? "bg-alpen-dk text-cream-50 border-ink shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]"
               : "bg-cream-50 text-ink border-ink shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]"
           }`}
         >
           <WeatherIcon condition="partly-cloudy" size={14} />
-          Sat
+          Satellite
         </button>
       </div>
 
@@ -113,7 +96,7 @@ export default function MapControls({
           <button
             onClick={radarScrubber.onTogglePlay}
             aria-label={radarScrubber.playing ? "Pause radar loop" : "Play radar loop"}
-            className="flex min-h-[24px] min-w-[24px] pointer-coarse:min-h-11 pointer-coarse:min-w-11 items-center justify-center -my-1 text-ink hover:text-alpen transition-colors"
+            className="flex min-h-[24px] min-w-[24px] min-h-11 pointer-coarse:min-w-11 items-center justify-center -my-1 text-ink hover:text-alpen transition-colors"
           >
             {radarScrubber.playing ? (
               <Pause size={14} strokeWidth={2.5} fill="currentColor" />
@@ -141,7 +124,7 @@ export default function MapControls({
       <button
         onClick={onToggleInSeason}
         aria-pressed={inSeasonOnly}
-        className={`inline-flex items-center gap-1.5 px-3 py-1.5 pointer-coarse:min-h-11 pointer-coarse:px-4 rounded-full border-[1.5px] text-[11.5px] font-bold uppercase tracking-[0.06em] transition-[transform,box-shadow] duration-100 ${
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 min-h-11 pointer-coarse:px-4 rounded-full border-[1.5px] text-[11.5px] font-bold uppercase tracking-[0.06em] transition-[transform,box-shadow] duration-100 ${
           inSeasonOnly
             ? "bg-forest text-cream-50 border-ink shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]"
             : "bg-cream-50 text-ink border-ink shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]"
@@ -150,6 +133,35 @@ export default function MapControls({
         <WeatherIcon condition={inSeasonOnly ? "clear" : "cold"} size={14} />
         In-season {inSeasonOnly ? "only" : "+ off"}
       </button>
+  </>;
+
+  return (
+    <div className={`absolute z-10 flex flex-col gap-2 ${positionClass}`}>
+      {/* Metric toggle row */}
+      <div className="flex bg-cream-50 border-[1.5px] border-ink rounded-full p-1 gap-0.5 shadow-stamp-sm">
+        {METRICS.map((m) => {
+          const isActive = metric === m;
+          return (
+            <button
+              key={m}
+              onClick={() => onMetricChange(m)}
+              className={`px-3 py-1 min-h-11 pointer-coarse:px-4 text-[11.5px] font-bold rounded-full border-[1.5px] transition-colors duration-150 uppercase tracking-[0.06em] ${
+                isActive
+                  ? "bg-ink text-cream-50 border-ink"
+                  : "border-transparent text-bark hover:text-ink"
+              }`}
+            >
+              {metricLabel(m)}
+            </button>
+          );
+        })}
+      </div>
+
+      <button type="button" onClick={event => { event.currentTarget.focus(); setLayersOpen(true); }} className="min-h-11 self-start rounded-full border border-ink bg-cream-50 px-4 text-sm font-bold shadow-stamp-sm md:hidden">Layers{weatherLayer !== "off" ? ` · ${weatherLayer}` : ""}</button>
+      <div className="hidden flex-col gap-2 md:flex">{layers}</div>
+      {layersOpen && <Modal onClose={() => setLayersOpen(false)} label="Map layers" className="inset-x-0 bottom-0 top-auto m-0 w-full rounded-t-[18px]">
+        <div className="space-y-4 p-5"><h2 className="font-display text-2xl font-bold">Map layers</h2>{layers}<button onClick={() => setLayersOpen(false)} className="min-h-11 w-full rounded-full bg-ink px-4 text-sm font-bold text-cream-50">Done</button></div>
+      </Modal>}
     </div>
   );
 }

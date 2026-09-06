@@ -18,7 +18,7 @@ export default function DescentProgress({ store }: { store: StoreApi<HudState> }
   const remaining = Math.ceil(Math.max(0, altitude - bottom));
   return (
     <div data-testid="descent-progress" className="mb-2 border-b border-ink/15 pb-2">
-      <div className="mb-1.5 flex items-baseline justify-between gap-3 font-mono text-[9px] uppercase tracking-wide sm:text-[10px]">
+      <div className="mb-1.5 flex items-baseline justify-between gap-3 font-mono text-xs tracking-normal">
         <span className="font-bold">{percent}% down</span>
         <span className="text-bark">{remaining.toLocaleString()} vertical ft left</span>
       </div>

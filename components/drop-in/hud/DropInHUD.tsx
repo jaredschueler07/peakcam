@@ -10,8 +10,9 @@ import Speedometer from "./Speedometer";
 import TrailStatus from "./TrailStatus";
 import { Volume2, VolumeX } from "lucide-react";
 
-export default function DropInHUD({ store, audioEnabled, onToggleAudio, onPause }: {
+export default function DropInHUD({ store, audioEnabled, onToggleAudio, onPause, touchEnabled }: {
   store: StoreApi<HudState>;
+  touchEnabled: boolean;
   audioEnabled: boolean;
   onToggleAudio: () => void;
   onPause: () => void;
@@ -20,11 +21,11 @@ export default function DropInHUD({ store, audioEnabled, onToggleAudio, onPause 
     <div className="pointer-events-none absolute inset-0 z-10 px-3 pb-3 pt-16 sm:px-5 sm:pb-5">
       <div className="flex items-start justify-between gap-3"><Speedometer store={store} /><TrailStatus store={store} /></div>
       <LiftStatus store={store} />
-      <JunctionPrompt store={store} />
-      <div className="absolute bottom-36 sm:bottom-4 left-1/2 w-[calc(100%_-_2rem)] max-w-sm -translate-x-1/2 sm:w-auto sm:max-w-none"><RunStatus store={store} /></div>
-      <div className="absolute right-4 top-52 hidden sm:block"><MinimapCanvas store={store} /></div>
-      <button data-gameplay-control type="button" onClick={onPause} className="pointer-events-auto absolute left-4 top-32 min-h-11 rounded-full border-[1.5px] border-ink bg-cream-50 px-4 text-sm font-bold text-ink shadow-stamp-sm focus-visible:ring-2 focus-visible:ring-alpen" aria-label="Pause game">Pause</button>
-      <p className="absolute left-4 top-48 hidden max-w-sm rounded bg-cream-50/90 px-2 py-1 text-xs text-ink sm:block">← → carve · ↑ tuck · ↓ brake · Space jump · Esc pause</p>
+      <JunctionPrompt store={store} touchEnabled={touchEnabled} />
+      <div className={`absolute left-1/2 -translate-x-1/2 ${touchEnabled ? "bottom-40 w-[calc(100%_-_2rem)] max-w-sm [@media(max-height:500px)]:bottom-4 [@media(max-height:500px)]:max-w-xs" : "bottom-4 w-auto"}`}><RunStatus store={store} /></div>
+      {!touchEnabled && <div className="absolute right-4 top-52 hidden sm:block"><MinimapCanvas store={store} /></div>}
+      <button data-gameplay-control type="button" onClick={event => { event.currentTarget.focus(); onPause(); }} className="pointer-events-auto absolute left-4 top-32 min-h-11 rounded-full border-[1.5px] border-ink bg-cream-50 px-4 text-sm font-bold text-ink shadow-stamp-sm focus-visible:ring-2 focus-visible:ring-alpen" aria-label="Pause game">Pause</button>
+      {!touchEnabled && <p className="absolute left-4 top-48 hidden max-w-sm rounded bg-cream-50/90 px-2 py-1 text-xs text-ink sm:block">← → carve · ↑ tuck · ↓ brake · Space jump · Esc pause</p>}
       <button
         type="button"
         data-gameplay-control

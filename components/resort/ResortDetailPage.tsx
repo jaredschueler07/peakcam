@@ -87,9 +87,9 @@ function CamPlayer({
   index?: number;
   onExpand?: () => void;
 }) {
-  // Auto-load first 2 image cams; lazy-load the rest (each image cam re-fetches
-  // every 30s once live, so the deferred tiles are a deliberate bandwidth guard)
-  const [loaded, setLoaded] = useState(cam.embed_type !== "image" || index < 2);
+  // Start only the first two still images. Video players load on demand so
+  // opening a resort does not start several third-party players on a phone.
+  const [loaded, setLoaded] = useState(cam.embed_type === "image" && index < 2);
   const label = camDisplayName(cam);
   const elevation = camElevationFt(cam.elevation);
 
@@ -153,7 +153,7 @@ function CamPlayer({
               )}
               <span className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
                                border-[1.5px] border-forest text-forest text-[11px] font-semibold uppercase tracking-wider">
-                Click to load snapshot
+                Tap to load snapshot
               </span>
             </div>
           </button>
@@ -162,9 +162,9 @@ function CamPlayer({
             <CamEmbed cam={cam} resortSlug={resortSlug} variant="tile" />
             {onExpand && (
               <button
-                onClick={onExpand}
+                onClick={event => { event.currentTarget.focus(); onExpand(); }}
                 aria-label="Open fullscreen"
-                className="absolute bottom-3 right-3 z-20 p-1.5 bg-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp text-ink hover:-translate-y-0.5 transition-transform"
+                className="absolute bottom-3 right-3 z-20 grid h-11 w-11 place-items-center bg-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp text-ink hover:-translate-y-0.5 transition-transform"
               >
                 <Maximize2 size={14} strokeWidth={2.5} />
               </button>
@@ -203,7 +203,7 @@ function CamPlayer({
             <span className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
                              border-[1.5px] border-forest text-forest text-[11px] font-semibold uppercase tracking-wider">
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-[livePulse_2s_ease-in-out_infinite]" />
-              Click to load live cam
+              Tap to load live cam
             </span>
           </div>
         </button>
@@ -215,9 +215,9 @@ function CamPlayer({
       {/* Expand to fullscreen (overlay) */}
       {loaded && onExpand && (
         <button
-          onClick={onExpand}
+          onClick={event => { event.currentTarget.focus(); onExpand(); }}
           aria-label="Open fullscreen"
-          className="absolute bottom-3 right-3 z-20 p-1.5 bg-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp text-ink hover:-translate-y-0.5 transition-transform"
+          className="absolute bottom-3 right-3 z-20 grid h-11 w-11 place-items-center bg-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp text-ink hover:-translate-y-0.5 transition-transform"
         >
           <Maximize2 size={14} strokeWidth={2.5} />
         </button>
@@ -367,17 +367,16 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
 
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-3xl md:text-4xl font-heading font-bold text-text-base uppercase tracking-wider leading-tight">
+              <div className="min-w-0">
+                <h1 className="break-words text-3xl md:text-4xl font-heading font-bold text-text-base uppercase tracking-wider leading-tight">
                   {resort.name}
                 </h1>
-                <FavoriteButton itemId={resort.id} itemType="resort" size="md" variant="outline" className="mt-1" />
               </div>
               <p className="text-text-muted text-sm mt-1.5">
                 {resort.region} · {resort.state}
               </p>
             </div>
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
               {resort.cond_rating && (
                 <ConditionBadge
                   rating={resort.cond_rating}
@@ -385,11 +384,12 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
                 />
               )}
               <button
-                onClick={() => {
+                onClick={event => {
+                  event.currentTarget.focus();
                   if (!user) { setShowAuthModal(true); return; }
                   toggleFav(resort.id);
                 }}
-                className={`p-2 rounded-lg border transition-all duration-[220ms] ${
+                className={`min-h-11 min-w-11 p-2 rounded-lg border transition-all duration-[220ms] ${
                   favorited
                     ? "bg-alpenglow/15 border-alpenglow/40 text-alpenglow hover:bg-alpenglow/25"
                     : "bg-surface2/50 border-border text-text-muted hover:text-alpenglow hover:border-alpenglow/30 hover:bg-alpenglow/10"
@@ -399,7 +399,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
               >
                 <Heart size={18} fill={favorited ? "currentColor" : "none"} strokeWidth={favorited ? 0 : 1.5} />
               </button>
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
                 {resort.instagram_url && (
                   <a href={resort.instagram_url} target="_blank" rel="noopener noreferrer"
                     className="text-text-muted hover:text-cyan transition-colors p-2 pointer-coarse:p-3 -m-1" aria-label="Instagram" title="Instagram">
@@ -430,7 +430,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-text-muted hover:text-cyan text-sm border border-border hover:border-border-hi
-                               rounded-lg px-3 py-1.5 transition-all duration-150"
+                               inline-flex min-h-11 items-center rounded-lg px-3 py-1.5 transition-all duration-150"
                   >
                     Resort site ↗
                   </a>
@@ -474,9 +474,12 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
           </section>
         )}
 
+        <nav aria-label="Resort sections" className="flex flex-wrap gap-2">
+          {[['cameras', 'Cameras'], ['conditions-report', 'Conditions'], ['forecast', 'Forecast']].map(([id, label]) => <a key={id} href={`#${id}`} className="inline-flex min-h-11 items-center rounded-full border border-ink bg-cream-50 px-4 text-sm font-bold">{label}</a>)}
+        </nav>
         {/* Snow conditions strip */}
         {snow ? (
-          <section>
+          <section id="conditions-report" className="scroll-mt-20">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">Snow Report</h2>
               {resort.snotel_station_id && (
@@ -498,7 +501,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
             </p>
           </section>
         ) : (
-          <section>
+          <section id="conditions-report" className="scroll-mt-20">
             <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base mb-3">Snow Report</h2>
             <div className="bg-surface border border-border rounded-xl p-6 text-center text-text-muted text-sm">
               No snow data available yet. Check back after the first SNOTEL sync.
@@ -508,7 +511,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
 
         {/* ForecastTable — 5-day morning/afternoon/evening */}
         {forecastPeriods && forecastPeriods.length > 0 ? (
-          <section>
+          <section id="forecast" className="scroll-mt-20">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">5-Day Forecast</h2>
               {isUS && (
@@ -528,7 +531,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
             </p>
           </section>
         ) : (
-          <section>
+          <section id="forecast" className="scroll-mt-20">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">5-Day Forecast</h2>
               {isUS && (
@@ -556,7 +559,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
         )}
 
         {/* Live cams */}
-        <section>
+        <section id="cameras" className="scroll-mt-20">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">
               Live Cams

@@ -19,7 +19,7 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
       : "Both Hemispheres";
 
   return (
-    <div className="pc-topo relative h-screen supports-[height:100svh]:h-[100svh] w-full overflow-hidden">
+    <div className="pc-topo relative py-6 md:py-0 md:h-[100svh] w-full overflow-hidden">
       {/* Subtle warmth radials layered over topo */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(1200px_600px_at_10%_-10%,rgba(217,85,47,0.10),transparent_60%)]" />
@@ -27,7 +27,7 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
       </div>
 
       {/* Overlay navigation — cream text on topo, logo italic */}
-      <nav className="absolute top-0 left-0 right-0 z-20 px-6 md:px-8 py-5 flex items-center justify-between">
+      <nav className="absolute top-0 left-0 right-0 z-20 px-6 md:px-8 py-5 hidden md:flex items-center justify-between">
         <Link href="/" className="font-display italic font-black text-[26px] md:text-[30px] tracking-tight leading-none">
           <span className="text-ink">Peak</span>
           <span className="text-alpen">Cam</span>
@@ -91,11 +91,11 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
           initial={{ opacity: 0.3, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, ease: "easeOut" }}
-          className="text-center max-w-5xl"
+          className="w-full min-w-0 text-center max-w-5xl"
         >
           {/* Eyebrow tag */}
           <motion.div
-            className="inline-block mb-6 px-4 py-1.5 bg-ink text-cream-50 rounded-full font-mono font-bold text-[11px] tracking-[0.16em] uppercase"
+            className="hidden md:inline-block mb-6 px-4 py-1.5 bg-ink text-cream-50 rounded-full font-mono font-bold text-[11px] tracking-[0.16em] uppercase"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.6 }}
@@ -103,13 +103,13 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
             Est. 2025 · {countLabel}
           </motion.div>
 
-          <h1 className="font-display font-black text-[20vw] sm:text-[18vw] md:text-[18vw] lg:text-[15rem] xl:text-[18rem] leading-[0.88] tracking-[-0.03em] mb-4">
+          <h1 className="font-display font-black text-5xl sm:text-6xl md:text-[18vw] lg:text-[15rem] xl:text-[18rem] leading-[0.88] tracking-[-0.03em] mb-4 [overflow-wrap:anywhere]">
             <span className="text-ink">Peak</span>
             <span className="text-alpen italic font-bold">Cam</span>
           </h1>
 
           <motion.p
-            className="font-display italic font-bold text-2xl md:text-4xl text-bark-dk mb-4 tracking-tight"
+            className="font-display italic font-bold text-xl md:text-4xl text-bark-dk mb-4 tracking-tight"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4, duration: 0.8 }}
@@ -118,7 +118,7 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
           </motion.p>
 
           <motion.p
-            className="text-base md:text-lg text-bark font-medium mb-12 max-w-xl mx-auto"
+            className="text-base md:text-lg text-bark font-medium mb-0 md:mb-12 max-w-xl mx-auto"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6, duration: 0.8 }}
@@ -129,7 +129,7 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
 
           <motion.a
             href="#conditions"
-            className="inline-flex items-center gap-2 px-7 py-3.5 bg-alpen text-cream-50 border-[1.5px] border-ink
+            className="hidden md:inline-flex items-center gap-2 px-7 py-3.5 bg-alpen-dk text-cream-50 border-[1.5px] border-ink
               rounded-full shadow-stamp font-bold text-[15px] tracking-wide
               hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-stamp-hover
               active:translate-x-[2px] active:translate-y-[2px] active:shadow-stamp-sm
@@ -145,7 +145,7 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
 
       {/* Scroll indicator */}
       <motion.div
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 text-bark"
+        className="hidden md:block absolute bottom-8 left-1/2 -translate-x-1/2 text-bark"
         animate={{ y: [0, 10, 0] }}
         transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
       >

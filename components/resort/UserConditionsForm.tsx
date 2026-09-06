@@ -255,7 +255,7 @@ export function UserConditionsForm({ resortId, resortSlug, onSubmitted }: Props)
             {!loadingUser && !user ? (
               <button
                 type="button"
-                onClick={() => setShowAuthModal(true)}
+                onClick={event => { event.currentTarget.focus(); setShowAuthModal(true); }}
                 className="w-full rounded-lg px-4 py-3 min-h-[44px] text-sm font-semibold
                   bg-cyan-dim border border-cyan/30 text-cyan hover:bg-cyan/20 cursor-pointer
                   transition-all duration-[220ms]"

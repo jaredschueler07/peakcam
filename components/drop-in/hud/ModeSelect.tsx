@@ -49,7 +49,7 @@ export default function ModeSelect({
   return (
     <div className="mt-6" data-testid="drop-in-mode-select">
       <p className="pc-eyebrow text-bark-dk">Choose your run</p>
-      <div role="radiogroup" aria-label="Run mode" className="mt-3 grid gap-3 sm:grid-cols-3">
+      <div role="radiogroup" aria-label="Run mode" className="mt-3 grid grid-cols-3 gap-2 sm:gap-3">
         {CARDS.map((card) => {
           const active = selected === card.mode;
           return (
@@ -70,16 +70,16 @@ export default function ModeSelect({
                 event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`[data-mode="${next.mode}"]`)?.focus();
               }}
               className={[
-                "rounded-lg border-[1.5px] border-ink px-4 py-3 text-left transition-transform",
+                "rounded-lg border-[1.5px] border-ink px-2 sm:px-4 py-3 text-left transition-transform",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink",
                 active
-                  ? "-translate-y-0.5 bg-alpen text-cream-50 shadow-stamp"
+                  ? "-translate-y-0.5 bg-alpen-dk text-cream-50 shadow-stamp"
                   : "bg-cream-50 text-ink shadow-stamp-sm hover:-translate-y-0.5",
               ].join(" ")}
             >
-              <span className="pc-display block text-2xl leading-tight">{card.title}</span>
+              <span className="pc-display block text-base sm:text-2xl leading-tight">{card.title}</span>
               <span
-                className={`mt-1 block text-xs ${active ? "text-cream-50/85" : "text-bark-dk"}`}
+                className={`mt-1 hidden sm:block text-xs ${active ? "text-cream-50/85" : "text-bark-dk"}`}
               >
                 {card.blurb}
               </span>

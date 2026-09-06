@@ -216,12 +216,14 @@ export class GameRuntime {
     window.addEventListener("resize", this.onResize);
     window.addEventListener("blur", this.onBlur);
     document.addEventListener("visibilitychange", this.onVisibility);
+    window.addEventListener("orientationchange", this.onOrientation);
     canvas.addEventListener("dblclick", this.onPointerLockGesture);
 
   }
 
   start(): void {
     if (this.disposed || this.raf) return;
+    this.touch.setActive(true);
     this.paused = false; this.lastMs = performance.now(); this.ui.setStatus("running");
     this.raf = requestAnimationFrame(this.frame);
   }
@@ -234,9 +236,10 @@ export class GameRuntime {
     if (this.disposed) return;
     await warmUpAndStart(this.ui, this.renderer, () => this.start());
   }
-  pause(): void { this.paused = true; this.input.clearHeld(); this.ui.setPaused(true); }
+  pause(): void { this.paused = true; this.touch.setActive(false); this.input.clearHeld(); this.ui.setPaused(true); }
   resume(): void {
     if (this.disposed) return;
+    this.touch.setActive(true);
     this.paused = false; this.lastMs = performance.now(); this.accumulator = 0; this.ui.setPaused(false);
     if (!this.raf) this.raf = requestAnimationFrame(this.frame);
   }
@@ -390,6 +393,7 @@ export class GameRuntime {
 
   private onResize = () => this.renderer.resize(this.canvas.clientWidth, this.canvas.clientHeight);
   private onBlur = () => this.input.clearHeld();
+  private onOrientation = () => this.pause();
   private onVisibility = () => { if (document.hidden) this.pause(); else this.input.clearHeld(); };
   private onPointerLockGesture = () => { void this.pointerLock.request(); };
 
@@ -465,6 +469,7 @@ export class GameRuntime {
     window.removeEventListener("resize", this.onResize);
     window.removeEventListener("blur", this.onBlur);
     document.removeEventListener("visibilitychange", this.onVisibility);
+    window.removeEventListener("orientationchange", this.onOrientation);
     this.canvas.removeEventListener("dblclick", this.onPointerLockGesture);
     for (const adapter of this.adapters) adapter.dispose();
     if (document.pointerLockElement === this.canvas) document.exitPointerLock?.();

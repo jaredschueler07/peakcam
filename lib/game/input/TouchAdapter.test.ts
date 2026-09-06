@@ -87,3 +87,42 @@ test("additional steering pointers cannot steal capture; cancel, clear and dispo
     assert.deepEqual(f.captures, [1, 3, 4, 5]);
   } finally { f.dispose(); }
 });
+
+test("steering starts on the right side and release preserves a held action", () => {
+  const f = fixture();
+  try {
+    f.event("pointerdown", 1, 300);
+    f.adapter.setAction("brake", true);
+    f.event("pointermove", 1, 364);
+    assert.equal(f.input.nextFrame().steer, -1, "screen-right input keeps the simulation convention");
+    f.event("pointerup", 1, 364);
+    const frame = f.input.nextFrame();
+    assert.equal(frame.steer, 0);
+    assert.equal(frame.brake, 1);
+  } finally { f.dispose(); }
+});
+
+test("button steering ignores canvas drags and disabling touch releases all held controls", () => {
+  const f = fixture();
+  try {
+    f.adapter.setDragEnabled(false);
+    f.event("pointerdown", 1, 300);
+    f.event("pointermove", 1, 364);
+    assert.equal(f.input.nextFrame().steer, 0);
+    assert.equal(f.captured.size, 0);
+    f.adapter.setSteer(-1);
+    f.adapter.setAction("tuck", true);
+    assert.equal(f.input.nextFrame().steer, 1);
+    f.adapter.setActive(false);
+    f.adapter.setSteer(1);
+    f.adapter.setAction("tuck", true);
+    const frame = f.input.nextFrame();
+    assert.equal(frame.steer, 0);
+    assert.equal(frame.tuck, 0);
+    f.adapter.setActive(true);
+    f.adapter.setDragEnabled(true);
+    f.event("pointerdown", 2, 300);
+    f.event("pointermove", 2, 236);
+    assert.equal(f.input.nextFrame().steer, 1);
+  } finally { f.dispose(); }
+});

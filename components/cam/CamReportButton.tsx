@@ -68,7 +68,7 @@ export function CamReportButton({ cam, resortName }: Props) {
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={event => { event.currentTarget.focus(); setOpen(true); }}
         disabled={disabled}
         className={`absolute top-3 left-3 z-10 inline-flex items-center gap-1.5
           px-2.5 py-0.5 pointer-coarse:min-h-10 pointer-coarse:px-3.5 rounded-full border-[1.5px] text-[11px] font-bold

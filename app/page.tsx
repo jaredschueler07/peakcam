@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { getAllResorts } from "@/lib/supabase";
 import { getRadarFrames } from "@/lib/weather-radar";
 import { BrowsePage } from "@/components/browse/BrowsePage";
+import { Header } from "@/components/layout/Header";
 import { PeakHero } from "@/components/home/PeakHero";
 import { PowderTicker } from "@/components/home/PowderTicker";
 import { LiveWebcams } from "@/components/home/LiveWebcams";
@@ -109,14 +110,15 @@ export default async function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(resortListJsonLd) }}
       />
+      <div className="sticky top-0 z-50 md:hidden"><Header showSearch={false} /></div>
       <PeakHero resortCount={resorts.length} />
       <PowderTicker alerts={powderAlerts} />
+      <BrowsePage resorts={resorts} radarFrames={radarFrames} />
       {snowCams.length > 0 && (
         <Suspense fallback={<div className="h-96 animate-pulse bg-surface rounded-lg" />}>
           <SnowCams snowCams={snowCams} />
         </Suspense>
       )}
-      <BrowsePage resorts={resorts} radarFrames={radarFrames} />
       <Suspense fallback={<div className="h-96 animate-pulse bg-surface rounded-lg" />}>
         <LiveWebcams cams={featuredCams} resortCount={resorts.length} />
       </Suspense>

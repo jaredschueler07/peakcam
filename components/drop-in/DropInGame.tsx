@@ -39,6 +39,7 @@ import ModeSelect, { type DropInModeChoice } from "./hud/ModeSelect";
 import PauseDialog from "./hud/PauseDialog";
 import ResultsDialog from "./hud/ResultsDialog";
 import TouchControls from "./input/TouchControls";
+import ControlSettings, { useTouchPreferences } from "./input/ControlSettings";
 
 import { freezeConditions } from "@/lib/game/competition/freeze-conditions";
 import type { CourseChoice } from "@/lib/game/config/course-choices";
@@ -83,11 +84,11 @@ function e2eSpawnArcM(): number | undefined {
 
 function ErrorPoster({ profile, message }: { profile: ResortGameProfile; message: string }) {
   return (
-    <div className="pc-topo fixed inset-0 flex items-center justify-center p-6 text-center">
-      <div className="pc-paper max-w-lg rounded-lg border-[1.5px] border-ink p-7 shadow-stamp-lg" role="alert">
+    <div className="pc-topo fixed inset-0 overflow-y-auto px-4 py-16 text-center">
+      <div className="pc-paper mx-auto max-w-lg break-words rounded-lg border-[1.5px] border-ink p-7 shadow-stamp-lg" role="alert">
         <p className="pc-eyebrow">Drop In v2</p><h1 className="pc-display mt-1 text-4xl">Couldn’t load {profile.name}</h1>
         <p className="mt-3 text-bark-dk">{message}</p>
-        <button className="mt-5 rounded-full border-[1.5px] border-ink bg-alpen px-5 py-2 font-bold text-cream-50 shadow-stamp-sm" onClick={() => location.reload()}>Try again</button>
+        <button className="mt-5 rounded-full border-[1.5px] border-ink bg-alpen-dk px-5 py-2 font-bold text-cream-50 shadow-stamp-sm" onClick={() => location.reload()}>Try again</button>
       </div>
     </div>
   );
@@ -100,6 +101,7 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
   conditions: ConditionsSnapshot;
   courseChoices: readonly CourseChoice[];
 }) {
+  const { preferences, update: updatePreferences, touchEnabled } = useTouchPreferences();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const runtimeRef = useRef<GameRuntime | null>(null);
   const audioRef = useRef<RuntimeAudio | null>(null);
@@ -112,6 +114,7 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
   }, []);
   const [error, setError] = useState<string | null>(null);
   const [runtime, setRuntime] = useState<GameRuntime | null>(null);
+  useEffect(() => { runtime?.touch.setDragEnabled(touchEnabled && preferences.steering === "drag"); }, [runtime, touchEnabled, preferences.steering]);
   const [loadingProgress, setLoadingProgress] = useState(0);
   // Which renderer actually initialised. The e2e matrix asserts against this rather than guessing
   // from navigator.gpu, because a browser can advertise WebGPU and still fall back.
@@ -482,7 +485,7 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
       if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
       // On a focused control, preventDefault() here would swallow the click
       // Enter is meant to produce — picking a mode would silently start a run.
-      if (target?.closest("button")) return;
+      if (target?.closest("button,summary,a,[role=button]")) return;
       event.preventDefault();
       start();
     };
@@ -503,14 +506,14 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
         data-drop-in-cam={camPreset}
         data-drop-in-physics={runtime?.world.config.physicsModel ?? physicsModel}
       >
-        <Link href={`/resorts/${profile.slug}`} className="absolute left-3 top-3 z-40 inline-flex items-center gap-2 rounded-full border-[1.5px] border-ink bg-cream-50 px-3.5 py-2 text-xs font-bold uppercase text-ink shadow-stamp-sm">
+        <Link href={`/resorts/${profile.slug}`} className="absolute left-[max(.75rem,env(safe-area-inset-left))] top-[max(.75rem,env(safe-area-inset-top))] z-40 min-h-11 inline-flex items-center gap-2 rounded-full border-[1.5px] border-ink bg-cream-50 px-3.5 py-2 text-xs font-bold uppercase text-ink shadow-stamp-sm">
           <ArrowLeft className="h-4 w-4" aria-hidden /> Conditions
         </Link>
         {phase === "poster" && (
-          <section className="pc-topo absolute inset-0 z-30 flex items-center justify-center px-6 text-center">
-            <div className="pc-paper max-w-xl rounded-lg border-[1.5px] border-ink p-7 shadow-stamp-lg sm:p-10">
+          <section className="pc-topo absolute inset-0 z-30 overflow-y-auto overscroll-contain px-4 pb-8 pt-20 text-center">
+            <div className="pc-paper mx-auto w-full min-w-0 max-w-xl rounded-lg border-[1.5px] border-ink p-4 shadow-stamp-lg sm:p-8">
               <p className="pc-eyebrow">PeakCam Drop In · v2</p>
-              <h1 className="pc-display mt-2 text-5xl text-ink sm:text-7xl">{profile.name}</h1>
+              <h1 className="pc-display mt-2 break-words text-[clamp(2rem,9vw,4.5rem)] text-ink">{profile.name}</h1>
               <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.14em] text-bark">{profile.tagline}</p>
               <div className="mt-5 border-y-[1.5px] border-ink/20 py-3 font-mono text-[11px] uppercase tracking-[0.12em] text-bark-dk" data-testid="drop-in-conditions-stamp">
                 {conditions.powderDay ? (
@@ -531,7 +534,7 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
                   </span>
                 )}
               </div>
-              <p className="mx-auto mt-5 max-w-sm text-sm text-bark-dk">Carve with WASD or arrows. Tuck with W, brake with S, jump with Space. Mouse lock is optional.</p>
+              <p className="mx-auto mt-5 max-w-sm text-sm text-bark-dk">{touchEnabled ? (preferences.steering === "drag" ? "Drag anywhere to steer. Use the buttons to brake, tuck, or jump." : "Hold the arrows to steer. Use the buttons to brake, tuck, or jump.") : "Carve with WASD or arrows. Tuck with W, brake with S, jump with Space."}</p>
               <ModeSelect
                 selected={session.mode}
                 onSelect={selectMode}
@@ -546,12 +549,13 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
                   setTrailId(id); clearGhost();
                   applyTicketState(NO_TICKET);
                   if (modeRef.current === "time_trial") mintTicket("time_trial", false, id);
-                }} className="mt-1 min-h-11 w-full rounded border-[1.5px] border-ink bg-cream-50 px-3 text-sm focus-visible:ring-2 focus-visible:ring-alpen">
+                }} className="mt-1 min-h-11 w-full min-w-0 rounded border-[1.5px] border-ink bg-cream-50 px-3 text-sm focus-visible:ring-2 focus-visible:ring-alpen">
                   {courseChoices.map((course) => <option key={course.id} value={course.id}>{course.name} · {course.difficulty ?? "unrated"} · {Math.round(course.lengthM)} m</option>)}
                 </select>
                 {selectedCourse && <span className="mt-1 block font-normal">{Math.round(selectedCourse.topElevationM * 3.28084).toLocaleString()} → {Math.round(selectedCourse.bottomElevationM * 3.28084).toLocaleString()} ft</span>}
               </label>
-              <button autoFocus onClick={start} className="mt-7 rounded-full border-[1.5px] border-ink bg-alpen px-8 py-3 font-bold uppercase tracking-wide text-cream-50 shadow-stamp transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink">
+              <details className="mt-4 rounded-lg border border-ink/20 p-3 text-left"><summary className="min-h-11 cursor-pointer content-center text-sm font-bold">Control preferences</summary><ControlSettings preferences={preferences} onChange={updatePreferences} /></details>
+              <button onClick={start} className="mt-7 rounded-full border-[1.5px] border-ink bg-alpen-dk px-8 py-3 font-bold uppercase tracking-wide text-cream-50 shadow-stamp transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink">
                 Start descent
               </button>
             </div>
@@ -559,7 +563,7 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
         )}
         {(phase === "loading" || phase === "playing") && <canvas ref={canvasRef} data-testid="drop-in-canvas" className="block h-full w-full touch-none" aria-label={`${profile.name} ski game`} />}
         {phase === "loading" && <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-ink/50" role="status"><span className="pc-eyebrow rounded-full bg-cream-50 px-4 py-2 text-ink">Loading real mountain… {Math.round(loadingProgress * 100)}%</span></div>}
-        {phase === "playing" && runtime && <><DropInHUD store={bridge.store} audioEnabled={audioEnabled} onToggleAudio={toggleAudio} onPause={() => runtime.pause()} /><TouchControls adapter={runtime.touch} /><PauseDialog store={bridge.store} onResume={() => runtime.resume()} onRestart={() => restartRun(runtime)} /><ResultsDialog
+        {phase === "playing" && runtime && <><DropInHUD store={bridge.store} audioEnabled={audioEnabled} onToggleAudio={toggleAudio} onPause={() => runtime.pause()} touchEnabled={touchEnabled} />{touchEnabled && <TouchControls adapter={runtime.touch} preferences={preferences} store={bridge.store} />}<PauseDialog store={bridge.store} onResume={() => runtime.resume()} onRestart={() => restartRun(runtime)} preferences={preferences} onPreferencesChange={updatePreferences} touchEnabled={touchEnabled} onTrail={session.mode === "free_ski" ? () => { runtime.resume(); runtime.touch.setAction("trail", true); runtime.touch.setAction("trail", false); } : undefined} /><ResultsDialog
           store={bridge.store}
           conditionsLabel={`${playedConditions.stamp} · ${playedConditions.surface}`}
           onRestart={() => restartRun(runtime)}

@@ -106,7 +106,7 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
         overflow-hidden">
 
         <CardCameraPreview key={cams.map(cam => `${cam.id}:${cam.embed_url}:${cam.youtube_id}`).join("|")} cams={cams} resortName={resort.name} onOpen={openCamera} />
-        {onToggleFavorite && <button type="button" onClick={onToggleFavorite}
+        {onToggleFavorite && <button type="button" onClick={event => { event.currentTarget.focus(); onToggleFavorite(); }}
           aria-label={favorited ? `Remove ${resort.name} from favorites` : `Add ${resort.name} to favorites`}
           aria-pressed={Boolean(favorited)}
           className="absolute right-3 top-3 grid h-11 w-11 place-items-center rounded-full border border-ink bg-cream-50 text-ink shadow-stamp-sm focus-visible:ring-2 focus-visible:ring-alpen">
@@ -129,7 +129,7 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
             </div>
 
             {/* Resort name — Fraunces 900, tight */}
-            <h3 className="font-display font-black text-[28px] leading-[0.95] tracking-[-0.02em] text-ink">
+            <h3 className="font-display font-black text-[28px] leading-[0.95] tracking-[-0.02em] text-ink [overflow-wrap:anywhere]">
               {resort.name}
             </h3>
 
@@ -202,7 +202,7 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
 
         {/* Ghost compare button — separate link outside main card link */}
         <div className="grid grid-cols-[1fr_auto] gap-2 px-5 pb-5 pt-1">
-          <button type="button" disabled={!cams.length} onClick={() => openCamera()}
+          <button type="button" disabled={!cams.length} onClick={event => { event.currentTarget.focus(); openCamera(); }}
             className="flex min-h-11 items-center justify-center gap-2 rounded-full border-[1.5px] border-ink bg-alpen-dk px-4 text-sm font-bold text-white shadow-stamp-sm transition-colors hover:bg-ink disabled:bg-cream disabled:text-bark disabled:shadow-none focus-visible:ring-2 focus-visible:ring-alpen">
             <Play size={14} aria-hidden />{cams.length ? "Live look" : "No cameras yet"}
           </button>

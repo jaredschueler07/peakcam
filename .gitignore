@@ -77,3 +77,6 @@ playwright-report/
 codex-*.log
 grok-*.log
 REPORT-*.md
+
+# Local browser audit captures (reports remain versioned).
+/docs/reviews/mobile-evidence/

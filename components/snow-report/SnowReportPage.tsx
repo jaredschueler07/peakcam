@@ -9,6 +9,10 @@ import type { ResortWithData } from "@/lib/types";
 type SortKey = "name" | "base" | "24h" | "48h" | "trails" | "lifts" | "conditions" | "pctNormal" | "trend";
 type SortDir = "asc" | "desc";
 
+const CONDITION_ORDER: Record<string, number> = {
+    great: 0, good: 1, fair: 2, poor: 3,
+  };
+
 export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
   const [sortKey, setSortKey] = useState<SortKey>("base");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -19,10 +23,6 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
   const hasTrend = useMemo(() => resorts.some(r => r.snow_report?.trend_7d != null), [resorts]);
   const hasTrails = useMemo(() => resorts.some(r => r.snow_report?.trails_open != null), [resorts]);
   const hasLifts = useMemo(() => resorts.some(r => r.snow_report?.lifts_open != null), [resorts]);
-
-  const CONDITION_ORDER: Record<string, number> = {
-    great: 0, good: 1, fair: 2, poor: 3,
-  };
 
   const sorted = useMemo(() => {
     let list = resorts.filter((r) => r.snow_report);
@@ -99,8 +99,18 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
           </Link>
         </div>
 
+        <label className="mb-4 block text-sm font-bold md:hidden">State or country
+          <select value={stateFilter} onChange={e => setStateFilter(e.target.value)} className="mt-2 min-h-11 w-full rounded-lg border border-ink bg-cream-50 px-3 text-base">
+            <option value="All">All states and countries</option>{states.map(state => <option key={state}>{state}</option>)}
+          </select>
+        </label>
+        <label className="mb-4 block text-sm font-bold md:hidden">Sort reports
+          <select value={sortKey} onChange={event => { const key = event.target.value as SortKey; setSortKey(key); setSortDir(key === "name" || key === "conditions" ? "asc" : "desc"); }} className="mt-2 min-h-11 w-full rounded-lg border border-ink bg-cream-50 px-3 text-base">
+            <option value="base">Base depth</option><option value="24h">New snow: 24 hours</option><option value="48h">New snow: 48 hours</option><option value="conditions">Conditions</option><option value="name">Resort name</option>{hasTrails && <option value="trails">Open trails</option>}{hasLifts && <option value="lifts">Open lifts</option>}{hasPctNormal && <option value="pctNormal">Percent of normal</option>}{hasTrend && <option value="trend">Snow trend</option>}
+          </select>
+        </label>
         {/* State filter */}
-        <div className="flex items-center gap-2 flex-wrap mb-4">
+        <div className="hidden md:flex items-center gap-2 flex-wrap mb-4">
           <button
             onClick={() => setStateFilter("All")}
             className={`text-xs px-2.5 py-1 pointer-coarse:min-h-11 pointer-coarse:px-3.5 rounded-lg border transition-colors duration-150 ${
@@ -140,7 +150,7 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
                 {hasLifts && <th className="text-right px-3 py-3 hidden lg:table-cell"><SortHeader label="Lifts" field="lifts" /></th>}
                 {hasPctNormal && <th className="text-right px-3 py-3 hidden lg:table-cell"><SortHeader label="% Normal" field="pctNormal" /></th>}
                 {hasTrend && <th className="text-center px-3 py-3 hidden lg:table-cell"><SortHeader label="Trend" field="trend" /></th>}
-                <th className="text-center px-3 py-3"><SortHeader label="Conditions" field="conditions" /></th>
+                <th className="hidden md:table-cell text-center px-3 py-3"><SortHeader label="Conditions" field="conditions" /></th>
               </tr>
             </thead>
             <tbody>
@@ -159,6 +169,7 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
                       >
                         {resort.name}
                       </Link>
+                      <div className="mt-1 md:hidden"><ConditionBadge rating={resort.cond_rating} label={resort.cond_rating.charAt(0).toUpperCase() + resort.cond_rating.slice(1)} /></div>
                     </td>
                     <td className="px-3 py-3 text-text-muted hidden sm:table-cell">{resort.state}</td>
                     <td className="px-3 py-3 text-right">
@@ -221,7 +232,7 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
                       )}
                     </td>
                     )}
-                    <td className="px-3 py-3 text-center">
+                    <td className="hidden md:table-cell px-3 py-3 text-center">
                       <ConditionBadge
                         rating={resort.cond_rating}
                         label={resort.cond_rating.charAt(0).toUpperCase() + resort.cond_rating.slice(1)}

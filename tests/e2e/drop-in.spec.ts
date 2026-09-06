@@ -669,9 +669,10 @@ test.describe("steering direction", () => {
       const before = await snapshot();
       if (control.startsWith("touch")) {
         const cdp = await page.context().newCDPSession(page);
-        const pad = await page.getByText("Drag to carve", { exact: true }).boundingBox();
-        expect(pad).not.toBeNull();
-        const origin = { x: pad!.x + pad!.width / 2, y: pad!.y + pad!.height / 2, id: 1 };
+        const canvas = await page.getByTestId("drop-in-canvas").boundingBox();
+        expect(canvas).not.toBeNull();
+        // Exercise both halves, including the right side rejected by the old adapter.
+        const origin = { x: canvas!.x + canvas!.width * (direction > 0 ? 0.75 : 0.25), y: canvas!.y + canvas!.height * 0.45, id: 1 };
         await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [origin] });
         await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ ...origin, x: origin.x + direction * 64 }] });
         await page.waitForTimeout(200);

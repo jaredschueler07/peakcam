@@ -69,7 +69,7 @@ export function PeakFooter() {
                 { href: "/snow-report", label: "Snow reports" },
                 { href: "/compare", label: "Compare" },
                 { href: "/map", label: "Map" },
-                { href: "/alerts/manage", label: "Powder alerts" },
+                { href: "/alerts", label: "Powder alerts" },
               ].map((item) => (
                 <li key={item.href}>
                   <Link
@@ -121,7 +121,7 @@ export function PeakFooter() {
               &copy; {new Date().getFullYear()} PeakCam · Updated every 5 min
             </p>
             <Link
-              href="/alerts/manage"
+              href="/alerts"
               className="inline-flex items-center gap-1.5 font-semibold text-[13px] text-alpen-dk
                          hover:text-alpen transition-colors duration-150"
             >

@@ -13,7 +13,7 @@ export function CardCameraPreview({ cams, resortName, onOpen }: { cams: Cam[]; r
   const count = `${cams.length} cam${cams.length === 1 ? "" : "s"} available`;
   return (
     <div className="relative aspect-[16/9] overflow-hidden border-b border-ink bg-mist">
-      <button type="button" disabled={!cams.length} onClick={() => onOpen(preview?.cam.id)}
+      <button type="button" disabled={!cams.length} onClick={event => { event.currentTarget.focus(); onOpen(preview?.cam.id); }}
         aria-label={`Live look at ${resortName}${preview ? ` — ${camDisplayName(preview.cam)}` : ""}`}
         className="group/preview absolute inset-0 block h-full w-full text-left outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-alpen disabled:cursor-default">
         {loading && <span className="pc-topo absolute inset-0 grid place-items-center bg-mist text-ink/50" aria-hidden><Camera size={30} strokeWidth={1.5} /></span>}
@@ -21,7 +21,7 @@ export function CardCameraPreview({ cams, resortName, onOpen }: { cams: Cam[]; r
           // Provider-supplied image or YouTube thumbnail; no video is loaded in the grid.
           // eslint-disable-next-line @next/next/no-img-element
           <img key={preview.src} src={preview.src} alt={`${camDisplayName(preview.cam)} at ${resortName}`}
-            loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-300 motion-safe:group-hover/preview:scale-[1.035]"
+            loading="lazy" decoding="async" className="h-full w-full object-contain"
             onLoad={() => setLoadedSrc(preview.src)}
             onError={() => setFailed(previous => new Set(previous).add(preview.src))} />
         ) : (
@@ -32,7 +32,7 @@ export function CardCameraPreview({ cams, resortName, onOpen }: { cams: Cam[]; r
           </span>
         )}
         {preview && <>
-          <span className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/85 to-transparent" aria-hidden />
+          <span className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/85 to-transparent" aria-hidden />
           <span className="absolute bottom-3 left-4 right-16 text-white">
             <span className="block truncate text-sm font-semibold">{camDisplayName(preview.cam)}</span>
             <span className="mt-0.5 block font-mono text-[9px] uppercase tracking-wide">{loading ? "Loading preview…" : `${preview.label} · Capture time unavailable`}</span>

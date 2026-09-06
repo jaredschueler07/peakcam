@@ -150,7 +150,7 @@ function ResortPicker({
                 setQuery("");
                 setOpen(false);
               }}
-              className="w-full text-left px-4 py-2.5 pointer-coarse:min-h-11 hover:bg-cream transition-colors flex items-center justify-between gap-2 border-b border-dashed border-bark/30 last:border-b-0"
+              className="w-full text-left px-4 py-2.5 min-h-11 hover:bg-cream transition-colors flex items-center justify-between gap-2 border-b border-dashed border-bark/30 last:border-b-0"
             >
               <div>
                 <span className="font-display font-black text-ink text-[14px]">{resort.name}</span>
@@ -203,7 +203,7 @@ function ResortColumnHeader({
               width={320}
               height={180}
               decoding="async"
-              className="absolute inset-0 w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-contain"
             />
             <div className="absolute inset-0 bg-ink/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
               <Camera size={20} className="text-cream-50" />
@@ -230,7 +230,7 @@ function ResortColumnHeader({
           <button
             type="button"
             onClick={onRemove}
-            className="relative z-10 shrink-0 w-8 h-8 pointer-coarse:w-10 pointer-coarse:h-10 flex items-center justify-center rounded-full bg-cream-50 border-[1.5px] border-ink text-ink hover:bg-alpen hover:text-cream-50 shadow-[2px_2px_0_#2a1f14] transition-colors touch-manipulation"
+            className="relative z-10 shrink-0 w-11 h-11 flex items-center justify-center rounded-full bg-cream-50 border-[1.5px] border-ink text-ink hover:bg-alpen hover:text-cream-50 shadow-[2px_2px_0_#2a1f14] transition-colors touch-manipulation"
             aria-label={`Remove ${resort.name} from comparison`}
           >
             <X size={14} strokeWidth={2.5} />
@@ -424,12 +424,12 @@ export function ComparePage({
     <div className="min-h-screen pc-paper">
       <Header showSearch={false} />
 
-      <div className="max-w-screen-xl mx-auto px-4 py-8 md:px-8">
+      <div className="max-w-screen-xl mx-auto px-4 py-5 md:py-8 md:px-8">
         {/* Page header */}
-        <div className="mb-8">
+        <div className="mb-5 md:mb-8">
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 text-bark hover:text-ink text-[13px] font-semibold mb-5 py-2 px-1 pointer-coarse:min-h-11 transition-colors"
+            className="inline-flex items-center gap-1.5 text-bark hover:text-ink text-[13px] font-semibold mb-5 py-2 px-1 min-h-11 transition-colors"
           >
             <ArrowLeft size={14} />
             Back to resorts
@@ -437,7 +437,7 @@ export function ComparePage({
           <div className="pc-eyebrow mb-1" style={{ color: "var(--pc-bark)" }}>
             Side-by-side · up to {MAX_RESORTS}
           </div>
-          <h1 className="font-display font-black text-5xl md:text-6xl text-ink leading-[0.95] tracking-[-0.02em]">
+          <h1 className="font-display font-black text-4xl md:text-6xl text-ink leading-[0.95] tracking-[-0.02em]">
             Compare <em className="text-alpen italic font-bold">resorts</em>.
           </h1>
         </div>
@@ -483,7 +483,7 @@ export function ComparePage({
         )}
 
         {/* Toolbar */}
-        <div className="flex items-center gap-3 flex-wrap mb-8">
+        <div className="flex items-center gap-3 flex-wrap mb-5 md:mb-8">
           {resorts.length < MAX_RESORTS && (
             <ResortPicker
               allResorts={allResorts}
@@ -496,7 +496,7 @@ export function ComparePage({
             <>
               <button
                 onClick={handleShare}
-                className="inline-flex items-center gap-2 px-4 py-2 pointer-coarse:min-h-11 bg-cream-50 text-ink
+                className="inline-flex items-center gap-2 px-4 py-2 min-h-11 bg-cream-50 text-ink
                            border-[1.5px] border-ink rounded-full shadow-stamp-sm
                            hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]
                            transition-[transform,box-shadow] duration-100 text-[13px] font-semibold"
@@ -506,7 +506,7 @@ export function ComparePage({
               </button>
               <button
                 onClick={() => setResorts([])}
-                className="text-bark hover:text-ink text-[13px] font-semibold px-3 py-2 pointer-coarse:min-h-11 transition-colors"
+                className="text-bark hover:text-ink text-[13px] font-semibold px-3 py-2 min-h-11 transition-colors"
               >
                 Clear all
               </button>
@@ -530,7 +530,7 @@ export function ComparePage({
                 return (
                   <button key={`${a}-${b}`}
                     onClick={() => { addResort(ra); addResort(rb); }}
-                    className="px-4 py-2 pointer-coarse:min-h-11 bg-cream-50 text-ink border-[1.5px] border-ink rounded-full
+                    className="px-4 py-2 min-h-11 bg-cream-50 text-ink border-[1.5px] border-ink rounded-full
                                shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]
                                transition-[transform,box-shadow] duration-100 text-[13px] font-semibold">
                     {ra.name} <span className="text-bark font-normal italic">vs</span> {rb.name}
@@ -548,9 +548,27 @@ export function ComparePage({
           </p>
         )}
 
+        {resorts.length > 0 && <section aria-label="Mobile resort comparison" className="md:hidden">
+          {resorts.length > 2 && <p className="mb-3 text-sm text-bark">Swipe across to compare all {resorts.length} resorts.</p>}
+          <div className="overflow-x-auto rounded-xl border border-ink bg-cream-50" tabIndex={0} aria-label="Comparison values">
+            <div style={{ width: `${Math.max(1, resorts.length / 2) * 100}%` }}>
+              <div className="grid bg-cream" style={{ gridTemplateColumns: `repeat(${resorts.length}, minmax(0, 1fr))` }}>
+                {resorts.map(resort => <div key={resort.slug} className="min-w-0 border-b border-r border-ink/20 p-3">
+                  <Link href={`/resorts/${resort.slug}`} className="block min-h-11 break-words font-display text-base font-bold">{resort.name}</Link>
+                  <button onClick={() => removeResort(resort.slug)} aria-label={`Remove ${resort.name} from comparison`} className="mt-2 min-h-11 rounded-full border border-bark px-3 text-xs font-bold">Remove</button>
+                </div>)}
+              </div>
+              {statRows.map(row => <div key={row.label} className="border-b border-ink/20 last:border-0">
+                <h2 className="sticky left-0 w-max max-w-[calc(100vw-3rem)] px-3 pt-3 text-xs font-bold text-bark">{row.label}</h2>
+                <div className="grid" style={{ gridTemplateColumns: `repeat(${resorts.length}, minmax(0, 1fr))` }}>{row.values.map((cell, i) => <div key={resorts[i].slug} className={`break-words px-3 pb-3 pt-1 text-base font-bold ${cell.isBest ? "text-forest" : "text-ink"}`}>{cell.display}</div>)}</div>
+              </div>)}
+            </div>
+          </div>
+        </section>}
+
         {/* Comparison grid */}
         {resorts.length > 0 && (
-          <div className="overflow-x-auto -mx-4 px-4 pb-4">
+          <div className="hidden md:block overflow-x-auto -mx-4 px-4 pb-4">
             <div
               className="min-w-fit rounded-[18px] border-[1.5px] border-ink shadow-stamp overflow-hidden bg-cream-50"
               style={{

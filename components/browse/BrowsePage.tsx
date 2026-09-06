@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { Fragment, useState, useMemo, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import Fuse from "fuse.js";
@@ -9,7 +9,7 @@ import { Header } from "@/components/layout/Header";
 import { SummitResortCard } from "@/components/browse/SummitResortCard";
 import { PowderAlertSignup } from "@/components/alerts/PowderAlertSignup";
 import { useFavorites } from "@/lib/useFavorites";
-import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
+import { Modal } from "@/components/ui/Modal";
 import { AuthModal } from "@/components/auth/AuthModal";
 import type { ResortWithData } from "@/lib/types";
 import type { RadarFrame } from "@/lib/weather-radar";
@@ -153,17 +153,10 @@ function FilterSheet({
   sort: SortOption;
   setSort: (s: SortOption) => void;
 }) {
-  useBodyScrollLock(open);
   if (!open) return null;
 
   return (
-    <div className="md:hidden">
-      <div className="fixed inset-0 z-40 bg-ink/40 animate-fadeIn" onClick={onClose} />
-      <div
-        className="fixed bottom-0 left-0 right-0 z-50 animate-slideUp"
-        role="dialog"
-        aria-label="Filters and sort"
-      >
+    <Modal onClose={onClose} label="Filters and sort" className="inset-x-0 bottom-0 top-auto m-0 w-full max-w-none rounded-t-[18px]">
         <div className="bg-cream-50 border-t-[1.5px] border-ink rounded-t-[18px] px-5 pt-3
                         pb-[max(1.5rem,env(safe-area-inset-bottom))] max-h-[85dvh] overflow-y-auto
                         shadow-[0_-6px_20px_-8px_rgba(42,31,20,0.35)]">
@@ -213,8 +206,22 @@ function FilterSheet({
             Done
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
+  );
+}
+
+function AlertSignupBanner({ resorts }: { resorts: ResortWithData[] }) {
+  return (
+<div className="pc-on-ink flex flex-wrap items-center justify-between gap-4 px-6 py-5 bg-forest text-cream-50
+                        border-[1.5px] border-ink rounded-[18px] shadow-stamp mb-8">
+          <div>
+            <p className="font-display font-black text-lg leading-tight">
+              Never miss a <em className="text-mustard italic">pow day</em>.
+            </p>
+            <p className="text-cream-50/80 text-sm mt-1">Email alerts when your resorts hit your snow threshold.</p>
+          </div>
+          <PowderAlertSignup resorts={resorts} />
+        </div>
   );
 }
 
@@ -493,10 +500,9 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
   // Full-list SEO is preserved by the server-rendered ItemList JSON-LD in
   // app/page.tsx and per-resort SSG pages; the grid is a browsing surface.
   const PAGE_SIZE = 24;
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
-  }, [search, stateFilter, condFilter, hasLiveCams, freshSnow, showFavoritesOnly, sort]);
+  const filterKey = JSON.stringify([search, stateFilter, condFilter, hasLiveCams, freshSnow, showFavoritesOnly, sort]);
+  const [pagination, setPagination] = useState({ key: filterKey, count: PAGE_SIZE });
+  const visibleCount = pagination.key === filterKey ? pagination.count : PAGE_SIZE;
   const visibleResorts = useMemo(
     () => filtered.slice(0, visibleCount),
     [filtered, visibleCount],
@@ -535,14 +541,14 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
   }, [hasLiveCams]);
 
   return (
-    <div id="conditions" className="min-h-screen pc-paper">
-      <Header showSearch={false} />
+    <div id="conditions" className="min-h-screen scroll-mt-16 pc-paper">
+      <div className="hidden md:contents"><Header showSearch={false} /></div>
 
       {/* ── Sticky paper search + filter bar ─────────────────── */}
       <div className="sticky top-[64px] z-30 border-b-[1.5px] border-ink bg-cream/95 backdrop-blur-md">
-        <div className="max-w-screen-2xl mx-auto px-4 py-5 md:px-8">
+        <div className="max-w-screen-2xl mx-auto px-4 py-3 md:py-5 md:px-8">
           {/* Top row: search input (pc-input style) */}
-          <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center gap-4 mb-2 md:mb-4">
             <div className="flex-1 relative">
               <Search
                 className="absolute left-5 top-1/2 -translate-y-1/2 text-bark pointer-events-none"
@@ -593,7 +599,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
               onClick={() => setCondFilter(condFilter === "goods" ? "all" : "goods")}
             />
             <button
-              onClick={() => setShowFilterSheet(true)}
+              onClick={event => { event.currentTarget.focus(); setShowFilterSheet(true); }}
               className={`ml-auto inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 min-h-[44px] text-[13px] font-semibold border-[1.5px] cursor-pointer select-none transition-colors duration-150 whitespace-nowrap ${
                 activeFilterCount > 0
                   ? "bg-ink border-ink text-cream-50"
@@ -709,7 +715,8 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
       </div>
 
       {/* ── Body ──────────────────────────────────────────────── */}
-      <div className="max-w-screen-2xl mx-auto px-4 py-8 md:px-8">
+      <div className="max-w-screen-2xl mx-auto flex flex-col px-4 py-5 md:py-8 md:px-8">
+        <div className="order-last mt-8 md:order-first md:mt-0">
         <SouthernSeasonBanner
           saCount={saCount}
           stateFilter={stateFilter}
@@ -725,27 +732,17 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
         <FeaturedRow resorts={resorts} />
         <PowderAlert resorts={resorts} />
 
-        {/* Powder alert signup banner — forest card.
-            pc-on-ink flips the focus ring to cream: ember-on-forest is
-            1.50:1, cream-on-forest is 7.05:1. */}
-        <div className="pc-on-ink flex items-center justify-between gap-4 px-6 py-5 bg-forest text-cream-50
-                        border-[1.5px] border-ink rounded-[18px] shadow-stamp mb-8">
-          <div>
-            <p className="font-display font-black text-lg leading-tight">
-              Never miss a <em className="text-mustard italic">pow day</em>.
-            </p>
-            <p className="text-cream-50/80 text-sm mt-1">Email alerts when your resorts hit your snow threshold.</p>
-          </div>
-          <PowderAlertSignup resorts={resorts} />
+        <div className="hidden md:block"><AlertSignupBanner resorts={resorts} /></div>
+
         </div>
 
         {/* Section header */}
-        <div className="flex items-end justify-between gap-4 mb-8 flex-wrap">
+        <div className="flex items-end justify-between gap-4 mb-5 md:mb-8 flex-wrap">
           <div>
             <div className="pc-eyebrow mb-1" style={{ color: "var(--pc-bark)" }}>
               Real-time · {filtered.length} of {resorts.length}
             </div>
-            <h2 className="font-display font-black text-5xl md:text-6xl text-ink leading-[0.95] tracking-[-0.02em]">
+            <h2 className="font-display font-black text-3xl md:text-6xl text-ink leading-[0.95] tracking-[-0.02em]">
               Today&apos;s <em className="text-alpen italic font-bold">conditions</em>.
             </h2>
           </div>
@@ -772,8 +769,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {visibleResorts.map((resort, i) => (
-                    <div
-                      key={resort.id}
+                    <Fragment key={resort.id}><div
                       onMouseEnter={() => setHoveredSlug(resort.slug)}
                       onMouseLeave={() => setHoveredSlug(null)}
                       style={{ contentVisibility: "auto", containIntrinsicSize: "0 560px" }}
@@ -785,12 +781,14 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
                         animate={i < 12}
                       />
                     </div>
+                    {i === Math.min(3, visibleResorts.length - 1) && <div className="md:hidden"><AlertSignupBanner resorts={resorts} /></div>}
+                    </Fragment>
                   ))}
                 </div>
                 {visibleCount < filtered.length && (
                   <div className="flex justify-center mt-10">
                     <button
-                      onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}
+                      onClick={() => setPagination({ key: filterKey, count: visibleCount + PAGE_SIZE })}
                       className="inline-flex items-center gap-2 px-7 py-3 min-h-11 bg-cream-50 text-ink
                                  border-[1.5px] border-ink rounded-full shadow-stamp font-bold text-[14px]
                                  hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]

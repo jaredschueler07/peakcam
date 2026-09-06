@@ -97,7 +97,7 @@ function CamBody({ resolved }: { resolved: Extract<ResolvedWidget, { kind: "cam"
       <img
         src={preview.src}
         alt={`${camName}${resort ? ` at ${resort.name}` : ""}`}
-        className="absolute inset-0 w-full h-full object-cover"
+        className="absolute inset-0 w-full h-full object-contain"
         loading="lazy"
         onError={() => setImgFailed(true)}
       />

@@ -14,7 +14,8 @@ function timeAgo(ts: number): string {
 
 /** Auto-refreshing image feed: freshness badge, manual refresh,
  *  paused while the tab is hidden, placeholder on load failure. */
-function ImageFeed({ url, name, refreshMs }: { url: string; name: string; refreshMs: number }) {
+function ImageFeed({ url, name, refreshMs, allowFill }: { url: string; name: string; refreshMs: number; allowFill: boolean }) {
+  const [fill, setFill] = useState(false);
   const [src, setSrc] = useState(url);
   const [refreshedAt, setRefreshedAt] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
@@ -73,11 +74,12 @@ function ImageFeed({ url, name, refreshMs }: { url: string; name: string; refres
       <img
         src={src}
         alt={name}
-        className="absolute inset-0 w-full h-full object-cover"
+        className={`absolute inset-0 w-full h-full ${fill ? "object-cover" : "object-contain"}`}
         loading="lazy"
         onLoad={() => setRefreshedAt(Date.now())}
         onError={() => setFailed(true)}
       />
+      {allowFill && <button type="button" onClick={() => setFill(value => !value)} aria-pressed={fill} className="absolute right-2 top-2 z-10 min-h-11 rounded-full border border-cream-50 bg-ink/90 px-3 text-sm font-bold text-cream-50">{fill ? "Show full frame" : "Fill view"}</button>}
       <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1.5">
         <span className="px-2 py-0.5 bg-ink/80 rounded-full font-mono text-[10px] font-bold text-cream-50 uppercase tracking-[0.12em]">
           {refreshedAt === null ? "Loading image…" : `Image loaded ${timeAgo(refreshedAt)}`}
@@ -85,9 +87,9 @@ function ImageFeed({ url, name, refreshMs }: { url: string; name: string; refres
         <button
           onClick={refresh}
           aria-label="Refresh feed"
-          className="p-1 bg-ink/80 rounded-full text-cream-50 hover:text-alpen transition-colors"
+          className="grid h-11 w-11 place-items-center bg-ink/80 rounded-full text-cream-50 hover:text-alpen transition-colors"
         >
-          <RefreshCw size={11} />
+          <RefreshCw size={16} />
         </button>
       </div>
     </>
@@ -129,7 +131,7 @@ export function CamEmbed({ cam, variant }: { cam: Cam; resortSlug: string; varia
     );
   }
   if (cam.embed_type === "image" && cam.embed_url) {
-    return <ImageFeed url={cam.embed_url} name={name} refreshMs={REFRESH_MS[variant]} />;
+    return <ImageFeed url={cam.embed_url} name={name} refreshMs={REFRESH_MS[variant]} allowFill={variant === "lightbox"} />;
   }
   return null;
 }

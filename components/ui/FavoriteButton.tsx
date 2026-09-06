@@ -70,9 +70,10 @@ export function FavoriteButton({
     checkFavoriteStatus();
   }, [checkFavoriteStatus]);
 
-  const toggleFavorite = async (e: React.MouseEvent) => {
+  const toggleFavorite = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
+    e.currentTarget.focus();
     
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {

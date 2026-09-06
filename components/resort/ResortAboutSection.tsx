@@ -39,7 +39,7 @@ export function ResortAboutSection({ resort }: { resort: ResortWithData }) {
 
       <h2
         id="about-heading"
-        className="font-display font-black text-[32px] leading-[0.95] tracking-[-0.02em] text-ink mb-5"
+        className="font-display font-black text-[32px] leading-[0.95] tracking-[-0.02em] text-ink mb-5 [overflow-wrap:anywhere]"
       >
         About {resort.name}
       </h2>
@@ -68,7 +68,7 @@ export function ResortAboutSection({ resort }: { resort: ResortWithData }) {
           </dl>
           <p className="mt-6 text-[13px] text-bark">
             More on how these numbers are measured:{" "}
-            <Link href="/methodology" className="underline underline-offset-2 hover:text-ink">
+            <Link href="/methodology" className="underline underline-offset-2 hover:text-ink [overflow-wrap:anywhere]">
               {SITE_URL.replace("https://", "")}/methodology
             </Link>
           </p>

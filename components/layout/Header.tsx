@@ -27,6 +27,8 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const [user, setUser] = useState<User | null>(null);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -41,6 +43,19 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setIsMenuOpen(false); menuButton.current?.focus(); }
+    };
+    const outside = (event: PointerEvent) => { if (!headerRef.current?.contains(event.target as Node)) setIsMenuOpen(false); };
+    const focusOutside = (event: FocusEvent) => { if (!headerRef.current?.contains(event.target as Node)) setIsMenuOpen(false); };
+    document.addEventListener("keydown", escape);
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("focusin", focusOutside);
+    return () => { document.removeEventListener("keydown", escape); document.removeEventListener("pointerdown", outside); document.removeEventListener("focusin", focusOutside); };
+  }, [isMenuOpen]);
 
   async function handleSignOut() {
     const supabase = createSupabaseBrowserClient();
@@ -62,7 +77,7 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
     /* pc-on-ink — the header surface is ink, so the global ember
        :focus-visible ring (3.1:1 on ink) is upgraded to the cream ring
        (14.7:1 on ink) by the rule in app/globals.css. */
-    <header className="pc-on-ink sticky top-0 z-50 h-[64px] flex items-center gap-5 px-6 md:px-7
+    <header ref={headerRef} className="pc-on-ink sticky top-0 z-50 h-[64px] flex items-center gap-5 px-6 md:px-7
       bg-ink text-cream-50 border-b-[1.5px] border-ink">
 
       {/* Logo — Fraunces display, italic, PEAK cream + CAM alpen */}
@@ -139,7 +154,7 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
           <Link
             href={`/auth?next=${encodeURIComponent(pathname)}`}
             className="ml-2 px-4 py-1.5 rounded-full text-[13px] font-bold whitespace-nowrap
-              bg-alpen text-cream-50 border-[1.5px] border-ink
+              bg-alpen-dk text-cream-50 border-[1.5px] border-ink
               shadow-[2px_2px_0_#faf4e6] hover:shadow-[3px_3px_0_#faf4e6]
               hover:-translate-x-[1px] hover:-translate-y-[1px]
               active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_#faf4e6]
@@ -153,7 +168,8 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
 
       {/* Mobile Menu Toggle */}
       <button
-        className="md:hidden ml-auto p-2 text-cream-50/80 hover:text-cream-50 flex-shrink-0"
+        ref={menuButton} aria-expanded={isMenuOpen} aria-controls="mobile-navigation"
+        className="md:hidden ml-auto min-h-11 min-w-11 p-2 text-cream-50/80 hover:text-cream-50 flex-shrink-0"
         onClick={() => setIsMenuOpen(!isMenuOpen)}
         aria-label="Toggle menu"
       >
@@ -162,7 +178,7 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
 
       {/* Mobile Menu Overlay */}
       {isMenuOpen && (
-        <div className="absolute top-[64px] left-0 right-0 bg-ink border-b-[1.5px] border-ink shadow-lg p-4 flex flex-col gap-1 md:hidden">
+        <nav id="mobile-navigation" aria-label="Main navigation" className="max-h-[calc(100dvh-64px)] overflow-y-auto overscroll-contain absolute top-[64px] left-0 right-0 bg-ink border-b-[1.5px] border-ink shadow-lg p-4 flex flex-col gap-1 md:hidden">
           {navLinks.filter((link) => !("authOnly" in link && link.authOnly) || user).map((link) => (
             <Link
               key={link.href}
@@ -183,7 +199,7 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
           {user ? (
             <button
               onClick={() => { handleSignOut(); setIsMenuOpen(false); }}
-              className="px-4 py-3 rounded-full text-sm font-semibold text-left text-cream-50/80 hover:bg-cream-50/10"
+              className="px-4 py-3 rounded-full break-words text-sm font-semibold text-left text-cream-50/80 hover:bg-cream-50/10"
             >
               Sign out ({user.email})
             </button>
@@ -191,13 +207,13 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
             <Link
               href={`/auth?next=${encodeURIComponent(pathname)}`}
               className="px-4 py-3 rounded-full text-sm font-bold text-center
-                bg-alpen text-cream-50 border-[1.5px] border-cream-50
+                bg-alpen-dk text-cream-50 border-[1.5px] border-cream-50
                 shadow-[2px_2px_0_#faf4e6]"
             >
               Sign in
             </Link>
           )}
-        </div>
+        </nav>
       )}
     </header>
   );
