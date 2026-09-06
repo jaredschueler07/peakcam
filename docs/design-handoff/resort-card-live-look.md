@@ -24,4 +24,11 @@ Implementation lives on `feat/resort-card-live-look` in `.worktrees/resort-card-
 
 Local preview: http://127.0.0.1:3114/
 
-Vercel preview details will be recorded after the deployment is Ready. Production is not changed.
+Vercel preview: https://peakcam-6hk8rlnt2-jaredschuelerspotify-3622s-projects.vercel.app
+
+- Deployment: `dpl_524tha4nbxYw6x3t3b4nL3b4bnua`
+- Deployed source: `133d2c7`
+- Target: Preview; status: Ready; homepage HTTP 200 through authenticated Vercel verification.
+- Deployed-browser smoke check passed: 24 initial cards, zero grid iframes, one camera iframe after opening Live look, successful Escape close, and no browser page errors.
+- The remote production build passed. It logs an existing `user_conditions.submitted_at` schema mismatch; this task does not change database schemas.
+- Existing Vercel preview protection remains enabled; a Vercel sign-in may be required. Production is not changed.
