@@ -142,14 +142,14 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
 
         {/* Auth */}
         {user ? (
-          <button
-            onClick={handleSignOut}
+          <Link
+            href="/account"
             className="ml-1 px-3.5 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap
               text-cream-50/80 hover:text-cream-50 hover:bg-cream-50/10 transition-colors duration-150"
             title={user.email ?? "Signed in"}
           >
-            Sign out
-          </button>
+            Account
+          </Link>
         ) : (
           <Link
             href={`/auth?next=${encodeURIComponent(pathname)}`}
@@ -196,13 +196,14 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
 
           <div className="h-px bg-cream-50/15 my-2" />
 
-          {user ? (
+          {user ? (<>
+            <Link href="/account" className="px-4 py-3 rounded-full text-sm font-semibold text-cream-50 hover:bg-cream-50/10">Account settings</Link>
             <button
               onClick={() => { handleSignOut(); setIsMenuOpen(false); }}
               className="px-4 py-3 rounded-full break-words text-sm font-semibold text-left text-cream-50/80 hover:bg-cream-50/10"
             >
               Sign out ({user.email})
-            </button>
+            </button></>
           ) : (
             <Link
               href={`/auth?next=${encodeURIComponent(pathname)}`}
