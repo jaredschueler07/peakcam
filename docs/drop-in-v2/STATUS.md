@@ -4,7 +4,7 @@
 
 Drop In v3 is implemented on the isolated `feat/drop-in-v3` integration branch
 in `.worktrees/drop-in-v3`, based on `de795d4`. This branch makes the native game
-the public default and removes the old iframe engine. It has **not been deployed**.
+the public default and removes the old iframe engine. A [Vercel preview](https://peakcam-30bdi0pzu-jaredschuelerspotify-3622s-projects.vercel.app/resorts/breckenridge/drop-in) is ready from `67cf51e`; it has **not been deployed to production**.
 The primary checkout and its snowing-now changes remain separate.
 A follow-up corrects inverted steering across keyboard, touch, mouse and gamepad;
 12 actual browser direction checks pass on WebGL/WebGPU.

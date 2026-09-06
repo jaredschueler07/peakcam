@@ -149,3 +149,11 @@ TypeScript and ESLint pass. Full production builds twice passed compilation but
 failed unrelated prerender queries with Supabase timeouts; this follow-up was
 visually checked on the isolated development server, not a completed production
 build. Earlier production performance numbers above are baseline evidence.
+
+## Vercel preview follow-up
+
+A clean committed `67cf51e` snapshot subsequently built successfully on Vercel
+and reached Ready as `dpl_HzRx7uEjsMrFFHj2uXdg2nwFF39s`. This closes the follow-up's
+production-build blocker; earlier local database timeouts remain recorded above.
+The protected Breckenridge game route returns HTTP 200 via authenticated CLI
+verification. [Preview](https://peakcam-30bdi0pzu-jaredschuelerspotify-3622s-projects.vercel.app/resorts/breckenridge/drop-in). No production promotion or migration was made.
