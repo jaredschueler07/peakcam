@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { createPortal } from "react-dom";
+import Link from "next/link";
+import { X, ChevronLeft, ChevronRight, ExternalLink, Camera } from "lucide-react";
 import type { Cam } from "@/lib/types";
 import { CamEmbed } from "./CamEmbed";
 import { camDisplayName } from "@/lib/cam-name";
@@ -15,79 +17,66 @@ interface Props {
 }
 
 export function CamLightbox({ cams, initialIndex, resortSlug, resortName, onClose }: Props) {
-  const [index, setIndex] = useState(() => Math.min(Math.max(initialIndex, 0), cams.length - 1));
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const cam = cams[index];
-
-  const prev = () => setIndex((i) => (i - 1 + cams.length) % cams.length);
-  const next = () => setIndex((i) => (i + 1) % cams.length);
+  const [index, setIndex] = useState(() => Math.max(0, Math.min(initialIndex, cams.length - 1)));
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const cam = cams[Math.min(index, cams.length - 1)];
+  const prev = () => setIndex(i => (i - 1 + cams.length) % cams.length);
+  const next = () => setIndex(i => (i + 1) % cams.length);
 
   useEffect(() => {
-    const prevFocus = document.activeElement as HTMLElement | null;
-    dialogRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowLeft") prev();
-      else if (e.key === "ArrowRight") next();
-    };
-    document.addEventListener("keydown", onKey);
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    const dialog = dialogRef.current;
+    dialog?.showModal();
+    closeRef.current?.focus();
     document.body.style.overflow = "hidden";
     return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-      prevFocus?.focus?.();
+      dialog?.close();
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (!cam) return null;
-
-  return (
-    <div
-      ref={dialogRef}
-      role="dialog"
-      aria-modal="true"
-      aria-label={`${resortName} webcams`}
-      tabIndex={-1}
-      className="fixed inset-0 z-[200] bg-ink/95 flex flex-col outline-none"
-      onClick={onClose}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3" onClick={(e) => e.stopPropagation()}>
+  if (!cam || typeof document === "undefined") return null;
+  const cameraUrl = cam.embed_type === "youtube" ? `https://www.youtube.com/watch?v=${cam.youtube_id}` : cam.embed_url;
+  const externalOnly = cam.embed_type === "link" || cam.embed_url?.startsWith("http:");
+  return createPortal(
+    <dialog ref={dialogRef} aria-label={`${resortName} webcams`}
+      onCancel={event => { event.preventDefault(); onClose(); }}
+      onClick={event => { if (event.target === event.currentTarget) onClose(); }}
+      onKeyDown={event => {
+        if (event.key === "ArrowLeft") { event.preventDefault(); prev(); }
+        if (event.key === "ArrowRight") { event.preventDefault(); next(); }
+      }}
+      className="fixed inset-0 m-auto max-h-[95dvh] w-[calc(100%_-_1.5rem)] max-w-5xl overflow-y-auto rounded-[20px] border-[1.5px] border-ink bg-cream-50 p-0 text-ink shadow-stamp backdrop:bg-ink/80">
+      <div className="flex items-center justify-between gap-3 px-4 py-4 sm:px-6">
         <div className="min-w-0">
-          <p className="font-mono text-[10.5px] font-bold text-cream-50/70 uppercase tracking-[0.14em]">{resortName}</p>
-          <h2 className="font-display font-black text-cream-50 text-xl leading-tight truncate">{camDisplayName(cam)}</h2>
+          <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-bark">Live look · {resortName}</p>
+          <h2 className="mt-1 truncate font-display text-xl font-black sm:text-2xl">{camDisplayName(cam)}</h2>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <span className="font-mono text-[11px] text-cream-50/70">{index + 1} / {cams.length}</span>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="p-2 bg-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp text-ink hover:-translate-y-0.5 transition-transform"
-          >
-            <X size={16} />
-          </button>
-        </div>
+        <button ref={closeRef} type="button" onClick={onClose} aria-label="Close camera preview"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-ink bg-cream text-ink focus-visible:ring-2 focus-visible:ring-alpen"><X size={19} aria-hidden /></button>
       </div>
-
-      {/* Media */}
-      <div className="flex-1 flex items-center justify-center px-4 pb-4 min-h-0" onClick={(e) => e.stopPropagation()}>
-        {cams.length > 1 && (
-          <button onClick={prev} aria-label="Previous cam"
-            className="p-2.5 pointer-coarse:p-3 sm:static sm:mr-3 absolute left-2 top-1/2 -translate-y-1/2 sm:translate-y-0 z-10 bg-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp text-ink hover:-translate-y-0.5 transition-transform shrink-0">
-            <ChevronLeft size={18} />
-          </button>
-        )}
-        <div className="relative w-full max-w-6xl aspect-video bg-ink rounded-[18px] overflow-hidden border-[1.5px] border-cream-50/20">
-          <CamEmbed key={cam.id} cam={cam} resortSlug={resortSlug} variant="lightbox" />
-        </div>
-        {cams.length > 1 && (
-          <button onClick={next} aria-label="Next cam"
-            className="p-2.5 pointer-coarse:p-3 sm:static sm:ml-3 absolute right-2 top-1/2 -translate-y-1/2 sm:translate-y-0 z-10 bg-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp text-ink hover:-translate-y-0.5 transition-transform shrink-0">
-            <ChevronRight size={18} />
-          </button>
-        )}
+      <div className="relative aspect-video w-full bg-ink">
+        {externalOnly ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-5 text-center text-cream-50">
+            <Camera size={30} aria-hidden />
+            <p className="text-sm">This camera is available on the resort’s website.</p>
+            <a href={cam.embed_url!} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-cream-50 px-4 text-sm font-bold">Open camera <ExternalLink size={14} aria-hidden /></a>
+          </div>
+        ) : <CamEmbed key={cam.id} cam={cam} resortSlug={resortSlug} variant="lightbox" />}
       </div>
-    </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={prev} disabled={cams.length < 2} aria-label="Previous cam" className="grid h-11 w-11 place-items-center rounded-full border border-ink/30 disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-alpen"><ChevronLeft size={19} aria-hidden /></button>
+          <span className="min-w-12 text-center font-mono text-xs">{index + 1} / {cams.length}</span>
+          <button type="button" onClick={next} disabled={cams.length < 2} aria-label="Next cam" className="grid h-11 w-11 place-items-center rounded-full border border-ink/30 disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-alpen"><ChevronRight size={19} aria-hidden /></button>
+        </div>
+        {cameraUrl && !externalOnly && <a href={cameraUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1 text-xs font-bold underline underline-offset-4">Open original <ExternalLink size={12} aria-hidden /></a>}
+        <Link href={`/resorts/${resortSlug}`} className="inline-flex min-h-11 items-center gap-1 text-sm font-bold text-alpen-dk underline underline-offset-4">Resort details <ExternalLink size={13} aria-hidden /></Link>
+        <p className="w-full font-mono text-[10px] text-bark">{cam.embed_type === "image" ? "Camera still · Capture time is provided by the camera operator when available." : "Feed provided by the camera operator. Availability may change."}</p>
+      </div>
+    </dialog>, document.body,
   );
 }

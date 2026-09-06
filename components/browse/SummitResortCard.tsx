@@ -2,89 +2,18 @@
 
 import { useForecastTime } from "@/lib/use-forecast-time";
 import { hasFreshSnowForecast } from "@/lib/snow-forecast";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
-import { Camera, ArrowLeftRight, TrendingUp, TrendingDown, Minus, Snowflake, Sun, Thermometer, Heart } from "lucide-react";
+import { Play, ArrowLeftRight, TrendingUp, TrendingDown, Minus, Snowflake, Sun, Thermometer, Heart } from "lucide-react";
+import dynamic from "next/dynamic";
+import { availableCameras } from "@/lib/cam-preview";
+import { CardCameraPreview } from "./CardCameraPreview";
 import type { ResortWithData, ConditionRating, SnowTrend, SnowOutlook } from "@/lib/types";
 import { isOffSeason, OFF_SEASON_COLOR } from "@/lib/map-utils";
 import { trackResortCardClick } from "@/lib/posthog";
 
-// ── Animated count-up number ─────────────────────────────────────────────────
-
-const COUNT_UP_MS = 600;
-
-/**
- * Poster-style count-up for the big base-depth stat.
- *
- * The number this renders is *transiently wrong* while it climbs, so it is
- * purely decorative: it renders inside `aria-hidden` and the true value is
- * exposed separately (see the `sr-only` line in the card body). There is
- * deliberately no live region here.
- *
- * Three guards keep the count-up from ever showing stale/bogus snow data:
- *  1. It no-ops when the target already equals what is on screen, so a
- *     re-render / data refresh with an unchanged value never restarts from 0
- *     (that restart is what briefly painted e.g. "6″" for a 94″ base).
- *  2. A mid-flight target change animates from the *currently displayed*
- *     number rather than resetting to 0.
- *  3. `prefers-reduced-motion: reduce` jumps straight to the final value.
- *
- * `animate={false}` (below-the-fold cards on the animation diet) renders the
- * final value immediately and never runs the count-up.
- */
-function AnimatedNumber({ value, animate = true }: { value: number; animate?: boolean }) {
-  const [count, setCount] = useState(animate ? 0 : value);
-  // What is actually painted right now, and what the last completed run
-  // settled on. Refs (not state) so reading them can't re-trigger the effect.
-  const displayedRef = useRef(animate ? 0 : value);
-  const settledRef = useRef<number | null>(animate ? null : value);
-
-  useEffect(() => {
-    // Guard 1 — already showing this number: do nothing.
-    if (settledRef.current === value) return;
-
-    const settle = () => {
-      displayedRef.current = value;
-      settledRef.current = value;
-      setCount(value);
-    };
-
-    const prefersReducedMotion =
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    const from = displayedRef.current;
-    // Guard 3 (reduced motion) + animation diet + degenerate no-distance case.
-    if (!animate || prefersReducedMotion || from === value) {
-      settle();
-      return;
-    }
-
-    // Guard 2 — count from whatever is on screen to the new target.
-    let frame = 0;
-    const start = performance.now();
-    const tick = (now: number) => {
-      const t = Math.min((now - start) / COUNT_UP_MS, 1);
-      if (t >= 1) {
-        settle();
-        return;
-      }
-      const next = Math.round(from + (value - from) * t);
-      displayedRef.current = next;
-      setCount(next);
-      frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-
-    // Cancelled on unmount and on target change — no leaked rAF, no stale
-    // closure writing an old target into state after the value moved on.
-    return () => cancelAnimationFrame(frame);
-  }, [value, animate]);
-
-  return <span aria-hidden="true">{count}</span>;
-}
+const CamLightbox = dynamic(() => import("@/components/cam/CamLightbox").then(module => module.CamLightbox), { ssr: false });
 
 // ── Condition palette (earth tones) ──────────────────────────────────────────
 
@@ -129,9 +58,8 @@ interface Props {
   favorited?: boolean;
   onToggleFavorite?: () => void;
   /**
-   * Entrance animation + count-up. Only the first screenful of cards should
-   * animate — with all 148 on, every card mounts an IntersectionObserver and
-   * an interval timer, and fast scrolls hit blank not-yet-revealed patches.
+   * Entrance animation. Only the first screenful of cards should
+   * animate — with all 148 on, every card mounts an IntersectionObserver and fast scrolls can hit blank not-yet-revealed patches.
    */
   animate?: boolean;
 }
@@ -146,7 +74,10 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
   const snow48h = snow?.new_snow_48h ?? 0;
   const trailsOpen = snow?.trails_open;
   const trailsTotal = snow?.trails_total;
-  const camCount = resort.cams.filter((c) => c.is_active).length;
+  const cams = availableCameras(resort.cams);
+  const [cameraIndex, setCameraIndex] = useState<number | null>(null);
+  const closeCamera = useCallback(() => setCameraIndex(null), []);
+  const openCamera = (id?: string) => { if (cams.length) setCameraIndex(Math.max(0, cams.findIndex(cam => cam.id === id))); };
   const isFresh = snow24h >= 8;
   const cond = resort.cond_rating ? conditionColors[resort.cond_rating] : null;
   const pctNormal = snow?.pct_of_normal;
@@ -161,7 +92,8 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
 
   return (
     <motion.div
-      className="group relative rounded-[18px] cursor-pointer"
+      data-testid="resort-card" data-resort-slug={resort.slug}
+      className="group relative rounded-[18px] "
       initial={entrance ? { opacity: 0, y: 20 } : false}
       whileInView={entrance ? { opacity: 1, y: 0 } : undefined}
       viewport={{ once: true }}
@@ -173,31 +105,21 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
         shadow-stamp group-hover:shadow-stamp-hover transition-shadow duration-150
         overflow-hidden">
 
-        {/* Fresh snow ribbon */}
-        {isFresh && (
-          <div className="absolute top-4 right-4 z-10 px-3 py-1 bg-alpen text-cream-50
-            border-[1.5px] border-alpen-dk rounded-full shadow-[2px_2px_0_#2a1f14]
-            font-mono font-bold text-[10.5px] tracking-[0.14em] uppercase flex items-center gap-1">
-            <Snowflake size={11} strokeWidth={2.5} /> Fresh
-          </div>
-        )}
-
-        {/* Snow forecast badge */}
-        {hasSnowForecast && !isFresh && (
-          <div className="absolute top-4 right-4 z-10 px-3 py-1 bg-ink text-cream-50
-            border-[1.5px] border-ink rounded-full font-mono font-bold text-[10.5px]
-            tracking-[0.14em] uppercase flex items-center gap-1">
-            <Snowflake size={11} strokeWidth={2.5} /> Snow forecast
-          </div>
-        )}
+        <CardCameraPreview key={cams.map(cam => `${cam.id}:${cam.embed_url}:${cam.youtube_id}`).join("|")} cams={cams} resortName={resort.name} onOpen={openCamera} />
+        {onToggleFavorite && <button type="button" onClick={onToggleFavorite}
+          aria-label={favorited ? `Remove ${resort.name} from favorites` : `Add ${resort.name} to favorites`}
+          aria-pressed={Boolean(favorited)}
+          className="absolute right-3 top-3 grid h-11 w-11 place-items-center rounded-full border border-ink bg-cream-50 text-ink shadow-stamp-sm focus-visible:ring-2 focus-visible:ring-alpen">
+          <Heart size={17} className={favorited ? "text-alpen" : ""} fill={favorited ? "currentColor" : "none"} aria-hidden />
+        </button>}
 
         {/* Main card link */}
         <Link
           href={`/resorts/${resort.slug}`}
-          className="block p-6"
+          className="block px-5 pt-5 pb-3 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-alpen"
           onClick={() => trackResortCardClick(resort.name, resort.slug)}
         >
-          <div className="relative space-y-5">
+          <div className="relative space-y-3">
             {/* Eyebrow: state / region */}
             <div className="flex items-center gap-2 font-mono font-bold text-[10.5px] text-bark uppercase tracking-[0.14em]">
               <span className="px-2 py-0.5 bg-ink text-cream-50 rounded-full">
@@ -211,48 +133,24 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
               {resort.name}
             </h3>
 
-            {/* Giant base depth stat — centered poster-style.
-                The whole visual block is aria-hidden because the digits count
-                up and are therefore momentarily wrong; the sr-only line below
-                carries the real, final number (and never a live region, so
-                nothing is announced mid-animation). */}
-            <div className="text-center py-4">
-              <div
-                aria-hidden="true"
-                className="font-display font-black text-[6.5rem] leading-none text-ink tracking-[-0.04em] group-hover:scale-[1.03] transition-transform duration-200"
-                style={{ fontVariantNumeric: "tabular-nums" }}
-              >
-                {baseDepth > 0 ? (
-                  <>
-                    <AnimatedNumber value={baseDepth} animate={entrance} />
-                    <span className="text-alpen">&quot;</span>
-                  </>
-                ) : (
-                  <span className="text-bark text-6xl">&mdash;</span>
-                )}
-              </div>
-              <div aria-hidden="true" className="font-mono font-bold text-[10.5px] text-bark tracking-[0.18em] uppercase mt-1">
-                Base Depth
-              </div>
-              <p className="sr-only">
-                {baseDepth > 0
-                  ? `Base depth: ${baseDepth} inches`
-                  : "Base depth: no report"}
-              </p>
-            </div>
+            {(isFresh || hasSnowForecast) && <span className="inline-flex items-center gap-1 rounded-full border border-alpen-dk bg-alpen-dk px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wide text-white"><Snowflake size={11} aria-hidden />{isFresh ? "Fresh snow" : "Snow forecast"}</span>}
 
             {/* Data strip — dashed bark rule top/bottom, mono numbers */}
-            <div className="grid grid-cols-3 gap-4 py-4 border-t border-b border-dashed border-bark/60">
+            <div className="grid grid-cols-4 gap-2 py-3 border-t border-b border-dashed border-bark/60">
               <div className="text-center">
-                <div className="font-mono font-bold text-xl text-ink tabular-nums">{snow24h}&quot;</div>
+                <div className="font-mono font-bold text-lg text-ink tabular-nums">{snow?.base_depth != null ? `${baseDepth}″` : "—"}</div>
+                <div className="font-mono text-[10px] text-bark uppercase tracking-widest mt-0.5">Base</div>
+              </div>
+              <div className="text-center">
+                <div className="font-mono font-bold text-lg text-ink tabular-nums">{snow?.new_snow_24h != null ? `${snow24h}″` : "—"}</div>
                 <div className="font-mono text-[10px] text-bark uppercase tracking-widest mt-0.5">24H</div>
               </div>
-              <div className="text-center border-x border-dashed border-bark/60">
-                <div className="font-mono font-bold text-xl text-ink tabular-nums">{snow48h}&quot;</div>
+              <div className="text-center">
+                <div className="font-mono font-bold text-lg text-ink tabular-nums">{snow?.new_snow_48h != null ? `${snow48h}″` : "—"}</div>
                 <div className="font-mono text-[10px] text-bark uppercase tracking-widest mt-0.5">48H</div>
               </div>
               <div className="text-center">
-                <div className="font-mono font-bold text-xl text-ink tabular-nums">
+                <div className="font-mono font-bold text-lg text-ink tabular-nums">
                   {trailsOpen != null && trailsTotal != null
                     ? `${trailsOpen}/${trailsTotal}`
                     : "\u2014"}
@@ -261,7 +159,7 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
               </div>
             </div>
 
-            {/* Footer: condition chip + trend + cameras + favorite */}
+            {/* Condition chip and outlook */}
             <div className="flex items-center justify-between pt-1">
               <div className="flex items-center gap-2">
                 {offSeason ? (
@@ -298,34 +196,19 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 text-bark-dk" role="img" aria-label={`${camCount} webcam${camCount !== 1 ? 's' : ''} available`}>
-                  <Camera size={14} strokeWidth={2.3} />
-                  <span className="font-mono font-bold text-[13px] tabular-nums">{camCount}</span>
-                </div>
-                {onToggleFavorite && (
-                  <button
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(); }}
-                    className={`p-1.5 pointer-coarse:p-3 rounded-full border-[1.5px] transition-all duration-100 ${
-                      favorited
-                        ? "bg-alpen/15 border-alpen text-alpen shadow-[2px_2px_0_#2a1f14]"
-                        : "bg-cream-50 border-ink/30 text-bark hover:text-alpen hover:border-ink hover:shadow-[2px_2px_0_#2a1f14]"
-                    }`}
-                    aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
-                  >
-                    <Heart size={13} fill={favorited ? "currentColor" : "none"} strokeWidth={favorited ? 0 : 2.2} />
-                  </button>
-                )}
-              </div>
             </div>
           </div>
         </Link>
 
         {/* Ghost compare button — separate link outside main card link */}
-        <div className="px-6 pb-5 pt-0">
+        <div className="grid grid-cols-[1fr_auto] gap-2 px-5 pb-5 pt-1">
+          <button type="button" disabled={!cams.length} onClick={() => openCamera()}
+            className="flex min-h-11 items-center justify-center gap-2 rounded-full border-[1.5px] border-ink bg-alpen-dk px-4 text-sm font-bold text-white shadow-stamp-sm transition-colors hover:bg-ink disabled:bg-cream disabled:text-bark disabled:shadow-none focus-visible:ring-2 focus-visible:ring-alpen">
+            <Play size={14} aria-hidden />{cams.length ? "Live look" : "No cameras yet"}
+          </button>
           <Link
             href={`/compare?resorts=${resort.slug}`}
-            className="flex items-center justify-center gap-1.5 w-full py-2 rounded-full
+            className="flex items-center justify-center gap-1.5 min-h-11 px-3 py-2 rounded-full
               border-[1.5px] border-ink/20 text-bark hover:text-ink hover:border-ink
               hover:bg-ink/5 transition-colors duration-150
               text-[12px] font-bold tracking-wide uppercase"
@@ -336,6 +219,7 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
         </div>
 
       </div>
+      {cameraIndex !== null && cams.length > 0 && <CamLightbox cams={cams} initialIndex={cameraIndex} resortSlug={resort.slug} resortName={resort.name} onClose={closeCamera} />}
     </motion.div>
   );
 }

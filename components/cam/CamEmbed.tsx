@@ -16,7 +16,7 @@ function timeAgo(ts: number): string {
  *  paused while the tab is hidden, placeholder on load failure. */
 function ImageFeed({ url, name, refreshMs }: { url: string; name: string; refreshMs: number }) {
   const [src, setSrc] = useState(url);
-  const [refreshedAt, setRefreshedAt] = useState(() => Date.now());
+  const [refreshedAt, setRefreshedAt] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
   const [, forceTick] = useState(0);
   const timers = useRef<{ refresh?: ReturnType<typeof setInterval>; tick?: ReturnType<typeof setInterval> }>({});
@@ -24,7 +24,6 @@ function ImageFeed({ url, name, refreshMs }: { url: string; name: string; refres
   const refresh = () => {
     const sep = url.includes("?") ? "&" : "?";
     setSrc(`${url}${sep}_t=${Date.now()}`);
-    setRefreshedAt(Date.now());
     setFailed(false);
   };
 
@@ -58,10 +57,11 @@ function ImageFeed({ url, name, refreshMs }: { url: string; name: string; refres
       <div className="absolute inset-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/images/cam-placeholder.jpg" alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover opacity-60" />
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
           <span className="px-3 py-1.5 bg-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp font-mono text-[11px] font-bold text-ink uppercase tracking-[0.12em]">
             Feed unavailable
           </span>
+          <button type="button" onClick={refresh} className="min-h-11 rounded-full border border-ink bg-cream-50 px-4 text-sm font-bold text-ink">Retry camera</button>
         </div>
       </div>
     );
@@ -75,11 +75,12 @@ function ImageFeed({ url, name, refreshMs }: { url: string; name: string; refres
         alt={name}
         className="absolute inset-0 w-full h-full object-cover"
         loading="lazy"
+        onLoad={() => setRefreshedAt(Date.now())}
         onError={() => setFailed(true)}
       />
       <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1.5">
         <span className="px-2 py-0.5 bg-ink/80 rounded-full font-mono text-[10px] font-bold text-cream-50 uppercase tracking-[0.12em]">
-          Live · {timeAgo(refreshedAt)}
+          {refreshedAt === null ? "Loading image…" : `Image loaded ${timeAgo(refreshedAt)}`}
         </span>
         <button
           onClick={refresh}
