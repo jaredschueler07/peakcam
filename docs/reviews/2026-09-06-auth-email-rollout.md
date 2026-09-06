@@ -17,4 +17,9 @@ Rollback: disable custom SMTP in the Supabase dashboard, restore the default sub
 
 ## Status at this commit
 
-Resend still reported `auth.peakcam.io` as pending verification (records confirmed on Google, Cloudflare and Quad9 resolvers). Custom SMTP is therefore not yet switched on; authentication mail continues to leave through Supabase's default sender with the branded templates until the follow-up commit records the SMTP cutover.
+- Resend verified `auth.peakcam.io` (DKIM, return-path MX and SPF all verified) at about 00:50 CDT.
+- A new Resend API key `peakcam-supabase-auth-smtp` (sending access, scoped to `auth.peakcam.io` only) was created and entered directly into Supabase; it was never written to disk, the repo, or logs. The existing send-only alerts key and the older full-access `peakcam` key were left untouched.
+- Supabase custom SMTP is ON: host `smtp.resend.com`, port 465, username `resend`, sender `PeakCam <login@auth.peakcam.io>`, minimum interval per user 60 s. Supabase raised the email rate limit from 2/h (default-sender cap) to 30/h automatically.
+- Production deploy of `32b9981` was READY with `NEXT_PUBLIC_AUTH_EMAIL_CODE_ENABLED=true`, so the sign-in UI now offers an email code.
+
+Not yet done: real delivery tests to designated inboxes with header inspection (SPF/DKIM/DMARC alignment) and a `rua` destination for DMARC reports. Inbox placement is unverified.
