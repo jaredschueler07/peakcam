@@ -32,3 +32,15 @@ Vercel preview: https://peakcam-6hk8rlnt2-jaredschuelerspotify-3622s-projects.ve
 - Deployed-browser smoke check passed: 24 initial cards, zero grid iframes, one camera iframe after opening Live look, successful Escape close, and no browser page errors.
 - The remote production build passed. It logs an existing `user_conditions.submitted_at` schema mismatch; this task does not change database schemas.
 - Existing Vercel preview protection remains enabled; a Vercel sign-in may be required. Production is not changed.
+
+## Production release — 2026-09-05
+
+The user approved publishing the preview to main and production. Remote main was updated through `db1c963`, while the primary checkout and its uncommitted work remained unchanged.
+
+- Production: https://www.peakcam.io/
+- Deployment: `dpl_Arh91aWBN2sP1Jbmkj3AYDXBsSYp`, built from `16666c0` with production settings, verified before promotion. Subsequent changes only relocate the proposed CI workflow and record this release.
+- All 1,119 unit tests, TypeScript, targeted lint, simulation import checks, terrain validation, and the production build passed.
+- Browser run: 30 of 31 cases initially passed. The Conditions navigation case timed out during the first local route load, then passed after compilation; it also passed on the staged production build in 5.4 seconds with no page errors.
+- Heap gate passed: 233,716 bytes retained against a 2,097,152-byte budget.
+- Public-site verification passed without Vercel authentication: HTTP 200, 24 initial cards, no grid iframes, one iframe on Live look, successful close, and no page errors.
+- GitHub's OAuth login lacks the `workflow` scope. The proposed workflow is retained at `docs/drop-in-v2/drop-in-ci-proposed.yml`, outside Actions; it is not enabled. The two public Supabase settings it needs are configured in repository Actions secrets. Checks were run locally and on Vercel for this release.
