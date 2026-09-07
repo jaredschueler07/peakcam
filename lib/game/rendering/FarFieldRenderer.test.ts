@@ -48,3 +48,19 @@ test('scene-owned or direct disposal releases both index-owning geometries exact
     assert.equal(highs, 1); assert.equal(lows, 1);
   }
 });
+
+test('pending adaptive movement clips the far field to the visible buffer, not the requested player tile', () => {
+  for (const nodes of [null, staticNodeFactories()]) {
+    const scene = new THREE.Scene(), renderer = new FarFieldRenderer(scene, fixture(), { nodes });
+    const camera = new THREE.Vector3(), frustum = new THREE.Frustum();
+    const active = new THREE.Vector4(-400, -200, 600, 800);
+    renderer.update(camera, frustum, { x: 201, z: 201 }, active);
+    assert.deepEqual(renderer.nearBounds.toArray(), [-399, -199, 599, 799]);
+    active.set(-200, 0, 800, 1000);
+    renderer.update(camera, frustum, { x: 201, z: 201 }, active);
+    assert.deepEqual(renderer.nearBounds.toArray(), [-199, 1, 799, 999]);
+    renderer.update(camera, frustum, { x: 0, z: 0 });
+    assert.deepEqual(renderer.nearBounds.toArray(), [-399, -199, 599, 799]);
+    renderer.dispose();
+  }
+});

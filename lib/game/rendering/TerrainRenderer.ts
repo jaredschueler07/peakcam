@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { AdaptiveTerrainStream } from "./AdaptiveTerrainMesh";
 import { clamp01, smoothstep } from "../core/math";
 import type { SimulationWorld, TerrainSampler } from "../core/types";
 import { fbm, vnoise } from "../terrain/noise";
@@ -152,8 +153,11 @@ export class TerrainRenderer {
   private readonly lowMesh: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
   // Reserve the bounded 2.84 MiB cache at construction. A thermal downshift
   // must not add this retained allocation midway through active play.
-  private readonly lowBuffers = allocateLowTileBuffers();
+  private readonly lowBuffers: LowTileBuffers;
+  private readonly adaptive: AdaptiveTerrainStream | null;
   private lowGeometryDirty = true;
+  private playerX = 0;
+  private playerZ = 0;
   private centerX = Infinity;
   private centerZ = Infinity;
   private readonly detailNormal: THREE.Texture;
@@ -173,7 +177,9 @@ export class TerrainRenderer {
     private rung: QualityRung = 0,
     /** Mobile keeps the single batched mesh regardless of shader quality. */
     private readonly mobileGeometry = false,
+    adaptiveGeometry = false,
   ) {
+    this.lowBuffers = adaptiveGeometry ? { position: new Float32Array(0), normal: new Float32Array(0), color: new Float32Array(0), groomed: new Float32Array(0), indices: new Uint32Array(0) } : allocateLowTileBuffers();
     this.detailNormal = buildSnowDetailNormal(world.seed);
     // The node material is built from the same constants; only the shading language differs.
     const material: THREE.Material = snowUniforms && nodes
@@ -194,7 +200,7 @@ export class TerrainRenderer {
       ));
     }
     for (const variant of this.variants.values()) variant.userData.snowFallback = this.detailNormal;
-    for (let index = 0; index < GRID_SIZE * GRID_SIZE; index += 1) {
+    for (let index = 0; index < (adaptiveGeometry ? 0 : GRID_SIZE * GRID_SIZE); index += 1) {
         const mesh = new THREE.Mesh(new THREE.BufferGeometry(), material);
         mesh.receiveShadow = true;
         scene.add(mesh);
@@ -204,6 +210,8 @@ export class TerrainRenderer {
     this.lowMesh.name = "terrain-low";
     this.lowMesh.receiveShadow = true;
     this.scene.add(this.lowMesh);
+    this.adaptive = adaptiveGeometry ? new AdaptiveTerrainStream(world.terrain, material, mobileGeometry) : null;
+    if (this.adaptive) scene.add(this.adaptive.mesh);
     this.applyTileVisibility();
   }
 
@@ -217,12 +225,14 @@ export class TerrainRenderer {
       this.material = next;
       for (const tile of this.tiles) tile.mesh.material = next;
       this.lowMesh.material = next;
+      if (this.adaptive) this.adaptive.mesh.material = next;
     }
-    if ((this.mobileGeometry || rung < 2) && this.lowGeometryDirty && Number.isFinite(this.centerX)) this.rebuildLowBatch();
+    if (!this.adaptive && (this.mobileGeometry || rung < 2) && this.lowGeometryDirty && Number.isFinite(this.centerX)) this.rebuildLowBatch();
     this.applyTileVisibility();
   }
 
   private applyTileVisibility(): void {
+    if (this.adaptive) { this.lowMesh.visible = false; return; }
     for (const tile of this.tiles) tile.mesh.visible = !this.mobileGeometry && this.rung >= 2;
     this.lowMesh.visible = (this.mobileGeometry || this.rung < 2) && this.lowMesh.geometry.index !== null;
   }
@@ -257,6 +267,9 @@ export class TerrainRenderer {
   /** Active material/textures belong to scene disposal; release only detached variants here. */
   disposeInactiveMaterials(audit?: { material?(): void }): void {
     this.disposed = true;
+    // Direct dispose() also enters here before releasing the scene-owned front.
+    // The hidden back buffer must be released through this shared teardown hook.
+    this.adaptive?.disposeInactiveGeometry();
     for (const material of this.variants.values()) {
       if (material !== this.material) { material.dispose(); audit?.material?.(); }
     }
@@ -265,6 +278,8 @@ export class TerrainRenderer {
 
   update(playerX: number, playerZ: number): void {
     if (this.disposed) return;
+    this.playerX = playerX; this.playerZ = playerZ;
+    if (this.adaptive) { this.adaptive.update(playerX, playerZ); return; }
     const cx = Math.floor(playerX / TILE_SIZE), cz = Math.floor(playerZ / TILE_SIZE);
     if (cx === this.centerX && cz === this.centerZ) return;
     this.centerX = cx; this.centerZ = cz;
@@ -292,6 +307,7 @@ export class TerrainRenderer {
   /** Exact active triangle interpolation for visual contact only. The physics
    * sampler remains bicubic; this reads the already-built Float32 mesh heights. */
   sampleRenderedHeight(x: number, z: number): number {
+    if (this.adaptive) return this.adaptive.sampleRenderedHeight(x, z);
     const ix = Math.floor(x / TILE_SIZE), iz = Math.floor(z / TILE_SIZE);
     for (const tile of this.tiles) {
       if (tile.x !== ix || tile.z !== iz) continue;
@@ -310,6 +326,17 @@ export class TerrainRenderer {
     return this.world.terrain.height(x, z);
   }
 
+  get activeNearBounds(): THREE.Vector4 | null { return this.adaptive?.bounds ?? null; }
+
+  debugGeometry(): unknown {
+    const physicalHeight = this.world.terrain.height(this.playerX, this.playerZ);
+    const renderedHeight = this.sampleRenderedHeight(this.playerX, this.playerZ);
+    const contactErrorM = renderedHeight - physicalHeight;
+    return this.adaptive ? { physicalHeight, renderedHeight, contactErrorM, mode: "adaptive", triangles: this.adaptive.triangles, vertices: this.adaptive.vertexCount,
+      bufferBytes: this.adaptive.bufferBytes, rebuilds: this.adaptive.rebuilds, lastBuildMs: this.adaptive.lastBuildMs, maxBuildMs: this.adaptive.maxBuildMs, rebuilding: this.adaptive.rebuilding, lastWorkMs: this.adaptive.lastWorkMs, maxWorkMs: this.adaptive.maxWorkMs }
+      : { physicalHeight, renderedHeight, contactErrorM, mode: "uniform", spacingM: this.mobileGeometry || this.rung < 2 ? 8 : 4 };
+  }
+
   private rebuild(tile: Tile, ix: number, iz: number): void {
     tile.x = ix; tile.z = iz;
     tile.mesh.geometry.dispose();
@@ -326,6 +353,7 @@ export class TerrainRenderer {
     for (const { mesh } of this.tiles) {
       this.scene.remove(mesh); mesh.geometry.dispose();
     }
+    if (this.adaptive) { this.scene.remove(this.adaptive.mesh); this.adaptive.geometry.dispose(); }
     this.scene.remove(this.lowMesh); this.lowMesh.geometry.dispose();
     this.material.dispose();
     this.tiles.length = 0;

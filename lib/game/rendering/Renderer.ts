@@ -219,7 +219,8 @@ export class GameRenderer {
       throw new Error("[Drop In] A WebGPU backend needs nodeFactories; await loadNodeFactories() before constructing GameRenderer.");
     }
     this.built = createScene(profile, Math.max(1, canvas.clientWidth) / Math.max(1, canvas.clientHeight), nodes, this.quality.rung);
-    this.terrain = new TerrainRenderer(this.built.scene, world, this.built.snowUniforms, nodes, snowDebug, this.quality.rung, this.mobile);
+    this.terrain = new TerrainRenderer(this.built.scene, world, this.built.snowUniforms, nodes, snowDebug, this.quality.rung, this.mobile,
+      profile.slug === "breckenridge" && world.terrain.kind === "real" && typeof location !== "undefined" && new URLSearchParams(location.search).get("terrain") === "adaptive");
     this.skier = new SkierRenderer(this.built.scene, options.riderPresentation, options.riderStyle);
     // A seventeen-part rider would consume seventeen extra mobile shadow draws.
     if (this.mobile) this.skier.root.traverse(object => { object.castShadow = false; });
@@ -412,6 +413,7 @@ export class GameRenderer {
       // WebGPU render.calls is lifetime render invocations; drawCalls is the per-frame draw budget.
       frameDrawCalls: this.renderer.backendKind === "webgpu" ? info.render?.drawCalls : info.render?.calls,
       frameTriangles: info.render?.triangles,
+      terrain: this.terrain.debugGeometry(),
     })) : null;
   }
 
@@ -464,7 +466,7 @@ export class GameRenderer {
       this.built.camera.updateMatrixWorld();
       this.farFieldMatrix.multiplyMatrices(this.built.camera.projectionMatrix, this.built.camera.matrixWorldInverse);
       this.farFieldFrustum.setFromProjectionMatrix(this.farFieldMatrix);
-      this.farField.update(this.built.camera.position, this.farFieldFrustum, state.pos);
+      this.farField.update(this.built.camera.position, this.farFieldFrustum, state.pos, this.terrain.activeNearBounds);
     }
     this.effects.update(state, this.built.camera, dt, this.weather.current.snow, this.weather.windSpeed);
     this.built.atmosphereUniforms.referenceHeight.value = state.pos.y;

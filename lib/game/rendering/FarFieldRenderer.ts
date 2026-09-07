@@ -214,8 +214,10 @@ export class FarFieldRenderer {
    * A wedge's box spans its azimuth sector from the inner rim to 30 km, so sectors behind the
    * camera fail the test outright — which is where the ~4-of-16 draw estimate comes from.
    */
-  update(cameraPosition: THREE.Vector3, frustum: THREE.Frustum, player?: { x: number; z: number }): void {
-    if (player) {
+  update(cameraPosition: THREE.Vector3, frustum: THREE.Frustum, player?: { x: number; z: number }, activeNearBounds?: THREE.Vector4 | null): void {
+    if (activeNearBounds) {
+      this.nearBounds.set(activeNearBounds.x + 1, activeNearBounds.y + 1, activeNearBounds.z - 1, activeNearBounds.w - 1);
+    } else if (player) {
       // Coarse far-field triangles can sit metres above the edited DEM. Depth
       // bias cannot fix that: remove them exactly where streamed tiles exist.
       const x = Math.floor(player.x / TILE_SIZE), z = Math.floor(player.z / TILE_SIZE);

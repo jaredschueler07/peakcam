@@ -222,3 +222,47 @@ test("mobile keeps one terrain batch across shader quality upgrades", () => {
   assert.equal(terrain.sampleRenderedHeight(15, 20), height);
   terrain.dispose();
 });
+
+test("adaptive terrain keeps one mesh and stable geometry across quality, movement and texture swaps on both backends", () => {
+  for (const nodeBackend of [false, true]) {
+    const scene = new THREE.Scene(), world = createProceduralWorld(profile, profile.seed);
+    const terrain = new TerrainRenderer(scene, world, nodeBackend ? createSnowNodeUniforms() : undefined,
+      nodeBackend ? staticNodeFactories() : null, 0, 4, true, true);
+    terrain.update(-201, 199);
+    const mesh = scene.getObjectByName("terrain-adaptive") as THREE.Mesh;
+    assert.ok(mesh); const geometry = mesh.geometry;
+    assert.ok(geometry.drawRange.count / 3 < 31_250);
+    for (const rung of [1, 4, 0, 3] as const) {
+      const beforeQuality = mesh.geometry; terrain.setQuality(rung);
+      assert.equal(mesh.geometry, beforeQuality, "shader changes never advance or replace geometry");
+      terrain.update(-169, 233);
+      assert.equal(scene.children.filter(c => c.visible).length, 1);
+    }
+    const beforeTextures = mesh.geometry;
+    if (nodeBackend) terrain.attachSurfaceTextures(surfaces());
+    assert.equal(mesh.geometry, beforeTextures);
+    const before = terrain.sampleRenderedHeight(-167.3, 234.1);
+    terrain.setQuality(0); terrain.setQuality(4);
+    assert.equal(terrain.sampleRenderedHeight(-167.3, 234.1), before);
+    let disposed = 0; geometry.addEventListener("dispose", () => disposed++);
+    terrain.dispose(); terrain.dispose(); assert.equal(disposed, 1); assert.equal(scene.children.length, 0);
+  }
+});
+
+
+test("both direct and scene-owned adaptive teardown dispose both previously rendered buffers exactly once", () => {
+  for (const sceneOwned of [false, true]) {
+    const scene = new THREE.Scene(), world = createProceduralWorld(profile, profile.seed);
+    const terrain = new TerrainRenderer(scene, world, undefined, null, 0, 1, true, true);
+    terrain.update(0, 0);
+    const mesh = scene.getObjectByName("terrain-adaptive") as THREE.Mesh;
+    const geometries = new Set<THREE.BufferGeometry>([mesh.geometry]);
+    for (const x of [32, 64, 96]) for (let i = 0; i < 100; i++) { terrain.update(x, 0); geometries.add(mesh.geometry); }
+    assert.equal(geometries.size, 2, "both buffers were actually presented before teardown");
+    const counts = new Map<THREE.BufferGeometry, number>();
+    for (const geometry of geometries) { counts.set(geometry, 0); geometry.addEventListener("dispose", () => counts.set(geometry, counts.get(geometry)! + 1)); }
+    if (sceneOwned) { terrain.disposeInactiveMaterials(); disposeObjectTree(scene); terrain.dispose(); }
+    else { terrain.dispose(); terrain.dispose(); }
+    for (const count of counts.values()) assert.equal(count, 1);
+  }
+});

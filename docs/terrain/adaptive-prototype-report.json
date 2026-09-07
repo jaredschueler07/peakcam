@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "measuredAt": "2026-09-07T15:44:50.535Z",
+  "platform": "darwin/arm64",
+  "node": "v22.23.2",
+  "reference": "Existing course-v4 bicubic physics surface, not independent surveyed ground.",
+  "method": "Five longest named pieces, 33 positions each, centre and +/-5m laterally. Actual active adaptive mesh interpolation, Float32 uniform baseline. Same spatial sample points. CPU timings include warm/cold mesh rebuilds; no rendering or GPU measured.",
+  "limits": "Sampled errors are not exhaustive bounds. Whole-scene GPU budgets, temporal appearance and hardware frame/heap metrics require separate recorded playtests. Finest spacing adds no survey source information.",
+  "routes": [
+    {
+      "id": "osm:way:128929352:0",
+      "name": "Pioneer",
+      "lengthM": 2393.9585718473913
+    },
+    {
+      "id": "osm:way:128943484:0",
+      "name": "Lower Lehman",
+      "lengthM": 2080.1126933158175
+    },
+    {
+      "id": "osm:way:128929015:0",
+      "name": "Claimjumper",
+      "lengthM": 1954.865905811455
+    },
+    {
+      "id": "osm:way:128930452:0",
+      "name": "Wirepatch",
+      "lengthM": 1897.487088924032
+    },
+    {
+      "id": "osm:way:128941952:0",
+      "name": "Cashier",
+      "lengthM": 1765.1038030220345
+    }
+  ],
+  "results": [
+    {
+      "mobile": false,
+      "baselineSpacingM": 4,
+      "maxTriangles": 50834,
+      "drawCalls": 1,
+      "fixedBufferBytes": 9473732,
+      "baselineContact": {
+        "count": 495,
+        "biasM": -0.0009484567230165248,
+        "rmseM": 0.029779282797033263,
+        "p95AbsoluteM": 0.06875241485386141,
+        "maxAbsoluteM": 0.1473786843603193
+      },
+      "adaptiveContact": {
+        "count": 495,
+        "biasM": -0.00010724588835158772,
+        "rmseM": 0.0019095814665520574,
+        "p95AbsoluteM": 0.004044000251269608,
+        "maxAbsoluteM": 0.010312413129213382
+      },
+      "maxContactChangeAtRecenterM": 0,
+      "cpuBuildMs": {
+        "p50": 11.55541699999992,
+        "p95": 28.344958000000588,
+        "max": 101.75799999999981
+      }
+    },
+    {
+      "mobile": true,
+      "baselineSpacingM": 8,
+      "maxTriangles": 29868,
+      "drawCalls": 1,
+      "fixedBufferBytes": 9473732,
+      "baselineContact": {
+        "count": 495,
+        "biasM": -0.005988634148601558,
+        "rmseM": 0.08768581370241603,
+        "p95AbsoluteM": 0.18402139997942868,
+        "maxAbsoluteM": 0.417174105767117
+      },
+      "adaptiveContact": {
+        "count": 495,
+        "biasM": -0.00010724588835158772,
+        "rmseM": 0.0019095814665520574,
+        "p95AbsoluteM": 0.004044000251269608,
+        "maxAbsoluteM": 0.010312413129213382
+      },
+      "maxContactChangeAtRecenterM": 0,
+      "cpuBuildMs": {
+        "p50": 4.841165999999248,
+        "p95": 9.243000000000393,
+        "max": 14.732124999999542
+      }
+    }
+  ],
+  "streamResults": [
+    {
+      "mobile": false,
+      "frames": 600,
+      "simulatedHz": 30,
+      "simulatedSpeedMps": 30,
+      "swaps": 26,
+      "fixedBufferBytes": 15801736,
+      "contact": {
+        "count": 600,
+        "biasM": 0.0005183802703883581,
+        "rmseM": 0.003325656805979097,
+        "p95AbsoluteM": 0.006987661252878752,
+        "maxAbsoluteM": 0.021483666269432433
+      },
+      "cpuWorkMs": {
+        "p50": 0,
+        "p95": 2.0145000000002256,
+        "max": 4.6183750000000146
+      }
+    },
+    {
+      "mobile": true,
+      "frames": 600,
+      "simulatedHz": 30,
+      "simulatedSpeedMps": 30,
+      "swaps": 48,
+      "fixedBufferBytes": 15801736,
+      "contact": {
+        "count": 600,
+        "biasM": 0.0005183802703883581,
+        "rmseM": 0.003325656805979097,
+        "p95AbsoluteM": 0.006987661252878752,
+        "maxAbsoluteM": 0.021483666269432433
+      },
+      "cpuWorkMs": {
+        "p50": 0,
+        "p95": 2.0293329999994967,
+        "max": 4.37854200000038
+      }
+    }
+  ]
+}
