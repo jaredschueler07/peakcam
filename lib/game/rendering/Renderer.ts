@@ -502,6 +502,7 @@ export class GameRenderer {
     this.farField?.dispose();
     this.farField = new FarFieldRenderer(this.built.scene, asset, {
       nodes: this.nodes,
+      mobileGeometry: this.mobile && this.terrain.activeNearBounds !== null,
       fallback: this.built.peaks,
       configureMaterial: (material) => {
         // WebGPU fogs from `scene.fogNode`, which needs nothing per material.

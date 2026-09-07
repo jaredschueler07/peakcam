@@ -79,3 +79,18 @@ Release budgets are in `docs/drop-in-v2/BUDGETS.md`: mobile <150k triangles,
 <80 draws, <64MB textures and <2MB retained heap growth/10s. Docker software GPU
 and a mobile viewport on a Mac are not iPhone/Pixel performance certification.
 Keep the default uniform until recorded coverage supports wider rollout.
+
+
+## Mobile whole-scene follow-up
+
+The first live Hermes matrix on commit 20e0ec9 found that Breckenridge's mobile
+uniform baseline could exceed 200k total scene triangles. Near geometry alone
+was not the whole budget: shader rung 2 still selected the desktop far-field
+indices. The mobile adaptive prototype now keeps the existing baked far-field
+LOD at every shader rung. This is gated with the prototype and coarse-pointer
+policy; normal visits and other resorts are unchanged. The far-field full pack
+has 85,968 triangles; its existing lower topology has 17,487 total triangles
+before wedge culling. The visible low-detail wedges are batched into one draw with preallocated index
+storage; wedge culling and exact source triangles are preserved. Materials, fog
+and source attributes are unchanged.
+The baseline recordings remain failures; a new deployed build must be retested.

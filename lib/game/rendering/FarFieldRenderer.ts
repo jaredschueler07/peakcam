@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { FarFieldBatch } from "./FarFieldBatch";
 import type { QualityRung } from "./QualityController";
 import type { DecodedFarField } from "../terrain/far-field-format";
 import { GRID_HALF, GRID_SIZE, TILE_SIZE, Z_TILES_BEHIND } from "./nearFieldReach";
@@ -84,6 +85,8 @@ export interface FarFieldOptions {
    * through this handle, so the WebGL bundle never pulls the node chunk.
    */
   nodes: NodeFactories | null;
+  /** Geometry budget is independent of shader quality on the mobile prototype. */
+  mobileGeometry?: boolean;
   /** The procedural ridge bands, hidden while a real far field is attached. */
   fallback?: THREE.Object3D;
   /** Applies the backend's fog/shadow treatment; needed because the asset attaches late. */
@@ -102,6 +105,7 @@ export class FarFieldRenderer {
   private readonly meshes: THREE.Mesh[] = [];
   private readonly highGeometries: THREE.BufferGeometry[] = [];
   private readonly lowGeometries: THREE.BufferGeometry[] = [];
+  private readonly mobileBatch: FarFieldBatch | null;
   private visible = 0;
   private disposed = false;
 
@@ -184,6 +188,12 @@ export class FarFieldRenderer {
       this.wedgeBounds.push(bounds);
     }
 
+    this.mobileBatch = opts.mobileGeometry ? new FarFieldBatch(this.lowGeometries, this.material) : null;
+    if (this.mobileBatch) {
+      for (const mesh of this.meshes) mesh.visible = false;
+      this.group.add(this.mobileBatch.mesh);
+    }
+
     // Georeferenced: unlike the ridge bands, the far field does NOT follow the camera. The whole
     // point is that it is the real mountain, in the same world coordinates as everything else.
     this.group.position.set(0, 0, 0);
@@ -198,7 +208,7 @@ export class FarFieldRenderer {
   /** Index topology only: geometry attributes, shader, clipping and bounds stay fixed. */
   setQuality(rung: QualityRung): void {
     if (this.disposed) return;
-    const geometries = rung < 2 ? this.lowGeometries : this.highGeometries;
+    const geometries = this.opts.mobileGeometry || rung < 2 ? this.lowGeometries : this.highGeometries;
     for (let i = 0; i < this.meshes.length; i++) this.meshes[i].geometry = geometries[i];
   }
 
@@ -228,17 +238,19 @@ export class FarFieldRenderer {
     let visible = 0;
     for (let i = 0; i < this.meshes.length; i += 1) {
       const drawn = frustum.intersectsBox(this.wedgeBounds[i]);
-      this.meshes[i].visible = drawn;
+      this.meshes[i].visible = drawn && this.mobileBatch === null;
       this.visibility[i] = drawn ? 1 : 0;
       if (drawn) visible += 1;
     }
     this.visible = visible;
+    this.mobileBatch?.update(this.visibility);
   }
 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
     for (const mesh of this.meshes) mesh.geometry.dispose();
+    this.mobileBatch?.mesh.geometry.dispose();
     this.material.dispose();
     this.group.clear();
     this.scene.remove(this.group);
