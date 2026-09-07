@@ -219,7 +219,7 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
         </div>
 
       </div>
-      {cameraIndex !== null && cams.length > 0 && <CamLightbox cams={cams} initialIndex={cameraIndex} resortSlug={resort.slug} resortName={resort.name} onClose={closeCamera} />}
+      {cameraIndex !== null && cams.length > 0 && <CamLightbox cams={cams} initialIndex={cameraIndex} resortSlug={resort.slug} resortName={resort.name} resortUrl={resort.cam_page_url || resort.website_url} onClose={closeCamera} />}
     </motion.div>
   );
 }

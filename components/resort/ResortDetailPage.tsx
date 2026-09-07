@@ -78,12 +78,14 @@ function CamPlayer({
   cam,
   resortSlug,
   resortName,
+  resortUrl,
   index = 99,
   onExpand,
 }: {
   cam: Cam;
   resortSlug: string;
   resortName: string;
+  resortUrl?: string | null;
   index?: number;
   onExpand?: () => void;
 }) {
@@ -159,7 +161,7 @@ function CamPlayer({
           </button>
         ) : (
           <>
-            <CamEmbed cam={cam} resortSlug={resortSlug} variant="tile" />
+            <CamEmbed cam={cam} resortSlug={resortSlug} variant="tile" resortUrl={resortUrl} />
             {onExpand && (
               <button
                 onClick={event => { event.currentTarget.focus(); onExpand(); }}
@@ -210,7 +212,7 @@ function CamPlayer({
       )}
 
       {/* Actual embed */}
-      {loaded && <CamEmbed cam={cam} resortSlug={resortSlug} variant="tile" />}
+      {loaded && <CamEmbed cam={cam} resortSlug={resortSlug} variant="tile" resortUrl={resortUrl} />}
 
       {/* Expand to fullscreen (overlay) */}
       {loaded && onExpand && (
@@ -602,6 +604,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
                     cam={cam}
                     resortSlug={resort.slug}
                     resortName={resort.name}
+                    resortUrl={resort.cam_page_url || resort.website_url}
                     index={i}
                     onExpand={
                       cam.embed_type !== "link"
@@ -657,6 +660,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
           initialIndex={lightboxIndex}
           resortSlug={resort.slug}
           resortName={resort.name}
+                    resortUrl={resort.cam_page_url || resort.website_url}
           onClose={() => setLightboxIndex(null)}
         />
       )}

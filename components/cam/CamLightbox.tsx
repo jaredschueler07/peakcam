@@ -13,10 +13,11 @@ interface Props {
   initialIndex: number;
   resortSlug: string;
   resortName: string;
+  resortUrl?: string | null;
   onClose: () => void;
 }
 
-export function CamLightbox({ cams, initialIndex, resortSlug, resortName, onClose }: Props) {
+export function CamLightbox({ cams, initialIndex, resortSlug, resortName, resortUrl, onClose }: Props) {
   const [index, setIndex] = useState(() => Math.max(0, Math.min(initialIndex, cams.length - 1)));
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -65,7 +66,7 @@ export function CamLightbox({ cams, initialIndex, resortSlug, resortName, onClos
             <p className="text-sm">This camera is available on the resort’s website.</p>
             <a href={cam.embed_url!} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-cream-50 px-4 text-sm font-bold">Open camera <ExternalLink size={14} aria-hidden /></a>
           </div>
-        ) : <CamEmbed key={cam.id} cam={cam} resortSlug={resortSlug} variant="lightbox" />}
+        ) : <CamEmbed key={cam.id} cam={cam} resortSlug={resortSlug} variant="lightbox" resortUrl={resortUrl} />}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <div className="flex items-center gap-2">

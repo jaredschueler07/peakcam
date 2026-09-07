@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { recordBugAction } from "@/lib/bug-reports/client";
+import { StreamFeed } from "./StreamFeed";
 import { RefreshCw } from "lucide-react";
 import type { Cam } from "@/lib/types";
 import { camDisplayName } from "@/lib/cam-name";
@@ -106,31 +107,15 @@ function ImageFeed({ url, name, refreshMs, allowFill }: { url: string; name: str
  *  clipboard-write; encrypted-media; gyroscope; picture-in-picture" and a
  *  `border-0` class. That exact allow list / className is preserved on both
  *  branches below so embed behavior is unchanged. */
-export function CamEmbed({ cam, variant }: { cam: Cam; resortSlug: string; variant: "tile" | "lightbox" }) {
+export function CamEmbed({ cam, variant, resortUrl }: { cam: Cam; resortSlug: string; variant: "tile" | "lightbox"; resortUrl?: string | null }) {
   useEffect(() => { recordBugAction("camera-opened", { cameraId: cam.id }); }, [cam.id]);
   const name = camDisplayName(cam);
 
   if (cam.embed_type === "youtube" && cam.youtube_id) {
-    return (
-      <iframe
-        src={`https://www.youtube.com/embed/${cam.youtube_id}?autoplay=1&mute=1`}
-        title={name}
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-        allowFullScreen
-        className="absolute inset-0 w-full h-full border-0"
-      />
-    );
+    return <StreamFeed id={cam.id} url={`https://www.youtube.com/embed/${cam.youtube_id}?autoplay=1&mute=1`} name={name} resortUrl={resortUrl} />;
   }
   if (cam.embed_type === "iframe" && cam.embed_url) {
-    return (
-      <iframe
-        src={cam.embed_url}
-        title={name}
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-        allowFullScreen
-        className="absolute inset-0 w-full h-full border-0"
-      />
-    );
+    return <StreamFeed id={cam.id} url={cam.embed_url} name={name} resortUrl={resortUrl} />;
   }
   if (cam.embed_type === "image" && cam.embed_url) {
     return <ImageFeed url={cam.embed_url} name={name} refreshMs={REFRESH_MS[variant]} allowFill={variant === "lightbox"} />;

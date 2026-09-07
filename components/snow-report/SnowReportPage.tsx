@@ -4,6 +4,8 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { ConditionBadge } from "@/components/ui/Badge";
+import { matchesResortSearch } from "@/lib/resort-search";
+import { recordBugAction } from "@/lib/bug-reports/client";
 import type { ResortWithData } from "@/lib/types";
 
 type SortKey = "name" | "base" | "24h" | "48h" | "trails" | "lifts" | "conditions" | "pctNormal" | "trend";
@@ -17,6 +19,7 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
   const [sortKey, setSortKey] = useState<SortKey>("base");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [stateFilter, setStateFilter] = useState("All");
+  const [query, setQuery] = useState("");
 
   const states = useMemo(() => [...new Set(resorts.map((r) => r.state))].sort(), [resorts]);
   const hasPctNormal = useMemo(() => resorts.some(r => r.snow_report?.pct_of_normal != null), [resorts]);
@@ -25,7 +28,7 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
   const hasLifts = useMemo(() => resorts.some(r => r.snow_report?.lifts_open != null), [resorts]);
 
   const sorted = useMemo(() => {
-    let list = resorts.filter((r) => r.snow_report);
+    let list = resorts.filter((r) => r.snow_report && matchesResortSearch(r, query));
     if (stateFilter !== "All") list = list.filter((r) => r.state === stateFilter);
 
     return [...list].sort((a, b) => {
@@ -50,7 +53,7 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
 
       return sortDir === "desc" ? -diff : diff;
     });
-  }, [resorts, sortKey, sortDir, stateFilter]);
+  }, [resorts, sortKey, sortDir, stateFilter, query]);
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -81,7 +84,7 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
 
   return (
     <div className="min-h-screen bg-bg">
-      <Header />
+      <Header onSearch={setQuery} searchValue={query} />
 
       <div className="max-w-screen-2xl mx-auto px-4 py-6 md:px-8">
         <div className="flex items-end justify-between mb-6">
@@ -89,8 +92,8 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
             <h1 className="text-2xl md:text-3xl font-heading font-bold text-text-base uppercase tracking-wider">
               Snow Report
             </h1>
-            <p className="text-text-muted text-sm mt-0.5">
-              {sorted.length} resorts with snow data
+            <p role="status" className="text-text-muted text-sm mt-0.5">
+              {sorted.length} {sorted.length === 1 ? "resort" : "resorts"} with snow data
               {resortsWithoutData > 0 && ` · ${resortsWithoutData} awaiting data`}
             </p>
           </div>
@@ -99,6 +102,9 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
           </Link>
         </div>
 
+        <label className="mb-4 block text-sm font-bold sm:hidden" htmlFor="snow-search">Search snow reports
+          <input id="snow-search" type="search" value={query} onChange={event => { setQuery(event.target.value); recordBugAction("search-edited"); }} placeholder="Resort, state or region" className="mt-2 min-h-11 w-full rounded-lg border border-ink bg-cream-50 px-3 text-base font-normal" />
+        </label>
         <label className="mb-4 block text-sm font-bold md:hidden">State or country
           <select value={stateFilter} onChange={e => setStateFilter(e.target.value)} className="mt-2 min-h-11 w-full rounded-lg border border-ink bg-cream-50 px-3 text-base">
             <option value="All">All states and countries</option>{states.map(state => <option key={state}>{state}</option>)}
@@ -248,8 +254,9 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
         {sorted.length === 0 && (
           <div className="text-center py-20 text-text-muted">
             <div className="text-4xl mb-3">❄️</div>
-            <p className="text-lg font-medium text-text-subtle">No snow data available</p>
-            <p className="text-sm mt-1">Snow reports will appear once data starts flowing in.</p>
+            <p className="text-lg font-medium text-text-subtle">{query.trim() || stateFilter !== "All" ? "No matching snow reports" : "No snow data available"}</p>
+            <p className="text-sm mt-1">{query.trim() || stateFilter !== "All" ? "Try another search or clear your filters." : "Snow reports will appear once data starts flowing in."}</p>
+            {(query.trim() || stateFilter !== "All") && <button type="button" onClick={() => { setQuery(""); setStateFilter("All"); }} className="mt-4 min-h-11 rounded-full border border-ink bg-cream-50 px-5 font-bold text-ink">Clear filters</button>}
           </div>
         )}
       </div>

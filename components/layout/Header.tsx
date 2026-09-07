@@ -11,6 +11,7 @@ import { Menu, X, Search } from "lucide-react";
 interface HeaderProps {
   onSearch?: (query: string) => void;
   showSearch?: boolean;
+  searchValue?: string;
 }
 
 export const navLinks = [
@@ -24,7 +25,7 @@ export const navLinks = [
   { label: "About",       href: "/about" },
 ];
 
-export function Header({ onSearch, showSearch = true }: HeaderProps) {
+export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps) {
   const pathname = usePathname();
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -103,7 +104,7 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
           <input
             ref={inputRef}
             type="text"
-            value={query}
+            value={searchValue ?? query}
             onChange={handleChange}
             placeholder="Search resorts, states, regions…"
             className="w-full bg-cream-50 border-[1.5px] border-ink
@@ -112,7 +113,7 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
               transition-shadow duration-100
               focus:shadow-[3px_3px_0_#a93f20] focus:border-alpen-dk"
           />
-          {query && (
+          {(searchValue ?? query) && (
             <button
               onClick={clearSearch}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-bark

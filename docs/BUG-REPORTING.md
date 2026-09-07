@@ -33,3 +33,13 @@ Diagnostic-free reports remain useful, but have no interaction history or game s
 ## Verification
 
 `node --import tsx --test lib/bug-reports.test.ts` covers context allowlisting, bounded history/expiry, device minimization, API origin/size checks, opt-out, hashing and storage failure/throttling responses. Browser acceptance checks must additionally verify desktop/mobile entry points, keyboard/focus behavior, optional attachment, retry preservation, and the game pause snapshot. Verify a synthetic submission in the actual private inbox; a mocked success response alone does not prove persistence.
+
+## Reviewer dashboard
+
+The private dashboard is at `/admin/bug-reports`. Sign-in is verified server-side with Supabase `getUser()` on the page and every API request; being signed in alone does not grant access. An operator must enroll the exact authorized Supabase user ID in `public.bug_report_reviewers`. No accounts are enrolled automatically. Only select access is granted to the server role on the membership table, including explicit revocation of Supabase's default broader grants. The web application cannot enroll additional reviewers. Do not use editable user metadata or notification-recipient email settings as authorization.
+
+The inbox supports Open/Triaged/Resolved/All filters, pages of 25 reports, expandable diagnostics, review notes, and explicit duplicate grouping. To group a repeat report, paste the original report's full ID in **Duplicate of report ID**, then save. The duplicate is resolved and retains its original description and diagnostics. **View duplicate group** shows the original and its linked reports regardless of the normal status filter. Clear the ID to unlink. Groups are kept flat: they cannot link to themselves, form cycles, or become nested groups.
+
+Every update checks a revision number. A concurrent edit is rejected with a reload message rather than overwriting another review. The database increments the revision even for direct dashboard/SQL changes. Mutations record the verified reviewer's ID and update time. Private APIs return `Cache-Control: private, no-store`; neither the public table nor the inbox view is readable by anonymous or ordinary authenticated users. The inbox DOM is excluded from PostHog capture/replay using its documented `ph-no-capture` block class. The route is excluded from indexing.
+
+Reviewer UI testing may use an isolated local fixture containing synthetic reports and a mock API; that does not certify authenticated production access. Verify the real sign-in flow after the user authorizes a reviewer account. Do not create a privileged test account merely to bypass that requirement.
