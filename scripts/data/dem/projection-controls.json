@@ -1,0 +1,65 @@
+[
+  {
+    "slug": "breckenridge",
+    "lat": 39.4749,
+    "lon": -106.081,
+    "eastingM": 407022.195092711,
+    "northingM": 4370036.54851894
+  },
+  {
+    "slug": "breckenridge",
+    "lat": 39.4949,
+    "lon": -106.061,
+    "eastingM": 408768.591957037,
+    "northingM": 4372235.78386129
+  },
+  {
+    "slug": "breckenridge",
+    "lat": 39.454899999999995,
+    "lon": -106.101,
+    "eastingM": 405274.821822947,
+    "northingM": 4367837.69680679
+  },
+  {
+    "slug": "heavenly",
+    "lat": 38.9404,
+    "lon": -119.912,
+    "eastingM": 247610.364233151,
+    "northingM": 4314195.77483999
+  },
+  {
+    "slug": "heavenly",
+    "lat": 38.9604,
+    "lon": -119.89200000000001,
+    "eastingM": 249414.625400208,
+    "northingM": 4316360.53591292
+  },
+  {
+    "slug": "heavenly",
+    "lat": 38.920399999999994,
+    "lon": -119.932,
+    "eastingM": 245805.150231797,
+    "northingM": 4312031.3843542
+  },
+  {
+    "slug": "ski-portillo",
+    "lat": -32.842,
+    "lon": -70.129,
+    "eastingM": 394343.10727685,
+    "northingM": 6365664.14033347
+  },
+  {
+    "slug": "ski-portillo",
+    "lat": -32.821999999999996,
+    "lon": -70.10900000000001,
+    "eastingM": 396191.623090938,
+    "northingM": 6367901.28308726
+  },
+  {
+    "slug": "ski-portillo",
+    "lat": -32.862,
+    "lon": -70.149,
+    "eastingM": 392495.438981995,
+    "northingM": 6363426.62356035
+  }
+]

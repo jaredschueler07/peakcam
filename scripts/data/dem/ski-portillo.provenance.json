@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "slug": "ski-portillo",
+  "sourceGridSha256": "ee7e2d1857075f1f7eeb821a5abb5147d466222d22c505cff6cab49e54cec28b",
+  "sourceMetaSha256": "1cd5acdd178d769c9a3e6975b15b27f1f5928f4d1aa0d38c26dec431e359a033",
+  "verticalDatum": "EGM2008",
+  "verticalDatumVerified": false,
+  "datumEvidence": "Collection-level expected datum only; original tile metadata and transformation logs were not retained with this cache.",
+  "sourceReference": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+  "limitations": [
+    "Immutable input is a previously resampled and quantized grid, not the original survey raster.",
+    "No independent surveyed checkpoints or dataset-specific accuracy certificate are bundled.",
+    "Acquisition epoch, datum realization, original tile hashes and any nodata-fill mask need recovery before survey acceptance.",
+    "Copernicus GLO-30 is a 30 m surface model, not a survey of bare-earth terrain or current snow."
+  ]
+}

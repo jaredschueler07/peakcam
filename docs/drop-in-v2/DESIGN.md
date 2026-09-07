@@ -1,5 +1,11 @@
 # Drop In v2 — Design
 
+> **Course v4 update:** [Mountain accuracy methodology](../terrain/README.md) supersedes
+> the physical micro-detail and approximate projection policy below. Real-mountain
+> detail now defaults to zero, invented relief/jumps are removed, and vectors use
+> the DEM's UTM grid. These historical notes do not establish survey accuracy.
+
+
 > 2026-08-01 · Design lead: Claude (orchestrator) · Research: Claude Opus ×2 (terrain, rendering), Codex gpt-5.6-sol (architecture) — full reports in `./research/`.
 > Direction chosen by Jared: **arcade physics + real resort identity + live-conditions integration**, production/enterprise grade.
 

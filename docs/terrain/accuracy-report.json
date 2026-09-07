@@ -1,0 +1,138 @@
+[
+  {
+    "schemaVersion": 1,
+    "slug": "ski-portillo",
+    "courseVersion": 4,
+    "accuracyStatus": "not-survey-certified",
+    "sourceFidelity": {
+      "identicalDecodedElevations": true,
+      "samples": 1048576,
+      "sourceGridSha256": "ee7e2d1857075f1f7eeb821a5abb5147d466222d22c505cff6cab49e54cec28b",
+      "sourceMetaSha256": "1cd5acdd178d769c9a3e6975b15b27f1f5928f4d1aa0d38c26dec431e359a033",
+      "runtimeGridSha256": "ee7e2d1857075f1f7eeb821a5abb5147d466222d22c505cff6cab49e54cec28b",
+      "trailsSha256": "18035e159ea3327cf2b95675871c19db9f3f99a11fed9d2be514489a54e10b66",
+      "maxRuntimeOffsetM": 0
+    },
+    "coordinates": {
+      "horizontalCrs": "EPSG:32719",
+      "originEastingM": 394343.10727685003,
+      "originNorthingM": 6365664.140333474,
+      "verticalDatum": "EGM2008",
+      "verticalDatumVerified": false,
+      "datumEvidence": "Collection-level expected datum only; original tile metadata and transformation logs were not retained with this cache.",
+      "verticalTransformApplied": false,
+      "verticalScale": 1,
+      "units": "UTM grid metres; elevations in source vertical datum metres"
+    },
+    "resolution": {
+      "sourceSpacingM": 30,
+      "runtimeSpacingM": 4.0039100684261975,
+      "quantumM": 0.1,
+      "quantizationMaxM": 0.05,
+      "subcellProbeCount": 10000,
+      "maxInterpolationOvershootM": 0.18471041493103257
+    },
+    "checkpoints": null,
+    "limitations": [
+      "Immutable input is a previously resampled and quantized grid, not the original survey raster.",
+      "No independent surveyed checkpoints or dataset-specific accuracy certificate are bundled.",
+      "Acquisition epoch, datum realization, original tile hashes and any nodata-fill mask need recovery before survey acceptance.",
+      "Copernicus GLO-30 is a 30 m surface model, not a survey of bare-earth terrain or current snow.",
+      "UTM grid distances have projection scale distortion; no claim of exact ground-distance scale.",
+      "Catmull-Rom interpolation and render mesh LOD can deviate from measured ground between samples.",
+      "OSM positions, widths, forest planting and landmark dimensions are not independently surveyed.",
+      "No snow-depth survey; this represents source ground/surface elevations, not measured current snow."
+    ],
+    "routeCount": 6
+  },
+  {
+    "schemaVersion": 1,
+    "slug": "breckenridge",
+    "courseVersion": 4,
+    "accuracyStatus": "not-survey-certified",
+    "sourceFidelity": {
+      "identicalDecodedElevations": true,
+      "samples": 1048576,
+      "sourceGridSha256": "b340b3bc42b7b9d1ae245c7c7131893d377b66daed0016fe3c89f1d279bb5144",
+      "sourceMetaSha256": "adc037f113c23f3d36770bb0d7151a85e97a49cc6f3cd1b59cd4cedc29f782d7",
+      "runtimeGridSha256": "b340b3bc42b7b9d1ae245c7c7131893d377b66daed0016fe3c89f1d279bb5144",
+      "trailsSha256": "af12ce22eeea495a8b5031484940a64a2a52443112c6a3dd51184c059b9d2ebe",
+      "maxRuntimeOffsetM": 0
+    },
+    "coordinates": {
+      "horizontalCrs": "EPSG:32613",
+      "originEastingM": 407022.195092712,
+      "originNorthingM": 4370036.5485189445,
+      "verticalDatum": "NAVD88",
+      "verticalDatumVerified": false,
+      "datumEvidence": "Collection-level expected datum only; original tile metadata and transformation logs were not retained with this cache.",
+      "verticalTransformApplied": false,
+      "verticalScale": 1,
+      "units": "UTM grid metres; elevations in source vertical datum metres"
+    },
+    "resolution": {
+      "sourceSpacingM": 1,
+      "runtimeSpacingM": 6.005865102639296,
+      "quantumM": 0.1,
+      "quantizationMaxM": 0.05,
+      "subcellProbeCount": 10000,
+      "maxInterpolationOvershootM": 0.14448321455529367
+    },
+    "checkpoints": null,
+    "limitations": [
+      "Immutable input is a previously resampled and quantized grid, not the original survey raster.",
+      "No independent surveyed checkpoints or dataset-specific accuracy certificate are bundled.",
+      "Acquisition epoch, datum realization, original tile hashes and any nodata-fill mask need recovery before survey acceptance.",
+      "UTM grid distances have projection scale distortion; no claim of exact ground-distance scale.",
+      "Catmull-Rom interpolation and render mesh LOD can deviate from measured ground between samples.",
+      "OSM positions, widths, forest planting and landmark dimensions are not independently surveyed.",
+      "No snow-depth survey; this represents source ground/surface elevations, not measured current snow."
+    ],
+    "routeCount": 228
+  },
+  {
+    "schemaVersion": 1,
+    "slug": "heavenly",
+    "courseVersion": 4,
+    "accuracyStatus": "not-survey-certified",
+    "sourceFidelity": {
+      "identicalDecodedElevations": true,
+      "samples": 1048576,
+      "sourceGridSha256": "b5e48d997ed513aac88488a1aeb5fb7b9d2a23263236dba853381dd75693b0a1",
+      "sourceMetaSha256": "8a33bec26d48fcf0b812a258e8234230553782a5bfaa5c3ff7403d3746b01085",
+      "runtimeGridSha256": "b5e48d997ed513aac88488a1aeb5fb7b9d2a23263236dba853381dd75693b0a1",
+      "trailsSha256": "62adc3da5b7397b8bcd3faa1e3fc477928ced3165ccb85ea6474545765daee6b",
+      "maxRuntimeOffsetM": 0
+    },
+    "coordinates": {
+      "horizontalCrs": "EPSG:32611",
+      "originEastingM": 247610.36423315137,
+      "originNorthingM": 4314195.7748399945,
+      "verticalDatum": "NAVD88",
+      "verticalDatumVerified": false,
+      "datumEvidence": "Collection-level expected datum only; original tile metadata and transformation logs were not retained with this cache.",
+      "verticalTransformApplied": false,
+      "verticalScale": 1,
+      "units": "UTM grid metres; elevations in source vertical datum metres"
+    },
+    "resolution": {
+      "sourceSpacingM": 10,
+      "runtimeSpacingM": 6.005865102639296,
+      "quantumM": 0.1,
+      "quantizationMaxM": 0.05,
+      "subcellProbeCount": 10000,
+      "maxInterpolationOvershootM": 0.19044950077204703
+    },
+    "checkpoints": null,
+    "limitations": [
+      "Immutable input is a previously resampled and quantized grid, not the original survey raster.",
+      "No independent surveyed checkpoints or dataset-specific accuracy certificate are bundled.",
+      "Acquisition epoch, datum realization, original tile hashes and any nodata-fill mask need recovery before survey acceptance.",
+      "UTM grid distances have projection scale distortion; no claim of exact ground-distance scale.",
+      "Catmull-Rom interpolation and render mesh LOD can deviate from measured ground between samples.",
+      "OSM positions, widths, forest planting and landmark dimensions are not independently surveyed.",
+      "No snow-depth survey; this represents source ground/surface elevations, not measured current snow."
+    ],
+    "routeCount": 129
+  }
+]

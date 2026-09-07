@@ -11,8 +11,6 @@ import {
   type RawRun, type TerrainMeta, type TrailsFile,
 } from "./formats";
 import { fbm } from "./noise";
-import { pointAtArcLength } from "./real-course";
-import { RAMP_LEN } from "./heightfield";
 import { fbmWithGradient, vnoiseWithGradient } from "./noise-grad";
 import {
   createNearestRun, createRealTerrain, CORRIDOR_DAMPING,
@@ -113,7 +111,7 @@ function straightRun(fromNorthM: number, toNorthM: number): RawRun {
 
 function makeTerrain(assets: SyntheticAssets, overrides: Partial<RealTerrainOptions> = {}) {
   return createRealTerrain(assets.heightfield, assets.meta, assets.trails, {
-    profile, ...overrides,
+    profile, amplitudeM: 0.5, ...overrides,
   });
 }
 
@@ -658,16 +656,17 @@ test("all three baked resorts load and sample", () => {
   }
 });
 
-test("real course ramps are physical height features along the selected polyline", () => {
-  const assets = loadBakedAssets("heavenly");
-  const terrain = createRealTerrain(assets.heightfield, assets.meta, assets.trails, {
-    profile: DROP_IN_GAME_PROFILES.heavenly,
-  });
-  const run = terrain.realRuns?.find((candidate) => candidate.ramps.length > 0);
-  assert.ok(run);
-  const ramp = run.ramps[0];
-  const point = pointAtArcLength(run.points, ramp.distanceM + RAMP_LEN / 2);
-  const centre = terrain.height(point.x, point.z);
-  const base = terrain.macroHeight(point.x, point.z) + terrain.microDetail(point.x, point.z);
-  assert.ok(centre > base + 0.1, `ramp added only ${centre - base} m`);
+test("real mountains preserve the DEM without invented ramps or seed-dependent height", () => {
+  for (const slug of ["heavenly", "breckenridge", "ski-portillo"] as const) {
+    const assets = loadBakedAssets(slug);
+    const terrain = createRealTerrain(assets.heightfield, assets.meta, assets.trails, { profile: DROP_IN_GAME_PROFILES[slug] });
+    const other = createRealTerrain(assets.heightfield, assets.meta, assets.trails, { profile: DROP_IN_GAME_PROFILES[slug], seed: 9876 });
+    assert.ok(terrain.realRuns!.every(run => run.ramps.length === 0));
+    for (let i = 0; i < 200; i++) {
+      const x = (i / 200 - 0.5) * assets.meta.sizeM, z = Math.sin(i) * assets.meta.sizeM * 0.49;
+      assert.equal(terrain.microDetail(x,z), 0);
+      assert.equal(terrain.height(x,z), terrain.macroHeight(x,z));
+      assert.equal(terrain.height(x,z), other.height(x,z));
+    }
+  }
 });

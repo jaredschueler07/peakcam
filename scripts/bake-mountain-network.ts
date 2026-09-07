@@ -3,6 +3,7 @@
  * Run: npx tsx scripts/bake-mountain-network.ts [all|slug] [--verify]
  */
 import fs from 'node:fs';
+import { localProjection } from './dem/local-projection';
 import { PNG } from 'pngjs';
 import { bakeMountainDetail } from './bake-mountain-detail';
 import path from 'node:path';
@@ -11,7 +12,7 @@ import { brotliCompressSync, brotliDecompressSync, constants } from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { clipPolylineToBox, rdp, type Pt } from './bake-resort';
 import { decodeHeightfield, encodeDelta, sampleHeightBilinear, quantizeHeight, type TerrainMeta, type TrailsFile, type RawRun, type RawLift, type Heightfield } from '../lib/game/terrain/formats';
-import { RESORT_BAKE_CONFIGS, mPerDegLon, M_PER_DEG_LAT, type ResortBakeConfig } from '../lib/game/terrain/resorts';
+import { RESORT_BAKE_CONFIGS, type ResortBakeConfig } from '../lib/game/terrain/resorts';
 import { createRealTerrain } from '../lib/game/terrain/real-heightfield';
 import { DROP_IN_GAME_PROFILES } from '../lib/game/config/profiles';
 import type { DropInResortSlug } from '../lib/game/config/schema';
@@ -23,7 +24,8 @@ export const DEFAULT_WIDTHS: Record<string,number> = { novice: 32, easy: 30, int
 export const DEFAULT_SPEEDS: Record<string,number> = { chair_lift: 2.5, gondola: 5, cable_car: 5, mixed_lift: 4, platter: 2, 't-bar': 2, drag_lift: 2, rope_tow: 1.5, magic_carpet: 0.7 };
 const rounded = (v:number) => Math.round(v*10)/10;
 export function bakeMountainNetwork(cfg: ResortBakeConfig, source: OsmSource, field: Heightfield): TrailsFile {
-  const project = (g:{lat:number;lon:number}): Pt => [rounded((g.lon-cfg.center[1])*mPerDegLon(cfg.center[0])),rounded((g.lat-cfg.center[0])*M_PER_DEG_LAT)];
+  const projection = localProjection(cfg.center);
+  const project = (g:{lat:number;lon:number}): Pt => projection.forward(g.lat,g.lon).map(rounded) as Pt;
   const elev = (p:Pt) => rounded(sampleHeightBilinear(field,...p));
   const file: TrailsFile = {v:2,center:cfg.center,sizeM:cfg.sizeM,unit:0.1,convention:cfg.convention,runs:[],lifts:[],junctions:[],forests:[],provenance:{source:'OpenStreetMap / Overpass cached out geom; ODbL 1.0',retrievedAt:source.osm3s?.timestamp_osm_base ?? 'unknown',gaps:['Widths without OSM width use difficulty defaults; missing grooming uses difficulty inference.', 'Lift speed without OSM aerialway:speed uses documented type defaults; occupancy remains null when unmapped.', 'Station bounds are 12 m gameplay zones at actual source terminals only. Incomplete clipped lines are explicitly non-rideable and preserve source endpoints.', 'Closed piste areas retain their boundary; playable descent follows the shorter high-to-low boundary arc, not a surveyed centreline.', 'Forest multipolygon relations are not included; only closed ways wholly inside the DEM are retained.']}};
   const vertices=new Map<string,{x:number;y:number;runIds:Set<string>}>();
@@ -32,13 +34,13 @@ export function bakeMountainNetwork(cfg: ResortBakeConfig, source: OsmSource, fi
     if(el.type!=='way'||!el.geometry||el.geometry.length<2)continue;
     const tags=el.tags??{}, points=el.geometry.map(project), sourceId=`osm:way:${el.id}`;
     if(tags.natural==='wood'||tags.landuse==='forest'){
-      if(points.length>3 && points[0][0]===points.at(-1)![0]&&points[0][1]===points.at(-1)![1]&&points.every(p=>p.every(v=>Math.abs(v)<=cfg.sizeM/2)))file.forests!.push({sourceId,points:rdp(points,3).map(([x,y])=>({x,y}))});
+      if(points.length>3 && points[0][0]===points.at(-1)![0]&&points[0][1]===points.at(-1)![1]&&points.every(p=>p.every(v=>Math.abs(v)<=cfg.sizeM/2)))file.forests!.push({sourceId,points:rdp(points,0.1).map(([x,y])=>({x,y}))});
       continue;
     }
     const isRun=tags['piste:type']==='downhill';
     if(!isRun && !(tags.aerialway in DEFAULT_SPEEDS)) continue;
     clipPolylineToBox(points,cfg.sizeM/2).forEach((piece,part)=>{
-      const simplified=rdp(piece,2);
+      const simplified=rdp(piece,0.1);
       if(isRun?elev(simplified[0])<elev(simplified.at(-1)!):elev(simplified[0])>elev(simplified.at(-1)!))simplified.reverse();
       const common={id:`${sourceId}:${part}`,sourceId,n:tags.name??tags['piste:name']??null,p:encodeDelta(simplified.map(([x,y])=>[Math.round(x*10),Math.round(y*10)]))};
       if(isRun){
@@ -74,7 +76,8 @@ export function bakeMountainNetwork(cfg: ResortBakeConfig, source: OsmSource, fi
 export function runBake(slug:string,verify=false):void{
   const cfg=RESORT_BAKE_CONFIGS[slug];if(!cfg)throw new Error(`Unknown resort ${slug}`);
   const dir=path.resolve('public/game/terrain'), sourceBytes=fs.readFileSync(`scripts/data/osm/${slug}.json.br`), source=JSON.parse(brotliDecompressSync(sourceBytes).toString()) as OsmSource;
-  const meta=JSON.parse(fs.readFileSync(`${dir}/${slug}.meta.json`,'utf8')) as TerrainMeta;
+  const meta=JSON.parse(fs.readFileSync(`scripts/data/dem/${slug}.meta.json`,'utf8')) as TerrainMeta;
+  localProjection(cfg.center, meta.epsg ?? undefined);
   const bytes=brotliDecompressSync(fs.readFileSync(`scripts/data/dem/${slug}.height.u16.br`));
   const buffer=bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength) as ArrayBuffer;
   const field=decodeHeightfield(buffer,meta);
@@ -86,7 +89,7 @@ export function runBake(slug:string,verify=false):void{
   for(let i=0;i<detailed.length;i++){const code=quantizeHeight(detailed[i],meta.minZ,meta.quantum);baked.writeUInt16LE(code,i*2);maxCode=Math.max(maxCode,code);}
   meta.maxZ=meta.minZ+maxCode*meta.quantum;
   const terrain=createRealTerrain(baked.buffer.slice(baked.byteOffset,baked.byteOffset+baked.byteLength) as ArrayBuffer,meta,network,{profile});
-  const catalog={version:3,slug,sourceSha256:createHash('sha256').update(sourceBytes).digest('hex'),runs:terrain.realRuns!.map((r,index)=>({index,id:r.id,name:r.name,difficulty:r.difficulty,sourceIndex:r.sourceIndex,topElevationM:rounded(r.points[0].y),bottomElevationM:rounded(r.points.at(-1)!.y),lengthM:rounded(r.lengthM),widthM:r.halfWidthM*2})),lifts:network.lifts.map(l=>({id:l.id,name:l.n,type:l.t})),gaps:network.provenance!.gaps};
+  const catalog={version:4,slug,sourceSha256:createHash('sha256').update(sourceBytes).digest('hex'),runs:terrain.realRuns!.map((r,index)=>({index,id:r.id,name:r.name,difficulty:r.difficulty,sourceIndex:r.sourceIndex,topElevationM:rounded(r.points[0].y),bottomElevationM:rounded(r.points.at(-1)!.y),lengthM:rounded(r.lengthM),widthM:r.halfWidthM*2})),lifts:network.lifts.map(l=>({id:l.id,name:l.n,type:l.t})),gaps:network.provenance!.gaps};
   const json=Buffer.from(JSON.stringify(network));const output=new Map<string,Buffer>([[`${slug}.trails.json`,json],[`${slug}.trails.json.br`,brotliCompressSync(json,{params:{[constants.BROTLI_PARAM_QUALITY]:11}})],[`${slug}.network.json`,Buffer.from(JSON.stringify(catalog))]]);
   output.set(`${slug}.meta.json`,Buffer.from(JSON.stringify(meta,null,2)+"\n"));
   output.set(`${slug}.height.u16.br`,brotliCompressSync(baked,{params:{[constants.BROTLI_PARAM_QUALITY]:11}}));

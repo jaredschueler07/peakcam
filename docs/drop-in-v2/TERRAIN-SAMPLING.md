@@ -1,5 +1,11 @@
 # Terrain sampling contract (Drop In v2, Phase 5.2)
 
+> **Course v4 update:** [Mountain accuracy methodology](../terrain/README.md) supersedes
+> the physical micro-detail and approximate projection policy below. Real-mountain
+> detail now defaults to zero, invented relief/jumps are removed, and vectors use
+> the DEM's UTM grid. These historical notes do not establish survey accuracy.
+
+
 How the game asks the mountain how tall it is. One height function, shared by the
 mesh builder, the physics step, prop scattering, the minimap and the server-side run
 validator — that single-source invariant is inherited from v1 and is not negotiable.

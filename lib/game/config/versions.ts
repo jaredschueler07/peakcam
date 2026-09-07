@@ -25,4 +25,5 @@ export const PHYSICS_VERSION = 3;
  * deterministic core is byte-for-byte unchanged, only the ground it runs over.
  */
 // 3 — full mountain network, explicit widths/grooming and baked terrain detail.
-export const COURSE_VERSION = 3;
+// 4 — source elevations restored, UTM-aligned vectors, no invented relief or jumps.
+export const COURSE_VERSION = 4;

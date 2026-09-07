@@ -47,14 +47,14 @@ test('Portillo captured contact clears the full ski planks at both mesh resoluti
   const base = 'public/game/terrain/ski-portillo', raw = brotliDecompressSync(fs.readFileSync(`${base}.height.u16.br`));
   const terrain = createRealTerrain(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.length), JSON.parse(fs.readFileSync(`${base}.meta.json`, 'utf8')), JSON.parse(fs.readFileSync(`${base}.trails.json`, 'utf8')), { profile });
   const world = createWorld(profile, profile.seed, terrain), state = createSimulation(profile, profile.seed);
-  Object.assign(state.pos, { x: -796.3001064716124, y: 2985.6549166778073, z: -774.2831095557972 });
+  Object.assign(state.pos, { x: -801.92, y: terrain.height(-801.92, -794.81), z: -794.81 });
   state.yaw = 1.4449002993357425; state.onGround = true; state.crash = 0; state.lean = 0; state.crouch = 0;
   const original = structuredClone(state.pos), scene = new THREE.Scene(), terrainRenderer = new TerrainRenderer(scene, world), skier = new SkierRenderer(scene);
   terrainRenderer.update(state.pos.x, state.pos.z);
   for (const rung of [1, 4] as const) for (const crouch of [0, 1]) {
     terrainRenderer.setQuality(rung); state.crouch = crouch;
     const difference = terrainRenderer.sampleRenderedHeight(state.pos.x, state.pos.z) - terrain.height(state.pos.x, state.pos.z);
-    assert.ok(difference > (rung === 1 ? 0.19 : 0.34), 'fixture reproduces actual surface above canonical pose');
+    assert.ok(difference > (rung === 1 ? 0.14 : 0.09), 'fixture reproduces actual surface above canonical pose');
     skier.update(state, terrain, 10, terrainRenderer); scene.updateMatrixWorld(true);
     let checked = 0;
     scene.traverse(object => {

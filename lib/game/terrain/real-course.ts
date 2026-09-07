@@ -121,18 +121,14 @@ function makeRun(run: DrapedRun, sourceIndex: number, seed: number): RealRun {
   const lengthM = polylineLength(points);
   const random = mulberry32(seed + sourceIndex * 1009);
   const gates: RealGate[] = [];
-  const firstGate = 55 + random() * 25;
+  const firstGate = Math.min(55 + random() * 25, lengthM * 0.5);
   for (let distanceM = firstGate, key = 0; distanceM < lengthM - 35; key += 1) {
     const point = pointAtArcLength(points, distanceM);
     gates.push({ key, distanceM, ...point, halfWidthM: run.halfWidthM * 0.52 });
     distanceM += 88 + random() * 24;
   }
   const ramps: RealRamp[] = [];
-  for (let distanceM = 180 + random() * 80, key = 0; distanceM < lengthM - 45; key += 1) {
-    const point = pointAtArcLength(points, distanceM);
-    ramps.push({ key, distanceM, ...point });
-    distanceM += 380 + random() * 100;
-  }
+  // Real runs have no invented kickers. A future park pack needs measured features.
   return {
     ...run,
     kind: "real", sourceIndex, name: run.name ?? `Run ${sourceIndex + 1}`,

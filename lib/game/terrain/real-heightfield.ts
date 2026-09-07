@@ -5,11 +5,10 @@
  *
  *   height(x, z) = bicubic(heightfield, x, z) + microDetail(x, z)
  *
- * The baked DEM gives the mountain its true macro shape at ~4–6 m/px; the
- * seeded fbm layer restores the gameplay-scale texture that resolution can't
- * carry, at wavelengths strictly below one DEM cell so it never fights the real
- * morphology, and damped to ~15% inside groomed corridors so pistes stay
- * skiable.
+ * Real-mountain construction preserves source elevations: microDetail defaults
+ * to zero and there are no synthetic ramps. Nonzero detail is an explicit
+ * experimental option, not a survey-accuracy mode. See docs/terrain/README.md.
+ * The raster is already resampled; source fidelity is not survey certification.
  *
  * This is a *new* code path. `heightfield.ts` (the v1-parity procedural terrain)
  * is untouched and still selected for resorts without baked assets — see
@@ -48,13 +47,12 @@ import {
 import { fbmWithGradient, type NoiseGradient } from "./noise-grad";
 import { buildRealCourse } from "./real-course";
 import { buildJunctions, nearestJunction } from "./junctions";
-import { RAMP_H, RAMP_LEN, RAMP_W } from "./heightfield";
 
 // ─── Options ─────────────────────────────────────────────────
 
 /** Fraction of full micro-detail amplitude that survives on a groomed corridor. */
 export const CORRIDOR_DAMPING = 0.15;
-export const DEFAULT_DETAIL_AMPLITUDE_M = 0.5;
+export const DEFAULT_DETAIL_AMPLITUDE_M = 0;
 export const MIN_DETAIL_AMPLITUDE_M = 0.3;
 export const MAX_DETAIL_AMPLITUDE_M = 0.8;
 /** Base micro-detail wavelength as a fraction of the DEM cell size. */
@@ -64,7 +62,7 @@ export const DEFAULT_CORRIDOR_HALF_WIDTH_M = 14;
 export const DEFAULT_CORRIDOR_FALLOFF_M = 10;
 
 export interface MicroDetailOptions {
-  /** Peak-to-centre amplitude in metres; must be within [0.3, 0.8] (DESIGN §3.3). */
+  /** Peak-to-centre amplitude: 0 (real default), or explicit experimental [0.3, 0.8] m. */
   amplitudeM?: number;
   /**
    * Wavelength of the coarsest fbm octave, metres. Must be strictly below the
@@ -178,9 +176,9 @@ export function createRealTerrain(
   const halfSizeM = field.sizeM / 2;
 
   const amplitudeM = options.amplitudeM ?? DEFAULT_DETAIL_AMPLITUDE_M;
-  if (!(amplitudeM >= MIN_DETAIL_AMPLITUDE_M && amplitudeM <= MAX_DETAIL_AMPLITUDE_M)) {
+  if (!(amplitudeM === 0 || (amplitudeM >= MIN_DETAIL_AMPLITUDE_M && amplitudeM <= MAX_DETAIL_AMPLITUDE_M))) {
     throw new Error(
-      `micro-detail amplitude must be within [${MIN_DETAIL_AMPLITUDE_M}, ${MAX_DETAIL_AMPLITUDE_M}] m, got ${amplitudeM}`,
+      `micro-detail amplitude must be 0 or within [${MIN_DETAIL_AMPLITUDE_M}, ${MAX_DETAIL_AMPLITUDE_M}] m, got ${amplitudeM}`,
     );
   }
   const baseWavelengthM = options.baseWavelengthM ?? cellSizeM * DEFAULT_WAVELENGTH_FRACTION;
@@ -252,54 +250,7 @@ export function createRealTerrain(
   }));
   const course = buildRealCourse(profile, runs, lifts, seed);
 
-  // Furniture and named trails are indexed once. A height/normal sample near
-  // one run must not walk every feature on the mountain.
-  const rampKey = (x:number,z:number) => (x+32768)*65536+z+32768;
-  const rampBuckets = new Map<number, typeof course.runs[number]["ramps"][number][]>();
-  for (const run of course.runs) for (const feature of run.ramps) {
-    const reach = RAMP_LEN + RAMP_W + 4;
-    for (let bx = Math.floor((feature.x-reach)/120); bx <= Math.floor((feature.x+reach)/120); bx += 1) {
-      for (let bz = Math.floor((feature.z-reach)/120); bz <= Math.floor((feature.z+reach)/120); bz += 1) {
-        const key = rampKey(bx,bz), bucket = rampBuckets.get(key) ?? [];
-        bucket.push(feature); rampBuckets.set(key, bucket);
-      }
-    }
-  }
   const courseIndex = createCourseIndex(course.runs);
-  const ramp = { value: 0, dx: 0, dz: 0 };
-  function sampleRamps(x: number, z: number): void {
-    ramp.value = 0; ramp.dx = 0; ramp.dz = 0;
-    const features = rampBuckets.get(rampKey(Math.floor(x/120),Math.floor(z/120)));
-    if (!features) return;
-    for (const feature of features) {
-        const dx = x - feature.x, dz = z - feature.z;
-        const forwardX = Math.sin(feature.heading), forwardZ = Math.cos(feature.heading);
-        const rightX = Math.cos(feature.heading), rightZ = -Math.sin(feature.heading);
-        const along = dx * forwardX + dz * forwardZ;
-        if (along < 0 || along > RAMP_LEN + 3.5) continue;
-        const across = dx * rightX + dz * rightZ;
-        const absoluteAcross = Math.abs(across);
-        if (absoluteAcross > RAMP_W) continue;
-        const lateralT = clamp01(1 - absoluteAcross / RAMP_W);
-        const lateral = smoothstep(lateralT);
-        const lateralDerivative = 6 * lateralT * (1 - lateralT)
-          * (across === 0 ? 0 : -Math.sign(across) / RAMP_W);
-        let shape: number, shapeDerivative: number;
-        if (along <= RAMP_LEN) {
-          const rise = along / RAMP_LEN;
-          shape = rise * rise;
-          shapeDerivative = 2 * rise / RAMP_LEN;
-        } else {
-          shape = clamp01(1 - (along - RAMP_LEN) / 3.5);
-          shapeDerivative = shape > 0 ? -1 / 3.5 : 0;
-        }
-        ramp.value += RAMP_H * shape * lateral;
-        const alongDerivative = RAMP_H * shapeDerivative * lateral;
-        const acrossDerivative = RAMP_H * shape * lateralDerivative;
-        ramp.dx += alongDerivative * forwardX + acrossDerivative * rightX;
-        ramp.dz += alongDerivative * forwardZ + acrossDerivative * rightZ;
-    }
-  }
 
   // ─── Corridor index ────────────────────────────────────────
 
@@ -337,6 +288,7 @@ export function createRealTerrain(
   const detail = { value: 0, dx: 0, dz: 0 };
 
   function sampleDetail(x: number, z: number): void {
+    if (amplitudeM === 0) { detail.value = 0; detail.dx = 0; detail.dz = 0; return; }
     const groomed = corridorField(x, z);
     const weight = 1 - (1 - corridorDamping) * groomed;
     const weightDx = -(1 - corridorDamping) * corridorGrad.dx;
@@ -367,8 +319,7 @@ export function createRealTerrain(
     sampleMacro(x, z);
     const macro = gridSample.value;
     sampleDetail(x, z);
-    sampleRamps(x, z);
-    return macro + detail.value + ramp.value;
+    return macro + detail.value;
   }
 
   function normal(x: number, z: number, out: Vec3): Vec3 {
@@ -376,12 +327,11 @@ export function createRealTerrain(
     const macroDx = gridSample.dCol / cellSizeM;
     const macroDz = gridSample.dRow / cellSizeM;
     sampleDetail(x, z);
-    sampleRamps(x, z);
     // Surface y = H(x, z) ⇒ normal ∝ (−∂H/∂x, 1, −∂H/∂z), matching the sign
     // convention of the procedural sampler's finite differences.
-    out.x = -(macroDx + detail.dx + ramp.dx);
+    out.x = -(macroDx + detail.dx);
     out.y = 1;
-    out.z = -(macroDz + detail.dz + ramp.dz);
+    out.z = -(macroDz + detail.dz);
     return normalize(out);
   }
 

@@ -1,8 +1,9 @@
 /** Offline geometry bake from cached OSM. No network in build/runtime. */
 import fs from 'node:fs';
+import { localProjection } from './dem/local-projection';
 import { brotliDecompressSync, brotliCompressSync } from 'node:zlib';
 import { pathToFileURL } from 'node:url';
-import { RESORT_BAKE_CONFIGS, M_PER_DEG_LAT, mPerDegLon } from '../lib/game/terrain/resorts';
+import { RESORT_BAKE_CONFIGS } from '../lib/game/terrain/resorts';
 import { decodeHeightfield, type TerrainMeta } from '../lib/game/terrain/formats';
 import { decodeFarField } from '../lib/game/terrain/far-field-format';
 import { rdp, type Pt } from './bake-resort';
@@ -49,10 +50,8 @@ function load(name:string):{osm3s:{timestamp_osm_base:string};elements:Element[]
   return JSON.parse(brotliDecompressSync(fs.readFileSync(`scripts/data/landmarks/${name}.json.br`)).toString());
 }
 function project(slug:string,g:Geo):Pt {
-  const center=RESORT_BAKE_CONFIGS[slug].center;
-  // Exactly the geographic ENU projection used for the source trail pack;
-  // game Z is minus asset northing. Do not mix absolute UTM coordinates here.
-  return [Math.round((g.lon-center[1])*mPerDegLon(center[0])*10)/10,Math.round(-(g.lat-center[0])*M_PER_DEG_LAT*10)/10];
+  const [x,y] = localProjection(RESORT_BAKE_CONFIGS[slug].center).forward(g.lat,g.lon);
+  return [Math.round(x*10)/10, Math.round(-y*10)/10];
 }
 function lake(slug:string,element:Element,timestamp:string){
   const outerParts=element.geometry?[element.geometry.map(g=>project(slug,g))]:element.members!.filter(m=>m.role==='outer'&&m.geometry).map(m=>m.geometry!.map(g=>project(slug,g)));
@@ -87,7 +86,7 @@ export function bakeLandmarks(verify=false):void {
   const footprint=hotel.geometry.map(g=>project('ski-portillo',g));
   const xs=footprint.map(p=>p[0]),zs=footprint.map(p=>p[1]);
   const center:Pt=[(Math.min(...xs)+Math.max(...xs))/2,(Math.min(...zs)+Math.max(...zs))/2];
-  const output={version:1,projection:'local geographic ENU per resorts.ts; gameZ=-assetY',licence:'OpenStreetMap contributors, ODbL 1.0',lakes:{'ski-portillo':lake('ski-portillo',portillo.elements.find(e=>e.id===25749554)!,portillo.osm3s.timestamp_osm_base),heavenly:lake('heavenly',tahoe.elements.find(e=>e.id===1823287)!,tahoe.osm3s.timestamp_osm_base)},hotel:{sourceId:'osm:way:272711273',footprint,center,main:clipHalfPlane(footprint.slice(0,-1),0,1,-744),annex:clipHalfPlane(footprint.slice(0,-1),0,-1,744),mainHeightM:18,annexHeightM:5.5,tower:{x:3,z:-742,width:8,depth:8,height:22},reference:'https://skiportillo.com/en/ski-lodging/skiing-hotel-portillo/',referenceImage:'https://skiportillo.com/wp-content/uploads/2023/12/All-Inclusive-Resort-Hotel-Ski-Portillo.jpg',note:'OSM footprint and location. Six-storey yellow main body, low front annex and blue tower proportions inferred from the official photograph; heights and height split are illustrative, not surveyed. Reference image is not redistributed.'}};
+  const output={version:1,projection:'local WGS84 UTM grid per resort DEM EPSG; gameZ=-assetY',licence:'OpenStreetMap contributors, ODbL 1.0',lakes:{'ski-portillo':lake('ski-portillo',portillo.elements.find(e=>e.id===25749554)!,portillo.osm3s.timestamp_osm_base),heavenly:lake('heavenly',tahoe.elements.find(e=>e.id===1823287)!,tahoe.osm3s.timestamp_osm_base)},hotel:{sourceId:'osm:way:272711273',footprint,center,main:clipHalfPlane(footprint.slice(0,-1),0,1,-744),annex:clipHalfPlane(footprint.slice(0,-1),0,-1,744),mainHeightM:18,annexHeightM:5.5,tower:{x:3,z:-742,width:8,depth:8,height:22},reference:'https://skiportillo.com/en/ski-lodging/skiing-hotel-portillo/',referenceImage:'https://skiportillo.com/wp-content/uploads/2023/12/All-Inclusive-Resort-Hotel-Ski-Portillo.jpg',note:'OSM footprint and location. Six-storey yellow main body, low front annex and blue tower proportions inferred from the official photograph; heights and height split are illustrative, not surveyed. Reference image is not redistributed.'}};
   const data=Buffer.from(JSON.stringify(output));if(brotliCompressSync(data).length>16000)throw new Error('Landmark shared asset exceeds 16 KB brotli');
   for(const slug of Object.keys(RESORT_BAKE_CONFIGS)) {
     const dir='public/game/terrain/';

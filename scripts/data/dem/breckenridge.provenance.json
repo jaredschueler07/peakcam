@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "slug": "breckenridge",
+  "sourceGridSha256": "b340b3bc42b7b9d1ae245c7c7131893d377b66daed0016fe3c89f1d279bb5144",
+  "sourceMetaSha256": "adc037f113c23f3d36770bb0d7151a85e97a49cc6f3cd1b59cd4cedc29f782d7",
+  "verticalDatum": "NAVD88",
+  "verticalDatumVerified": false,
+  "datumEvidence": "Collection-level expected datum only; original tile metadata and transformation logs were not retained with this cache.",
+  "sourceReference": "https://www.usgs.gov/3d-elevation-program",
+  "limitations": [
+    "Immutable input is a previously resampled and quantized grid, not the original survey raster.",
+    "No independent surveyed checkpoints or dataset-specific accuracy certificate are bundled.",
+    "Acquisition epoch, datum realization, original tile hashes and any nodata-fill mask need recovery before survey acceptance."
+  ]
+}

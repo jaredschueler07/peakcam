@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "slug": "heavenly",
+  "sourceGridSha256": "b5e48d997ed513aac88488a1aeb5fb7b9d2a23263236dba853381dd75693b0a1",
+  "sourceMetaSha256": "8a33bec26d48fcf0b812a258e8234230553782a5bfaa5c3ff7403d3746b01085",
+  "verticalDatum": "NAVD88",
+  "verticalDatumVerified": false,
+  "datumEvidence": "Collection-level expected datum only; original tile metadata and transformation logs were not retained with this cache.",
+  "sourceReference": "https://www.usgs.gov/3d-elevation-program",
+  "limitations": [
+    "Immutable input is a previously resampled and quantized grid, not the original survey raster.",
+    "No independent surveyed checkpoints or dataset-specific accuracy certificate are bundled.",
+    "Acquisition epoch, datum realization, original tile hashes and any nodata-fill mask need recovery before survey acceptance."
+  ]
+}

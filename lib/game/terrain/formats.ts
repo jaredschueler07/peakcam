@@ -11,13 +11,11 @@
  *
  * The heightfield is a square grid of `grid × grid` samples covering a
  * `sizeM × sizeM` box centred on `meta.center` (`[lat, lon]`), sampled on a
- * local ENU frame:
- *
- *   mPerDegLat = 111132
- *   mPerDegLon = 111320 * cos(centerLat)
- *
- * Local metres: `x` grows east, `y` grows north, both relative to the centre,
- * spanning `[-sizeM/2, +sizeM/2]`.
+ * local metric frame. Current real packs use the WGS84 UTM CRS in meta.epsg,
+ * translated by the projected centre (scripts/dem/local-projection.ts).
+ * Grid north/east and UTM grid metres are not exact true north/ground distances.
+ * Older terrarium packs used an approximate geographic frame; never mix them.
+ * Asset x grows east, y north, spanning [-sizeM/2, +sizeM/2].
  *
  * Samples are stored row-major, **north to south** (row 0 is the north edge)
  * and **west to east** within a row (column 0 is the west edge) — i.e. the

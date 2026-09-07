@@ -8,7 +8,7 @@
   "sizeM": 4096,
   "grid": 1024,
   "minZ": 2329.2,
-  "maxZ": 4139.8,
+  "maxZ": 4140.4,
   "quantum": 0.1,
   "source": "copernicus",
   "sourceZoom": null,

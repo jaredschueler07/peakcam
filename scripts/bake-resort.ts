@@ -1,3 +1,4 @@
+import { localProjection } from './dem/local-projection';
 /**
  * bake-resort.ts
  * ──────────────
@@ -686,8 +687,8 @@ async function fetchOverpass(cfg: ResortBakeConfig): Promise<OverpassWay[]> {
 }
 
 function bakeTrails(cfg: ResortBakeConfig, elements: OverpassWay[]): BakedFile[] {
-  const [cLat, cLon] = cfg.center;
-  const mLon = mPerDegLon(cLat);
+  const [cLat,cLon] = cfg.center;
+  const projection = localProjection(cfg.center);
   const half = cfg.sizeM / 2;
   const runs: RawRun[] = [];
   const lifts: RawLift[] = [];
@@ -695,7 +696,7 @@ function bakeTrails(cfg: ResortBakeConfig, elements: OverpassWay[]): BakedFile[]
   for (const el of elements) {
     if (!el.geometry || el.geometry.length < 2) continue;
     const tags = el.tags ?? {};
-    const projected: Pt[] = el.geometry.map((g) => [(g.lon - cLon) * mLon, (g.lat - cLat) * M_PER_DEG_LAT]);
+    const projected: Pt[] = el.geometry.map((g) => projection.forward(g.lat, g.lon));
     const isRun = Boolean(tags["piste:type"]);
 
     for (const piece of clipPolylineToBox(projected, half)) {

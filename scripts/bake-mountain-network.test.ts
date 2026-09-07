@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
+import { localProjection } from './dem/local-projection';
 import test from 'node:test';
 import { bakeMountainNetwork, type OsmSource } from './bake-mountain-network';
 import { decodeTrails, type Heightfield } from '../lib/game/terrain/formats';
-import { RESORT_BAKE_CONFIGS, M_PER_DEG_LAT, mPerDegLon } from '../lib/game/terrain/resorts';
+import { RESORT_BAKE_CONFIGS } from '../lib/game/terrain/resorts';
 const cfg={...RESORT_BAKE_CONFIGS.heavenly,sizeM:1000};
 const field:Heightfield={width:3,height:3,sizeM:1000,cellSizeM:500,minZ:2000,maxZ:2200,heights:new Float32Array([2200,2200,2200,2100,2100,2100,2000,2000,2000])};
-const geo=(x:number,y:number)=>({lat:cfg.center[0]+y/M_PER_DEG_LAT,lon:cfg.center[1]+x/mPerDegLon(cfg.center[0])});
+const projection=localProjection(cfg.center);
+const geo=(x:number,y:number)=>{const [lat,lon]=projection.inverse(x,y);return {lat,lon};};
 const source:OsmSource={osm3s:{timestamp_osm_base:'2026-09-05T00:00:00Z'},elements:[
  {type:'way',id:10,tags:{name:'Named descent','piste:type':'downhill','piste:difficulty':'advanced',width:'21'},geometry:[geo(0,400),geo(0,0),geo(700,-200),geo(0,-400)]},
  {type:'way',id:20,tags:{name:'Joining trail','piste:type':'downhill','piste:grooming':'classic'},geometry:[geo(-300,300),geo(0,0)]},

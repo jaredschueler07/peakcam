@@ -1,14 +1,13 @@
-/** Seeded offline gameplay relief; output is quantised into the shared DEM.
- * The source DEM remains untouched in scripts/data/dem. These are designed
- * snow/rock features, not a claim of surveyed mogul or tree locations.
+/** Seeded offline forest placement; elevations are preserved unchanged.
+ * The immutable, already resampled DEM remains in scripts/data/dem.
+ * Tree locations are designed scenery, not surveyed positions.
  */
 import { decodeTrails, sampleHeightBilinear, type Heightfield, type TrailsFile } from '../lib/game/terrain/formats';
 import { mulberry32 } from '../lib/game/core/rng';
 interface Segment { ax:number;ay:number;bx:number;by:number;width:number;groomed:boolean }
 const clamp=(v:number,a:number,b:number)=>Math.max(a,Math.min(b,v));
-const smooth=(v:number)=>{const t=clamp(v,0,1);return t*t*(3-2*t);};
 export function bakeMountainDetail(field:Heightfield,network:TrailsFile,seed:number,treeLineElevationM=Infinity):Float32Array {
-  const decoded=decodeTrails(network),cell=64,half=field.sizeM/2;
+  const decoded=decodeTrails(network),cell=64;
   const buckets=new Map<string,Segment[]>();
   for(const run of decoded.runs){
     const groomed=!run.gladed&&!['backcountry','mogul','no'].includes(run.grooming??'');
@@ -28,7 +27,7 @@ export function bakeMountainDetail(field:Heightfield,network:TrailsFile,seed:num
     }
     return true;
   }
-  const random=mulberry32(seed),phase=random()*Math.PI*2;
+  const random=mulberry32(seed);
   const wells:Array<{x:number;y:number;radiusM:number}>=[];
   // Designed 30m planting grid with ±5m jitter inside mapped closed woods. At 4–6m
   // DEM resolution the wells have a 6m radius; individual ski-scale holes are
@@ -48,50 +47,8 @@ export function bakeMountainDetail(field:Heightfield,network:TrailsFile,seed:num
       }
     }
   }
-  network.detail={version:2,seed,treeLineElevationM:Number.isFinite(treeLineElevationM)?treeLineElevationM:undefined,treeWells:wells,description:'Designed seed-stable corridor cuts/banks, ungroomed mogul relief, convex-ridge lips, steep rock relief and mapped-forest wells baked into the DEM; not surveyed features.'};
-  const result=new Float32Array(field.heights),{width,height,heights,cellSizeM:step}=field;
-  for(let r=1;r<height-1;r++)for(let c=1;c<width-1;c++){
-    const x=-half+c*step,y=half-r*step,index=r*width+c,h=heights[index];
-    const gx=(heights[index+1]-heights[index-1])/(2*step),gy=(heights[index-width]-heights[index+width])/(2*step),slope=Math.hypot(gx,gy);
-    const convex=(4*h-heights[index-1]-heights[index+1]-heights[index-width]-heights[index+width])/(step*step);
-    let distance = Infinity, clearance = Infinity;
-    let nearest: Segment | undefined, px = 0, py = 0;
-    let groomedInterior = false;
-    for (const segment of buckets.get(`${Math.floor(x/cell)},${Math.floor(y/cell)}`) ?? []) {
-      const dx = segment.bx-segment.ax, dy = segment.by-segment.ay;
-      const t = clamp(((x-segment.ax)*dx+(y-segment.ay)*dy)/(dx*dx+dy*dy || 1),0,1);
-      const cx = segment.ax+dx*t, cy = segment.ay+dy*t;
-      const d = Math.hypot(x-cx,y-cy), edgeDistance = d-segment.width;
-      const insideGroomer = segment.groomed && edgeDistance <= 0;
-      // A wide groomer owns its interior even beside a closer, narrower black.
-      // Else choose the strongest corridor influence, measured from its edge.
-      if ((insideGroomer && !groomedInterior) ||
-          (insideGroomer === groomedInterior && edgeDistance < clearance)) {
-        groomedInterior = insideGroomer;
-        distance = d; clearance = edgeDistance; nearest = segment; px = cx; py = cy;
-      }
-    }
-    const corridor=nearest?smooth((nearest.width+12-distance)/12):0;
-    let offset=0;
-    if(nearest?.groomed){
-      // A shallow cut softens the crossfall without removing DEM morphology.
-      const cut=clamp((sampleHeightBilinear(field,px,py)-h)*0.3,-1.2,1.2);
-      offset+=cut*corridor;
-      offset+=0.95*Math.exp(-Math.pow((distance-nearest.width-3)/5,2));
-    }else if(nearest){
-      // >= three samples/wavelength avoids pretending the DEM resolves 1m bumps.
-      offset+=0.65*Math.sin(x/3.8+phase)*Math.sin(y/4.7-phase)*corridor;
-    }
-    const off=1-(nearest?.groomed?corridor:0);
-    offset+=off*smooth((slope-0.7)/0.4)*0.9*Math.sin(x/7+phase)*Math.sin(y/8);
-    offset+=off*smooth((convex-0.006)/0.018)*smooth((0.9-slope)/0.4)*(0.65+0.45*Math.sin(x/13+y/17+phase));
-    result[index]=h+offset;
-  }
-  for(const well of wells){
-    const c0=Math.round((well.x+half)/step),r0=Math.round((half-well.y)/step),radius=Math.ceil(well.radiusM/step);
-    for(let r=Math.max(1,r0-radius);r<=Math.min(height-2,r0+radius);r++)for(let c=Math.max(1,c0-radius);c<=Math.min(width-2,c0+radius);c++){
-      const x=-half+c*step,y=half-r*step,d=Math.hypot(x-well.x,y-well.y);if(d<well.radiusM)result[r*width+c]-=0.55*smooth(1-d/well.radiusM);
-    }
-  }
-  return result;
+  network.detail={version:3,seed,treeLineElevationM:Number.isFinite(treeLineElevationM)?treeLineElevationM:undefined,treeWells:wells,description:'Designed tree placement inside mapped forests; treeWells is a legacy field name, no depressions or other height edits. Trees are not surveyed.'};
+  // Trees are scenery placement only. No invented cuts, banks, moguls or wells
+  // may alter the source elevations in the real-mountain pack.
+  return new Float32Array(field.heights);
 }
