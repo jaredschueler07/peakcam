@@ -24,7 +24,7 @@ test('grounded skis and boots stay planted when the torso tucks', () => {
   const { world, state } = flat(), scene = new THREE.Scene(), skier = new SkierRenderer(scene);
   const ground = { sampleRenderedHeight: () => 100.3 };
   skier.update(state, world.terrain, 10, ground); scene.updateMatrixWorld(true);
-  const feet = skier.root.getObjectByName('skier-feet')!, body = skier.root.getObjectByName('skier-body')!;
+  const feet = skier.root.getObjectByName('rider-equipment')!, body = skier.root.getObjectByName('rider-torso')!;
   const matrices = feet.children.map(child => child.matrixWorld.clone()), standingBody = body.matrixWorld.clone();
   state.crouch = 1; skier.update(state, world.terrain, 10, ground); scene.updateMatrixWorld(true);
   assert.deepEqual(feet.children.map(child => child.matrixWorld), matrices);
@@ -58,10 +58,10 @@ test('Portillo captured contact clears the full ski planks at both mesh resoluti
     skier.update(state, terrain, 10, terrainRenderer); scene.updateMatrixWorld(true);
     let checked = 0;
     scene.traverse(object => {
-      if (object.name !== 'ski-shell') return;
+      if (object.name !== 'left-ski' && object.name !== 'right-ski') return;
       const point = new THREE.Vector3();
       for (let z = -0.93; z <= 0.93; z += 0.031) for (const side of [-1, 1]) {
-        point.set(side * 0.08, -0.0275, z).applyMatrix4(object.matrixWorld);
+        point.set(side * 0.08, 0, z).applyMatrix4(object.matrixWorld);
         assert.ok(point.y >= terrainRenderer.sampleRenderedHeight(point.x, point.z) - 0.001, `rung${rung}/crouch${crouch} ski intersects snow`); checked++;
       }
     });

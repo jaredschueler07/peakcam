@@ -33,6 +33,8 @@ import { physicsModelForSessionRequest, resolveRuntimePhysicsModel } from "@/lib
 import { trailIdFromName } from "@/lib/game/config/course-ids";
 import { cameraPresetName } from "@/lib/game/rendering/debugFlags";
 import type { CameraPresetName } from "@/lib/game/rendering/camera-presets";
+import RiderLocker from "./RiderLocker";
+import { DEFAULT_RIDER_STYLE, readRiderStyle, saveRiderStyle, type RiderStyle, type RiderMode, type SnowboardStance } from "@/lib/game/config/rider-style";
 import DropInErrorBoundary from "./DropInErrorBoundary";
 import DropInHUD from "./hud/DropInHUD";
 import ModeSelect, { type DropInModeChoice } from "./hud/ModeSelect";
@@ -123,6 +125,12 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
   // Read after mount, not during render: the server has no location and would hydrate-mismatch.
   const [camPreset, setCamPreset] = useState<CameraPresetName>("classic");
   useEffect(() => setCamPreset(cameraPresetName()), []);
+  const [riderStyle, setRiderStyle] = useState<RiderStyle>(DEFAULT_RIDER_STYLE);
+  const [riderMode, setRiderMode] = useState<RiderMode>("skier");
+  const [stance, setStance] = useState<SnowboardStance>("regular");
+  const [lockerOpen, setLockerOpen] = useState(false);
+  useEffect(() => { try { setRiderStyle(readRiderStyle(localStorage)); } catch { /* Storage may be disabled. */ } }, []);
+  const changeRiderStyle = (next: RiderStyle) => { setRiderStyle(next); try { saveRiderStyle(localStorage, next); } catch { /* Keep this visit usable. */ } };
   const [audioEnabled, setAudioEnabled] = useState(true);
   const bridge = useMemo(() => new UiBridge(profile), [profile]);
 
@@ -350,7 +358,7 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
         if (cancelled) return;
         const created = await createGame({
           canvas, profile, uiBridge: bridge, signal: controller.signal, conditions: playedConditionsRef.current, physicsModel, audio,
-          mode: modeRef.current,
+          mode: modeRef.current, riderStyle, riderPresentation: { riderMode, stance },
           // The ghost header carries world.seed; it must equal the ticket seed
           // or the server rejects the submission with seed_mismatch.
           trailId: playedTrailRef.current,
@@ -397,7 +405,7 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
       }
     })();
     return () => { cancelled = true; unsubscribe(); };
-  }, [bridge, conditions, phase, profile]);
+  }, [bridge, conditions, phase, profile, riderStyle, riderMode, stance, physicsModel]);
 
   const start = () => {
     if (teardownRef.current) return;
@@ -419,6 +427,16 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
     setAudioEnabled(enabled);
     track(EVENTS.DROP_IN_LOAD_STARTED, { resort: profile.slug, engine: "v2", load_stage: "runtime" });
     setPhase("loading");
+  };
+
+  const returnToLocker = () => {
+    clearGhost();
+    teardownRef.current?.abort(); teardownRef.current = null;
+    runtimeRef.current?.dispose(); runtimeRef.current = null;
+    audioRef.current?.dispose(); audioRef.current = null;
+    freezeRunTicket(null);
+    setRuntime(null); setLoadingProgress(0); setGfxBackend("pending");
+    setLockerOpen(true); setPhase("poster");
   };
 
   /** Arm first, then reset: the runtime begins recording at the reset itself. */
@@ -504,6 +522,10 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
         data-drop-in-ticket={ticketState.status}
         data-drop-in-gfx={gfxBackend}
         data-drop-in-cam={camPreset}
+        data-drop-in-rider={riderMode}
+        data-drop-in-character={riderStyle.character}
+        data-drop-in-outfit={riderStyle.outfit}
+        data-drop-in-gear={riderMode === "skier" ? riderStyle.skis : riderStyle.board}
         data-drop-in-physics={runtime?.world.config.physicsModel ?? physicsModel}
       >
         <Link href={`/resorts/${profile.slug}`} className="absolute left-[max(.75rem,env(safe-area-inset-left))] top-[max(.75rem,env(safe-area-inset-top))] z-40 min-h-11 inline-flex items-center gap-2 rounded-full border-[1.5px] border-ink bg-cream-50 px-3.5 py-2 text-xs font-bold uppercase text-ink shadow-stamp-sm">
@@ -511,7 +533,7 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
         </Link>
         {phase === "poster" && (
           <section className="pc-topo absolute inset-0 z-30 overflow-y-auto overscroll-contain px-4 pb-8 pt-20 text-center">
-            <div className="pc-paper mx-auto w-full min-w-0 max-w-xl rounded-lg border-[1.5px] border-ink p-4 shadow-stamp-lg sm:p-8">
+            <div className="pc-paper mx-auto w-full min-w-0 max-w-2xl rounded-lg border-[1.5px] border-ink p-4 shadow-stamp-lg sm:p-8">
               <p className="pc-eyebrow">PeakCam Drop In · v2</p>
               <h1 className="pc-display mt-2 break-words text-[clamp(2rem,9vw,4.5rem)] text-ink">{profile.name}</h1>
               <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.14em] text-bark">{profile.tagline}</p>
@@ -554,6 +576,11 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
                 </select>
                 {selectedCourse && <span className="mt-1 block font-normal">{Math.round(selectedCourse.topElevationM * 3.28084).toLocaleString()} → {Math.round(selectedCourse.bottomElevationM * 3.28084).toLocaleString()} ft</span>}
               </label>
+              <div className="mt-5 flex flex-wrap justify-center gap-3 text-sm text-ink">
+                <label>Gear <select aria-label="Rider mode" value={riderMode} onChange={event => setRiderMode(event.target.value as RiderMode)} className="min-h-11 rounded border border-ink bg-cream-50 p-2"><option value="skier">Skis</option><option value="snowboarder">Snowboard</option></select></label>
+                {riderMode === "snowboarder" && <label>Stance <select aria-label="Snowboard stance" value={stance} onChange={event => setStance(event.target.value as SnowboardStance)} className="min-h-11 rounded border border-ink bg-cream-50 p-2"><option value="regular">Regular</option><option value="goofy">Goofy</option></select></label>}
+              </div>
+              <RiderLocker style={riderStyle} onChange={changeRiderStyle} riderMode={riderMode} stance={stance} open={lockerOpen} onToggle={() => setLockerOpen(!lockerOpen)} />
               <details className="mt-4 rounded-lg border border-ink/20 p-3 text-left"><summary className="min-h-11 cursor-pointer content-center text-sm font-bold">Control preferences</summary><ControlSettings preferences={preferences} onChange={updatePreferences} /></details>
               <button onClick={start} className="mt-7 rounded-full border-[1.5px] border-ink bg-alpen-dk px-8 py-3 font-bold uppercase tracking-wide text-cream-50 shadow-stamp transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink">
                 Start descent
@@ -563,7 +590,7 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
         )}
         {(phase === "loading" || phase === "playing") && <canvas ref={canvasRef} data-testid="drop-in-canvas" className="block h-full w-full touch-none" aria-label={`${profile.name} ski game`} />}
         {phase === "loading" && <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-ink/50" role="status"><span className="pc-eyebrow rounded-full bg-cream-50 px-4 py-2 text-ink">Loading real mountain… {Math.round(loadingProgress * 100)}%</span></div>}
-        {phase === "playing" && runtime && <><DropInHUD store={bridge.store} audioEnabled={audioEnabled} onToggleAudio={toggleAudio} onPause={() => runtime.pause()} touchEnabled={touchEnabled} />{touchEnabled && <TouchControls adapter={runtime.touch} preferences={preferences} store={bridge.store} />}<PauseDialog store={bridge.store} onResume={() => runtime.resume()} onRestart={() => restartRun(runtime)} preferences={preferences} onPreferencesChange={updatePreferences} touchEnabled={touchEnabled} onTrail={session.mode === "free_ski" ? () => { runtime.resume(); runtime.touch.setAction("trail", true); runtime.touch.setAction("trail", false); } : undefined} /><ResultsDialog
+        {phase === "playing" && runtime && <><DropInHUD store={bridge.store} audioEnabled={audioEnabled} onToggleAudio={toggleAudio} onPause={() => runtime.pause()} touchEnabled={touchEnabled} />{touchEnabled && <TouchControls adapter={runtime.touch} preferences={preferences} store={bridge.store} />}<PauseDialog onChangeRider={returnToLocker} store={bridge.store} onResume={() => runtime.resume()} onRestart={() => restartRun(runtime)} preferences={preferences} onPreferencesChange={updatePreferences} touchEnabled={touchEnabled} onTrail={session.mode === "free_ski" ? () => { runtime.resume(); runtime.touch.setAction("trail", true); runtime.touch.setAction("trail", false); } : undefined} /><ResultsDialog
           store={bridge.store}
           conditionsLabel={`${playedConditions.stamp} · ${playedConditions.surface}`}
           onRestart={() => restartRun(runtime)}

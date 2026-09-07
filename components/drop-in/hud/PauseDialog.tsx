@@ -6,7 +6,7 @@ import { useStore } from "zustand";
 import type { StoreApi } from "zustand/vanilla";
 import type { HudState } from "@/lib/game/runtime/UiBridge";
 
-export default function PauseDialog({ store, onResume, onRestart, preferences, onPreferencesChange, touchEnabled, onTrail }: { store: StoreApi<HudState>; onResume(): void; onRestart(): void; preferences: TouchPreferences; onPreferencesChange(value: TouchPreferences): void; touchEnabled: boolean; onTrail?: () => void }) {
+export default function PauseDialog({ store, onResume, onRestart, preferences, onPreferencesChange, touchEnabled, onTrail, onChangeRider }: { store: StoreApi<HudState>; onResume(): void; onRestart(): void; preferences: TouchPreferences; onPreferencesChange(value: TouchPreferences): void; touchEnabled: boolean; onTrail?: () => void; onChangeRider?: () => void }) {
   const paused = useStore(store, (state) => state.status === "paused");
   const dialogRef = useDialogFocus(paused);
   if (!paused) return null;
@@ -21,6 +21,7 @@ export default function PauseDialog({ store, onResume, onRestart, preferences, o
           {onTrail && <button className="min-h-11 rounded-full border border-ink bg-cream-50 px-5 py-2 font-bold" onClick={onTrail}>Next trail</button>}
           <button className="min-h-11 rounded-full border-[1.5px] border-ink bg-cream-50 px-5 py-2 font-bold shadow-stamp-sm" onClick={onRestart}>Restart</button>
         </div>
+        {onChangeRider && <button type="button" onClick={onChangeRider} className="mt-4 min-h-11 text-sm font-semibold text-forest underline underline-offset-4">Change rider &amp; start a new run</button>}
       </div>
     </div>
   );

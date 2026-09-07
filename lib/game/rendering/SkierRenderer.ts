@@ -1,161 +1,249 @@
 import * as THREE from "three";
-import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import type { RiderPresentation } from "../config/rider-style";
+const DUCK_FRONT_RAD = 15 * Math.PI / 180, DUCK_REAR_RAD = -6 * Math.PI / 180;
 import type { SimulationState, TerrainSampler, Vec3 } from "../core/types";
+import { DEFAULT_RIDER_STYLE, OUTFITS, type RiderStyle } from "../config/rider-style";
+import { coloredParts, styledDeckGeometry, ellipsoid, jacketGeometry, sleeveGeometry, yetiHeadGeometry, yetiPawGeometry } from "./rider-geometry";
 
-const UP = new THREE.Vector3(0, 1, 0);
-/** Stable tumble axis — previously `new THREE.Vector3(0.6,0.4,0.7).normalize()` every crash frame. */
-const TUMBLE_AXIS = new THREE.Vector3(0.6, 0.4, 0.7).normalize();
-const normal: Vec3 = { x: 0, y: 1, z: 0 };
-const normalVec = new THREE.Vector3();
-const upScratch = new THREE.Vector3();
-const contactScratch = new THREE.Vector3();
-const SKI_CONTACT_Z = [-0.93, 0, 0.93] as const;
 export interface RenderedGroundSampler { sampleRenderedHeight(x: number, z: number): number }
+type RiderPose = SimulationState & { boardRoll?: number; grabTime?: number; stumble?: boolean };
+const contactScratch = new THREE.Vector3();
+const UP = new THREE.Vector3(0, 1, 0);
+const TUMBLE_AXIS = new THREE.Vector3(.6, .4, .7).normalize();
+const normal: Vec3 = { x: 0, y: 1, z: 0 };
+const normalVec = new THREE.Vector3(), upScratch = new THREE.Vector3();
+const origin = new THREE.Vector3(), target = new THREE.Vector3(), bend = new THREE.Vector3();
+const direction = new THREE.Vector3(), perpendicular = new THREE.Vector3(), joint = new THREE.Vector3();
 
-const material = (color: THREE.ColorRepresentation, roughness = 0.7, metalness = 0, emissive: THREE.ColorRepresentation = 0) => {
-  const result = new THREE.MeshStandardMaterial({ color, roughness, metalness, emissive, emissiveIntensity: emissive ? 0.35 : 0 });
+function material(color: number, roughness = .7, metalness = 0, vertexColors = false) {
+  const result = new THREE.MeshStandardMaterial({ color, roughness, metalness, vertexColors });
   result.userData.heightFog = false;
   return result;
-};
+}
+function mesh(name: string, geometry: THREE.BufferGeometry, mat: THREE.Material): THREE.Mesh {
+  const result = new THREE.Mesh(geometry, mat);
+  result.name = name; result.castShadow = true;
+  return result;
+}
+function segment(part: THREE.Mesh, a: THREE.Vector3, b: THREE.Vector3): void {
+  direction.subVectors(b, a);
+  const length = direction.length();
+  part.position.copy(a);
+  part.quaternion.setFromUnitVectors(UP, direction.multiplyScalar(1 / Math.max(.0001, length)));
+  part.scale.y = length;
+}
 
-function limb(length: number, radius: number, mat: THREE.Material) {
-  const group = new THREE.Group();
-  const mesh = new THREE.Mesh(new THREE.CapsuleGeometry(radius, length, 4, 8), mat);
-  mesh.position.y = -length * 0.5 - radius * 0.5; mesh.castShadow = true; group.add(mesh);
-  return group;
+/** Two-bone IK keeps boots planted and sleeves connected, including during deep crouches. */
+class Limb {
+  readonly upper: THREE.Mesh;
+  readonly lower: THREE.Mesh;
+  constructor(parent: THREE.Group, name: string, mat: THREE.Material, private readonly a: number, private readonly b: number, radius: number) {
+    this.upper = mesh(`${name}-upper`, sleeveGeometry(radius, a), mat);
+    this.lower = mesh(`${name}-lower`, sleeveGeometry(radius * .88, b), mat);
+    parent.add(this.upper, this.lower);
+  }
+  pose(start: THREE.Vector3, end: THREE.Vector3, pole: THREE.Vector3): void {
+    direction.subVectors(end, start);
+    const distance = Math.max(.0001, direction.length());
+    direction.multiplyScalar(1 / distance);
+    const reach = Math.min(this.a + this.b - .001, Math.max(Math.abs(this.a - this.b) + .001, distance));
+    const along = (this.a * this.a - this.b * this.b + reach * reach) / (2 * reach);
+    perpendicular.copy(pole).addScaledVector(direction, -pole.dot(direction));
+    if (perpendicular.lengthSq() < .000001) perpendicular.set(1, 0, 0).addScaledVector(direction, -direction.x);
+    perpendicular.normalize();
+    joint.copy(start).addScaledVector(direction, along).addScaledVector(perpendicular, Math.sqrt(Math.max(0, this.a * this.a - along * along)));
+    segment(this.upper, start, joint);
+    segment(this.lower, joint, end);
+  }
 }
 
 export class SkierRenderer {
   readonly root = new THREE.Group();
   private readonly body = new THREE.Group();
-  private readonly feet = new THREE.Group();
+  private readonly equipment = new THREE.Group();
   private readonly head = new THREE.Group();
-  private readonly armL: THREE.Group; private readonly armR: THREE.Group;
-  private readonly legL: THREE.Group; private readonly legR: THREE.Group;
-  private readonly skiL: THREE.Group; private readonly skiR: THREE.Group;
-  private readonly poleL: THREE.Group; private readonly poleR: THREE.Group;
+  private readonly armL: Limb; private readonly armR: Limb;
+  private readonly legL: Limb; private readonly legR: Limb;
+  private readonly gloveL: THREE.Mesh; private readonly gloveR: THREE.Mesh;
+  private readonly footL = new THREE.Group(); private readonly footR = new THREE.Group();
+  private readonly board: THREE.Mesh | null;
+  private readonly poleL: THREE.Mesh | null; private readonly poleR: THREE.Mesh | null;
   private readonly qGround = new THREE.Quaternion(); private readonly qYaw = new THREE.Quaternion();
+  private readonly snowboard: boolean;
+  private readonly side: number;
+  private readonly shoulderWidth: number;
   private tumble = 0;
+  private crouch = 0;
+  private lean = 0;
+  private grabBlend = 0;
 
-  constructor(scene: THREE.Scene) {
-    const suit = material(0x1b6fe0, 0.55), suit2 = material(0xf4f7fb, 0.6);
-    const dark = material(0x1d2330, 0.65), skin = material(0xe8b58a, 0.75);
-    const ski = material(0xff8b2e, 0.35, 0.3, 0xff6a00), pole = material(0xb9c4d2, 0.4, 0.7);
-    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.30, 0.62, 4, 10), suit);
-    torso.position.y = 1.16; torso.castShadow = true;
-    const chest = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.36, 0.42), suit2);
-    chest.position.y = 1.30; chest.castShadow = true;
-    const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.24, 14, 12), material(0xe8ecf3, 0.35, 0.15));
-    const goggles = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.15, 0.30), material(0x101820, 0.15, 0.9, 0x3aa0ff));
-    goggles.position.set(0, 0.03, 0.13);
-    const chin = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), skin); chin.position.set(0, -0.14, 0.06);
-    this.head.add(helmet, goggles, chin); this.head.position.y = 1.72;
-    this.armL = limb(0.52, 0.10, suit); this.armR = limb(0.52, 0.10, suit);
-    this.armL.position.set(-0.36, 1.40, 0.02); this.armR.position.set(0.36, 1.40, 0.02);
-    this.legL = limb(0.62, 0.13, dark); this.legR = limb(0.62, 0.13, dark);
-    this.legL.position.set(-0.17, 0.86, 0); this.legR.position.set(0.17, 0.86, 0);
-    const bootL = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.24, 0.36), material(0x2b3444, 0.5));
-    bootL.name = "ski-boot";
-    const bootR = bootL.clone(); bootL.position.set(-0.17, 0.16, 0.02); bootR.position.set(0.17, 0.16, 0.02);
-    // These three orange pieces move as one ski. Bake their fixed transforms
-    // into one shared geometry, retaining every vertex, normal and silhouette.
-    const skiParts = [
-      new THREE.BoxGeometry(0.16, 0.055, 1.86),
-      new THREE.ConeGeometry(0.09, 0.30, 6).rotateX(Math.PI / 2).translate(0, 0.05, 1.02),
-      new THREE.ConeGeometry(0.09, 0.30, 6).rotateX(-Math.PI / 2).translate(0, 0.03, -1),
-    ];
-    const skiGeometry = mergeGeometries(skiParts)!;
-    for (const part of skiParts) part.dispose();
-    const makeSki = () => {
-      const group = new THREE.Group(), shell = new THREE.Mesh(skiGeometry, ski);
-      shell.name = "ski-shell";
-      const binding = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.09, 0.34), dark); binding.position.y = 0.06;
-      group.add(shell, binding); return group;
-    };
-    this.skiL = makeSki(); this.skiR = makeSki();
-    const makePole = () => {
-      const group = new THREE.Group(), shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.018, 1.24, 5), pole);
-      shaft.position.y = -0.62; const basket = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.02, 5, 8), dark);
-      basket.rotation.x = Math.PI / 2; basket.position.y = -1.12; group.add(shaft, basket); return group;
-    };
-    this.poleL = makePole(); this.poleR = makePole();
-    this.poleL.position.set(-0.42, 1.16, 0.06); this.poleR.position.set(0.42, 1.16, 0.06);
-    this.body.name = "skier-body"; this.feet.name = "skier-feet";
-    this.body.add(torso, chest, this.head, this.armL, this.armR, this.legL, this.legR, this.poleL, this.poleR);
-    // Skis/boots inherit terrain alignment and yaw, never the torso's tuck dip.
-    this.feet.add(bootL, bootR, this.skiL, this.skiR);
-    this.root.add(this.body, this.feet); scene.add(this.root);
+  constructor(scene: THREE.Scene, config?: RiderPresentation, style: RiderStyle = DEFAULT_RIDER_STYLE) {
+    this.snowboard = config?.riderMode === "snowboarder";
+    this.side = config?.stance === "goofy" ? -1 : 1;
+    const yeti = style.character === "yeti", outfit = OUTFITS[style.outfit];
+    this.shoulderWidth = yeti ? .305 : .245;
+    const suit = material(outfit.sleeves, .9), dark = material(outfit.pants, .9);
+    const clothing = material(0xffffff, .8, 0, true), goggles = material(outfit.lens, .24, .4);
+    const equipment = material(0xffffff, .5, .1, true);
+    this.root.userData.riderStyle = style;
+    this.root.name = "rider"; this.body.name = "rider-torso"; this.head.name = "rider-head";
+    const jacket = jacketGeometry(outfit);
+    if (yeti) jacket.scale(1.25, 1, 1.17);
+    this.body.add(mesh("jacket", jacket, clothing));
+    this.body.add(mesh("trouser-seat", ellipsoid(yeti ? .245 : .21, .13, .14, 0, -.035, 0), dark));
+    const helmet = yeti ? yetiHeadGeometry() : coloredParts([
+      [ellipsoid(.145, .15, .17, 0, .035, -.015), 0xecf0eb],
+      [ellipsoid(.137, .105, .137, 0, -.035, .015), 0xdba881],
+      [ellipsoid(.144, .062, .13, 0, -.105, .0), 0x233044],
+      [ellipsoid(.15, .035, .171, 0, .014, -.015), 0x28364a],
+      [ellipsoid(.132, .071, .047, 0, .003, .133), 0x162233],
+    ]);
+    this.head.add(mesh(yeti ? "yeti-fur-and-face" : "helmet-and-gaiter", helmet, clothing));
+    this.head.add(mesh("curved-goggle-lens", ellipsoid(yeti ? .179 : .12, .056, .045, 0, yeti ? .047 : .006, yeti ? .19 : .151), goggles));
+    this.head.position.set(0, yeti ? .765 : .715, .015); this.body.add(this.head);
+    this.armL = new Limb(this.root, "left-arm", suit, .285, .265, yeti ? .113 : .09);
+    this.armR = new Limb(this.root, "right-arm", suit, .285, .265, yeti ? .113 : .09);
+    this.legL = new Limb(this.root, "left-leg", dark, .40, .38, yeti ? .14 : .125);
+    this.legR = new Limb(this.root, "right-leg", dark, .40, .38, yeti ? .14 : .125);
+    const glove = yeti ? yetiPawGeometry() : coloredParts([
+      [ellipsoid(.061, .09, .065, 0, .035, .015), 0x172231],
+      [ellipsoid(.03, .052, .032, -.045, .015, .045), 0x172231],
+      [ellipsoid(.069, .032, .065, 0, -.025, 0), 0x33485b],
+    ]);
+    this.gloveL = mesh("left-glove", glove, clothing); this.gloveR = mesh("right-glove", glove, clothing);
+    this.root.add(this.body, this.gloveL, this.gloveR, this.equipment);
+    this.equipment.name = "rider-equipment";
+    this.equipment.add(this.footL, this.footR);
+    this.footL.name = "left-foot"; this.footR.name = "right-foot";
+    const boot = coloredParts([
+      [ellipsoid(.085, .07, .18, 0, .10, .065), 0x162233],
+      [ellipsoid(.082, .14, .10, 0, .19, -.015), 0x344457],
+      [ellipsoid(.083, .022, .107, 0, .22, -.006), 0xb8c5cc],
+      [ellipsoid(.084, .02, .107, 0, .15, .025), 0x111c2b],
+      [ellipsoid(.10, .025, .185, 0, .06, .055), 0x172231],
+    ]);
+    if (yeti) boot.scale(1.13, 1, 1.08);
+    this.footL.add(mesh("left-boot", boot, clothing)); this.footR.add(mesh("right-boot", boot, clothing));
+    if (this.snowboard) {
+      this.board = mesh("snowboard", styledDeckGeometry(.40, 1.60, style.board), equipment);
+      this.board.position.y = .035; this.equipment.add(this.board);
+      this.poleL = this.poleR = null;
+    } else {
+      this.board = null;
+      const ski = styledDeckGeometry(.14, 1.85, style.skis);
+      this.footL.add(mesh("left-ski", ski, equipment)); this.footR.add(mesh("right-ski", ski, equipment));
+      const pole = coloredParts([
+        [new THREE.CylinderGeometry(.012, .009, 1.05, 6).translate(0, -.525, 0), 0xa7b6c5],
+        [ellipsoid(.055, .012, .055, 0, -.97, 0), 0x172231],
+        [ellipsoid(.022, .07, .023, 0, -.035, 0), 0x172231],
+      ]);
+      this.poleL = mesh("left-pole", pole, clothing); this.poleR = mesh("right-pole", pole, clothing);
+      this.root.add(this.poleL, this.poleR);
+    }
+    scene.add(this.root);
   }
 
-  update(state: SimulationState, terrain: TerrainSampler, dt: number, renderedGround?: RenderedGroundSampler): void {
+  update(state: RiderPose, terrain: Pick<TerrainSampler, "normal" | "height" | "realLifts">, dt: number, renderedGround?: RenderedGroundSampler): void {
     this.root.position.set(state.pos.x, state.pos.y, state.pos.z);
     terrain.normal(state.pos.x, state.pos.z, normal);
     normalVec.set(normal.x, normal.y, normal.z);
-    if (state.crash > 0) {
+    const crashing = state.crash > 0 && !state.stumble;
+    const blend = 1 - Math.exp(-14 * dt);
+    const grab = this.snowboard && !state.onGround && (state.grabTime ?? 0) > 0;
+    this.grabBlend += ((grab ? 1 : 0) - this.grabBlend) * blend;
+    const charge = this.snowboard ? Math.min(1, state.jumpCharge / .4) : 0;
+    this.crouch += (Math.max(state.crouch, charge, grab ? .85 : 0) - this.crouch) * blend;
+    this.lean += (state.lean - this.lean) * blend;
+    if (crashing) {
       this.tumble += dt * 9;
       this.qGround.setFromUnitVectors(UP, normalVec);
       this.qYaw.setFromAxisAngle(TUMBLE_AXIS, this.tumble);
       this.root.quaternion.copy(this.qGround).multiply(this.qYaw);
-      this.body.position.y = 0;
-      this.body.rotation.set(Math.sin(this.tumble * 1.7) * 0.8, 0, Math.cos(this.tumble * 1.3) * 0.7);
-      this.armL.rotation.z = Math.sin(this.tumble * 2.1) * 1.4; this.armR.rotation.z = -Math.cos(this.tumble * 1.8) * 1.4;
-      this.legL.rotation.x = Math.cos(this.tumble * 2.4); this.legR.rotation.x = -Math.sin(this.tumble * 2.2);
     } else {
       this.tumble = 0;
-      upScratch.copy(UP).lerp(normalVec, state.onGround ? 1 : 0.25).normalize();
+      upScratch.copy(UP).lerp(normalVec, state.onGround ? 1 : .25).normalize();
       this.qGround.setFromUnitVectors(UP, upScratch); this.qYaw.setFromAxisAngle(UP, state.yaw);
       this.root.quaternion.slerp(this.qGround.multiply(this.qYaw), 1 - Math.exp(-16 * dt));
-      this.body.position.y = -state.crouch * 0.46;
-      this.body.rotation.set(state.crouch * 0.72 + Math.min(1, Math.hypot(state.vel.x, state.vel.z) / 70) * 0.18 - (state.onGround ? 0 : 0.15), state.lean * 0.2, -state.lean * 0.46);
-      const swing = Math.sin(state.time * 5.2) * 0.16 * (1 - state.crouch);
-      this.armL.rotation.set(-0.35 - state.crouch * 0.9 + swing, 0, 0.45 + state.lean * 0.3);
-      this.armR.rotation.set(-0.35 - state.crouch * 0.9 - swing, 0, -0.45 + state.lean * 0.3);
-      this.poleL.rotation.set(0.9 + state.crouch * 0.6, 0, 0.5); this.poleR.rotation.set(0.9 + state.crouch * 0.6, 0, -0.5);
-      this.poleL.position.set(-0.42 - state.lean * 0.05, 1.16 - state.crouch * 0.3, 0.06);
-      this.poleR.position.set(0.42 - state.lean * 0.05, 1.16 - state.crouch * 0.3, 0.06);
-      this.legL.rotation.set(state.crouch * 0.55, 0, 0.06 + state.lean * 0.12); this.legR.rotation.set(state.crouch * 0.55, 0, -0.06 + state.lean * 0.12);
-      const spread = 0.19 + Math.abs(state.lean) * 0.06;
-      this.skiL.position.set(-spread, 0.045, 0.05); this.skiR.position.set(spread, 0.045, 0.05);
-      this.skiL.rotation.set(state.onGround ? 0 : 0.16, -state.lean * 0.1, state.lean * 0.42);
-      this.skiR.rotation.copy(this.skiL.rotation); this.head.rotation.y = state.lean * 0.35;
     }
+    const c = this.crouch, lean = this.lean;
+    const facing = this.snowboard ? this.side * Math.PI / 2 : 0;
+    const breath = Math.sin(state.time * 2.2) * .006 * (1 - c);
+    this.body.position.set(-lean * .13, .91 - c * .28 - this.grabBlend * .16 + breath, this.snowboard ? -.035 : -.07 - c * .15);
+    this.body.rotation.set(.10 + c * .45 + this.grabBlend * .32, facing + lean * .10, -lean * .23, "YXZ");
+    if (state.stumble) this.body.rotation.x += Math.sin(state.crash * 24) * .18;
     if (state.liftIndex >= 0) {
-      const lift = terrain.realLifts?.[state.liftIndex];
-      const seated = lift && !/platter|drag_lift|t-bar|j-bar|rope_tow|magic_carpet/.test(lift.type);
       this.root.quaternion.setFromAxisAngle(UP, state.yaw);
-      this.body.position.y = 0;
-      this.body.rotation.set(0, 0, 0);
-      if (seated) {
-        this.legL.rotation.x = this.legR.rotation.x = -1.15;
-        this.skiL.rotation.x = this.skiR.rotation.x = 0.35;
-        this.armL.rotation.x = this.armR.rotation.x = -0.9;
+      const lift = terrain.realLifts?.[state.liftIndex];
+      if (lift && !/platter|drag_lift|t-bar|j-bar|rope_tow|magic_carpet/.test(lift.type)) {
+        this.body.position.y = .64;
+        this.body.rotation.set(.08, facing, 0, "YXZ");
       }
     }
+    this.body.updateMatrix();
+    this.head.rotation.set(-c * .20, this.snowboard ? -this.side * 1.15 : -lean * .20, lean * .08);
+    const spread = .18 + Math.abs(lean) * .025;
+    this.footL.position.set(this.snowboard ? 0 : -spread, .035, this.snowboard ? this.side * .29 : .025);
+    this.footR.position.set(this.snowboard ? 0 : spread, .035, this.snowboard ? -this.side * .29 : .025);
+    this.footL.rotation.set(0, facing + (this.snowboard ? -this.side * (this.side > 0 ? DUCK_FRONT_RAD : DUCK_REAR_RAD) : -lean * .06), 0);
+    this.footR.rotation.set(0, facing + (this.snowboard ? -this.side * (this.side > 0 ? DUCK_REAR_RAD : DUCK_FRONT_RAD) : -lean * .06), 0);
+    this.equipment.rotation.z = this.snowboard ? -(state.boardRoll ?? state.lean * .6) * .12 : lean * .08;
+    // Lift by the width of the edged deck so its lower edge stays above the snow.
+    this.equipment.position.y = Math.abs(Math.sin(this.equipment.rotation.z)) * (this.snowboard ? .20 : spread + .07);
+    this.equipment.position.y += this.grabBlend * .18;
+    this.equipment.updateMatrix();
+    this.poseLeg(this.legL, this.footL, -.14, facing);
+    this.poseLeg(this.legR, this.footR, .14, facing);
+    this.poseArm(this.armL, this.gloveL, this.poleL, -1, c, lean, facing, crashing, grab);
+    this.poseArm(this.armR, this.gloveR, this.poleR, 1, c, lean, facing, crashing, false);
     if (renderedGround && state.onGround && state.liftIndex < 0 && state.crash <= 0) {
       const supportOffset = state.pos.y - terrain.height(state.pos.x, state.pos.z);
       this.root.position.y = renderedGround.sampleRenderedHeight(state.pos.x, state.pos.z) + supportOffset;
-      // Preserve the physical ground normal and each ski's edge pose. A small
-      // footprint check covers the different slopes of raster triangles versus
-      // the analytic normal, without changing collision, camera or recorded pose.
-      const clearance = Math.max(this.skiClearance(this.skiL, renderedGround, supportOffset),
-        this.skiClearance(this.skiR, renderedGround, supportOffset));
+      const clearance = this.snowboard
+        ? this.deckClearance(null, renderedGround, supportOffset, .20, .8)
+        : Math.max(this.deckClearance(this.footL, renderedGround, supportOffset, .08, .93), this.deckClearance(this.footR, renderedGround, supportOffset, .08, .93));
       this.root.position.y += Math.max(0, clearance);
     }
-    // Spawn/recovery immunity belongs to collision handling. Hiding the whole
-    // skier made the first750ms capture and active turns randomly disappear.
+    // Preserve main's visibility fix: immunity must not blink the rider out of the scene.
     this.root.visible = true;
   }
 
-  private skiClearance(ski: THREE.Group, ground: RenderedGroundSampler, supportOffset: number): number {
-    ski.updateMatrix();
+  private deckClearance(foot: THREE.Group | null, ground: RenderedGroundSampler, support: number, halfWidth: number, halfLength: number): number {
+    foot?.updateMatrix();
     let clearance = 0;
-    for (const z of SKI_CONTACT_Z) for (let side = -1; side <= 1; side += 2) {
-      contactScratch.set(side * 0.08, -0.0275, z).applyMatrix4(ski.matrix)
-        .applyQuaternion(this.root.quaternion).add(this.root.position);
-      clearance = Math.max(clearance, ground.sampleRenderedHeight(contactScratch.x, contactScratch.z)
-        + supportOffset + 0.01 - contactScratch.y);
+    for (let i = -1; i <= 1; i++) for (let side = -1; side <= 1; side += 2) {
+      contactScratch.set(side * halfWidth, 0, i * halfLength);
+      if (foot) contactScratch.applyMatrix4(foot.matrix);
+      else contactScratch.y += .035;
+      contactScratch.applyMatrix4(this.equipment.matrix).applyQuaternion(this.root.quaternion).add(this.root.position);
+      clearance = Math.max(clearance, ground.sampleRenderedHeight(contactScratch.x, contactScratch.z) + support + .01 - contactScratch.y);
     }
     return clearance;
   }
 
+  private poseLeg(limb: Limb, foot: THREE.Group, x: number, facing: number): void {
+    origin.set(x, -.025, 0).applyMatrix4(this.body.matrix);
+    target.set(0, .23, 0); foot.updateMatrix();
+    target.applyMatrix4(foot.matrix).applyMatrix4(this.equipment.matrix);
+    bend.set(Math.sin(facing), .05, Math.cos(facing));
+    limb.pose(origin, target, bend);
+  }
+
+  private poseArm(limb: Limb, glove: THREE.Mesh, pole: THREE.Mesh | null, side: number, crouch: number, lean: number, facing: number, crashing: boolean, grab: boolean): void {
+    origin.set(side * this.shoulderWidth, .465, 0).applyMatrix4(this.body.matrix);
+    // Relaxed bent elbows; outside hand opens in a turn while the inside hand stays lower.
+    target.set(side * (this.shoulderWidth + .095 + Math.abs(lean) * .08), .10 - crouch * .02 + side * lean * .10, .22 + crouch * .19);
+    if (crashing) target.set(side * .55, .25 + Math.sin(this.tumble + side) * .3, .05);
+    target.applyMatrix4(this.body.matrix);
+    if (grab) {
+      target.x += (this.side * .18 - target.x) * this.grabBlend;
+      target.y += (this.equipment.position.y + .17 - target.y) * this.grabBlend;
+      target.z += (this.side * .18 - target.z) * this.grabBlend;
+    }
+    direction.subVectors(target, origin).clampLength(0, .549);
+    target.copy(origin).add(direction);
+    bend.set(side * .65 * Math.cos(facing) - .3 * Math.sin(facing), -.3, -side * .65 * Math.sin(facing) - .3 * Math.cos(facing));
+    limb.pose(origin, target, bend);
+    glove.position.copy(target); glove.quaternion.copy(limb.lower.quaternion);
+    if (pole) { pole.position.copy(target); pole.rotation.set(.45 + crouch * .6, 0, side * .13); }
+  }
 }

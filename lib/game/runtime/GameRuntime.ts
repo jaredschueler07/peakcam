@@ -174,6 +174,8 @@ export class GameRuntime {
     nodeFactories?: NodeFactories | null,
     trailId?: string,
     mode: "free_ski" | "time_trial" | "score_attack" = "free_ski",
+    riderStyle?: import("../config/rider-style").RiderStyle,
+    riderPresentation?: import("../config/rider-style").RiderPresentation,
   ) {
     this.ranked = mode !== "free_ski";
     const config = { ...simulationConfigForConditions(conditions, physicsModel), allowLifts: mode === "free_ski" };
@@ -200,7 +202,7 @@ export class GameRuntime {
       if (!this.activated) { this.activated = true; analytics.controlActivated(scheme); }
     });
     const sceneStartedAt = performance.now();
-    this.renderer = new GameRenderer(canvas, profile, this.world, this.state, { backend, nodeFactories, localHour: sensoryLocalHour(profile.slug, mode) });
+    this.renderer = new GameRenderer(canvas, profile, this.world, this.state, { backend, nodeFactories, riderStyle, riderPresentation, localHour: sensoryLocalHour(profile.slug, mode) });
     this.renderer.setWeather(startingWeatherIndex(conditions));
     this.sceneBuildMs = performance.now() - sceneStartedAt;
     this.keyboard = new KeyboardAdapter(this.input);

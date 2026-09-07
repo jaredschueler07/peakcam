@@ -384,8 +384,8 @@ test("shared scene materials receive fog and CSM hooks once while skier colors o
     assert.equal(skierMesh.material.userData.heightFog, false);
     skierColors.add(skierMesh.material.color.getHex());
   });
-  assert.ok(skierColors.has(0x1b6fe0), "blue jacket remains saturated");
-  assert.ok(skierColors.has(0xff8b2e), "orange skis remain saturated");
+  assert.ok(skierColors.has(0xd9552f), "Alpenglow jacket keeps its poster color");
+  assert.ok((skierScene.getObjectByName("left-ski") as THREE.Mesh).geometry.hasAttribute("color"), "gear graphics use vertex colors");
 });
 
 test("weather and lift actions are rising-edge input actions", () => {
@@ -1174,32 +1174,19 @@ test("procedural marker placement remains independent of player X", () => {
   assert.deepEqual(positions.slice(0, fake.markers.count), original);
 });
 
-test("batched ski shells retain all transformed geometry and dispose shared ownership once", () => {
+test("printed ski decks share geometry and dispose shared ownership once", () => {
   const scene = new THREE.Scene();
   new SkierRenderer(scene);
-  const shells: THREE.Mesh[] = [];
-  scene.traverse(object => { if (object instanceof THREE.Mesh && object.name === "ski-shell") shells.push(object); });
-  assert.equal(shells.length, 2);
-  assert.equal(shells[0].geometry, shells[1].geometry);
-  assert.equal(shells[0].material, shells[1].material);
-  for (const shell of shells) {
-    assert.equal(shell.parent?.children.length, 2, "orange shell plus separate dark binding");
-    assert.equal(shell.castShadow, false, "preserve the original ski shadow policy");
-  }
-  const originals = [new THREE.BoxGeometry(0.16, 0.055, 1.86),
-    new THREE.ConeGeometry(0.09, 0.30, 6).rotateX(Math.PI / 2).translate(0, 0.05, 1.02),
-    new THREE.ConeGeometry(0.09, 0.30, 6).rotateX(-Math.PI / 2).translate(0, 0.03, -1)];
-  const merged = shells[0].geometry;
-  assert.equal(merged.index!.count, originals.reduce((sum, geometry) => sum + geometry.index!.count, 0));
-  for (const name of ["position", "normal", "uv"]) {
-    const expected = originals.flatMap(geometry => Array.from(geometry.getAttribute(name).array));
-    assert.deepEqual(Array.from(merged.getAttribute(name).array), expected, `${name} stays identical after static transforms`);
-  }
-  merged.computeBoundingBox();
-  const expectedBounds = new THREE.Box3();
-  for (const geometry of originals) { geometry.computeBoundingBox(); expectedBounds.union(geometry.boundingBox!); geometry.dispose(); }
-  assert.deepEqual(merged.boundingBox, expectedBounds);
-  let released = 0; merged.addEventListener("dispose", () => released++);
+  const left = scene.getObjectByName("left-ski") as THREE.Mesh;
+  const right = scene.getObjectByName("right-ski") as THREE.Mesh;
+  assert.equal(left.geometry, right.geometry);
+  assert.equal(left.material, right.material);
+  assert.equal(left.parent?.children.length, 2, "boot and deck are batched separately");
+  assert.ok(left.geometry.hasAttribute("color"), "printed graphics need no texture");
+  assert.ok(left.geometry.getAttribute("position").count / 3 < 400);
+  left.geometry.computeBoundingBox();
+  assert.ok(left.geometry.boundingBox!.max.y > .09, "curved tips rise above the deck");
+  let released = 0; left.geometry.addEventListener("dispose", () => released++);
   disposeObjectTree(scene);
   assert.equal(released, 1);
 });

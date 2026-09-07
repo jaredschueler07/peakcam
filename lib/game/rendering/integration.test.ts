@@ -475,3 +475,22 @@ for (const kind of ["webgl", "webgpu"] as const) test(`${kind}: late far-field a
   renderer.debugSetQuality(4); assert.equal(mesh.geometry.index!.count, 6);
   renderer.dispose();
 });
+
+test("cosmetic choices reach the scene without entering the simulation config", () => {
+  class InspectingBackend extends FakeBackend {
+    style: unknown;
+    override render(scene?: THREE.Scene) {
+      super.render(); this.style = scene?.getObjectByName("rider")?.userData.riderStyle;
+    }
+  }
+  const backend = new InspectingBackend("webgl");
+  const world = createProceduralWorld(profile, profile.seed);
+  const state = createSimulation(profile, profile.seed);
+  const configBefore = structuredClone(world.config);
+  const riderStyle = { character: "human", outfit: "glacier", board: "nightfall", skis: "ridgeline" } as const;
+  const renderer = new GameRenderer(fakeCanvas(), profile, world, state, { backend, riderStyle, devicePixelRatio: 1 });
+  renderer.render(state, world, 1 / 60, 0);
+  assert.equal(backend.style, riderStyle);
+  assert.deepEqual(world.config, configBefore);
+  renderer.dispose();
+});

@@ -38,6 +38,8 @@ interface RuntimeSurfaceTexturesConsumer {
 }
 
 export interface CreateGameOptions {
+  riderStyle?: import("../config/rider-style").RiderStyle;
+  riderPresentation?: import("../config/rider-style").RiderPresentation;
   trailId?: string;
   mode?: "free_ski" | "time_trial" | "score_attack";
   canvas: HTMLCanvasElement;
@@ -144,7 +146,7 @@ export async function createGame(options: CreateGameOptions): Promise<GameRuntim
     runtime = new GameRuntime(
       options.canvas, options.profile, options.uiBridge, options.analytics, source.sampler,
       options.conditions, options.physicsModel, options.audio, assetLoadMs, options.seed, options.spawnArcM, backend,
-      nodeFactories, options.trailId, options.mode,
+      nodeFactories, options.trailId, options.mode, options.riderStyle, options.riderPresentation,
     );
     options.signal?.addEventListener("abort", abortRuntime, { once: true });
     const cleanup = installE2eDebug(window as Window & { __dropInDebug?: import("./e2e-debug").DropInDebugApi }, location.search, () => runtime!.createDebugApi());

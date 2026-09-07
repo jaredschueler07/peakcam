@@ -80,3 +80,6 @@ REPORT-*.md
 
 # Local browser audit captures (reports remain versioned).
 /docs/reviews/mobile-evidence/
+
+# Local rider/gameplay review captures
+/artifacts/drop-in-forest/

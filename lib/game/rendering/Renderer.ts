@@ -71,6 +71,8 @@ export interface QualityChangeEvent {
 }
 
 interface RendererOptions {
+  riderStyle?: import("../config/rider-style").RiderStyle;
+  riderPresentation?: import("../config/rider-style").RiderPresentation;
   localHour?: number;
   backend?: RendererBackend;
   devicePixelRatio?: number;
@@ -217,7 +219,7 @@ export class GameRenderer {
     }
     this.built = createScene(profile, Math.max(1, canvas.clientWidth) / Math.max(1, canvas.clientHeight), nodes, this.quality.rung);
     this.terrain = new TerrainRenderer(this.built.scene, world, this.built.snowUniforms, nodes, snowDebug, this.quality.rung);
-    this.skier = new SkierRenderer(this.built.scene);
+    this.skier = new SkierRenderer(this.built.scene, options.riderPresentation, options.riderStyle);
     this.ghost = new GhostRenderer(this.built.scene);
     this.worldRenderer = new WorldRenderer(this.built.scene, profile, world);
     this.reducedMotion = options.reducedMotion ?? (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
