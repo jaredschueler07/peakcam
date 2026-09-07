@@ -11,12 +11,13 @@ Finer tessellation resolves the current bicubic surface; it adds no survey data.
 
 One active indexed mesh covers the same 1,000 × 1,000m tile window as before.
 Desktop uses 1m spacing inside a 64m square, 2m inside 128m, 4m inside 256m,
-and 8m outside. Mobile uses 1m inside 32m, 2m inside 128m, 4m inside 256m,
-8m inside 512m, and 16m outside. The centre snaps to 32m desktop/16m mobile
+and 8m outside. Mobile uses 1m inside 32m, 2m inside 48m, 4m inside 80m,
+8m inside 160m, 16m inside 320m, and 32m outside. The centre snaps to 32m desktop/16m mobile
 world coordinates. The outer boundary clips to the original 200m tile window.
 
-Every coarse/fine join shares exact corner and midpoint vertices, with a fan
-on the coarse side. Tests verify upward winding, total covered area, two uses
+The grid remains fixed in world coordinates as the rider moves. Every
+coarse/fine join shares the actual neighbor boundary vertices, including
+quarter points at clipped 32m-to-8m edges, with a fan on the coarse side. Tests verify upward winding, total covered area, two uses
 of every internal edge, and exact interpolation of every actual triangle.
 Normals and snow attributes use the same immutable world sample at shared
 vertices. No skirts hide cracks. No physical surface is modified.
@@ -48,13 +49,13 @@ The committed report samples the five longest named pieces at 33 positions,
 centre and ±5m laterally: 495 identical spatial points per mesh comparison.
 Mobile's maximum contact error drops from 0.417m (8m uniform) to 0.0103m;
 RMSE drops from 0.0877m to 0.00191m. Desktop uses the same refined near surface.
-The sampled maximum triangle count is 29,868 mobile / 50,834 desktop, one draw.
+The sampled maximum triangle count is 8,542 mobile / 50,834 desktop, one draw.
 The old mobile terrain has 31,250 triangles. All figures here count terrain only.
 
 A second offline exercise moves 600m at a simulated 30m/s and 30Hz. The actual
 stream swaps its reserved buffers, and contact error is sampled while building.
-The recorded host had p95 CPU work of ~2.03ms mobile/~2.01ms desktop, maximum
-~4.38ms/~4.62ms, with a maximum moving contact error of ~0.0215m. These are CPU
+The recorded host had p95 CPU work of ~1.15ms mobile/~2.02ms desktop, maximum
+~2.87ms/~6.16ms, with a maximum moving contact error of ~0.0215m. These are CPU
 observations on macOS arm64, not GPU frame rate, not actual mobile hardware,
 and not guaranteed timing bounds. A 2ms slice can overshoot by one coarse cell.
 
@@ -94,3 +95,9 @@ before wedge culling. The visible low-detail wedges are batched into one draw wi
 storage; wedge culling and exact source triangles are preserved. Materials, fog
 and source attributes are unchanged.
 The baseline recordings remain failures; a new deployed build must be retested.
+
+The be19fa0 retest passed draw/heap gates but still reached 170,044 WebGL /
+153,381 WebGPU scene triangles. WebGPU texture memory was 53.2 MiB; WebGL
+byte accounting was unavailable. The tighter mobile near bands above address
+the remaining triangle excess; final deployed recordings are pending. Earlier
+failures remain preserved in the local Hermes evidence directories.

@@ -82,7 +82,7 @@ test("mobile coarsens the outer ring while retaining watertight joins and the or
   const source = terrain(), mesh = new AdaptiveTerrainMesh(source, new THREE.MeshBasicMaterial(), true);
   for (const [x, z] of [[0, 0], [201, -201], [199.9, -0.1], [-602, -403]]) {
     mesh.update(x, z);
-    assert.ok(mesh.triangles < 31_250, `mobile terrain count ${mesh.triangles} stays below baseline`);
+    assert.ok(mesh.triangles < 9_000, `mobile terrain count ${mesh.triangles} reserves room for the full scene`);
     const p = mesh.geometry.getAttribute("position"), idx = mesh.geometry.index!;
     const edges = new Map<string, number>(); let area = 0;
     for (let i = 0; i < mesh.geometry.drawRange.count; i += 3) {
@@ -97,7 +97,7 @@ test("mobile coarsens the outer ring while retaining watertight joins and the or
       assert.ok(count === 1 || count === 2); if (count === 2) continue;
       const [a, b] = key.split(",").map(Number), bound = mesh.bounds;
       assert.ok((p.getX(a) === p.getX(b) && (p.getX(a) === bound.x || p.getX(a) === bound.z)) ||
-        (p.getZ(a) === p.getZ(b) && (p.getZ(a) === bound.y || p.getZ(a) === bound.w)));
+        (p.getZ(a) === p.getZ(b) && (p.getZ(a) === bound.y || p.getZ(a) === bound.w)), `open edge at rider ${x},${z}: ${p.getX(a)},${p.getZ(a)} to ${p.getX(b)},${p.getZ(b)}`);
     }
     for (const side of [-6, 0, 6]) assert.ok(Math.abs(mesh.sampleRenderedHeight(x + side, z) - triangleHeight(source.height, x + side, z, 1)) < 1e-9);
   }
@@ -126,4 +126,14 @@ test("stream keeps complete geometry and contact live until an atomic swap, with
   let disposed = 0; for (const g of observed) g.addEventListener("dispose", () => disposed++);
   stream.disposeInactiveGeometry(); stream.disposeInactiveGeometry(); stream.geometry.dispose();
   assert.equal(disposed, 2); stream.mesh.material.dispose();
+});
+
+
+test("mobile recentering preserves the distant world lattice", () => {
+  const source = terrain(), mesh = new AdaptiveTerrainMesh(source, new THREE.MeshBasicMaterial(), true);
+  mesh.update(0, 0);
+  const before = mesh.sampleRenderedHeight(500.25, 400.75);
+  mesh.update(16, 0);
+  assert.equal(mesh.sampleRenderedHeight(500.25, 400.75), before, "moving the rider cannot shift the outer grid sideways");
+  mesh.geometry.dispose(); mesh.mesh.material.dispose();
 });

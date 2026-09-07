@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "measuredAt": "2026-09-07T15:44:50.535Z",
+  "measuredAt": "2026-09-07T16:40:42.968Z",
   "platform": "darwin/arm64",
   "node": "v22.23.2",
   "reference": "Existing course-v4 bicubic physics surface, not independent surveyed ground.",
@@ -56,15 +56,15 @@
       },
       "maxContactChangeAtRecenterM": 0,
       "cpuBuildMs": {
-        "p50": 11.55541699999992,
-        "p95": 28.344958000000588,
-        "max": 101.75799999999981
+        "p50": 13.164000000000215,
+        "p95": 42.695624999999836,
+        "max": 70.54641600000014
       }
     },
     {
       "mobile": true,
       "baselineSpacingM": 8,
-      "maxTriangles": 29868,
+      "maxTriangles": 8542,
       "drawCalls": 1,
       "fixedBufferBytes": 9473732,
       "baselineContact": {
@@ -83,9 +83,9 @@
       },
       "maxContactChangeAtRecenterM": 0,
       "cpuBuildMs": {
-        "p50": 4.841165999999248,
-        "p95": 9.243000000000393,
-        "max": 14.732124999999542
+        "p50": 1.9576670000005834,
+        "p95": 4.234832999999526,
+        "max": 6.154375000000073
       }
     }
   ],
@@ -106,8 +106,8 @@
       },
       "cpuWorkMs": {
         "p50": 0,
-        "p95": 2.0145000000002256,
-        "max": 4.6183750000000146
+        "p95": 2.017334000000119,
+        "max": 6.163958999999522
       }
     },
     {
@@ -126,8 +126,8 @@
       },
       "cpuWorkMs": {
         "p50": 0,
-        "p95": 2.0293329999994967,
-        "max": 4.37854200000038
+        "p95": 1.1484580000005735,
+        "max": 2.867417000000387
       }
     }
   ]

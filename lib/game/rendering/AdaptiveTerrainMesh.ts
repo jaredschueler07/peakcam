@@ -17,7 +17,7 @@ const color = new THREE.Color();
 const normal = { x: 0, y: 1, z: 0 };
 
 /** A single, stitched, source-sampled mesh. All storage is reserved before play.
- * The 1/2/4/8m squares are aligned to the same world lattice. Coarse cells sharing
+ * The nested 1–32m squares are aligned to the same world lattice. Coarse cells sharing
  * an edge with finer cells add its midpoint, so both sides have identical edges.
  * No skirts, duplicate coplanar sheets, or changes to the physical surface.
  */
@@ -98,7 +98,7 @@ export class AdaptiveTerrainMesh {
     this.minZ = (Math.floor(z / TILE_SIZE) - Z_TILES_BEHIND) * TILE_SIZE;
     this.vertices = 0; this.indexCount = 0; this.minHeight = Infinity; this.maxHeight = -Infinity;
     this.vertexMap.fill(-1);
-    const outer = this.mobile ? 16 : 8;
+    const outer = this.mobile ? 32 : 8;
     this.firstBuildX = Math.floor(this.minX / outer) * outer;
     this.buildX = this.firstBuildX; this.buildZ = Math.floor(this.minZ / outer) * outer;
     this.building = true; this.buildCpuMs = performance.now() - started;
@@ -107,7 +107,7 @@ export class AdaptiveTerrainMesh {
   /** Bounded batches; one coarse cell is the maximum indivisible unit. */
   advance(budgetMs: number): void {
     if (!this.building) return;
-    const started = performance.now(), outer = this.mobile ? 16 : 8;
+    const started = performance.now(), outer = this.mobile ? 32 : 8;
     do {
       this.clippedCell(this.buildX, this.buildZ, outer);
       this.buildX += outer;
@@ -132,9 +132,14 @@ export class AdaptiveTerrainMesh {
     this.maxBuildMs = Math.max(this.maxBuildMs, this.lastBuildMs);
   }
 
-  private spacing(x: number, z: number): number {
-    const d = Math.max(Math.abs(x - this.anchorX), Math.abs(z - this.anchorZ));
-    return d < (this.mobile ? 16 : 32) ? 1 : d < 64 ? 2 : d < 128 ? 4 : this.mobile && d >= 256 ? 16 : 8;
+  private minimumSpacing(x: number, z: number, size: number): number {
+    // Refine a cell if any of its interior reaches a finer band. The world
+    // lattice stays fixed even when a 16m centre moves across a 32m outer cell.
+    const dx = Math.max(x - this.anchorX, this.anchorX - x - size, 0);
+    const dz = Math.max(z - this.anchorZ, this.anchorZ - z - size, 0);
+    const d = Math.max(dx, dz) + 1e-6;
+    if (this.mobile) return d < 16 ? 1 : d < 24 ? 2 : d < 40 ? 4 : d < 80 ? 8 : d < 160 ? 16 : 32;
+    return d < 32 ? 1 : d < 64 ? 2 : d < 128 ? 4 : 8;
   }
 
   private clippedCell(x: number, z: number, size: number): void {
@@ -148,15 +153,19 @@ export class AdaptiveTerrainMesh {
   }
 
   private leafSize(x: number, z: number): number {
-    const size = this.spacing(x, z);
-    if (size < 16) return size;
-    const cx = Math.floor(x / 16) * 16, cz = Math.floor(z / 16) * 16;
-    return cx < this.minX || cz < this.minZ || cx + 16 > this.minX + WIDTH || cz + 16 > this.minZ + WIDTH ? 8 : 16;
+    let size = this.mobile ? 32 : 8;
+    while (size > 1) {
+      const cx = Math.floor(x / size) * size, cz = Math.floor(z / size) * size;
+      const clipped = cx < this.minX || cz < this.minZ || cx + size > this.minX + WIDTH || cz + size > this.minZ + WIDTH;
+      if (!clipped && this.minimumSpacing(cx, cz, size) >= size) break;
+      size /= 2;
+    }
+    return size;
   }
 
   private cell(x: number, z: number, size: number): void {
     const half = size / 2;
-    if (this.spacing(x + half, z + half) < size) {
+    if (this.minimumSpacing(x, z, size) < size) {
       this.cell(x, z, half); this.cell(x + half, z, half);
       this.cell(x, z + half, half); this.cell(x + half, z + half, half);
       return;
@@ -171,14 +180,28 @@ export class AdaptiveTerrainMesh {
       this.triangle(a, c, b); this.triangle(b, c, d); return;
     }
     const middle = this.vertex(x + half, z + half);
-    if (left) { const m = this.vertex(x, z + half); this.triangle(middle, a, m); this.triangle(middle, m, c); }
-    else this.triangle(middle, a, c);
-    if (bottom) { const m = this.vertex(x + half, z + size); this.triangle(middle, c, m); this.triangle(middle, m, d); }
-    else this.triangle(middle, c, d);
-    if (right) { const m = this.vertex(x + size, z + half); this.triangle(middle, d, m); this.triangle(middle, m, b); }
-    else this.triangle(middle, d, b);
-    if (top) { const m = this.vertex(x + half, z); this.triangle(middle, b, m); this.triangle(middle, m, a); }
-    else this.triangle(middle, b, a);
+    this.fanEdge(middle, x, z, 0, 1, size);
+    this.fanEdge(middle, x, z + size, 1, 0, size);
+    this.fanEdge(middle, x + size, z + size, 0, -1, size);
+    this.fanEdge(middle, x + size, z, -1, 0, size);
+  }
+
+  /** Follow the neighbour's actual edge vertices, including 32m-to-8m joins
+   * where the 1km outer window clips a cell. A single midpoint is insufficient. */
+  private fanEdge(center: number, x: number, z: number, dx: number, dz: number, size: number): void {
+    let cursor = 0, previous = this.vertex(x, z);
+    const direction = dx || dz;
+    while (cursor < size) {
+      const px = x + dx * (cursor + 0.25) - dz * 0.25;
+      const pz = z + dz * (cursor + 0.25) + dx * 0.25;
+      const outside = px < this.minX || px >= this.minX + WIDTH || pz < this.minZ || pz >= this.minZ + WIDTH;
+      const spacing = outside ? size : this.leafSize(px, pz);
+      const along = dx ? x + dx * cursor : z + dz * cursor;
+      const nextLine = direction > 0 ? (Math.floor(along / spacing) + 1) * spacing : (Math.ceil(along / spacing) - 1) * spacing;
+      cursor = Math.min(size, cursor + (nextLine - along) * direction);
+      const next = this.vertex(x + dx * cursor, z + dz * cursor);
+      this.triangle(center, previous, next); previous = next;
+    }
   }
 
   private triangle(a: number, b: number, c: number): void {
@@ -244,19 +267,29 @@ export class AdaptiveTerrainMesh {
     const du = u - 0.5, dv = v - 0.5, radius = Math.max(Math.abs(du), Math.abs(dv));
     const hm = this.positions[center * 3 + 1];
     if (radius === 0) return hm;
-    let e0: number, e1: number, mid: number, t: number;
+    let edgeX: number, edgeZ: number, horizontal: boolean, t: number;
     if (Math.abs(du) > Math.abs(dv)) {
-      const edgeX = du < 0 ? cx : cx + size;
-      e0 = du < 0 ? ha : hb; e1 = du < 0 ? hc : hd;
-      mid = this.vertexMap[(cz + half - this.minZ) * ROW + edgeX - this.minX]; t = 0.5 + dv / (2 * radius);
+      edgeX = du < 0 ? cx : cx + size; edgeZ = cz; horizontal = false;
+      t = 0.5 + dv / (2 * radius);
     } else {
-      const edgeZ = dv < 0 ? cz : cz + size;
-      e0 = dv < 0 ? ha : hc; e1 = dv < 0 ? hb : hd;
-      mid = this.vertexMap[(edgeZ - this.minZ) * ROW + cx + half - this.minX]; t = 0.5 + du / (2 * radius);
+      edgeX = cx; edgeZ = dv < 0 ? cz : cz + size; horizontal = true;
+      t = 0.5 + du / (2 * radius);
     }
-    const edge = mid >= 0 ? (t <= 0.5 ? e0 + (this.positions[mid * 3 + 1] - e0) * t * 2 : e1 + (this.positions[mid * 3 + 1] - e1) * (1 - t) * 2) : e0 + (e1 - e0) * t;
-    return hm + (edge - hm) * radius * 2;
+    return hm + (this.edgeHeight(edgeX, edgeZ, size, horizontal, t) - hm) * radius * 2;
   }
+
+  private edgeHeight(x: number, z: number, size: number, horizontal: boolean, t: number): number {
+    const key = (z - this.minZ) * ROW + x - this.minX, stride = horizontal ? 1 : ROW;
+    const at = t * size;
+    let lo = Math.max(0, Math.floor(at)), hi = Math.min(size, Math.ceil(at));
+    while (lo > 0 && this.vertexMap[key + lo * stride] < 0) lo--;
+    while (hi < size && this.vertexMap[key + hi * stride] < 0) hi++;
+    const a = this.positions[this.vertexMap[key + lo * stride] * 3 + 1];
+    if (lo === hi) return a;
+    const b = this.positions[this.vertexMap[key + hi * stride] * 3 + 1];
+    return a + (b - a) * (at - lo) / (hi - lo);
+  }
+
 }
 
 
