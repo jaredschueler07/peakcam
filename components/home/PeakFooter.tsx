@@ -1,5 +1,6 @@
 import { Mountain } from "lucide-react";
 import Link from "next/link";
+import { BugReportButton } from "@/components/feedback/BugReportProvider";
 
 // Poster footer — ink bar on cream paper, Fraunces wordmark with alpen italic CAM,
 // dashed bark rules between sections, mono caption row.
@@ -102,6 +103,7 @@ export function PeakFooter() {
                   </Link>
                 </li>
               ))}
+              <li><BugReportButton className="min-h-11 text-ink/80 hover:text-alpen text-sm font-medium" /></li>
               <li>
                 <a
                   href="mailto:hello@peakcam.io"

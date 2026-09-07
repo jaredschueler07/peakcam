@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { recordBugAction } from "@/lib/bug-reports/client";
 import { RefreshCw } from "lucide-react";
 import type { Cam } from "@/lib/types";
 import { camDisplayName } from "@/lib/cam-name";
@@ -106,6 +107,7 @@ function ImageFeed({ url, name, refreshMs, allowFill }: { url: string; name: str
  *  `border-0` class. That exact allow list / className is preserved on both
  *  branches below so embed behavior is unchanged. */
 export function CamEmbed({ cam, variant }: { cam: Cam; resortSlug: string; variant: "tile" | "lightbox" }) {
+  useEffect(() => { recordBugAction("camera-opened", { cameraId: cam.id }); }, [cam.id]);
   const name = camDisplayName(cam);
 
   if (cam.embed_type === "youtube" && cam.youtube_id) {

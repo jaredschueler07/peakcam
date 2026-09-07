@@ -123,7 +123,7 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteLd) }}
         />
-        <ClientProviders>{children}</ClientProviders>
+        <ClientProviders release={process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 40) ?? "local"}>{children}</ClientProviders>
         <Suspense>
           <Analytics />
         </Suspense>

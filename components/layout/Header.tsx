@@ -1,5 +1,7 @@
 "use client";
 import Link from "next/link";
+import { BugReportButton } from "@/components/feedback/BugReportProvider";
+import { recordBugAction } from "@/lib/bug-reports/client";
 import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -63,11 +65,13 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    recordBugAction("search-edited");
     setQuery(e.target.value);
     onSearch?.(e.target.value);
   }
 
   function clearSearch() {
+    recordBugAction("search-cleared");
     setQuery("");
     onSearch?.("");
     inputRef.current?.focus();
@@ -140,6 +144,7 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
           </Link>
         ))}
 
+        <BugReportButton compact className="hidden md:inline-flex min-h-11 min-w-11 items-center justify-center rounded-full hover:bg-cream-50/10" />
         {/* Auth */}
         {user ? (
           <Link
@@ -194,6 +199,7 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
             </Link>
           ))}
 
+          <BugReportButton className="flex min-h-11 items-center px-3 text-sm font-semibold" />
           <div className="h-px bg-cream-50/15 my-2" />
 
           {user ? (<>

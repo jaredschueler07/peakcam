@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { BugReportProvider } from "@/components/feedback/BugReportProvider";
 
 const PostHogProvider = dynamic(
   () => import("@/lib/posthog").then((mod) => mod.PostHogProvider),
@@ -12,11 +13,11 @@ const MetaPixel = dynamic(
   { ssr: false }
 );
 
-export function ClientProviders({ children }: { children: React.ReactNode }) {
+export function ClientProviders({ children, release = "local" }: { children: React.ReactNode; release?: string }) {
   return (
-    <PostHogProvider>
+    <BugReportProvider release={release}><PostHogProvider>
       {children}
       <MetaPixel />
-    </PostHogProvider>
+    </PostHogProvider></BugReportProvider>
   );
 }

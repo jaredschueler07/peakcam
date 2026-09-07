@@ -1,5 +1,6 @@
 "use client";
 
+import { BugReportButton } from "@/components/feedback/BugReportProvider";
 import ControlSettings, { type TouchPreferences } from "../input/ControlSettings";
 import { useDialogFocus } from "./useDialogFocus";
 import { useStore } from "zustand";
@@ -22,6 +23,7 @@ export default function PauseDialog({ store, onResume, onRestart, preferences, o
           <button className="min-h-11 rounded-full border-[1.5px] border-ink bg-cream-50 px-5 py-2 font-bold shadow-stamp-sm" onClick={onRestart}>Restart</button>
         </div>
         {onChangeRider && <button type="button" onClick={onChangeRider} className="mt-4 min-h-11 text-sm font-semibold text-forest underline underline-offset-4">Change rider &amp; start a new run</button>}
+        <div><BugReportButton className="mt-3 min-h-11 text-sm font-semibold text-forest underline underline-offset-4" /></div>
       </div>
     </div>
   );

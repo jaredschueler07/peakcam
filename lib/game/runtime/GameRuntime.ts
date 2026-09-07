@@ -1,3 +1,4 @@
+import { registerGameReport, recordBugAction } from "@/lib/bug-reports/client";
 import { prepareLiftPath, RIDER_DROP_M } from "../core/lifts";
 import type { DropInDebugApi } from "./e2e-debug";
 import { sampleSensoryState, sensoryLocalHour, type SensoryState } from "./sensory-state";
@@ -147,6 +148,7 @@ export class GameRuntime {
   private ranked = false;
   private debugMutated = false;
   private debugCleanup?: () => void;
+  private clearBugReport?: () => void;
   private readonly inputTape = new InputTapeRecorder();
   private finishedRun: FinishedRunRecording | null = null;
   /** Reused listener payload — avoids allocating `{speed,carve,...}` every HUD tick. */
@@ -220,6 +222,20 @@ export class GameRuntime {
     document.addEventListener("visibilitychange", this.onVisibility);
     window.addEventListener("orientationchange", this.onOrientation);
     canvas.addEventListener("dblclick", this.onPointerLockGesture);
+    recordBugAction("game-started");
+    this.clearBugReport = registerGameReport(() => {
+      const performance = this.renderer.performanceSummary();
+      return {
+        resort: profile.slug, trailIndex: this.state.selectedTrail,
+        rider: config.riderMode ?? "skier", stance: config.stance ?? "regular",
+        surface: this.conditions.surface, backend: this.renderer.backendKind,
+        physicsModel: this.physicsModel, physicsVersion: PHYSICS_VERSION, courseVersion: COURSE_VERSION,
+        ranked: this.ranked, paused: this.paused, onGround: this.state.onGround,
+        elapsedSeconds: this.state.time, x: this.state.pos.x, y: this.state.pos.y, z: this.state.pos.z,
+        speedMps: Math.hypot(this.state.vel.x, this.state.vel.y, this.state.vel.z),
+        p95FrameMs: performance.p95FrameMs, quality: performance.rung,
+      };
+    });
 
   }
 
@@ -466,6 +482,8 @@ export class GameRuntime {
 
   dispose(): void {
     if (this.disposed) return; this.disposed = true;
+    this.clearBugReport?.(); this.clearBugReport = undefined;
+    recordBugAction("game-closed");
     this.debugCleanup?.(); this.debugCleanup = undefined;
     if (this.raf) cancelAnimationFrame(this.raf); this.raf = 0;
     window.removeEventListener("resize", this.onResize);
