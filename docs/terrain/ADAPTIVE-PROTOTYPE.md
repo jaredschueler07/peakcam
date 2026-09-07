@@ -99,5 +99,8 @@ The baseline recordings remain failures; a new deployed build must be retested.
 The be19fa0 retest passed draw/heap gates but still reached 170,044 WebGL /
 153,381 WebGPU scene triangles. WebGPU texture memory was 53.2 MiB; WebGL
 byte accounting was unavailable. The tighter mobile near bands above address
-the remaining triangle excess; final deployed recordings are pending. Earlier
+the remaining triangle excess. Final fc85b13 recordings pass the sampled
+triangle/draw/heap gates on both backends; WebGPU texture bytes pass, while
+WebGL texture bytes remain unmeasured. See [ADAPTIVE-ACCEPTANCE.md](ADAPTIVE-ACCEPTANCE.md)
+for the measured limits and preserved evidence. Earlier
 failures remain preserved in the local Hermes evidence directories.
