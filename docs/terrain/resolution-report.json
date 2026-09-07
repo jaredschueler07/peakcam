@@ -1,0 +1,182 @@
+[
+  {
+    "schemaVersion": 1,
+    "slug": "ski-portillo",
+    "courseVersion": 4,
+    "sourceGridSha256": "ee7e2d1857075f1f7eeb821a5abb5147d466222d22c505cff6cab49e54cec28b",
+    "trailsSha256": "18035e159ea3327cf2b95675871c19db9f3f99a11fed9d2be514489a54e10b66",
+    "reference": "Existing bicubic physical sampler over resampled DEM; not independent measured ground.",
+    "method": "Float32 vertices with actual renderer triangle split; projected x/z aligned at spacing multiples. Current desktop uses 4 m, mobile uses 8 m. Hypothetical 1/2 m grids are offline experiments only.",
+    "limitations": [
+      "Route sampling is not an exhaustive maximum error proof.",
+      "This does not measure the DEM against original LiDAR or surveyed checkpoints.",
+      "Normals, fog, shadows and GPU rasterization are not measured.",
+      "Triangle estimates include terrain only; trees, avatar and infrastructure also consume the mobile budget."
+    ],
+    "sampleCount": 627,
+    "omittedEdgeSamples": 3,
+    "meshes": [
+      {
+        "spacingM": 1,
+        "count": 627,
+        "biasM": 0.0001324654500861701,
+        "rmseM": 0.0023426437745276284,
+        "p95AbsoluteM": 0.004339690190136025,
+        "maxAbsoluteM": 0.026982398762356752,
+        "fullWindowTerrainTriangles": 2000000,
+        "terrainAloneBelowMobileTriangleCeiling": false
+      },
+      {
+        "spacingM": 2,
+        "count": 627,
+        "biasM": 0.0006598301986515432,
+        "rmseM": 0.009453821131456274,
+        "p95AbsoluteM": 0.015216180171137239,
+        "maxAbsoluteM": 0.11515345455245551,
+        "fullWindowTerrainTriangles": 500000,
+        "terrainAloneBelowMobileTriangleCeiling": false
+      },
+      {
+        "spacingM": 4,
+        "count": 627,
+        "biasM": 0.00374518739232209,
+        "rmseM": 0.03232108555020755,
+        "p95AbsoluteM": 0.06179241159816229,
+        "maxAbsoluteM": 0.2832248744880417,
+        "fullWindowTerrainTriangles": 125000,
+        "terrainAloneBelowMobileTriangleCeiling": true
+      },
+      {
+        "spacingM": 8,
+        "count": 627,
+        "biasM": 0.011906711522972669,
+        "rmseM": 0.08609985614717006,
+        "p95AbsoluteM": 0.18464569149500676,
+        "maxAbsoluteM": 0.651668267936202,
+        "fullWindowTerrainTriangles": 31250,
+        "terrainAloneBelowMobileTriangleCeiling": true
+      }
+    ],
+    "routeCount": 6
+  },
+  {
+    "schemaVersion": 1,
+    "slug": "breckenridge",
+    "courseVersion": 4,
+    "sourceGridSha256": "b340b3bc42b7b9d1ae245c7c7131893d377b66daed0016fe3c89f1d279bb5144",
+    "trailsSha256": "af12ce22eeea495a8b5031484940a64a2a52443112c6a3dd51184c059b9d2ebe",
+    "reference": "Existing bicubic physical sampler over resampled DEM; not independent measured ground.",
+    "method": "Float32 vertices with actual renderer triangle split; projected x/z aligned at spacing multiples. Current desktop uses 4 m, mobile uses 8 m. Hypothetical 1/2 m grids are offline experiments only.",
+    "limitations": [
+      "Route sampling is not an exhaustive maximum error proof.",
+      "This does not measure the DEM against original LiDAR or surveyed checkpoints.",
+      "Normals, fog, shadows and GPU rasterization are not measured.",
+      "Triangle estimates include terrain only; trees, avatar and infrastructure also consume the mobile budget."
+    ],
+    "sampleCount": 18684,
+    "omittedEdgeSamples": 0,
+    "meshes": [
+      {
+        "spacingM": 1,
+        "count": 18684,
+        "biasM": 0.00002290219506506847,
+        "rmseM": 0.002739255923868945,
+        "p95AbsoluteM": 0.005614607840016106,
+        "maxAbsoluteM": 0.04118061989538546,
+        "fullWindowTerrainTriangles": 2000000,
+        "terrainAloneBelowMobileTriangleCeiling": false
+      },
+      {
+        "spacingM": 2,
+        "count": 18684,
+        "biasM": 0.00015836897098021435,
+        "rmseM": 0.01074676020568109,
+        "p95AbsoluteM": 0.021976587713652407,
+        "maxAbsoluteM": 0.19763625765926918,
+        "fullWindowTerrainTriangles": 500000,
+        "terrainAloneBelowMobileTriangleCeiling": false
+      },
+      {
+        "spacingM": 4,
+        "count": 18684,
+        "biasM": 0.00035355428551945043,
+        "rmseM": 0.039465816489867106,
+        "p95AbsoluteM": 0.08201269652545307,
+        "maxAbsoluteM": 0.5667771176808856,
+        "fullWindowTerrainTriangles": 125000,
+        "terrainAloneBelowMobileTriangleCeiling": true
+      },
+      {
+        "spacingM": 8,
+        "count": 18684,
+        "biasM": 0.0015118243384740957,
+        "rmseM": 0.1293076274799309,
+        "p95AbsoluteM": 0.2697180889176707,
+        "maxAbsoluteM": 2.0080000271900644,
+        "fullWindowTerrainTriangles": 31250,
+        "terrainAloneBelowMobileTriangleCeiling": true
+      }
+    ],
+    "routeCount": 228
+  },
+  {
+    "schemaVersion": 1,
+    "slug": "heavenly",
+    "courseVersion": 4,
+    "sourceGridSha256": "b5e48d997ed513aac88488a1aeb5fb7b9d2a23263236dba853381dd75693b0a1",
+    "trailsSha256": "62adc3da5b7397b8bcd3faa1e3fc477928ced3165ccb85ea6474545765daee6b",
+    "reference": "Existing bicubic physical sampler over resampled DEM; not independent measured ground.",
+    "method": "Float32 vertices with actual renderer triangle split; projected x/z aligned at spacing multiples. Current desktop uses 4 m, mobile uses 8 m. Hypothetical 1/2 m grids are offline experiments only.",
+    "limitations": [
+      "Route sampling is not an exhaustive maximum error proof.",
+      "This does not measure the DEM against original LiDAR or surveyed checkpoints.",
+      "Normals, fog, shadows and GPU rasterization are not measured.",
+      "Triangle estimates include terrain only; trees, avatar and infrastructure also consume the mobile budget."
+    ],
+    "sampleCount": 11241,
+    "omittedEdgeSamples": 0,
+    "meshes": [
+      {
+        "spacingM": 1,
+        "count": 11241,
+        "biasM": 0.0002624369614400634,
+        "rmseM": 0.0017001061301794567,
+        "p95AbsoluteM": 0.003407381439501478,
+        "maxAbsoluteM": 0.02163124152320961,
+        "fullWindowTerrainTriangles": 2000000,
+        "terrainAloneBelowMobileTriangleCeiling": false
+      },
+      {
+        "spacingM": 2,
+        "count": 11241,
+        "biasM": 0.0010376057293547802,
+        "rmseM": 0.006673092569760162,
+        "p95AbsoluteM": 0.013906138126458245,
+        "maxAbsoluteM": 0.07298802885225086,
+        "fullWindowTerrainTriangles": 500000,
+        "terrainAloneBelowMobileTriangleCeiling": false
+      },
+      {
+        "spacingM": 4,
+        "count": 11241,
+        "biasM": 0.004218233620783984,
+        "rmseM": 0.025615479058164276,
+        "p95AbsoluteM": 0.05314610811683451,
+        "maxAbsoluteM": 0.32259348506340757,
+        "fullWindowTerrainTriangles": 125000,
+        "terrainAloneBelowMobileTriangleCeiling": true
+      },
+      {
+        "spacingM": 8,
+        "count": 11241,
+        "biasM": 0.01614228239065787,
+        "rmseM": 0.08983004582598185,
+        "p95AbsoluteM": 0.18405285026756246,
+        "maxAbsoluteM": 0.9656016769954476,
+        "fullWindowTerrainTriangles": 31250,
+        "terrainAloneBelowMobileTriangleCeiling": true
+      }
+    ],
+    "routeCount": 129
+  }
+]

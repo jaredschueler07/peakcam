@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "slug": "breckenridge",
+  "courseVersion": 4,
+  "sourceGridSha256": "b340b3bc42b7b9d1ae245c7c7131893d377b66daed0016fe3c89f1d279bb5144",
+  "sourceMetaSha256": "adc037f113c23f3d36770bb0d7151a85e97a49cc6f3cd1b59cd4cedc29f782d7",
+  "scope": {
+    "sizeM": 6144,
+    "minElevationM": 2869,
+    "maxElevationM": 4024.5,
+    "requiredClasses": [
+      "open",
+      "forest",
+      "steep",
+      "runout"
+    ]
+  },
+  "targets": {
+    "horizontalM": 0.5,
+    "verticalM": 0.25,
+    "minControlCount": 30,
+    "minAxisSpanFraction": 0.5,
+    "minElevationSpanFraction": 0.6,
+    "maxMeshErrorM": 0.1
+  },
+  "source": {
+    "originalDelivery": null,
+    "horizontalReference": null,
+    "verticalReference": null,
+    "validCoverage": null
+  },
+  "survey": null,
+  "mesh": {
+    "maxErrorM": 2.0080000271900644,
+    "coverage": "sampled",
+    "reference": {
+      "reference": "docs/terrain/resolution-report.json",
+      "sha256": "92b51018b322fdca8933edc621bd2ddb70394ef6935cff9763b893627985f7e1"
+    }
+  },
+  "reviewer": null
+}

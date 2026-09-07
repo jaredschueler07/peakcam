@@ -215,3 +215,74 @@ horizontal accuracy, adequate spatial coverage, or certification.
 
 Do not convert any item in this list into a completed claim merely because source-fidelity
 tests or a browser playtest passed.
+
+## Executed buildout and engineering gates
+
+The [implementation plan](../superpowers/plans/2026-09-07-survey-terrain.md) tracks the
+remaining work task by task. Source discovery and source-window probes are documented
+in [the acquisition guide](SOURCE-ACQUISITION.md). They do not silently select a new
+runtime source.
+
+```sh
+npm run discover-terrain-sources -- all --output .agent-team/source-candidates.json
+npm run measure-terrain-resolution -- all --summary --output .agent-team/resolution-report.json
+npm run terrain-readiness -- all --output .agent-team/readiness-report.json
+npm run terrain-readiness -- all --require-ready
+```
+
+See `scripts/discover-terrain-sources.ts` for the supported discovery arguments. The
+last command is deliberately **nonzero (exit 2)** while any resort lacks sufficient
+evidence. Report-only mode exits zero for successful report generation, even when the
+reported status is `blocked`. Malformed input, stale source/course fingerprints and
+invalid scope exit 1. None of these commands certifies a survey.
+
+`docs/terrain/readiness/<slug>.json` binds evidence to the current course and source
+hashes. Unknown source, datum, control and reviewer evidence is `null`. A source window
+with 100% valid pixels does not establish full-resort coverage. The engineering gate
+requires all four quadrants, minimum axis/elevation spans, the declared terrain classes,
+and at least 30 independent control points. It checks worst individual horizontal and
+vertical residuals including control uncertainty; a good average cannot hide a bad point.
+It also checks a conservative combined vertical/control/mesh error budget.
+
+A sampled mesh maximum is explicitly tagged `sampled`, which blocks a claim of a
+full-scope error bound. Referenced evidence hashes and survey declarations must be
+inspected independently: the gate validates declarations and active source fingerprints;
+it does not authenticate remote documents or replace review of the survey methods.
+The proposed 0.25/0.5 m targets are project engineering targets and remain provisional.
+
+The [resolution report](resolution-report.json) measures rendered Float32 triangle
+heights against the current physical surface along all selected named trail pieces,
+including ±5 m lateral samples. Its diagonal and negative-coordinate behavior are tested
+against the actual terrain renderer. It measures an approximation inside our pipeline,
+not absolute error against the real mountain.
+
+The [original-source experiment](breckenridge-source-resolution.json) uses a recovered
+1024² Breckenridge 1 m source window in native NAD83 UTM13N. Point-sampling that local
+window at the game's ~6 m spacing and reconstructing it with bicubic interpolation
+produced ~0.111 m RMS loss and ~1.088 m worst sampled loss against the original raster.
+This is not an exact reproduction of GDAL warp filtering, whole-mountain coverage, or
+independent ground control. It demonstrates why “6 m grid from 1 m LiDAR” is insufficient
+evidence for a 0.25 m worst-error target.
+
+Uniform 1 m geometry over the current 1 km² streamed window would require 2,000,000
+terrain triangles; even 2 m requires 500,000. The next runtime work therefore needs
+adaptive geometry near the rider and error-driven refinement, with crack-free shared
+edges, the same canonical physical surface, explicit measured error bounds, and mobile
+resource validation. It must be evaluated against a source with adequate coverage and
+known reference frames before a new terrain pack is promoted.
+
+
+For the newly recovered Heavenly 0.5 m source window, the same local experiment
+at ~6 m spacing measured ~0.134 m RMS processing loss and ~1.369 m worst sampled
+loss. See [the source-window report](heavenly-source-resolution.json). These windows
+remain in their native NAD83 reference frames; no unverified conversion to the game's
+WGS84 frame is applied. The acquisition guide records the source coverage gaps.
+
+```sh
+npx tsx scripts/measure-source-resolution.ts .agent-team/terrain-source-probes/breckenridge-original/window-1m.tif --output .agent-team/breck-resolution.json
+npx tsx scripts/measure-source-resolution.ts .agent-team/terrain-source-probes/heavenly-tahoe-original/window-native.tif --output .agent-team/heavenly-resolution.json
+```
+
+These source-window commands require the actual source probes first; see the acquisition
+guide for the URLs and pixel-window extraction commands. The current production DEMs and
+course v4 are retained until the independently validated promotion criteria are met.

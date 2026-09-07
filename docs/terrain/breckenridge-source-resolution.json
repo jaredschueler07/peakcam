@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "sourceFile": "window-1m.tif",
+  "sha256": "5fcd76976a3e4c65b205d1b3864e356c281a59f73f95cf5b9677046d949eebe4",
+  "projectedCrs": "EPSG:26913",
+  "bounds": [
+    405500,
+    4370976,
+    406524,
+    4372000
+  ],
+  "width": 1024,
+  "height": 1024,
+  "sourceSpacingM": 1,
+  "reference": "Original raster window in its native horizontal and vertical reference. No transformation between NAD83 and WGS84 is inferred.",
+  "method": "Local point-sampled bilinear reduction, 0.1 m elevation quantization, then game bicubic reconstruction compared to original raster nodes on an interior probe lattice.",
+  "limitations": [
+    "One local window does not establish whole-resort accuracy or coverage.",
+    "Point-sampled reduction is not an exact reproduction of GDAL full-mountain warp filtering.",
+    "Residuals measure processing loss against the source, not independent survey accuracy.",
+    "Separate spacing cases sample slightly different interior extents to avoid boundary extrapolation."
+  ],
+  "experiments": [
+    {
+      "spacingM": 1,
+      "coarseGrid": {
+        "width": 1024,
+        "height": 1024
+      },
+      "count": 115600,
+      "biasM": -0.00002288079179282007,
+      "rmseM": 0.028870540492237643,
+      "p95AbsoluteM": 0.047607421875,
+      "maxAbsoluteM": 0.050048828125
+    },
+    {
+      "spacingM": 2,
+      "coarseGrid": {
+        "width": 512,
+        "height": 512
+      },
+      "count": 114921,
+      "biasM": -0.00005418161533004619,
+      "rmseM": 0.032632485433005474,
+      "p95AbsoluteM": 0.0611724853515625,
+      "maxAbsoluteM": 0.2910308837890625
+    },
+    {
+      "spacingM": 4,
+      "coarseGrid": {
+        "width": 256,
+        "height": 256
+      },
+      "count": 112225,
+      "biasM": 0.0000393283607487584,
+      "rmseM": 0.06936387118259622,
+      "p95AbsoluteM": 0.1404266357421875,
+      "maxAbsoluteM": 0.7504066675901413
+    },
+    {
+      "spacingM": 6.005865102639296,
+      "coarseGrid": {
+        "width": 171,
+        "height": 171
+      },
+      "count": 110224,
+      "biasM": 0.00028096467845701347,
+      "rmseM": 0.11091094404018292,
+      "p95AbsoluteM": 0.22907833047111126,
+      "maxAbsoluteM": 1.0877792026954012
+    },
+    {
+      "spacingM": 8,
+      "coarseGrid": {
+        "width": 128,
+        "height": 128
+      },
+      "count": 108241,
+      "biasM": 0.0006521659523234287,
+      "rmseM": 0.16236483202349403,
+      "p95AbsoluteM": 0.33648872934281826,
+      "maxAbsoluteM": 1.2976360023021698
+    }
+  ]
+}

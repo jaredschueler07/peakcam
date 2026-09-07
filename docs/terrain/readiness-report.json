@@ -1,0 +1,266 @@
+[
+  {
+    "schemaVersion": 1,
+    "slug": "ski-portillo",
+    "courseVersion": 4,
+    "status": "blocked",
+    "certified": false,
+    "targets": {
+      "horizontalM": 0.5,
+      "verticalM": 0.25,
+      "minControlCount": 30,
+      "minAxisSpanFraction": 0.5,
+      "minElevationSpanFraction": 0.6,
+      "maxMeshErrorM": 0.1
+    },
+    "controlCoverage": {
+      "count": 0,
+      "quadrants": 0,
+      "xSpanFraction": null,
+      "zSpanFraction": null,
+      "elevationSpanFraction": null,
+      "classes": []
+    },
+    "errors": {
+      "maxHorizontalIncludingUncertaintyM": null,
+      "maxVerticalIncludingUncertaintyM": null,
+      "maxMeshM": 0.651668267936202
+    },
+    "blockers": [
+      {
+        "code": "original-delivery",
+        "detail": "Archive original raster/point-cloud delivery, metadata and source hashes."
+      },
+      {
+        "code": "horizontal-reference",
+        "detail": "Document horizontal datum, realization, epoch and coordinate transformation."
+      },
+      {
+        "code": "vertical-reference",
+        "detail": "Verify the delivery-specific vertical datum and geoid transformation."
+      },
+      {
+        "code": "source-coverage",
+        "detail": "Provide valid measured coverage for the complete declared scope and retain its mask."
+      },
+      {
+        "code": "mesh-error",
+        "detail": "Measure the rendered surface against its reference and meet the mesh error allocation."
+      },
+      {
+        "code": "mesh-coverage",
+        "detail": "A sampled maximum is not a validated bound across the declared scope."
+      },
+      {
+        "code": "independent-control",
+        "detail": "Supply independent survey report and control observations; DEM-derived control does not qualify."
+      },
+      {
+        "code": "control-count",
+        "detail": "0/30 minimum independent controls supplied."
+      },
+      {
+        "code": "control-quadrants",
+        "detail": "0/4 scope quadrants have control."
+      },
+      {
+        "code": "control-axis-span",
+        "detail": "Controls must span at least the required fraction of both horizontal axes."
+      },
+      {
+        "code": "control-elevation-span",
+        "detail": "Controls do not cover the required elevation range."
+      },
+      {
+        "code": "control-classes",
+        "detail": "Missing surveyed classes: open, steep, runout."
+      },
+      {
+        "code": "horizontal-error",
+        "detail": "Horizontal error plus survey uncertainty exceeds tolerance or is unknown."
+      },
+      {
+        "code": "vertical-error",
+        "detail": "Vertical error plus survey uncertainty exceeds tolerance or is unknown."
+      }
+    ],
+    "note": "Evidence declarations require independent inspection of their referenced artifacts, datum alignment and sampling design. This engineering gate never issues a survey certificate.",
+    "evidenceSha256": "9eab8eb7d719ddbb65bef168c315ed48e36f4593348a7835c215453943bd60b8"
+  },
+  {
+    "schemaVersion": 1,
+    "slug": "breckenridge",
+    "courseVersion": 4,
+    "status": "blocked",
+    "certified": false,
+    "targets": {
+      "horizontalM": 0.5,
+      "verticalM": 0.25,
+      "minControlCount": 30,
+      "minAxisSpanFraction": 0.5,
+      "minElevationSpanFraction": 0.6,
+      "maxMeshErrorM": 0.1
+    },
+    "controlCoverage": {
+      "count": 0,
+      "quadrants": 0,
+      "xSpanFraction": null,
+      "zSpanFraction": null,
+      "elevationSpanFraction": null,
+      "classes": []
+    },
+    "errors": {
+      "maxHorizontalIncludingUncertaintyM": null,
+      "maxVerticalIncludingUncertaintyM": null,
+      "maxMeshM": 2.0080000271900644
+    },
+    "blockers": [
+      {
+        "code": "original-delivery",
+        "detail": "Archive original raster/point-cloud delivery, metadata and source hashes."
+      },
+      {
+        "code": "horizontal-reference",
+        "detail": "Document horizontal datum, realization, epoch and coordinate transformation."
+      },
+      {
+        "code": "vertical-reference",
+        "detail": "Verify the delivery-specific vertical datum and geoid transformation."
+      },
+      {
+        "code": "source-coverage",
+        "detail": "Provide valid measured coverage for the complete declared scope and retain its mask."
+      },
+      {
+        "code": "mesh-error",
+        "detail": "Measure the rendered surface against its reference and meet the mesh error allocation."
+      },
+      {
+        "code": "mesh-coverage",
+        "detail": "A sampled maximum is not a validated bound across the declared scope."
+      },
+      {
+        "code": "independent-control",
+        "detail": "Supply independent survey report and control observations; DEM-derived control does not qualify."
+      },
+      {
+        "code": "control-count",
+        "detail": "0/30 minimum independent controls supplied."
+      },
+      {
+        "code": "control-quadrants",
+        "detail": "0/4 scope quadrants have control."
+      },
+      {
+        "code": "control-axis-span",
+        "detail": "Controls must span at least the required fraction of both horizontal axes."
+      },
+      {
+        "code": "control-elevation-span",
+        "detail": "Controls do not cover the required elevation range."
+      },
+      {
+        "code": "control-classes",
+        "detail": "Missing surveyed classes: open, forest, steep, runout."
+      },
+      {
+        "code": "horizontal-error",
+        "detail": "Horizontal error plus survey uncertainty exceeds tolerance or is unknown."
+      },
+      {
+        "code": "vertical-error",
+        "detail": "Vertical error plus survey uncertainty exceeds tolerance or is unknown."
+      }
+    ],
+    "note": "Evidence declarations require independent inspection of their referenced artifacts, datum alignment and sampling design. This engineering gate never issues a survey certificate.",
+    "evidenceSha256": "d7f30efb6517a6a1919c887736bbaae737524793124abdd585ef739e8a528f32"
+  },
+  {
+    "schemaVersion": 1,
+    "slug": "heavenly",
+    "courseVersion": 4,
+    "status": "blocked",
+    "certified": false,
+    "targets": {
+      "horizontalM": 0.5,
+      "verticalM": 0.25,
+      "minControlCount": 30,
+      "minAxisSpanFraction": 0.5,
+      "minElevationSpanFraction": 0.6,
+      "maxMeshErrorM": 0.1
+    },
+    "controlCoverage": {
+      "count": 0,
+      "quadrants": 0,
+      "xSpanFraction": null,
+      "zSpanFraction": null,
+      "elevationSpanFraction": null,
+      "classes": []
+    },
+    "errors": {
+      "maxHorizontalIncludingUncertaintyM": null,
+      "maxVerticalIncludingUncertaintyM": null,
+      "maxMeshM": 0.9656016769954476
+    },
+    "blockers": [
+      {
+        "code": "original-delivery",
+        "detail": "Archive original raster/point-cloud delivery, metadata and source hashes."
+      },
+      {
+        "code": "horizontal-reference",
+        "detail": "Document horizontal datum, realization, epoch and coordinate transformation."
+      },
+      {
+        "code": "vertical-reference",
+        "detail": "Verify the delivery-specific vertical datum and geoid transformation."
+      },
+      {
+        "code": "source-coverage",
+        "detail": "Provide valid measured coverage for the complete declared scope and retain its mask."
+      },
+      {
+        "code": "mesh-error",
+        "detail": "Measure the rendered surface against its reference and meet the mesh error allocation."
+      },
+      {
+        "code": "mesh-coverage",
+        "detail": "A sampled maximum is not a validated bound across the declared scope."
+      },
+      {
+        "code": "independent-control",
+        "detail": "Supply independent survey report and control observations; DEM-derived control does not qualify."
+      },
+      {
+        "code": "control-count",
+        "detail": "0/30 minimum independent controls supplied."
+      },
+      {
+        "code": "control-quadrants",
+        "detail": "0/4 scope quadrants have control."
+      },
+      {
+        "code": "control-axis-span",
+        "detail": "Controls must span at least the required fraction of both horizontal axes."
+      },
+      {
+        "code": "control-elevation-span",
+        "detail": "Controls do not cover the required elevation range."
+      },
+      {
+        "code": "control-classes",
+        "detail": "Missing surveyed classes: open, forest, steep, runout."
+      },
+      {
+        "code": "horizontal-error",
+        "detail": "Horizontal error plus survey uncertainty exceeds tolerance or is unknown."
+      },
+      {
+        "code": "vertical-error",
+        "detail": "Vertical error plus survey uncertainty exceeds tolerance or is unknown."
+      }
+    ],
+    "note": "Evidence declarations require independent inspection of their referenced artifacts, datum alignment and sampling design. This engineering gate never issues a survey certificate.",
+    "evidenceSha256": "7b3b15afe90f7e885ce02c76d3df6331f06d3d5afa846053df14c6fa7f720fb7"
+  }
+]

@@ -1,0 +1,390 @@
+{
+  "schemaVersion": 1,
+  "inventories": [
+    {
+      "schemaVersion": 1,
+      "slug": "breckenridge",
+      "startedAt": "2026-09-07T15:07:32.913Z",
+      "completedAt": "2026-09-07T15:07:33.581Z",
+      "endpoint": "https://tnmaccess.nationalmap.gov/api/v1/products",
+      "dataset": "Digital Elevation Model (DEM) 1 meter",
+      "queryBoundsWgs84": {
+        "west": -106.11715296548147,
+        "south": 39.44688709637067,
+        "east": -106.0448753238674,
+        "north": 39.502902453215036
+      },
+      "status": "catalog-candidates-not-coverage",
+      "catalogTotal": 7,
+      "uniqueCount": 7,
+      "duplicateCount": 0,
+      "validRasterCoverage": null,
+      "pages": [
+        {
+          "queryUrl": "https://tnmaccess.nationalmap.gov/api/v1/products?datasets=Digital+Elevation+Model+%28DEM%29+1+meter&bbox=-106.11715296548147%2C39.44688709637067%2C-106.0448753238674%2C39.502902453215036&max=100&offset=0&sort=title",
+          "fetchedAt": "2026-09-07T15:07:33.580Z",
+          "serverDate": "Mon, 07 Sep 2026 15:07:33 GMT",
+          "responseSha256": "a6e117e6e39b612de8bb906004f653ad5ce641696dc7f2c99b6d3286b0543535",
+          "offset": 0,
+          "count": 7
+        }
+      ],
+      "products": [
+        {
+          "sourceId": "6a1a474bb66b01118e5fc84e",
+          "title": "USGS 1 Meter 13 x40y437 CO_ParkFremontCuster_2018_C21",
+          "downloadUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/CO_ParkFremontCuster_2018_C21/TIFF/USGS_1M_13_x40y437_CO_ParkFremontCuster_2018_C21.tif",
+          "metadataUrl": "https://www.sciencebase.gov/catalog/item/6a1a474bb66b01118e5fc84e",
+          "vendorMetadataUrl": "https://thor-f5.er.usgs.gov/ngtoc/metadata/waf/elevation/1_meter/geotiff/CO_ParkFremontCuster_2018_C21/USGS_1M_13_x40y437_CO_ParkFremontCuster_2018_C21.xml",
+          "publicationDate": "2026-05-28",
+          "lastUpdated": "2026-05-29T20:11:36.911-06:00",
+          "sizeInBytes": 5490317,
+          "bounds": {
+            "west": -106.16262237499996,
+            "south": 39.38369485000004,
+            "east": -106.04503253999997,
+            "north": 39.47488739700003
+          },
+          "status": "catalog-candidate-not-coverage"
+        },
+        {
+          "sourceId": "62172073d34ec739b2dbf5a0",
+          "title": "USGS 1 Meter 13 x40y437 CO_SanLuisJuanMiguel_2020_D20",
+          "downloadUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/CO_SanLuisJuanMiguel_2020_D20/TIFF/USGS_1M_13_x40y437_CO_SanLuisJuanMiguel_2020_D20.tif",
+          "metadataUrl": "https://www.sciencebase.gov/catalog/item/62172073d34ec739b2dbf5a0",
+          "vendorMetadataUrl": "https://prd-tnm.s3.amazonaws.com/index.html?prefix=StagedProducts/Elevation/metadata/CO_SanLuisJuanMiguel_2020_D20/CO_SanLuisJuanMiguel_5_2020",
+          "publicationDate": "2021-11-24",
+          "lastUpdated": "2022-02-23T23:06:45.625-07:00",
+          "sizeInBytes": 1659456,
+          "bounds": {
+            "west": -106.16262237499996,
+            "south": 39.38369485000004,
+            "east": -106.04503253999997,
+            "north": 39.47488739700003
+          },
+          "status": "catalog-candidate-not-coverage"
+        },
+        {
+          "sourceId": "6a1a4746b66b01118e5fc832",
+          "title": "USGS 1 Meter 13 x41y437 CO_ParkFremontCuster_2018_C21",
+          "downloadUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/CO_ParkFremontCuster_2018_C21/TIFF/USGS_1M_13_x41y437_CO_ParkFremontCuster_2018_C21.tif",
+          "metadataUrl": "https://www.sciencebase.gov/catalog/item/6a1a4746b66b01118e5fc832",
+          "vendorMetadataUrl": "https://thor-f5.er.usgs.gov/ngtoc/metadata/waf/elevation/1_meter/geotiff/CO_ParkFremontCuster_2018_C21/USGS_1M_13_x41y437_CO_ParkFremontCuster_2018_C21.xml",
+          "publicationDate": "2026-05-28",
+          "lastUpdated": "2026-05-29T20:11:31.044-06:00",
+          "sizeInBytes": 107300901,
+          "bounds": {
+            "west": -106.04637932799994,
+            "south": 39.38479553500008,
+            "east": -105.92893300099996,
+            "north": 39.47587541200005
+          },
+          "status": "catalog-candidate-not-coverage"
+        },
+        {
+          "sourceId": "5eaa4ba382cefae35a21f861",
+          "title": "USGS one meter x40y437 CO Central Western 2016",
+          "downloadUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/CO_Central_Western_2016/TIFF/USGS_one_meter_x40y437_CO_Central_Western_2016.tif",
+          "metadataUrl": "https://www.sciencebase.gov/catalog/item/5eaa4ba382cefae35a21f861",
+          "vendorMetadataUrl": "http://nationalmap.gov/3DEP/3dep_prodmetadata.html",
+          "publicationDate": "2020-03-30",
+          "lastUpdated": "2020-11-16T18:37:12.107-07:00",
+          "sizeInBytes": null,
+          "bounds": {
+            "west": -106.162704643,
+            "south": 39.3847421053,
+            "east": -106.044962076,
+            "north": 39.4738364399
+          },
+          "status": "catalog-candidate-not-coverage"
+        },
+        {
+          "sourceId": "5eaa4ba382cefae35a21f863",
+          "title": "USGS one meter x40y438 CO Central Western 2016",
+          "downloadUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/CO_Central_Western_2016/TIFF/USGS_one_meter_x40y438_CO_Central_Western_2016.tif",
+          "metadataUrl": "https://www.sciencebase.gov/catalog/item/5eaa4ba382cefae35a21f863",
+          "vendorMetadataUrl": "http://nationalmap.gov/3DEP/3dep_prodmetadata.html",
+          "publicationDate": "2020-03-30",
+          "lastUpdated": "2020-11-16T18:37:12.867-07:00",
+          "sizeInBytes": null,
+          "bounds": {
+            "west": -106.16419617,
+            "south": 39.4748339696,
+            "east": -106.04630877,
+            "north": 39.5639234564
+          },
+          "status": "catalog-candidate-not-coverage"
+        },
+        {
+          "sourceId": "5eaa4bdf82cefae35a21f9cb",
+          "title": "USGS one meter x41y437 CO Central Western 2016",
+          "downloadUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/CO_Central_Western_2016/TIFF/USGS_one_meter_x41y437_CO_Central_Western_2016.tif",
+          "metadataUrl": "https://www.sciencebase.gov/catalog/item/5eaa4bdf82cefae35a21f9cb",
+          "vendorMetadataUrl": "http://nationalmap.gov/3DEP/3dep_prodmetadata.html",
+          "publicationDate": "2020-03-30",
+          "lastUpdated": "2020-11-16T18:37:21.330-07:00",
+          "sizeInBytes": null,
+          "bounds": {
+            "west": -106.04646151,
+            "south": 39.3857270007,
+            "east": -105.928851013,
+            "north": 39.474940719
+          },
+          "status": "catalog-candidate-not-coverage"
+        },
+        {
+          "sourceId": "5eaa4be082cefae35a21f9cd",
+          "title": "USGS one meter x41y438 CO Central Western 2016",
+          "downloadUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/CO_Central_Western_2016/TIFF/USGS_one_meter_x41y438_CO_Central_Western_2016.tif",
+          "metadataUrl": "https://www.sciencebase.gov/catalog/item/5eaa4be082cefae35a21f9cd",
+          "vendorMetadataUrl": "http://nationalmap.gov/3DEP/3dep_prodmetadata.html",
+          "publicationDate": "2020-03-30",
+          "lastUpdated": "2020-11-16T18:37:22.473-07:00",
+          "sizeInBytes": null,
+          "bounds": {
+            "west": -106.047814466,
+            "south": 39.4758219135,
+            "east": -105.930059751,
+            "north": 39.5650311387
+          },
+          "status": "catalog-candidate-not-coverage"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "slug": "heavenly",
+      "startedAt": "2026-09-07T15:07:33.581Z",
+      "completedAt": "2026-09-07T15:07:34.178Z",
+      "endpoint": "https://tnmaccess.nationalmap.gov/api/v1/products",
+      "dataset": "Digital Elevation Model (DEM) 1 meter",
+      "queryBoundsWgs84": {
+        "west": -119.94854675373642,
+        "south": 38.91186417519402,
+        "east": -119.87548067050521,
+        "north": 38.96892667967067
+      },
+      "status": "catalog-candidates-not-coverage",
+      "catalogTotal": 12,
+      "uniqueCount": 12,
+      "duplicateCount": 0,
+      "validRasterCoverage": null,
+      "pages": [
+        {
+          "queryUrl": "https://tnmaccess.nationalmap.gov/api/v1/products?datasets=Digital+Elevation+Model+%28DEM%29+1+meter&bbox=-119.94854675373642%2C38.91186417519402%2C-119.87548067050521%2C38.96892667967067&max=100&offset=0&sort=title",
+          "fetchedAt": "2026-09-07T15:07:34.178Z",
+          "serverDate": "Mon, 07 Sep 2026 15:07:34 GMT",
+          "responseSha256": "ba32379e1466c9c58b3cbd937b1e41c4a61db9e18287cd6a8c4f5f96f8652c34",
+          "offset": 0,
+          "count": 12
+        }
+      ],
+      "products": [
+        {
+          "sourceId": "683db1abd4be0234870fc66a",
+          "title": "USGS 1 Meter 10 x76y432 CA_SierraNevada_B22",
+          "downloadUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/CA_SierraNevada_B22/TIFF/USGS_1M_10_x76y432_CA_SierraNevada_B22.tif",
+          "metadataUrl": "https://www.sciencebase.gov/catalog/item/683db1abd4be0234870fc66a",
+          "vendorMetadataUrl": "https://thor-f5.er.usgs.gov/ngtoc/metadata/waf/elevation/1_meter/geotiff/CA_SierraNevada_B22/USGS_1M_10_x76y432_CA_SierraNevada_B22.xml",
+          "publicationDate": "2025-05-15",
+          "lastUpdated": "2025-06-02T08:19:09.291-06:00",
+          "sizeInBytes": 197793575,
+          "bounds": {
+            "west": -120.00189499499999,
+            "south": 38.89740260800005,
+            "east": -119.88279736499999,
+            "north": 38.99040972100005
+          },
+          "status": "catalog-candidate-not-coverage"
+        },
+        {
+          "sourceId": "6a4c600c1ba49be4d7c30ec1",
+          "title": "USGS 1 Meter 10 x76y432 NV_USFSR4_D23",
+          "downloadUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NV_USFSR4_D23/TIFF/USGS_1M_10_x76y432_NV_USFSR4_D23.tif",
+          "metadataUrl": "https://www.sciencebase.gov/catalog/item/6a4c600c1ba49be4d7c30ec1",
+          "vendorMetadataUrl": "https://thor-f5.er.usgs.gov/ngtoc/metadata/waf/elevation/1_meter/geotiff/NV_USFSR4_D23/USGS_1M_10_x76y432_NV_USFSR4_D23.xml",
+          "publicationDate": "2026-06-24",
+          "lastUpdated": "2026-07-06T20:10:21.349-06:00",
+          "sizeInBytes": 7643506,
+          "bounds": {
+            "west": -120.00189499499999,
+            "south": 38.89740260800005,
+            "east": -119.88279736499999,
+            "north": 38.99040972100005
+          },
+          "status": "catalog-candidate-not-coverage"
+        },
+        {
+          "sourceId": "640acbbed34e254fd352c6cb",
+          "title": "USGS 1 Meter 10 x76y432 NV_WestCentral_EarthMRI_2020_D20",
+          "downloadUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NV_WestCentral_EarthMRI_2020_D20/TIFF/USGS_1M_10_x76y432_NV_WestCentral_EarthMRI_2020_D20.tif",
+          "metadataUrl": "https://www.sciencebase.gov/catalog/item/640acbbed34e254fd352c6cb",
+          "vendorMetadataUrl": "https://prd-tnm.s3.amazonaws.com/index.html?prefix=StagedProducts/Elevation/metadata/NV_WestCentral_EarthMRI_2020_D20/NV_WestCentralEarthMRI_5_2020",
+          "publicationDate": "2023-03-08",
+          "lastUpdated": "2023-03-09T23:37:51.205-07:00",
+          "sizeInBytes": 26608728,
+          "bounds": {
+            "west": -120.00189499499999,
+            "south": 38.89740260800005,
+            "east": -119.88279736499999,
+            "north": 38.99040972100005
+          },
+          "status": "catalog-candidate-not-coverage"
+        },
+        {
+          "sourceId": "683db1e2d4be0234870fc6dc",
+          "title": "USGS 1 Meter 11 x24y432 CA_SierraNevada_B22",
+          "downloadUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/CA_SierraNevada_B22/TIFF/USGS_1M_11_x24y432_CA_SierraNevada_B22.tif",
+          "metadataUrl": "https://www.sciencebase.gov/catalog/item/683db1e2d4be0234870fc6dc",
+          "vendorMetadataUrl": "https://thor-f5.er.usgs.gov/ngtoc/metadata/waf/elevation/1_meter/geotiff/CA_SierraNevada_B22/USGS_1M_11_x24y432_CA_SierraNevada_B22.xml",
+          "publicationDate": "2025-05-15",
+          "lastUpdated": "2025-06-02T08:20:33.461-06:00",
+          "sizeInBytes": 195574126,
+          "bounds": {
+            "west": -120.00190123999994,
+            "south": 38.90041910600007,
+            "east": -119.88293192199995,
+            "north": 38.99332209900007
+          },
+          "status": "catalog-candidate-not-coverage"
+        },
+        {
+          "sourceId": "6a4c60a51ba49be4d7c31099",
+          "title": "USGS 1 Meter 11 x24y432 NV_USFSR4_D23",
+          "downloadUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NV_USFSR4_D23/TIFF/USGS_1M_11_x24y432_NV_USFSR4_D23.tif",
+          "metadataUrl": "https://www.sciencebase.gov/catalog/item/6a4c60a51ba49be4d7c31099",
+          "vendorMetadataUrl": "https://thor-f5.er.usgs.gov/ngtoc/metadata/waf/elevation/1_meter/geotiff/NV_USFSR4_D23/USGS_1M_11_x24y432_NV_USFSR4_D23.xml",
+          "publicationDate": "2026-06-24",
+          "lastUpdated": "2026-07-06T20:12:55.501-06:00",
+          "sizeInBytes": 6895197,
+          "bounds": {
+            "west": -120.00190123999994,
+            "south": 38.90041910600007,
+            "east": -119.88293192199995,
+            "north": 38.99332209900007
+          },
+          "status": "catalog-candidate-not-coverage"
+        },
+        {
+          "sourceId": "640acec4d34e254fd352cfa2",
+          "title": "USGS 1 Meter 11 x24y432 NV_WestCentral_EarthMRI_2020_D20",
+          "downloadUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NV_WestCentral_EarthMRI_2020_D20/TIFF/USGS_1M_11_x24y432_NV_WestCentral_EarthMRI_2020_D20.tif",
+          "metadataUrl": "https://www.sciencebase.gov/catalog/item/640acec4d34e254fd352cfa2",
+          "vendorMetadataUrl": "https://prd-tnm.s3.amazonaws.com/index.html?prefix=StagedProducts/Elevation/metadata/NV_WestCentral_EarthMRI_2020_D20/NV_WestCentralEarthMRI_5_2020",
+          "publicationDate": "2023-03-08",
+          "lastUpdated": "2023-03-10T00:07:18.372-07:00",
+          "sizeInBytes": 26874117,
+          "bounds": {
+            "west": -120.00190123999994,
+            "south": 38.90041910600007,
+            "east": -119.88293192199995,
+            "north": 38.99332209900007
+          },
+          "status": "catalog-candidate-not-coverage"
+        },
+        {
+          "sourceId": "683db16cd4be0234870fc588",
+          "title": "USGS 1 Meter 11 x25y432 CA_SierraNevada_B22",
+          "downloadUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/CA_SierraNevada_B22/TIFF/USGS_1M_11_x25y432_CA_SierraNevada_B22.tif",
+          "metadataUrl": "https://www.sciencebase.gov/catalog/item/683db16cd4be0234870fc588",
+          "vendorMetadataUrl": "https://thor-f5.er.usgs.gov/ngtoc/metadata/waf/elevation/1_meter/geotiff/CA_SierraNevada_B22/USGS_1M_11_x25y432_CA_SierraNevada_B22.xml",
+          "publicationDate": "2025-05-15",
+          "lastUpdated": "2025-06-02T08:14:27.659-06:00",
+          "sizeInBytes": 9943562,
+          "bounds": {
+            "west": -119.88658282299997,
+            "south": 38.90332220200003,
+            "east": -119.76774254699995,
+            "north": 38.996120663000056
+          },
+          "status": "catalog-candidate-not-coverage"
+        },
+        {
+          "sourceId": "6a4c609f1ba49be4d7c31085",
+          "title": "USGS 1 Meter 11 x25y432 NV_USFSR4_D23",
+          "downloadUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NV_USFSR4_D23/TIFF/USGS_1M_11_x25y432_NV_USFSR4_D23.tif",
+          "metadataUrl": "https://www.sciencebase.gov/catalog/item/6a4c609f1ba49be4d7c31085",
+          "vendorMetadataUrl": "https://thor-f5.er.usgs.gov/ngtoc/metadata/waf/elevation/1_meter/geotiff/NV_USFSR4_D23/USGS_1M_11_x25y432_NV_USFSR4_D23.xml",
+          "publicationDate": "2026-06-24",
+          "lastUpdated": "2026-07-06T20:12:49.194-06:00",
+          "sizeInBytes": 39656256,
+          "bounds": {
+            "west": -119.88658282299997,
+            "south": 38.90332220200003,
+            "east": -119.76774254699995,
+            "north": 38.996120663000056
+          },
+          "status": "catalog-candidate-not-coverage"
+        },
+        {
+          "sourceId": "640acebdd34e254fd352cf7e",
+          "title": "USGS 1 Meter 11 x25y432 NV_WestCentral_EarthMRI_2020_D20",
+          "downloadUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NV_WestCentral_EarthMRI_2020_D20/TIFF/USGS_1M_11_x25y432_NV_WestCentral_EarthMRI_2020_D20.tif",
+          "metadataUrl": "https://www.sciencebase.gov/catalog/item/640acebdd34e254fd352cf7e",
+          "vendorMetadataUrl": "https://prd-tnm.s3.amazonaws.com/index.html?prefix=StagedProducts/Elevation/metadata/NV_WestCentral_EarthMRI_2020_D20/NV_WestCentralEarthMRI_5_2020",
+          "publicationDate": "2023-03-08",
+          "lastUpdated": "2023-03-10T00:07:02.064-07:00",
+          "sizeInBytes": 221864132,
+          "bounds": {
+            "west": -119.88658282299997,
+            "south": 38.90332220200003,
+            "east": -119.76774254699995,
+            "north": 38.996120663000056
+          },
+          "status": "catalog-candidate-not-coverage"
+        },
+        {
+          "sourceId": "5eace54282cefae35a247ee8",
+          "title": "USGS one meter x24y432 NV Reno Carson QL1 2017",
+          "downloadUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NV_Reno_Carson_QL1_2017/TIFF/USGS_one_meter_x24y432_NV_Reno_Carson_QL1_2017.tif",
+          "metadataUrl": "https://www.sciencebase.gov/catalog/item/5eace54282cefae35a247ee8",
+          "vendorMetadataUrl": "http://nationalmap.gov/3DEP/3dep_prodmetadata.html",
+          "publicationDate": "2020-03-30",
+          "lastUpdated": "2020-11-17T15:53:53.354-07:00",
+          "sizeInBytes": 12845056,
+          "bounds": {
+            "west": -120.001984236222,
+            "south": 38.900363039689,
+            "east": -119.882860623893,
+            "north": 38.9933778116848
+          },
+          "status": "catalog-candidate-not-coverage"
+        },
+        {
+          "sourceId": "5eace62082cefae35a2483a2",
+          "title": "USGS one meter x25y432 NV Reno Carson QL1 2017",
+          "downloadUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NV_Reno_Carson_QL1_2017/TIFF/USGS_one_meter_x25y432_NV_Reno_Carson_QL1_2017.tif",
+          "metadataUrl": "https://www.sciencebase.gov/catalog/item/5eace62082cefae35a2483a2",
+          "vendorMetadataUrl": "http://nationalmap.gov/3DEP/3dep_prodmetadata.html",
+          "publicationDate": "2020-03-30",
+          "lastUpdated": "2020-11-17T15:54:00.367-07:00",
+          "sizeInBytes": 70810337,
+          "bounds": {
+            "west": -119.886665743771,
+            "south": 38.903266209296,
+            "east": -119.767671326182,
+            "north": 38.9961763130897
+          },
+          "status": "catalog-candidate-not-coverage"
+        },
+        {
+          "sourceId": "5ead0c6082cefae35a255e47",
+          "title": "USGS one meter x76y432 NV Reno Carson QL1 2017",
+          "downloadUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NV_Reno_Carson_QL1_2017/TIFF/USGS_one_meter_x76y432_NV_Reno_Carson_QL1_2017.tif",
+          "metadataUrl": "https://www.sciencebase.gov/catalog/item/5ead0c6082cefae35a255e47",
+          "vendorMetadataUrl": "http://nationalmap.gov/3DEP/3dep_prodmetadata.html",
+          "publicationDate": "2020-03-30",
+          "lastUpdated": "2020-11-17T15:54:27.901-07:00",
+          "sizeInBytes": 13621002,
+          "bounds": {
+            "west": -120.001966745045,
+            "south": 38.8973377770865,
+            "east": -119.882725818668,
+            "north": 38.9904654963527
+          },
+          "status": "catalog-candidate-not-coverage"
+        }
+      ]
+    }
+  ]
+}

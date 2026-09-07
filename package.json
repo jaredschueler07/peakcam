@@ -24,7 +24,10 @@
     "powder-alerts": "node scripts/powder-alert-check.mjs",
     "generate-images": "node scripts/generate-images.mjs",
     "generate-images:one": "node scripts/generate-images.mjs --name",
-    "audit-terrain": "tsx scripts/audit-terrain.ts"
+    "audit-terrain": "tsx scripts/audit-terrain.ts",
+    "terrain-readiness": "tsx scripts/terrain-readiness.ts",
+    "measure-terrain-resolution": "tsx scripts/measure-terrain-resolution.ts",
+    "discover-terrain-sources": "tsx scripts/discover-terrain-sources.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.9.0",

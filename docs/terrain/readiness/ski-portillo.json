@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "slug": "ski-portillo",
+  "courseVersion": 4,
+  "sourceGridSha256": "ee7e2d1857075f1f7eeb821a5abb5147d466222d22c505cff6cab49e54cec28b",
+  "sourceMetaSha256": "1cd5acdd178d769c9a3e6975b15b27f1f5928f4d1aa0d38c26dec431e359a033",
+  "scope": {
+    "sizeM": 4096,
+    "minElevationM": 2329.2,
+    "maxElevationM": 4139.8,
+    "requiredClasses": [
+      "open",
+      "steep",
+      "runout"
+    ]
+  },
+  "targets": {
+    "horizontalM": 0.5,
+    "verticalM": 0.25,
+    "minControlCount": 30,
+    "minAxisSpanFraction": 0.5,
+    "minElevationSpanFraction": 0.6,
+    "maxMeshErrorM": 0.1
+  },
+  "source": {
+    "originalDelivery": null,
+    "horizontalReference": null,
+    "verticalReference": null,
+    "validCoverage": null
+  },
+  "survey": null,
+  "mesh": {
+    "maxErrorM": 0.651668267936202,
+    "coverage": "sampled",
+    "reference": {
+      "reference": "docs/terrain/resolution-report.json",
+      "sha256": "92b51018b322fdca8933edc621bd2ddb70394ef6935cff9763b893627985f7e1"
+    }
+  },
+  "reviewer": null
+}
