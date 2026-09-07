@@ -1,4 +1,4 @@
-import type { SurfaceKind } from "../core/config";
+import { localSnowSurface, type SurfaceKind } from "../core/config";
 import type { SimulationState, SimulationWorld } from "../core/types";
 const normal = { x: 0, y: 1, z: 0 };
 const clamp = (x: number) => Math.max(0, Math.min(1, x));
@@ -9,8 +9,7 @@ export function sampleSensoryState(state: SimulationState, world: SimulationWorl
   const corridor = clamp(world.terrain.trailField(state.pos.x, state.pos.z));
   world.terrain.normal(state.pos.x, state.pos.z, normal);
   const exposure = clamp((1 - normal.y) * 3);
-  out.surface = env?.powderDepthCm && corridor < 0.5 ? "powder"
-    : env?.morningIce && normal.z * env.northSign > 0.08 && corridor >= 0.5 ? "ice" : world.config.surface;
+  out.surface = localSnowSurface(world.config, corridor, normal.z);
   out.windLevel = env ? clamp(env.windSpeedMps / 20 * (0.3 + exposure * 0.7)) : clamp(presetWind / 15);
   out.liftProximity = 0;
   if (world.terrain.realLifts) for (const lift of world.terrain.realLifts) {

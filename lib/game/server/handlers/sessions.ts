@@ -41,7 +41,9 @@ export const sessionRequestSchema = z
     resortSlug: z.string().min(1).max(64),
     mode: competitiveRunModeSchema,
     trailId: z.string().min(1).max(64),
-    surface: z.enum(["powder", "packed", "firm", "ice"]).default("packed"),
+    surface: z.enum(["powder", "packed", "firm", "ice", "slush"]).default("packed"),
+    riderMode: z.enum(["skier", "snowboarder"]).optional(),
+    stance: z.enum(["regular", "goofy"]).optional(),
     physicsModel: z.enum(["v1", "v2"]).default("v1"),
   })
   .strict();
@@ -63,6 +65,8 @@ export interface SessionResponseBody extends Partial<RankedConditions> {
   mode: "time_trial" | "score_attack";
   trailId: string;
   surface: SurfaceKind;
+  riderMode?: "skier" | "snowboarder";
+  stance?: "regular" | "goofy";
   physicsModel: PhysicsModel;
   physicsVersion: number;
   courseVersion: number;
@@ -105,7 +109,7 @@ export async function handleCreateSession(
     });
   }
 
-  const { resortSlug, mode, trailId } = parsed.data;
+  const { resortSlug, mode, trailId, riderMode = "skier", stance = "regular" } = parsed.data;
   const physicsModel = physicsModelForRollout();
   const course = resolveCourse(resortSlug, trailId);
   if (!course) {
@@ -142,7 +146,7 @@ export async function handleCreateSession(
       trailId,
       seed,
       surface, environment, conditionsDate,
-      physicsModel,
+      physicsModel, riderMode, stance,
       physicsVersion: PHYSICS_VERSION,
       courseVersion: COURSE_VERSION,
       userId,
@@ -157,7 +161,7 @@ export async function handleCreateSession(
     mode,
     trailId,
     surface, environment, conditionsDate,
-    physicsModel,
+    physicsModel, riderMode, stance,
     physicsVersion: PHYSICS_VERSION,
     courseVersion: COURSE_VERSION,
     tickHz: GHOST_TICK_HZ,

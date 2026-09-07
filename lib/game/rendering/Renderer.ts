@@ -208,7 +208,8 @@ export class GameRenderer {
     const navigatorLike = typeof navigator === "undefined" ? undefined : navigator as Navigator & { deviceMemory?: number };
     const signals = options.qualitySignals ?? { hardwareConcurrency: navigatorLike?.hardwareConcurrency, deviceMemory: navigatorLike?.deviceMemory, coarsePointer: typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches, dpr: this.maxDpr };
     this.mobile = signals.coarsePointer;
-    this.quality = new QualityController(seedQualityRung(signals, this.renderer.backendKind));
+    if (this.mobile) this.maxDpr = Math.min(this.maxDpr, 1.5);
+    this.quality = new QualityController(seedQualityRung(signals, this.renderer.backendKind), this.mobile ? 2 : 4);
     const snowDebug = snowDebugMode();
     // `nodes` is the one backend switch the scene needs: it is non-null exactly on WebGPU, and
     // carries the node-material factories that only that path fetches.
@@ -218,8 +219,10 @@ export class GameRenderer {
       throw new Error("[Drop In] A WebGPU backend needs nodeFactories; await loadNodeFactories() before constructing GameRenderer.");
     }
     this.built = createScene(profile, Math.max(1, canvas.clientWidth) / Math.max(1, canvas.clientHeight), nodes, this.quality.rung);
-    this.terrain = new TerrainRenderer(this.built.scene, world, this.built.snowUniforms, nodes, snowDebug, this.quality.rung);
+    this.terrain = new TerrainRenderer(this.built.scene, world, this.built.snowUniforms, nodes, snowDebug, this.quality.rung, this.mobile);
     this.skier = new SkierRenderer(this.built.scene, options.riderPresentation, options.riderStyle);
+    // A seventeen-part rider would consume seventeen extra mobile shadow draws.
+    if (this.mobile) this.skier.root.traverse(object => { object.castShadow = false; });
     this.ghost = new GhostRenderer(this.built.scene);
     this.worldRenderer = new WorldRenderer(this.built.scene, profile, world);
     this.reducedMotion = options.reducedMotion ?? (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
@@ -230,7 +233,7 @@ export class GameRenderer {
     // Reading `?cam=` here, not inside CameraController, keeps that class pure and injectable.
     this.cameraController = new CameraController(
       this.built.camera, state, this.reducedMotion,
-      options.cameraPreset ?? CAMERA_PRESETS[cameraPresetName()],
+      options.cameraPreset ?? CAMERA_PRESETS[cameraPresetName()], world.config.riderMode === "snowboarder",
     );
     const debugWeather = typeof location !== "undefined" && new URLSearchParams(location.search).has("weather");
     this.weather = new WeatherRenderer(profile, this.built, this.renderer, debugWeather ? undefined : world.config.environment, debugWeather ? 12 : options.localHour);

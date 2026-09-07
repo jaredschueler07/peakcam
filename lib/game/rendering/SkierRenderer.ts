@@ -149,7 +149,7 @@ export class SkierRenderer {
     normalVec.set(normal.x, normal.y, normal.z);
     const crashing = state.crash > 0 && !state.stumble;
     const blend = 1 - Math.exp(-14 * dt);
-    const grab = this.snowboard && !state.onGround && (state.grabTime ?? 0) > 0;
+    const grab = this.snowboard && !state.onGround && state.grabbing;
     this.grabBlend += ((grab ? 1 : 0) - this.grabBlend) * blend;
     const charge = this.snowboard ? Math.min(1, state.jumpCharge / .4) : 0;
     this.crouch += (Math.max(state.crouch, charge, grab ? .85 : 0) - this.crouch) * blend;

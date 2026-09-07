@@ -215,3 +215,11 @@ test("reminted tickets must match every frozen environment value", () => {
   assert.equal(ticketMatchesConfig(ticket, { ...config, environment: { ...environment, morningIce: false } }), false);
   assert.equal(ticketMatchesConfig(ticket, { ...config, environment: undefined }), false);
 });
+
+test("a signed snowboard ticket cannot be used for skis or the opposite stance", () => {
+  const board = { ...fresh, physicsModel: "v2" as const, riderMode: "snowboarder" as const, stance: "goofy" as const };
+  const state: TicketState = { status: "ready", ticket: board };
+  assert.equal(ticketForWorld(state, board.seed, { surface: "packed", physicsModel: "v2", riderMode: "skier", stance: "goofy" }, NOW), null);
+  assert.equal(ticketForWorld(state, board.seed, { surface: "packed", physicsModel: "v2", riderMode: "snowboarder", stance: "regular" }, NOW), null);
+  assert.equal(ticketForWorld(state, board.seed, { surface: "packed", physicsModel: "v2", riderMode: "snowboarder", stance: "goofy" }, NOW), board);
+});

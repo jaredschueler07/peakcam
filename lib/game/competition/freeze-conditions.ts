@@ -8,10 +8,10 @@ import { usableTicket, type TicketState } from "./ticket-lifecycle";
 /** Freeze the signed mountain before constructing it; URL model overrides stay offline. */
 export function freezeConditions(
   live: ConditionsSnapshot, state: TicketState, model: PhysicsModel,
-  resortSlug: string, mode: "free_ski" | "time_trial" | "score_attack", trailId: string, now: number,
+  resortSlug: string, mode: "free_ski" | "time_trial" | "score_attack", trailId: string, now: number, riderMode = "skier", stance = "regular",
 ): { ticket: RunSessionTicket | null; conditions: ConditionsSnapshot; trailId: string } {
   const held = mode === "free_ski" ? null : usableTicket(state, now);
-  const ticket = held && held.physicsModel === model && held.physicsVersion === PHYSICS_VERSION &&
+  const ticket = held && (held.riderMode ?? "skier") === riderMode && (held.stance ?? "regular") === stance && held.physicsModel === model && held.physicsVersion === PHYSICS_VERSION &&
     held.courseVersion === COURSE_VERSION && held.tickHz === GHOST_SAMPLE_HZ &&
     held.resortSlug === resortSlug && held.mode === mode &&
     (mode === "score_attack" || held.trailId === trailId) ? held : null;

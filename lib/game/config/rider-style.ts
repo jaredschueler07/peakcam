@@ -1,6 +1,6 @@
-export type RiderMode = "skier" | "snowboarder";
-export type SnowboardStance = "regular" | "goofy";
-/** Visual equipment/stance; independent of the signed simulation configuration. */
+export type { RiderMode, SnowboardStance } from "../core/config";
+import type { RiderMode, SnowboardStance } from "../core/config";
+/** Equipment and stance shared by the solver, signed run ticket, and renderer. */
 export interface RiderPresentation { readonly riderMode?: RiderMode; readonly stance?: SnowboardStance }
 /** Cosmetic choices only: never part of SimulationConfig, a run ticket, or a ghost header. */
 export type RiderCharacter = "yeti" | "human";

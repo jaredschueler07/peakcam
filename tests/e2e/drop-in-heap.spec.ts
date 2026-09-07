@@ -62,10 +62,12 @@ async function usedHeap(page: import("@playwright/test").Page): Promise<number> 
   });
 }
 
-test("active play retains under 2 MB of JS heap over 10s after GC", async ({ page }) => {
+for (const rider of ["skier", "snowboarder"]) test(`${rider} active play retains under 2 MB of JS heap over 10s after GC`, async ({ page }) => {
   test.setTimeout(90_000);
 
   await page.goto(V2_URL);
+  await page.getByLabel("Rider mode").selectOption(rider);
+  await page.getByLabel("Snow surface").selectOption("powder");
   await page.getByRole("button", { name: /start descent/i }).click();
   await expect(page.locator("[data-drop-in-state='running'] canvas[data-testid='drop-in-canvas']")).toBeVisible();
   await expect(page.locator("[data-drop-in-gfx='webgl']")).toHaveCount(1);

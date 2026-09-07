@@ -57,6 +57,7 @@ export class CameraController {
     state: SimulationState,
     reducedMotion?: boolean,
     private readonly preset: CameraPreset = CAMERA_PRESETS.classic,
+    private readonly snowboard = false,
   ) {
     this.reducedMotion = reducedMotion ?? (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
     // Start at the actual chase pose. Real runs can face any heading; seeding a fixed
@@ -98,8 +99,9 @@ export class CameraController {
     const preset = this.preset;
     const forwardX = Math.sin(state.yaw), forwardZ = Math.cos(state.yaw);
     const back = preset.backBase + clamp01(speed / BACK_SPEED_REF) * preset.backSpeedGain;
-    const desiredX = state.pos.x - forwardX * back;
-    const desiredZ = state.pos.z - forwardZ * back;
+    const swing = this.snowboard && !this.reducedMotion ? state.boardRoll * Math.PI / 12 : 0;
+    const desiredX = state.pos.x - Math.sin(state.yaw + swing) * back;
+    const desiredZ = state.pos.z - Math.cos(state.yaw + swing) * back;
     const desiredY = state.pos.y + preset.heightBase + clamp01(speed / HEIGHT_SPEED_REF) * preset.heightSpeedGain
       + (state.onGround ? 0 : preset.airLift);
     const lambda = state.crash > 0 ? 3 : 6.5;

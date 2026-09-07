@@ -147,6 +147,10 @@ export interface SimulationState {
   landingTimer: number;
   lean: number;
   crouch: number;
+  boardRoll: number;
+  grabTime: number;
+  grabbing: boolean;
+  stumble: boolean;
   jumpCharge: number;
   selectedTrail: number;
   liftIndex: number;

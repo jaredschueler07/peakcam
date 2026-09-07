@@ -9,129 +9,129 @@
   "hashes": [
     {
       "step": 120,
-      "hash": "785ddb3ce990b8d756615917d8b0e3f1e77d8211470a1608371cd5f5e0409f1f"
+      "hash": "d2912bb6e3b55e3aa7fceaee4233000546332113a0740c8f1ae99f190f82d7b6"
     },
     {
       "step": 240,
-      "hash": "6201cfc9fd14a828cc8f0a9c3013d8c3ac117f7f7896e708cc4e605e6fa16cd5"
+      "hash": "c5c0265458026da38586106c4dc95fd8eafa39b7979361f0e15556db611ee977"
     },
     {
       "step": 360,
-      "hash": "5ce1392007132a8a3d1384698bd08465ed6cd618798b7be04fbbb69bf6f66451"
+      "hash": "fdb1006dc48a1313cc7f61d173e331d461dfc888403a3a4821b2d37d6f8d9978"
     },
     {
       "step": 480,
-      "hash": "95947fe799f4a45fbbac9051b75c9376e22cc023f69ecbecce6b483fb1218742"
+      "hash": "0aae9fdaebd35339793ff67d3f8fb34ead1b49deb360ab662408e8bc70c6b6f9"
     },
     {
       "step": 600,
-      "hash": "14de45a2283d3adcb534015a01918bcc421d9bb5f717aa24b071e4dbc7cdf35c"
+      "hash": "884cb917c8999f852554698d0b8d77899d014ed89fcd7ae3c0d8a63a7308a5c5"
     },
     {
       "step": 720,
-      "hash": "c75ae831002c751a27ff591912487a36737a1701306dfa0d3862dbc1d49be56d"
+      "hash": "8142a2a1bb2b12d92deedcc5961b6f5be65c4654bf507bb16c2959c933601fdd"
     },
     {
       "step": 840,
-      "hash": "89260aa49636fce3ec314fbbd044c699e5d6a2311aaad2d01b01eacccdf82cbe"
+      "hash": "0ac5cff0545c4fd10dd462c326312d63bea524d2fd6648aa9cc0d14b48d5179d"
     },
     {
       "step": 960,
-      "hash": "41d332ac9bc2a7f29b136aa13a470c22a7bcc39ea15d2b2fd2136732055867e7"
+      "hash": "46c18bccdb2e46089fcad8a505a012ae5220001eab6a4a8243ab6d1f9941ba4f"
     },
     {
       "step": 1080,
-      "hash": "2657d1f3443f3314ca07359dec2be60ed7834cc64bf404ab694db9384a7ac46a"
+      "hash": "df72cfa5a8086a9c8e4bc4838160bd5fd57b440f58186aebbc4c0758e7697630"
     },
     {
       "step": 1200,
-      "hash": "4c5bbeffbebc32c17d6f57923059fd678cad7e59cfaffbaade64831697db266a"
+      "hash": "25c4a2950ffedd4a7f8930d8fa8f3cfcc1f6cddc88dbc06fd8ef5adb7e5f0129"
     },
     {
       "step": 1320,
-      "hash": "2c3e49de1cb28532d146e7c2f32d7d3b397c2d51927773d5a20fe32fd85f7dd7"
+      "hash": "83bf3f516b34c4e4031b5b5ea28c1f9864fa49f8666f770b8caa908ccf710e57"
     },
     {
       "step": 1440,
-      "hash": "475652ffd9b8a43f6f2d8e04c86ea5ba8a1bc25ee998b96821f9b8e636c2499a"
+      "hash": "b40e8cb49130f7a2dd46dc60f7446c1793958ec3ced7773467a614c7fbc31210"
     },
     {
       "step": 1560,
-      "hash": "748d09dc6397ca0a4fa51d7cd1bb85a5a3dee8300e5a760091c992f63c77adee"
+      "hash": "dd9fdb8edfc7efe44d37bede7c5578c76ef7bc38e3c60cabb2471b6e87972abb"
     },
     {
       "step": 1680,
-      "hash": "158a100b5c6937e3491fcf86eaa69536b4369488c6a8f8be4187678f681fa4de"
+      "hash": "265236b7033b2d76d9fa0083ac677e104928bb468a94260f5a8398ac7e9afc1a"
     },
     {
       "step": 1800,
-      "hash": "d3b6dddb785ef498d08be93c7d1937647e8c20958f5069e75a130860c7174adf"
+      "hash": "c811d55b4868451ff58664071ff0ad4cb4e58ea0d3cefee4f1184be95e829755"
     },
     {
       "step": 1920,
-      "hash": "54f84cf86f9e89421cb9bc4c19d881eaa67dc00a3e1f356f6797f4a7cb30321c"
+      "hash": "ffa67438f475811f7b7c2939604c8bc57901db3ecf1183352ecdc1b2e636e8d6"
     },
     {
       "step": 2040,
-      "hash": "396a01e5ab6dc0f6ed752688370825ee7d4747c35632c294b6d0643a47445516"
+      "hash": "c61542ab144a80af05a2347c479e926b6e4489092f091079ef439b0af3201b13"
     },
     {
       "step": 2160,
-      "hash": "522eb39bb364c50f4405100f49cb04cfd684bea8dad0a315c7b1827113b45ab5"
+      "hash": "b9ae5ff03b5b704df2a39b5fb7b87b1875ee29da5bebc1332aa39cc52f085526"
     },
     {
       "step": 2280,
-      "hash": "29223d7a7db31b001f3f57c6ab08be7d2c0a047b7657d1e893a921ecc39cae53"
+      "hash": "881f94e1a4b81d41b25c1b69d77264be751426d6ade4d31b282077b6ce0948e8"
     },
     {
       "step": 2400,
-      "hash": "bc9145216fa53b6df361b2f6cb44aaa62217562b760ff7fe35af55c65db728ff"
+      "hash": "01b2cc5460b9d9b60f1aa64c60afc0822362c10bd3100822625c0516809b248e"
     },
     {
       "step": 2520,
-      "hash": "0af6f9997935106c41ce29b942bc9c1e0d530aec69842cfc1ae1129dbbd6f2fe"
+      "hash": "747b4f8fb005622a109dcdff11f69c31e7365cbaa136ee1f9ab7f1f5254904d4"
     },
     {
       "step": 2640,
-      "hash": "80dd1b4e266164c6cfa134f61bebc068ea2ee5ddb1547ba82f5258cfe32fdf46"
+      "hash": "84acbd6e05f1b34c975725570f77f864718828a14c4d0b1ed0d2839c6be7ab3f"
     },
     {
       "step": 2760,
-      "hash": "c2d9ccd7e06cd7001b732d5b9125b38eb7cc91b0f0490546d8de070e8e62ede8"
+      "hash": "e09436f664b93d6e758459302945f9cdce379bd8dac494c13be2e892e565ef1e"
     },
     {
       "step": 2880,
-      "hash": "a30084b71a803848d151c7d1ba6b3f25955ee6603fe8f345aafce3c21ddb3ea7"
+      "hash": "0e9af35d626a8a0a23b18751ff2c8c2f6aebe16215a38998698b06f97df4965f"
     },
     {
       "step": 3000,
-      "hash": "f8b877edc8987b1dec0a4d65a497023c2b3b52d7b4d97b2cef7e49d4af9489ad"
+      "hash": "7eb9e4f1172dc7c7804a17fdc69ca2174dae4e677d2c720991b7c260f25571a3"
     },
     {
       "step": 3120,
-      "hash": "80fda37fa0faa5ad55e0bebf5761ecc65aa5b5d14f2590696151e43a63113846"
+      "hash": "fb3706845a0acd8f06caea3f91ed6bdbb961bec2f904f5beca5e907f9768b359"
     },
     {
       "step": 3240,
-      "hash": "d01e5ef211fc70ed4996504595c42bf57aed1a5a3e0b58e345906ee8d0b9fca6"
+      "hash": "7c778c6dc558eab0f4cca9ec6ca4d80b0415a5396449b0521f113ec2b4b60c2b"
     },
     {
       "step": 3360,
-      "hash": "179dd36af1c8fb3bd893591ff9d4be66683ffb2e420b6afaa17667cce9f02bee"
+      "hash": "1b424875f705ac5b514e35046b3acedc7e0369535166c300914587b446b44f82"
     },
     {
       "step": 3480,
-      "hash": "79fcdf125d60910107dcc0d943fdb45aaf587805ef9d76430529dff166fb8c32"
+      "hash": "75afeb65f120081f8eb3e832b82ebb6172e8684c19edc81199e7959372dfa3ed"
     },
     {
       "step": 3600,
-      "hash": "604b4048aed86f4bb2653a6692ec624e3e3df9883daf80383f257c675b54ba3f"
+      "hash": "0526d7d1ed6237ea40c70c0916ac07933284f44771b32b1f802301d8de4355f1"
     }
   ],
   "final": {
     "time": 29.999999999998938,
     "score": 0,
-    "distance": 809.0931086136309
+    "distance": 434.0416501206154
   },
-  "crashCount": 2
+  "crashCount": 0
 }

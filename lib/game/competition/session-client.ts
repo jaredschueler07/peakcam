@@ -39,7 +39,9 @@ export const runSessionTicketSchema = z
     resortSlug: z.string().min(1),
     mode: z.enum(["time_trial", "score_attack"]),
     trailId: z.string().min(1),
-    surface: z.enum(["powder", "packed", "firm", "ice"]),
+    surface: z.enum(["powder", "packed", "firm", "ice", "slush"]),
+    riderMode: z.enum(["skier", "snowboarder"]).optional(),
+    stance: z.enum(["regular", "goofy"]).optional(),
     physicsModel: z.enum(["v1", "v2"]),
     physicsVersion: z.number().finite(),
     courseVersion: z.number().finite(),
@@ -55,6 +57,8 @@ export interface RunSessionInput {
   mode: CompetitiveRunMode;
   trailId: string;
   surface: SurfaceKind;
+  riderMode?: "skier" | "snowboarder";
+  stance?: "regular" | "goofy";
   physicsModel: PhysicsModel;
 }
 
@@ -100,7 +104,7 @@ export async function requestRunSession(
         mode: input.mode,
         trailId: input.trailId,
         surface: input.surface,
-        physicsModel: input.physicsModel,
+        physicsModel: input.physicsModel, riderMode: input.riderMode, stance: input.stance,
       }),
       // A ticket carries a one-time nonce; a cached one is a dead ticket.
       cache: "no-store",

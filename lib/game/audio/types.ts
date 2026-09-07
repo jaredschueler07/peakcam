@@ -72,7 +72,8 @@ export interface AudioContextLike {
  * Snow surface quantization from DESIGN §3.6. Lives here until the physics
  * core grows its own copy in Phase 5/6; audio only reads it.
  */
-export type SurfaceKind = "powder" | "packed" | "firm" | "ice";
+export type { SurfaceKind } from "../core/config";
+import type { SurfaceKind } from "../core/config";
 
 /** Mixer buses. `master` is the parent of the other two. */
 export type AudioBusName = "master" | "music" | "sfx";

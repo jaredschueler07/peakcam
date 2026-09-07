@@ -21,11 +21,11 @@ import { rankedTerrain } from "./ranked-terrain";
 import { CHUNK_SIZE, createWorld, getChunk } from "../terrain/obstacles";
 import { simulationConfigForConditions } from "../runtime/physics-selection";
 
-for (const [slug, index] of [["breckenridge", 1], ["heavenly", 2], ["ski-portillo", 2]] as const) for (const controller of ["keyboard", "touch"] as const) {
+for (const riderMode of ["skier", "snowboarder"] as const) for (const [slug, index] of [["breckenridge", 1], ["heavenly", 2], ["ski-portillo", 2]] as const) for (const controller of ["keyboard", "touch"] as const) {
   const terrain = rankedTerrain(slug);
   const run = terrain.realRuns![index];
   const ticket: RunTicketPayload = { ...fixedTrialConditions(), resortSlug: slug, mode: "time_trial", trailId: run.id!, seed: 123,
-    physicsModel: "v2", physicsVersion: PHYSICS_VERSION, courseVersion: COURSE_VERSION, nonce: "test", iat: 0, exp: 10000000 };
+    physicsModel: "v2", riderMode, stance: controller === "touch" ? "goofy" : "regular", physicsVersion: PHYSICS_VERSION, courseVersion: COURSE_VERSION, nonce: "test", iat: 0, exp: 10000000 };
 
   function record() {
     // Construct the client world through the runtime config seam; replay builds its own server world.
@@ -47,7 +47,7 @@ for (const [slug, index] of [["breckenridge", 1], ["heavenly", 2], ["ski-portill
         jumpHeld: false, jumpPressed: false, restartPressed: false, trailPressed: false };
       inputs.record(input); stepSimulation(state, input, FIXED_DT, world); recorder.sample(state, state.time);
     }
-    assert.ok(state.finished, `autopilot did not finish ${run.name}: ${state.courseProgress}/${run.lengthM}`);
+    assert.ok(state.finished, `autopilot did not finish ${riderMode} ${run.name}: ${state.courseProgress}/${run.lengthM}`);
     const ghost = decodeGhost(encodeGhost(recorder.finish()!, { physicsVersion: PHYSICS_VERSION, courseVersion: COURSE_VERSION, sampleHz: 30, seed: ticket.seed }));
     const tape = inputs.finish()!;
     const steering = new Set(Array.from(tape).filter((_, i) => i % 4 === 0));
@@ -57,19 +57,20 @@ for (const [slug, index] of [["breckenridge", 1], ["heavenly", 2], ["ski-portill
   }
   const recorded = record();
 
-  test(`${slug}/${controller}: v2 recorded inputs on committed real terrain replay exactly and reach the finish`, (t) => {
+  test(`${slug}/${controller}/${riderMode}: v2 recorded inputs on committed real terrain replay exactly and reach the finish`, (t) => {
     const result = replayInputs(ticket, recorded.tape, recorded.ghost);
     assert.equal(result.accepted, true, result.reason);
     assert.equal(result.score, recorded.score);
     t.diagnostic(`${run.name}: ${run.id}; ${Math.round(run.lengthM)}m; ${recorded.tape.length / 4} fixed ticks; ${result.timeMs}ms; score ${result.score}`);
   });
-  test(`${slug}/${controller}: v2 replay rejects a changed input and a changed displayed ghost`, () => {
+  test(`${slug}/${controller}/${riderMode}: v2 replay rejects a changed input and a changed displayed ghost`, () => {
+    assert.equal(replayInputs({ ...ticket, riderMode: riderMode === "skier" ? "snowboarder" : "skier" }, recorded.tape, recorded.ghost).accepted, false);
     const tape = recorded.tape.slice(); tape[0] = 127;
     assert.equal(replayInputs(ticket, tape, recorded.ghost).accepted, false);
     const ghost = structuredClone(recorded.ghost); ghost.samples[5].xCm += 1;
     assert.equal(replayInputs(ticket, recorded.tape, ghost).accepted, false);
   });
-  test(`${slug}/${controller}: v2 replay rejects a truncated tape, extra ticks, and changed signed conditions`, () => {
+  test(`${slug}/${controller}/${riderMode}: v2 replay rejects a truncated tape, extra ticks, and changed signed conditions`, () => {
     assert.equal(replayInputs(ticket, recorded.tape.slice(0, -4), recorded.ghost).accepted, false);
     const extra = new Uint8Array(recorded.tape.length + 4); extra.set(recorded.tape);
     assert.equal(replayInputs(ticket, extra, recorded.ghost).accepted, false);
@@ -77,7 +78,7 @@ for (const [slug, index] of [["breckenridge", 1], ["heavenly", 2], ["ski-portill
   });
 
 
-  test(`${slug}/${controller}: ranked HTTP accepts the real v2 run and rejects score, input, and absent-tape tampering`, async () => {
+  test(`${slug}/${controller}/${riderMode}: ranked HTTP accepts the real v2 run and rejects score, input, and absent-tape tampering`, async () => {
     const now = Date.UTC(2026, 8, 5, 18);
     const keys = testKeyring();
     const token = issueTicket(ticket, { ...activeKeyOf(keys), now, ttlMs: 1800000 });

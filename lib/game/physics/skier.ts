@@ -6,7 +6,7 @@ export function createSkierState(): SimulationState {
     pos: { x: 0, y: 0, z: 0 }, vel: { x: 0, y: 0, z: 0 }, yaw: 0,
     onGround: true, airTime: 0, spin: 0, crash: 0, score: 0, best: 0,
     combo: 1, comboTimer: 0, time: 0, startY: 0, carve: 0, edgeAngle: 0,
-    landingTimer: 0, lean: 0,
+    landingTimer: 0, lean: 0, boardRoll: 0, grabTime: 0, grabbing: false, stumble: false,
     crouch: 0, jumpCharge: 0, selectedTrail: 0, liftIndex: -1, liftProgress: 0, liftDistanceM: 0, liftCooldown: 0, liftRide: 0, liftFromZ: 0,
     liftToZ: 0, invuln: 0, lastGateZ: -1e9, distance: 0, prevZ: 0,
     prevX: 0, courseProgress: 0, prevCourseProgress: 0, finished: false,

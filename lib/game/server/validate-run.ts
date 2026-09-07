@@ -220,9 +220,9 @@ export const MIN_AVG_GAP_RATIO = 1;
 
 /** Rebuild the signed model selection server-side; never infer it from the client ghost. */
 export function simulationConfigForTicket(
-  ticket: Pick<RunTicketPayload, "surface" | "physicsModel" | "environment">,
+  ticket: Pick<RunTicketPayload, "surface" | "physicsModel" | "environment" | "riderMode" | "stance">,
 ): SimulationConfig {
-  return simulationConfig(ticket.surface, ticket.physicsModel, ticket.environment);
+  return simulationConfig(ticket.surface, ticket.physicsModel, ticket.environment, ticket.riderMode, ticket.stance);
 }
 
 // ─── Types ───────────────────────────────────────────────────

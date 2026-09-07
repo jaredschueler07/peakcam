@@ -47,6 +47,7 @@ const EDGE_PROFILES: Readonly<Record<SurfaceKind, EdgeProfile>> = {
   powder: { filter: "lowpass", baseHz: 900, carveHz: 1400, q: 0.7, gain: 0.85 },
   packed: { filter: "bandpass", baseHz: 1500, carveHz: 2600, q: 1.1, gain: 1.0 }, // v1 defaults
   firm: { filter: "bandpass", baseHz: 2300, carveHz: 3000, q: 1.9, gain: 1.15 },
+  slush: { filter: "lowpass", baseHz: 1200, carveHz: 1800, q: 0.8, gain: 1.05 },
   ice: { filter: "bandpass", baseHz: 3000, carveHz: 3200, q: 2.8, gain: 1.3 },
 };
 

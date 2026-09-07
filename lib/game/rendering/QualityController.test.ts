@@ -115,3 +115,12 @@ test("WebGL seeds exactly one rung below the same WebGPU device, clamped at zero
   assert.equal(seedQualityRung({ hardwareConcurrency: 12, deviceMemory: 8, coarsePointer: false, dpr: 1 }, "webgpu"), 4);
   assert.equal(seedQualityRung({ hardwareConcurrency: 12, deviceMemory: 8, coarsePointer: false, dpr: 1 }, "webgl"), 3);
 });
+
+test("a mobile resource ceiling survives sustained frame-rate headroom", () => {
+  const quality = new QualityController(4, 2);
+  assert.equal(quality.rung, 2);
+  for (let seconds = 0; seconds <= 180; seconds += 5) quality.observeFrameTimes(8, 33.3, seconds);
+  assert.equal(quality.rung, 2);
+  for (let i = 0; i < 20; i++) quality.observe(120);
+  assert.equal(quality.rung, 2);
+});

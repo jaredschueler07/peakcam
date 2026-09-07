@@ -171,6 +171,8 @@ export class TerrainRenderer {
     private readonly snowDebug = 0,
     /** Current effective quality, including temporary prewarm tiers. */
     private rung: QualityRung = 0,
+    /** Mobile keeps the single batched mesh regardless of shader quality. */
+    private readonly mobileGeometry = false,
   ) {
     this.detailNormal = buildSnowDetailNormal(world.seed);
     // The node material is built from the same constants; only the shading language differs.
@@ -216,13 +218,13 @@ export class TerrainRenderer {
       for (const tile of this.tiles) tile.mesh.material = next;
       this.lowMesh.material = next;
     }
-    if (rung < 2 && this.lowGeometryDirty && Number.isFinite(this.centerX)) this.rebuildLowBatch();
+    if ((this.mobileGeometry || rung < 2) && this.lowGeometryDirty && Number.isFinite(this.centerX)) this.rebuildLowBatch();
     this.applyTileVisibility();
   }
 
   private applyTileVisibility(): void {
-    for (const tile of this.tiles) tile.mesh.visible = this.rung >= 2;
-    this.lowMesh.visible = this.rung < 2 && this.lowMesh.geometry.index !== null;
+    for (const tile of this.tiles) tile.mesh.visible = !this.mobileGeometry && this.rung >= 2;
+    this.lowMesh.visible = (this.mobileGeometry || this.rung < 2) && this.lowMesh.geometry.index !== null;
   }
 
   private rebuildLowBatch(): void {
@@ -283,7 +285,7 @@ export class TerrainRenderer {
       }
     }
     this.lowGeometryDirty = true;
-    if (this.rung < 2) this.rebuildLowBatch();
+    if (this.mobileGeometry || this.rung < 2) this.rebuildLowBatch();
     this.applyTileVisibility();
   }
 
@@ -293,7 +295,7 @@ export class TerrainRenderer {
     const ix = Math.floor(x / TILE_SIZE), iz = Math.floor(z / TILE_SIZE);
     for (const tile of this.tiles) {
       if (tile.x !== ix || tile.z !== iz) continue;
-      const stride = this.rung < 2 ? 2 : 1, spacing = CELL_SIZE * stride;
+      const stride = this.mobileGeometry || this.rung < 2 ? 2 : 1, spacing = CELL_SIZE * stride;
       const localX = x - ix * TILE_SIZE, localZ = z - iz * TILE_SIZE;
       const col = Math.min(TILE_RESOLUTION - stride, Math.floor(localX / spacing) * stride);
       const row = Math.min(TILE_RESOLUTION - stride, Math.floor(localZ / spacing) * stride);

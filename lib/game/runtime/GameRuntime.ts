@@ -178,7 +178,7 @@ export class GameRuntime {
     riderPresentation?: import("../config/rider-style").RiderPresentation,
   ) {
     this.ranked = mode !== "free_ski";
-    const config = { ...simulationConfigForConditions(conditions, physicsModel), allowLifts: mode === "free_ski" };
+    const config = { ...simulationConfigForConditions({ ...conditions, riderMode: riderPresentation?.riderMode, stance: riderPresentation?.stance }, physicsModel), allowLifts: mode === "free_ski" };
     this.world = createWorld(
       profile,
       runSeed,
@@ -414,7 +414,7 @@ export class GameRuntime {
       snapshot: () => {
         assertLive();
         const s = this.state;
-        return { pos: { ...s.pos }, vel: { ...s.vel }, yaw: s.yaw, time: s.time,
+        return { riderMode: this.world.config.riderMode ?? "skier", stance: this.world.config.stance ?? "regular", surface: this.world.config.surface, boardRoll: s.boardRoll, grabTime: s.grabTime, grabbing: s.grabbing, jumpCharge: s.jumpCharge, spin: s.spin, stumble: s.stumble, pos: { ...s.pos }, vel: { ...s.vel }, yaw: s.yaw, time: s.time,
           liftIndex: s.liftIndex, liftProgress: s.liftProgress, liftDistanceM: s.liftDistanceM,
           courseProgress: s.courseProgress, selectedTrail: s.selectedTrail, finished: s.finished,
           onGround: s.onGround, crash: s.crash, ranked: this.ranked, paused: this.paused,

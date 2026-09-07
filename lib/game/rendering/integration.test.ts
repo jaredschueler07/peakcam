@@ -174,6 +174,8 @@ test("the instanced props carry vertex colours identically on both backends", ()
     scene.traverse((object) => {
       const mesh = object as THREE.InstancedMesh;
       if (!mesh.isInstancedMesh) return;
+      // Gate poles share a uniform red/blue material; only scenery uses baked vertex colours.
+      if (mesh.name === "gate-poles") { assert.equal(mesh.count, 2); return; }
       instanced += 1;
       const material = mesh.material as THREE.Material & { vertexColors?: boolean };
       assert.equal(material.vertexColors, true, `${kind}: instanced prop keeps vertexColors`);

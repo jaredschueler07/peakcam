@@ -126,6 +126,7 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
   const [camPreset, setCamPreset] = useState<CameraPresetName>("classic");
   useEffect(() => setCamPreset(cameraPresetName()), []);
   const [riderStyle, setRiderStyle] = useState<RiderStyle>(DEFAULT_RIDER_STYLE);
+  const [snowSurface, setSnowSurface] = useState<"live" | import("@/lib/game/core/config").SurfaceKind>("live");
   const [riderMode, setRiderMode] = useState<RiderMode>("skier");
   const [stance, setStance] = useState<SnowboardStance>("regular");
   const [lockerOpen, setLockerOpen] = useState(false);
@@ -138,7 +139,7 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
   // in on the first trail, so that is the course we ask a ticket for.
   const [trailId, setTrailId] = useState(() => courseChoices[0]?.id ?? trailIdFromName(profile.trails[0].name));
   const selectedCourse = courseChoices.find((course) => course.id === trailId);
-  const physicsModel = resolveRuntimePhysicsModel(conditions.physicsModel);
+  const physicsModel = riderMode === "snowboarder" || snowSurface !== "live" ? "v2" : resolveRuntimePhysicsModel(conditions.physicsModel);
   const [mode, setMode] = useState<DropInModeChoice>("free_ski");
   const [ticketState, setTicketState] = useState<TicketState>(NO_TICKET);
   /** The ticket this descent was actually seeded from; frozen at start. */
@@ -189,7 +190,7 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
         mode: choice,
         trailId: requestedTrailId,
         surface: conditions.surface,
-        physicsModel: physicsModelForSessionRequest(conditions),
+        physicsModel: physicsModelForSessionRequest(conditions), riderMode, stance,
       },
       { signal: controller.signal },
     ).then((result) => {
@@ -318,6 +319,7 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
       applyTicketState(NO_TICKET);
       return;
     }
+    setSnowSurface("live");
     mintTicket(choice);
   };
 
@@ -405,12 +407,12 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
       }
     })();
     return () => { cancelled = true; unsubscribe(); };
-  }, [bridge, conditions, phase, profile, riderStyle, riderMode, stance, physicsModel]);
+  }, [bridge, conditions, phase, profile, riderStyle, riderMode, stance, physicsModel, snowSurface]);
 
   const start = () => {
     if (teardownRef.current) return;
-    const frozen = freezeConditions(conditions, ticketStateRef.current, physicsModel,
-      profile.slug, modeRef.current, trailId, Date.now());
+    const frozen = freezeConditions(snowSurface === "live" ? conditions : { ...conditions, surface: snowSurface, environment: undefined }, ticketStateRef.current, physicsModel,
+      profile.slug, modeRef.current, trailId, Date.now(), riderMode, stance);
     freezeRunTicket(frozen.ticket);
     playedConditionsRef.current = frozen.conditions;
     playedTrailRef.current = frozen.trailId;
@@ -577,9 +579,14 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
                 {selectedCourse && <span className="mt-1 block font-normal">{Math.round(selectedCourse.topElevationM * 3.28084).toLocaleString()} → {Math.round(selectedCourse.bottomElevationM * 3.28084).toLocaleString()} ft</span>}
               </label>
               <div className="mt-5 flex flex-wrap justify-center gap-3 text-sm text-ink">
-                <label>Gear <select aria-label="Rider mode" value={riderMode} onChange={event => setRiderMode(event.target.value as RiderMode)} className="min-h-11 rounded border border-ink bg-cream-50 p-2"><option value="skier">Skis</option><option value="snowboarder">Snowboard</option></select></label>
-                {riderMode === "snowboarder" && <label>Stance <select aria-label="Snowboard stance" value={stance} onChange={event => setStance(event.target.value as SnowboardStance)} className="min-h-11 rounded border border-ink bg-cream-50 p-2"><option value="regular">Regular</option><option value="goofy">Goofy</option></select></label>}
+                <label>Gear <select aria-label="Rider mode" value={riderMode} onChange={event => { setRiderMode(event.target.value as RiderMode); selectMode("free_ski"); }} className="min-h-11 rounded border border-ink bg-cream-50 p-2"><option value="skier">Skis</option><option value="snowboarder">Snowboard</option></select></label>
+                {riderMode === "snowboarder" && <label>Stance <select aria-label="Snowboard stance" value={stance} onChange={event => { setStance(event.target.value as SnowboardStance); selectMode("free_ski"); }} className="min-h-11 rounded border border-ink bg-cream-50 p-2"><option value="regular">Regular</option><option value="goofy">Goofy</option></select></label>}
               </div>
+              {riderMode === "snowboarder" && <p className="text-sm text-bark-dk">Hold jump to flex the tail; release to ollie. Hold again in the air to grab, and steer to spin.</p>}
+              {mode === "free_ski" && <label className="mt-3 block text-sm">Snow <select aria-label="Snow surface" value={snowSurface} onChange={event => setSnowSurface(event.target.value as typeof snowSurface)} className="min-h-11 rounded border border-ink bg-cream-50 p-2">
+                <option value="live">Today’s mountain</option><option value="powder">Deep powder</option><option value="packed">Groomed corduroy</option><option value="firm">Hardpack</option><option value="ice">Ice</option><option value="slush">Spring slush</option>
+              </select></label>}
+              <p className="mt-2 text-sm text-bark-dk">{({ powder: "Float through soft snow with slower, heavier turns.", packed: "Quick edges and predictable grip on groomed snow.", firm: "Fast, firm snow with a little drift.", ice: "Fast glide, long braking distances. Set your edge early.", slush: "Heavy, wet snow pulls at your gear and scrubs speed." })[snowSurface === "live" ? conditions.surface : snowSurface]}</p>
               <RiderLocker style={riderStyle} onChange={changeRiderStyle} riderMode={riderMode} stance={stance} open={lockerOpen} onToggle={() => setLockerOpen(!lockerOpen)} />
               <details className="mt-4 rounded-lg border border-ink/20 p-3 text-left"><summary className="min-h-11 cursor-pointer content-center text-sm font-bold">Control preferences</summary><ControlSettings preferences={preferences} onChange={updatePreferences} /></details>
               <button onClick={start} className="mt-7 rounded-full border-[1.5px] border-ink bg-alpen-dk px-8 py-3 font-bold uppercase tracking-wide text-cream-50 shadow-stamp transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink">

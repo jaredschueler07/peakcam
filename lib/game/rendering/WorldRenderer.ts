@@ -171,10 +171,13 @@ export class WorldRenderer {
     for (let i = 0; i < 42; i += 1) {
       const group = new THREE.Group(), color = i % 2 ? 0x2f7de0 : 0xe63a4a;
       const poleMaterial = new THREE.MeshStandardMaterial({ color, roughness: 0.55, emissive: color, emissiveIntensity: 0.16 });
-      const left = new THREE.Mesh(poleGeometry, poleMaterial), right = new THREE.Mesh(poleGeometry, poleMaterial);
-      left.position.y = right.position.y = 1.5;
+      const poles = new THREE.InstancedMesh(poleGeometry, poleMaterial, 2);
+      poles.name = "gate-poles"; poles.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      poles.computeBoundingSphere();
       const panel = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.9, 6, 2), new THREE.MeshStandardMaterial({ color, roughness: 0.62, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }));
-      panel.position.y = 2.35; group.add(left, right, panel); group.visible = false; group.userData = { left, right, panel, poleMaterial, key: 0 };
+      // A flat transparent banner needs only one double-sided pass.
+      panel.material.forceSinglePass = true;
+      panel.position.y = 2.35; group.add(poles, panel); group.visible = false; group.userData = { poles, halfWidth: NaN, panel, poleMaterial, key: 0 };
       this.gates.push(group); this.scene.add(group);
     }
   }
@@ -315,6 +318,16 @@ export class WorldRenderer {
     this.markers.count = count; this.markers.instanceMatrix.needsUpdate = true;
   }
 
+  private positionGatePoles(group: THREE.Group, halfWidth: number): void {
+    if (group.userData.halfWidth === halfWidth) return;
+    group.userData.halfWidth = halfWidth;
+    const poles = group.userData.poles as THREE.InstancedMesh;
+    poles.setMatrixAt(0, matrix.makeTranslation(-halfWidth, 1.5, 0));
+    poles.setMatrixAt(1, matrix.makeTranslation(halfWidth, 1.5, 0));
+    poles.instanceMatrix.needsUpdate = true;
+    poles.computeBoundingSphere();
+  }
+
   private updateGates(state: SimulationState) {
     if (this.world.terrain.kind === "real" && this.world.terrain.realRuns) {
       const run = this.world.terrain.realRuns[state.selectedTrail]; let count = 0;
@@ -324,7 +337,7 @@ export class WorldRenderer {
         // Terrain, not `gate.y`, for the same reason the ramps use it: the chord between polyline
         // vertices measured up to 17.5m off the drawn heightfield on Roca Jack.
         group.position.set(gate.x, this.world.terrain.height(gate.x, gate.z), gate.z); group.rotation.y = gate.heading;
-        group.userData.left.position.x = -gate.halfWidthM; group.userData.right.position.x = gate.halfWidthM;
+        this.positionGatePoles(group, gate.halfWidthM);
         group.userData.panel.scale.x = gate.halfWidthM * 2;
         const done = state.passedGates.has(state.selectedTrail * 100003 + gate.key);
         group.userData.panel.material.opacity = done ? 0.22 : 0.9;
@@ -338,7 +351,7 @@ export class WorldRenderer {
       const trail = this.profile.trails[ti], start = Math.floor((state.pos.z - 40) / GATE_SPACING);
       for (let k = start; k < start + 7 && count < this.gates.length; k += 1) {
         if (k < 1) continue; const z = k * GATE_SPACING + ti * 31, x = trailCenter(trail, z), half = trail.half * 0.52, group = this.gates[count++];
-        group.visible = true; group.position.set(x, this.world.terrain.height(x, z), z); group.userData.left.position.x = -half; group.userData.right.position.x = half; group.userData.panel.scale.x = half * 2;
+        group.visible = true; group.position.set(x, this.world.terrain.height(x, z), z); this.positionGatePoles(group, half); group.userData.panel.scale.x = half * 2;
         const done = state.passedGates.has(ti * 100003 + k); group.userData.panel.material.opacity = done ? 0.22 : 0.9; group.userData.poleMaterial.emissiveIntensity = done ? 0.02 : 0.16;
       }
     }

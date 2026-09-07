@@ -46,6 +46,8 @@ export interface RunTicketClaims {
   trailId: string;
   seed: number;
   surface: SurfaceKind;
+  riderMode?: "skier" | "snowboarder";
+  stance?: "regular" | "goofy";
   physicsModel: PhysicsModel;
   physicsVersion: number;
   courseVersion: number;
@@ -235,7 +237,9 @@ function isTicketPayload(value: unknown): value is RunTicketPayload {
     (p.mode === "time_trial" || p.mode === "score_attack") &&
     typeof p.trailId === "string" &&
     Number.isFinite(p.seed) &&
-    (p.surface === "powder" || p.surface === "packed" || p.surface === "firm" || p.surface === "ice") &&
+    (p.surface === "powder" || p.surface === "packed" || p.surface === "firm" || p.surface === "ice" || p.surface === "slush") &&
+    (p.riderMode === undefined || p.riderMode === "skier" || p.riderMode === "snowboarder") &&
+    (p.stance === undefined || p.stance === "regular" || p.stance === "goofy") &&
     (p.physicsModel === "v1" || p.physicsModel === "v2") &&
     Number.isFinite(p.physicsVersion) &&
     Number.isFinite(p.courseVersion) &&

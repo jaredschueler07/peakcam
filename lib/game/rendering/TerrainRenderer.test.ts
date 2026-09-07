@@ -208,3 +208,17 @@ test("rendered height matches actual index triangles at high and low quality, in
   assert.equal(terrain.sampleRenderedHeight(10000, 10000), world.terrain.height(10000, 10000));
   terrain.dispose();
 });
+
+test("mobile keeps one terrain batch across shader quality upgrades", () => {
+  const scene = new THREE.Scene(), world = createProceduralWorld(profile, profile.seed);
+  const terrain = new TerrainRenderer(scene, world, undefined, null, 0, 4, true);
+  terrain.update(0, 0);
+  const { high, low } = terrainMeshes(scene);
+  assert.equal(low.visible, true);
+  assert.ok(high.every(mesh => !mesh.visible));
+  const height = terrain.sampleRenderedHeight(15, 20), geometry = low.geometry;
+  terrain.setQuality(1); terrain.setQuality(4);
+  assert.equal(low.visible, true); assert.equal(low.geometry, geometry);
+  assert.equal(terrain.sampleRenderedHeight(15, 20), height);
+  terrain.dispose();
+});

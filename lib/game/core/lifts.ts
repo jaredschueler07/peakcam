@@ -113,7 +113,7 @@ export function stepRealLifts(s: SimulationState, dt: number, world: SimulationW
   s.liftProgress=s.liftDistanceM/path.lengthM;s.liftRide=(path.lengthM-s.liftDistanceM)/liftSpeed(lift);
   const p=sampleLiftPath(path,s.liftDistanceM,scratch);
   s.pos.x=p.x;s.pos.y=p.y-RIDER_DROP_M;s.pos.z=p.z;s.yaw=p.heading;
-  s.vel.x=0;s.vel.y=0;s.vel.z=0;s.onGround=path.surface;s.jumpCharge=0;s.carve=0;s.edgeAngle=0;s.lean=0;s.crouch=0;s.airTime=0;s.crash=0;
+  s.vel.x=0;s.vel.y=0;s.vel.z=0;s.onGround=path.surface;s.jumpCharge=0;s.boardRoll=0;s.grabTime=0;s.grabbing=false;s.stumble=false;s.carve=0;s.edgeAngle=0;s.lean=0;s.crouch=0;s.airTime=0;s.crash=0;
   s.prevX=s.pos.x;s.prevZ=s.pos.z;
   if(s.liftDistanceM>=path.lengthM){
     s.liftIndex=-1;s.liftRide=0;s.liftCooldown=5;s.onGround=true;s.invuln=2;

@@ -46,7 +46,7 @@ for (const [mode, stance, character] of variants) {
     for (let i = 0; i < 240; i++) {
       state.time = i / 120; state.crouch = (Math.sin(i / 30) + 1) / 2;
       state.lean = Math.sin(i / 20); state.boardRoll = state.lean * .6;
-      state.onGround = i < 120; state.grabTime = i > 150 ? .5 : 0;
+      state.onGround = i < 120; state.grabTime = i > 150 ? .5 : 0; state.grabbing = i > 150;
       state.crash = i > 200 ? .4 : 0; state.stumble = i > 220;
       rig.update(state, terrain, 1 / 120); scene.updateMatrixWorld(true);
       for (const side of ["left", "right"]) {

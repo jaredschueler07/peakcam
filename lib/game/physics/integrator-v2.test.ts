@@ -8,8 +8,8 @@ import { mulberry32 } from "../core/rng";
 import { createSimulation, stepSimulation } from "../core/simulation";
 import type { InputFrame, SimulationState, SimulationWorld } from "../core/types";
 import { createProceduralWorld } from "../terrain/obstacles";
-import { GRAVITY, MAX_SPEED } from "./constants";
-import { integrateSkierV2 } from "./integrator-v2";
+import { normal } from "./integrator-core";
+import { integrateSkierV2, V2_MODEL } from "./integrator-v2";
 import { integrateSkier } from "./integrator";
 
 const profile = DROP_IN_GAME_PROFILES["ski-portillo"];
@@ -59,22 +59,18 @@ test("edge angle follows the analytic turn-in lag response", () => {
   assert.ok(Math.abs(state.edgeAngle - expected) < 1e-6);
 });
 
-test("a fully edged ski sheds lateral velocity more than twice as fast as a shallow edge", () => {
-  const shallow = setup();
-  const full = setup();
-  for (const [fixture, edge] of [[shallow, 0.2], [full, 1]] as const) {
-    fixture.state.vel.x = 10;
-    fixture.state.vel.z = 20;
-    fixture.state.edgeAngle = edge;
-  }
-
-  for (let i = 0; i < 60; i += 1) {
-    const sign = i % 2 === 0 ? 1 : -1;
-    integrateSkierV2(shallow.state, input({ steer: sign * 0.2 }), FIXED_DT, shallow.world);
-    integrateSkierV2(full.state, input({ steer: sign }), FIXED_DT, full.world);
-  }
-
-  assert.ok(Math.abs(rightVelocity(shallow.state)) / Math.abs(rightVelocity(full.state)) > 2);
+test("full edge sheds small lateral slips faster than a shallow edge below the grip cap", () => {
+  const residuals = [0.2, 1].map(edge => {
+    const { state, world } = setup();
+    state.edgeAngle = edge;
+    normal.x = 0; normal.y = 1; normal.z = 0;
+    let slip = 2;
+    for (let i = 0; i < 60; i++) slip = V2_MODEL.carve(state, world.config, {
+      steer: edge, tuck: 0, brake: 0, dt: FIXED_DT, flatSpeed: 20, forwardVelocity: 20, rightVelocity: slip,
+    }).rightVelocity;
+    return slip;
+  });
+  assert.ok(residuals[0] > residuals[1] * 2);
 });
 
 test("ice retains more lateral velocity than packed snow after one second", () => {
@@ -127,29 +123,14 @@ test("physics-model dispatch selects different v1 and v2 dynamics", () => {
   assert.notDeepEqual(v1, v2);
 });
 
-test("firm v2 lateral decay uses additive grip without gripMultiplier", () => {
-  const { state, world } = setup("firm");
-  state.vel.x = 10; state.vel.z = 20;
-  const right = { x: Math.cos(state.yaw), z: -Math.sin(state.yaw) };
-  const beforeRight = state.vel.x * right.x + state.vel.z * right.z;
-  const normal = { x: 0, y: 1, z: 0 };
-  world.terrain.normal(state.pos.x, state.pos.z, normal);
-  const gravity = { x: 0, y: -GRAVITY, z: 0 };
-  const projection = gravity.x * normal.x + gravity.y * normal.y + gravity.z * normal.z;
-  const tangent = {
-    x: gravity.x - projection * normal.x,
-    y: gravity.y - projection * normal.y,
-    z: gravity.z - projection * normal.z,
-  };
-  const rightAfterGravity = beforeRight + (tangent.x * right.x + tangent.z * right.z) * FIXED_DT;
-  const flatSpeed = Math.hypot(state.vel.x, state.vel.z);
-  const cfg = world.config;
-  const speedFade = 1 - cfg.carve.gripSpeedFade * Math.min(1, flatSpeed / (MAX_SPEED * cfg.topSpeedMultiplier));
-  const grip = (cfg.carve.gripBase + cfg.carve.gripEdgeGain * 0) * speedFade * (1 + 0 * 1.4);
-  const expected = rightAfterGravity * Math.exp(-grip * FIXED_DT);
-
-  integrateSkierV2(state, input(), FIXED_DT, world);
-  assert.ok(Math.abs(rightVelocity(state) - expected) < 1e-12);
+test("firm grip is bounded under a large skid and ignores the legacy grip multiplier", () => {
+  const a = setup("firm"), b = setup("firm");
+  for (const f of [a,b]) { f.state.vel.x = 10; f.state.vel.z = 20; }
+  b.world = { ...b.world, config: { ...b.world.config, gripMultiplier: 100 } };
+  integrateSkierV2(a.state, input(), FIXED_DT, a.world);
+  integrateSkierV2(b.state, input(), FIXED_DT, b.world);
+  assert.deepEqual(a.state.vel, b.state.vel);
+  assert.ok(a.state.vel.x > 9.5, "large skids cannot be erased by unlimited grip");
 });
 
 test("skid drag changes forward velocity when lateral slip is unedged", () => {
@@ -253,7 +234,7 @@ test("v2 strategy with the full v1 config preserves legacy fields", () => {
   for (let i = 1; i < speeds.length; i++) assert.ok(speeds[i] > speeds[i - 1]);
 });
 
-test("deep powder provides deterministic off-piste float and no support pad on a groomer", () => {
+test("powder keeps collision height identical to the canonical terrain on and off piste", () => {
   for (const corridor of [0, 1]) {
     const { state, world } = setupPlanarLanding();
     state.onGround = true; state.pos.y = 0;
@@ -261,6 +242,6 @@ test("deep powder provides deterministic off-piste float and no support pad on a
     const supportedWorld = { ...world, config: simulationConfig("powder", "v2", environment),
       terrain: { ...world.terrain, height: () => 0, trailField: () => corridor } };
     integrateSkierV2(state, input(), 0, supportedWorld);
-    assert.equal(state.pos.y, corridor ? 0 : 0.12);
+    assert.equal(state.pos.y, 0);
   }
 });

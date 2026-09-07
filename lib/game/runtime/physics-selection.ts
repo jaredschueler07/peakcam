@@ -19,12 +19,12 @@ export function physicsModelForSessionRequest(conditions: { physicsModel: Physic
 }
 
 export function simulationConfigForConditions(
-  conditions: { surface: SurfaceKind; physicsModel: PhysicsModel; environment?: SimulationEnvironment },
+  conditions: { surface: SurfaceKind; physicsModel: PhysicsModel; environment?: SimulationEnvironment; riderMode?: "skier" | "snowboarder"; stance?: "regular" | "goofy" },
   physicsModel: PhysicsModel = conditions.physicsModel,
 ) {
   return simulationConfig(
     conditions.surface,
     physicsModel,
-    conditions.environment,
+    conditions.environment, conditions.riderMode, conditions.stance,
   );
 }

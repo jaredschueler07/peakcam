@@ -172,21 +172,22 @@ function snapshot(s: SimulationState): number[] {
 }
 
 function runScenario(
-  model: PhysicsModel, surface: SurfaceKind, scenario: Scenario,
+  model: PhysicsModel, surface: SurfaceKind, scenario: Scenario, stance?: "regular" | "goofy",
 ): number[][] {
   const world = createProceduralWorld(
-    GOLDEN_PROFILE, GOLDEN_PROFILE.seed, simulationConfig(surface, model, scenario.environment),
+    GOLDEN_PROFILE, GOLDEN_PROFILE.seed, simulationConfig(surface, model, scenario.environment, stance ? "snowboarder" : "skier", stance),
   );
   const state = createSimulation(GOLDEN_PROFILE, GOLDEN_PROFILE.seed, world.terrain);
   scenario.prepare?.(state, world);
   const random = mulberry32(scenario.seed);
   const integrate = model === "v2" ? integrateSkierV2 : integrateSkier;
-  const trace: number[][] = [snapshot(state)];
+  const capture = () => stance ? [...snapshot(state), state.boardRoll, state.grabTime, Number(state.stumble), Number(state.grabbing)] : snapshot(state);
+  const trace: number[][] = [capture()];
   for (let i = 0; i < scenario.ticks; i += 1) {
     integrate(state, TAPES[scenario.tape](i, random), FIXED_DT, world);
-    if (i % 20 === 19) trace.push(snapshot(state));
+    if (i % 20 === 19) trace.push(capture());
   }
-  trace.push(snapshot(state));
+  trace.push(capture());
   return trace;
 }
 
@@ -203,20 +204,31 @@ function computeAll(): Record<string, number[][]> {
       }
     }
   }
+  for (const stance of ["regular", "goofy"] as const) {
+    for (const surface of [...SURFACES, "slush"] as const) {
+      for (const scenario of SCENARIOS) out[`snowboard/${stance}/${surface}/${scenario.name}`] = runScenario("v2", surface, scenario, stance);
+    }
+  }
   return out;
 }
 
 const computed = computeAll();
+const snowboardPath = (stance: string, surface: string) => new URL(`./__fixtures__/snowboard-${stance}-${surface}.json`, import.meta.url);
 
 if (process.env.UPDATE_GOLDEN === "1") {
-  writeFileSync(FIXTURE_PATH, `${JSON.stringify(computed, null, 1)}\n`);
+  writeFileSync(FIXTURE_PATH, `${JSON.stringify(Object.fromEntries(Object.entries(computed).filter(([key]) => !key.startsWith("snowboard/"))), null, 1)}\n`);
+  for (const stance of ["regular", "goofy"]) for (const surface of [...SURFACES, "slush"]) {
+    const entries = Object.entries(computed).filter(([key]) => key.startsWith(`snowboard/${stance}/${surface}/`));
+    writeFileSync(snowboardPath(stance, surface), `{\n${entries.map(([key, trace]) => `${JSON.stringify(key)}:${JSON.stringify(trace)}`).join(",\n")}\n}\n`);
+  }
 }
 
-const golden = JSON.parse(readFileSync(FIXTURE_PATH, "utf8")) as Record<string, number[][]>;
+const golden: Record<string, number[][]> = JSON.parse(readFileSync(FIXTURE_PATH, "utf8"));
+for (const stance of ["regular", "goofy"]) for (const surface of [...SURFACES, "slush"]) Object.assign(golden, JSON.parse(readFileSync(snowboardPath(stance, surface), "utf8")));
 
 test("the golden fixture covers every model × surface × scenario", () => {
   assert.deepEqual(Object.keys(computed).sort(), Object.keys(golden).sort());
-  assert.equal(Object.keys(golden).length, 2 * SURFACES.length * SCENARIOS.length);
+  assert.equal(Object.keys(golden).length, (2 * SURFACES.length + 2 * (SURFACES.length + 1)) * SCENARIOS.length);
 });
 
 for (const name of Object.keys(computed)) {

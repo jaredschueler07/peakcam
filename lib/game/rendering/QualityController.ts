@@ -58,7 +58,9 @@ export class QualityController {
   private underSince: number | null = null;
   private lastStepAt: number | null = null;
 
-  constructor(public rung: QualityRung) {}
+  constructor(public rung: QualityRung, private readonly maxRung: QualityRung = 4) {
+    this.rung = Math.min(rung, maxRung) as QualityRung;
+  }
 
   /**
    * Thermal governor for the slow adapt tick: fed the rolling p75 frame time and the
@@ -84,7 +86,7 @@ export class QualityController {
       if (this.underSince === null) this.underSince = nowSeconds;
       if (this.canStep(nowSeconds, this.underSince, STEP_UP_DWELL_S)) {
         if (this.pixelScale < 1) this.pixelScale = Math.min(1, Number((this.pixelScale + 0.1).toFixed(2)));
-        else if (this.rung < 4) this.rung = (this.rung + 1) as QualityRung;
+        else if (this.rung < this.maxRung) this.rung = (this.rung + 1) as QualityRung;
         this.underSince = nowSeconds;
         this.lastStepAt = nowSeconds;
       }
@@ -109,7 +111,7 @@ export class QualityController {
       else this.pixelScale = Math.max(0.7, Number((this.pixelScale - 0.1).toFixed(2)));
     } else if (fps > 58) {
       if (this.pixelScale < 1) this.pixelScale = Math.min(1, Number((this.pixelScale + 0.1).toFixed(2)));
-      else if (this.rung < 4) this.rung = (this.rung + 1) as QualityRung;
+      else if (this.rung < this.maxRung) this.rung = (this.rung + 1) as QualityRung;
     }
     return { rung: this.rung, pixelScale: this.pixelScale, changed: previousRung !== this.rung || previousScale !== this.pixelScale };
   }

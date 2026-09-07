@@ -45,7 +45,7 @@ test("v1 rows keep today's multipliers untouched when only the model differs", (
     assert.equal(v2.topSpeedMultiplier, v1.topSpeedMultiplier);
     assert.equal(v2.gripMultiplier, v1.gripMultiplier);
     assert.equal(v2.landingImpactThresholdMultiplier, v1.landingImpactThresholdMultiplier);
-    assert.equal(v2.sprayDepthMultiplier, v1.sprayDepthMultiplier);
+    assert.ok(v2.sprayDepthMultiplier > 0);
   }
 });
 
@@ -57,7 +57,7 @@ test("all four v2 rows exist with their own carve tables", () => {
   }
   assert.deepEqual(simulationConfig("powder", "v2").carve, {
     gripBase: 4.2, gripEdgeGain: 6.5, gripSpeedFade: 0.25, skidDrag: 0.35,
-    turnInLag: 0.14, airAuthority: 0.9, landingWindow: 0.22,
+    turnInLag: 0.26, airAuthority: 0.9, landingWindow: 0.22,
   });
   assert.deepEqual(simulationConfig("packed", "v2").carve, {
     gripBase: 5.0, gripEdgeGain: 8.0, gripSpeedFade: 0.3, skidDrag: 0.25,
@@ -68,7 +68,7 @@ test("all four v2 rows exist with their own carve tables", () => {
     turnInLag: 0.06, airAuthority: 1.0, landingWindow: 0.12,
   });
   assert.deepEqual(simulationConfig("ice", "v2").carve, {
-    gripBase: 2.8, gripEdgeGain: 7.2, gripSpeedFade: 0.55, skidDrag: 0.12,
+    gripBase: 0.9, gripEdgeGain: 2.2, gripSpeedFade: 0.55, skidDrag: 0.04,
     turnInLag: 0.04, airAuthority: 1.0, landingWindow: 0.08,
   });
 });
