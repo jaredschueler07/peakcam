@@ -147,16 +147,16 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-surface border-b border-border">
-                <th className="text-left px-4 py-3"><SortHeader label="Resort" field="name" /></th>
-                <th className="text-left px-3 py-3 hidden sm:table-cell"><span className="text-xs uppercase tracking-wider text-text-muted font-semibold">State</span></th>
-                <th className="text-right px-3 py-3"><SortHeader label="Base" field="base" /></th>
-                <th className="text-right px-3 py-3"><SortHeader label="24h" field="24h" /></th>
-                <th className="text-right px-3 py-3 hidden md:table-cell"><SortHeader label="48h" field="48h" /></th>
-                {hasTrails && <th className="text-right px-3 py-3 hidden md:table-cell"><SortHeader label="Trails" field="trails" /></th>}
-                {hasLifts && <th className="text-right px-3 py-3 hidden lg:table-cell"><SortHeader label="Lifts" field="lifts" /></th>}
-                {hasPctNormal && <th className="text-right px-3 py-3 hidden lg:table-cell"><SortHeader label="% Normal" field="pctNormal" /></th>}
-                {hasTrend && <th className="text-center px-3 py-3 hidden lg:table-cell"><SortHeader label="Trend" field="trend" /></th>}
-                <th className="hidden md:table-cell text-center px-3 py-3"><SortHeader label="Conditions" field="conditions" /></th>
+                <th scope="col" className="text-left px-4 py-3"><SortHeader label="Resort" field="name" /></th>
+                <th scope="col" className="text-left px-3 py-3 hidden sm:table-cell"><span className="text-xs uppercase tracking-wider text-text-muted font-semibold">State</span></th>
+                <th scope="col" className="text-right px-3 py-3"><SortHeader label="Base" field="base" /></th>
+                <th scope="col" className="text-right px-3 py-3"><SortHeader label="24h" field="24h" /></th>
+                <th scope="col" className="text-right px-3 py-3 hidden md:table-cell"><SortHeader label="48h" field="48h" /></th>
+                {hasTrails && <th scope="col" className="text-right px-3 py-3 hidden md:table-cell"><SortHeader label="Trails" field="trails" /></th>}
+                {hasLifts && <th scope="col" className="text-right px-3 py-3 hidden lg:table-cell"><SortHeader label="Lifts" field="lifts" /></th>}
+                {hasPctNormal && <th scope="col" className="text-right px-3 py-3 hidden lg:table-cell"><SortHeader label="% Normal" field="pctNormal" /></th>}
+                {hasTrend && <th scope="col" className="text-center px-3 py-3 hidden lg:table-cell"><SortHeader label="Trend" field="trend" /></th>}
+                <th scope="col" className="hidden md:table-cell text-center px-3 py-3"><SortHeader label="Conditions" field="conditions" /></th>
               </tr>
             </thead>
             <tbody>

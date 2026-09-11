@@ -64,12 +64,12 @@ export function ForecastTable({ periods }: ForecastTableProps) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b-[1.5px] border-dashed border-bark bg-cream">
-              <th className="px-4 py-3 text-left font-mono font-bold text-[11px] uppercase tracking-[0.14em] text-bark">Day</th>
-              <th className="px-3 py-3 text-left font-mono font-bold text-[11px] uppercase tracking-[0.14em] text-bark w-16"></th>
-              <th className="px-3 py-3 text-left font-mono font-bold text-[11px] uppercase tracking-[0.14em] text-bark">Temp</th>
-              <th className="px-3 py-3 text-left font-mono font-bold text-[11px] uppercase tracking-[0.14em] text-bark">Wind</th>
-              <th className="px-3 py-3 text-left font-mono font-bold text-[11px] uppercase tracking-[0.14em] text-bark w-32">Snow</th>
-              <th className="px-3 py-3 text-left font-mono font-bold text-[11px] uppercase tracking-[0.14em] text-bark">Forecast</th>
+              <th scope="col" className="px-4 py-3 text-left font-mono font-bold text-[11px] uppercase tracking-[0.14em] text-bark">Day</th>
+              <th scope="col" className="px-3 py-3 text-left font-mono font-bold text-[11px] uppercase tracking-[0.14em] text-bark w-16"><span className="sr-only">Conditions</span></th>
+              <th scope="col" className="px-3 py-3 text-left font-mono font-bold text-[11px] uppercase tracking-[0.14em] text-bark">Temp</th>
+              <th scope="col" className="px-3 py-3 text-left font-mono font-bold text-[11px] uppercase tracking-[0.14em] text-bark">Wind</th>
+              <th scope="col" className="px-3 py-3 text-left font-mono font-bold text-[11px] uppercase tracking-[0.14em] text-bark w-32">Snow</th>
+              <th scope="col" className="px-3 py-3 text-left font-mono font-bold text-[11px] uppercase tracking-[0.14em] text-bark">Forecast</th>
             </tr>
           </thead>
           <tbody>

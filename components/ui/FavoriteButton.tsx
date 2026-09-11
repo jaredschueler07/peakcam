@@ -13,6 +13,11 @@ interface FavoriteButtonProps {
   itemType: FavoriteType;
   variant?: "ghost" | "outline";
   size?: "sm" | "md";
+  /**
+   * Name of the thing being favorited (cam name, resort name…). Used to keep
+   * accessible names unique when several of these buttons share a page.
+   */
+  label?: string;
   className?: string;
 }
 
@@ -21,6 +26,7 @@ export function FavoriteButton({
   itemType,
   variant = "ghost",
   size = "sm",
+  label,
   className = "",
 }: FavoriteButtonProps) {
   const [isFavorited, setIsFavorited] = useState(false);
@@ -123,6 +129,16 @@ export function FavoriteButton({
 
   const starOpacity = isLoading ? "opacity-40" : "opacity-100";
 
+  // With a label the name is specific ("Add Summit Cam to favorites"); without
+  // one it stays exactly as it was before the label prop existed.
+  const accessibleName = label
+    ? isFavorited
+      ? `Remove ${label} from favorites`
+      : `Add ${label} to favorites`
+    : isFavorited
+      ? "Remove from Favorites"
+      : "Add to Favorites";
+
   return (
     <>
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
@@ -132,7 +148,8 @@ export function FavoriteButton({
         onClick={toggleFavorite}
         disabled={isProcessing}
         className={`${className} group min-w-[36px] relative z-50`}
-        title={isFavorited ? "Remove from Favorites" : "Add to Favorites"}
+        title={accessibleName}
+        aria-label={accessibleName}
       >
         {isProcessing ? (
           <Loader2 className="w-4 h-4 animate-spin text-cyan" />

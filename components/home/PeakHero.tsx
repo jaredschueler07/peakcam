@@ -103,19 +103,21 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
             Est. 2025 · {countLabel}
           </motion.div>
 
-          <h1 className="font-display font-black text-5xl sm:text-6xl md:text-[18vw] lg:text-[15rem] xl:text-[18rem] leading-[0.88] tracking-[-0.03em] mb-4 [overflow-wrap:anywhere]">
+          {/* Wordmark is decorative type, not the page heading — the h1 below
+              carries the actual headline for a11y/SEO. */}
+          <div className="font-display font-black text-5xl sm:text-6xl md:text-[18vw] lg:text-[15rem] xl:text-[18rem] leading-[0.88] tracking-[-0.03em] mb-4 [overflow-wrap:anywhere]">
             <span className="text-ink">Peak</span>
             <span className="text-alpen italic font-bold">Cam</span>
-          </h1>
+          </div>
 
-          <motion.p
+          <motion.h1
             className="font-display italic font-bold text-xl md:text-4xl text-bark-dk mb-4 tracking-tight"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4, duration: 0.8 }}
           >
             Where&rsquo;s it good?
-          </motion.p>
+          </motion.h1>
 
           <motion.p
             className="text-base md:text-lg text-bark font-medium mb-0 md:mb-12 max-w-xl mx-auto"

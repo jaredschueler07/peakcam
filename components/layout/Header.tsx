@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { BugReportButton } from "@/components/feedback/BugReportProvider";
 import { recordBugAction } from "@/lib/bug-reports/client";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import type { User } from "@supabase/supabase-js";
@@ -27,6 +27,7 @@ export const navLinks = [
 
 export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -71,6 +72,17 @@ export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps
     onSearch?.(e.target.value);
   }
 
+  // Without an `onSearch` prop there is no local list to filter (only the home
+  // page holds the resort data), so submitting hands the query to the home
+  // page's search via ?q=.
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (onSearch) return;
+    const q = query.trim();
+    if (!q) return;
+    router.push(`/?q=${encodeURIComponent(q)}`);
+  }
+
   function clearSearch() {
     recordBugAction("search-cleared");
     setQuery("");
@@ -95,7 +107,11 @@ export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps
 
       {/* Search — cream bg, ink border, stamp shadow, pill radius */}
       {showSearch && (
-        <div className="flex-1 max-w-[420px] relative hidden sm:block">
+        <form
+          role="search"
+          onSubmit={handleSubmit}
+          className="flex-1 max-w-[420px] relative hidden sm:block"
+        >
           <Search size={15} strokeWidth={2.5}
             className="absolute left-4 top-1/2 -translate-y-1/2 text-bark pointer-events-none" />
           {/* 16px base font keeps iOS Safari from zooming the viewport on focus;
@@ -106,6 +122,7 @@ export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps
             type="text"
             value={searchValue ?? query}
             onChange={handleChange}
+            aria-label="Search resorts"
             placeholder="Search resorts, states, regions…"
             className="w-full bg-cream-50 border-[1.5px] border-ink
               rounded-full shadow-[2px_2px_0_#2a1f14]
@@ -115,6 +132,7 @@ export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps
           />
           {(searchValue ?? query) && (
             <button
+              type="button"
               onClick={clearSearch}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-bark
                 text-lg px-1 hover:text-ink transition-colors duration-150"
@@ -123,7 +141,8 @@ export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps
               ×
             </button>
           )}
-        </div>
+          <button type="submit" className="sr-only">Search</button>
+        </form>
       )}
 
       {/* Desktop Nav */}

@@ -80,7 +80,7 @@ export function AuthForm({ redirectTo = "/", initialError, onSignedIn }: { redir
     } catch (caught) { setError(authErrorMessage(caught)); }
     finally { submitting.current = false; setLoading(false); }
   }
-  const inputClass = "mt-1 min-h-11 w-full rounded-lg border border-bark bg-cream-50 px-3 py-2 text-base text-ink";
+  const inputClass = "pc-auth-input mt-1 min-h-11 w-full rounded-lg border border-bark bg-cream-50 px-3 py-2 text-base text-ink";
   const labels: Record<Mode, string> = { signin: "Sign in", signup: "Create account", link: EMAIL_CODE_ENABLED ? "Email sign-in code" : "Email sign-in link", reset: "Send reset link", confirm: "Resend confirmation" };
   const codeForm = <form onSubmit={verifyCode} className="space-y-3"><label className="block font-bold text-ink">Sign-in code<input autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6,10}" minLength={6} maxLength={10} required disabled={loading} value={token} onChange={event => setToken(event.target.value.replace(/\D/g, ""))} className={inputClass} /></label><button disabled={loading || token.length < 6} className="min-h-11 w-full rounded-full border border-ink bg-alpen-dk px-4 text-sm font-bold text-cream-50 disabled:opacity-50">{loading ? "Checking…" : "Verify code"}</button></form>;
   if (sent) return <div className="space-y-4 py-4 text-sm text-bark">

@@ -573,11 +573,15 @@ export function ComparePage({
               className="min-w-fit rounded-[18px] border-[1.5px] border-ink shadow-stamp overflow-hidden bg-cream-50"
               style={{
                 display: "grid",
-                gridTemplateColumns: `140px repeat(${resorts.length}, minmax(180px, 1fr))`,
+                gridTemplateColumns: `minmax(96px, max-content) repeat(${resorts.length}, minmax(180px, 1fr))`,
               }}
             >
-              {/* Header row */}
-              <div className="bg-cream border-b-[1.5px] border-r-[1.5px] border-dashed border-bark" />
+              {/* Header row — the corner cell labels the row-header column */}
+              <div className="bg-cream border-b-[1.5px] border-r-[1.5px] border-dashed border-bark flex items-end px-4 py-3">
+                <span className="font-mono font-bold text-[11px] tracking-[0.14em] uppercase text-bark">
+                  Stat
+                </span>
+              </div>
               {resorts.map((resort, i) => (
                 <div
                   key={resort.slug}
@@ -609,6 +613,7 @@ export function ComparePage({
                     {row.values.map((cell, resortIdx) => (
                       <div
                         key={`${row.label}-${resorts[resortIdx].slug}`}
+                        aria-label={`${row.label}, ${resorts[resortIdx].name}`}
                         className={`bg-cream-50 border-dashed border-bark ${
                           resortIdx < resorts.length - 1 ? "border-r-[1.5px]" : ""
                         } ${isLast ? "" : "border-b"}`}

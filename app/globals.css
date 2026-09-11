@@ -332,3 +332,27 @@ body {
   font-weight: 700;
   letter-spacing: 0.04em;
 }
+
+/* ── Auth form fields (/auth) ──
+   Chromium paints `:-webkit-autofill` inputs from its own UA layer, which beats
+   author `background-color`; under a dark resolved color-scheme that renders as
+   a solid dark box (reported on the password field). The inset box-shadow +
+   text-fill-color pair is the only way to override it. */
+.pc-auth-input:-webkit-autofill,
+.pc-auth-input:-webkit-autofill:hover,
+.pc-auth-input:-webkit-autofill:focus,
+.pc-auth-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px var(--pc-cream-dk) inset;
+  box-shadow: 0 0 0 1000px var(--pc-cream-dk) inset;
+  -webkit-text-fill-color: var(--pc-ink);
+  caret-color: var(--pc-ink);
+  transition: background-color 5000s ease-in-out 0s;
+}
+/* Keep the focus ring visible on an autofilled field (the inset above would
+   otherwise replace it). */
+.pc-auth-input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--pc-cream-dk) inset,
+                      0 0 0 3px rgba(189, 70, 36, 0.45);
+  box-shadow: 0 0 0 1000px var(--pc-cream-dk) inset,
+              0 0 0 3px rgba(189, 70, 36, 0.45);
+}

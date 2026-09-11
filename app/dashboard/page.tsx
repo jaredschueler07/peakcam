@@ -14,7 +14,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-bg flex flex-col">
       <Header />
 
-      <main className="flex-grow container mx-auto px-4 py-12">
+      <main id="main-content" className="flex-grow container mx-auto px-4 py-12">
         <header className="mb-12">
           <div className="flex items-center gap-3 mb-2 text-cyan">
             <Layout size={24} />

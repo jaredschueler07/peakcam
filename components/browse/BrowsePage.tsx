@@ -398,6 +398,23 @@ function SouthernSeasonBanner({
 
 export function BrowsePage({ resorts, radarFrames = [] }: Props) {
   const [search, setSearch] = useState("");
+
+  // Header search on inner pages routes here as /?q=… (the resort list only
+  // exists on this page). Read it from window.location on mount rather than
+  // useSearchParams() so the home page stays statically rendered.
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q")?.trim();
+    if (!q) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate ?q= from the URL after SSR
+    setSearch(q);
+    searchInputRef.current?.focus();
+    // Drop ?q= so a reload doesn't re-apply a search the user has since cleared.
+    params.delete("q");
+    const qs = params.toString();
+    window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash);
+  }, []);
   const [stateFilter, setStateFilter] = useState<StateFilter>("All");
   const [condFilter, setCondFilter] = useState<ConditionFilter>("all");
   const [hasLiveCams, setHasLiveCams] = useState(false);
@@ -555,6 +572,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
                 size={18}
               />
               <input
+                ref={searchInputRef}
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}

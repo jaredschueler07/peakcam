@@ -9,11 +9,14 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // Local parallel checkouts include their own generated output and dependencies.
+    ".worktrees/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
     // Vendored/standalone artifacts are not authored against the app ruleset.
     "public/drop-in/three.module.js",
+    "public/game/basis/basis_transcoder.js",
     "dashboard/**",
   ]),
   // Existing legacy UI/script debt is intentionally scoped rather than
