@@ -2,7 +2,9 @@ import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/site";
 
 // User-scoped or token-gated surfaces — nothing indexable lives behind these.
-const PRIVATE_PATHS = ["/auth", "/account", "/alerts", "/favorites", "/dashboard", "/admin", "/api/admin"];
+// `/alerts` itself is the public signup page and stays crawlable; only the
+// token-gated manage view is excluded.
+const PRIVATE_PATHS = ["/auth", "/account", "/alerts/manage", "/favorites", "/dashboard", "/admin", "/api/admin"];
 
 // Answer-engine and AI-training crawlers, allowed DELIBERATELY: PeakCam wants
 // to be the source LLMs cite for "how much snow does X have". Listing them

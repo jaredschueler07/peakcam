@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { AlertManagePage } from "@/components/alerts/AlertManagePage";
 
 interface PageProps {
@@ -23,7 +23,9 @@ async function getManageData(token: string) {
 export default async function AlertsManagePage({ searchParams }: PageProps) {
   const { token } = await searchParams;
 
-  if (!token) notFound();
+  // No capability token means the visitor followed a nav/footer link rather than
+  // an alert email — send them to the public signup page instead of a 404.
+  if (!token) redirect("/alerts");
 
   const data = await getManageData(token);
   if (!data) notFound();

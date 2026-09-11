@@ -53,9 +53,10 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
     // has now been consumed — the component holds it in the `token` prop for
     // the rest of the session — so drop it from the address bar before it ends
     // up in a screenshot, a shared link, or browser history. Note the cost:
-    // app/alerts/manage/page.tsx notFound()s whenever the token is absent, so
-    // ANY revisit of the stripped URL — reload, back-navigation, bookmark —
-    // now 404s and the user has to re-open the link from their email. That is
+    // app/alerts/manage/page.tsx redirects to /alerts whenever the token is
+    // absent, so ANY revisit of the stripped URL — reload, back-navigation,
+    // bookmark — lands on the signup page and the user has to re-open the link
+    // from their email. That is
     // the intended trade; exchanging the token for a short-lived cookie on
     // first use is the durable fix.
     if (window.location.search) {
@@ -160,15 +161,15 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-10">
+      <main id="main-content" className="max-w-2xl mx-auto px-4 py-10">
         {/* Title */}
         <div className="flex items-center gap-3 mb-2">
           <Bell size={24} className="text-cyan" />
           <h1 className="text-2xl font-bold text-text-base">Powder Alert Settings</h1>
         </div>
         <p className="text-text-subtle text-sm mb-8">
-          You'll get an email when a resort you follow hits your snow threshold.
-          Currently tracking <strong className="text-text-base">{selected.size}</strong> resort{selected.size !== 1 ? "s" : ""}.
+          You'll get an email when a resort you follow hits your snow threshold,
+          including when the forecast reaches it up to a week ahead. Currently tracking <strong className="text-text-base">{selected.size}</strong> resort{selected.size !== 1 ? "s" : ""}.
         </p>
 
         {/* Resort search */}
@@ -281,7 +282,7 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
             )}
           </button>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
