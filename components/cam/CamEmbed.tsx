@@ -110,13 +110,28 @@ function ImageFeed({ url, name, refreshMs, allowFill }: { url: string; name: str
 export function CamEmbed({ cam, variant, resortUrl }: { cam: Cam; resortSlug: string; variant: "tile" | "lightbox"; resortUrl?: string | null }) {
   useEffect(() => { recordBugAction("camera-opened", { cameraId: cam.id }); }, [cam.id]);
   const name = camDisplayName(cam);
+  // Default to the still during SSR/hydration; never mount the viewer on mobile.
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 768px)");
+    const update = () => setIsDesktop(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
 
   if (cam.embed_type === "youtube" && cam.youtube_id) {
     return <StreamFeed id={cam.id} url={`https://www.youtube.com/embed/${cam.youtube_id}?autoplay=1&mute=1`} name={name} resortUrl={resortUrl} />;
   }
   if (cam.embed_type === "iframe" && cam.embed_url) {
+    // Palisades' Roundshot viewer is unusable on small screens; serve the still instead.
+    const isPalisadesRoundshot = /palisadestahoe\.roundshot\.com\/silverado/i.test(cam.embed_url);
+    if (isPalisadesRoundshot && !isDesktop) {
+      return <ImageFeed url="https://palisadestahoe.roundshot.com/cams/249" name={name} refreshMs={REFRESH_MS[variant]} allowFill={variant === "lightbox"} />;
+    }
     return <StreamFeed id={cam.id} url={cam.embed_url} name={name} resortUrl={resortUrl} />;
   }
+
   if (cam.embed_type === "image" && cam.embed_url) {
     return <ImageFeed url={cam.embed_url} name={name} refreshMs={REFRESH_MS[variant]} allowFill={variant === "lightbox"} />;
   }
