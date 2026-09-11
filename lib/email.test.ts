@@ -13,7 +13,7 @@ import { sendCamReportEmail, type CamReportEmailInput } from "./cam-reports/emai
 
 // ─── Fakes ────────────────────────────────────────────────────────────────────
 
-type SentPayload = { from: string; to: string | string[]; subject: string };
+type SentPayload = { from: string; to: string | string[]; subject: string; html: string };
 
 function okClient(): EmailClient & { sent: SentPayload[] } {
   const sent: SentPayload[] = [];
@@ -277,5 +277,30 @@ test("sendCamReportEmail logs nothing on success", async () => {
     assert.strictEqual(client.sent.length, 1);
   } finally {
     cap.restore();
+  }
+});
+
+for (const leadDays of [1, 2]) {
+  test(`forecast email subject and title describe future snow in ${leadDays} days`, async () => {
+    const client = okClient();
+    await sendPowderAlertEmail({ email: "test@example.com", manageToken: "token", alerts: [
+      { resortName: "X", slug: "x", newSnow: 3, threshold: 2, forecastLeadDays: leadDays },
+    ] }, client);
+    assert.equal(client.sent[0].subject, `3" over 3 days at X in ${leadDays} day${leadDays === 1 ? "" : "s"} — PeakCam`);
+    assert.match(client.sent[0].html, /Storm inbound\./);
+    assert.doesNotMatch(client.sent[0].html, /Fresh powder dropped/);
+  });
+}
+
+test("mixed and forecast-only digests distinguish future snow from observed snow", async () => {
+  for (const mixed of [false, true]) {
+    const client = okClient();
+    const forecast = { resortName: "X", slug: "x", newSnow: 3, threshold: 2, forecastLeadDays: 2 };
+    await sendPowderAlertEmail({ email: "test@example.com", manageToken: "token", alerts: [
+      forecast, { ...forecast, resortName: "Y", forecastLeadDays: mixed ? undefined : 1 },
+    ] }, client);
+    assert.equal(client.sent[0].subject, `${mixed ? "Fresh snow and forecasts" : "Snow forecast"} at 2 resorts — PeakCam`);
+    assert.match(client.sent[0].html, mixed ? /Fresh snow and storms ahead/ : /Storm inbound/);
+    assert.doesNotMatch(client.sent[0].html, /Fresh powder dropped/);
   }
 });

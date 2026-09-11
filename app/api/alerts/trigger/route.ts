@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { EmailSendError, sendPowderAlertEmail } from "@/lib/email";
 import { checkFreshness } from "@/lib/feed-freshness";
 import { sendFeedFreshnessAlertEmail } from "@/lib/alerts/freshness-email";
+import { getOpenMeteoForecast } from "@/lib/open-meteo";
+import { findForecastAlert } from "@/lib/alerts/forecast";
+import type { WeatherPeriod } from "@/lib/types";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -42,10 +45,124 @@ interface SnowReport {
   new_snow_24h: number | null;
 }
 
+interface ResortLocation {
+  id: string;
+  lat: number;
+  lng: number;
+}
+
 interface FreshnessSummary {
   ageHours: number | null;
   stale: boolean;
   alerted: boolean;
+}
+
+interface AlertLog {
+  subscriber_id: string;
+  resort_id: string;
+  new_snow_inches: number;
+  alert_date: string;
+  kind?: "live" | "forecast";
+  storm_start_date?: string | null;
+}
+
+const FORECAST_LOOKBACK_DAYS = 14;
+const FORECAST_COOLDOWN_DAYS = 3;
+const FORECAST_GROWTH_INCHES = 1;
+
+function dateOffset(date: Date, days: number): string {
+  return new Date(date.getTime() + days * 86_400_000).toISOString().slice(0, 10);
+}
+
+function daysSince(alertDate: string, today: string): number | null {
+  const then = Date.parse(`${alertDate}T00:00:00Z`);
+  const now = Date.parse(`${today}T00:00:00Z`);
+  if (!Number.isFinite(then) || !Number.isFinite(now)) return null;
+  return Math.floor((now - then) / 86_400_000);
+}
+
+function shouldSuppressForecast(
+  logs: AlertLog[],
+  hasMetadata: boolean,
+  subscriberId: string,
+  resortId: string,
+  forecast: { snowInches: number; stormStartDate: string | null },
+  today: string,
+): boolean {
+  const matching = logs.filter((log) => log.subscriber_id === subscriberId && log.resort_id === resortId);
+  if (!hasMetadata) {
+    // Legacy schema has no `kind` column: any matching row inside the cooldown
+    // suppresses. (The kind test made this branch dead code pre-migration.)
+    return matching.some((log) => (daysSince(log.alert_date, today) ?? 99) < FORECAST_COOLDOWN_DAYS);
+  }
+  if (!forecast.stormStartDate) {
+    return matching.some((log) => log.kind === "forecast" && (daysSince(log.alert_date, today) ?? 99) < FORECAST_COOLDOWN_DAYS);
+  }
+
+  const sameStorm = matching.filter((log) =>
+    log.kind === "forecast" && log.storm_start_date === forecast.stormStartDate
+  );
+  if (sameStorm.length > 0) {
+    const highestTotal = Math.max(...sameStorm.map((log) => log.new_snow_inches));
+    return forecast.snowInches < highestTotal + FORECAST_GROWTH_INCHES;
+  }
+
+  // Rows written before storm metadata was available still get a short cooldown.
+  return matching.some((log) =>
+    log.kind === "forecast" && !log.storm_start_date && (daysSince(log.alert_date, today) ?? 99) < FORECAST_COOLDOWN_DAYS
+  );
+}
+
+async function loadAlertLogs(now: Date): Promise<{ logs: AlertLog[]; hasMetadata: boolean }> {
+  const lookback = dateOffset(now, -FORECAST_LOOKBACK_DAYS);
+  try {
+    const response = await sbFetch(
+      `/powder_alert_log?alert_date=gte.${lookback}&select=subscriber_id,resort_id,new_snow_inches,alert_date,kind,storm_start_date`
+    );
+    if (response.ok) return { logs: await response.json(), hasMetadata: true };
+  } catch {
+    // Fall through to the legacy query below.
+  }
+
+  // Older environments may not have the forecast metadata columns yet. Use a
+  // short lookback supported by the original schema as a safe cooldown.
+  try {
+    const response = await sbFetch(
+      `/powder_alert_log?alert_date=gte.${dateOffset(now, -FORECAST_COOLDOWN_DAYS)}&select=subscriber_id,resort_id,new_snow_inches,alert_date`
+    );
+    if (response.ok) return { logs: await response.json(), hasMetadata: false };
+  } catch {
+    // A failed dedup read is treated as no rows, matching the old behavior.
+  }
+  return { logs: [], hasMetadata: false };
+}
+
+async function insertAlertLogs(entries: Array<Record<string, unknown>>): Promise<boolean> {
+  let response: Response;
+  try {
+    response = await sbFetch("/powder_alert_log", {
+      method: "POST",
+      headers: { Prefer: "resolution=ignore-duplicates" },
+      body: JSON.stringify(entries),
+    });
+  } catch {
+    return false;
+  }
+  if (response.ok) return true;
+  if (response.status !== 400 && response.status !== 404) return false;
+
+  // Unknown-column fallback for databases that have not run the metadata migration.
+  const legacyEntries = entries.map(({ kind: _kind, storm_start_date: _stormStartDate, ...entry }) => entry);
+  try {
+    const fallback = await sbFetch("/powder_alert_log", {
+      method: "POST",
+      headers: { Prefer: "resolution=ignore-duplicates" },
+      body: JSON.stringify(legacyEntries),
+    });
+    return fallback.ok;
+  } catch {
+    return false;
+  }
 }
 
 // Dead-man's switch on the two production snow feeds (snotel-sync,
@@ -119,6 +236,7 @@ async function handleTrigger(request: NextRequest) {
       attempted: 0,
       sent: 0,
       failed: 0,
+      logFailures: 0,
       message: "No active subscriptions",
       freshness,
     });
@@ -135,28 +253,67 @@ async function handleTrigger(request: NextRequest) {
   const snowReports: SnowReport[] = await snowResp.json();
   const snowByResort = new Map(snowReports.map((s) => [s.resort_id, s.new_snow_24h ?? 0]));
 
+  // Alerts use seven-day Open-Meteo forecasts. US resort pages use NWS,
+  // so their numbers can differ. Forecast failures must not block live alerts.
+  const forecastByResort = new Map<string, WeatherPeriod[]>();
+  try {
+    const locationsResp = await sbFetch(
+      `/resorts?id=in.(${resortIds.map((id) => `"${id}"`).join(",")})&select=id,lat,lng`
+    );
+    const locations: ResortLocation[] = locationsResp.ok ? await locationsResp.json() : [];
+    await Promise.all(locations.map(async (location) => {
+      try {
+        const periods = await getOpenMeteoForecast(location.lat, location.lng);
+        if (periods) forecastByResort.set(location.id, periods);
+      } catch {
+        // Includes malformed provider responses; omit only this resort's forecast.
+      }
+    }));
+  } catch {
+    // Location lookup is optional too: continue with the live reports already loaded.
+  }
+
   // 3. Group triggered alerts by subscriber
   // Map: subscriber_id → { subscriber, alerts[] }
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
-  // Load already-sent alerts for today (dedup check)
-  const logResp = await sbFetch(
-    `/powder_alert_log?alert_date=eq.${today}&select=subscriber_id,resort_id`
-  );
-  const todayLog: Array<{ subscriber_id: string; resort_id: string }> = logResp.ok
-    ? await logResp.json()
-    : [];
-  const alreadySent = new Set(todayLog.map((l) => `${l.subscriber_id}:${l.resort_id}`));
+  const { logs, hasMetadata } = await loadAlertLogs(new Date());
+  const todayLog = logs.filter((log) => log.alert_date === today);
 
-  type AlertEntry = { resortName: string; slug: string; newSnow: number; threshold: number; resort_id: string };
+  type AlertEntry = {
+    resortName: string;
+    slug: string;
+    newSnow: number;
+    threshold: number;
+    resort_id: string;
+    forecastLeadDays?: number;
+    forecastDays?: number;
+    stormStartDate?: string | null;
+  };
   const bySubscriber = new Map<string, { subscriber: Subscriber; alerts: AlertEntry[] }>();
 
   for (const pref of prefs) {
     const newSnow = snowByResort.get(pref.resort_id) ?? 0;
-    if (newSnow < pref.threshold_inches) continue;
+    const periods = forecastByResort.get(pref.resort_id);
+    // Include tomorrow. A qualifying live reading takes priority, and the existing
+    // subscriber/resort/day log deduplicates either kind of alert for today.
+    const forecast = periods ? findForecastAlert(periods, pref.threshold_inches) : null;
+    const hasLiveAlert = newSnow >= pref.threshold_inches;
+    if (!hasLiveAlert && !forecast) continue;
 
-    const dedupKey = `${pref.subscriber_id}:${pref.resort_id}`;
-    if (alreadySent.has(dedupKey)) continue;
+    const todayRows = todayLog.filter((log) =>
+      log.subscriber_id === pref.subscriber_id && log.resort_id === pref.resort_id
+    );
+    if (hasLiveAlert && todayRows.length > 0) continue;
+    if (!hasLiveAlert && todayRows.some((log) => log.kind !== "forecast")) continue;
+    if (!hasLiveAlert && forecast && shouldSuppressForecast(
+      logs,
+      hasMetadata,
+      pref.subscriber_id,
+      pref.resort_id,
+      forecast,
+      today,
+    )) continue;
 
     const sub = pref.alert_subscribers;
     if (!bySubscriber.has(pref.subscriber_id)) {
@@ -165,9 +322,14 @@ async function handleTrigger(request: NextRequest) {
     bySubscriber.get(pref.subscriber_id)!.alerts.push({
       resortName: pref.resorts.name,
       slug: pref.resorts.slug,
-      newSnow,
+      newSnow: hasLiveAlert ? newSnow : forecast!.snowInches,
       threshold: pref.threshold_inches,
       resort_id: pref.resort_id,
+      ...(hasLiveAlert ? {} : {
+        forecastLeadDays: forecast!.leadDays,
+        forecastDays: forecast!.forecastDays,
+        stormStartDate: forecast!.stormStartDate,
+      }),
     });
   }
 
@@ -177,6 +339,7 @@ async function handleTrigger(request: NextRequest) {
       attempted: 0,
       sent: 0,
       failed: 0,
+      logFailures: 0,
       message: "No thresholds exceeded",
       freshness,
     });
@@ -186,6 +349,7 @@ async function handleTrigger(request: NextRequest) {
   const attempted = bySubscriber.size;
   let sent = 0;
   let failed = 0;
+  let logFailures = 0;
   // Distinct failure reasons, surfaced in the response so a dead API key shows
   // up in the cron result itself instead of only in the logs.
   const errors = new Set<string>();
@@ -202,17 +366,18 @@ async function handleTrigger(request: NextRequest) {
       const logEntries = alerts.map((a) => ({
         subscriber_id: subscriberId,
         resort_id: a.resort_id,
-        new_snow_inches: a.newSnow,
+        new_snow_inches: Math.round(a.newSnow),
         alert_date: today,
+        kind: a.forecastLeadDays != null ? "forecast" : "live",
+        storm_start_date: a.forecastLeadDays != null ? a.stormStartDate ?? null : null,
       }));
 
-      await sbFetch("/powder_alert_log", {
-        method: "POST",
-        headers: { Prefer: "resolution=ignore-duplicates" },
-        body: JSON.stringify(logEntries),
-      });
-
       sent++;
+      if (!await insertAlertLogs(logEntries)) {
+        logFailures++;
+        failed++;
+        errors.add("log_insert_failed");
+      }
     } catch (err) {
       console.error(`[alerts/trigger] Failed to send to ${subscriber.email}:`, err);
       failed++;
@@ -229,6 +394,7 @@ async function handleTrigger(request: NextRequest) {
     attempted,
     sent,
     failed,
+    logFailures,
     ...(errors.size > 0 ? { errors: [...errors] } : {}),
     freshness,
   };

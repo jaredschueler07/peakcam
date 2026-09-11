@@ -251,17 +251,20 @@ export async function sendPowderAlertEmail(
   params: {
     email: string;
     manageToken: string;
-    alerts: Array<{ resortName: string; slug: string; newSnow: number; threshold: number }>;
+    alerts: Array<{ resortName: string; slug: string; newSnow: number; threshold: number; forecastLeadDays?: number; forecastDays?: number }>;
   },
   client?: EmailClient
 ) {
   const manageUrl = `${SITE_URL}/alerts/manage?token=${params.manageToken}`;
 
   const topResort = params.alerts[0];
-  const subject =
-    params.alerts.length === 1
-      ? `${topResort.newSnow}" of new snow at ${topResort.resortName} — PeakCam`
-      : `Powder at ${params.alerts.length} resorts — PeakCam`;
+  const hasForecast = params.alerts.some(a => a.forecastLeadDays != null);
+  const allForecast = params.alerts.every(a => a.forecastLeadDays != null);
+  const subject = params.alerts.length === 1
+    ? topResort.forecastLeadDays != null
+      ? `${topResort.newSnow}" over ${topResort.forecastDays ?? 3} days at ${topResort.resortName} in ${topResort.forecastLeadDays} day${topResort.forecastLeadDays === 1 ? "" : "s"} — PeakCam`
+      : `${topResort.newSnow}" of new snow at ${topResort.resortName} — PeakCam`
+    : `${allForecast ? "Snow forecast" : hasForecast ? "Fresh snow and forecasts" : "Powder"} at ${params.alerts.length} resorts — PeakCam`;
 
   const alertRows = params.alerts
     .map(
@@ -277,7 +280,7 @@ export async function sendPowderAlertEmail(
           <span style="color: #a78bfa; font-family: monospace; font-size: 20px; font-weight: 700;">
             +${a.newSnow}"
           </span>
-          <span style="color: #64748b; font-size: 12px; display: block;">in 24h</span>
+          <span style="color: #64748b; font-size: 12px; display: block;">${a.forecastLeadDays ? `forecast in ${a.forecastLeadDays} day${a.forecastLeadDays === 1 ? "" : "s"}` : "in 24h"}</span>
         </td>
       </tr>`
     )
@@ -286,8 +289,8 @@ export async function sendPowderAlertEmail(
   await sendOrThrow("powder_alert", params.email, {
     subject,
     html: buildEmailHtml({
-      preheader: `${topResort.newSnow}" of fresh snow at ${topResort.resortName}${params.alerts.length > 1 ? ` and ${params.alerts.length - 1} more` : ""}.`,
-      title: "Fresh powder dropped.",
+      preheader: `${topResort.newSnow}" of ${topResort.forecastLeadDays ? "forecast" : "fresh"} snow at ${topResort.resortName}${params.alerts.length > 1 ? ` and ${params.alerts.length - 1} more` : ""}.`,
+      title: allForecast ? "Storm inbound." : hasForecast ? "Fresh snow and storms ahead." : "Fresh powder dropped.",
       body: `
         <table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
           <tbody>${alertRows}</tbody>

@@ -141,7 +141,7 @@ async function fetchOpenMeteo(
     daily:
       "weathercode,temperature_2m_max,temperature_2m_min,snowfall_sum,precipitation_probability_max,wind_gusts_10m_max,wind_direction_10m_dominant",
     past_days: String(PAST_DAYS),
-    forecast_days: "5",
+    forecast_days: "7",
     timezone: "auto",
   });
   if (elevationFt != null) {
@@ -255,19 +255,20 @@ export function parseSnapshot(data: OpenMeteoResponse, nowMs = Date.now()): Open
   };
 }
 
-// ── Forecast (5-day) ────────────────────────────────────────────
+// ── Forecast (7-day) ────────────────────────────────────────────
 
 export function parseForecast(data: OpenMeteoResponse): WeatherPeriod[] {
   const d = data.daily;
   const days: WeatherPeriod[] = [];
 
-  for (let i = PAST_DAYS; i < d.time.length && days.length < 5; i++) {
+  for (let i = PAST_DAYS; i < d.time.length && days.length < 7; i++) {
     const code = d.weathercode[i];
     const high = Math.round(celsiusToFahrenheit(d.temperature_2m_max[i]));
     const low = Math.round(celsiusToFahrenheit(d.temperature_2m_min[i]));
     const windSpeed = Math.round(kmhToMph(d.wind_gusts_10m_max[i]));
 
     days.push({
+      date: d.time[i],
       dow: days.length === 0 ? "Today" : DAY_NAMES[new Date(d.time[i]).getUTCDay()],
       condition: weatherCodeToCondition(code),
       high,

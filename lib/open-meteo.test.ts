@@ -154,7 +154,7 @@ test("parseSnapshot computes depth, new-snow windows, and grid fields", () => {
   assert.strictEqual(snap.snowingNow, true); // constant 1cm/hr snowfall throughout
 });
 
-test("parseForecast shapes 5 daily WeatherPeriod entries starting with Today", () => {
+test("parseForecast shapes available daily WeatherPeriod entries starting with Today", () => {
   const days = parseForecast(buildFixture());
   assert.strictEqual(days.length, 3); // forecast_days beyond past_days: indices 2,3,4
   assert.strictEqual(days[0].dow, "Today");
@@ -197,4 +197,15 @@ test("model snowfall needs a snow weather code and adequate probability", () => 
   data.hourly.weathercode.fill(71);
   data.hourly.precipitation_probability.fill(20);
   assert.equal(parseSnapshot(data, now).snowingNow, false);
+});
+
+test("parseForecast returns seven days including today and caps longer responses", () => {
+  const fixture = buildFixture();
+  for (const values of Object.values(fixture.daily)) {
+    while (values.length < 10) (values as Array<string | number>).push(values[values.length - 1]);
+  }
+  const days = parseForecast(fixture);
+  assert.equal(days.length, 7);
+  assert.equal(days[0].dow, "Today");
+  assert.equal(days[6].snowInches, 0);
 });

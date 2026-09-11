@@ -163,7 +163,8 @@ export interface UserCondition {
 
 // ── NWS Weather ──────────────────────────────────────────────
 export interface WeatherPeriod {
-  dow: string;                    // "Today", "Mon", "Tue" …
+  date?: string;                  // ISO calendar date when available
+  dow: string;                    // "Today", "Mon", "Tue" … (up to 7 days)
   condition: string;              // "clear" | "partly-cloudy" | "heavy-snow" etc.
   high: number;                   // °F
   low: number | null;             // °F — null on overnight periods
