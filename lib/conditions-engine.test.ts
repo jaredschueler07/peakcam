@@ -1,3 +1,4 @@
+import { computeSnotelRating } from "./conditions-engine";
 import { test } from "node:test";
 import assert from "node:assert";
 import { computeTrend, computeConditions, type ConditionsInput } from "./conditions-engine";
@@ -28,4 +29,29 @@ test("computeConditions threads a custom history7d.thresholdIn through to trend7
   };
   const result = computeConditions(input);
   assert.strictEqual(result.trend7d, "stable");
+});
+
+
+test("fresh snow cannot produce a good rating without a substantial base", () => {
+  const input: ConditionsInput = {
+    current: { snowDepthIn: 2, sweIn: null, newSnow24h: 2, newSnow48h: 2 },
+    normals: { medianSweIn: null, pctile10SweIn: null, pctile90SweIn: null },
+    history7d: { sweValues: [] },
+    forecast: { snowInchesNext48h: 0, maxHighTemp48h: 74 },
+  };
+  assert.strictEqual(computeConditions(input).condRating, "poor");
+});
+
+test("GOOD requires recent snow and a known substantial base", () => {
+  assert.equal(computeSnotelRating(2, 2, 30, null), "good");
+  assert.equal(computeSnotelRating(2, 2, 24, null), "good");
+  assert.equal(computeSnotelRating(2, 2, 23, null), "fair");
+  assert.equal(computeSnotelRating(0, 0, 30, 100), "fair");
+});
+test("unknown depth with fresh snow remains FAIR, not POOR or GOOD", () => {
+  assert.equal(computeSnotelRating(4, 4, null, null), "fair");
+  assert.equal(computeSnotelRating(0, 0, null, null), "poor");
+});
+test("GREAT retains the existing depth-blind threshold", () => {
+  assert.equal(computeSnotelRating(6, 6, 2, null), "great");
 });

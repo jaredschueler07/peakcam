@@ -205,8 +205,13 @@ export function computeSnotelRating(
   const t = RATING_THRESHOLDS;
 
   if (newSnow24h >= t.great.newSnow24h || newSnow48h >= t.great.newSnow48h) return "great";
-  if (newSnow24h >= t.good.newSnow24h) return "good";
-  if (pctOfNormal != null && pctOfNormal >= t.good.pctOfNormal && snowDepthIn != null && snowDepthIn >= t.good.minDepth) return "good";
+  // A fresh-snow spike is not a usable base: GOOD requires at least 24in
+  // of settled base depth as well as 2in of recent snow. This keeps warm,
+  // thin conditions (for example 74°F with a 2in base) from reading as GOOD.
+  if (newSnow24h >= t.good.newSnow24h && snowDepthIn != null && snowDepthIn >= t.good.minDepth) return "good";
+  // Unknown depth cannot qualify for GOOD, but fresh snow is still evidence
+  // for FAIR. Keep the existing fallback path for other missing-depth cases.
+  if (snowDepthIn == null && newSnow24h >= t.good.newSnow24h) return "fair";
   if (snowDepthIn != null && snowDepthIn >= t.fair.minDepth && (pctOfNormal == null || pctOfNormal >= t.fair.pctOfNormal)) return "fair";
 
   return "poor";
