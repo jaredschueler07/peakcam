@@ -105,7 +105,7 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
 
           {/* Wordmark is decorative type, not the page heading — the h1 below
               carries the actual headline for a11y/SEO. */}
-          <div className="font-display font-black text-5xl sm:text-6xl md:text-[18vw] lg:text-[15rem] xl:text-[18rem] leading-[0.88] tracking-[-0.03em] mb-4 [overflow-wrap:anywhere]">
+          <div className="font-display font-black whitespace-nowrap text-5xl sm:text-6xl md:text-[16vw] lg:text-[13rem] xl:text-[15rem] leading-[0.88] tracking-[-0.03em] mb-4">
             <span className="text-ink">Peak</span>
             <span className="text-alpen italic font-bold">Cam</span>
           </div>
