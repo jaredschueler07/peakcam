@@ -92,7 +92,8 @@ export class Descent implements DescentRuntime {
     this.lastFrame = performance.now();
     this.startedAt = this.lastFrame;
     this.hud.setState(this.snapshot(true));
-    if (process.env.NODE_ENV !== "production" && typeof window !== "undefined") {
+    // Dev and e2e hook (`?e2e=1` in production): the runtime, diagnostics and the autopilot bot.
+    if (typeof window !== "undefined" && (process.env.NODE_ENV !== "production" || new URLSearchParams(window.location.search).has("e2e"))) {
       (window as unknown as { __descent?: Descent }).__descent = this;
     }
     this.raf = requestAnimationFrame(this.frame);

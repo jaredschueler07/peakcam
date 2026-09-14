@@ -6,7 +6,8 @@ import { expect, test } from "@playwright/test";
  * line-following bot reaching the finish, the results card — not the pixels.
  */
 
-const URL = "/resorts/breckenridge/drop-in";
+// `?e2e=1` exposes `window.__descent` in the production bundle (see lib/descent/Descent.ts).
+const URL = "/resorts/breckenridge/drop-in?e2e=1";
 
 declare global {
   interface Window {
