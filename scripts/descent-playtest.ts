@@ -24,6 +24,7 @@ const scenario = args.get("scenario") ?? "carve";
 const base = args.get("base") ?? "http://localhost:3000";
 const course = Number(args.get("course") ?? "0");
 const mobile = args.get("mobile") === "1";
+const gear = args.get("gear") ?? "skis";
 mkdirSync(out, { recursive: true });
 
 interface Diag { fps: number; timings: Record<string, number>; info: { calls: number; triangles: number }; quality: number }
@@ -79,6 +80,19 @@ async function main() {
 
   await page.getByRole("button", { name: /ski now/i }).click();
   await page.waitForTimeout(300);
+  if (gear === "snowboard") {
+    await page.getByRole("radio", { name: /snowboard/i }).click();
+    // The runtime is recreated for a gear change; wait for it to come back.
+    await page.waitForTimeout(500);
+    await page.waitForFunction(() => Boolean((window as unknown as { __descent?: unknown }).__descent), null, { timeout: 60_000 });
+    await page.waitForSelector('[data-descent-phase="menu"]', { timeout: 60_000 });
+    await page.waitForTimeout(800);
+    if (!(await page.getByRole("button", { name: /drop in/i }).last().isVisible())) {
+      await page.getByRole("button", { name: /ski now/i }).click();
+      await page.waitForTimeout(300);
+    }
+    await shot(page, "02-gear-snowboard");
+  }
   if (scenario === "ranked") {
     await page.getByRole("radio", { name: /time trial/i }).click();
     await page.waitForTimeout(1500);

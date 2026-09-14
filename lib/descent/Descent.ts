@@ -19,7 +19,7 @@ import { createRiderSim, type RiderSim } from "./sim/rider";
 import { autopilot } from "./testing/autopilot";
 import {
   CAMERA_PRESETS, SIM_DT, SIM_HZ,
-  type CameraPreset, type DescentEvent, type DescentPhase, type DescentRuntime, type GhostSource, type HudSnapshot, type RiderStyle, type StartRunOptions, type World,
+  type CameraPreset, type DescentEvent, type DescentPhase, type DescentRuntime, type GhostSource, type HudSnapshot, type RiderMode, type RiderStyle, type SnowboardStance, type StartRunOptions, type World,
 } from "./types";
 
 const MAX_FRAME_DT = 0.1;
@@ -32,6 +32,8 @@ export interface DescentInit {
   canvas: HTMLCanvasElement;
   world: World;
   riderStyle: RiderStyle;
+  riderMode?: RiderMode;
+  stance?: SnowboardStance;
   weatherIndex: number;
   audioEnabled: boolean;
   forceLowQuality?: boolean;
@@ -80,8 +82,8 @@ export class Descent implements DescentRuntime {
     this.world = init.world;
     this.weatherIdx = init.weatherIndex;
     this.onEvent = init.onEvent ?? (() => {});
-    this.renderer = new Renderer({ canvas: init.canvas, world: init.world, riderStyle: init.riderStyle, forceLowQuality: init.forceLowQuality });
-    this.sim = createRiderSim(init.world, 0);
+    this.renderer = new Renderer({ canvas: init.canvas, world: init.world, riderStyle: init.riderStyle, riderMode: init.riderMode, stance: init.stance, forceLowQuality: init.forceLowQuality });
+    this.sim = createRiderSim(init.world, 0, { riderMode: init.riderMode, stance: init.stance });
     this.sim.resetToStart();
     this.hud = createStore<HudSnapshot>(() => this.snapshot(true));
     this.renderer.terrain.flush(this.sim.state.x, this.sim.state.z);
@@ -432,6 +434,7 @@ export class Descent implements DescentRuntime {
       weatherName: this.world.profile.weather[this.weatherIdx]?.name ?? "",
       trailHint: this.trailHint,
       countdown: this.countdown,
+      mode: s.mode,
       toast: this.toast,
       trick: now < this.trickUntil ? (this.hud?.getState().trick ?? null) : null,
       bestTrick: s.bestTrick,

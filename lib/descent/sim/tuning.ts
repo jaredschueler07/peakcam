@@ -80,6 +80,34 @@ export const COMBO_WINDOW = 3.2;
 export const COMBO_MAX = 5;
 
 export const LIFT_BOARD_RADIUS = 14;
+/** A lift ride is a hop, not a wait: seconds from base to top, scaled a little by length. */
+export const LIFT_RIDE_MIN_S = 1.6;
+export const LIFT_RIDE_MAX_S = 3.2;
+export const LIFT_RIDE_S_PER_KM = 0.9;
+
+/**
+ * How a snowboard differs from skis, as multipliers on the ski numbers.
+ * One edge that bites harder but a slower glide on the flat, more float in
+ * powder, a weaker one-footed skate, and quicker spins.
+ */
+export interface RiderKit {
+  gripBase: number;
+  gripEdge: number;
+  carveKeep: number;
+  friction: number;
+  powderFriction: number;
+  brakeDecel: number;
+  turn: number;
+  dragUpright: number;
+  dragTuck: number;
+  skatePush: number;
+  spin: number;
+  pop: number;
+}
+export const KITS: Readonly<Record<"skier" | "snowboarder", RiderKit>> = {
+  skier: { gripBase: 1, gripEdge: 1, carveKeep: 1, friction: 1, powderFriction: 1, brakeDecel: 1, turn: 1, dragUpright: 1, dragTuck: 1, skatePush: 1, spin: 1, pop: 1 },
+  snowboarder: { gripBase: 0.88, gripEdge: 1.18, carveKeep: 1.1, friction: 1.12, powderFriction: 0.6, brakeDecel: 1.25, turn: 1.06, dragUpright: 1.2, dragTuck: 1.15, skatePush: 0.72, spin: 1.12, pop: 1.06 },
+};
 
 export interface SnowTuning {
   /** Lateral grip at zero edge (1/s). Higher = skis bite sooner. */

@@ -28,7 +28,7 @@ import { nearestPointOnRun, type NearestRunPoint } from "@/lib/game/terrain/real
 import { nearestJunction } from "@/lib/game/terrain/junctions";
 import {
   clearRiderEvents, createRiderEvents, treeCellKey,
-  type Course, type CrashReason, type GrabKind, type InputState, type RiderState, type SurfaceKind, type World, type WorldLift,
+  type Course, type CrashReason, type GrabKind, type InputState, type RiderMode, type RiderState, type SnowboardStance, type SurfaceKind, type World, type WorldLift,
 } from "../types";
 import * as T from "./tuning";
 
@@ -48,8 +48,9 @@ function damp(a: number, b: number, lambda: number, dt: number): number {
   return a + (b - a) * (1 - Math.exp(-lambda * dt));
 }
 
-export function createRiderState(): RiderState {
+export function createRiderState(mode: RiderMode = "skier", stance: SnowboardStance = "regular"): RiderState {
   return {
+    mode, stance,
     x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, travelYaw: 0, edge: 0, crouch: 0, charge: 0, braking: false, tucking: false, held: false,
     onGround: true, airTime: 0, groundTime: 0, speed: 0, grade: 0, nx: 0, ny: 1, nz: 0, groundY: 0,
     spin: 0, spinVel: 0, flip: 0, flipVel: 0, grab: null, grabTime: 0,
@@ -86,8 +87,14 @@ interface Scratch {
   liftSample: LiftSample;
 }
 
-export function createRiderSim(world: World, courseIndex: number): RiderSim {
-  const state = createRiderState();
+export interface RiderSimOptions {
+  riderMode?: RiderMode;
+  stance?: SnowboardStance;
+}
+
+export function createRiderSim(world: World, courseIndex: number, options: RiderSimOptions = {}): RiderSim {
+  const state = createRiderState(options.riderMode ?? "skier", options.stance ?? "regular");
+  const kit = T.KITS[state.mode];
   const terrain = world.terrain;
   const scratch: Scratch = {
     normal: { x: 0, y: 1, z: 0 },
@@ -315,7 +322,7 @@ export function createRiderSim(world: World, courseIndex: number): RiderSim {
     const edgeAbs = Math.abs(s.edge);
 
     // Yaw: steering turn rate falls with speed (sidecut), plus smear when braking.
-    const turnRate = (T.TURN_RATE_SLOW + (T.TURN_RATE_FAST - T.TURN_RATE_SLOW) * Math.sqrt(speedT)) * snow.turn
+    const turnRate = (T.TURN_RATE_SLOW + (T.TURN_RATE_FAST - T.TURN_RATE_SLOW) * Math.sqrt(speedT)) * snow.turn * kit.turn
       * Math.min(1, speed / 2.5);
     // Positive yaw turns left (toward +x when facing +z), so a right steer is a negative yaw rate.
     const travel = speed > 0.8 ? Math.atan2(w, u) : 0; // angle between skis and velocity, in ski frame
@@ -345,7 +352,7 @@ export function createRiderSim(world: World, courseIndex: number): RiderSim {
 
     // Grip: bleed lateral velocity. Only the turn-generated share feeds forward speed
     // (carve conservation); slip from gravity or a skid is simply lost.
-    let grip = snow.gripBase + snow.gripEdge * edgeAbs;
+    let grip = snow.gripBase * kit.gripBase + snow.gripEdge * kit.gripEdge * edgeAbs;
     // Set edges hold at a standstill: no sideways creep while waiting at the gate.
     grip *= 1 + 4 * (1 - Math.min(1, speed / 3));
     if (input.brake) grip *= 0.42;
@@ -354,7 +361,7 @@ export function createRiderSim(world: World, courseIndex: number): RiderSim {
     if (carveW * w < 0) carveW = 0;
     const redirected = Math.abs(carveW) * (1 - decay);
     carveW *= decay;
-    u += redirected * snow.carveKeep * (u >= 0 ? 1 : -1) * (input.brake ? 0.3 : 1);
+    u += redirected * Math.min(0.9, snow.carveKeep * kit.carveKeep) * (u >= 0 ? 1 : -1) * (input.brake ? 0.3 : 1);
     w *= decay;
     if (edgeAbs > 0.3 && speed > 4) s.carveDistance += speed * dt;
 
@@ -368,9 +375,10 @@ export function createRiderSim(world: World, courseIndex: number): RiderSim {
 
     // Friction, brake, aero drag along the forward axis.
     const normalLoad = T.GRAVITY * Math.max(0.2, ny);
-    let decel = snow.friction * normalLoad;
-    if (input.brake) decel += snow.brakeDecel * (0.6 + 0.4 * edgeAbs);
-    const drag = input.brake ? T.DRAG_BRAKE : (input.tuck ? T.DRAG_TUCK + (T.DRAG_UPRIGHT - T.DRAG_TUCK) * (1 - s.crouch) : T.DRAG_UPRIGHT);
+    let decel = snow.friction * (s.surface === "powder" ? kit.powderFriction : kit.friction) * normalLoad;
+    if (input.brake) decel += snow.brakeDecel * kit.brakeDecel * (0.6 + 0.4 * edgeAbs);
+    const dragUpright = T.DRAG_UPRIGHT * kit.dragUpright, dragTuck = T.DRAG_TUCK * kit.dragTuck;
+    const drag = input.brake ? T.DRAG_BRAKE : (input.tuck ? dragTuck + (dragUpright - dragTuck) * (1 - s.crouch) : dragUpright);
     const uAbs = Math.abs(u);
     let uNext = uAbs - (decel + drag * uAbs * uAbs) * dt;
     if (uNext < 0) uNext = 0;
@@ -379,7 +387,7 @@ export function createRiderSim(world: World, courseIndex: number): RiderSim {
     // Skating: below walking speed, tucking pushes wherever gravity isn't already doing the work
     // (flats, and the shallow rises a mapped line sometimes starts on).
     if (input.tuck && speed < T.SKATE_MAX_SPEED && gForward < T.SKATE_MAX_ALONG_G) {
-      u += (T.SKATE_PUSH + Math.max(0, -gForward)) * (1 - Math.max(0, u) / T.SKATE_MAX_SPEED) * dt;
+      u += (T.SKATE_PUSH * kit.skatePush + Math.max(0, -gForward)) * (1 - Math.max(0, u) / T.SKATE_MAX_SPEED) * dt;
     }
 
     // Speed ceiling (soft).
@@ -390,7 +398,7 @@ export function createRiderSim(world: World, courseIndex: number): RiderSim {
 
     // Pop.
     if (input.jumpReleased && s.charge > 0) {
-      const pop = T.POP_MIN + (T.POP_MAX - T.POP_MIN) * s.charge;
+      const pop = (T.POP_MIN + (T.POP_MAX - T.POP_MIN) * s.charge) * kit.pop;
       s.vx += nx * pop; s.vy += ny * pop; s.vz += nz * pop;
       s.charge = 0; s.onGround = false; s.airTime = 0;
       tuckArmed = !input.tuck; brakeArmed = !input.brake;
@@ -417,7 +425,7 @@ export function createRiderSim(world: World, courseIndex: number): RiderSim {
     const steer = clamp(input.steer, -1, 1);
     // Rotation needs real hang time: a roller under a tucked, steering rider must not throw a flip.
     const committed = s.airTime > T.AIR_ROTATION_DELAY;
-    s.spinVel = damp(s.spinVel, committed ? -steer * T.SPIN_RATE * (1 + 0.35 * s.charge) : 0, 1 / T.SPIN_LAG, dt);
+    s.spinVel = damp(s.spinVel, committed ? -steer * T.SPIN_RATE * kit.spin * (1 + 0.35 * s.charge) : 0, 1 / T.SPIN_LAG, dt);
     if (!input.tuck) tuckArmed = true;
     if (!input.brake) brakeArmed = true;
     const flipTarget = !committed ? 0 : (input.tuck && tuckArmed) ? -T.FLIP_RATE : (input.brake && brakeArmed) ? T.FLIP_RATE : 0;
@@ -440,7 +448,7 @@ export function createRiderSim(world: World, courseIndex: number): RiderSim {
     if (held < 0.18) return;
     const points = T.STYLE.grab[grab];
     pendingAirStyle += points;
-    pendingLabels.push(GRAB_LABELS[grab]);
+    pendingLabels.push((state.mode === "snowboarder" ? BOARD_GRAB_LABELS : GRAB_LABELS)[grab]);
   }
 
   function land(input: InputState): void {
@@ -563,9 +571,14 @@ export function createRiderSim(world: World, courseIndex: number): RiderSim {
 
   // ─── Lift ──────────────────────────────────────────────────
 
+  let liftRideSpeed = 0;
+
   function boardLift(lift: WorldLift): void {
     const s = state;
     s.liftIndex = lift.index; s.liftDistanceM = 0;
+    const path = liftPath(lift);
+    const rideS = clamp(T.LIFT_RIDE_MIN_S + T.LIFT_RIDE_S_PER_KM * (path.lengthM / 1000), T.LIFT_RIDE_MIN_S, T.LIFT_RIDE_MAX_S);
+    liftRideSpeed = path.lengthM / rideS;
     s.vx = 0; s.vy = 0; s.vz = 0; s.charge = 0; s.crouch = 0; s.edge = 0;
     s.grab = null; s.spin = 0; s.flip = 0; s.onGround = true; s.airTime = 0;
     s.events.liftBoarded = true;
@@ -575,12 +588,12 @@ export function createRiderSim(world: World, courseIndex: number): RiderSim {
     const s = state;
     const lift = world.lifts[s.liftIndex];
     const path = liftPath(lift);
-    s.liftDistanceM = Math.min(path.lengthM, s.liftDistanceM + lift.speedMps * dt);
+    s.liftDistanceM = Math.min(path.lengthM, s.liftDistanceM + liftRideSpeed * dt);
     const p = sampleLiftPath(path, s.liftDistanceM, scratch.liftSample);
     s.liftSeat.x = p.x; s.liftSeat.y = p.y; s.liftSeat.z = p.z; s.liftSeat.heading = p.heading;
     s.x = p.x; s.z = p.z; s.y = p.y - 3.4 + 1.2; // seat height: rider sits a little below the cable
     s.yaw = p.heading; s.travelYaw = p.heading;
-    s.vx = 0; s.vy = 0; s.vz = 0; s.speed = lift.speedMps;
+    s.vx = 0; s.vy = 0; s.vz = 0; s.speed = liftRideSpeed;
     s.progress = s.liftDistanceM / path.lengthM;
     if (s.liftDistanceM >= path.lengthM) {
       s.liftIndex = -1;
@@ -645,6 +658,7 @@ export function createRiderSim(world: World, courseIndex: number): RiderSim {
 }
 
 const GRAB_LABELS: Record<GrabKind, string> = { mute: "Mute", eagle: "Spread Eagle", daffy: "Daffy", twister: "Twister" };
+const BOARD_GRAB_LABELS: Record<GrabKind, string> = { mute: "Indy", eagle: "Method", daffy: "Tail Grab", twister: "Nose Grab" };
 
 /**
  * The snow under the rider. On a groomed corridor the surface is what the

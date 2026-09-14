@@ -16,6 +16,7 @@ const KEYBOARD: Section[] = [
       { keys: ["A", "D", "◀", "▶"], label: "Carve & Steer", note: "Air: 360 spins" },
       { keys: ["W", "▲"], label: "Speed Tuck", note: "Air: Frontflip" },
       { keys: ["S", "▼"], label: "Brake & Power Smear", note: "Air: Backflip" },
+      { keys: ["BOARD"], label: "Snowboard: A/D = heelside / toeside edge; grabs become Indy · Method · Tail · Nose" },
     ],
   },
   {

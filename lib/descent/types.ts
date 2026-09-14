@@ -29,11 +29,11 @@ import type { RealTerrainSampler } from "@/lib/game/terrain/real-heightfield";
 import type { DecodedFarField } from "@/lib/game/terrain/far-field-format";
 import type { ResortGameProfile, ResortWeather } from "@/lib/game/config/schema";
 import type { ConditionsSnapshot } from "@/lib/game/conditions";
-import type { SurfaceKind } from "@/lib/game/core/config";
+import type { SurfaceKind, RiderMode, SnowboardStance } from "@/lib/game/core/config";
 import type { RiderStyle } from "@/lib/game/config/rider-style";
 import type { DecodedGhost } from "@/lib/game/replay/codec";
 
-export type { SurfaceKind, RiderStyle, ConditionsSnapshot, ResortGameProfile, ResortWeather, RealRun, RealLift, RealJunction };
+export type { SurfaceKind, RiderStyle, ConditionsSnapshot, ResortGameProfile, ResortWeather, RealRun, RealLift, RealJunction, RiderMode, SnowboardStance };
 
 export const SIM_HZ = 120;
 export const SIM_DT = 1 / SIM_HZ;
@@ -193,6 +193,9 @@ export interface RiderEvents {
 }
 
 export interface RiderState {
+  /** Skis or a snowboard; fixed for the life of the sim. */
+  mode: RiderMode;
+  stance: SnowboardStance;
   // Kinematics
   x: number; y: number; z: number;
   vx: number; vy: number; vz: number;
@@ -336,6 +339,7 @@ export interface HudSnapshot {
   countdown: number;
   /** Short-lived status line ("CAMERA FAR", "CHECKPOINT"), or null. */
   toast: string | null;
+  mode: RiderMode;
   /** Latest trick landed, for the HUD toast; cleared after a few seconds. */
   trick: TrickEvent | null;
   /** Best single trick of the run, and how many times the rider went down. */

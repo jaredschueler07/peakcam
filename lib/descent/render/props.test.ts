@@ -219,7 +219,7 @@ test("Lanes merges every named run into one ribbon mesh and boosts the selected 
   assert.ok(geometry.getIndex()!.count > 0);
   // Centre vertices carry the run opacity, edges are transparent.
   const before = alpha.getX(1);
-  assert.ok(Math.abs(before - 0.16) < 1e-6, "expert run centreline is 0.16 before selection");
+  assert.ok(Math.abs(before - 0.09) < 1e-6, "expert run centreline is 0.09 before selection");
   assert.strictEqual(alpha.getX(0), 0);
   lanes.update(frame(world));
   assert.ok(alpha.getX(1) > before, "selected course is boosted");

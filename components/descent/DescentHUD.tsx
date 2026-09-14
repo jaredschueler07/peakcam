@@ -21,10 +21,12 @@ function TopStrip({ store, resortName, onHelp, onHint, onMap, onFullscreen }: {
 }) {
   const courseName = useStore(store, (s) => s.courseName);
   const trailHint = useStore(store, (s) => s.trailHint);
+  const mode = useStore(store, (s) => s.mode);
   return (
     <div className="pointer-events-none absolute left-2 top-2 flex flex-nowrap items-center gap-1 font-mono sm:left-3 sm:top-3">
       <span className="max-w-[60vw] truncate border border-[#2a323d] bg-[#0b0e13]/85 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#e8edf2] sm:max-w-none">
         <span className="text-[#7f8b99]">{resortName}</span>{" // "}{courseName}
+        <span className="ml-1.5 hidden rounded-sm bg-[#e8edf2]/15 px-1 text-[8px] text-[#e8edf2] sm:inline">{mode === "snowboarder" ? "Board" : "Ski"}</span>
       </span>
       <button type="button" className={`${CHIP} hidden sm:inline-block`} onClick={onFullscreen} aria-label="Toggle fullscreen">Full</button>
       <button type="button" className={`${CHIP} hidden sm:inline-block`} onClick={onHelp} aria-label="Controls">H</button>

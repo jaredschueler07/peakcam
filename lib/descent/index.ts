@@ -5,7 +5,7 @@
  * three.js, so import it lazily from a `"use client"` component.
  */
 
-import type { ConditionsSnapshot, DescentEvent, DescentRuntime, ResortGameProfile, RiderStyle } from "./types";
+import type { ConditionsSnapshot, DescentEvent, DescentRuntime, ResortGameProfile, RiderMode, RiderStyle, SnowboardStance } from "./types";
 import { loadWorld } from "./world/loadWorld";
 import { Descent } from "./Descent";
 
@@ -16,6 +16,8 @@ export interface CreateDescentOptions {
   profile: ResortGameProfile;
   conditions: ConditionsSnapshot;
   riderStyle: RiderStyle;
+  riderMode?: RiderMode;
+  stance?: SnowboardStance;
   weatherIndex: number;
   audioEnabled?: boolean;
   forceLowQuality?: boolean;
@@ -33,7 +35,7 @@ export async function createDescent(options: CreateDescentOptions): Promise<Desc
   options.signal?.throwIfAborted();
   options.onProgress?.(1, "Building the scene");
   return new Descent({
-    canvas: options.canvas, world, riderStyle: options.riderStyle, weatherIndex: options.weatherIndex,
+    canvas: options.canvas, world, riderStyle: options.riderStyle, riderMode: options.riderMode, stance: options.stance, weatherIndex: options.weatherIndex,
     audioEnabled: options.audioEnabled ?? true, forceLowQuality: options.forceLowQuality, onEvent: options.onEvent,
   });
 }

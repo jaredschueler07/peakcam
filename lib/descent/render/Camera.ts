@@ -80,8 +80,8 @@ export class ChaseCamera {
 
     this.solveTarget(state, this.heading, speedT);
 
-    // Critically damped spring toward the target.
-    const omega = p.lag;
+    // Critically damped spring toward the target; much stiffer on a lift, which is a fast hop.
+    const omega = state.liftIndex >= 0 ? 16 : p.lag;
     const k = 1 + omega * dt;
     const k2 = k * k;
     this.scratch.copy(this.target).sub(this.position).multiplyScalar(omega * omega * dt);

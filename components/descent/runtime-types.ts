@@ -46,6 +46,8 @@ export const AUDIO_STORAGE_KEY = "descent-audio";
 export const QUALITY_STORAGE_KEY = "descent-quality";
 export const TOUCH_STORAGE_KEY = "descent-touch";
 export const CAMERA_STORAGE_KEY = "descent-camera";
+export const RIDER_MODE_STORAGE_KEY = "descent-rider-mode";
+export const STANCE_STORAGE_KEY = "descent-stance";
 
 export function readStorage(key: string): string | null {
   try { return localStorage.getItem(key); } catch { return null; }

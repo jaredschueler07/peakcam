@@ -160,3 +160,37 @@ test("the rider can board a lift at its base and gets off at the top facing down
   assert.ok(sim.state.y > lift.base.y + 100, "gained the lift's vertical");
   assert.equal(sim.state.liftIndex, -1);
 });
+
+test("a snowboarder glides slower on the flat but keeps more speed through a carve", () => {
+  const drive = (t: number, input: InputState) => { input.tuck = t < 3; input.steer = t > 3 && t < 5 ? 1 : 0; };
+  const skier = createRiderSim(world, 3); skier.resetToStart();
+  const boarder = createRiderSim(world, 3, { riderMode: "snowboarder", stance: "goofy" }); boarder.resetToStart();
+  assert.equal(boarder.state.mode, "snowboarder");
+  assert.equal(boarder.state.stance, "goofy");
+  const input = createInputState();
+  let skierFlat = 0, boardFlat = 0, skierPeak = 0, boardPeak = 0;
+  for (let i = 0; i < 8 * SIM_HZ; i++) {
+    const t = i / SIM_HZ;
+    input.jumpReleased = false;
+    drive(t, input); skier.step(input, SIM_DT); skierPeak = Math.max(skierPeak, skier.state.speed);
+    drive(t, input); boarder.step(input, SIM_DT); boardPeak = Math.max(boardPeak, boarder.state.speed);
+    if (i === 3 * SIM_HZ - 1) { skierFlat = skier.state.speed; boardFlat = boarder.state.speed; }
+  }
+  assert.ok(boardFlat > 1.5 && skierFlat > 1.5, "both got going on the flat");
+  assert.ok(boardFlat < skierFlat, `one-footed skate: board ${boardFlat.toFixed(1)} vs skis ${skierFlat.toFixed(1)} m/s`);
+  assert.ok(boardPeak > boardFlat && skierPeak > skierFlat, "both carried speed into the carve");
+});
+
+test("a lift ride is a short hop, not a real-time wait", () => {
+  const lift = world.lifts.find((candidate) => candidate.rideable && candidate.top.y - candidate.base.y > 100)!;
+  const sim = createRiderSim(world, 0);
+  sim.resetToStart();
+  sim.state.checkpoint = { x: lift.base.x, y: lift.base.y, z: lift.base.z, yaw: 0, gate: -1, progressM: 0 };
+  sim.resetToCheckpoint();
+  const input = createInputState();
+  input.liftPressed = true; sim.step(input, SIM_DT); input.liftPressed = false;
+  let seconds = 0;
+  while (sim.state.liftIndex >= 0 && seconds < 10) { sim.step(input, SIM_DT); seconds += SIM_DT; }
+  assert.ok(seconds < 3.5, `rode ${lift.name} in ${seconds.toFixed(1)} s`);
+  assert.ok(sim.state.y > lift.base.y + 100);
+});

@@ -7,6 +7,7 @@ import type { CameraPreset, ConditionsSnapshot, DescentRuntime, RiderStyle, Worl
 import { CAMERA_PRESETS } from "@/lib/descent/types";
 import type { CompetitiveRunMode } from "@/lib/game/config/modes";
 import { GEAR, OUTFITS, type GearId, type OutfitId, type RiderCharacter } from "@/lib/game/config/rider-style";
+import type { RiderMode, SnowboardStance } from "@/lib/game/core/config";
 import TrailMapCanvas from "./TrailMapCanvas";
 import { difficultyMeta } from "./runtime-types";
 
@@ -69,7 +70,7 @@ function CourseLine({ world, index }: { world: World; index: number }) {
   );
 }
 
-export default function DescentMenu({ runtime, conditions, panel, onPanel, session, riderStyle, onRiderStyle, onDropIn, settings }: {
+export default function DescentMenu({ runtime, conditions, panel, onPanel, session, riderStyle, onRiderStyle, riderMode, onRiderMode, stance, onStance, onDropIn, settings }: {
   runtime: DescentRuntime;
   conditions: ConditionsSnapshot;
   panel: MenuPanel;
@@ -77,6 +78,10 @@ export default function DescentMenu({ runtime, conditions, panel, onPanel, sessi
   session: SessionUi;
   riderStyle: RiderStyle;
   onRiderStyle(style: RiderStyle): void;
+  riderMode: RiderMode;
+  onRiderMode(mode: RiderMode): void;
+  stance: SnowboardStance;
+  onStance(stance: SnowboardStance): void;
   onDropIn(): void;
   settings: SettingsUi;
 }) {
@@ -179,10 +184,24 @@ export default function DescentMenu({ runtime, conditions, panel, onPanel, sessi
                 </button>
               ))}
             </div>
+            <p className={`${LABEL} mt-3`}>Gear</p>
+            <div className="mt-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Gear">
+              <button type="button" role="radio" aria-checked={riderMode === "skier"} className={optionClass(riderMode === "skier")} onClick={() => onRiderMode("skier")}>Skis</button>
+              <button type="button" role="radio" aria-checked={riderMode === "snowboarder"} className={optionClass(riderMode === "snowboarder")} onClick={() => onRiderMode("snowboarder")}>Snowboard</button>
+            </div>
+            {riderMode === "snowboarder" && (
+              <>
+                <p className={`${LABEL} mt-3`}>Stance</p>
+                <div className="mt-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Stance">
+                  <button type="button" role="radio" aria-checked={stance === "regular"} className={optionClass(stance === "regular")} onClick={() => onStance("regular")}>Regular</button>
+                  <button type="button" role="radio" aria-checked={stance === "goofy"} className={optionClass(stance === "goofy")} onClick={() => onStance("goofy")}>Goofy</button>
+                </div>
+              </>
+            )}
             <div className="mt-2 flex flex-wrap gap-1.5">
               {(Object.keys(GEAR) as GearId[]).map((g) => (
                 <button key={g} type="button" className={optionClass(riderStyle.skis === g)} onClick={() => onRiderStyle({ ...riderStyle, skis: g, board: g })}>
-                  <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ background: `#${GEAR[g].base.toString(16).padStart(6, "0")}` }} />{GEAR[g].name} skis
+                  <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ background: `#${GEAR[g].base.toString(16).padStart(6, "0")}` }} />{GEAR[g].name} {riderMode === "snowboarder" ? "board" : "skis"}
                 </button>
               ))}
             </div>

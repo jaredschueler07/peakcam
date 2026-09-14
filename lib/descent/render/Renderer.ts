@@ -8,7 +8,7 @@
  */
 
 import * as THREE from "three";
-import type { CameraPreset, DescentPhase, RiderState, RiderStyle, World } from "../types";
+import type { CameraPreset, DescentPhase, RiderMode, RiderState, RiderStyle, SnowboardStance, World } from "../types";
 import type { RenderFrame, RenderModule } from "./frame";
 import { ChaseCamera } from "./Camera";
 import { FarField } from "./FarField";
@@ -27,6 +27,8 @@ export interface RendererOptions {
   canvas: HTMLCanvasElement;
   world: World;
   riderStyle: RiderStyle;
+  riderMode?: RiderMode;
+  stance?: SnowboardStance;
   /** Start at the lowest rung and never adapt (the settings "low" toggle). */
   forceLowQuality?: boolean;
 }
@@ -79,7 +81,7 @@ export class Renderer {
     const lanes = new Lanes(this.scene, world);
     this.tracks = new Tracks(this.scene, world);
     this.particles = new Particles(this.scene, world);
-    this.rider = new RiderMesh(this.scene, world, options.riderStyle);
+    this.rider = new RiderMesh(this.scene, world, options.riderStyle, { riderMode: options.riderMode, stance: options.stance });
     this.modules.push(this.sky, this.terrain, farField, trees, lifts, lake, lanes, signs, this.tracks, this.rider, this.particles);
 
     if (this.forceLow) this.setQuality(2);

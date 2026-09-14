@@ -70,3 +70,31 @@ test("ghost rig is driven by setGhostPose and ignores update", () => {
   assert.equal(ghost.root.visible, false);
   ghost.dispose();
 });
+
+test("snowboarder rig builds for both stances and poses through carve, skid, air grabs and lift", () => {
+  for (const stance of ["regular", "goofy"] as const) {
+    const scene = new THREE.Scene();
+    const rider = new RiderMesh(scene, stubWorld, DEFAULT_RIDER_STYLE, { riderMode: "snowboarder", stance });
+    let poles = 0;
+    rider.root.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && (m.geometry as THREE.BufferGeometry).type === "CylinderGeometry") poles += 1; });
+    assert.equal(poles, 0, "snowboarder carries no poles");
+    const s = createRiderState();
+    s.x = 3; s.y = 50; s.z = 4; s.yaw = 0.3; s.vx = 9; s.vz = 9;
+    s.edge = 0.7; for (let i = 0; i < 20; i++) rider.update(frame(s));
+    s.edge = -0.7; for (let i = 0; i < 20; i++) rider.update(frame(s));
+    s.braking = true; s.travelYaw = s.yaw + 0.9; for (let i = 0; i < 20; i++) rider.update(frame(s));
+    s.braking = false; s.vx = 1; s.vz = 1; for (let i = 0; i < 20; i++) rider.update(frame(s));
+    s.onGround = false; s.y = 55;
+    for (const grab of ["mute", "eagle", "daffy", "twister"] as const) { s.grab = grab; for (let i = 0; i < 12; i++) rider.update(frame(s)); }
+    s.grab = null; s.onGround = true; s.y = 50; s.liftIndex = 1; s.liftSeat.heading = 2;
+    for (let i = 0; i < 20; i++) rider.update(frame(s));
+    assert.equal(rider.root.position.x, 3);
+    assert.ok(Number.isFinite(rider.root.quaternion.w));
+    rider.dispose();
+    assert.equal(scene.children.length, 0);
+  }
+  const ghost = new RiderMesh(new THREE.Scene(), stubWorld, DEFAULT_RIDER_STYLE, { ghost: true, riderMode: "snowboarder", stance: "goofy" });
+  ghost.setGhostPose({ x: 0, y: 1, z: 0, yaw: 0, airborne: false, tucked: true, crashed: false, visible: true });
+  assert.equal(ghost.root.visible, true);
+  ghost.dispose();
+});

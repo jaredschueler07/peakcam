@@ -9,6 +9,7 @@ import type { CourseChoice } from "@/lib/game/config/course-choices";
 import type { CameraPreset, DescentEvent, DescentRuntime, RiderStyle } from "@/lib/descent/types";
 import { EVENTS, track } from "@/lib/analytics-events";
 import { DEFAULT_RIDER_STYLE, readRiderStyle, saveRiderStyle } from "@/lib/game/config/rider-style";
+import type { RiderMode, SnowboardStance } from "@/lib/game/core/config";
 import { isRunSessionFailure, requestRunSession, type RunSessionTicket } from "@/lib/game/competition/session-client";
 import { NO_TICKET, usableTicket, type TicketState } from "@/lib/game/competition/ticket-lifecycle";
 import { freezeConditions } from "@/lib/game/competition/freeze-conditions";
@@ -22,7 +23,7 @@ import ResultsCard, { type RunSummary } from "./ResultsCard";
 import TouchControls from "./TouchControls";
 import TrailMapCanvas from "./TrailMapCanvas";
 import {
-  AUDIO_STORAGE_KEY, CAMERA_STORAGE_KEY, QUALITY_STORAGE_KEY, TOUCH_STORAGE_KEY,
+  AUDIO_STORAGE_KEY, CAMERA_STORAGE_KEY, QUALITY_STORAGE_KEY, RIDER_MODE_STORAGE_KEY, STANCE_STORAGE_KEY, TOUCH_STORAGE_KEY,
   readStorage, shellInput, writeStorage, type Hotkey,
 } from "./runtime-types";
 
@@ -72,6 +73,8 @@ export default function DescentGame({ profile, conditions }: {
   const [generation, setGeneration] = useState(0);
 
   const [riderStyle, setRiderStyle] = useState<RiderStyle>(DEFAULT_RIDER_STYLE);
+  const [riderMode, setRiderMode] = useState<RiderMode>("skier");
+  const [stance, setStance] = useState<SnowboardStance>("regular");
   const [audio, setAudio] = useState(true);
   const [camera, setCamera] = useState<CameraPreset>("chase");
   const [weatherIndex, setWeatherIndex] = useState<number>(conditions.weatherDefault);
@@ -107,6 +110,8 @@ export default function DescentGame({ profile, conditions }: {
   // Preferences.
   useEffect(() => {
     setRiderStyle(readRiderStyle(localStorage));
+    setRiderMode(readStorage(RIDER_MODE_STORAGE_KEY) === "snowboarder" ? "snowboarder" : "skier");
+    setStance(readStorage(STANCE_STORAGE_KEY) === "goofy" ? "goofy" : "regular");
     setAudio(readStorage(AUDIO_STORAGE_KEY) !== "off");
     const cam = readStorage(CAMERA_STORAGE_KEY);
     if (cam === "chase" || cam === "far" || cam === "high" || cam === "helmet") setCamera(cam);
@@ -147,7 +152,7 @@ export default function DescentGame({ profile, conditions }: {
         const { createDescent } = await import("@/lib/descent");
         if (cancelled) return;
         created = await createDescent({
-          canvas, profile, conditions, riderStyle, weatherIndex,
+          canvas, profile, conditions, riderStyle, weatherIndex, riderMode, stance,
           forceLowQuality: readStorage(QUALITY_STORAGE_KEY) === "low",
           signal: controller.signal,
           onProgress: (_fraction, label) => {
@@ -179,7 +184,7 @@ export default function DescentGame({ profile, conditions }: {
     };
     // Rider style / weather are applied at creation; a change recreates the runtime.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, conditions, riderStyle.character, riderStyle.outfit, riderStyle.skis, generation]);
+  }, [profile, conditions, riderStyle.character, riderStyle.outfit, riderStyle.skis, riderMode, stance, generation]);
 
   const handleEvent = useCallback((event: DescentEvent) => {
     const rt = runtimeRef.current;
@@ -249,7 +254,7 @@ export default function DescentGame({ profile, conditions }: {
     sessionAbortRef.current = controller;
     applyTicketState({ status: "requesting" });
     void requestRunSession(
-      { resortSlug: profile.slug, mode: choice, trailId: requestedTrailId, surface: conditions.surface, physicsModel: PHYSICS_MODEL },
+      { resortSlug: profile.slug, mode: choice, trailId: requestedTrailId, surface: conditions.surface, physicsModel: PHYSICS_MODEL, riderMode, stance },
       { signal: controller.signal },
     ).then((result) => {
       if (controller.signal.aborted) return;
@@ -292,7 +297,7 @@ export default function DescentGame({ profile, conditions }: {
   const dropIn = () => {
     const rt = runtimeRef.current;
     if (!rt) return;
-    const frozen = freezeConditions(conditions, ticketStateRef.current, PHYSICS_MODEL, profile.slug, modeRef.current, trailId, Date.now());
+    const frozen = freezeConditions(conditions, ticketStateRef.current, PHYSICS_MODEL, profile.slug, modeRef.current, trailId, Date.now(), riderMode, stance);
     freezeRunTicket(frozen.ticket);
     playedTrailRef.current = frozen.trailId;
     playedDateRef.current = frozen.ticket?.conditionsDate;
@@ -316,6 +321,8 @@ export default function DescentGame({ profile, conditions }: {
   }), [mode, trailId, runTicket]);
 
   const changeRiderStyle = (next: RiderStyle) => { setRiderStyle(next); saveRiderStyle(localStorage, next); };
+  const changeRiderMode = (next: RiderMode) => { setRiderMode(next); writeStorage(RIDER_MODE_STORAGE_KEY, next); };
+  const changeStance = (next: SnowboardStance) => { setStance(next); writeStorage(STANCE_STORAGE_KEY, next); };
 
   const touch = touchPref ?? touchDevice;
   const inGame = phase === "countdown" || phase === "riding" || phase === "finished";
@@ -351,6 +358,10 @@ export default function DescentGame({ profile, conditions }: {
           session={{ mode, pending: ticketState.status === "requesting", notice, onSelectMode: selectMode }}
           riderStyle={riderStyle}
           onRiderStyle={changeRiderStyle}
+          riderMode={riderMode}
+          onRiderMode={changeRiderMode}
+          stance={stance}
+          onStance={changeStance}
           onDropIn={dropIn}
           settings={{
             audio, onAudio: (v) => { setAudio(v); runtime.setAudioEnabled(v); writeStorage(AUDIO_STORAGE_KEY, v ? "on" : "off"); },
@@ -457,5 +468,5 @@ const fallbackStore = createStore<HudSnapshot>(() => ({
   phase: "menu", speedKmh: 0, style: 0, combo: 1, runTime: 0, progress: 0, verticalFt: 0, altitudeFt: 0,
   courseName: "", courseDifficulty: null, trailName: null, onTrail: false, surface: "packed", tucked: false, braking: false,
   airborne: false, crashed: false, junction: null, liftPrompt: null, liftRiding: null, x: 0, z: 0, travelYaw: 0,
-  camera: "chase", weatherName: "", trailHint: false, fps: 0, gpu: "", countdown: 0, toast: null, trick: null, bestTrick: null, crashes: 0,
+  camera: "chase", weatherName: "", trailHint: false, fps: 0, gpu: "", countdown: 0, toast: null, trick: null, bestTrick: null, crashes: 0, mode: "skier",
 }));

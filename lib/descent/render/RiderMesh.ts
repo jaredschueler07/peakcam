@@ -20,6 +20,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { GEAR, OUTFITS } from "@/lib/game/config/rider-style";
+import type { RiderMode, SnowboardStance } from "@/lib/game/core/config";
 import type { RiderState, RiderStyle, World } from "../types";
 import type { RenderFrame, RenderModule } from "./frame";
 
@@ -29,6 +30,12 @@ interface Limb {
   pivot: THREE.Group;
   target: THREE.Euler;
   extra?: THREE.Group;
+}
+
+export interface RiderMeshOptions {
+  ghost?: boolean;
+  riderMode?: RiderMode;
+  stance?: SnowboardStance;
 }
 
 export interface GhostPose {
@@ -53,6 +60,16 @@ export class RiderMesh implements RenderModule {
   private readonly geometries: THREE.BufferGeometry[] = [];
   private readonly scene: THREE.Scene;
   private readonly world: World;
+  /** Snowboarder rig: no poles, one board, body turned across the nose. */
+  private readonly board: boolean;
+  private readonly goofy: boolean;
+  /** Body yaw relative to the board nose (regular −60°, goofy +60°). */
+  private readonly stanceYaw: number;
+  /** Index (0 = left, 1 = right) of the leading foot / hand on a board. */
+  private readonly front: 0 | 1;
+  private readonly back: 0 | 1;
+  private readonly stanceGroup: THREE.Group;
+  private boardGroup: THREE.Group | null = null;
 
   private readonly hips: THREE.Group;
   private readonly torso: Limb;
@@ -94,12 +111,22 @@ export class RiderMesh implements RenderModule {
   private readonly xAxis = new THREE.Vector3(1, 0, 0);
   private readonly zAxis = new THREE.Vector3(0, 0, 1);
 
-  constructor(scene: THREE.Scene, world: World, style: RiderStyle, options: { ghost?: boolean } = {}) {
+  constructor(scene: THREE.Scene, world: World, style: RiderStyle, options: RiderMeshOptions = {}) {
     this.scene = scene;
     this.world = world;
     this.ghost = options.ghost === true;
+    this.board = options.riderMode === "snowboarder";
+    this.goofy = options.stance === "goofy";
+    this.stanceYaw = this.board ? (this.goofy ? 60 : -60) * DEG : 0;
+    this.front = this.board && this.goofy ? 1 : 0;
+    this.back = this.front === 0 ? 1 : 0;
     this.root = new THREE.Group();
     this.root.name = this.ghost ? "rider-ghost" : "rider";
+    // The body hangs off a stance group so a snowboarder can face across the nose
+    // while the root (and the board) keep the sim's heading convention.
+    this.stanceGroup = new THREE.Group();
+    this.stanceGroup.rotation.y = this.stanceYaw;
+    this.root.add(this.stanceGroup);
 
     const outfit = OUTFITS[style.outfit];
     const gear = GEAR[style.skis];
@@ -149,7 +176,7 @@ export class RiderMesh implements RenderModule {
     // ── Hips / torso / head ──
     this.hips = new THREE.Group();
     this.hips.position.y = 0.9;
-    this.root.add(this.hips);
+    this.stanceGroup.add(this.hips);
 
     // Lower "hip" capsule lives on the hips group so the waist reads through a torso fold.
     const hipMesh = mesh(geo(new THREE.CapsuleGeometry(0.15, 0.16, 4, 12)), pants);
@@ -224,16 +251,18 @@ export class RiderMesh implements RenderModule {
       const pole = new THREE.Group();
       pole.position.y = -0.31;
       fore.add(pole);
-      const grip = mesh(geo(new THREE.CylinderGeometry(0.018, 0.016, 0.12, 6)), trim);
-      grip.position.y = -0.02;
-      pole.add(grip);
-      const shaft = mesh(geo(new THREE.CylinderGeometry(0.009, 0.007, 1.1, 6)), poleMat);
-      shaft.position.y = -0.55;
-      pole.add(shaft);
-      const basket = mesh(geo(new THREE.TorusGeometry(0.045, 0.012, 4, 10)), skiAccent);
-      basket.rotation.x = Math.PI / 2;
-      basket.position.y = -0.93;
-      pole.add(basket);
+      if (!this.board) {
+        const grip = mesh(geo(new THREE.CylinderGeometry(0.018, 0.016, 0.12, 6)), trim);
+        grip.position.y = -0.02;
+        pole.add(grip);
+        const shaft = mesh(geo(new THREE.CylinderGeometry(0.009, 0.007, 1.1, 6)), poleMat);
+        shaft.position.y = -0.55;
+        pole.add(shaft);
+        const basket = mesh(geo(new THREE.TorusGeometry(0.045, 0.012, 4, 10)), skiAccent);
+        basket.rotation.x = Math.PI / 2;
+        basket.position.y = -0.93;
+        pole.add(basket);
+      }
 
       return [
         { pivot: upper, target: new THREE.Euler() },
@@ -250,7 +279,14 @@ export class RiderMesh implements RenderModule {
     // ── Legs / skis ──
     const buildLeg = (side: -1 | 1): [Limb, Limb, Limb] => {
       const thigh = new THREE.Group();
-      thigh.position.set(side * 0.11, 0, 0);
+      const index = side < 0 ? 0 : 1;
+      if (this.board) {
+        // Feet sit on the bindings, ±0.28 m along the board, expressed in the stance frame.
+        const zb = index === this.front ? 0.28 : -0.28;
+        thigh.position.set(-zb * Math.sin(this.stanceYaw), 0, zb * Math.cos(this.stanceYaw));
+      } else {
+        thigh.position.set(side * 0.11, 0, 0);
+      }
       this.hips.add(thigh);
       const hipBall = mesh(geo(new THREE.SphereGeometry(0.085, 8, 6)), pants);
       thigh.add(hipBall);
@@ -262,20 +298,34 @@ export class RiderMesh implements RenderModule {
       const knee = mesh(geo(new THREE.SphereGeometry(0.075, 8, 6)), pants);
       shin.add(knee);
       shin.add(limbCapsule(0.07, 0.42, pants, 0.88));
-      // Boot: a capsule laid flat, toe forward.
+      // Boot: a capsule laid flat, toe forward — or along the binding angle on a board.
+      const foot = new THREE.Group();
+      if (this.board) {
+        const toe = this.goofy ? 90 * DEG : -90 * DEG;
+        const bindingAngle = (index === this.front ? 21 : -6) * DEG * (this.goofy ? -1 : 1);
+        foot.rotation.y = toe + bindingAngle - this.stanceYaw;
+      }
+      shin.add(foot);
       const boot = mesh(geo(new THREE.CapsuleGeometry(0.075, 0.16, 4, 10)), bootMat);
       boot.rotation.x = Math.PI / 2;
       boot.scale.set(1, 1, 0.95);
       boot.position.set(0, -0.4, 0.04);
-      shin.add(boot);
+      foot.add(boot);
       const cuff = mesh(geo(new THREE.TorusGeometry(0.075, 0.02, 4, 10)), trim);
       cuff.rotation.x = Math.PI / 2;
       cuff.position.set(0, -0.33, 0.02);
-      shin.add(cuff);
+      foot.add(cuff);
 
       const ski = new THREE.Group();
       ski.position.set(0, -0.48, 0.04);
       shin.add(ski);
+      if (this.board) {
+        return [
+          { pivot: thigh, target: new THREE.Euler() },
+          { pivot: shin, target: new THREE.Euler() },
+          { pivot: ski, target: new THREE.Euler() },
+        ];
+      }
       const skiBody = mesh(geo(new RoundedBoxGeometry(0.1, 0.035, 1.42, 1, 0.015)), skiMat);
       ski.add(skiBody);
       const tipSeg = new THREE.Group();
@@ -304,6 +354,57 @@ export class RiderMesh implements RenderModule {
     this.thigh = [ltA, rtA];
     this.shin = [lsA, rsA];
     this.ski = [lkA, rkA];
+
+    // ── Board ──
+    if (this.board) {
+      const deck = GEAR[style.board];
+      const topMat = mat(deck.base, 0.25);
+      const stripeMat = mat(deck.accent, 0.25);
+      const edgeMat = mat(deck.ink, 0.35, 0.4);
+      const boardGroup = new THREE.Group();
+      boardGroup.position.y = 0.02;
+      this.root.add(boardGroup);
+      this.boardGroup = boardGroup;
+      const deckMesh = mesh(geo(new RoundedBoxGeometry(0.26, 0.02, 1.2, 1, 0.02)), topMat);
+      boardGroup.add(deckMesh);
+      const stripe = mesh(geo(new RoundedBoxGeometry(0.07, 0.024, 1.1, 1, 0.01)), stripeMat);
+      stripe.position.y = 0.003;
+      boardGroup.add(stripe);
+      for (const side of [-1, 1]) {
+        const edge = mesh(geo(new RoundedBoxGeometry(0.012, 0.018, 1.2, 1, 0.005)), edgeMat);
+        edge.position.set(side * 0.128, 0, 0);
+        boardGroup.add(edge);
+      }
+      for (const end of [-1, 1]) {
+        const tipSeg = new THREE.Group();
+        tipSeg.position.set(0, 0, end * 0.6);
+        tipSeg.rotation.x = -end * 0.2;
+        boardGroup.add(tipSeg);
+        const tip = mesh(geo(new RoundedBoxGeometry(0.26, 0.02, 0.18, 1, 0.02)), topMat);
+        tip.position.z = end * 0.09;
+        tip.scale.set(0.92, 1, 1);
+        tipSeg.add(tip);
+      }
+      const toeSign = this.goofy ? 1 : -1;
+      for (let i = 0; i < 2; i++) {
+        const isFront = i === 0;
+        const bindingGroup = new THREE.Group();
+        bindingGroup.position.set(0, 0.012, isFront ? 0.28 : -0.28);
+        bindingGroup.rotation.y = (isFront ? 21 : -6) * DEG * (this.goofy ? -1 : 1);
+        boardGroup.add(bindingGroup);
+        const base = mesh(geo(new RoundedBoxGeometry(0.2, 0.03, 0.1, 1, 0.01)), edgeMat);
+        bindingGroup.add(base);
+        const highback = mesh(geo(new RoundedBoxGeometry(0.14, 0.14, 0.025, 1, 0.01)), edgeMat);
+        // Highback stands on the heel edge (opposite the toes) and leans forward.
+        highback.position.set(-toeSign * 0.09, 0.08, 0);
+        highback.rotation.z = toeSign * 0.25;
+        bindingGroup.add(highback);
+        const strap = mesh(geo(new THREE.TorusGeometry(0.06, 0.012, 4, 10, Math.PI)), stripeMat);
+        strap.rotation.y = Math.PI / 2;
+        strap.position.set(toeSign * 0.02, 0.03, 0);
+        bindingGroup.add(strap);
+      }
+    }
 
     // ── Blob shadow ──
     if (!this.ghost && typeof document !== "undefined") {
@@ -540,6 +641,116 @@ export class RiderMesh implements RenderModule {
     }
   }
 
+  /**
+   * Snowboard overrides layered on the skier targets: the skier pass already
+   * set crouch / crash / lift shapes, this re-aims what a board changes —
+   * toeside vs heelside carving, the heelside skid, the pushing back foot,
+   * board grabs and the head looking down the hill.
+   */
+  private boardAdjust(s: RiderState, onLift: boolean, crashed: boolean): void {
+    const f = this.front, b = this.back;
+    // Look toward the nose (root +z) from the turned body.
+    this.head.target.y += -this.stanceYaw * 0.8;
+    for (let i = 0; i < 2; i++) { this.ski[i].target.set(0, 0, 0); this.pole[i].target.set(0, 0, 0); }
+    if (crashed) return;
+    if (onLift) {
+      // Board hangs off the front foot; the back foot dangles free.
+      this.thigh[b].target.set(-1.2, 0, 0);
+      this.shin[b].target.set(1.0, 0, 0);
+      for (let i = 0; i < 2; i++) { this.upperArm[i].target.set(-0.4, 0, (i === 0 ? -1 : 1) * 0.2); this.forearm[i].target.set(-1.1, 0, 0); }
+      return;
+    }
+    if (!s.onGround) {
+      // Board grabs: front hand = leading hand.
+      const fs = f === 0 ? -1 : 1, bs = b === 0 ? -1 : 1;
+      switch (s.grab) {
+        case "mute": // indy: back hand to the toe edge between the bindings
+          this.torso.target.set(0.5, 0, 0.15 * -bs);
+          this.upperArm[b].target.set(1.4, 0, bs * -0.5);
+          this.forearm[b].target.set(-0.15, 0, 0);
+          this.upperArm[f].target.set(-1.6, 0, fs * 0.9);
+          for (let i = 0; i < 2; i++) { this.thigh[i].target.set(-1.4, 0, 0); this.shin[i].target.set(1.5, 0, 0); }
+          break;
+        case "eagle": // method: front hand heel edge, board pulled up behind
+          this.torso.target.set(-0.35, 0, 0.2 * fs);
+          this.upperArm[f].target.set(1.1, 0, fs * 1.1);
+          this.forearm[f].target.set(-0.3, 0, 0);
+          this.upperArm[b].target.set(-2.2, 0, bs * 0.6);
+          for (let i = 0; i < 2; i++) { this.thigh[i].target.set(0.5, 0, 0); this.shin[i].target.set(1.7, 0, 0); }
+          break;
+        case "daffy": // tail grab: back hand reaches back to the tail
+          this.torso.target.set(0.3, -0.5 * (this.goofy ? -1 : 1), 0);
+          this.upperArm[b].target.set(1.5, 0, bs * 0.3);
+          this.forearm[b].target.set(-0.2, 0, 0);
+          this.upperArm[f].target.set(-1.4, 0, fs * 0.8);
+          this.thigh[b].target.set(-0.6, 0, 0); this.shin[b].target.set(1.4, 0, 0);
+          this.thigh[f].target.set(-1.2, 0, 0); this.shin[f].target.set(0.9, 0, 0);
+          break;
+        case "twister": // nose grab: front hand reaches forward to the nose
+          this.torso.target.set(0.4, 0.5 * (this.goofy ? -1 : 1), 0);
+          this.upperArm[f].target.set(1.6, 0, fs * 0.3);
+          this.forearm[f].target.set(-0.2, 0, 0);
+          this.upperArm[b].target.set(-1.3, 0, bs * 0.9);
+          this.thigh[f].target.set(-0.6, 0, 0); this.shin[f].target.set(1.4, 0, 0);
+          this.thigh[b].target.set(-1.2, 0, 0); this.shin[b].target.set(0.9, 0, 0);
+          break;
+        default:
+          for (let i = 0; i < 2; i++) { const side = i === 0 ? -1 : 1; this.upperArm[i].target.set(-0.6, 0, side * 1.1); this.forearm[i].target.set(-0.4, 0, 0); }
+          break;
+      }
+      return;
+    }
+
+    const speed = Math.hypot(s.vx, s.vz);
+    const crouch = s.crouch;
+    // Neutral riding stance: knees soft, arms relaxed and slightly out.
+    for (let i = 0; i < 2; i++) {
+      const side = i === 0 ? -1 : 1;
+      this.upperArm[i].target.set(0.15 - crouch * 0.6, 0, side * (0.45 - crouch * 0.2));
+      this.forearm[i].target.set(-0.5, 0, 0);
+    }
+    if (s.held) {
+      this.upperArm[f].target.set(-0.7, 0, (f === 0 ? -1 : 1) * 0.5);
+      return;
+    }
+
+    // Toeside (lean over the toes) vs heelside (sit back). Right turn = toeside for regular.
+    const toeside = (s.edge > 0) !== this.goofy;
+    const e = Math.abs(s.edge);
+    if (toeside) {
+      this.torso.target.x += e * 0.45;
+      this.hipsYTarget -= e * 0.12;
+      for (let i = 0; i < 2; i++) { this.thigh[i].target.x -= e * 0.45; this.shin[i].target.x += e * 0.7; }
+      this.upperArm[b].target.z += (b === 0 ? -1 : 1) * e * 0.5;
+    } else {
+      this.torso.target.x -= e * 0.25;
+      this.hipsYTarget -= e * 0.2;
+      for (let i = 0; i < 2; i++) { this.thigh[i].target.x -= e * 0.9; this.shin[i].target.x += e * 1.1; }
+      for (let i = 0; i < 2; i++) { this.upperArm[i].target.x -= e * 0.9; }
+    }
+    // The stance frame already turns the body; fold torso counter-rotation toward the nose.
+    this.torso.target.y += -this.stanceYaw * 0.15;
+
+    if (s.braking && !s.held) {
+      // Heelside skid: sit low with the board across the travel, back arm swinging.
+      this.hipsYTarget -= 0.2;
+      this.torso.target.x -= 0.2;
+      for (let i = 0; i < 2; i++) { this.thigh[i].target.x -= 0.9; this.shin[i].target.x += 1.2; }
+      this.upperArm[f].target.set(-1.1, 0, (f === 0 ? -1 : 1) * 0.6);
+      this.upperArm[b].target.set(-0.4 + Math.sin(s.stride * 3) * 0.35, 0, (b === 0 ? -1 : 1) * 1.2);
+    } else if (speed < 6.5 && speed > 0.2 && crouch < 0.5) {
+      // Skating: back foot unstrapped, pushing beside the board; front foot stays on.
+      const amp = 1 - speed / 6.5;
+      const phase = Math.sin(s.stride * 2.4);
+      this.thigh[b].target.set(-0.3 + phase * 0.7 * amp, 0, (b === 0 ? -1 : 1) * -0.35 * amp);
+      this.shin[b].target.set(0.5 + Math.max(0, -phase) * 0.6 * amp, 0, 0);
+      this.thigh[f].target.set(-0.35, 0, 0);
+      this.shin[f].target.set(0.55, 0, 0);
+      this.upperArm[b].target.x += phase * 0.5 * amp;
+      this.upperArm[f].target.x -= phase * 0.3 * amp;
+    }
+  }
+
   private liftTargets(): void {
     this.setNeutralTargets();
     this.hipsYTarget = 0.62;
@@ -569,6 +780,14 @@ export class RiderMesh implements RenderModule {
     else if (crashed) this.crashTargets(s);
     else if (!s.onGround) this.airTargets(s);
     else this.groundTargets(s);
+    if (this.board) {
+      this.boardAdjust(s, onLift, crashed);
+      if (this.boardGroup) {
+        // On the chair the board dangles nose-down from the front foot.
+        this.boardGroup.rotation.x = damp(this.boardGroup.rotation.x, onLift ? 0.35 : 0, 8, dt);
+        this.boardGroup.position.y = damp(this.boardGroup.position.y, onLift ? -0.06 : 0.02, 8, dt);
+      }
+    }
 
     // Secondary motion: breathing while idle, torso counter-rotation against the carve,
     // and the poles trailing the hands by a beat.
@@ -595,7 +814,7 @@ export class RiderMesh implements RenderModule {
 
     // Root orientation: slope tilt × yaw(+spin) × flip × bank × tumble.
     const yaw = onLift ? s.liftSeat.heading : s.yaw + (s.onGround ? 0 : s.spin);
-    const bankTarget = s.onGround && !crashed && !onLift ? -s.edge * 35 * DEG : 0;
+    const bankTarget = s.onGround && !crashed && !onLift ? s.edge * 35 * DEG : 0;
     this.bank = damp(this.bank, bankTarget, 10, dt);
     const flipTarget = s.onGround || crashed || onLift ? 0 : s.flip;
     this.flip = damp(this.flip, flipTarget, s.onGround ? 14 : 30, dt);
@@ -630,7 +849,7 @@ export class RiderMesh implements RenderModule {
     // Plant the pole tips on the snow while gliding upright (or parked at the gate):
     // aim each pole from the hand down to the surface instead of trusting the damped
     // limb chain, which leaves the tips floating a few centimetres.
-    if (s.onGround && !crashed && !onLift && (s.held || (s.crouch < 0.45 && !s.braking))) {
+    if (!this.board && s.onGround && !crashed && !onLift && (s.held || (s.crouch < 0.45 && !s.braking))) {
       this.root.updateMatrixWorld(true);
       for (let i = 0; i < 2; i++) {
         const pole = this.pole[i].pivot;
@@ -686,9 +905,11 @@ export class RiderMesh implements RenderModule {
         this.shin[i].pivot.rotation.set(knee, 0, 0);
         this.upperArm[i].pivot.rotation.set(0.35 - crouch * 1.4, 0, side * 0.18);
       }
-      this.ski[i].pivot.rotation.set(-(this.thigh[i].pivot.rotation.x + this.shin[i].pivot.rotation.x), 0, 0);
+      if (!this.board) {
+        this.ski[i].pivot.rotation.set(-(this.thigh[i].pivot.rotation.x + this.shin[i].pivot.rotation.x), 0, 0);
+        this.pole[i].pivot.rotation.set(0.55 + crouch * 1.5, 0, 0);
+      }
       this.forearm[i].pivot.rotation.set(-0.55, 0, 0);
-      this.pole[i].pivot.rotation.set(0.55 + crouch * 1.5, 0, 0);
     }
   }
 
