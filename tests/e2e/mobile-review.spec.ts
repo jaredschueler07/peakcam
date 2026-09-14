@@ -68,42 +68,31 @@ test.describe("mobile layout and navigation", () => {
     await expect(page.getByRole("status")).toContainText("If mobile-test@example.invalid has a PeakCam account");
   });
 
-  test("game start scrolls into reach and control preferences survive reload", async ({ page }) => {
-    await page.goto("/resorts/breckenridge/drop-in?gfx=webgl");
-    await page.getByText("Control preferences", { exact: true }).click();
-    await page.getByLabel("Steering hand", { exact: true }).selectOption("right");
-    await page.getByLabel("Steering style", { exact: true }).selectOption("buttons");
-    await page.reload();
-    await page.getByText("Control preferences", { exact: true }).click();
-    await expect(page.getByLabel("Steering hand", { exact: true })).toHaveValue("right");
-    await expect(page.getByLabel("Steering style", { exact: true })).toHaveValue("buttons");
-    const start = page.getByRole("button", { name: "Start descent", exact: true });
-    await start.scrollIntoViewIfNeeded();
-    await expect(start).toBeInViewport({ ratio: 1 });
+  test("the Drop In menu fits a phone and Ski Now is reachable", async ({ page }) => {
+    await page.goto("/resorts/breckenridge/drop-in");
+    await expect(page.locator('[data-descent-phase="menu"]')).toBeVisible({ timeout: 90_000 });
+    const skiNow = page.getByRole("button", { name: /ski now/i });
+    await expect(skiNow).toBeInViewport({ ratio: 1 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 });
 
-test("landscape phones retain touch buttons with the selected handedness", async ({ browser }) => {
+test("landscape phones get touch controls and a pause dialog", async ({ browser }) => {
   test.setTimeout(120_000);
   const context = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
-  await page.goto(`${test.info().project.use.baseURL}/resorts/breckenridge/drop-in?gfx=webgl`);
-  await page.getByText("Control preferences", { exact: true }).click();
-  await page.getByLabel("Steering hand", { exact: true }).selectOption("right");
-  await page.getByLabel("Steering style", { exact: true }).selectOption("buttons");
-  await page.getByRole("button", { name: "Start descent", exact: true }).click();
-  const tuck = page.getByRole("button", { name: "Tuck", exact: true });
-  await expect(tuck).toBeVisible({ timeout: 90_000 });
+  await page.goto(`${test.info().project.use.baseURL}/resorts/breckenridge/drop-in`);
+  await expect(page.locator('[data-descent-phase="menu"]')).toBeVisible({ timeout: 90_000 });
+  await page.getByRole("button", { name: /ski now/i }).click();
+  await page.getByRole("button", { name: /drop in/i }).last().click();
+  await expect(page.locator('[data-descent-phase="riding"]')).toBeVisible({ timeout: 15_000 });
+  const tuck = page.getByRole("button", { name: /tuck/i });
+  await expect(tuck).toBeVisible();
   await expect(tuck).toBeInViewport({ ratio: 1 });
-  const right = page.getByRole("button", { name: "Steer right", exact: true });
-  await expect(right).toBeInViewport({ ratio: 1 });
-  expect((await tuck.boundingBox())!.x).toBeLessThan((await right.boundingBox())!.x);
-  await expect(page.getByRole("button", { name: "Restart", exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "Pause game" }).click();
-  await expect(page.getByRole("button", { name: "Resume", exact: true })).toBeFocused();
-  await expect(tuck).toHaveCount(0);
-  await page.getByRole("button", { name: "Resume", exact: true }).click();
+  await expect(page.getByRole("button", { name: /jump/i })).toBeInViewport({ ratio: 1 });
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: /paused/i })).toBeVisible();
+  await page.getByRole("button", { name: /resume/i }).click();
   await expect(tuck).toBeVisible();
   await context.close();
 });

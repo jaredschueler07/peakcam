@@ -9,7 +9,7 @@ import {
   DROP_IN_GAME_PROFILES,
 } from "@/lib/drop-in";
 import { getResortBySlug, lookupResortNameBySlug } from "@/lib/supabase";
-import DropInClientBoundary from "@/components/drop-in/DropInClientBoundary";
+import DescentClientBoundary from "@/components/descent/DescentClientBoundary";
 import DropInUnavailable from "@/components/drop-in/DropInUnavailable";
 import { Header } from "@/components/layout/Header";
 import { getWeatherForecast } from "@/lib/weather";
@@ -144,7 +144,7 @@ export default async function DropInPage({
   // provides it, and without it "Skip to main content" lands on nothing.
   return (
     <main id="main-content">
-      <DropInClientBoundary
+      <DescentClientBoundary
         profile={DROP_IN_GAME_PROFILES[slug as keyof typeof DROP_IN_GAME_PROFILES]}
         conditions={conditions}
         courseChoices={courseNetworks[slug as keyof typeof courseNetworks].runs}

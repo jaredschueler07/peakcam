@@ -13,8 +13,8 @@ npm run dev              # Dev server (localhost:3000)
 npm run build            # Production build
 npm run lint             # ESLint (flat config, next/core-web-vitals + TS)
 npx tsc --noEmit         # Type check
-npm test                 # node:test via tsx — lib/*.test.ts + scripts/*.test.ts
-npm run drop-in:sync-three   # Re-vendor public/drop-in/three.module.js after bumping `three`
+npm test                 # node:test via tsx — lib/**/*.test.ts (incl. lib/descent) + scripts/*.test.ts + tests/*.test.ts
+npx tsx scripts/descent-playtest.ts --slug breckenridge --scenario carve --out /tmp/pt   # scripted Drop In playtest (needs `npm run dev`)
 
 # Data & ops scripts (all load .env.local themselves, write via service-role key)
 npm run import-resorts:standalone  # Seed resorts/cams from data/*.csv (the maintained importer). A newly-imported resort has no live page until the next deploy — /resorts/[slug] uses dynamicParams=false, so its static params list is fixed at build time.
@@ -75,11 +75,21 @@ Known live-DB drift from the repo migrations (verify against prod before trustin
 
 Retro ski-poster theme (cream paper / ink / forest / alpenglow; Fraunces display, DM Sans body, JetBrains Mono readouts; hard "stamp" shadows) defined in `tailwind.config.ts` + `app/globals.css` (`--pc-*` tokens, `.pc-paper`/`.pc-topo` utilities). Light theme only. `tailwind.config.ts` contains a **legacy alias layer** remapping old dark-theme token names (`bg`, `surface*`, `text-*`, even `cyan` → forest green) so un-migrated components still render. Still on legacy tokens: ResortDetailPage internals, SnowReportPage, FavoritesPage, AlertManagePage, ConditionVoter, UserConditionsForm, MapBottomSheet, weather icons (which hardcode dark-theme hex). Use the new `pc-*`/poster tokens for all new work; migrating a legacy component means replacing old class names, not extending the alias layer.
 
-### Drop In (`/resorts/[slug]/drop-in`)
+### Drop In (`/resorts/[slug]/drop-in`) — the Descent engine (v3)
 
-A self-contained arcade ski descent, live for three pilot resorts (`ski-portillo`, `breckenridge`, `heavenly`). Entry points: the map popup card, the mobile bottom sheet, and the resort detail page — all gated on `isDropInResort()`.
+An arcade ski descent on real lidar terrain, live for three pilot resorts (`ski-portillo`, `breckenridge`, `heavenly`). Entry points: the map popup card, the mobile bottom sheet, the resort detail page and the `/drop-in` hub — all gated on `isDropInResort()`.
 
-`public/drop-in/engine.html` is the entire game in one file (markup, CSS, and an inline module) and imports a **vendored** `three.module.js` beside it. It is a bundler-free static asset, so it carries its own copy of every resort profile: **`RESORT_PROFILES` in the engine and `PROFILES` in `lib/drop-in.ts` must stay in sync by hand**, and `scripts/drop-in-engine.test.ts` fails the build if they drift. The host mounts it in an iframe sandboxed *without* `allow-same-origin` (`components/drop-in/DropInFrame.tsx`) — the engine therefore has an opaque origin, cannot touch app cookies, and announces itself over `postMessage` authenticated by `event.source`, not by origin. `proxy.ts` excludes `/drop-in/` so the static assets skip the Supabase session round-trip.
+The game is `lib/descent/` (engine) + `components/descent/` (React shell), modelled on the feel of a single-file browser ski sim: one 120 Hz fixed-step rider sim, one three.js WebGL scene, one zustand HUD store.
+
+- **Contracts** live in `lib/descent/types.ts` (`World`, `RiderState`, `InputState`, `HudSnapshot`, `DescentRuntime`). `lib/descent/index.ts` exports `createDescent()`; the shell imports it lazily (three.js must stay out of SSR).
+- **World** (`world/loadWorld.ts`): reuses the v2 data path — `TerrainAssetLoader`/`FarFieldAssetLoader` + `createTerrainSource` from `lib/game/terrain/*` — then derives courses (every named OSM run, start shifted ≤ 45 m to sustained downhill), rideable lifts, a tree spatial hash and lake outlines. `buildWorld()` is pure so tests build the real mountains from disk (`lib/descent/testing/fixture-world.ts`).
+- **Sim** (`sim/rider.ts`, numbers in `sim/tuning.ts`): point mass on the bicubic heightfield with a ski axis; lateral speed bled by edge grip, turn-generated lateral fed back as forward speed (carve conservation, energy-safe), brake = power smear, Space = charge/pop, natural air off lips, spins/flips/grabs with landing tolerances, tree crashes, gates as checkpoints, lifts via `prepareLiftPath`. Stays inside the leaderboard validator's envelope (`rider.test.ts` samples at 30 Hz to prove it).
+- **Render** (`render/*`): chunked flat-shaded terrain with skirts and distance LOD (`TerrainMesh`), PCFF horizon (`FarField`), sky/sun/fog from the profile weather presets (`Sky`), instanced conifers + rocks, lifts with moving chairs, canvas-text gate/finish/junction signs, ski-track ribbons, snowfall + spray points, an articulated rider rig posed from `RiderState`, a critically damped chase camera with four presets. `Renderer` adapts a quality rung from frame time.
+- **Competition** reuses `lib/game/competition/*` and `lib/game/replay/codec.ts`: ghosts are sampled at 30 Hz with the same `GhostSample` shape, so `/api/drop-in/*` and the server validator are unchanged. `COURSE_GATES` still keys ranked start/finish off the v2 run vertices — keep the ≤ 45 m start shift.
+- **Dev/e2e hooks**: in non-production the runtime is on `window.__descent` (`diagnostics`, `setAutopilot(true)`); `scripts/descent-playtest.ts` drives scripted runs in headless Chromium against a running dev server and writes screenshots + a JSON trace; `tests/e2e/descent.spec.ts` is the Playwright smoke run.
+- **Brotli over HTTP**: browsers only accept `Content-Encoding: br` on HTTPS, so the loaders fall back to `/api/drop-in/terrain/<file>` (server-side decompression) when the static `.br` fetch fails — the LAN dev URL, for instance.
+
+The v2 engine under `lib/game/{rendering,runtime,physics,core,input,audio}` and `components/drop-in/{DropInGame,hud/*,input/*}` is no longer mounted by the route; `lib/game/terrain`, `config`, `conditions`, `competition`, `replay` and `server` are still live dependencies. `components/drop-in/hud/{SubmitRunCard,LeaderboardPanel}` are reused by the v3 results card.
 
 ### Adjacent subsystems (same repo, not part of the web app)
 

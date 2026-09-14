@@ -1,9 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Default project runs the functional drop-in suite. `chromium-heap` is the
- * P11 zero-allocation guard: Chromium with `--js-flags=--expose-gc` so the
- * heap e2e can force GC and sample `performance.memory.usedJSHeapSize`.
+ * Default project runs the functional suite, including the Drop In v3 smoke run
+ * (`descent.spec.ts`). `chromium-heap` is kept for a future zero-allocation
+ * guard: Chromium with `--js-flags=--expose-gc` so a heap e2e can force GC and
+ * sample `performance.memory.usedJSHeapSize`.
  *
  * Backend matrix (P11 Task 6). Production now defaults to WebGPU, but headless
  * Chromium's WebGPU adapter is SwiftShader, which renders the canvas black —
