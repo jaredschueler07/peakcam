@@ -87,7 +87,7 @@ async function main() {
   await page.getByRole("button", { name: /drop in/i }).last().click();
   await page.waitForSelector('[data-descent-phase="countdown"]', { timeout: 10_000 });
   await shot(page, "02-countdown");
-  await page.waitForSelector('[data-descent-phase="riding"]', { timeout: 10_000 });
+  await page.waitForSelector('[data-descent-phase="riding"]', { timeout: 60_000 });
   await page.waitForTimeout(200);
 
   const trace: Array<{ t: number; speed: number; style: number; progress: number; airborne: boolean; crashed: boolean; fps: number; frame: number }> = [];

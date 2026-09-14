@@ -1,7 +1,7 @@
 /**
  * lib/descent/render/RiderMesh.ts
  * ───────────────────────────────
- * The rider: a blocky, flat-shaded skier built from primitives and posed
+ * The rider: a rounded, smooth-shaded skier built from capsules and spheres, posed
  * procedurally from `RiderState` every frame. There is no animation data —
  * every pose (tuck, carve lean, wedge, skate stride, grabs, tumble, chair
  * sit) is a target set of joint angles that the rig damps toward, so
@@ -18,6 +18,7 @@
  */
 
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { GEAR, OUTFITS } from "@/lib/game/config/rider-style";
 import type { RiderState, RiderStyle, World } from "../types";
 import type { RenderFrame, RenderModule } from "./frame";
@@ -83,6 +84,7 @@ export class RiderMesh implements RenderModule {
   private readonly scratchUp = new THREE.Vector3(0, 1, 0);
   private readonly scratchN = { x: 0, y: 1, z: 0 };
   private readonly scratchE = new THREE.Euler();
+  private breath = 0;
   private readonly poleWorld = new THREE.Vector3();
   private readonly poleParentQuat = new THREE.Quaternion();
   private readonly poleWorldQuat = new THREE.Quaternion();
@@ -103,8 +105,8 @@ export class RiderMesh implements RenderModule {
     const gear = GEAR[style.skis];
     const yeti = style.character === "yeti";
 
-    const mat = (color: number): THREE.MeshLambertMaterial => {
-      const material = new THREE.MeshLambertMaterial({ color, flatShading: true });
+    const mat = (color: number, roughness = 0.7, metalness = 0): THREE.MeshStandardMaterial => {
+      const material = new THREE.MeshStandardMaterial({ color, roughness, metalness });
       if (this.ghost) {
         material.color.set(0x9fd0ff);
         material.transparent = true;
@@ -122,80 +124,115 @@ export class RiderMesh implements RenderModule {
       m3.receiveShadow = false;
       return m3;
     };
+    /** Capsule along Y with its top cap at y=0 and total length `len` hanging down. */
+    const limbCapsule = (radius: number, len: number, m: THREE.Material, taper = 1): THREE.Mesh => {
+      const body = Math.max(0.01, len - radius * 2);
+      const c = mesh(geo(new THREE.CapsuleGeometry(radius, body, 4, 10)), m);
+      c.position.y = -len / 2;
+      c.scale.set(taper, 1, taper);
+      return c;
+    };
 
-    const jacket = mat(yeti ? 0xf2f1ea : outfit.jacket);
-    const sleeves = mat(yeti ? 0xe4e2d8 : outfit.sleeves);
-    const trim = mat(yeti ? 0xd8d5c8 : outfit.trim);
-    const pants = mat(yeti ? 0xe9e7de : outfit.pants);
-    const skin = mat(yeti ? 0x3a3330 : 0xd9a67a);
-    const lens = mat(outfit.lens);
-    const bootMat = mat(yeti ? 0x2a2420 : 0x1e1a18);
-    const skiMat = mat(gear.base);
-    const skiAccent = mat(gear.accent);
-    const poleMat = mat(gear.ink);
+    const fabricRough = yeti ? 0.92 : 0.7;
+    const jacket = mat(yeti ? 0xf2f1ea : outfit.jacket, fabricRough);
+    const sleeves = mat(yeti ? 0xe4e2d8 : outfit.sleeves, fabricRough);
+    const trim = mat(yeti ? 0xd8d5c8 : outfit.trim, fabricRough);
+    const pants = mat(yeti ? 0xe9e7de : outfit.pants, fabricRough);
+    const skin = mat(yeti ? 0x3a3330 : 0xd9a67a, 0.6);
+    const lens = mat(outfit.lens, 0.3);
+    const helmetMat = mat(yeti ? 0xd8d5c8 : outfit.trim, 0.35);
+    const bootMat = mat(yeti ? 0x2a2420 : 0x1e1a18, 0.5);
+    const skiMat = mat(gear.base, 0.25);
+    const skiAccent = mat(gear.accent, 0.25);
+    const poleMat = mat(gear.ink, 0.4, 0.3);
 
     // ── Hips / torso / head ──
     this.hips = new THREE.Group();
     this.hips.position.y = 0.9;
     this.root.add(this.hips);
 
+    // Lower "hip" capsule lives on the hips group so the waist reads through a torso fold.
+    const hipMesh = mesh(geo(new THREE.CapsuleGeometry(0.15, 0.16, 4, 12)), pants);
+    hipMesh.scale.set(1.35, 0.8, 1);
+    hipMesh.position.y = -0.02;
+    this.hips.add(hipMesh);
+
     const torsoPivot = new THREE.Group();
     this.hips.add(torsoPivot);
-    const torsoMesh = mesh(geo(new THREE.BoxGeometry(0.42, 0.56, 0.26)), jacket);
+    const torsoMesh = mesh(geo(new THREE.CapsuleGeometry(0.15, 0.34, 4, 12)), jacket);
+    torsoMesh.scale.set(1.4, 1, 0.85);
     torsoMesh.position.y = 0.3;
     torsoPivot.add(torsoMesh);
-    const collar = mesh(geo(new THREE.BoxGeometry(0.44, 0.08, 0.28)), trim);
+    // Scarf / collar ring hides the neck seam.
+    const collar = mesh(geo(new THREE.TorusGeometry(0.12, 0.045, 6, 14)), trim);
+    collar.rotation.x = Math.PI / 2;
     collar.position.y = 0.6;
     torsoPivot.add(collar);
-    const belt = mesh(geo(new THREE.BoxGeometry(0.44, 0.06, 0.28)), trim);
-    belt.position.y = 0.02;
-    torsoPivot.add(belt);
     this.torso = { pivot: torsoPivot, target: new THREE.Euler() };
 
     const headPivot = new THREE.Group();
     headPivot.position.y = 0.64;
     torsoPivot.add(headPivot);
-    const headMesh = mesh(geo(new THREE.BoxGeometry(0.24, 0.26, 0.24)), yeti ? jacket : skin);
-    headMesh.position.y = 0.14;
+    const headMesh = mesh(geo(new THREE.SphereGeometry(0.13, 14, 10)), yeti ? jacket : skin);
+    headMesh.scale.set(1, 0.92, 0.95);
+    headMesh.position.y = 0.13;
     headPivot.add(headMesh);
-    const helmet = mesh(geo(new THREE.BoxGeometry(0.27, 0.14, 0.27)), yeti ? trim : lens);
-    helmet.position.y = 0.24;
+    // Helmet dome: the upper hemisphere, slightly larger than the head.
+    const helmet = mesh(geo(new THREE.SphereGeometry(0.145, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.55)), helmetMat);
+    helmet.position.y = 0.135;
     headPivot.add(helmet);
-    const goggles = mesh(geo(new THREE.BoxGeometry(0.26, 0.08, 0.06)), lens);
-    goggles.position.set(0, 0.16, 0.14);
-    headPivot.add(goggles);
-    const band = mesh(geo(new THREE.BoxGeometry(0.27, 0.04, 0.27)), trim);
-    band.position.y = 0.16;
+    // Goggle band wraps the head; the lens is a flattened capsule on the face.
+    const band = mesh(geo(new THREE.TorusGeometry(0.135, 0.018, 5, 16)), trim);
+    band.rotation.x = Math.PI / 2;
+    band.position.y = 0.155;
     headPivot.add(band);
+    const goggles = mesh(geo(new THREE.CapsuleGeometry(0.038, 0.16, 3, 8)), lens);
+    goggles.rotation.z = Math.PI / 2;
+    goggles.scale.set(1, 1, 0.55);
+    goggles.position.set(0, 0.155, 0.125);
+    headPivot.add(goggles);
+    if (yeti) {
+      for (const side of [-1, 1]) {
+        const ear = mesh(geo(new THREE.SphereGeometry(0.04, 8, 6)), jacket);
+        ear.position.set(side * 0.13, 0.19, 0);
+        headPivot.add(ear);
+      }
+    }
     this.head = { pivot: headPivot, target: new THREE.Euler() };
 
     // ── Arms ──
     const buildArm = (side: -1 | 1): [Limb, Limb, Limb] => {
       const upper = new THREE.Group();
-      upper.position.set(side * 0.27, 0.54, 0);
+      upper.position.set(side * 0.24, 0.52, 0);
       torsoPivot.add(upper);
-      const upperMesh = mesh(geo(new THREE.BoxGeometry(0.12, 0.3, 0.12)), sleeves);
-      upperMesh.position.y = -0.15;
-      upper.add(upperMesh);
+      // Shoulder ball overlaps the torso so the joint never gaps.
+      const shoulder = mesh(geo(new THREE.SphereGeometry(0.075, 8, 6)), sleeves);
+      upper.add(shoulder);
+      upper.add(limbCapsule(0.062, 0.34, sleeves, 0.95));
 
       const fore = new THREE.Group();
       fore.position.y = -0.3;
       upper.add(fore);
-      const foreMesh = mesh(geo(new THREE.BoxGeometry(0.11, 0.28, 0.11)), sleeves);
-      foreMesh.position.y = -0.14;
-      fore.add(foreMesh);
-      const glove = mesh(geo(new THREE.BoxGeometry(0.12, 0.1, 0.12)), trim);
+      const elbow = mesh(geo(new THREE.SphereGeometry(0.06, 8, 6)), sleeves);
+      fore.add(elbow);
+      fore.add(limbCapsule(0.055, 0.32, sleeves, 0.9));
+      const glove = mesh(geo(new THREE.SphereGeometry(0.065, 8, 6)), trim);
+      glove.scale.set(1, 1.15, 1);
       glove.position.y = -0.31;
       fore.add(glove);
 
       const pole = new THREE.Group();
       pole.position.y = -0.31;
       fore.add(pole);
-      const shaft = mesh(geo(new THREE.CylinderGeometry(0.012, 0.012, 1.15, 5)), poleMat);
-      shaft.position.y = -0.45;
+      const grip = mesh(geo(new THREE.CylinderGeometry(0.018, 0.016, 0.12, 6)), trim);
+      grip.position.y = -0.02;
+      pole.add(grip);
+      const shaft = mesh(geo(new THREE.CylinderGeometry(0.009, 0.007, 1.1, 6)), poleMat);
+      shaft.position.y = -0.55;
       pole.add(shaft);
-      const basket = mesh(geo(new THREE.CylinderGeometry(0.05, 0.05, 0.02, 6)), skiAccent);
-      basket.position.y = -0.95;
+      const basket = mesh(geo(new THREE.TorusGeometry(0.045, 0.012, 4, 10)), skiAccent);
+      basket.rotation.x = Math.PI / 2;
+      basket.position.y = -0.93;
       pole.add(basket);
 
       return [
@@ -215,35 +252,45 @@ export class RiderMesh implements RenderModule {
       const thigh = new THREE.Group();
       thigh.position.set(side * 0.11, 0, 0);
       this.hips.add(thigh);
-      const thighMesh = mesh(geo(new THREE.BoxGeometry(0.16, 0.42, 0.18)), pants);
-      thighMesh.position.y = -0.21;
-      thigh.add(thighMesh);
+      const hipBall = mesh(geo(new THREE.SphereGeometry(0.085, 8, 6)), pants);
+      thigh.add(hipBall);
+      thigh.add(limbCapsule(0.082, 0.46, pants, 0.92));
 
       const shin = new THREE.Group();
       shin.position.y = -0.42;
       thigh.add(shin);
-      const shinMesh = mesh(geo(new THREE.BoxGeometry(0.14, 0.36, 0.16)), pants);
-      shinMesh.position.y = -0.18;
-      shin.add(shinMesh);
-      const boot = mesh(geo(new THREE.BoxGeometry(0.15, 0.16, 0.3)), bootMat);
+      const knee = mesh(geo(new THREE.SphereGeometry(0.075, 8, 6)), pants);
+      shin.add(knee);
+      shin.add(limbCapsule(0.07, 0.42, pants, 0.88));
+      // Boot: a capsule laid flat, toe forward.
+      const boot = mesh(geo(new THREE.CapsuleGeometry(0.075, 0.16, 4, 10)), bootMat);
+      boot.rotation.x = Math.PI / 2;
+      boot.scale.set(1, 1, 0.95);
       boot.position.set(0, -0.4, 0.04);
       shin.add(boot);
+      const cuff = mesh(geo(new THREE.TorusGeometry(0.075, 0.02, 4, 10)), trim);
+      cuff.rotation.x = Math.PI / 2;
+      cuff.position.set(0, -0.33, 0.02);
+      shin.add(cuff);
 
       const ski = new THREE.Group();
       ski.position.set(0, -0.48, 0.04);
       shin.add(ski);
-      const skiBody = mesh(geo(new THREE.BoxGeometry(0.1, 0.03, 1.5)), skiMat);
+      const skiBody = mesh(geo(new RoundedBoxGeometry(0.1, 0.035, 1.42, 1, 0.015)), skiMat);
       ski.add(skiBody);
-      const tip = mesh(geo(new THREE.BoxGeometry(0.1, 0.03, 0.24)), skiAccent);
-      tip.position.set(0, 0.03, 0.85);
-      tip.rotation.x = -0.28;
-      ski.add(tip);
-      const tail = mesh(geo(new THREE.BoxGeometry(0.1, 0.03, 0.12)), skiAccent);
-      tail.position.set(0, 0.01, -0.8);
-      tail.rotation.x = 0.12;
+      const tipSeg = new THREE.Group();
+      tipSeg.position.set(0, 0, 0.71);
+      tipSeg.rotation.x = -0.22;
+      ski.add(tipSeg);
+      const tip = mesh(geo(new RoundedBoxGeometry(0.1, 0.035, 0.32, 1, 0.015)), skiAccent);
+      tip.position.z = 0.15;
+      tipSeg.add(tip);
+      const tail = mesh(geo(new RoundedBoxGeometry(0.1, 0.035, 0.16, 1, 0.015)), skiAccent);
+      tail.position.set(0, 0.005, -0.78);
+      tail.rotation.x = 0.1;
       ski.add(tail);
-      const binding = mesh(geo(new THREE.BoxGeometry(0.11, 0.05, 0.3)), poleMat);
-      binding.position.y = 0.03;
+      const binding = mesh(geo(new RoundedBoxGeometry(0.11, 0.05, 0.28, 1, 0.012)), poleMat);
+      binding.position.y = 0.035;
       ski.add(binding);
 
       return [
@@ -523,10 +570,23 @@ export class RiderMesh implements RenderModule {
     else if (!s.onGround) this.airTargets(s);
     else this.groundTargets(s);
 
+    // Secondary motion: breathing while idle, torso counter-rotation against the carve,
+    // and the poles trailing the hands by a beat.
+    this.breath += dt;
+    const speedNow = Math.hypot(s.vx, s.vz);
+    const idle = s.onGround && !crashed && !onLift && (s.held || speedNow < 0.3);
+    const breathe = idle ? Math.sin((this.breath / 1.5) * Math.PI * 2) : 0;
+    if (!crashed && !onLift && s.onGround) {
+      this.torso.target.y += -s.edge * 0.22;
+      this.head.target.y += s.edge * 0.1;
+    }
+    this.torso.target.x += breathe * 0.015;
+
     const rate = crashed ? 14 : s.grab ? 9 : 12;
-    const limbs: Limb[] = [this.torso, this.head, ...this.upperArm, ...this.forearm, ...this.pole, ...this.thigh, ...this.shin, ...this.ski];
+    const limbs: Limb[] = [this.torso, this.head, ...this.upperArm, ...this.forearm, ...this.thigh, ...this.shin, ...this.ski];
     for (const limb of limbs) dampEuler(limb.pivot.rotation, limb.target, rate, dt);
-    this.hipsY = damp(this.hipsY, this.hipsYTarget, 10, dt);
+    for (let i = 0; i < 2; i++) dampEuler(this.pole[i].pivot.rotation, this.pole[i].target, rate * 0.55, dt);
+    this.hipsY = damp(this.hipsY, this.hipsYTarget + breathe * 0.01, 10, dt);
     this.hips.position.y = this.hipsY;
 
     // Root position.

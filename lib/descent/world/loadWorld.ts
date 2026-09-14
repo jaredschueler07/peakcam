@@ -19,12 +19,12 @@ import type { DecodedFarField } from "@/lib/game/terrain/far-field-format";
 import { RESORT_BAKE_CONFIGS } from "@/lib/game/terrain/resorts";
 import { liftSpeed } from "@/lib/game/core/lifts";
 import { pointAtArcLength, polylineLength } from "@/lib/game/terrain/real-course";
-import { mulberry32 } from "@/lib/game/core/rng";
 import type { RealRun } from "@/lib/game/core/types";
+import { plantForest } from "./forest";
 import type { DropInResortSlug } from "@/lib/game/config/schema";
 import {
   treeCellKey,
-  type ConditionsSnapshot, type Course, type CourseGate, type ResortGameProfile, type TreeSite, type World, type WorldLift,
+  type ConditionsSnapshot, type Course, type CourseGate, type ResortGameProfile, type World, type WorldLift,
 } from "../types";
 
 export interface LoadWorldOptions {
@@ -125,15 +125,15 @@ export function buildWorld(options: BuildWorldOptions): World {
   });
 
   report(0.9, "Planting the forest");
-  const random = mulberry32(seed ^ 0x5eed);
   const treeLineM = bake.treeLineElevationM;
-  const trees: TreeSite[] = [];
-  for (const site of terrain.treeSites ?? []) {
-    if (treeLineM > 0 && site.y > treeLineM) continue;
-    const variant = random();
-    const heightM = 5 + variant * 9;
-    trees.push({ x: site.x, y: site.y, z: site.z, radiusM: Math.max(0.35, Math.min(0.9, site.radiusM * 0.5)), heightM, variant });
-  }
+  const lakeEntry = landmarks?.lakes?.[slug];
+  const lakes = lakeEntry
+    ? [{ name: lakeEntry.name, elevationM: lakeEntry.elevationM, outer: lakeEntry.outer.map(([x, y]) => ({ x, z: -y })) }]
+    : [];
+  const trees = plantForest({
+    field: terrain.field, halfSizeM: terrain.field.sizeM / 2, forests: terrain.trails.forests,
+    runs: terrain.runs, lifts: terrain.lifts, lakes, treeLineM, seed,
+  });
   const treeCells = new Map<number, number[]>();
   for (let i = 0; i < trees.length; i++) {
     const key = treeCellKey(Math.floor(trees[i].x / TREE_CELL_M), Math.floor(trees[i].z / TREE_CELL_M));
@@ -141,11 +141,6 @@ export function buildWorld(options: BuildWorldOptions): World {
     if (!list) { list = []; treeCells.set(key, list); }
     list.push(i);
   }
-
-  const lakeEntry = landmarks?.lakes?.[slug];
-  const lakes = lakeEntry
-    ? [{ name: lakeEntry.name, elevationM: lakeEntry.elevationM, outer: lakeEntry.outer.map(([x, y]) => ({ x, z: -y })) }]
-    : [];
 
   return {
     profile,

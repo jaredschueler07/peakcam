@@ -1,23 +1,30 @@
 /**
  * lib/descent/render/Trees.ts
  * ───────────────────────────
- * The forest: one low-poly conifer geometry (trunk + three stacked cones with
- * snow-capped upper faces, all vertex-coloured) drawn once as an
- * `InstancedMesh` over every `TreeSite`, plus a scattering of rocks on the
- * steep ground above the tree line. Two draw calls, nothing per frame.
+ * The forest at scale. `world.trees` may hold ~150k sites, so they are tiled
+ * into 512 m cells and every tile owns two `InstancedMesh`es sharing two
+ * geometries: a **near** conifer (trunk + three snow-capped tiers) and a
+ * **far** impostor (a six-sided cone on a stub trunk, 16 triangles). Per
+ * frame the only work is flipping `.visible` / `.castShadow` per tile by
+ * distance to the camera; nothing is rebuilt. Rocks above the tree line are a
+ * single extra instanced mesh.
  */
 
 import * as THREE from "three";
 import { mulberry32 } from "@/lib/game/core/rng";
-import { createNearestRun } from "@/lib/game/terrain/real-heightfield";
-import type { World } from "../types";
+import type { TreeSite, World } from "../types";
 import type { RenderFrame, RenderModule } from "./frame";
 
 const ROCK_COUNT = 200;
-const MAX_TREE_INSTANCES = 20_000;
+const ROCK_MIN_GRADE = 0.9;
 /** Canopy width as a fraction of tree height: a 10 m tree is ~4 m across. */
 const WIDTH_PER_HEIGHT = 0.42;
-const ROCK_MIN_GRADE = 0.9;
+export const TREE_TILE_M = 512;
+/** Tiles closer than this (to their centre) draw the detailed conifer. */
+export const NEAR_DISTANCE_M = 650;
+export const NEAR_DISTANCE_LOW_M = 450;
+/** Only tiles this close cast shadows. */
+export const SHADOW_DISTANCE_M = 260;
 
 /** Push one triangle with a flat colour. */
 function tri(
@@ -29,19 +36,26 @@ function tri(
   for (let i = 0; i < 3; i++) colors.push(color.r, color.g, color.b);
 }
 
+function finish(positions: number[], colors: number[]): THREE.BufferGeometry {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 /**
  * A unit-height conifer, apex at y = 1, base at y = 0. Sides carry the cone
  * tier colour; the upper faces of each tier (the "shelf" where the tier
  * meets the one above) carry the snow-cap colour.
  */
-function buildTreeGeometry(cone: readonly [number, number, number], trunk: number, cap: number): THREE.BufferGeometry {
+function buildNearGeometry(cone: readonly [number, number, number], trunk: number, cap: number): THREE.BufferGeometry {
   const positions: number[] = [];
   const colors: number[] = [];
   const trunkColor = new THREE.Color(trunk);
   const capColor = new THREE.Color(cap);
   const segments = 6;
 
-  // Trunk: a hexagonal prism from 0 to 0.28.
   const trunkR = 0.08, trunkTop = 0.3;
   for (let i = 0; i < segments; i++) {
     const a0 = (i / segments) * Math.PI * 2, a1 = ((i + 1) / segments) * Math.PI * 2;
@@ -51,8 +65,6 @@ function buildTreeGeometry(cone: readonly [number, number, number], trunk: numbe
     tri(positions, colors, x0, 0, z0, x1, trunkTop, z1, x0, trunkTop, z0, trunkColor);
   }
 
-  // Three tiers, widest at the bottom. Each tier is a cone whose base sits
-  // slightly below the previous tier's top so they overlap.
   const tiers: Array<{ base: number; top: number; radius: number; color: THREE.Color }> = [
     { base: 0.2, top: 0.55, radius: 0.48, color: new THREE.Color(cone[0]) },
     { base: 0.42, top: 0.8, radius: 0.36, color: new THREE.Color(cone[1]) },
@@ -65,89 +77,133 @@ function buildTreeGeometry(cone: readonly [number, number, number], trunk: numbe
       const a0 = (i / segments) * Math.PI * 2, a1 = ((i + 1) / segments) * Math.PI * 2;
       const x0 = Math.cos(a0), z0 = Math.sin(a0);
       const x1 = Math.cos(a1), z1 = Math.sin(a1);
-      // Side face: base ring → apex.
       tri(positions, colors,
         x0 * tier.radius, tier.base, z0 * tier.radius,
         x1 * tier.radius, tier.base, z1 * tier.radius,
         0, tier.top, 0, tier.color);
-      // Snow cap: a shallow upward-facing ring just above the base, sitting on the branches.
       tri(positions, colors,
         x1 * shelfR, shelf, z1 * shelfR,
         x0 * shelfR, shelf, z0 * shelfR,
         0, shelf + (tier.top - shelf) * 0.55, 0, capColor);
     }
   }
+  return finish(positions, colors);
+}
 
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
-  geometry.computeVertexNormals();
-  return geometry;
+/** The distant impostor: a six-sided cone on a four-sided stub trunk (16 triangles). */
+function buildFarGeometry(cone: readonly [number, number, number], trunk: number): THREE.BufferGeometry {
+  const positions: number[] = [];
+  const colors: number[] = [];
+  const trunkColor = new THREE.Color(trunk);
+  const coneColor = new THREE.Color(cone[1]);
+  const trunkR = 0.07, trunkTop = 0.22;
+  for (let i = 0; i < 4; i++) {
+    const a0 = (i / 4) * Math.PI * 2, a1 = ((i + 1) / 4) * Math.PI * 2;
+    const x0 = Math.cos(a0) * trunkR, z0 = Math.sin(a0) * trunkR;
+    const x1 = Math.cos(a1) * trunkR, z1 = Math.sin(a1) * trunkR;
+    tri(positions, colors, x0, 0, z0, x1, 0, z1, x1, trunkTop, z1, trunkColor);
+    tri(positions, colors, x0, 0, z0, x1, trunkTop, z1, x0, trunkTop, z0, trunkColor);
+  }
+  const base = 0.18, radius = 0.42;
+  for (let i = 0; i < 6; i++) {
+    const a0 = (i / 6) * Math.PI * 2, a1 = ((i + 1) / 6) * Math.PI * 2;
+    tri(positions, colors,
+      Math.cos(a0) * radius, base, Math.sin(a0) * radius,
+      Math.cos(a1) * radius, base, Math.sin(a1) * radius,
+      0, 1, 0, coneColor);
+  }
+  // Underside disc so the cone is closed when seen from below on a ridge.
+  for (let i = 0; i < 2; i++) {
+    const a0 = (i * 3 / 6) * Math.PI * 2, a1 = ((i * 3 + 1) / 6) * Math.PI * 2, a2 = ((i * 3 + 2) / 6) * Math.PI * 2;
+    tri(positions, colors,
+      Math.cos(a0) * radius, base, Math.sin(a0) * radius,
+      Math.cos(a2) * radius, base, Math.sin(a2) * radius,
+      Math.cos(a1) * radius, base, Math.sin(a1) * radius, coneColor);
+  }
+  return finish(positions, colors);
+}
+
+interface Tile {
+  cx: number;
+  cy: number;
+  cz: number;
+  near: THREE.InstancedMesh;
+  far: THREE.InstancedMesh;
+}
+
+function fillInstances(mesh: THREE.InstancedMesh, trees: readonly TreeSite[]): void {
+  const dummy = new THREE.Object3D();
+  const bounds = new THREE.Box3();
+  const point = new THREE.Vector3();
+  for (let i = 0; i < trees.length; i++) {
+    const tree = trees[i];
+    const height = tree.heightM;
+    const width = height * WIDTH_PER_HEIGHT * (0.9 + tree.variant * 0.25);
+    dummy.position.set(tree.x, tree.y - 0.2, tree.z);
+    dummy.rotation.set((tree.variant - 0.5) * 0.06, tree.variant * Math.PI * 2, ((tree.variant * 7.3) % 1 - 0.5) * 0.06);
+    dummy.scale.set(width, height, width);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+    bounds.expandByPoint(point.set(tree.x - width, tree.y, tree.z - width));
+    bounds.expandByPoint(point.set(tree.x + width, tree.y + height, tree.z + width));
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  const sphere = new THREE.Sphere();
+  bounds.getBoundingSphere(sphere);
+  mesh.boundingSphere = sphere;
+  mesh.boundingBox = bounds;
+  mesh.frustumCulled = true;
 }
 
 export class Trees implements RenderModule {
-  private readonly meshes: THREE.Mesh[] = [];
-  private readonly geometries: THREE.BufferGeometry[] = [];
-  private readonly materials: THREE.Material[] = [];
+  private readonly group = new THREE.Group();
+  private readonly tiles: Tile[] = [];
+  private readonly disposables: Array<{ dispose(): void }> = [];
+  /** Total instanced trees, for diagnostics. */
+  readonly treeCount: number;
 
   constructor(private readonly scene: THREE.Scene, world: World) {
-    this.buildTrees(world);
+    this.treeCount = world.trees.length;
+    this.buildTiles(world);
     this.buildRocks(world);
+    this.scene.add(this.group);
   }
 
-  private buildTrees(world: World): void {
+  get tileCount(): number { return this.tiles.length; }
+
+  private buildTiles(world: World): void {
     const sites = world.trees;
     if (sites.length === 0) return;
-    // Densify: one companion tree beside every mapped site, unless it would
-    // land on a run. The sites are inside mapped forests, so this doubles the
-    // canopy without inventing forest where the survey has none.
-    const random = mulberry32(world.seed ^ 0x7ee5);
-    const nearest = createNearestRun();
-    const trees = sites.slice();
-    for (let i = 0; i < sites.length && trees.length < MAX_TREE_INSTANCES; i++) {
-      const site = sites[i];
-      const angle = random() * Math.PI * 2, distance = 2 + random() * 3;
-      const x = site.x + Math.cos(angle) * distance, z = site.z + Math.sin(angle) * distance;
-      const hit = world.terrain.nearestRun(x, z, nearest);
-      if (hit.run && hit.d < hit.run.halfWidthM + 1.5) continue;
-      const variant = random();
-      trees.push({ x, y: world.terrain.height(x, z), z, radiusM: site.radiusM, heightM: 4.5 + variant * 8.5, variant });
-    }
-
     const forest = world.profile.forest;
-    const geometry = buildTreeGeometry(forest.cone, forest.trunk, forest.cap);
+    const nearGeometry = buildNearGeometry(forest.cone, forest.trunk, forest.cap);
+    const farGeometry = buildFarGeometry(forest.cone, forest.trunk);
     // `color` stays white: vertex colours are multiplied by it.
     const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-    const mesh = new THREE.InstancedMesh(geometry, material, trees.length);
-    mesh.castShadow = true;
-    mesh.receiveShadow = false;
+    this.disposables.push(nearGeometry, farGeometry, material);
 
-    const dummy = new THREE.Object3D();
-    const bounds = new THREE.Box3();
-    const point = new THREE.Vector3();
-    for (let i = 0; i < trees.length; i++) {
-      const tree = trees[i];
-      const height = tree.heightM;
-      const width = height * WIDTH_PER_HEIGHT * (0.9 + tree.variant * 0.25);
-      dummy.position.set(tree.x, tree.y - 0.2, tree.z);
-      dummy.rotation.set((tree.variant - 0.5) * 0.06, tree.variant * Math.PI * 2, ((tree.variant * 7.3) % 1 - 0.5) * 0.06);
-      dummy.scale.set(width, height, width);
-      dummy.updateMatrix();
-      mesh.setMatrixAt(i, dummy.matrix);
-      bounds.expandByPoint(point.set(tree.x, tree.y, tree.z));
-      bounds.expandByPoint(point.set(tree.x, tree.y + height, tree.z));
+    const buckets = new Map<string, TreeSite[]>();
+    for (const site of sites) {
+      const key = `${Math.floor(site.x / TREE_TILE_M)},${Math.floor(site.z / TREE_TILE_M)}`;
+      let list = buckets.get(key);
+      if (!list) { list = []; buckets.set(key, list); }
+      list.push(site);
     }
-    mesh.instanceMatrix.needsUpdate = true;
-    const sphere = new THREE.Sphere();
-    bounds.getBoundingSphere(sphere);
-    mesh.boundingSphere = sphere;
-    mesh.boundingBox = bounds;
-    mesh.frustumCulled = true;
 
-    this.scene.add(mesh);
-    this.meshes.push(mesh);
-    this.geometries.push(geometry);
-    this.materials.push(material);
+    for (const trees of buckets.values()) {
+      const near = new THREE.InstancedMesh(nearGeometry, material, trees.length);
+      const far = new THREE.InstancedMesh(farGeometry, material, trees.length);
+      fillInstances(near, trees);
+      fillInstances(far, trees);
+      near.castShadow = false;
+      near.receiveShadow = false;
+      far.castShadow = false;
+      far.receiveShadow = false;
+      near.visible = false;
+      far.visible = true;
+      const centre = near.boundingSphere!.center;
+      this.tiles.push({ cx: centre.x, cy: centre.y, cz: centre.z, near, far });
+      this.group.add(near, far);
+    }
   }
 
   private buildRocks(world: World): void {
@@ -155,7 +211,6 @@ export class Trees implements RenderModule {
     const normal = { x: 0, y: 1, z: 0 };
     const half = world.halfSizeM * 0.9;
     const placed: Array<{ x: number; y: number; z: number; s: number; r: number }> = [];
-    // Bounded search so a resort with no steep ground doesn't spin.
     for (let attempt = 0; attempt < ROCK_COUNT * 12 && placed.length < ROCK_COUNT; attempt++) {
       const x = (random() * 2 - 1) * half, z = (random() * 2 - 1) * half;
       const y = world.terrain.height(x, z);
@@ -189,23 +244,31 @@ export class Trees implements RenderModule {
     bounds.getBoundingSphere(sphere);
     mesh.boundingSphere = sphere;
     mesh.boundingBox = bounds;
-
-    this.scene.add(mesh);
-    this.meshes.push(mesh);
-    this.geometries.push(geometry);
-    this.materials.push(material);
+    this.group.add(mesh);
+    this.disposables.push(geometry, material);
   }
 
-  update(_frame: RenderFrame): void {
-    // Static: the forest never moves.
+  update(frame: RenderFrame): void {
+    const cam = frame.camera.position;
+    const nearLimit = frame.quality === 2 ? NEAR_DISTANCE_LOW_M : NEAR_DISTANCE_M;
+    const nearSq = nearLimit * nearLimit;
+    const shadowSq = SHADOW_DISTANCE_M * SHADOW_DISTANCE_M;
+    for (let i = 0; i < this.tiles.length; i++) {
+      const tile = this.tiles[i];
+      const dx = cam.x - tile.cx, dy = cam.y - tile.cy, dz = cam.z - tile.cz;
+      const distSq = dx * dx + dy * dy + dz * dz;
+      const near = distSq <= nearSq;
+      tile.near.visible = near;
+      tile.far.visible = !near;
+      tile.near.castShadow = near && distSq <= shadowSq;
+    }
   }
 
   dispose(): void {
-    for (const mesh of this.meshes) this.scene.remove(mesh);
-    for (const geometry of this.geometries) geometry.dispose();
-    for (const material of this.materials) material.dispose();
-    this.meshes.length = 0;
-    this.geometries.length = 0;
-    this.materials.length = 0;
+    this.scene.remove(this.group);
+    this.group.clear();
+    for (const item of this.disposables) item.dispose();
+    this.disposables.length = 0;
+    this.tiles.length = 0;
   }
 }

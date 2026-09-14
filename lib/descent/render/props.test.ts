@@ -8,6 +8,7 @@ import { Trees } from "./Trees";
 import { Lifts } from "./Lifts";
 import { Signs } from "./Signs";
 import { Lake } from "./Lake";
+import { Lanes } from "./Lanes";
 
 /** A gentle south-facing slope: z grows → elevation falls. */
 function height(x: number, z: number): number {
@@ -62,7 +63,12 @@ function stubWorld(): World {
     out.i = 0; out.run = run; out.d = Math.hypot(x - 5, 0); out.x = 5; out.z = z; out.on = out.d <= run.halfWidthM;
     return out;
   };
-  const terrain = { height, normal, nearestRun } as unknown as World["terrain"];
+  const drapedRuns = [
+    { id: run.id, name: run.name, difficulty: "expert", points: runPoints, halfWidthM: 12 },
+    { id: "osm:way:2:0", name: "Cat Track", difficulty: "easy", points: [{ x: 60, y: height(60, -150), z: -150 }, { x: 80, y: height(80, -80), z: -80 }], halfWidthM: 30 },
+    { id: "osm:way:3:0", name: "Stub", difficulty: null, points: [{ x: 0, y: 0, z: 0 }], halfWidthM: 8 },
+  ];
+  const terrain = { height, normal, nearestRun, runs: drapedRuns } as unknown as World["terrain"];
   const profile = {
     slug: "breckenridge", accent: "#3d7fd6", accent2: "#ffd166",
     forest: { treeline: 0.4, rockBias: 0.1, rockKeep: 0.5, treeScale: 1, trunk: 0x4a3628, cone: [0x1d3c28, 0x244a30, 0x2e5a3a], cap: 0xdfeaf5 },
@@ -99,16 +105,30 @@ function frame(world: World, overrides: Partial<RenderFrame> = {}): RenderFrame 
   };
 }
 
-test("Trees instances every site and adds rocks above the tree line", () => {
-  const world = stubWorld();
+test("Trees tiles sites into near/far instanced pairs and switches by camera distance", () => {
+  const base = stubWorld();
+  // Sites at x = -30, 30 and 700 fall into three different 512 m tiles.
+  const world: World = { ...base, trees: [...base.trees, { x: 700, y: height(700, -50), z: -50, radiusM: 0.5, heightM: 16, variant: 0.5 }] };
   const scene = new THREE.Scene();
   const trees = new Trees(scene, world);
-  const instanced = scene.children.filter((c) => c instanceof THREE.InstancedMesh) as THREE.InstancedMesh[];
-  assert.ok(instanced.length >= 1 && instanced.length <= 3);
-  // Every site plus up to one companion each.
-  assert.ok(instanced[0].count >= 2 && instanced[0].count <= 4);
-  assert.ok(instanced[0].boundingSphere && instanced[0].boundingSphere.radius > 0);
-  trees.update(frame(world));
+  assert.strictEqual(trees.treeCount, 3);
+  assert.strictEqual(trees.tileCount, 3);
+  const group = scene.children[0] as THREE.Group;
+  const instanced = group.children.filter((c) => c instanceof THREE.InstancedMesh) as THREE.InstancedMesh[];
+  assert.strictEqual(instanced.length, 6, "three tiles × near+far, no rocks on the gentle stub slope");
+  for (const mesh of instanced) assert.ok(mesh.boundingSphere && mesh.boundingSphere.radius > 0);
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, height(0, -50), -50);
+  trees.update(frame(world, { camera }));
+  const near = instanced.filter((m) => m.visible && m.geometry.getAttribute("position").count > 60);
+  const far = instanced.filter((m) => m.visible && m.geometry.getAttribute("position").count <= 60);
+  assert.strictEqual(near.length, 2, "the two tiles around the camera draw the detailed conifer");
+  assert.strictEqual(far.length, 1, "the distant tile draws the impostor");
+  assert.ok(near.every((m) => m.castShadow), "close tiles cast shadows");
+  camera.position.set(0, height(0, -50) + 2000, -50);
+  trees.update(frame(world, { camera }));
+  assert.ok(instanced.every((m) => !m.visible || m.geometry.getAttribute("position").count <= 60), "far from everything: impostors only");
+  assert.ok(instanced.every((m) => !m.castShadow));
   trees.dispose();
   assert.strictEqual(scene.children.length, 0);
 });
@@ -117,8 +137,9 @@ test("Trees creates nothing for a treeless resort", () => {
   const world = { ...stubWorld(), trees: [], treeLineM: 0 };
   const scene = new THREE.Scene();
   const trees = new Trees(scene, world);
+  assert.strictEqual(trees.tileCount, 0);
   // Rocks are the only possible child, and the gentle stub slope has no steep ground.
-  assert.strictEqual(scene.children.filter((c) => c instanceof THREE.InstancedMesh && c.count === 0).length, 0);
+  assert.strictEqual((scene.children[0] as THREE.Group).children.length, 0);
   trees.dispose();
 });
 
@@ -181,5 +202,31 @@ test("Lake lays the outline flat just above the water level", () => {
   assert.ok(Math.abs(box.min.z - 300) < 1e-6 && Math.abs(box.max.z - 450) < 1e-6, "shape y maps to world z");
   lake.update(frame(world));
   lake.dispose();
+  assert.strictEqual(scene.children.length, 0);
+});
+
+test("Lanes merges every named run into one ribbon mesh and boosts the selected course", () => {
+  const world = stubWorld();
+  const scene = new THREE.Scene();
+  const lanes = new Lanes(scene, world);
+  const mesh = scene.children[0] as THREE.Mesh;
+  assert.ok(mesh instanceof THREE.Mesh);
+  const geometry = mesh.geometry;
+  const alpha = geometry.getAttribute("alpha") as THREE.BufferAttribute;
+  const position = geometry.getAttribute("position");
+  assert.strictEqual(alpha.count, position.count);
+  assert.strictEqual(position.count % 3, 0, "three vertices per sample");
+  assert.ok(geometry.getIndex()!.count > 0);
+  // Centre vertices carry the run opacity, edges are transparent.
+  const before = alpha.getX(1);
+  assert.ok(Math.abs(before - 0.16) < 1e-6, "expert run centreline is 0.16 before selection");
+  assert.strictEqual(alpha.getX(0), 0);
+  lanes.update(frame(world));
+  assert.ok(alpha.getX(1) > before, "selected course is boosted");
+  const material = mesh.material as THREE.ShaderMaterial;
+  assert.strictEqual(material.transparent, true);
+  assert.strictEqual(material.depthWrite, false);
+  assert.strictEqual(material.fog, true);
+  lanes.dispose();
   assert.strictEqual(scene.children.length, 0);
 });

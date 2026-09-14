@@ -13,6 +13,7 @@ import type { RenderFrame, RenderModule } from "./frame";
 import { ChaseCamera } from "./Camera";
 import { FarField } from "./FarField";
 import { Lake } from "./Lake";
+import { Lanes } from "./Lanes";
 import { Lifts } from "./Lifts";
 import { Particles } from "./Particles";
 import { RiderMesh, type GhostPose } from "./RiderMesh";
@@ -75,10 +76,11 @@ export class Renderer {
     const lifts = new Lifts(this.scene, world);
     const signs = new Signs(this.scene, world);
     const lake = new Lake(this.scene, world);
+    const lanes = new Lanes(this.scene, world);
     this.tracks = new Tracks(this.scene, world);
     this.particles = new Particles(this.scene, world);
     this.rider = new RiderMesh(this.scene, world, options.riderStyle);
-    this.modules.push(this.sky, this.terrain, farField, trees, lifts, lake, signs, this.tracks, this.rider, this.particles);
+    this.modules.push(this.sky, this.terrain, farField, trees, lifts, lake, lanes, signs, this.tracks, this.rider, this.particles);
 
     if (this.forceLow) this.setQuality(2);
     if (typeof ResizeObserver !== "undefined") {
