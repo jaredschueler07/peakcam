@@ -1,6 +1,11 @@
 import { expect, test } from "@playwright/test";
 import type { DropInDebugApi } from "../../lib/game/runtime/e2e-debug";
 
+test.skip(
+  process.env.NEXT_PUBLIC_DROP_IN_ENABLED !== "true",
+  "Drop In is parked (2026-09-17). Build and run with NEXT_PUBLIC_DROP_IN_ENABLED=true to exercise the game specs.",
+);
+
 test("snow selection reaches the real solver, and snowboard ollies and grabs respond to hold/release", async ({ page }) => {
   for (const surface of ["powder", "packed", "ice", "slush"]) {
     await page.goto("/resorts/heavenly/drop-in?gfx=webgl&e2edebug=1");

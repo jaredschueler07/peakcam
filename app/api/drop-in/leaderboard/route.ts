@@ -7,6 +7,7 @@
 //
 // The logic lives in lib/game/server/handlers/leaderboard.ts.
 
+import { dropInDisabledResponse, isDropInEnabled } from "@/lib/drop-in";
 import type { NextRequest } from "next/server";
 
 import { handleGetLeaderboard } from "@/lib/game/server/handlers/leaderboard";
@@ -17,6 +18,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest): Promise<Response> {
+  if (!isDropInEnabled()) return dropInDisabledResponse();
   return handleGetLeaderboard(request, {
     reader: leaderboardReader,
     currentUserId,

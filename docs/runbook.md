@@ -182,3 +182,11 @@ tail -f ~/peakcam/peakcam/agents/loop.log \
        ~/peakcam/peakcam/scripts/snotel-sync.log \
        ~/peakcam/peakcam/logs/pipeline.log
 ```
+
+## Drop In (arcade game) — parked
+
+Drop In was gated out of production on 2026-09-17 so the core cam/snow product gets focus. The code stays in the tree; `lib/drop-in.ts` reads `NEXT_PUBLIC_DROP_IN_ENABLED` and, while it is not `"true"`, hides the nav item, resort/map buttons, sitemap entry and 404 link, and 404s `/drop-in`, `/resorts/{slug}/drop-in` and every `/api/drop-in/*` route.
+
+- **Re-enable:** set `NEXT_PUBLIC_DROP_IN_ENABLED=true` in the Vercel environment (it is inlined at build time, so redeploy).
+- **Snapshot of the game before parking:** branch `archive/drop-in-2026-09-17`, tag `drop-in-archive-2026-09-17`. The unmerged v3 engine lives on `feat/drop-in-v3-skisim`.
+- **Game e2e specs** skip themselves unless the flag is set.

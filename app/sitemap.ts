@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { getResortSitemapEntries } from "@/lib/supabase";
 import { SITE_URL } from "@/lib/site";
+import { isDropInEnabled } from "@/lib/drop-in";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Let a listing failure throw rather than silently emitting a sitemap with
@@ -29,7 +30,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // The Drop In hub only. The three playable routes
     // (/resorts/{slug}/drop-in) are deliberately `robots: { index: false }`, and
     // a sitemap of noindex URLs is a contradiction — the hub links to them.
-    { url: `${SITE_URL}/drop-in`, lastModified: buildTime, changeFrequency: "monthly", priority: 0.5 },
+    ...(isDropInEnabled()
+      ? [{ url: `${SITE_URL}/drop-in`, lastModified: buildTime, changeFrequency: "monthly" as const, priority: 0.5 }]
+      : []),
     { url: `${SITE_URL}/about`, lastModified: buildTime, changeFrequency: "monthly", priority: 0.4 },
     { url: `${SITE_URL}/methodology`, lastModified: buildTime, changeFrequency: "monthly", priority: 0.5 },
     ...resortEntries,

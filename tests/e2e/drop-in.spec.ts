@@ -4,6 +4,11 @@ import portilloCourses from "../../public/game/terrain/ski-portillo.network.json
 import heavenlyCourses from "../../public/game/terrain/heavenly.network.json";
 import { GHOST_SAMPLE_HZ } from "../../lib/game/replay/recorder";
 
+test.skip(
+  process.env.NEXT_PUBLIC_DROP_IN_ENABLED !== "true",
+  "Drop In is parked (2026-09-17). Build and run with NEXT_PUBLIC_DROP_IN_ENABLED=true to exercise the game specs.",
+);
+
 const V2_URL = "/resorts/heavenly/drop-in";
 
 /**

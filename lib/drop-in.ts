@@ -14,6 +14,22 @@ export interface DropInProfile {
   trailNames: readonly string[];
 }
 
+/**
+ * Production kill switch. Drop In is parked while the core product gets
+ * focus (2026-09-17); the game code stays in the tree so the v3 engine branch
+ * can keep merging cleanly. Set NEXT_PUBLIC_DROP_IN_ENABLED=true to bring back
+ * every entry point (nav, resort/map buttons, hub, game pages, API routes,
+ * sitemap) in one flip. Read at call time so tests can toggle it.
+ */
+export function isDropInEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_DROP_IN_ENABLED === "true";
+}
+
+/** Uniform 404 for the Drop In API routes while the feature is parked. */
+export function dropInDisabledResponse(): Response {
+  return Response.json({ error: "Drop In is not available" }, { status: 404 });
+}
+
 /** The pilot roster. Order is intentional — Portillo shipped first. */
 export const DROP_IN_RESORT_SLUGS: readonly DropInResortSlug[] = [
   "ski-portillo",
@@ -45,6 +61,7 @@ export { DROP_IN_GAME_PROFILES } from "./game/config/profiles";
 export type { DropInResortSlug, ResortGameProfile } from "./game/config/schema";
 
 export function getDropInProfile(slug: string): DropInProfile | null {
+  if (!isDropInEnabled()) return null;
   return Object.prototype.hasOwnProperty.call(PROFILES, slug)
     ? PROFILES[slug as DropInResortSlug]
     : null;
@@ -56,6 +73,7 @@ export function getDropInProfile(slug: string): DropInProfile | null {
  * mountain the engine doesn't have — it is derived, never hand-listed.
  */
 export function getDropInRoster(): DropInProfile[] {
+  if (!isDropInEnabled()) return [];
   return DROP_IN_RESORT_SLUGS.map((slug) => PROFILES[slug]).filter(Boolean);
 }
 

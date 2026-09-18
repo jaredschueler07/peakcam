@@ -8,6 +8,7 @@
 // The logic lives in lib/game/server/handlers/runs.ts; this file supplies the
 // production dependencies.
 
+import { dropInDisabledResponse, isDropInEnabled } from "@/lib/drop-in";
 import type { NextRequest } from "next/server";
 
 import { handleSubmitRun } from "@/lib/game/server/handlers/runs";
@@ -23,6 +24,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest): Promise<Response> {
+  if (!isDropInEnabled()) return dropInDisabledResponse();
   return handleSubmitRun(request, {
     keyring: ticketKeyring,
     currentUserId,
