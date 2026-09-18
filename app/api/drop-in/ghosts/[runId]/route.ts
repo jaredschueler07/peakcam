@@ -6,6 +6,7 @@
 //
 // The logic lives in lib/game/server/handlers/ghosts.ts.
 
+import { dropInDisabledResponse, isDropInEnabled } from "@/lib/drop-in";
 import type { NextRequest } from "next/server";
 
 import { handleGetGhost } from "@/lib/game/server/handlers/ghosts";
@@ -17,6 +18,7 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ runId: string }> },
 ): Promise<Response> {
+  if (!isDropInEnabled()) return dropInDisabledResponse();
   const { runId } = await context.params;
   return handleGetGhost(request, runId, { reader: leaderboardReader });
 }

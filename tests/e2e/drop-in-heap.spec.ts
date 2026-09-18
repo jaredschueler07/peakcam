@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
 
+test.skip(
+  process.env.NEXT_PUBLIC_DROP_IN_ENABLED !== "true",
+  "Drop In is parked (2026-09-17). Build and run with NEXT_PUBLIC_DROP_IN_ENABLED=true to exercise the game specs.",
+);
+
 /**
  * Zero-allocation frame path guard (P11 Task 8).
  *

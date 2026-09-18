@@ -2,6 +2,11 @@ import { expect, test } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
+test.skip(
+  process.env.NEXT_PUBLIC_DROP_IN_ENABLED !== "true",
+  "Drop In is parked (2026-09-17). Build and run with NEXT_PUBLIC_DROP_IN_ENABLED=true to exercise the game specs.",
+);
+
 test("rider locker previews, persists separate gear, and returns from gameplay", async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));

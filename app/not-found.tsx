@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Compass, Map, Snowflake, Columns2, Mountain } from "lucide-react";
 import { POPULAR_RESORTS } from "@/lib/popular-resorts";
+import { isDropInEnabled } from "@/lib/drop-in";
 
 /**
  * Global 404.
@@ -25,7 +26,9 @@ const DESTINATIONS = [
   { href: "/map", label: "Map", hint: "Conditions by geography", icon: Map },
   { href: "/snow-report", label: "Snow report", hint: "Base depth & fresh snow", icon: Snowflake },
   { href: "/compare", label: "Compare", hint: "Two mountains, side by side", icon: Columns2 },
-  { href: "/drop-in", label: "Drop In", hint: "Arcade ski descent (beta)", icon: Mountain },
+  ...(isDropInEnabled()
+    ? [{ href: "/drop-in", label: "Drop In", hint: "Arcade ski descent (beta)", icon: Mountain }]
+    : []),
 ];
 
 export default function NotFound() {

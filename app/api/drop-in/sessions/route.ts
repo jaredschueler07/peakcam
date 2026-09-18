@@ -9,6 +9,7 @@
 // tested without mocking Next module resolution; this file is the adapter that
 // supplies the production dependencies.
 
+import { dropInDisabledResponse, isDropInEnabled } from "@/lib/drop-in";
 import { dailyMorningConditions } from "@/lib/game/server/morning-snapshot";
 import type { NextRequest } from "next/server";
 
@@ -24,6 +25,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest): Promise<Response> {
+  if (!isDropInEnabled()) return dropInDisabledResponse();
   return handleCreateSession(request, {
     keyring: ticketKeyring,
     dailyConditions: dailyMorningConditions,

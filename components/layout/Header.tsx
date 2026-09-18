@@ -7,6 +7,7 @@ import { useState, useRef, useEffect } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import type { User } from "@supabase/supabase-js";
 import { Menu, X, Search } from "lucide-react";
+import { isDropInEnabled } from "@/lib/drop-in";
 
 interface HeaderProps {
   onSearch?: (query: string) => void;
@@ -19,7 +20,7 @@ export const navLinks = [
   { label: "Map",         href: "/map" },
   { label: "Compare",     href: "/compare" },
   { label: "Snow Report", href: "/snow-report" },
-  { label: "Drop In",     href: "/drop-in" },
+  ...(isDropInEnabled() ? [{ label: "Drop In", href: "/drop-in" }] : []),
   { label: "Favorites",   href: "/favorites", authOnly: true },
   { label: "My Peak",     href: "/dashboard", authOnly: true },
   { label: "About",       href: "/about" },

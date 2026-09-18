@@ -4,7 +4,8 @@ import { Gamepad2, MountainSnow, Timer } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { PeakFooter } from "@/components/home/PeakFooter";
 import DropInRoster, { dropInResortCount } from "@/components/drop-in/DropInRoster";
-import { getDropInRoster } from "@/lib/drop-in";
+import { notFound } from "next/navigation";
+import { getDropInRoster, isDropInEnabled } from "@/lib/drop-in";
 
 import { SITE_URL as BASE_URL } from "@/lib/site";
 const PAGE_URL = `${BASE_URL}/drop-in`;
@@ -53,7 +54,7 @@ export const metadata: Metadata = {
   },
   // The playable routes are noindex (a canvas is not a search result); this hub
   // is the indexable front door for all of them.
-  robots: { index: true, follow: true },
+  robots: { index: isDropInEnabled(), follow: true },
 };
 
 const HOW_IT_WORKS = [
@@ -78,6 +79,7 @@ const HOW_IT_WORKS = [
 ];
 
 export default function DropInHubPage() {
+  if (!isDropInEnabled()) notFound();
   return (
     <>
       <Header showSearch={false} />

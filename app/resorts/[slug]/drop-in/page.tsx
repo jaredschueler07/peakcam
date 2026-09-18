@@ -7,6 +7,7 @@ import {
   DROP_IN_RESORT_SLUGS,
   getDropInProfile,
   DROP_IN_GAME_PROFILES,
+  isDropInEnabled,
 } from "@/lib/drop-in";
 import { getResortBySlug, lookupResortNameBySlug } from "@/lib/supabase";
 import DropInClientBoundary from "@/components/drop-in/DropInClientBoundary";
@@ -29,6 +30,7 @@ export const revalidate = 3600;
 // rendered on demand (and cached by the revalidate above), so the resort lookup
 // that powers the "not in the pilot yet" state never runs during the build.
 export function generateStaticParams() {
+  if (!isDropInEnabled()) return [];
   return DROP_IN_RESORT_SLUGS.map((slug) => ({ slug }));
 }
 
@@ -88,6 +90,7 @@ export default async function DropInPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  if (!isDropInEnabled()) notFound();
   const profile = getDropInProfile(slug);
 
   // Off the pilot roster. Two very different situations share this URL shape:

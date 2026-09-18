@@ -1,3 +1,5 @@
+process.env.NEXT_PUBLIC_DROP_IN_ENABLED = "true";
+
 import { test } from "node:test";
 import assert from "node:assert";
 import {
@@ -43,4 +45,20 @@ test("supported resorts receive a stable encoded game URL", () => {
     "/resorts/heavenly/drop-in",
   );
   assert.strictEqual(getDropInGameUrl("not a resort"), null);
+});
+
+test("with the kill switch off, every Drop In lookup denies and the roster is empty", async () => {
+  const prev = process.env.NEXT_PUBLIC_DROP_IN_ENABLED;
+  process.env.NEXT_PUBLIC_DROP_IN_ENABLED = "false";
+  try {
+    const mod = await import("./drop-in");
+    assert.strictEqual(mod.isDropInEnabled(), false);
+    assert.strictEqual(mod.isDropInResort("heavenly"), false);
+    assert.strictEqual(mod.getDropInProfile("breckenridge"), null);
+    assert.strictEqual(mod.getDropInGameUrl("ski-portillo"), null);
+    assert.deepStrictEqual(mod.getDropInRoster(), []);
+    assert.strictEqual(mod.dropInDisabledResponse().status, 404);
+  } finally {
+    process.env.NEXT_PUBLIC_DROP_IN_ENABLED = prev;
+  }
 });
