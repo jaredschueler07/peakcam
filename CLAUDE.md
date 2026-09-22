@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PeakCam is a live mountain webcam and snow report aggregator, in production at https://www.peakcam.io (Vercel, auto-deploy on push to main). Stack: Next.js 16 (App Router), React 19, Supabase (Postgres + Auth), Tailwind CSS 4, MapLibre GL (react-map-gl), Resend, PostHog. ~127 resorts and ~299 cams seeded from `data/*.csv`.
+PeakCam is a live mountain webcam and snow report aggregator, in production at https://www.peakcam.io (Vercel, auto-deploy on push to main). Stack: Next.js 16 (App Router), React 19, Supabase (Postgres + Auth), Tailwind CSS 4, MapLibre GL (react-map-gl), Resend, PostHog. ~148 resorts and ~350 cam rows seeded from `data/*.csv`.
 
 ## Commands
 
@@ -18,7 +18,8 @@ npm run drop-in:sync-three   # Re-vendor public/drop-in/three.module.js after bu
 
 # Data & ops scripts (all load .env.local themselves, write via service-role key)
 npm run import-resorts:standalone  # Seed resorts/cams from data/*.csv (the maintained importer). A newly-imported resort has no live page until the next deploy — /resorts/[slug] uses dynamicParams=false, so its static params list is fixed at build time.
-npm run snotel-sync      # SNOTEL sync — the production data feed (launchd runs it every 6h)
+npm run snotel-sync      # SNOTEL sync — the production data feed for NRCS-station resorts (launchd runs it every 6h)
+npm run model-sync       # Open-Meteo sync for resorts without a SNOTEL station (South America etc.; launchd every 6h)
 npm run pipeline-sync    # Multi-source pipeline (currently dormant in prod — see Gotchas)
 npm run seed-normals     # 30-year SNOTEL normals (run-once/annual)
 npm run cam-health       # Probe all cam URLs, stamp cams.last_checked_at
@@ -53,7 +54,7 @@ Cam embeds are click-to-play by `embed_type`: `youtube` (autoplay+mute embed), `
 
 ### Data ingestion — two pipelines, one live
 
-1. **`scripts/snotel-sync.ts` — the production feed** (launchd `com.peakcam.snotel-sync`, every 6h). NRCS AWDB API → QC via `lib/snow-quality.ts` (range/spike checks, carry-forward) → `snowpack_daily` → full conditions engine (normals, 7-day SWE history, user reports, NWS grid) → appends `snow_reports` (source='snotel') + patches `resorts.cond_rating`. This is the only thing feeding the live site.
+1. **`scripts/snotel-sync.ts` — the production feed** (launchd `com.peakcam.snotel-sync`, every 6h). NRCS AWDB API → QC via `lib/snow-quality.ts` (range/spike checks, carry-forward) → `snowpack_daily` → full conditions engine (normals, 7-day SWE history, user reports, NWS grid) → appends `snow_reports` (source='snotel') + patches `resorts.cond_rating`. `scripts/model-sync.ts` mirrors it for the ~59 resorts with no SNOTEL station, using the Open-Meteo model (source='open_meteo'). Together these two scripts are the only things feeding the live site.
 2. **`lib/pipeline/` — multi-source blender** (SNOTEL + NWS + Liftie + SNODAS + Weather Unlocked + user reports → `data_source_readings` + `resort_conditions_summary`). Code-complete but dormant: its launchd job has never succeeded (plist missing PATH), the blender has stubbed inputs (pct_of_normal=null, NWS grid fields never populated, elevation hardcoded), and no UI code reads its output tables. Both pipelines write `snow_reports` and overwrite `resorts.cond_rating` — last writer wins.
 
 ### Conditions engine
@@ -67,7 +68,8 @@ Cam embeds are click-to-play by `embed_type`: `youtube` (autoplay+mute embed), `
 Known live-DB drift from the repo migrations (verify against prod before trusting a migration file):
 - `user_conditions.snow_quality`: migration checks `icy/slush`; code and UI submit `crud/ice/spring`.
 - `latest_snow_reports` view was created as `SELECT *` in 001; columns added to `snow_reports` by 005/007 required manual view recreation in prod — no migration records it.
-- `cams` has no unique constraint: re-running the importer duplicates cam rows (`ignore-duplicates` is a no-op).
+- `cams` now has unique indexes (`cams_unique_per_resort` on resort_id+name+embed_url+youtube_id, and `cams_resort_embed_url_idx`) applied by hand in prod, so the importer's `ignore-duplicates` works; migrations in the repo contain no CREATE INDEX at all — every prod index exists only in the live DB.
+- `latest_snow_reports` is hit ~12k times/day by the anon role, which has a 3s `statement_timeout`; the view must stay index-friendly (see migration 018).
 
 `snow_reports.conditions` is an overloaded string: `"tag1,tag2||narrative"`. Consumers must split on `||` (done in ConditionsStrip, ComparePage, map-utils). Don't add new consumers without unpacking it.
 
@@ -90,7 +92,7 @@ A self-contained arcade ski descent, live for three pilot resorts (`ski-portillo
 ### Scheduling map
 
 - Vercel cron: `/api/alerts/trigger` daily 13:00 UTC (`vercel.json`).
-- Mac Mini launchd (`~/Library/LaunchAgents/com.peakcam.*`): snotel-sync every 6h, cam-health-check daily 06:00, pipeline daily 06:00 (failing), agents (KeepAlive). Plists are the scheduling ground truth — `docs/runbook.md`'s job table is stale.
+- Mac Mini launchd (`~/Library/LaunchAgents/com.peakcam.*`, user `maestro_admin`, ops checkout at `/Users/maestro_admin/peakcam/peakcam`, reachable as `mac-mini-ha-1` over Tailscale): snotel-sync every 6h, model-sync every 6h, cam-health-check daily, agents (KeepAlive); the pipeline plist is renamed `.disabled`. Logs are `scripts/*.log` and `agents/loop.log` in that checkout. Plists are the scheduling ground truth — `docs/runbook.md`'s job table is stale. The Mini's `.env.local` is the canonical secrets file; the dev checkout must copy it.
 
 ## Environment Variables
 
@@ -101,7 +103,7 @@ A self-contained arcade ski descent, live for three pilot resorts (`ski-portillo
 - Path alias `@/*` maps to the repo root (`tsconfig.json`).
 - MapLibre (`components/map/MapView.tsx`) must be loaded with `dynamic(..., { ssr: false })`.
 - `snow_reports` is append-only; the latest row per resort comes from the `latest_snow_reports` view.
-- Powder threshold (8") and the "128 resorts" copy are hardcoded in multiple places — grep before changing either.
+- Powder threshold (8") is hardcoded in multiple places — grep before changing it. The resort count in UI copy is computed from data; page metadata says "150+".
 - NWS forecast snow amounts are keyword heuristics (`lib/weather.ts`), not QPF.
 - Two auth UX flows coexist: `/auth` page (email+password) and `AuthModal` (magic link). Both land on `/auth/callback`.
 - Docs trust: `GEMINI.md` is an accurate high-level overview; `docs/runbook.md` has stale schedules; `UX-AUDIT-PLAN*.md` are executed historical artifacts.

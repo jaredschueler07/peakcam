@@ -1,5 +1,7 @@
 # PeakCam Tasks
 
+> **Current roadmap:** [September 11 verification and engineering priorities](docs/roadmap-2026-09-11.md). The sprint list below is a historical March snapshot, not the current release checklist.
+
 > Last updated: 2026-03-28 | Sprint 4 (Polish & Launch Prep) | Week 2
 
 ## Active — Sprint 4
