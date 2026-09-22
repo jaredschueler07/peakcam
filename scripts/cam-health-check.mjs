@@ -75,9 +75,12 @@ export function computeCamUpdate(cam, isAlive) {
     }
     return { body, transition: null };
   }
+  if (manuallyDisabled) return { body: { last_checked_at: body.last_checked_at }, transition: null };
+  // Once auto-disabled, freeze the counter: it should read "how many
+  // failures tripped the disable", not "how many days it has been dead".
+  if (cam.auto_disabled) return { body, transition: null };
   const failures = (cam.consecutive_failures ?? 0) + 1;
   body.consecutive_failures = failures;
-  if (manuallyDisabled) return { body: { last_checked_at: body.last_checked_at }, transition: null };
   if (cam.is_active && failures >= DISABLE_THRESHOLD) {
     body.is_active = false;
     body.auto_disabled = true;

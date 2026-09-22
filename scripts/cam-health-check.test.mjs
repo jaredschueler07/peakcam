@@ -32,7 +32,8 @@ test("dead cam reaching threshold: auto-disables", () => {
 
 test("already auto-disabled + still dead: counts up, no re-transition", () => {
   const { body, transition } = computeCamUpdate(cam({ is_active: false, auto_disabled: true, consecutive_failures: 5 }), false);
-  assert.strictEqual(body.consecutive_failures, 6);
+  assert.strictEqual(body.consecutive_failures, undefined, "counter is frozen once auto-disabled");
+  assert.ok(body.last_checked_at);
   assert.strictEqual(transition, null);
   assert.ok(!("is_active" in body));
 });
