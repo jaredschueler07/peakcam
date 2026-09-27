@@ -15,9 +15,11 @@ const MetaPixel = dynamic(
   () => import("@/lib/meta-pixel").then((mod) => mod.MetaPixel),
   { ssr: false }
 );
-// Ad conversion tags. Each component is a no-op without its NEXT_PUBLIC_* id,
-// and the render is gated on the (build-time inlined) env var so the chunk is
-// never even requested when the tag is not configured.
+// Ad conversion tags. Each component returns null without its NEXT_PUBLIC_* id;
+// the render is additionally gated on the (build-time inlined) env var so an
+// unconfigured tag mounts nothing at all. The conversion helpers in the same
+// modules (trackGoogleConversion / trackRedditSignUp) are imported statically
+// by PowderAlertSignup and no-op on the same condition.
 const GoogleTag = dynamic(
   () => import("@/lib/google-tag").then((mod) => mod.GoogleTag),
   { ssr: false }
