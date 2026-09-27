@@ -3,9 +3,21 @@ import posthog from "posthog-js";
 export const EVENTS = {
   BROWSE_OPENED: "browse_opened",
   RESORT_VIEWED: "resort_viewed",
+  RESORT_CARD_CLICKED: "resort_card_clicked",
+  CAM_CLICKED: "cam_clicked",
+  CAM_PLAYED: "cam_played",
+  SEARCH_PERFORMED: "search_performed",
+  FILTER_APPLIED: "filter_applied",
+  ALERT_MODAL_OPENED: "alert_modal_opened",
   ALERT_SIGNUP_SUBMITTED: "alert_signup_submitted",
+  // Fired only on an API 200 — the conversion the ad pixels mirror.
+  ALERT_SIGNUP_SUCCEEDED: "alert_signup_succeeded",
   ALERT_CONFIRMED: "alert_confirmed",
   AUTH_SIGNUP_STARTED: "auth_signup_started",
+  // The form was submitted and Supabase accepted it; the account is NOT
+  // confirmed yet. AUTH_SIGNUP_COMPLETED fires from the email-confirm
+  // callback (SignupWelcomeTracker) once the user actually lands signed in.
+  AUTH_SIGNUP_SUBMITTED: "auth_signup_submitted",
   AUTH_SIGNUP_COMPLETED: "auth_signup_completed",
   FAVORITE_ADDED: "favorite_added",
   FAVORITE_REMOVED: "favorite_removed",

@@ -5,12 +5,23 @@ import { Modal } from "@/components/ui/Modal";
 import { Bell, Check, Loader2, X, Search } from "lucide-react";
 import type { ResortWithData } from "@/lib/types";
 import { track, EVENTS } from "@/lib/analytics-events";
+import { trackLead } from "@/lib/meta-pixel-events";
+import { trackGoogleConversion } from "@/lib/google-tag";
+import { trackRedditSignUp } from "@/lib/reddit-pixel";
 
 interface Props {
   resorts: ResortWithData[];
 }
 
 const THRESHOLD_OPTIONS = [3, 6, 12, 18, 24];
+
+/** Which surface opened the modal — the component is mounted on / and /alerts. */
+function alertModalSource(): string {
+  const path = window.location.pathname;
+  if (path === "/alerts") return "alerts_page";
+  if (path === "/") return "browse";
+  return path;
+}
 
 type Step = "pick" | "email" | "done";
 
@@ -94,6 +105,7 @@ export function PowderAlertSignup({ resorts }: Props) {
       const resort_slugs = resorts
         .filter((r) => selected.has(r.id))
         .map((r) => r.slug);
+      const thresholdValues = [...selected].map((id) => thresholds[id] ?? 6);
       track(EVENTS.ALERT_SIGNUP_SUBMITTED, {
         resort_slugs,
         resort_count: selected.size,
@@ -101,6 +113,16 @@ export function PowderAlertSignup({ resorts }: Props) {
           [...selected].map((id) => [id, thresholds[id] ?? 6])
         ),
       });
+      // The conversion proper: the API accepted the subscription. Mirrored to
+      // every ad pixel that is configured (each helper no-ops without its id).
+      track(EVENTS.ALERT_SIGNUP_SUCCEEDED, {
+        resort_count: selected.size,
+        threshold_min: Math.min(...thresholdValues),
+        resort_slugs,
+      });
+      trackLead();
+      trackGoogleConversion();
+      trackRedditSignUp();
       setStep("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -113,7 +135,11 @@ export function PowderAlertSignup({ resorts }: Props) {
     <>
       {/* Trigger button */}
       <button
-        onClick={event => { event.currentTarget.focus(); setOpen(true); }}
+        onClick={event => {
+          event.currentTarget.focus();
+          setOpen(true);
+          track(EVENTS.ALERT_MODAL_OPENED, { source: alertModalSource() });
+        }}
         className="inline-flex items-center gap-2 px-4 py-2 pointer-coarse:min-h-11 rounded-lg border border-border
                    bg-surface hover:bg-surface2 hover:border-cyan/40 text-text-subtle
                    hover:text-cyan text-sm font-medium transition-colors duration-150"

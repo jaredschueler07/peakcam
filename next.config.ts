@@ -26,7 +26,10 @@ const CSP_DIRECTIVES = [
   // posthog: posthog-js lazy-loads recorder/surveys bundles from its assets host.
   // vercel-scripts: @vercel/analytics + @vercel/speed-insights loaders.
   // connect.facebook.net: Meta Pixel (NEXT_PUBLIC_META_PIXEL_ID).
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://us.i.posthog.com https://us-assets.i.posthog.com https://va.vercel-scripts.com https://connect.facebook.net",
+  // googletagmanager.com / googleadservices.com: Google Ads tag (gtag.js) and
+  //   its conversion helper script (NEXT_PUBLIC_GOOGLE_ADS_ID).
+  // redditstatic.com: Reddit Pixel (NEXT_PUBLIC_REDDIT_PIXEL_ID).
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://us.i.posthog.com https://us-assets.i.posthog.com https://va.vercel-scripts.com https://connect.facebook.net https://www.googletagmanager.com https://www.googleadservices.com https://www.redditstatic.com",
 
   // Tailwind/Next inject inline <style> tags; MapLibre sets inline styles on
   // its canvas container.
@@ -46,8 +49,13 @@ const CSP_DIRECTIVES = [
   // PostHog, map tile + weather + radar APIs, and Vercel's analytics
   // collectors. www.facebook.com is where the Meta Pixel POSTs its /tr beacons
   // — a different origin from connect.facebook.net, which only serves the
-  // script and belongs in script-src.
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://us.i.posthog.com https://us-assets.i.posthog.com https://api.maptiler.com https://*.basemaps.cartocdn.com https://api.rainviewer.com https://api.weather.gov https://api.open-meteo.com https://gibs.earthdata.nasa.gov https://vitals.vercel-insights.com https://va.vercel-scripts.com https://www.facebook.com",
+  // script and belongs in script-src. The Google Ads tag beacons to
+  // google-analytics.com / googletagmanager.com and pings conversions via
+  // google.com, googleadservices.com and googleads.g.doubleclick.net; the
+  // Reddit pixel fetches its config from pixel-config.reddit.com and beacons
+  // to alb.reddit.com. Conversion <img> pixels are already covered by the
+  // https: img-src above.
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://us.i.posthog.com https://us-assets.i.posthog.com https://api.maptiler.com https://*.basemaps.cartocdn.com https://api.rainviewer.com https://api.weather.gov https://api.open-meteo.com https://gibs.earthdata.nasa.gov https://vitals.vercel-insights.com https://va.vercel-scripts.com https://www.facebook.com https://www.google-analytics.com https://*.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://www.google.com https://googleads.g.doubleclick.net https://www.redditstatic.com https://alb.reddit.com https://pixel-config.reddit.com https://www.reddit.com",
 
   // Cam embeds (YouTube + arbitrary operator iframes) — see the note above.
   "frame-src https:",

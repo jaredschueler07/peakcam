@@ -12,7 +12,10 @@ test("the query filters on resort, user and the one-hour window", () => {
   assert.ok(path.startsWith("/user_conditions?"));
   assert.strictEqual(params.get("resort_id"), `eq.${RESORT}`);
   assert.strictEqual(params.get("user_id"), `eq.${USER}`);
-  assert.strictEqual(params.get("submitted_at"), "gte.2026-08-01T12:00:00.000Z");
+  // `created_at` is the real prod column (migration 004's `submitted_at` never
+  // matched the live table — see supabase/migrations/019).
+  assert.strictEqual(params.get("created_at"), "gte.2026-08-01T12:00:00.000Z");
+  assert.strictEqual(params.get("submitted_at"), null);
   assert.strictEqual(params.get("limit"), "1");
   // Deliberately no is_flagged filter: flagged rows must count against the
   // limit, which is the whole point of reading past RLS here.

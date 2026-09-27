@@ -49,7 +49,9 @@ export function AuthForm({ redirectTo = "/", initialError, onSignedIn }: { redir
         track(EVENTS.AUTH_SIGNUP_STARTED, { email_domain });
         const { data, error } = await client.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: callback.href } });
         if (error) throw error;
-        track(EVENTS.AUTH_SIGNUP_COMPLETED, { email_domain });
+        // Not "completed": the account is unconfirmed until the email link is
+        // followed. AUTH_SIGNUP_COMPLETED fires from the callback landing.
+        track(EVENTS.AUTH_SIGNUP_SUBMITTED, { email_domain, session_issued: Boolean(data.session) });
         if (data.session) finish(); else setSent(true);
       } else if (requestMode === "confirm") {
         const { error } = await client.auth.resend({ type: "signup", email: email.trim(), options: { emailRedirectTo: callback.href } });

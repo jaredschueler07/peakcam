@@ -26,6 +26,8 @@ import { trackViewContent } from "@/lib/meta-pixel-events";
 import { FavoriteButton } from "../ui/FavoriteButton";
 import { isDropInResort } from "@/lib/drop-in";
 import DropInLink from "@/components/drop-in/DropInLink";
+import { useHydrated } from "@/lib/use-hydrated";
+import { formatLocalDateTime, formatUtcDate } from "@/lib/format-date";
 
 interface Props {
   resort: ResortWithData;
@@ -34,6 +36,22 @@ interface Props {
   hourlyData?: HourlyWeather[] | null;
   liveConditions?: LiveConditions | null;
   userConditions?: UserCondition[];
+}
+
+// ─── "Updated …" stamp ───────────────────────────────────────────────────────
+
+/**
+ * Hydration-safe timestamp. This whole page is a client component that is
+ * also server-rendered (UTC) and ISR-cached; formatting `updated_at` in the
+ * visitor's timezone at render time produced "Sep 27, 2:52 PM" on the server
+ * and "Sep 27, 9:52 AM" in the browser → React #418 on every resort page, and
+ * React then re-rendered the entire tree client-side. Render the deterministic
+ * UTC date first, and swap in the local date+time once hydrated. The machine-
+ * readable ISO lives in `dateTime` either way.
+ */
+function UpdatedStamp({ iso }: { iso: string }) {
+  const hydrated = useHydrated();
+  return <time dateTime={iso}>{hydrated ? formatLocalDateTime(iso) : formatUtcDate(iso)}</time>;
 }
 
 // ─── Cam player ──────────────────────────────────────────────────────────────
@@ -497,9 +515,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
             </div>
             <ConditionsStrip resort={resort} />
             <p className="text-text-muted text-xs mt-2">
-              Updated {new Date(snow.updated_at).toLocaleDateString("en-US", {
-                month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
-              })} · Source: {snow.source}
+              Updated <UpdatedStamp iso={snow.updated_at} /> · Source: {snow.source}
             </p>
           </section>
         ) : (

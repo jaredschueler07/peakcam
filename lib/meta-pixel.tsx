@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, Suspense } from "react";
+import { useEffect, useRef, Suspense } from "react";
 import Script from "next/script";
 
 const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
@@ -9,10 +9,17 @@ const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 function MetaPixelPageView() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const isFirstRun = useRef(true);
 
   useEffect(() => {
     if (!PIXEL_ID) return;
-    // Fire PageView on route change (SPA navigation)
+    // The inline snippet below already fires PageView for the initial load;
+    // this effect also runs on mount, so skip that first run and only report
+    // SPA navigations. Without the guard the landing page counts twice.
+    if (isFirstRun.current) {
+      isFirstRun.current = false;
+      return;
+    }
     if (typeof window !== "undefined" && window.fbq) {
       window.fbq("track", "PageView");
     }

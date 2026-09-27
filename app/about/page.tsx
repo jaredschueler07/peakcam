@@ -121,8 +121,9 @@ export default function About() {
             <p className="mt-4">
               <span className="text-text-base font-medium">Analytics.</span>{" "}
               We use PostHog for anonymous product analytics — which pages and
-              features get used — and a Meta pixel for advertising measurement.
-              Neither is tied to your email address.
+              features get used. When enabled, a Meta pixel, a Google Ads tag
+              and a Reddit pixel measure whether our advertising led to a
+              powder-alert sign-up. None of them is given your email address.
             </p>
 
             <p className="mt-4">

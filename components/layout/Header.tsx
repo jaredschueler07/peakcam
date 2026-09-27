@@ -146,8 +146,10 @@ export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps
         </form>
       )}
 
-      {/* Desktop Nav */}
-      <nav className="hidden md:flex items-center gap-1 ml-auto flex-shrink-0">
+      {/* Desktop Nav — `lg`, not `md`: at 768px (iPad portrait) the search
+          pill + seven links + Sign in measure ~803px and overflow the viewport,
+          clipping "Sign in" and adding sideways scroll on every showSearch page. */}
+      <nav className="hidden lg:flex items-center gap-1 ml-auto flex-shrink-0">
         {navLinks.filter((link) => !("authOnly" in link && link.authOnly) || user).map((link) => (
           <Link
             key={link.href}
@@ -165,7 +167,7 @@ export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps
           </Link>
         ))}
 
-        <BugReportButton compact className="hidden md:inline-flex min-h-11 min-w-11 items-center justify-center rounded-full hover:bg-cream-50/10" />
+        <BugReportButton compact className="hidden lg:inline-flex min-h-11 min-w-11 items-center justify-center rounded-full hover:bg-cream-50/10" />
         {/* Auth */}
         {user ? (
           <Link
@@ -195,7 +197,7 @@ export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps
       {/* Mobile Menu Toggle */}
       <button
         ref={menuButton} aria-expanded={isMenuOpen} aria-controls="mobile-navigation"
-        className="md:hidden ml-auto min-h-11 min-w-11 p-2 text-cream-50/80 hover:text-cream-50 flex-shrink-0"
+        className="lg:hidden ml-auto min-h-11 min-w-11 p-2 text-cream-50/80 hover:text-cream-50 flex-shrink-0"
         onClick={() => setIsMenuOpen(!isMenuOpen)}
         aria-label="Toggle menu"
       >
@@ -204,7 +206,7 @@ export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps
 
       {/* Mobile Menu Overlay */}
       {isMenuOpen && (
-        <nav id="mobile-navigation" aria-label="Main navigation" className="max-h-[calc(100dvh-64px)] overflow-y-auto overscroll-contain absolute top-[64px] left-0 right-0 bg-ink border-b-[1.5px] border-ink shadow-lg p-4 flex flex-col gap-1 md:hidden">
+        <nav id="mobile-navigation" aria-label="Main navigation" className="max-h-[calc(100dvh-64px)] overflow-y-auto overscroll-contain absolute top-[64px] left-0 right-0 bg-ink border-b-[1.5px] border-ink shadow-lg p-4 flex flex-col gap-1 lg:hidden">
           {navLinks.filter((link) => !("authOnly" in link && link.authOnly) || user).map((link) => (
             <Link
               key={link.href}

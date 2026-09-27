@@ -239,8 +239,8 @@ export async function getUserConditions(resortId: string, limit = 10): Promise<U
     .select("*")
     .eq("resort_id", resortId)
     .eq("is_flagged", false)
-    .gte("submitted_at", new Date(Date.now() - 48 * 3600_000).toISOString())
-    .order("submitted_at", { ascending: false })
+    .gte("created_at", new Date(Date.now() - 48 * 3600_000).toISOString())
+    .order("created_at", { ascending: false })
     .limit(limit);
 
   if (error) {

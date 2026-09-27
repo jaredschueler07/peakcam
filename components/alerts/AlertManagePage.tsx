@@ -46,7 +46,9 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
   // Fire ALERT_CONFIRMED once on mount — by the time this component renders,
   // the token has already been validated server-side and preferences loaded.
   useEffect(() => {
-    track(EVENTS.ALERT_CONFIRMED, { token: token.slice(0, 8) });
+    // No token fragment in the properties: the sanitizer exists to keep the
+    // manage_token out of analytics, and a prefix is pointless anyway.
+    track(EVENTS.ALERT_CONFIRMED);
 
     // The manage_token is a non-expiring bearer capability (read this
     // subscriber's email, rewrite their alerts, delete the subscription). It
@@ -66,7 +68,6 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
         window.location.pathname
       );
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filteredResorts = resorts.filter(

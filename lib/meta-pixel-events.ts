@@ -29,7 +29,7 @@ export function trackSearch(query: string) {
   pixelTrack("Search", { search_string: query });
 }
 
-/** Fire when a user subscribes to powder alerts. */
-export function trackLead(email: string) {
+/** Fire when the powder-alert subscribe API accepts a sign-up (200). */
+export function trackLead() {
   pixelTrack("Lead", { content_name: "powder_alert_subscription" });
 }

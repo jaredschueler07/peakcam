@@ -158,7 +158,8 @@ export interface UserCondition {
   trail_conditions: UserTrailConditions;
   notes: string | null;
   is_flagged: boolean;
-  submitted_at: string;
+  /** Prod column is `created_at` (migration 004 said `submitted_at`; see 019). */
+  created_at: string;
 }
 
 // ── NWS Weather ──────────────────────────────────────────────

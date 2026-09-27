@@ -32,7 +32,7 @@ export function recentReportPath(
     select: "id",
     resort_id: `eq.${resortId}`,
     user_id: `eq.${userId}`,
-    submitted_at: `gte.${sinceIso}`,
+    created_at: `gte.${sinceIso}`,
     limit: "1",
   });
   return `/user_conditions?${q.toString()}`;

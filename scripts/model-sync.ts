@@ -129,7 +129,7 @@ async function fetchDepthHistory(resortId: string): Promise<(number | null)[]> {
 async function fetchUserReports(resortId: string): Promise<UserConditionReport[]> {
   const cutoff = new Date(Date.now() - 24 * 3600_000).toISOString();
   const url =
-    `${SUPABASE_URL}/rest/v1/user_conditions?resort_id=eq.${resortId}&is_flagged=eq.false&submitted_at=gte.${cutoff}` +
+    `${SUPABASE_URL}/rest/v1/user_conditions?resort_id=eq.${resortId}&is_flagged=eq.false&created_at=gte.${cutoff}` +
     `&select=snow_quality,visibility,wind,trail_conditions`;
   const resp = await fetch(url, { headers: supaHeaders });
   if (!resp.ok) return [];

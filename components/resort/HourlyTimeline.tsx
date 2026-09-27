@@ -39,6 +39,11 @@ function formatHour(iso: string): string {
 }
 
 export function HourlyTimeline({ hourlyData }: HourlyTimelineProps) {
+  // SSR invariant: `formatHour`/`getHours()` below are in the *browser's*
+  // timezone, so the chart must never be in the server-rendered HTML — it only
+  // mounts after the user expands it (initial state false). If this ever
+  // defaults to open, format the labels with a fixed timeZone or gate them on
+  // lib/use-hydrated.ts, or every resort page hydration-mismatches (#418).
   const [expanded, setExpanded] = useState(false);
 
   const chartData = useMemo(() => {

@@ -1,10 +1,11 @@
 "use client";
 
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { Camera, Play } from "lucide-react";
 import { useState } from "react";
 import type { Cam } from "@/lib/types";
 import { camDisplayName } from "@/lib/cam-name";
+import { entranceMotionProps } from "@/lib/motion-entrance";
 
 interface LiveWebcamsProps {
   cams: Cam[];
@@ -84,6 +85,10 @@ function WebcamTile({
   isHero?: boolean;
 }) {
   const name = camDisplayName(cam);
+  // Entrance fade honours Reduce Motion by becoming instant, never by being
+  // skipped — see lib/motion-entrance.ts.
+  const reducedMotion = useReducedMotion();
+  const entrance = entranceMotionProps(true, reducedMotion);
 
   const embedSrc =
     cam.embed_type === "youtube" && cam.youtube_id
@@ -95,10 +100,11 @@ function WebcamTile({
       className="group relative aspect-video rounded-[18px] overflow-hidden cursor-pointer
                  bg-cream-50 border-[1.5px] border-ink shadow-stamp
                  hover:shadow-stamp-hover transition-shadow duration-150"
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      whileHover={{ y: -2, x: -1 }}
+      initial={entrance.initial}
+      whileInView={entrance.whileInView}
+      viewport={entrance.viewport}
+      transition={entrance.transition}
+      whileHover={reducedMotion ? undefined : { y: -2, x: -1 }}
     >
       {/* Loaded state: actual embed */}
       {isLoaded && embedSrc && (

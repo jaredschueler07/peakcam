@@ -1,31 +1,40 @@
 "use client";
 
-import { 
-  CloudSnow, 
-  CheckCircle2, 
-  IceCream, 
-  Droplets, 
-  Sun, 
-  CloudFog, 
-  EyeOff, 
-  Wind, 
-  WindArrowDown, 
-  Tornado, 
+import {
+  CloudSnow,
+  CheckCircle2,
+  IceCream,
+  Droplets,
+  Sun,
+  CloudFog,
+  EyeOff,
+  Wind,
+  WindArrowDown,
+  Tornado,
   Navigation,
   Check,
   Mountain,
   Zap,
-  Split
+  Split,
+  Layers
 } from "lucide-react";
-import type { UserCondition } from "@/lib/types";
+import type { UserCondition, UserSnowQuality } from "@/lib/types";
+import { useForecastTime } from "@/lib/use-forecast-time";
+import { formatUtcDate, timeAgo } from "@/lib/format-date";
 
 // ── Label maps ───────────────────────────────────────────────
 
-const snowLabels: Record<string, { label: string; icon: any; color: string }> = {
-  powder:  { label: "Powder",  icon: CloudSnow, color: "text-powder" },
+// Keys must match `UserSnowQuality` (lib/types.ts), the form's options
+// (UserConditionsForm) and the prod CHECK constraint
+// (powder/packed/crud/ice/spring — see supabase/migrations/019). The old
+// icy/slush keys never matched a submitted value, so reports rendered
+// without a snow-quality label.
+const snowLabels: Record<UserSnowQuality, { label: string; icon: any; color: string }> = {
+  powder:  { label: "Powder",  icon: CloudSnow,    color: "text-powder" },
   packed:  { label: "Packed",  icon: CheckCircle2, color: "text-cyan" },
-  icy:     { label: "Icy",     icon: IceCream, color: "text-good" },
-  slush:   { label: "Slush",   icon: Droplets, color: "text-fair" },
+  crud:    { label: "Crud",    icon: Layers,       color: "text-fair" },
+  ice:     { label: "Ice",     icon: IceCream,     color: "text-good" },
+  spring:  { label: "Spring",  icon: Droplets,     color: "text-fair" },
 };
 
 const visibilityLabels: Record<string, { label: string; icon: any }> = {
@@ -48,18 +57,6 @@ const trailLabels: Record<string, { label: string; icon: any }> = {
   variable:  { label: "Variable",   icon: Split },
 };
 
-// ── Helpers ──────────────────────────────────────────────────
-
-function timeAgo(isoString: string): string {
-  const diffMs = Date.now() - new Date(isoString).getTime();
-  const diffMins = Math.floor(diffMs / 60_000);
-  if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHrs = Math.floor(diffMins / 60);
-  if (diffHrs < 24) return `${diffHrs}h ago`;
-  return `${Math.floor(diffHrs / 24)}d ago`;
-}
-
 // ── Component ────────────────────────────────────────────────
 
 interface Props {
@@ -67,6 +64,13 @@ interface Props {
 }
 
 export function UserConditionsList({ conditions }: Props) {
+  // Hydration-safe relative times: this list is server-rendered inside the
+  // ISR'd resort page, so "5m ago" computed from Date.now() at render time
+  // differed between the cached HTML and the browser (React #418). The shared
+  // clock is null during SSR/hydration → render the UTC date, then upgrade
+  // to a live "Xm ago" that also ticks every 30s.
+  const nowMs = useForecastTime();
+
   if (conditions.length === 0) {
     return (
       <div className="bg-surface border border-border rounded-xl p-6 text-center text-text-muted text-sm">
@@ -101,7 +105,9 @@ export function UserConditionsList({ conditions }: Props) {
                   {snow?.label}
                 </span>
               </div>
-              <span className="text-text-muted text-[11px] shrink-0">{timeAgo(c.submitted_at)}</span>
+              <time dateTime={c.created_at} className="text-text-muted text-[11px] shrink-0">
+                {nowMs === null ? formatUtcDate(c.created_at) : timeAgo(c.created_at, nowMs)}
+              </time>
             </div>
 
             {/* Condition pills */}

@@ -4,10 +4,11 @@ import { useForecastTime } from "@/lib/use-forecast-time";
 import { hasFreshSnowForecast } from "@/lib/snow-forecast";
 import { useState } from "react";
 import Link from "next/link";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { Snowflake, Play } from "lucide-react";
 import type { Cam, ResortWithData } from "@/lib/types";
 import { camDisplayName } from "@/lib/cam-name";
+import { entranceMotionProps } from "@/lib/motion-entrance";
 
 interface SnowCam {
   cam: Cam;
@@ -99,6 +100,9 @@ function SnowCamCard({
 }) {
   const snow = resort.snow_report;
   const name = camDisplayName(cam);
+  // Entrance fade honours Reduce Motion by becoming instant, never by being
+  // skipped — see lib/motion-entrance.ts.
+  const entrance = entranceMotionProps(true, useReducedMotion());
 
   const embedSrc =
     cam.embed_type === "youtube" && cam.youtube_id
@@ -115,9 +119,10 @@ function SnowCamCard({
                  bg-cream-50 border-[1.5px] border-ink shadow-stamp
                  hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]
                  transition-[transform,box-shadow] duration-150"
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
+      initial={entrance.initial}
+      whileInView={entrance.whileInView}
+      viewport={entrance.viewport}
+      transition={entrance.transition}
     >
       {/* Cam embed */}
       <div className="relative aspect-video bg-cream border-b-[1.5px] border-ink">

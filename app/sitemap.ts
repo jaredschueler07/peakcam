@@ -3,6 +3,11 @@ import { getResortSitemapEntries } from "@/lib/supabase";
 import { SITE_URL } from "@/lib/site";
 import { isDropInEnabled } from "@/lib/drop-in";
 
+// Match the data pages' ISR window: the sitemap's lastModified values come
+// from snow_reports, which the sync jobs append every 6h, so a build-time
+// snapshot goes stale within a day of a deploy.
+export const revalidate = 3600;
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Let a listing failure throw rather than silently emitting a sitemap with
   // only the static pages — same failure class as generateStaticParams in
@@ -22,11 +27,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
+  // The aggregate pages (/, /snow-report, /map) change exactly when the newest
+  // snow report lands, so their lastModified is the max report timestamp —
+  // not the moment this function happened to run.
+  let newestReportMs = 0;
+  for (const e of entries) {
+    if (!e.lastReportAt) continue;
+    const ms = new Date(e.lastReportAt).getTime();
+    if (ms > newestReportMs) newestReportMs = ms;
+  }
+  const dataModified = newestReportMs > 0 ? new Date(newestReportMs) : buildTime;
+
   return [
-    { url: SITE_URL, lastModified: buildTime, changeFrequency: "hourly", priority: 1.0 },
-    { url: `${SITE_URL}/snow-report`, lastModified: buildTime, changeFrequency: "hourly", priority: 0.9 },
-    { url: `${SITE_URL}/map`, lastModified: buildTime, changeFrequency: "hourly", priority: 0.8 },
+    { url: SITE_URL, lastModified: dataModified, changeFrequency: "hourly", priority: 1.0 },
+    { url: `${SITE_URL}/snow-report`, lastModified: dataModified, changeFrequency: "hourly", priority: 0.9 },
+    { url: `${SITE_URL}/map`, lastModified: dataModified, changeFrequency: "hourly", priority: 0.8 },
     { url: `${SITE_URL}/compare`, lastModified: buildTime, changeFrequency: "weekly", priority: 0.6 },
+    // Powder-alert sign-up landing page: the only dedicated conversion page,
+    // has its own canonical (app/alerts/page.tsx) and is not in PRIVATE_PATHS.
+    { url: `${SITE_URL}/alerts`, lastModified: buildTime, changeFrequency: "monthly", priority: 0.7 },
     // The Drop In hub only. The three playable routes
     // (/resorts/{slug}/drop-in) are deliberately `robots: { index: false }`, and
     // a sitemap of noindex URLs is a contradiction — the hub links to them.

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import { Play, ArrowLeftRight, TrendingUp, TrendingDown, Minus, Snowflake, Sun, Thermometer, Heart } from "lucide-react";
 import dynamic from "next/dynamic";
+import { entranceMotionProps } from "@/lib/motion-entrance";
 import { availableCameras } from "@/lib/cam-preview";
 import { CardCameraPreview } from "./CardCameraPreview";
 import type { ResortWithData, ConditionRating, SnowTrend, SnowOutlook } from "@/lib/types";
@@ -65,8 +66,12 @@ interface Props {
 }
 
 export function SummitResortCard({ resort, favorited, onToggleFavorite, animate = true }: Props) {
+  // `useReducedMotion()` is null/false until after hydration. The entrance
+  // props therefore must NOT depend on it for *whether* the card reveals —
+  // only for how fast. See lib/motion-entrance.ts for the invariant and the
+  // "cards permanently invisible under Reduce Motion" bug it prevents.
   const reducedMotion = useReducedMotion();
-  const entrance = animate && !reducedMotion;
+  const entrance = entranceMotionProps(animate, reducedMotion);
   const snow = resort.snow_report;
   const forecastTime = useForecastTime();
   const baseDepth = snow?.base_depth ?? 0;
@@ -94,11 +99,11 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
     <motion.div
       data-testid="resort-card" data-resort-slug={resort.slug}
       className="group relative rounded-[18px] "
-      initial={entrance ? { opacity: 0, y: 20 } : false}
-      whileInView={entrance ? { opacity: 1, y: 0 } : undefined}
-      viewport={{ once: true }}
+      initial={entrance.initial}
+      whileInView={entrance.whileInView}
+      viewport={entrance.viewport}
       whileHover={reducedMotion ? undefined : { y: -4, x: -1 }}
-      transition={{ duration: 0.15 }}
+      transition={entrance.transition}
     >
       {/* Card paper — cream-50 bg, ink border, stamp shadow */}
       <div className="relative bg-cream-50 border-[1.5px] border-ink rounded-[18px]
