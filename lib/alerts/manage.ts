@@ -23,6 +23,8 @@ export interface ManageSubscriber {
 export interface ManagePreference {
   resort_id: string;
   threshold_inches: number;
+  /** Opening-day email opt-in for this resort (migration 020). */
+  opening_day: boolean;
 }
 
 export interface ManageResort {
@@ -67,10 +69,7 @@ export async function getManageState(token: string): Promise<ManageState | null>
   if (!subscriber) return null;
 
   const [preferences, resorts] = await Promise.all([
-    fetchRows<ManagePreference>(
-      `/alert_preferences?subscriber_id=eq.${subscriber.id}&select=resort_id,threshold_inches`,
-      "preferences"
-    ),
+    fetchPreferences(subscriber.id),
     fetchRows<ManageResort>(
       `/resorts?is_active=eq.true&select=id,name,state,region,slug&order=name`,
       "resorts"
@@ -78,6 +77,27 @@ export async function getManageState(token: string): Promise<ManageState | null>
   ]);
 
   return { subscriber, preferences, resorts };
+}
+
+/**
+ * The subscriber's rows including `opening_day`. A database that has not run
+ * migration 020 answers 400 for the unknown column; fall back to the original
+ * two-column read with the flag off rather than turning every manage link
+ * into an error page during the deploy window. Any other failure throws.
+ */
+async function fetchPreferences(subscriberId: string): Promise<ManagePreference[]> {
+  const base = `/alert_preferences?subscriber_id=eq.${subscriberId}`;
+  const resp = await serviceFetch(`${base}&select=resort_id,threshold_inches,opening_day`);
+  if (resp.ok) return (await resp.json()) as ManagePreference[];
+  if (resp.status !== 400) {
+    throw new Error(`[alerts/manage] preferences query failed: HTTP ${resp.status}`);
+  }
+  console.error("[alerts/manage] opening_day column missing — apply migration 020; serving preferences with the flag off");
+  const legacy = await fetchRows<Omit<ManagePreference, "opening_day">>(
+    `${base}&select=resort_id,threshold_inches`,
+    "preferences"
+  );
+  return legacy.map((row) => ({ ...row, opening_day: false }));
 }
 
 /** The subset of `resortIds` that exist and are active — the same gate subscribe-core applies. */
@@ -100,22 +120,36 @@ export async function findActiveResortIds(resortIds: string[]): Promise<string[]
 export async function replacePreferences(
   subscriberId: string,
   resortIds: string[],
-  thresholds: Record<string, number>
+  thresholds: Record<string, number>,
+  /** Opening-day flag for every row; undefined leaves each row's stored value alone. */
+  openingDay?: boolean
 ): Promise<boolean> {
   if (resortIds.length > 0) {
     // on_conflict names the (subscriber_id, resort_id) unique constraint so an
     // already-followed resort gets its threshold updated rather than ignored.
-    const upsert = await serviceFetch("/alert_preferences?on_conflict=subscriber_id,resort_id", {
-      method: "POST",
-      headers: { Prefer: "resolution=merge-duplicates" },
-      body: JSON.stringify(
-        resortIds.map((rid) => ({
-          subscriber_id: subscriberId,
-          resort_id: rid,
-          threshold_inches: clampThreshold(thresholds[rid]),
-        }))
-      ),
-    });
+    // merge-duplicates only touches the columns in the body, which is what
+    // makes "openingDay undefined → unchanged" work.
+    const rows = resortIds.map((rid) => ({
+      subscriber_id: subscriberId,
+      resort_id: rid,
+      threshold_inches: clampThreshold(thresholds[rid]),
+      ...(openingDay === undefined ? {} : { opening_day: openingDay }),
+    }));
+    const upsertRows = (body: unknown) =>
+      serviceFetch("/alert_preferences?on_conflict=subscriber_id,resort_id", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates" },
+        body: JSON.stringify(body),
+      });
+
+    let upsert = await upsertRows(rows);
+    if (!upsert.ok && upsert.status === 400 && openingDay !== undefined) {
+      // Pre-migration-020 database: the column does not exist yet. Save the
+      // resorts and thresholds anyway (the subscriber's real intent) and say
+      // so loudly — the flag is the only thing lost.
+      console.error("[alerts/manage] opening_day column missing — apply migration 020; saving preferences without the flag");
+      upsert = await upsertRows(rows.map(({ opening_day: _openingDay, ...row }) => row));
+    }
     if (!upsert.ok) {
       console.error("[alerts/manage] prefs upsert failed:", await upsert.text());
       return false;

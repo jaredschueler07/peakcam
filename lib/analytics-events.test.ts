@@ -33,6 +33,7 @@ test("EVENTS has the required product event names", () => {
     DROP_IN_FAILED: "drop_in_failed",
     DROP_IN_TERRAIN_FALLBACK: "drop_in_terrain_fallback",
     DROP_IN_PERFORMANCE: "drop_in_performance",
+    OPENING_ALERT_SELECTED: "opening_alert_selected",
   });
 });
 

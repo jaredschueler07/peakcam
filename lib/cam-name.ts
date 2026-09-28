@@ -1,7 +1,7 @@
 import type { Cam } from "./types";
 
 /**
- * Cam naming, in one place.
+ * Cam naming (and elevation formatting), in one place.
  *
  * `cams.name` is typed non-null but plenty of imported rows carry a blank
  * string, which used to render as empty captions, empty `alt` text, and
@@ -57,4 +57,24 @@ export function withResolvedCamNames<T extends NameableCam>(cams: T[]): T[] {
     const name = camDisplayName(cam, "");
     return name === cam.name ? cam : { ...cam, name };
   });
+}
+
+// ── Elevation ────────────────────────────────────────────────
+
+/**
+ * `cams.elevation` is a free-text column: most rows hold a number as a string,
+ * but blanks, whitespace, and non-numeric junk all occur. `Number("")` is 0,
+ * so a naive `Number.isFinite` check printed "0′" for a blank cell, a plain
+ * truthiness check printed "NaN′ elevation" for junk, and a surface that read
+ * the column raw printed a unit-less "9000". One parser for every surface —
+ * the resort page's captions and players and the hubs' featured-cam posters.
+ * The locale is pinned because these render inside `"use client"` components:
+ * the server HTML and the browser's hydration pass must agree on the separator.
+ */
+export function camElevationFt(elevation: Cam["elevation"]): string | null {
+  const raw = elevation?.trim();
+  if (!raw) return null;
+  const feet = Number(raw);
+  if (!Number.isFinite(feet) || feet <= 0) return null;
+  return `${feet.toLocaleString("en-US")}′`;
 }

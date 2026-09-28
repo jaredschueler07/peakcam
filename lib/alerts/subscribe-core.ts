@@ -27,7 +27,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { EmailSendError } from "@/lib/email";
-import { clampThreshold, MAX_RESORTS_PER_REQUEST } from "./validate";
+import { clampThreshold, MAX_RESORTS_PER_REQUEST, parseOptionalBoolean } from "./validate";
 
 /** Formats a thrown email failure the same way across every catch below. */
 function describeEmailError(err: unknown): string {
@@ -56,7 +56,7 @@ export interface SubscribeDeps {
   findActiveResorts(resortIds: string[]): Promise<ResortRef[]>;
   /** Inserts the initial preference rows for a brand-new subscriber. */
   insertPreferences(
-    prefs: Array<{ subscriber_id: string; resort_id: string; threshold_inches: number }>
+    prefs: Array<{ subscriber_id: string; resort_id: string; threshold_inches: number; opening_day: boolean }>
   ): Promise<boolean>;
   sendWelcomeEmail(params: {
     email: string;
@@ -96,6 +96,7 @@ export async function handleSubscribe(
     email?: unknown;
     resort_ids?: unknown;
     thresholds?: unknown;
+    opening_alerts?: unknown;
   };
 
   if (typeof input.email !== "string" || !Array.isArray(input.resort_ids) || input.resort_ids.length === 0) {
@@ -104,6 +105,13 @@ export async function handleSubscribe(
       body: { error: "email and at least one resort_id are required" },
     };
   }
+
+  // Opening-day mail is opt-in per preference row; absent means off.
+  const openingAlerts = parseOptionalBoolean(input.opening_alerts, "opening_alerts");
+  if (!openingAlerts.ok) {
+    return { status: 400, body: { error: openingAlerts.error } };
+  }
+  const openingDay = openingAlerts.value ?? false;
 
   const email = input.email.toLowerCase().trim();
   if (!EMAIL_RE.test(email)) {
@@ -169,6 +177,7 @@ export async function handleSubscribe(
       subscriber_id: subscriber.id,
       resort_id: r.id,
       threshold_inches: clampThreshold(thresholds[r.id]),
+      opening_day: openingDay,
     }))
   );
   if (!prefsOk) {

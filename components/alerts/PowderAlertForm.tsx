@@ -7,6 +7,7 @@ import type { Resort } from "@/lib/types";
 import { POPULAR_SLUGS } from "@/lib/popular-resorts";
 import { DEFAULT_THRESHOLD, thresholdOptionsFor } from "@/lib/alerts/client";
 import { useAlertSubscribe } from "@/lib/alerts/use-alert-subscribe";
+import { track, EVENTS } from "@/lib/analytics-events";
 import { Button } from "@/components/ui/Button";
 
 // Only reachable from the success state, so the Supabase auth client behind it
@@ -36,6 +37,12 @@ export interface PowderAlertFormProps {
   doneExtra?: ReactNode;
   /** When given, the success state ends with a "Done" button that calls it (modal hosts). */
   onClose?(): void;
+  /**
+   * Start with "email me the morning a selected resort opens" ticked. Off by
+   * default; /opening-dates turns it on because that is the alert its visitor
+   * came for.
+   */
+  defaultOpeningAlerts?: boolean;
 }
 
 type Step = "pick" | "email" | "done";
@@ -75,6 +82,7 @@ export function PowderAlertForm({
   onDone,
   doneExtra,
   onClose,
+  defaultOpeningAlerts = false,
 }: PowderAlertFormProps) {
   const id = useId();
   const bySlug = useMemo(() => new Map(resorts.map((r) => [r.slug, r])), [resorts]);
@@ -93,6 +101,7 @@ export function PowderAlertForm({
     Object.fromEntries(preselectedIds.map((rid) => [rid, preselectedThreshold ?? DEFAULT_THRESHOLD]))
   );
   const [email, setEmail] = useState("");
+  const [openingAlerts, setOpeningAlerts] = useState(defaultOpeningAlerts);
   const [showAuth, setShowAuth] = useState(false);
   const emailRef = useRef<HTMLInputElement>(null);
   // Focus the email field only when the visitor moved to that step themselves;
@@ -151,10 +160,17 @@ export function PowderAlertForm({
     });
   };
 
+  const toggleOpeningAlerts = (checked: boolean) => {
+    setOpeningAlerts(checked);
+    // Only the opt-in is an event: it is the signal that the opening-day
+    // promise landed with this visitor (the count says for how many mountains).
+    if (checked) track(EVENTS.OPENING_ALERT_SELECTED, { slugs_count: selectedResorts.length, source });
+  };
+
   const handleSubmit = async () => {
     const resortIds = selectedResorts.map((r) => r.id);
     const resortSlugs = selectedResorts.map((r) => r.slug);
-    const outcome = await submit({ email, resortIds, thresholds, resortSlugs });
+    const outcome = await submit({ email, resortIds, thresholds, resortSlugs, openingAlerts });
     // A duplicate submit (Enter twice) resolves to the same outcome; only the
     // first one advances the form and notifies the host.
     if (outcome !== "ok" || doneFired.current) return;
@@ -183,6 +199,7 @@ export function PowderAlertForm({
         <p className="mt-2 text-sm leading-relaxed text-bark">
           We just emailed <strong className="break-all font-bold text-ink">{email.trim()}</strong> a link to manage your
           mountains.
+          {openingAlerts && " You’ll also hear from us the morning any of them opens for the season."}
         </p>
         {repeatInBrowser && (
           <p className="mt-2 text-sm leading-relaxed text-bark">
@@ -376,6 +393,28 @@ export function PowderAlertForm({
           .
         </p>
       )}
+
+      {/* Opening-day mail is a second, separate promise (one note when the
+          resort's confirmed date arrives), so it is an explicit checkbox
+          rather than folded into the threshold sentence. */}
+      <label
+        htmlFor={`${id}-opening`}
+        className="flex cursor-pointer items-start gap-3 rounded-lg border-[1.5px] border-ink/15 bg-cream px-3 py-2.5"
+      >
+        <input
+          id={`${id}-opening`}
+          type="checkbox"
+          checked={openingAlerts}
+          onChange={(e) => toggleOpeningAlerts(e.target.checked)}
+          className="mt-0.5 size-4 shrink-0 accent-forest"
+        />
+        <span className="text-sm leading-snug text-ink">
+          <span className="font-bold">Also email me the morning a selected resort opens</span>
+          <span className="mt-0.5 block text-xs text-bark">
+            One note on opening day, once the resort confirms the date. Same unsubscribe link.
+          </span>
+        </span>
+      </label>
 
       <div>
         <label htmlFor={`${id}-email`} className="block text-sm font-bold text-ink">

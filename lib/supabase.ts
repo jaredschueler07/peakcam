@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition } from "./types";
+import type { ResortOpening } from "./openings";
 import { withResolvedCamNames } from "./cam-name";
 
 // ─────────────────────────────────────────────────────────────
@@ -175,6 +176,38 @@ export async function lookupResortNameBySlug(slug: string): Promise<ResortNameLo
 }
 
 // ─────────────────────────────────────────────────────────────
+// Opening dates
+// ─────────────────────────────────────────────────────────────
+
+/** PostgREST's "relation does not exist" — the table is missing, not unreachable. */
+const MISSING_TABLE_CODES = new Set(["PGRST205", "42P01"]);
+
+/**
+ * Every `resort_openings` row (one per resort, public-read — migration 020).
+ * /opening-dates joins these to getAllResorts() in lib/openings.ts.
+ *
+ * A failed query throws so the ISR revalidation fails and the last good page
+ * keeps serving (same policy as getAllResorts). The one exception is a
+ * database that has not run migration 020 yet: that is "no dates known",
+ * not an outage, so it returns [] — the page then shows every resort as TBA
+ * instead of failing the build.
+ */
+export async function getResortOpenings(): Promise<ResortOpening[]> {
+  const { data, error } = await supabase
+    .from("resort_openings")
+    .select("*");
+
+  if (error) {
+    if (MISSING_TABLE_CODES.has(error.code)) {
+      console.warn("[PeakCam] resort_openings table missing — apply migration 020; showing every resort as TBA");
+      return [];
+    }
+    throw error;
+  }
+  return data ?? [];
+}
+
+// ─────────────────────────────────────────────────────────────
 // User-Verified Conditions
 // ─────────────────────────────────────────────────────────────
 
@@ -320,14 +353,23 @@ export async function getResortElevationFt(resortId: string): Promise<number | n
 
 export interface ResortSitemapEntry {
   slug: string;
+  name: string;
+  /** Raw `resorts.state` ("CO", "BC", "Chile") — groups the entry into its /ski-cams hub. */
+  state: string;
+  region: string;
   /** updated_at of the latest snow report, null when a resort has none. */
   lastReportAt: string | null;
 }
 
-/** Slugs plus real last-report timestamps — used for sitemap lastModified. */
+/**
+ * Slugs plus real last-report timestamps — used for sitemap lastModified.
+ * Carries name/state/region too (it satisfies lib/hubs.ts HubResortLike), so
+ * the sitemap can emit the /ski-cams hub URLs from the same two light queries
+ * instead of the three-query getAllResorts().
+ */
 export async function getResortSitemapEntries(): Promise<ResortSitemapEntry[]> {
   const [resortsRes, reportsRes] = await Promise.all([
-    supabase.from("resorts").select("id, slug").eq("is_active", true),
+    supabase.from("resorts").select("id, slug, name, state, region").eq("is_active", true),
     supabase.from("latest_snow_reports").select("resort_id, updated_at"),
   ]);
   if (resortsRes.error) throw resortsRes.error;
@@ -338,6 +380,9 @@ export async function getResortSitemapEntries(): Promise<ResortSitemapEntry[]> {
   );
   return (resortsRes.data ?? []).map((r) => ({
     slug: r.slug,
+    name: r.name,
+    state: r.state,
+    region: r.region,
     lastReportAt: lastByResort.get(r.id) ?? null,
   }));
 }

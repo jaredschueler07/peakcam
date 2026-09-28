@@ -146,7 +146,7 @@ From `lib/analytics-events.ts`:
 | `auth_signup_started` | before `supabase.auth.signUp()` | `email_domain` |
 | `auth_signup_submitted` | after `signUp` returns (email confirmation still pending) | `email_domain` |
 | `auth_signup_completed` | on `/auth/callback` landing with `?welcome=signup` when `email_confirmed_at` is fresh, or immediately when signUp returns a session | `confirmation: "email" \| "none"` |
-| `auth_callback_failed` | `/auth?error=auth_failed` | `reason` (`missing_code`, `missing_code_verifier`, `exchange_failed`) |
+| `auth_callback_failed` | `/auth?error=auth_failed` | `reason` (`missing_code`, `missing_code_verifier`, `exchange_failed`, `verify_failed`) |
 | `favorite_added` / `favorite_removed` | after DB write | `item_id`, `item_type` |
 | `condition_voted` | after vote POST success | `resort_slug`, `snow_quality`, `comfort` |
 
@@ -156,6 +156,28 @@ PostHog `identify(user.id, { email_domain })` runs on sign-in and `reset()` on s
 - `alert_confirmed` fires on every visit to `/alerts/manage` — if a user revisits to edit preferences, the funnel will show >100% step-3 conversion. Read the raw value, not the ratio.
 - `condition_voted` has `snow_quality` + `comfort`, not a single `rating`. Build funnels against those fields, not an imaginary `rating` prop.
 - Legacy events in `lib/posthog.tsx` (`resort_card_clicked`, `cam_clicked`, `search_performed`, `filter_applied`) still fire but live outside the central `EVENTS` constant. Tracked for future consolidation; not load-bearing for launch.
+
+## Auth Email Templates (Supabase dashboard)
+
+Source of truth is `supabase/email-templates/*.html` (mirrored, JSON-escaped, in `templates.json`, which also holds the subjects as `mailer_subjects_*`). **Supabase does not read the repo.** A template change takes effect only when the HTML is pasted into the dashboard: project `owsxnogvufankayfwczl` → **Authentication → Email Templates → (Confirm signup | Reset password | …) → Source**, then Save.
+
+`confirmation.html` (Confirm signup) and `recovery.html` (Reset password) link straight to our callback with a token hash:
+
+```
+{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=signup&next={{ .RedirectTo }}
+{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=recovery&next={{ .RedirectTo }}
+```
+
+`app/auth/callback/route.ts` verifies the hash server-side (`supabase.auth.verifyOtp({ token_hash, type })`) and writes the session cookies from that response, so the link works in whichever browser opens it. The previous `{{ .ConfirmationURL }}` form bounced through Supabase's `/auth/v1/verify` and came back with a PKCE `code` that only the browser holding the code-verifier cookie could exchange — mail-app webviews and second devices landed on `/auth?error=auth_failed&reason=missing_code_verifier` with the account already confirmed. The `code` path is still handled, for links already sitting in inboxes and for the templates that keep `{{ .ConfirmationURL }}` (invite, email change). `{{ .RedirectTo }}` is the `emailRedirectTo` the form sent (`…/auth/callback?next=/favorites`); the callback unwraps it to its inner `next`, runs it through `safeNext()`, and collapses anything off-origin to `/`.
+
+Order of operations when changing these:
+
+1. Deploy the app with the `token_hash`-aware callback first — it is backwards compatible, the templates are not.
+2. **Authentication → URL Configuration**: Site URL must be `https://www.peakcam.io` (the link is built from `{{ .SiteURL }}`), and `https://www.peakcam.io/auth/callback` (or `https://www.peakcam.io/**`) must be on the redirect allowlist, otherwise Supabase downgrades `{{ .RedirectTo }}` to the bare Site URL and every confirmed user lands on `/` instead of their `next` page.
+3. Paste `supabase/email-templates/confirmation.html` into **Confirm signup** and `recovery.html` into **Reset password**; Save each.
+4. Test with a designated inbox: sign up on one device, open the link in a different browser → should land on the `next` page with `?welcome=signup`; request a password reset → link should land on `/auth/update-password` signed in. In PostHog, `auth_callback_failed` with `reason=verify_failed` means the hash was expired or already used (token-hash links are single-use — a mail scanner that follows the link first consumes it).
+
+Rollback: paste the previous template body back (the `{{ .ConfirmationURL }}` form is in git history for both files). The callback keeps accepting `code`, so no app change is needed to roll back.
 
 ## Known Issues / Fast-Follow Backlog
 

@@ -76,24 +76,30 @@ export interface SubscribeInput {
   thresholds?: Record<string, number>;
   /** Analytics only — never sent to the API. Same order as `resortIds`. */
   resortSlugs?: string[];
+  /** Also email the morning a selected resort opens for the season. Omitted → the API defaults to off. */
+  openingAlerts?: boolean;
 }
 
 export interface SubscribePayload {
   email: string;
   resort_ids: string[];
   thresholds: Record<string, number>;
+  /** Present only when the form offered the choice — older callers keep sending the three-field body. */
+  opening_alerts?: boolean;
 }
 
-/** The exact body POST /api/alerts/subscribe has always received. */
+/** The exact body POST /api/alerts/subscribe has always received (plus `opening_alerts` when a form set it). */
 export function buildSubscribePayload(input: SubscribeInput): SubscribePayload {
   const resortIds = [...new Set(input.resortIds)];
-  return {
+  const payload: SubscribePayload = {
     email: input.email.trim(),
     resort_ids: resortIds,
     thresholds: Object.fromEntries(
       resortIds.map((id) => [id, input.thresholds?.[id] ?? DEFAULT_THRESHOLD])
     ),
   };
+  if (input.openingAlerts !== undefined) payload.opening_alerts = input.openingAlerts;
+  return payload;
 }
 
 /**

@@ -1,5 +1,6 @@
 import { getAllResorts } from "@/lib/supabase";
 import { SITE_URL } from "@/lib/site";
+import { HUB_BASE_PATH, hubPath, listHubs } from "@/lib/hubs";
 
 // llms.txt (https://llmstxt.org): a markdown map of the site written for LLM
 // crawlers and answer engines. Regenerated with the rest of the static site
@@ -40,6 +41,17 @@ export async function GET(): Promise<Response> {
     })
     .join("\n\n");
 
+  // One line per /ski-cams hub page, states (biggest first) then regions —
+  // the same set the sitemap and generateStaticParams emit.
+  const { states: stateHubs, regions: regionHubs } = listHubs(resorts);
+  const hubLines = [...stateHubs, ...regionHubs]
+    .map((group) => {
+      const cams = group.resorts.reduce((sum, r) => sum + r.cams.filter((c) => c.is_active).length, 0);
+      const detail = `${group.count} resort${group.count === 1 ? "" : "s"}${cams > 0 ? `, ${cams} live webcam${cams === 1 ? "" : "s"}` : ""}`;
+      return `- [${group.hub.label} ski webcams](${SITE_URL}${hubPath(group.hub)}): ${detail}`;
+    })
+    .join("\n");
+
   const body = `# PeakCam
 
 > Live ski resort webcams, snow reports, and powder alerts for ${resorts.length} resorts
@@ -61,6 +73,15 @@ often quote their upper mountain). Full details: ${SITE_URL}/methodology
 - [Compare](${SITE_URL}/compare): side-by-side conditions for any set of resorts
 - [About](${SITE_URL}/about): what PeakCam is and where the data comes from
 - [Methodology](${SITE_URL}/methodology): how the numbers are measured — SNOTEL telemetry, quality control, 30-year normals, and the user-report blend
+
+## Webcams by state and region
+
+Hub pages for every state, province, country and mountain region PeakCam covers: a live
+summary (resorts tracked, deepest base, most new snow in 24h, best rating, last data sync),
+every resort ranked by base depth with its cam count, featured live cams, a data-derived
+overview and an FAQ. Index: ${SITE_URL}${HUB_BASE_PATH}
+
+${hubLines}
 
 ## Resorts
 

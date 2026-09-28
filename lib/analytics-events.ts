@@ -42,6 +42,10 @@ export const EVENTS = {
   DROP_IN_FAILED: "drop_in_failed",
   DROP_IN_TERRAIN_FALLBACK: "drop_in_terrain_fallback",
   DROP_IN_PERFORMANCE: "drop_in_performance",
+  // The "email me the morning a selected resort opens" checkbox was switched
+  // on (PowderAlertForm, AlertManagePage). `slugs_count` is how many resorts
+  // it applies to; `source` names the surface.
+  OPENING_ALERT_SELECTED: "opening_alert_selected",
 } as const;
 
 export type EventName = (typeof EVENTS)[keyof typeof EVENTS];

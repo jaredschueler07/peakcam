@@ -91,6 +91,7 @@ export function useAlertSubscribe({ source }: { source: string }): UseAlertSubsc
             resort_slugs,
             resort_count,
             thresholds: payload.thresholds,
+            opening_alerts: payload.opening_alerts ?? false,
             source,
           });
           // The conversion proper: the API accepted the subscription. Mirrored

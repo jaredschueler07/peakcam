@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getResortBySlug, getAllResortSlugs, getLiveConditions, getUserConditions, getResortElevationFt } from "@/lib/supabase";
+import { getResortBySlug, getAllResortSlugs, getAllResorts, getLiveConditions, getUserConditions, getResortElevationFt } from "@/lib/supabase";
 import { ResortAboutSection } from "@/components/resort/ResortAboutSection";
+import type { NearbyResortsData } from "@/components/resort/NearbyResorts";
+import { nearbyResorts, summarizeNearby } from "@/lib/geo";
+import { HUB_BASE_PATH, groupByRegion, hubPath, stateHub, stateHubPath } from "@/lib/hubs";
+import { isOffSeason } from "@/lib/map-utils";
 import { getWeatherForecast, getHourlyForecast, bucketIntoPeriods } from "@/lib/weather";
 import { getOpenMeteoForecast, getOpenMeteoHourly } from "@/lib/open-meteo";
 import { ResortDetailPage } from "@/components/resort/ResortDetailPage";
@@ -103,11 +107,15 @@ export default async function ResortPage({
   // return notFound() narrows type — TypeScript knows resort is non-null below
   if (!resort) return notFound();
 
-  // Fetch weather, live conditions, and user reports server-side
+  // Fetch weather, live conditions, user reports and the catalogue (for the
+  // nearby block) server-side. getAllResorts() throws on a failed query, like
+  // getResortBySlug above: that fails this ISR revalidation so the last good
+  // page keeps serving, rather than caching a resort page with no neighbours
+  // at 200 for an hour.
   const isUS = resort.country === "US";
   const elevationFt = isUS ? null : await getResortElevationFt(resort.id);
 
-  const [weather, hourlyRaw, liveConditions, userConditions] = await Promise.all([
+  const [weather, hourlyRaw, liveConditions, userConditions, allResorts] = await Promise.all([
     isUS
       ? getWeatherForecast(resort.lat, resort.lng)
       : getOpenMeteoForecast(resort.lat, resort.lng, elevationFt),
@@ -116,9 +124,27 @@ export default async function ResortPage({
       : getOpenMeteoHourly(resort.lat, resort.lng, elevationFt),
     getLiveConditions(resort.id),
     getUserConditions(resort.id),
+    getAllResorts(),
   ]);
 
   const forecastPeriods = hourlyRaw ? bucketIntoPeriods(hourlyRaw) : null;
+
+  // Nearby resorts (growth-audit S2). Ranked here from the full catalogue and
+  // reduced to ≤5 summary rows plus two hub targets, so the client component
+  // never receives the other ~147 resorts and their cam rows. The state hub
+  // exists for every non-blank `state` (the hub pages are generated from the
+  // same grouping); a region hub only for regions with ≥3 resorts, hence the
+  // groupByRegion lookup rather than a bare regionHubPath().
+  const stateCode = resort.state?.trim() ?? "";
+  const stateHubLink = stateCode ? { label: stateHub(stateCode).label, href: stateHubPath(stateCode) } : null;
+  const regionGroup = groupByRegion(allResorts).find((group) => group.resorts.some((r) => r.slug === resort.slug));
+  const nearby: NearbyResortsData = {
+    resorts: summarizeNearby(nearbyResorts(resort, allResorts)),
+    stateHub: stateHubLink,
+    regionHub: regionGroup ? { label: regionGroup.hub.label, href: hubPath(regionGroup.hub) } : null,
+    // Same season heuristic and hourly ISR cadence as generateMetadata above.
+    offSeason: isOffSeason(resort.lat, new Date()),
+  };
 
   const snow = resort.snow_report;
   const pageUrl = `${BASE_URL}/resorts/${resort.slug}`;
@@ -228,12 +254,16 @@ export default async function ResortPage({
     ...(videos.length ? { video: videos } : {}),
   };
 
+  // Item 2 is the state hub ("Colorado" → /ski-cams/colorado), a real page in
+  // the crawl path — the old `/#browse` fragment was the homepage again. A
+  // resort with no state on file (none today) falls back to the hub index.
+  const crumbHub = stateHubLink ?? { label: "Ski cams", href: HUB_BASE_PATH };
   const breadcrumbLd = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Home", item: BASE_URL },
-      { "@type": "ListItem", position: 2, name: "Resorts", item: `${BASE_URL}/#browse` },
+      { "@type": "ListItem", position: 2, name: crumbHub.label, item: `${BASE_URL}${crumbHub.href}` },
       { "@type": "ListItem", position: 3, name: resort.name, item: pageUrl },
     ],
   };
@@ -268,7 +298,7 @@ export default async function ResortPage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageLd) }}
         />
       )}
-      <ResortDetailPage resort={resort} weather={weather} forecastPeriods={forecastPeriods} hourlyData={hourlyRaw} liveConditions={liveConditions} userConditions={userConditions} />
+      <ResortDetailPage resort={resort} weather={weather} forecastPeriods={forecastPeriods} hourlyData={hourlyRaw} liveConditions={liveConditions} userConditions={userConditions} nearby={nearby} />
       <ResortAboutSection resort={resort} />
     </main>
   );

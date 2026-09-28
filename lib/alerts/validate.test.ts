@@ -6,6 +6,7 @@ import {
   isUuid,
   MAX_RESORTS_PER_REQUEST,
   parseManageUpdate,
+  parseOptionalBoolean,
 } from "./validate";
 
 const ALTA = "6f1d2c3b-4a5e-4f60-8b7c-9d0e1f2a3b4c";
@@ -45,7 +46,37 @@ test("parseManageUpdate accepts the body AlertManagePage sends", () => {
     token: "tok",
     resortIds: [ALTA, BRIGHTON],
     thresholds: { [ALTA]: 12, [BRIGHTON]: 6 },
+    openingAlerts: undefined,
   });
+});
+
+test("parseOptionalBoolean accepts absent or boolean and rejects everything that merely looks boolean", () => {
+  assert.deepEqual(parseOptionalBoolean(undefined, "opening_alerts"), { ok: true, value: undefined });
+  assert.deepEqual(parseOptionalBoolean(null, "opening_alerts"), { ok: true, value: undefined });
+  assert.deepEqual(parseOptionalBoolean(true, "opening_alerts"), { ok: true, value: true });
+  assert.deepEqual(parseOptionalBoolean(false, "opening_alerts"), { ok: true, value: false });
+  for (const value of ["true", "false", 1, 0, "", {}, []]) {
+    const parsed = parseOptionalBoolean(value, "opening_alerts");
+    assert.equal(parsed.ok, false, JSON.stringify(value));
+    if (parsed.ok) return;
+    assert.match(parsed.error, /opening_alerts must be a boolean/);
+  }
+});
+
+test("parseManageUpdate carries opening_alerts through as a boolean and rejects a non-boolean", () => {
+  for (const flag of [true, false]) {
+    const parsed = parseManageUpdate({ token: "tok", resort_ids: [ALTA], opening_alerts: flag });
+    assert.equal(parsed.ok, true);
+    if (!parsed.ok) return;
+    assert.equal(parsed.update.openingAlerts, flag);
+  }
+  // Absent means "leave each row as it is", never "turn it off".
+  const absent = parseManageUpdate({ token: "tok", resort_ids: [ALTA] });
+  assert.equal(absent.ok && absent.update.openingAlerts, undefined);
+  const bad = parseManageUpdate({ token: "tok", resort_ids: [ALTA], opening_alerts: "yes" });
+  assert.equal(bad.ok, false);
+  if (bad.ok) return;
+  assert.match(bad.error, /opening_alerts/);
 });
 
 test("parseManageUpdate treats an empty resort list as 'follow nothing'", () => {

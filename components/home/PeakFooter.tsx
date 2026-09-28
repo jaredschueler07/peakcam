@@ -67,6 +67,8 @@ export function PeakFooter() {
             <ul className="space-y-2.5">
               {[
                 { href: "/", label: "Resorts" },
+                { href: "/ski-cams", label: "Webcams by state" },
+                { href: "/opening-dates", label: "Opening dates" },
                 { href: "/snow-report", label: "Snow reports" },
                 { href: "/compare", label: "Compare" },
                 { href: "/map", label: "Map" },

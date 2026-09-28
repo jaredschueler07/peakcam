@@ -27,12 +27,34 @@ export function clampThreshold(value: unknown): number {
   return Math.max(MIN_THRESHOLD_INCHES, Math.min(MAX_THRESHOLD_INCHES, Math.round(n)));
 }
 
+export type OptionalBooleanParse =
+  | { ok: true; value: boolean | undefined }
+  | { ok: false; error: string };
+
+/**
+ * The `opening_alerts` flag both alert endpoints accept: absent (or null) is
+ * "not specified" and a caller that sends anything but a real boolean is
+ * rejected rather than coerced — `"false"` would otherwise opt a subscriber
+ * in to opening-day mail they never asked for.
+ */
+export function parseOptionalBoolean(value: unknown, field: string): OptionalBooleanParse {
+  if (value === undefined || value === null) return { ok: true, value: undefined };
+  if (typeof value !== "boolean") return { ok: false, error: `${field} must be a boolean` };
+  return { ok: true, value };
+}
+
 export interface ManageUpdate {
   token: string;
   /** De-duplicated, lower-cased, UUID-shaped, in request order. Empty means "follow nothing". */
   resortIds: string[];
   /** A clamped threshold for every id in `resortIds` (defaulted when absent). */
   thresholds: Record<string, number>;
+  /**
+   * Opening-day emails for every resort in `resortIds`. `undefined` when the
+   * body did not mention it — the caller then leaves each row's stored value
+   * alone instead of resetting it.
+   */
+  openingAlerts: boolean | undefined;
 }
 
 export type ManageUpdateParse =
@@ -51,11 +73,14 @@ export function parseManageUpdate(body: unknown): ManageUpdateParse {
     token?: unknown;
     resort_ids?: unknown;
     thresholds?: unknown;
+    opening_alerts?: unknown;
   };
 
   if (typeof input.token !== "string" || input.token.length === 0) {
     return { ok: false, error: "token is required" };
   }
+  const openingAlerts = parseOptionalBoolean(input.opening_alerts, "opening_alerts");
+  if (!openingAlerts.ok) return openingAlerts;
   if (!Array.isArray(input.resort_ids)) {
     return { ok: false, error: "resort_ids must be an array" };
   }
@@ -94,5 +119,5 @@ export function parseManageUpdate(body: unknown): ManageUpdateParse {
     thresholds[id] = clampThreshold(raw);
   }
 
-  return { ok: true, update: { token: input.token, resortIds, thresholds } };
+  return { ok: true, update: { token: input.token, resortIds, thresholds, openingAlerts: openingAlerts.value } };
 }

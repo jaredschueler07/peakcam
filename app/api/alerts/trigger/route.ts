@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { EmailSendError, sendPowderAlertEmail } from "@/lib/email";
+import { EmailSendError, sendOpeningDayEmail, sendPowderAlertEmail } from "@/lib/email";
 import { checkFreshness } from "@/lib/feed-freshness";
 import { sendFeedFreshnessAlertEmail } from "@/lib/alerts/freshness-email";
 import { getOpenMeteoForecast } from "@/lib/open-meteo";
 import { findForecastAlert } from "@/lib/alerts/forecast";
+import {
+  planOpeningDayEmails,
+  type OpeningLogEntry,
+  type OpeningPreference,
+  type OpeningTodayResort,
+} from "@/lib/alerts/opening-day";
+import { formatOpeningDate } from "@/lib/openings";
 import type { WeatherPeriod } from "@/lib/types";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -62,8 +69,18 @@ interface AlertLog {
   resort_id: string;
   new_snow_inches: number;
   alert_date: string;
-  kind?: "live" | "forecast";
+  kind?: "live" | "forecast" | "opening";
   storm_start_date?: string | null;
+}
+
+interface OpeningsSummary {
+  /** Resorts whose confirmed_open is today. */
+  resortsOpening: number;
+  attempted: number;
+  sent: number;
+  failed: number;
+  logFailures: number;
+  errors?: string[];
 }
 
 const FORECAST_LOOKBACK_DAYS = 14;
@@ -119,7 +136,13 @@ async function loadAlertLogs(now: Date): Promise<{ logs: AlertLog[]; hasMetadata
     const response = await sbFetch(
       `/powder_alert_log?alert_date=gte.${lookback}&select=subscriber_id,resort_id,new_snow_inches,alert_date,kind,storm_start_date`
     );
-    if (response.ok) return { logs: await response.json(), hasMetadata: true };
+    if (response.ok) {
+      // Opening-day rows share the table but belong to runOpeningDayAlerts;
+      // left in, a subscriber's opening email would count as "already alerted
+      // today" and swallow a real powder alert on opening day.
+      const logs: AlertLog[] = await response.json();
+      return { logs: logs.filter((log) => log.kind !== "opening"), hasMetadata: true };
+    }
   } catch {
     // Fall through to the legacy query below.
   }
@@ -205,6 +228,133 @@ async function runFreshnessCheck(): Promise<FreshnessSummary> {
   }
 }
 
+// ── Opening-day alerts ──────────────────────────────────────────────────────
+// Resorts whose confirmed opening date is today (UTC) → one email per
+// subscriber who opted in (alert_preferences.opening_day) for any of them,
+// deduped through powder_alert_log rows with kind = 'opening'. Isolated from
+// the powder branch the same way the freshness check is: nothing here can
+// stop a powder alert, and a powder failure never skips this. Four batched
+// reads at most; on the ~350 days a year with no opening it is one.
+
+interface OpeningRow {
+  resort_id: string;
+  resorts: { name: string; slug: string } | null;
+}
+
+/** Sends the day's opening emails and never throws — every failure lands in the summary. */
+async function runOpeningDayAlerts(today: string): Promise<OpeningsSummary> {
+  const summary: OpeningsSummary = { resortsOpening: 0, attempted: 0, sent: 0, failed: 0, logFailures: 0 };
+  const errors = new Set<string>();
+  const finish = () => (errors.size > 0 ? { ...summary, errors: [...errors] } : summary);
+  const fail = (reason: string) => {
+    errors.add(reason);
+    summary.failed++;
+    return finish();
+  };
+
+  try {
+    // 1. Who opens today? A missing table (migration 020 not applied) or any
+    //    other non-2xx is a failed run, not "nobody" — silence here would hide
+    //    a broken cron on the one morning it matters.
+    const openingsResp = await sbFetch(
+      `/resort_openings?confirmed_open=eq.${today}&select=resort_id,resorts(name,slug)`
+    );
+    if (!openingsResp.ok) return fail("openings_query_failed");
+    const openingRows: OpeningRow[] = await openingsResp.json();
+    const opening = openingRows.filter((row) => row.resorts !== null);
+    summary.resortsOpening = opening.length;
+    if (opening.length === 0) return finish();
+
+    const resortIds = opening.map((row) => row.resort_id);
+    const idList = resortIds.map((id) => `"${id}"`).join(",");
+
+    // 2. Everyone who asked, the dedupe log, and cam counts — independent reads, in parallel.
+    const [prefsResp, logResp, camsResp] = await Promise.all([
+      sbFetch(
+        `/alert_preferences?resort_id=in.(${idList})&opening_day=is.true&select=subscriber_id,resort_id,alert_subscribers(id,email,manage_token)`
+      ),
+      sbFetch(`/powder_alert_log?kind=eq.opening&alert_date=eq.${today}&resort_id=in.(${idList})&select=subscriber_id,resort_id`),
+      sbFetch(`/cams?resort_id=in.(${idList})&is_active=eq.true&select=resort_id`),
+    ]);
+    if (!prefsResp.ok) return fail("openings_prefs_query_failed");
+    // Fail closed on the dedupe read: a second email is the one outcome this
+    // branch exists to prevent, so with no log we send nothing and say why.
+    if (!logResp.ok) return fail("openings_log_query_failed");
+    const prefs: OpeningPreference[] = await prefsResp.json();
+    const alreadySent: OpeningLogEntry[] = await logResp.json();
+    // Cam counts are decoration on the email; a failed read renders "Watch the cams →".
+    const camRows: Array<{ resort_id: string }> = camsResp.ok ? await camsResp.json() : [];
+    const camCount = new Map<string, number>();
+    for (const cam of camRows) camCount.set(cam.resort_id, (camCount.get(cam.resort_id) ?? 0) + 1);
+
+    const openings: OpeningTodayResort[] = opening.map((row) => ({
+      resort_id: row.resort_id,
+      name: row.resorts!.name,
+      slug: row.resorts!.slug,
+      camCount: camCount.get(row.resort_id) ?? 0,
+    }));
+    const plans = planOpeningDayEmails(openings, prefs, alreadySent);
+    summary.attempted = plans.length;
+    if (plans.length === 0) return finish();
+
+    // 3. Send, then log. The log insert has NO legacy fallback that strips
+    //    `kind`: a row written as the default 'live' with 0″ would suppress
+    //    that subscriber's real powder alert for the day (see loadAlertLogs).
+    const dateLabel = formatOpeningDate(today, "long");
+    for (const plan of plans) {
+      try {
+        await sendOpeningDayEmail({
+          email: plan.subscriber.email,
+          manageToken: plan.subscriber.manage_token,
+          dateLabel,
+          resorts: plan.resorts,
+        });
+        summary.sent++;
+      } catch (err) {
+        console.error(`[alerts/trigger] opening-day email to ${plan.subscriber.email} failed:`, err);
+        summary.failed++;
+        if (err instanceof EmailSendError) {
+          errors.add(`${err.kind}${err.resendErrorName ? `:${err.resendErrorName}` : ""}`);
+        } else {
+          errors.add(err instanceof Error ? err.name : "unknown_error");
+        }
+        continue;
+      }
+
+      const logEntries = plan.resortIds.map((resortId) => ({
+        subscriber_id: plan.subscriber.id,
+        resort_id: resortId,
+        new_snow_inches: 0,
+        alert_date: today,
+        kind: "opening",
+        storm_start_date: null,
+      }));
+      let logged = false;
+      try {
+        const logInsert = await sbFetch("/powder_alert_log", {
+          method: "POST",
+          headers: { Prefer: "resolution=ignore-duplicates" },
+          body: JSON.stringify(logEntries),
+        });
+        logged = logInsert.ok;
+        if (!logInsert.ok) console.error("[alerts/trigger] opening-day log insert failed:", await logInsert.text());
+      } catch (err) {
+        console.error("[alerts/trigger] opening-day log insert threw:", err);
+      }
+      if (!logged) {
+        summary.logFailures++;
+        summary.failed++;
+        errors.add("log_insert_failed");
+      }
+    }
+    return finish();
+  } catch (err) {
+    console.error("[alerts/trigger] opening-day branch failed:", err);
+    // A named error (TimeoutError, AbortError) is more useful than "Error".
+    return fail(err instanceof Error && err.name !== "Error" ? err.name : "openings_branch_threw");
+  }
+}
+
 // Shared handler for both GET (Vercel Cron) and POST (script) invocations.
 // Protected by Authorization: Bearer <CRON_SECRET>
 // Checks latest SNOTEL data against subscriber thresholds and fires emails.
@@ -221,25 +371,36 @@ async function handleTrigger(request: NextRequest) {
   // Runs regardless of what happens below — see runFreshnessCheck's isolation note.
   const freshness = await runFreshnessCheck();
 
+  // One calendar day for the whole run (UTC, matching alert_date and
+  // resort_openings.confirmed_open), so the opening branch and the powder
+  // branch cannot straddle midnight and disagree.
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+  // Independent of the powder path below — see runOpeningDayAlerts. Its
+  // failures are reported in every response and fail the run like any other.
+  const openings = await runOpeningDayAlerts(today);
+  const openingsStatus = openings.failed > 0 ? 500 : 200;
+
   // 1. Load all alert preferences with subscriber + resort info
   const prefsResp = await sbFetch(
     `/alert_preferences?select=subscriber_id,resort_id,threshold_inches,alert_subscribers(id,email,manage_token),resorts(name,slug)`
   );
   if (!prefsResp.ok) {
-    return NextResponse.json({ error: "Failed to load preferences", freshness }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load preferences", freshness, openings }, { status: 500 });
   }
   const prefs: AlertPreference[] = await prefsResp.json();
 
   if (prefs.length === 0) {
     return NextResponse.json({
-      ok: true,
+      ok: openings.failed === 0,
       attempted: 0,
       sent: 0,
       failed: 0,
       logFailures: 0,
       message: "No active subscriptions",
       freshness,
-    });
+      openings,
+    }, { status: openingsStatus });
   }
 
   // 2. Load latest snow reports for all relevant resort IDs
@@ -248,7 +409,7 @@ async function handleTrigger(request: NextRequest) {
     `/latest_snow_reports?resort_id=in.(${resortIds.map((id) => `"${id}"`).join(",")})&select=resort_id,new_snow_24h`
   );
   if (!snowResp.ok) {
-    return NextResponse.json({ error: "Failed to load snow reports", freshness }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load snow reports", freshness, openings }, { status: 500 });
   }
   const snowReports: SnowReport[] = await snowResp.json();
   const snowByResort = new Map(snowReports.map((s) => [s.resort_id, s.new_snow_24h ?? 0]));
@@ -275,8 +436,6 @@ async function handleTrigger(request: NextRequest) {
 
   // 3. Group triggered alerts by subscriber
   // Map: subscriber_id → { subscriber, alerts[] }
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-
   const { logs, hasMetadata } = await loadAlertLogs(new Date());
   const todayLog = logs.filter((log) => log.alert_date === today);
 
@@ -335,14 +494,15 @@ async function handleTrigger(request: NextRequest) {
 
   if (bySubscriber.size === 0) {
     return NextResponse.json({
-      ok: true,
+      ok: openings.failed === 0,
       attempted: 0,
       sent: 0,
       failed: 0,
       logFailures: 0,
       message: "No thresholds exceeded",
       freshness,
-    });
+      openings,
+    }, { status: openingsStatus });
   }
 
   // 4. Send emails and log
@@ -390,23 +550,27 @@ async function handleTrigger(request: NextRequest) {
   }
 
   const summary = {
-    ok: failed === 0,
+    ok: failed === 0 && openings.failed === 0,
     attempted,
     sent,
     failed,
     logFailures,
     ...(errors.size > 0 ? { errors: [...errors] } : {}),
     freshness,
+    openings,
   };
 
   console.log(
     `[alerts/trigger] Done — ${sent}/${attempted} emails sent, ${failed} failed` +
-      (errors.size > 0 ? ` (${[...errors].join(", ")})` : "")
+      (errors.size > 0 ? ` (${[...errors].join(", ")})` : "") +
+      (openings.resortsOpening > 0
+        ? `; opening day at ${openings.resortsOpening} resort${openings.resortsOpening === 1 ? "" : "s"}: ${openings.sent}/${openings.attempted} emails sent`
+        : "")
   );
 
   // Any failure is reported as a failed cron run — otherwise a broken key stays
   // invisible until someone reads the logs.
-  return NextResponse.json(summary, { status: failed > 0 ? 500 : 200 });
+  return NextResponse.json(summary, { status: failed > 0 || openings.failed > 0 ? 500 : 200 });
 }
 
 // GET — Vercel Cron invokes routes via GET

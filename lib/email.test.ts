@@ -7,6 +7,7 @@ import {
   escapeHtml,
   sendEmail,
   sendManageLinkEmail,
+  sendOpeningDayEmail,
   sendPowderAlertEmail,
   sendWelcomeEmail,
   setEmailClientForTests,
@@ -295,6 +296,83 @@ for (const leadDays of [1, 2]) {
     assert.doesNotMatch(client.sent[0].html, /Fresh powder dropped/);
   });
 }
+
+// ─── Opening-day email ────────────────────────────────────────────────────────
+
+test("sendOpeningDayEmail names a single resort in the subject and links its cams", async () => {
+  const client = okClient();
+  await sendOpeningDayEmail(
+    {
+      email: "skier@example.com",
+      manageToken: "tok",
+      dateLabel: "Friday, November 13, 2026",
+      resorts: [{ resortName: "Mammoth Mountain", slug: "mammoth", camCount: 3 }],
+    },
+    client
+  );
+  assert.strictEqual(client.sent.length, 1);
+  assert.strictEqual(client.sent[0].subject, "Mammoth Mountain opens today — PeakCam");
+  const { html } = client.sent[0];
+  assert.match(html, /Opening day\./);
+  assert.match(html, /Friday, November 13, 2026/);
+  assert.match(html, /Watch 3 live cams →/);
+  assert.ok(html.includes(`${SITE_URL}/resorts/mammoth`), "resort link");
+  assert.ok(html.includes(`${SITE_URL}/alerts/manage?token=tok`), "manage link");
+  assert.doesNotMatch(html, /localhost/);
+});
+
+test("sendOpeningDayEmail counts the resorts in a multi-resort digest and copes with zero cams", async () => {
+  const client = okClient();
+  await sendOpeningDayEmail(
+    {
+      email: "skier@example.com",
+      manageToken: "tok",
+      dateLabel: "Saturday, October 31, 2026",
+      resorts: [
+        { resortName: "Keystone Resort", slug: "keystone", camCount: 0 },
+        { resortName: "Arapahoe Basin", slug: "arapahoe-basin", camCount: 1 },
+      ],
+    },
+    client
+  );
+  assert.strictEqual(client.sent[0].subject, "2 of your resorts open today — PeakCam");
+  const { html } = client.sent[0];
+  assert.match(html, /2 of your mountains open today\./);
+  assert.match(html, /Watch the cams →/, "no count when the resort has no active cam");
+  assert.match(html, /Watch 1 live cam →/);
+  assert.ok(html.includes(`${SITE_URL}/resorts/keystone`));
+  assert.ok(html.includes(`${SITE_URL}/resorts/arapahoe-basin`));
+});
+
+test("sendOpeningDayEmail escapes resort names in HTML and throws EmailSendError on a Resend error", async () => {
+  const client = okClient();
+  const name = `Alta & Snowbird <script>alert(1)</script>`;
+  await sendOpeningDayEmail(
+    { email: "a@example.com", manageToken: "tok", dateLabel: "Friday, November 13, 2026", resorts: [{ resortName: name, slug: "alta", camCount: 2 }] },
+    client
+  );
+  assert.doesNotMatch(client.sent[0].html, /<script>/);
+  assert.match(client.sent[0].html, /Alta &amp; Snowbird &lt;script&gt;/);
+  assert.match(client.sent[0].subject, /Alta & Snowbird/);
+
+  const cap = captureConsole();
+  try {
+    await assert.rejects(
+      () =>
+        sendOpeningDayEmail(
+          { email: "a@example.com", manageToken: "tok", dateLabel: "Friday, November 13, 2026", resorts: [{ resortName: "Alta", slug: "alta", camCount: 2 }] },
+          failingClient({ name: "invalid_api_key", message: "API key is invalid", statusCode: 401 })
+        ),
+      (err: unknown) => {
+        assert.ok(err instanceof EmailSendError);
+        assert.strictEqual(err.emailType, "opening_day");
+        return true;
+      }
+    );
+  } finally {
+    cap.restore();
+  }
+});
 
 // ─── Links come from the canonical SITE_URL, never from env ──────────────────
 

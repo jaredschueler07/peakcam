@@ -13,8 +13,10 @@ import {
   parseSnapshot,
   parseForecast,
   parseHourly,
+  formatUtcOffset,
   type OpenMeteoResponse,
 } from "./open-meteo";
+import { bucketIntoPeriods } from "./weather";
 
 // ── Unit conversions ──────────────────────────────────────────
 
@@ -186,7 +188,66 @@ test("snow forecast selects the resort-local current hour, not the server hour o
   assert.equal(parseSnapshot(data, Date.parse("2026-07-12T19:15:00Z")).snowingNow, true);
   assert.equal(parseSnapshot(data, Date.parse("2026-07-12T20:00:00Z")).snowingNow, false);
   assert.equal(parseSnapshot(data, Date.parse("2026-07-11T18:00:00Z")).snowingNow, false);
-  assert.equal(parseHourly(data)[0].time, "2026-07-12T19:00:00.000Z");
+  // The emitted string keeps the resort's wall clock AND resolves to the right instant.
+  assert.equal(parseHourly(data)[0].time, "2026-07-12T12:00:00-07:00");
+  assert.equal(Date.parse(parseHourly(data)[0].time), Date.parse("2026-07-12T19:00:00Z"));
+});
+
+// ── Resort-local hourly timestamps (code review P1-7) ─────────
+
+test("formatUtcOffset renders whole-hour, half-hour, zero and negative offsets", () => {
+  assert.equal(formatUtcOffset(0), "+00:00");
+  assert.equal(formatUtcOffset(-3 * 3600), "-03:00");
+  assert.equal(formatUtcOffset(-7 * 3600), "-07:00");
+  assert.equal(formatUtcOffset(5.5 * 3600), "+05:30");
+  assert.equal(formatUtcOffset(-(9 * 3600 + 30 * 60)), "-09:30");
+});
+
+/**
+ * 96 resort-local wall times (4 days from local midnight 2026-07-10), written
+ * exactly the way Open-Meteo returns them with timezone=auto: no zone
+ * designator. Built through Date.UTC so the fixture is identical on every
+ * test machine regardless of its TZ. Index 48 is local midnight of "today"
+ * (PAST_DAYS=2), matching the parser's NOW_IDX.
+ */
+function localWallTimes(): string[] {
+  const times: string[] = [];
+  for (let i = 0; i < 96; i++) {
+    times.push(new Date(Date.UTC(2026, 6, 10, i)).toISOString().slice(0, 16));
+  }
+  return times;
+}
+
+test("parseHourly stamps every hour with the response's UTC offset, not Z", () => {
+  const data = buildFixture();
+  data.utc_offset_seconds = -3 * 3600; // Chile / Argentina (UTC-3)
+  data.hourly.time = localWallTimes();
+  const hourly = parseHourly(data);
+  assert.equal(hourly.length, 48);
+  assert.equal(hourly[0].time, "2026-07-12T00:00:00-03:00");
+  assert.equal(hourly[47].time, "2026-07-13T23:00:00-03:00");
+  // Same instant as the old UTC output (local midnight -03:00 is 03:00Z) …
+  assert.equal(Date.parse(hourly[0].time), Date.UTC(2026, 6, 12, 3));
+  // … so the current-hour lookup still works off these strings.
+  for (const h of hourly) assert.ok(!h.time.endsWith("Z"), h.time);
+});
+
+test("bucketIntoPeriods on an Open-Meteo series groups by resort-local hour and date", () => {
+  const data = buildFixture();
+  data.utc_offset_seconds = -3 * 3600;
+  data.hourly.time = localWallTimes();
+  const periods = bucketIntoPeriods(parseHourly(data));
+
+  // 2026-07-12 is a Sunday. Two full local days → morning/afternoon/evening
+  // each, in order; overnight 00–05 local is skipped. Bucketing in server UTC
+  // would have pushed 21:00–23:00 local (00:00–02:00Z) onto the next day and
+  // pulled 03:00–05:00 local (06:00–08:00Z) into "morning".
+  assert.deepEqual(
+    periods.map((p) => `${p.day} ${p.period}`),
+    ["Sun morning", "Sun afternoon", "Sun evening", "Mon morning", "Mon afternoon", "Mon evening"],
+  );
+  // Six hours per bucket at a constant 1 cm/h (0.4" rounded per hour).
+  for (const p of periods) assert.equal(p.snowInches, Math.round(6 * (Math.round(cmToInches(1) * 10) / 10) * 10) / 10);
 });
 
 test("model snowfall needs a snow weather code and adequate probability", () => {

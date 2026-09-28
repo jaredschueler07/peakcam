@@ -9,7 +9,7 @@ const RESORTS = [
 
 interface Calls {
   created: string[];
-  prefsInserted: Array<{ subscriber_id: string; resort_id: string; threshold_inches: number }>;
+  prefsInserted: Array<{ subscriber_id: string; resort_id: string; threshold_inches: number; opening_day: boolean }>;
   welcome: Array<{ email: string; manageToken: string }>;
   manageLink: Array<{ email: string; manageToken: string }>;
 }
@@ -55,11 +55,43 @@ test("a new email creates the subscriber and its preferences", async () => {
   assert.strictEqual(result.status, 200);
   assert.deepStrictEqual(calls.created, ["new.skier@example.com"]);
   assert.deepStrictEqual(calls.prefsInserted, [
-    { subscriber_id: "sub-new", resort_id: "r-alta", threshold_inches: 12 },
-    { subscriber_id: "sub-new", resort_id: "r-brighton", threshold_inches: 6 },
+    { subscriber_id: "sub-new", resort_id: "r-alta", threshold_inches: 12, opening_day: false },
+    { subscriber_id: "sub-new", resort_id: "r-brighton", threshold_inches: 6, opening_day: false },
   ]);
   assert.strictEqual(calls.welcome.length, 1);
   assert.strictEqual(calls.manageLink.length, 0);
+});
+
+test("opening_alerts: true stamps opening_day on every preference row; absent means off", async () => {
+  const { deps, calls } = makeDeps(null);
+  await handleSubscribe({ ...NEW_BODY, opening_alerts: true }, deps);
+  assert.deepStrictEqual(
+    calls.prefsInserted.map((p) => p.opening_day),
+    [true, true]
+  );
+
+  const { deps: plainDeps, calls: plainCalls } = makeDeps(null);
+  await handleSubscribe({ ...NEW_BODY, opening_alerts: false }, plainDeps);
+  assert.deepStrictEqual(plainCalls.prefsInserted.map((p) => p.opening_day), [false, false]);
+});
+
+test("opening_alerts must be a real boolean — strings are rejected before any lookup", async () => {
+  let lookups = 0;
+  const deps: SubscribeDeps = {
+    ...makeDeps(null).deps,
+    async findActiveResorts(ids) {
+      lookups++;
+      return RESORTS.filter((r) => ids.includes(r.id));
+    },
+  };
+  for (const opening_alerts of ["true", 1, "yes"]) {
+    const result = await handleSubscribe({ ...NEW_BODY, opening_alerts }, deps);
+    assert.strictEqual(result.status, 400, JSON.stringify(opening_alerts));
+    assert.match(String(result.body.error), /opening_alerts/);
+  }
+  assert.strictEqual(lookups, 0);
+  // null is treated the same as absent.
+  assert.strictEqual((await handleSubscribe({ ...NEW_BODY, opening_alerts: null }, deps)).status, 200);
 });
 
 test("an existing email is never mutated — no create, no preference writes", async () => {

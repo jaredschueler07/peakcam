@@ -10,7 +10,7 @@ import { ConditionBadge } from "@/components/ui/Badge";
 import type { ResortWithData, WeatherPeriod, LiveConditions, Cam, UserCondition, ForecastPeriod, HourlyWeather } from "@/lib/types";
 import { CamReportButton } from "@/components/cam/CamReportButton";
 import { CamEmbed } from "@/components/cam/CamEmbed";
-import { camDisplayName } from "@/lib/cam-name";
+import { camDisplayName, camElevationFt } from "@/lib/cam-name";
 import { CamLightbox } from "@/components/cam/CamLightbox";
 import { ConditionsHero } from "@/components/resort/ConditionsHero";
 import { ForecastTable } from "@/components/resort/ForecastTable";
@@ -29,6 +29,7 @@ import DropInLink from "@/components/drop-in/DropInLink";
 import { useHydrated } from "@/lib/use-hydrated";
 import { formatLocalDateTime, formatUtcDate } from "@/lib/format-date";
 import { ResortAlertCapture } from "@/components/alerts/ResortAlertCapture";
+import { NearbyResorts, type NearbyResortsData } from "@/components/resort/NearbyResorts";
 
 interface Props {
   resort: ResortWithData;
@@ -37,6 +38,8 @@ interface Props {
   hourlyData?: HourlyWeather[] | null;
   liveConditions?: LiveConditions | null;
   userConditions?: UserCondition[];
+  /** Server-computed neighbours + hub links (app/resorts/[slug]/page.tsx); omitted → no block. */
+  nearby?: NearbyResortsData | null;
 }
 
 // ─── "Updated …" stamp ───────────────────────────────────────────────────────
@@ -80,21 +83,6 @@ const readIsLg = () => window.matchMedia(LG_QUERY).matches;
 const readIsLgOnServer = () => false;
 
 // ─── Cam player ──────────────────────────────────────────────────────────────
-
-/**
- * `cams.elevation` is a free-text column: most rows hold a number as a string,
- * but blanks, whitespace, and non-numeric junk all occur. `Number("")` is 0,
- * so a naive `Number.isFinite` check printed "0′" for a blank cell, while a
- * plain truthiness check elsewhere printed "NaN′ elevation" for junk. One
- * parser, used by both the caption and the player.
- */
-function camElevationFt(elevation: Cam["elevation"]): string | null {
-  const raw = elevation?.trim();
-  if (!raw) return null;
-  const feet = Number(raw);
-  if (!Number.isFinite(feet) || feet <= 0) return null;
-  return `${feet.toLocaleString()}′`;
-}
 
 /** Caption under a cam tile. Some imported cam rows have a blank `name`, which
  *  used to render an empty <p>; fall back to the feed name and, failing that,
@@ -366,7 +354,7 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData, liveConditions, userConditions = [] }: Props) {
+export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData, liveConditions, userConditions = [], nearby = null }: Props) {
   const activeCams = resort.cams.filter((c) => c.is_active);
   const embeddableCams = activeCams.filter((c) => c.embed_type !== "link");
   const snow = resort.snow_report;
@@ -737,6 +725,11 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
           )}
         </section>
 
+        {/* Nearby resorts + hub links — the page's only links to other resorts
+            (growth-audit S2). One mount serves both layouts: the cameras
+            section above is shared, only the lead cam moves on phones. */}
+        {nearby && <NearbyResorts resortName={resort.name} resortSlug={resort.slug} {...nearby} />}
+
         {/* Community conditions — vote + detailed report */}
         <section>
           <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base mb-4">
@@ -764,7 +757,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
         </section>
 
         {/* Footer nav */}
-        <div className="border-t border-border pt-6">
+        <div className="border-t border-border pt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
           <Link
             href="/"
             className="inline-flex items-center gap-1.5 text-text-muted hover:text-cyan text-sm transition-colors"
@@ -774,6 +767,14 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
             </svg>
             Back to all resorts
           </Link>
+          {nearby?.stateHub && (
+            <Link
+              href={nearby.stateHub.href}
+              className="inline-flex min-h-11 items-center text-sm font-bold text-forest underline-offset-2 hover:underline hover:text-forest-dk"
+            >
+              More in {nearby.stateHub.label} →
+            </Link>
+          )}
         </div>
 
       </div>

@@ -20,6 +20,7 @@
     "snodas-sync": "tsx scripts/snodas-sync.ts",
     "pipeline-sync": "tsx scripts/pipeline-sync.ts",
     "seed-normals": "tsx scripts/seed-snotel-normals.ts",
+    "seed-openings": "node scripts/seed-resort-openings.mjs",
     "cam-health": "node scripts/cam-health-check.mjs",
     "powder-alerts": "node scripts/powder-alert-check.mjs",
     "generate-images": "node scripts/generate-images.mjs",

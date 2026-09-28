@@ -17,6 +17,8 @@ interface Resort {
 interface Preference {
   resort_id: string;
   threshold_inches: number;
+  /** Opening-day email opt-in (migration 020); absent on a pre-migration read. */
+  opening_day?: boolean;
 }
 
 interface Props {
@@ -35,6 +37,8 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
 
   const [selected, setSelected] = useState<Set<string>>(initSelected);
   const [thresholds, setThresholds] = useState<Record<string, number>>(initThresholds);
+  // Stored per row, offered as one switch: "on" if any followed resort has it.
+  const [openingAlerts, setOpeningAlerts] = useState(() => preferences.some((p) => p.opening_day === true));
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -103,6 +107,7 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
           thresholds: Object.fromEntries(
             [...selected].map((id) => [id, thresholds[id] ?? 6])
           ),
+          opening_alerts: openingAlerts,
         }),
       });
       if (!resp.ok) {
@@ -115,6 +120,12 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const toggleOpeningAlerts = (checked: boolean) => {
+    setOpeningAlerts(checked);
+    setSaved(false);
+    if (checked) track(EVENTS.OPENING_ALERT_SELECTED, { slugs_count: selected.size, source: "alerts_manage" });
   };
 
   const handleUnsubscribe = async () => {
@@ -252,6 +263,27 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
             <p className="text-text-muted text-sm text-center py-8">No resorts match your search.</p>
           )}
         </div>
+
+        {/* Opening-day mail — one switch for every followed resort */}
+        <label
+          htmlFor="manage-opening-alerts"
+          className="flex items-start gap-3 rounded-lg border border-border bg-surface px-4 py-3 mb-8 cursor-pointer"
+        >
+          <input
+            id="manage-opening-alerts"
+            type="checkbox"
+            checked={openingAlerts}
+            onChange={(e) => toggleOpeningAlerts(e.target.checked)}
+            className="mt-0.5 w-4 h-4 shrink-0 accent-forest"
+          />
+          <span className="text-sm text-text-base">
+            <span className="font-medium">Also email me the morning a selected resort opens</span>
+            <span className="block text-xs text-text-muted mt-0.5">
+              One note on opening day, once the resort confirms its date. Applies to every resort you follow.{" "}
+              <Link href="/opening-dates" className="text-cyan hover:underline">See opening dates</Link>
+            </span>
+          </span>
+        </label>
 
         {error && (
           <p className="text-red-400 text-sm mb-4">{error}</p>

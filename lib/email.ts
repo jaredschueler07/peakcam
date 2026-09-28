@@ -319,6 +319,79 @@ export async function sendPowderAlertEmail(
   }, client);
 }
 
+// ─── Opening-day email ────────────────────────────────────────────────────────
+// Sent by the /api/alerts/trigger cron on the morning a resort's confirmed
+// opening date arrives, to subscribers who ticked "email me the morning a
+// selected resort opens" (alert_preferences.opening_day). One email per
+// subscriber per day listing every resort of theirs that opens.
+
+export interface OpeningDayEmailResort {
+  resortName: string;
+  slug: string;
+  /** Active cams on the resort page; 0 renders the link without a count. */
+  camCount: number;
+}
+
+/** Throws {@link EmailSendError} if the mail was not accepted by Resend. */
+export async function sendOpeningDayEmail(
+  params: {
+    email: string;
+    manageToken: string;
+    /** Opening day, already formatted for people ("Friday, November 13, 2026"). */
+    dateLabel: string;
+    resorts: OpeningDayEmailResort[];
+  },
+  client?: EmailClient
+) {
+  const manageUrl = `${SITE_URL}/alerts/manage?token=${params.manageToken}`;
+  const first = params.resorts[0];
+  const others = params.resorts.length - 1;
+
+  const subject = params.resorts.length === 1
+    ? `${first.resortName} opens today — PeakCam`
+    : `${params.resorts.length} of your resorts open today — PeakCam`;
+
+  const rows = params.resorts
+    .map(
+      (r) => `
+      <tr>
+        <td style="padding: 12px 0; border-bottom: 1px solid #1e293b;">
+          <a href="${SITE_URL}/resorts/${r.slug}"
+             style="color: #22d3ee; font-weight: 600; text-decoration: none;">
+            ${escapeHtml(r.resortName)}
+          </a>
+          <span style="color: #64748b; font-size: 12px; display: block;">Opening day</span>
+        </td>
+        <td style="padding: 12px 0; border-bottom: 1px solid #1e293b; text-align: right;">
+          <a href="${SITE_URL}/resorts/${r.slug}"
+             style="color: #a78bfa; font-weight: 600; font-size: 13px; text-decoration: none;">
+            ${r.camCount > 0 ? `Watch ${r.camCount} live cam${r.camCount === 1 ? "" : "s"} →` : "Watch the cams →"}
+          </a>
+        </td>
+      </tr>`
+    )
+    .join("");
+
+  await sendOrThrow("opening_day", params.email, {
+    subject,
+    html: buildEmailHtml({
+      preheader: `${escapeHtml(first.resortName)}${others > 0 ? ` and ${others} more` : ""} open${params.resorts.length === 1 ? "s" : ""} for the season today, ${escapeHtml(params.dateLabel)}.`,
+      title: params.resorts.length === 1 ? "Opening day." : `${params.resorts.length} of your mountains open today.`,
+      body: `
+        <p>It's ${escapeHtml(params.dateLabel)} — lifts turn today at:</p>
+        <table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+          <tbody>${rows}</tbody>
+        </table>
+        <p>The live cams and today's snow report are on each resort page. Your powder
+        alerts for these mountains stay on; this is a one-time opening-day note.</p>
+      `,
+      ctaUrl: `${SITE_URL}/resorts/${first.slug}`,
+      ctaLabel: `Watch ${escapeHtml(first.resortName)} live`,
+      manageUrl,
+    }),
+  }, client);
+}
+
 // ─── HTML shell ───────────────────────────────────────────────────────────────
 
 function buildEmailHtml(params: {

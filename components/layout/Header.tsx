@@ -20,6 +20,7 @@ export const navLinks = [
   { label: "Map",         href: "/map" },
   { label: "Compare",     href: "/compare" },
   { label: "Snow Report", href: "/snow-report" },
+  { label: "Webcams",     href: "/ski-cams" },
   ...(isDropInEnabled() ? [{ label: "Drop In", href: "/drop-in" }] : []),
   { label: "Favorites",   href: "/favorites", authOnly: true },
   { label: "My Peak",     href: "/dashboard", authOnly: true },
@@ -147,8 +148,9 @@ export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps
       )}
 
       {/* Desktop Nav — `lg`, not `md`: at 768px (iPad portrait) the search
-          pill + seven links + Sign in measure ~803px and overflow the viewport,
-          clipping "Sign in" and adding sideways scroll on every showSearch page. */}
+          pill + seven links + Sign in measured ~803px and overflowed the viewport,
+          clipping "Sign in" and adding sideways scroll on every showSearch page.
+          Now eight links with Webcams, so `lg` is the floor — do not lower it. */}
       <nav className="hidden lg:flex items-center gap-1 ml-auto flex-shrink-0">
         {navLinks.filter((link) => !("authOnly" in link && link.authOnly) || user).map((link) => (
           <Link

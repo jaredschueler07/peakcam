@@ -31,6 +31,9 @@ export async function GET(request: NextRequest) {
       email: state.subscriber.email,
       created_at: state.subscriber.created_at,
       preferences: state.preferences,
+      // The flag is stored per row but offered as one switch; "on" when any
+      // followed resort has it, which is the only state the UI can produce.
+      opening_alerts: state.preferences.some((p) => p.opening_day),
       resorts: state.resorts,
     });
   } catch (err) {
@@ -40,7 +43,7 @@ export async function GET(request: NextRequest) {
 }
 
 // PUT /api/alerts/manage
-// Body: { token, resort_ids[], thresholds?: { [resort_id]: inches } }
+// Body: { token, resort_ids[], thresholds?: { [resort_id]: inches }, opening_alerts?: boolean }
 export async function PUT(request: NextRequest) {
   const body = await request.json().catch(() => null);
 
@@ -49,7 +52,7 @@ export async function PUT(request: NextRequest) {
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
-  const { token, resortIds, thresholds } = parsed.update;
+  const { token, resortIds, thresholds, openingAlerts } = parsed.update;
 
   try {
     const subscriber = await findSubscriberByToken(token);
@@ -65,7 +68,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "No valid resort IDs provided" }, { status: 400 });
     }
 
-    const ok = await replacePreferences(subscriber.id, activeIds, thresholds);
+    const ok = await replacePreferences(subscriber.id, activeIds, thresholds, openingAlerts);
     if (!ok) {
       return NextResponse.json({ error: "Failed to update preferences" }, { status: 500 });
     }

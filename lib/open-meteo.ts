@@ -190,10 +190,32 @@ function avgWindow(arr: number[], start: number, count: number): number {
   return n > 0 ? total / n : 0;
 }
 
-/** Open-Meteo returns resort-local wall times; never parse them in the server timezone. */
+/** "+HH:MM" / "-HH:MM" zone designator for a UTC offset in seconds (`utc_offset_seconds`). */
+export function formatUtcOffset(seconds: number): string {
+  const sign = seconds < 0 ? "-" : "+";
+  const abs = Math.abs(Math.trunc(seconds));
+  const hh = String(Math.floor(abs / 3600)).padStart(2, "0");
+  const mm = String(Math.floor((abs % 3600) / 60)).padStart(2, "0");
+  return `${sign}${hh}:${mm}`;
+}
+
+const HAS_ZONE_RE = /(?:Z|[+-]\d{2}:?\d{2})$/;
+const MINUTE_PRECISION_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+
+/**
+ * Open-Meteo (requested with timezone=auto) returns resort-local wall times
+ * with no zone designator ("2026-07-12T12:00") and reports the offset once as
+ * `utc_offset_seconds`. Re-attach that offset so the string is at the same
+ * time an exact instant (Date.parse, for hasCurrentSnowForecast and
+ * findCurrentHourIndex) and the resort's own wall clock (lib/weather.ts
+ * parseLocalParts, for bucketIntoPeriods). Never parse these in the server
+ * timezone, and never emit them as UTC "Z" — that threw the local hour away
+ * and mislabelled the forecast table's periods (code review P1-7).
+ */
 function hourlyTime(data: OpenMeteoResponse, time: string): string {
-  const utcMs = Date.parse(`${time}Z`) - (data.utc_offset_seconds ?? 0) * 1000;
-  return new Date(utcMs).toISOString();
+  if (HAS_ZONE_RE.test(time)) return time;
+  const withSeconds = MINUTE_PRECISION_RE.test(time) ? `${time}:00` : time;
+  return `${withSeconds}${formatUtcOffset(data.utc_offset_seconds ?? 0)}`;
 }
 
 /** Only the interval containing now qualifies; never pick a stale or future nearest hour. */

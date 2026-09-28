@@ -24,6 +24,8 @@ test("trigger evaluates subscribers separately and preserves live alerts during 
         globalThis.fetch = async (input, init) => {
           const url = String(input);
           const json = (data: unknown) => new Response(JSON.stringify(data));
+          // Nobody opens today; the opening-day branch is covered by its own tests below.
+          if (url.includes("/resort_openings?")) return json([]);
           if (url.includes("api.open-meteo.com")) {
             forecastFetches++;
             assert.equal(new URL(url).searchParams.get("forecast_days"), "7");
@@ -121,6 +123,7 @@ test("does not re-alert the same forecast storm on the following day", async () 
     globalThis.fetch = async (input, init) => {
       const url = String(input);
       const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
+      if (url.includes("/resort_openings?")) return json([]);
       if (url.includes("api.open-meteo.com")) {
         const snowfall = [0, 0, 0, 0, 0, 1.5, 1.5, 1.5, 0, 0];
         return json({ daily: {
@@ -199,6 +202,7 @@ test("rounds fractional forecast totals and reports a failed log insert", async 
     globalThis.fetch = async (input, init) => {
       const url = String(input);
       const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
+      if (url.includes("/resort_openings?")) return json([]);
       if (url.includes("api.open-meteo.com")) {
         const snowfall = [0, 0, 0, 1.2, 1.2, 1.3, 0];
         return json({ daily: {
@@ -243,5 +247,246 @@ test("rounds fractional forecast totals and reports a failed log insert", async 
     for (const key of ["CRON_SECRET", "NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "RESEND_API_KEY"]) {
       if (savedEnv[key] === undefined) delete process.env[key]; else process.env[key] = savedEnv[key];
     }
+  }
+});
+
+// ── Opening-day branch ────────────────────────────────────────
+// Resorts whose confirmed_open is today → one email per opted-in subscriber,
+// logged as kind='opening'. Isolated from the powder branch in both
+// directions, and never a second email for the same resort/day.
+
+const TRIGGER_ENV = ["CRON_SECRET", "NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "RESEND_API_KEY"] as const;
+
+function withTriggerEnv(): () => void {
+  const savedEnv = { ...process.env };
+  process.env.CRON_SECRET = "test-secret";
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://db.test";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service";
+  process.env.RESEND_API_KEY = "re_test_key_1234567890";
+  return () => {
+    for (const key of TRIGGER_ENV) {
+      if (savedEnv[key] === undefined) delete process.env[key]; else process.env[key] = savedEnv[key];
+    }
+  };
+}
+
+type SentMail = { to: string; subject: string; html: string };
+
+function captureMail(): SentMail[] {
+  const sent: SentMail[] = [];
+  setEmailClientForTests({ emails: { send: async (payload: SentMail) => {
+    sent.push(payload);
+    return { data: { id: "test" }, error: null };
+  } } } as unknown as EmailClient);
+  return sent;
+}
+
+const authed = () => new NextRequest("https://peakcam.test/api/alerts/trigger", { headers: { authorization: "Bearer test-secret" } });
+
+test("opening day: one email per opted-in subscriber, logged as kind=opening, never twice for the same resort/day", async () => {
+  const restoreEnv = withTriggerEnv();
+  const originalFetch = globalThis.fetch;
+  const { GET } = await import("../../app/api/alerts/trigger/route");
+  const today = new Date().toISOString().slice(0, 10);
+  const logRows: Array<Record<string, unknown>> = [];
+  const posts: Array<Array<Record<string, unknown>>> = [];
+  try {
+    const sent = captureMail();
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
+      if (url.includes("/snow_reports?")) return json([{ updated_at: new Date().toISOString() }]);
+      if (url.includes("/resort_openings?")) {
+        assert.ok(url.includes(`confirmed_open=eq.${today}`), "probes today's confirmed openings only");
+        return json([
+          { resort_id: "r-mammoth", resorts: { name: "Mammoth Mountain", slug: "mammoth" } },
+          { resort_id: "r-vail", resorts: { name: "Vail Mountain", slug: "vail" } },
+        ]);
+      }
+      if (url.includes("/alert_preferences?") && url.includes("opening_day=is.true")) {
+        const ann = { id: "s-ann", email: "ann@example.com", manage_token: "tok-ann" };
+        const bob = { id: "s-bob", email: "bob@example.com", manage_token: "tok-bob" };
+        return json([
+          { subscriber_id: "s-ann", resort_id: "r-vail", alert_subscribers: ann },
+          { subscriber_id: "s-ann", resort_id: "r-mammoth", alert_subscribers: ann },
+          { subscriber_id: "s-bob", resort_id: "r-mammoth", alert_subscribers: bob },
+        ]);
+      }
+      // No powder subscriptions in this test: the powder branch returns early.
+      if (url.includes("/alert_preferences?")) return json([]);
+      if (url.includes("/cams?")) return json([{ resort_id: "r-mammoth" }, { resort_id: "r-mammoth" }, { resort_id: "r-mammoth" }]);
+      if (url.includes("/powder_alert_log")) {
+        if (init?.method === "POST") {
+          const body = JSON.parse(String(init.body)) as Array<Record<string, unknown>>;
+          posts.push(body);
+          logRows.push(...body);
+          return json([]);
+        }
+        assert.ok(url.includes("kind=eq.opening") && url.includes(`alert_date=eq.${today}`), "dedupe read is scoped to today's opening rows");
+        return json(logRows.map(({ subscriber_id, resort_id }) => ({ subscriber_id, resort_id })));
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    };
+
+    const first = await GET(authed());
+    assert.equal(first.status, 200);
+    const body = await first.json();
+    assert.equal(body.ok, true);
+    assert.deepEqual(body.openings, { resortsOpening: 2, attempted: 2, sent: 2, failed: 0, logFailures: 0 });
+    assert.deepEqual(sent.map((m) => m.to).sort(), ["ann@example.com", "bob@example.com"]);
+
+    const ann = sent.find((m) => m.to === "ann@example.com")!;
+    assert.equal(ann.subject, "2 of your resorts open today — PeakCam");
+    assert.match(ann.html, /Watch 3 live cams →/);
+    assert.match(ann.html, /Watch the cams →/, "Vail has no active cam");
+    assert.ok(ann.html.includes("/alerts/manage?token=tok-ann"));
+    const bob = sent.find((m) => m.to === "bob@example.com")!;
+    assert.equal(bob.subject, "Mammoth Mountain opens today — PeakCam");
+
+    // Every log row is an opening row with no snow — never a default 'live'
+    // row, which would swallow that subscriber's powder alert for the day.
+    assert.equal(logRows.length, 3);
+    for (const row of logRows) {
+      assert.equal(row.kind, "opening");
+      assert.equal(row.new_snow_inches, 0);
+      assert.equal(row.alert_date, today);
+      assert.equal(row.storm_start_date, null);
+    }
+    assert.deepEqual(
+      logRows.map((r) => `${r.subscriber_id}:${r.resort_id}`).sort(),
+      ["s-ann:r-mammoth", "s-ann:r-vail", "s-bob:r-mammoth"]
+    );
+
+    // A second run the same day (a manual re-trigger, a Vercel retry) sends nothing.
+    const second = await GET(authed());
+    assert.equal(second.status, 200);
+    assert.deepEqual((await second.json()).openings, { resortsOpening: 2, attempted: 0, sent: 0, failed: 0, logFailures: 0 });
+    assert.equal(sent.length, 2);
+    assert.equal(posts.length, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+    setEmailClientForTests(null);
+    restoreEnv();
+  }
+});
+
+test("an opening-day log row never suppresses that subscriber's powder alert", async () => {
+  const restoreEnv = withTriggerEnv();
+  const originalFetch = globalThis.fetch;
+  const { GET } = await import("../../app/api/alerts/trigger/route");
+  const today = new Date().toISOString().slice(0, 10);
+  let posted: Array<Record<string, unknown>> = [];
+  try {
+    const sent = captureMail();
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
+      if (url.includes("/resort_openings?")) return json([]);
+      if (url.includes("api.open-meteo.com")) return json({});
+      if (url.includes("/snow_reports?")) return json([{ updated_at: new Date().toISOString() }]);
+      if (url.includes("/alert_preferences?")) return json([{
+        subscriber_id: "sub", resort_id: "x", threshold_inches: 2,
+        alert_subscribers: { id: "sub", email: "ski@example.com", manage_token: "token" },
+        resorts: { name: "X", slug: "x" },
+      }]);
+      if (url.includes("/latest_snow_reports?")) return json([{ resort_id: "x", new_snow_24h: 5 }]);
+      if (url.includes("/resorts?")) return json([{ id: "x", lat: 39, lng: -120 }]);
+      if (url.includes("/powder_alert_log")) {
+        if (init?.method === "POST") {
+          posted = JSON.parse(String(init.body));
+          return json([]);
+        }
+        // This morning's opening-day email to the same subscriber for the same resort.
+        return json([{ subscriber_id: "sub", resort_id: "x", new_snow_inches: 0, alert_date: today, kind: "opening", storm_start_date: null }]);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    };
+    const response = await GET(authed());
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.sent, 1, "5″ over a 2″ threshold still alerts on opening day");
+    assert.deepEqual(sent.map((m) => m.to), ["ski@example.com"]);
+    assert.match(sent[0].subject, /5" of new snow at X/);
+    assert.equal(posted[0].kind, "live");
+    assert.deepEqual(body.openings, { resortsOpening: 0, attempted: 0, sent: 0, failed: 0, logFailures: 0 });
+  } finally {
+    globalThis.fetch = originalFetch;
+    setEmailClientForTests(null);
+    restoreEnv();
+  }
+});
+
+test("a failed openings query fails the run loudly but never blocks powder alerts", async () => {
+  const restoreEnv = withTriggerEnv();
+  const originalFetch = globalThis.fetch;
+  const { GET } = await import("../../app/api/alerts/trigger/route");
+  try {
+    const sent = captureMail();
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
+      // Migration 020 not applied, or the table is unreachable.
+      if (url.includes("/resort_openings?")) return json({ message: "relation does not exist" }, 404);
+      if (url.includes("api.open-meteo.com")) return json({});
+      if (url.includes("/snow_reports?")) return json([{ updated_at: new Date().toISOString() }]);
+      if (url.includes("/alert_preferences?")) return json([{
+        subscriber_id: "sub", resort_id: "x", threshold_inches: 2,
+        alert_subscribers: { id: "sub", email: "ski@example.com", manage_token: "token" },
+        resorts: { name: "X", slug: "x" },
+      }]);
+      if (url.includes("/latest_snow_reports?")) return json([{ resort_id: "x", new_snow_24h: 5 }]);
+      if (url.includes("/resorts?")) return json([{ id: "x", lat: 39, lng: -120 }]);
+      if (url.includes("/powder_alert_log")) return json([]);
+      throw new Error(`Unexpected fetch: ${url}`);
+    };
+    const response = await GET(authed());
+    const body = await response.json();
+    assert.equal(response.status, 500, "a broken opening-day branch is a failed cron run");
+    assert.equal(body.ok, false);
+    assert.equal(body.sent, 1, "the powder alert still went out");
+    assert.deepEqual(sent.map((m) => m.to), ["ski@example.com"]);
+    assert.equal(body.openings.failed, 1);
+    assert.deepEqual(body.openings.errors, ["openings_query_failed"]);
+    assert.equal(body.openings.sent, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+    setEmailClientForTests(null);
+    restoreEnv();
+  }
+});
+
+test("opening day: a failed dedupe read sends nothing rather than risk a second email", async () => {
+  const restoreEnv = withTriggerEnv();
+  const originalFetch = globalThis.fetch;
+  const { GET } = await import("../../app/api/alerts/trigger/route");
+  try {
+    const sent = captureMail();
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
+      if (url.includes("/snow_reports?")) return json([{ updated_at: new Date().toISOString() }]);
+      if (url.includes("/resort_openings?")) return json([{ resort_id: "r-mammoth", resorts: { name: "Mammoth Mountain", slug: "mammoth" } }]);
+      if (url.includes("/alert_preferences?") && url.includes("opening_day=is.true")) {
+        return json([{ subscriber_id: "s-ann", resort_id: "r-mammoth", alert_subscribers: { id: "s-ann", email: "ann@example.com", manage_token: "tok-ann" } }]);
+      }
+      if (url.includes("/alert_preferences?")) return json([]);
+      if (url.includes("/cams?")) return json([]);
+      if (url.includes("/powder_alert_log")) {
+        assert.notEqual(init?.method, "POST", "nothing may be logged when nothing was sent");
+        return json({ message: "timeout" }, 503);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    };
+    const response = await GET(authed());
+    const body = await response.json();
+    assert.equal(response.status, 500);
+    assert.deepEqual(sent, []);
+    assert.equal(body.openings.resortsOpening, 1);
+    assert.equal(body.openings.attempted, 0);
+    assert.deepEqual(body.openings.errors, ["openings_log_query_failed"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    setEmailClientForTests(null);
+    restoreEnv();
   }
 });

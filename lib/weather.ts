@@ -220,16 +220,63 @@ export async function getHourlyForecast(
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-/** Bucket hourly data into morning/afternoon/evening periods per day. */
+// ── Local wall-clock parsing ──────────────────────────────────
+// Hourly series arrive as ISO strings that already carry the resort's own UTC
+// offset: NWS `startTime` ("2026-11-02T06:00:00-07:00") and, via
+// lib/open-meteo.ts hourlyTime(), Open-Meteo ("2026-07-12T12:00:00-03:00").
+// The wall clock written in the string IS the resort's local time. Going
+// through `new Date()` and reading getHours() / toISOString() / getDay()
+// re-expresses that instant in the *server's* zone — UTC on Vercel — so a
+// Colorado "6am–noon" morning bucket held 23:00–05:00 local and the evening
+// bucket slid under the next day's label (code review P1-7). Read the parts
+// straight from the string instead; never convert.
+
+export interface LocalParts {
+  /** 0–23 on the wall clock the string was written in. */
+  hour: number;
+  /** "YYYY-MM-DD" on that same wall clock. */
+  dateKey: string;
+  /** 0 (Sun) – 6 (Sat) for `dateKey`. */
+  weekday: number;
+}
+
+// Date, "T", hh:mm, optional :ss(.fraction), optional zone designator. The
+// zone is matched only so the string validates — its value is deliberately
+// not used, because the wall clock is what we want.
+const ISO_LOCAL_RE =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}(?::?\d{2})?)?$/;
+
+/**
+ * Local hour / date / weekday of an ISO timestamp, taken from the string's
+ * own offset without ever converting to the server zone. A string with no
+ * zone designator (or "Z") is read as written. Returns null for anything
+ * that is not a well-formed timestamp.
+ */
+export function parseLocalParts(iso: string): LocalParts | null {
+  const m = ISO_LOCAL_RE.exec(iso.trim());
+  if (!m) return null;
+  const [, y, mo, d, h, mi] = m;
+  const month = Number(mo);
+  const day = Number(d);
+  const hour = Number(h);
+  if (month < 1 || month > 12 || day < 1 || hour > 23 || Number(mi) > 59) return null;
+  // Date.UTC on the civil date alone: a calendar date's weekday does not
+  // depend on any zone, and staying in UTC keeps the server zone out of it.
+  const civil = new Date(Date.UTC(Number(y), month - 1, day));
+  if (civil.getUTCDate() !== day) return null; // "2026-02-30" would have rolled over
+  return { hour, dateKey: `${y}-${mo}-${d}`, weekday: civil.getUTCDay() };
+}
+
+/** Bucket hourly data into morning/afternoon/evening periods per resort-local day. */
 export function bucketIntoPeriods(hourly: HourlyWeather[]): ForecastPeriod[] {
   type Bucket = { period: "morning" | "afternoon" | "evening"; day: string; items: HourlyWeather[] };
   const buckets = new Map<string, Bucket>();
 
   for (const h of hourly) {
-    const date = new Date(h.time);
-    const hour = date.getHours();
-    const dayKey = date.toISOString().slice(0, 10);
-    const dow = DAY_NAMES[date.getDay()];
+    const local = parseLocalParts(h.time);
+    if (!local) continue; // malformed timestamp — nothing to file it under
+    const { hour, dateKey, weekday } = local;
+    const dow = DAY_NAMES[weekday];
 
     let period: "morning" | "afternoon" | "evening";
     if (hour >= 6 && hour < 12) period = "morning";
@@ -237,7 +284,7 @@ export function bucketIntoPeriods(hourly: HourlyWeather[]): ForecastPeriod[] {
     else if (hour >= 18 && hour < 24) period = "evening";
     else continue; // skip overnight (0-6)
 
-    const key = `${dayKey}-${period}`;
+    const key = `${dateKey}-${period}`;
     if (!buckets.has(key)) {
       buckets.set(key, { period, day: dow, items: [] });
     }

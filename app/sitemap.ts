@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { getResortSitemapEntries } from "@/lib/supabase";
 import { SITE_URL } from "@/lib/site";
 import { isDropInEnabled } from "@/lib/drop-in";
+import { HUB_BASE_PATH, hubPath, listHubs } from "@/lib/hubs";
 
 // Match the data pages' ISR window: the sitemap's lastModified values come
 // from snow_reports, which the sync jobs append every 6h, so a build-time
@@ -45,6 +46,28 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
   const dataModified = newestReportMs > 0 ? new Date(newestReportMs) : buildTime;
 
+  // /ski-cams/[hub] — one URL per state/province/country and per region with
+  // enough resorts, exactly the set app/ski-cams/[hub]/page.tsx's
+  // generateStaticParams emits (both call listHubs on the active resorts). A
+  // hub's data-bearing content changes when any of its resorts' reports does,
+  // so lastModified is the newest report in the hub; a hub with no reports yet
+  // falls back to build time like a resort would.
+  const { states, regions } = listHubs(entries);
+  const hubEntries: MetadataRoute.Sitemap = [...states, ...regions].map((group) => {
+    let newestMs = 0;
+    for (const r of group.resorts) {
+      if (!r.lastReportAt) continue;
+      const ms = new Date(r.lastReportAt).getTime();
+      if (ms > newestMs) newestMs = ms;
+    }
+    return {
+      url: `${SITE_URL}${hubPath(group.hub)}`,
+      lastModified: newestMs > 0 ? new Date(newestMs) : buildTime,
+      changeFrequency: "daily",
+      priority: 0.8,
+    };
+  });
+
   return [
     { url: SITE_URL, lastModified: dataModified, changeFrequency: "hourly", priority: 1.0 },
     { url: `${SITE_URL}/snow-report`, lastModified: dataModified, changeFrequency: "hourly", priority: 0.9 },
@@ -53,6 +76,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Powder-alert sign-up landing page: the only dedicated conversion page,
     // has its own canonical (app/alerts/page.tsx) and is not in PRIVATE_PATHS.
     { url: `${SITE_URL}/alerts`, lastModified: buildTime, changeFrequency: "monthly", priority: 0.7 },
+    // Pre-season landing page ("when does X open"): the table is re-seeded as
+    // resorts announce, roughly weekly through November, so weekly is honest.
+    { url: `${SITE_URL}/opening-dates`, lastModified: buildTime, changeFrequency: "weekly", priority: 0.7 },
+    // Hub index: its list of hubs only changes when the catalogue does (a
+    // deploy), so build time is the honest lastModified; the hubs themselves
+    // carry their newest report below.
+    { url: `${SITE_URL}${HUB_BASE_PATH}`, lastModified: buildTime, changeFrequency: "weekly", priority: 0.7 },
     // The Drop In hub only. The three playable routes
     // (/resorts/{slug}/drop-in) are deliberately `robots: { index: false }`, and
     // a sitemap of noindex URLs is a contradiction — the hub links to them.
@@ -61,6 +91,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       : []),
     { url: `${SITE_URL}/about`, lastModified: buildTime, changeFrequency: "monthly", priority: 0.4 },
     { url: `${SITE_URL}/methodology`, lastModified: buildTime, changeFrequency: "monthly", priority: 0.5 },
+    ...hubEntries,
     ...resortEntries,
   ];
 }

@@ -32,6 +32,14 @@ test("buildSubscribePayload trims the email, dedupes ids and defaults thresholds
   assert.deepEqual(buildSubscribePayload({ email: "a@b.co", resortIds: ["x"] }).thresholds, { x: 6 });
 });
 
+test("buildSubscribePayload sends opening_alerts only when the form set it", () => {
+  // Surfaces without the checkbox (ResortAlertCapture) keep the original three-field body.
+  assert.equal("opening_alerts" in buildSubscribePayload({ email: "a@b.co", resortIds: ["x"] }), false);
+  assert.equal(buildSubscribePayload({ email: "a@b.co", resortIds: ["x"], openingAlerts: true }).opening_alerts, true);
+  // An explicit "no" is sent as false, not dropped — the server treats absent as off anyway.
+  assert.equal(buildSubscribePayload({ email: "a@b.co", resortIds: ["x"], openingAlerts: false }).opening_alerts, false);
+});
+
 test("isValidEmail mirrors the server's shape check", () => {
   assert.equal(isValidEmail("skier@example.com"), true);
   assert.equal(isValidEmail("  skier@example.com  "), true);

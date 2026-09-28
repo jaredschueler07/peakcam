@@ -40,11 +40,22 @@ const deps: SubscribeDeps = {
   },
 
   async insertPreferences(prefs) {
-    const resp = await serviceFetch("/alert_preferences", {
-      method: "POST",
-      headers: { Prefer: "resolution=ignore-duplicates" },
-      body: JSON.stringify(prefs),
-    });
+    const insert = (body: unknown) =>
+      serviceFetch("/alert_preferences", {
+        method: "POST",
+        headers: { Prefer: "resolution=ignore-duplicates" },
+        body: JSON.stringify(body),
+      });
+
+    let resp = await insert(prefs);
+    if (!resp.ok && resp.status === 400) {
+      // A database that has not run migration 020 rejects the opening_day
+      // column. The subscription itself must still go through — retry with
+      // the flag stripped and log it, rather than failing every new signup
+      // for the length of the deploy window.
+      console.error("[alerts/subscribe] opening_day column missing — apply migration 020; saving preferences without the flag");
+      resp = await insert(prefs.map(({ opening_day: _openingDay, ...pref }) => pref));
+    }
     if (!resp.ok) {
       console.error("[alerts/subscribe] prefs insert failed:", await resp.text());
       return false;

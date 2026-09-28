@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { camDisplayName, withResolvedCamNames } from "./cam-name";
+import { camDisplayName, camElevationFt, withResolvedCamNames } from "./cam-name";
 
 /** Only the fields the naming logic reads; the real rows carry ~20 more. */
 function cam(over: Partial<{ name: string; embed_url: string | null; youtube_id: string | null }>) {
@@ -50,4 +50,16 @@ test("the data edge resolves derivable names but never invents a generic one", (
   assert.strictEqual(resolved[0], rows[0]);
   // …and the generic label stays a presentation decision.
   assert.strictEqual(camDisplayName(resolved[2]), "Live cam");
+});
+
+test("camElevationFt formats a numeric elevation with its unit and drops everything else", () => {
+  assert.strictEqual(camElevationFt("9000"), "9,000′");
+  assert.strictEqual(camElevationFt(" 11450 "), "11,450′", "surrounding whitespace is trimmed");
+  assert.strictEqual(camElevationFt("850"), "850′");
+  assert.strictEqual(camElevationFt(""), null, "a blank cell is not 0′");
+  assert.strictEqual(camElevationFt("   "), null, "whitespace is not an elevation, even though it is truthy");
+  assert.strictEqual(camElevationFt(null), null);
+  assert.strictEqual(camElevationFt("summit"), null, "junk is dropped, not printed as NaN′ or verbatim");
+  assert.strictEqual(camElevationFt("0"), null);
+  assert.strictEqual(camElevationFt("-40"), null);
 });
