@@ -61,7 +61,10 @@ export const metadata: Metadata = {
     "Argentina ski resorts",
   ],
   metadataBase: new URL(BASE_URL),
-  alternates: { canonical: "/" },
+  // No root `alternates.canonical`: Next replaces (not merges) `alternates`
+  // from a child, so a root "/" is inherited verbatim by any page that sets
+  // none — canonicalising it to the homepage. Every indexable page sets its
+  // own canonical instead.
   openGraph: {
     type: "website",
     siteName: "PeakCam",
@@ -85,7 +88,8 @@ const organizationLd = {
   name: "PeakCam",
   url: BASE_URL,
   logo: `${BASE_URL}/icon.png`,
-  sameAs: [],
+  // The profiles linked from the site footer (components/home/PeakFooter.tsx).
+  sameAs: ["https://instagram.com/peakcam.io", "https://x.com/peakcam_io"],
 };
 
 const websiteLd = {
@@ -93,7 +97,8 @@ const websiteLd = {
   "@type": "WebSite",
   name: "PeakCam",
   url: BASE_URL,
-  description: "Live webcams, snow reports, and weather forecasts for ski resorts across North America.",
+  description:
+    "Live webcams and sensor-measured snow reports for ski resorts across North and South America",
   potentialAction: {
     "@type": "SearchAction",
     target: {

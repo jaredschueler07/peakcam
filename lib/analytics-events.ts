@@ -25,6 +25,11 @@ export const EVENTS = {
   // a different browser (mail-app webview, second device) — real completions
   // that can never emit AUTH_SIGNUP_COMPLETED, so they are counted here instead.
   AUTH_CALLBACK_FAILED: "auth_callback_failed",
+  // AuthModal opened for a signed-out visitor. `source` names the surface that
+  // raised the gate (favorite_card, user_report, alert_done, …) so gate →
+  // sign-up conversion can be read per surface; without it the account funnel
+  // had a single measured step.
+  AUTH_GATE_SHOWN: "auth_gate_shown",
   FAVORITE_ADDED: "favorite_added",
   FAVORITE_REMOVED: "favorite_removed",
   CONDITION_VOTED: "condition_voted",

@@ -2,13 +2,14 @@
 
 import { useForecastTime } from "@/lib/use-forecast-time";
 import { hasFreshSnowForecast } from "@/lib/snow-forecast";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import { Snowflake, Play } from "lucide-react";
 import type { Cam, ResortWithData } from "@/lib/types";
 import { camDisplayName } from "@/lib/cam-name";
 import { entranceMotionProps } from "@/lib/motion-entrance";
+import { trackCamPlayed } from "@/lib/posthog";
 
 interface SnowCam {
   cam: Cam;
@@ -113,6 +114,15 @@ function SnowCamCard({
 
   const isImage = cam.embed_type === "image";
 
+  // The feed actually showing (still or player document loaded), as opposed
+  // to the "Load cam" click. Once per card.
+  const played = useRef(false);
+  const handlePlayed = () => {
+    if (played.current) return;
+    played.current = true;
+    trackCamPlayed("home_snow", cam.embed_type, resort.slug);
+  };
+
   return (
     <motion.div
       className="group relative rounded-[18px] overflow-hidden
@@ -135,6 +145,7 @@ function SnowCamCard({
               className="w-full h-full object-cover"
               loading="lazy"
               decoding="async"
+              onLoad={handlePlayed}
             />
           ) : cam.embed_type === "link" ? null : (
             <iframe
@@ -143,6 +154,7 @@ function SnowCamCard({
               allow="autoplay; encrypted-media"
               allowFullScreen
               title={name}
+              onLoad={handlePlayed}
             />
           )
         ) : (

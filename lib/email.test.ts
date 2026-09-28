@@ -1,15 +1,19 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
+import { readFileSync } from "node:fs";
 import {
   checkResendApiKey,
   EmailSendError,
+  escapeHtml,
   sendEmail,
+  sendManageLinkEmail,
   sendPowderAlertEmail,
   sendWelcomeEmail,
   setEmailClientForTests,
   type EmailClient,
 } from "./email";
 import { sendCamReportEmail, type CamReportEmailInput } from "./cam-reports/email";
+import { SITE_URL } from "./site";
 
 // ─── Fakes ────────────────────────────────────────────────────────────────────
 
@@ -291,6 +295,61 @@ for (const leadDays of [1, 2]) {
     assert.doesNotMatch(client.sent[0].html, /Fresh powder dropped/);
   });
 }
+
+// ─── Links come from the canonical SITE_URL, never from env ──────────────────
+
+test("every email link is built from the canonical SITE_URL", async () => {
+  const client = okClient();
+  await sendWelcomeEmail({ email: "a@example.com", manageToken: "tok", resortNames: ["Alta"] }, client);
+  await sendManageLinkEmail({ email: "a@example.com", manageToken: "tok" }, client);
+  await sendPowderAlertEmail(
+    { email: "a@example.com", manageToken: "tok", alerts: [{ resortName: "Alta", slug: "alta", newSnow: 12, threshold: 6 }] },
+    client
+  );
+  assert.strictEqual(client.sent.length, 3);
+  for (const { html } of client.sent) {
+    assert.ok(html.includes(`${SITE_URL}/alerts/manage?token=tok`), "manage link");
+    assert.ok(html.includes(`href="${SITE_URL}"`), "logo link");
+    assert.doesNotMatch(html, /localhost/);
+  }
+  assert.ok(client.sent[2].html.includes(`${SITE_URL}/resorts/alta`), "resort link");
+});
+
+// The regression this guards was `const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || …`
+// evaluated when lib/email.ts is first imported — before any test body runs — so
+// setting the variable inside a test could never catch that line coming back.
+// Check the source instead: the only environment read the module may make is
+// the Resend key.
+test("lib/email.ts reads no site URL from the environment", () => {
+  const source = readFileSync(new URL("./email.ts", import.meta.url), "utf8");
+  const envReads = [...source.matchAll(/process\.env\.(\w+)/g)].map((m) => m[1]);
+  assert.deepStrictEqual([...new Set(envReads)], ["RESEND_API_KEY"]);
+  assert.doesNotMatch(source, /process\.env\W+NEXT_PUBLIC_SITE_URL/);
+});
+
+// ─── Resort names are escaped before they hit HTML ────────────────────────────
+
+test("escapeHtml neutralises the five HTML-significant characters", () => {
+  assert.strictEqual(escapeHtml(`Tom & Jerry's <b class="x">`), "Tom &amp; Jerry&#39;s &lt;b class=&quot;x&quot;&gt;");
+  assert.strictEqual(escapeHtml("Alta"), "Alta");
+});
+
+test("welcome and powder emails HTML-escape resort names but keep the plain-text subject raw", async () => {
+  const name = `Alta & Snowbird <script>alert(1)</script>`;
+  const client = okClient();
+  await sendWelcomeEmail({ email: "a@example.com", manageToken: "tok", resortNames: [name] }, client);
+  await sendPowderAlertEmail(
+    { email: "a@example.com", manageToken: "tok", alerts: [{ resortName: name, slug: "alta", newSnow: 12, threshold: 6 }] },
+    client
+  );
+  for (const { html } of client.sent) {
+    assert.doesNotMatch(html, /<script>/);
+    assert.match(html, /Alta &amp; Snowbird &lt;script&gt;/);
+  }
+  // Subjects are not HTML — escaping there would show literal "&amp;" in the inbox.
+  assert.match(client.sent[1].subject, /Alta & Snowbird/);
+  assert.doesNotMatch(client.sent[1].subject, /&amp;/);
+});
 
 test("mixed and forecast-only digests distinguish future snow from observed snow", async () => {
   for (const mixed of [false, true]) {

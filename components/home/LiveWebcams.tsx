@@ -2,10 +2,11 @@
 
 import { motion, useReducedMotion } from "motion/react";
 import { Camera, Play } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Cam } from "@/lib/types";
 import { camDisplayName } from "@/lib/cam-name";
 import { entranceMotionProps } from "@/lib/motion-entrance";
+import { trackCamPlayed } from "@/lib/posthog";
 
 interface LiveWebcamsProps {
   cams: Cam[];
@@ -95,6 +96,16 @@ function WebcamTile({
       ? `https://www.youtube.com/embed/${cam.youtube_id}?autoplay=1&mute=1`
       : cam.embed_url;
 
+  // The feed actually showing (player document loaded), as opposed to the
+  // "Load live feed" click. Once per tile: a player that navigates internally
+  // fires `load` again. This strip only knows the cam, not its resort.
+  const played = useRef(false);
+  const handlePlayed = () => {
+    if (played.current) return;
+    played.current = true;
+    trackCamPlayed("home_live", cam.embed_type);
+  };
+
   return (
     <motion.div
       className="group relative aspect-video rounded-[18px] overflow-hidden cursor-pointer
@@ -114,6 +125,7 @@ function WebcamTile({
           allow="autoplay; encrypted-media"
           allowFullScreen
           title={name}
+          onLoad={handlePlayed}
         />
       )}
 

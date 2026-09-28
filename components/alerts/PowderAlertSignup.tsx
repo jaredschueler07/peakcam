@@ -1,46 +1,22 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState } from "react";
+import { Bell } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
-import { Bell, Check, Loader2, X, Search } from "lucide-react";
-import type { ResortWithData } from "@/lib/types";
 import { track, EVENTS } from "@/lib/analytics-events";
-import { trackLead } from "@/lib/meta-pixel-events";
-import { trackGoogleConversion } from "@/lib/google-tag";
-import { trackRedditSignUp } from "@/lib/reddit-pixel";
+import { PowderAlertForm, type AlertResort } from "./PowderAlertForm";
 
 interface Props {
-  resorts: ResortWithData[];
+  resorts: AlertResort[];
+  /** Surface name for analytics; derived from the current path when omitted. */
+  source?: string;
+  /** Skip the picker and open on the email step with these resorts chosen. */
+  preselectedSlugs?: string[];
+  preselectedThreshold?: number;
+  label?: string;
 }
 
-const THRESHOLD_OPTIONS = [3, 6, 12, 18, 24];
-
-// The subscribe API answers an identical 200 whether it created a subscription
-// or merely re-sent the manage link to an address that already had one
-// (enumeration safety — see lib/alerts/subscribe-core.ts). The client cannot
-// tell the two apart, so the ad-platform conversions are deduped per browser
-// instead: report Lead / conversion / SignUp once, and tag every later success
-// from this browser as a repeat so PostHog can separate the two.
-const LEAD_SENT_KEY = "peakcam_alert_lead_sent";
-
-function readLeadSent(): boolean {
-  try {
-    return window.localStorage.getItem(LEAD_SENT_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function markLeadSent() {
-  try {
-    window.localStorage.setItem(LEAD_SENT_KEY, "1");
-  } catch {
-    // Storage unavailable (private mode, quota): the conversion still fires
-    // once per page load, which is the pre-existing behaviour.
-  }
-}
-
-/** Which surface opened the modal — the component is mounted on / and /alerts. */
+/** Which surface opened the modal — the component is mounted on / (browse banner) today. */
 function alertModalSource(): string {
   const path = window.location.pathname;
   if (path === "/alerts") return "alerts_page";
@@ -48,349 +24,61 @@ function alertModalSource(): string {
   return path;
 }
 
-type Step = "pick" | "email" | "done";
-
-export function PowderAlertSignup({ resorts }: Props) {
+/**
+ * Trigger button + modal around PowderAlertForm. The form owns every step and
+ * the subscribe call; this wrapper only opens, titles and closes the dialog.
+ * /alerts renders the form inline instead (components/alerts/AlertsPageContent).
+ */
+export function PowderAlertSignup({ resorts, source, preselectedSlugs, preselectedThreshold, label = "Get powder alerts" }: Props) {
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<Step>("pick");
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [thresholds, setThresholds] = useState<Record<string, number>>({});
-  const [email, setEmail] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const emailRef = useRef<HTMLInputElement>(null);
-  // Ref rather than the `submitting` state: the email input's Enter handler
-  // calls handleSubmit directly, and a second keypress can land before the
-  // state update that disables the button has re-rendered. Without the latch
-  // one subscriber posts twice and fires every conversion pixel twice.
-  const inFlight = useRef(false);
+  const [activeSource, setActiveSource] = useState(source ?? "");
+  const [subscribed, setSubscribed] = useState(false);
 
-  // Focus email input when step changes
-  useEffect(() => {
-    if (step === "email") emailRef.current?.focus();
-  }, [step]);
-
-  const handleClose = useCallback(() => {
-    setOpen(false);
-    // Reset after fade
-    setTimeout(() => {
-      setStep("pick");
-      setSearch("");
-      setSelected(new Set());
-      setThresholds({});
-      setEmail("");
-      setError(null);
-    }, 200);
-  }, []);
-
-  const toggleResort = useCallback((id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-        setThresholds((t) => ({ ...t, [id]: t[id] ?? 6 }));
-      }
-      return next;
-    });
-  }, []);
-
-  const filteredResorts = resorts.filter(
-    (r) =>
-      !search ||
-      r.name.toLowerCase().includes(search.toLowerCase()) ||
-      r.state.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const handleSubmit = async () => {
-    if (inFlight.current) return;
-    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError("Enter a valid email address");
-      return;
-    }
-    if (selected.size === 0) {
-      setError("Select at least one resort");
-      return;
-    }
-
-    inFlight.current = true;
-    setSubmitting(true);
-    setError(null);
-
-    try {
-      const resp = await fetch("/api/alerts/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email.trim(),
-          resort_ids: [...selected],
-          thresholds: Object.fromEntries(
-            [...selected].map((id) => [id, thresholds[id] ?? 6])
-          ),
-        }),
-      });
-
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error ?? "Something went wrong");
-      const resort_slugs = resorts
-        .filter((r) => selected.has(r.id))
-        .map((r) => r.slug);
-      const thresholdValues = [...selected].map((id) => thresholds[id] ?? 6);
-      track(EVENTS.ALERT_SIGNUP_SUBMITTED, {
-        resort_slugs,
-        resort_count: selected.size,
-        thresholds: Object.fromEntries(
-          [...selected].map((id) => [id, thresholds[id] ?? 6])
-        ),
-      });
-      // The conversion proper: the API accepted the subscription. Mirrored to
-      // every ad pixel that is configured (each helper no-ops without its id),
-      // but only for the first success in this browser — see LEAD_SENT_KEY.
-      const repeat_in_browser = readLeadSent();
-      track(EVENTS.ALERT_SIGNUP_SUCCEEDED, {
-        resort_count: selected.size,
-        threshold_min: Math.min(...thresholdValues),
-        resort_slugs,
-        repeat_in_browser,
-      });
-      if (!repeat_in_browser) {
-        trackLead();
-        trackGoogleConversion();
-        trackRedditSignUp();
-        markLeadSent();
-      }
-      setStep("done");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      inFlight.current = false;
-      setSubmitting(false);
-    }
+  const handleOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
+    // Modal restores focus to document.activeElement on close.
+    event.currentTarget.focus();
+    const resolved = source ?? alertModalSource();
+    setActiveSource(resolved);
+    setSubscribed(false);
+    setOpen(true);
+    track(EVENTS.ALERT_MODAL_OPENED, { source: resolved });
   };
+  // Unmounting the Modal also unmounts the form, so its steps reset for free.
+  const handleClose = () => setOpen(false);
 
   return (
     <>
-      {/* Trigger button */}
       <button
-        onClick={event => {
-          event.currentTarget.focus();
-          setOpen(true);
-          track(EVENTS.ALERT_MODAL_OPENED, { source: alertModalSource() });
-        }}
-        className="inline-flex items-center gap-2 px-4 py-2 pointer-coarse:min-h-11 rounded-lg border border-border
-                   bg-surface hover:bg-surface2 hover:border-cyan/40 text-text-subtle
-                   hover:text-cyan text-sm font-medium transition-colors duration-150"
+        type="button"
+        onClick={handleOpen}
+        className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-ink bg-cream-50 px-4 py-2 pointer-coarse:min-h-11
+                   text-sm font-bold text-ink shadow-stamp transition-transform duration-100
+                   hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-stamp-hover
+                   active:translate-x-[1px] active:translate-y-[1px] active:shadow-stamp-sm"
       >
-        <Bell size={15} />
-        Get powder alerts
+        <Bell size={15} aria-hidden />
+        {label}
       </button>
 
-      {/* Modal backdrop */}
       {open && (
-        <Modal onClose={handleClose} label="Get powder alerts" className="m-auto w-[calc(100%_-_2rem)] max-w-lg rounded-2xl">
-          <div className="w-full max-w-lg bg-surface border border-border rounded-xl
-                          overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-
-            {/* Modal header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-              <div className="flex items-center gap-2.5">
-                <Bell size={16} className="text-cyan" />
-                <span className="font-semibold text-text-base">
-                  {step === "done" ? "You're all set!" : "Get powder alerts"}
-                </span>
-              </div>
-              <button
-                onClick={handleClose}
-                className="w-11 h-11 flex items-center justify-center rounded-md border border-border
-                           text-text-muted hover:text-text-base transition-colors"
-                aria-label="Close"
-              >
-                <X size={14} />
-              </button>
+        <Modal onClose={handleClose} label="Get powder alerts" className="m-auto w-[calc(100%_-_2rem)] max-w-lg rounded-[18px]">
+          <div className="pc-on-ink flex items-center justify-between gap-3 border-b-[1.5px] border-ink bg-ink px-5 py-4 text-cream-50">
+            <div className="flex items-center gap-2.5">
+              <Bell size={16} aria-hidden className="text-alpen" />
+              <span className="font-display text-lg font-bold">{subscribed ? "You’re all set" : "Get powder alerts"}</span>
             </div>
-
-            {/* Step: Pick resorts */}
-            {step === "pick" && (
-              <>
-                <div className="px-5 pt-4 shrink-0">
-                  <p className="text-text-subtle text-sm mb-3">
-                    Choose resorts to follow. We'll email you when fresh snow hits your threshold.
-                  </p>
-                  <div className="relative mb-3">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
-                    <input
-                      type="text"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Search resorts..."
-                      className="w-full pl-9 pr-3 py-2 bg-bg border border-border rounded-lg
-                                 text-text-base text-[16px] md:text-sm placeholder:text-text-muted outline-none focus:border-cyan/50"
-                    />
-                  </div>
-                  {selected.size > 0 && (
-                    <p className="text-cyan text-xs mb-2 font-medium">
-                      {selected.size} resort{selected.size !== 1 ? "s" : ""} selected
-                    </p>
-                  )}
-                </div>
-
-                {/* Scrollable resort list */}
-                <div className="overflow-y-auto flex-1 px-5 pb-2">
-                  <div className="space-y-1.5">
-                    {filteredResorts.map((resort) => {
-                      const isOn = selected.has(resort.id);
-                      return (
-                        <div key={resort.id}
-                             className={`rounded-lg border transition-colors duration-100 ${
-                               isOn ? "bg-cyan/5 border-cyan/30" : "bg-bg border-border hover:border-border-hi"
-                             }`}>
-                          <div className="flex items-center gap-3 px-3 py-2.5 pointer-coarse:min-h-11">
-                            <button
-                              onClick={() => toggleResort(resort.id)}
-                              className={`h-11 w-11 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
-                                isOn ? "bg-cyan border-cyan" : "border-border"
-                              }`}
-                              aria-pressed={isOn}
-                              aria-label={isOn ? `Remove ${resort.name}` : `Add ${resort.name}`}
-                            >
-                              {isOn && <Check size={10} className="text-bg" strokeWidth={3} />}
-                            </button>
-
-                            <button
-                              onClick={() => toggleResort(resort.id)}
-                              className="flex-1 min-w-0 text-left"
-                            >
-                              <p className={`font-medium text-sm truncate ${isOn ? "text-text-base" : "text-text-subtle"}`}>
-                                {resort.name}
-                              </p>
-                              <p className="text-text-muted text-xs">{resort.state}</p>
-                            </button>
-
-                            {isOn && (
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <span className="text-text-muted text-[11px]">≥</span>
-                                <select
-                                  value={thresholds[resort.id] ?? 6}
-                                  onChange={(e) => {
-                                    e.stopPropagation();
-                                    setThresholds((t) => ({
-                                      ...t,
-                                      [resort.id]: Number(e.target.value),
-                                    }));
-                                  }}
-                                  className="bg-surface2 border border-border rounded px-1.5 py-1
-                                             text-text-base text-xs outline-none focus:border-cyan/50"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  {THRESHOLD_OPTIONS.map((n) => (
-                                    <option key={n} value={n}>{n}&quot;</option>
-                                  ))}
-                                </select>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {filteredResorts.length === 0 && (
-                      <p className="text-text-muted text-sm text-center py-6">No resorts found.</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="px-5 py-4 border-t border-border shrink-0">
-                  <button
-                    onClick={() => { if (selected.size > 0) { setStep("email"); setError(null); } }}
-                    disabled={selected.size === 0}
-                    className="w-full py-2.5 pointer-coarse:min-h-11 rounded-lg bg-cyan text-bg font-semibold text-sm
-                               hover:bg-cyan/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    Continue →
-                  </button>
-                </div>
-              </>
-            )}
-
-            {/* Step: Email */}
-            {step === "email" && (
-              <div className="px-5 py-6 space-y-4">
-                <p className="text-text-subtle text-sm">
-                  Alerts set up for <strong className="text-text-base">{selected.size}</strong> resort{selected.size !== 1 ? "s" : ""}.
-                  Where should we send them?
-                </p>
-
-                <input
-                  ref={emailRef}
-                  type="email"
-                  value={email}
-                  onChange={(e) => { setEmail(e.target.value); setError(null); }}
-                  onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-                  placeholder="your@email.com"
-                  autoComplete="email"
-                  inputMode="email"
-                  className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text-base
-                             placeholder:text-text-muted outline-none focus:border-cyan/50 text-[16px] md:text-sm"
-                />
-
-                {error && <p className="text-red-400 text-sm">{error}</p>}
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setStep("pick")}
-                    className="flex-1 py-2.5 pointer-coarse:min-h-11 rounded-lg border border-border text-text-subtle
-                               hover:text-text-base text-sm transition-colors"
-                  >
-                    Back
-                  </button>
-                  <button
-                    onClick={handleSubmit}
-                    disabled={submitting}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 pointer-coarse:min-h-11 rounded-lg
-                               bg-cyan text-bg font-semibold text-sm hover:bg-cyan/90
-                               transition-colors disabled:opacity-60"
-                  >
-                    {submitting ? (
-                      <><Loader2 size={14} className="animate-spin" /> Activating...</>
-                    ) : (
-                      "Activate alerts"
-                    )}
-                  </button>
-                </div>
-
-                <p className="text-text-muted text-xs text-center">
-                  No passwords. Manage or unsubscribe anytime via your email.
-                </p>
-              </div>
-            )}
-
-            {/* Step: Done */}
-            {step === "done" && (
-              <div className="px-5 py-10 text-center space-y-4">
-                <div className="w-14 h-14 rounded-full bg-cyan/10 border border-cyan/30 flex items-center
-                                justify-center mx-auto">
-                  <Check size={24} className="text-cyan" />
-                </div>
-                {/* Wording is deliberately the same whether or not this address
-                    was already subscribed — the endpoint cannot tell the caller
-                    which it was without leaking who has an account. */}
-                <h2 className="text-text-base font-semibold text-lg">Check your inbox</h2>
-                <p className="text-text-subtle text-sm leading-relaxed">
-                  We&apos;ve emailed <strong className="text-text-base">{email}</strong> a link to
-                  confirm and manage your powder alerts. If that address is already subscribed,
-                  the link lets you change what you follow.
-                </p>
-                <button
-                  onClick={handleClose}
-                  className="mt-2 px-6 py-2.5 pointer-coarse:min-h-11 bg-surface2 border border-border rounded-lg
-                             text-text-subtle hover:text-text-base text-sm transition-colors"
-                >
-                  Close
-                </button>
-              </div>
-            )}
+            <button type="button" onClick={handleClose} aria-label="Close" className="h-11 w-11 shrink-0 rounded-full border border-cream-50 text-xl">
+              ×
+            </button>
           </div>
+          <PowderAlertForm
+            resorts={resorts}
+            source={activeSource}
+            preselectedSlugs={preselectedSlugs}
+            preselectedThreshold={preselectedThreshold}
+            onDone={() => setSubscribed(true)}
+            onClose={handleClose}
+          />
         </Modal>
       )}
     </>

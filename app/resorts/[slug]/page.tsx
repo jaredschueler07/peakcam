@@ -6,6 +6,11 @@ import { getWeatherForecast, getHourlyForecast, bucketIntoPeriods } from "@/lib/
 import { getOpenMeteoForecast, getOpenMeteoHourly } from "@/lib/open-meteo";
 import { ResortDetailPage } from "@/components/resort/ResortDetailPage";
 import { camDisplayName } from "@/lib/cam-name";
+import {
+  buildResortMetaDescription,
+  buildResortSchemaDescription,
+  conditionsNarrative,
+} from "@/lib/resort-copy";
 
 import { SITE_URL as BASE_URL } from "@/lib/site";
 
@@ -50,14 +55,11 @@ export async function generateMetadata({
   // the last good metadata instead of caching an empty `{}` at 200.
   const resort = await getResortBySlug(slug);
   if (!resort) return {};
-  const snow = resort.snow_report;
-  const conditionsNarrative = snow?.conditions
-    ? (snow.conditions.includes("||") ? snow.conditions.split("||")[1] : snow.conditions)
-    : "current conditions";
 
-  const desc = snow
-    ? `${resort.name} live cams — ${snow.base_depth ?? "?"}″ base, ${conditionsNarrative}. ${resort.cams.length} webcam${resort.cams.length !== 1 ? "s" : ""} available. Real-time snow report for ${resort.state}.`
-    : `Live webcams and real-time snow conditions at ${resort.name}, ${resort.state}. Check base depth, trail status, and powder reports.`;
+  // Season-aware: off-season copy points at the coming season instead of
+  // publishing a dead "0″ base" snippet. ISR re-renders hourly, so `new
+  // Date()` here tracks the season boundary within a day.
+  const desc = buildResortMetaDescription(resort, new Date());
 
   const pageUrl = `${BASE_URL}/resorts/${slug}`;
 
@@ -120,6 +122,9 @@ export default async function ResortPage({
 
   const snow = resort.snow_report;
   const pageUrl = `${BASE_URL}/resorts/${resort.slug}`;
+  const ogImage = `${BASE_URL}/resorts/${resort.slug}/opengraph-image`;
+  // `conditions` is "tags||narrative"; only the narrative half is prose.
+  const narrative = conditionsNarrative(snow?.conditions);
 
   // Build amenityFeature array for snow conditions
   const amenityFeature: object[] = [];
@@ -136,20 +141,60 @@ export default async function ResortPage({
       amenityFeature.push({ "@type": "LocationFeatureSpecification", name: "Lifts Open", value: `${snow.lifts_open} of ${snow.lifts_total}` });
     if (snow.swe_in != null)
       amenityFeature.push({ "@type": "LocationFeatureSpecification", name: "Snow Water Equivalent", value: `${snow.swe_in} inches` });
-    if (snow.conditions)
-      amenityFeature.push({ "@type": "LocationFeatureSpecification", name: "Current Conditions", value: snow.conditions.includes("||") ? snow.conditions.split("||")[1] : snow.conditions });
+    if (narrative)
+      amenityFeature.push({ "@type": "LocationFeatureSpecification", name: "Current Conditions", value: narrative });
   }
 
-  // Build VideoObject entries for YouTube webcams
-  const youtubeCams = resort.cams.filter((c) => c.youtube_id);
-  const videos = youtubeCams.map((cam) => ({
-    "@type": "VideoObject",
-    name: `${resort.name} — ${camDisplayName(cam)} Live Webcam`,
-    description: `Live webcam at ${resort.name}${cam.elevation ? ` (${cam.elevation})` : ""}.`,
-    thumbnailUrl: `https://img.youtube.com/vi/${cam.youtube_id}/hqdefault.jpg`,
-    embedUrl: `https://www.youtube.com/embed/${cam.youtube_id}`,
-    uploadDate: resort.created_at,
-  }));
+  // One VideoObject per live stream (youtube + iframe). Refreshing stills
+  // (`image`) and link-outs are not video and get no entry. Google requires
+  // name/thumbnailUrl/uploadDate: uploadDate is the cam row's own created_at
+  // (when PeakCam catalogued the stream), never the resort's; an iframe
+  // stream exposes no poster frame, so the resort's OG card is the nearest
+  // real image. The LIVE badge needs a BroadcastEvent carrying isLiveBroadcast
+  // AND startDate AND endDate — isLiveBroadcast alone is a missing-field error
+  // in the Rich Results Test, which turns every VideoObject from valid to
+  // erroring. A 24/7 cam has no real end, and Google accepts the *expected*
+  // end of an open-ended stream: 24h past the latest snow report, which the
+  // sync jobs refresh four times a day, so every hourly ISR revalidation pushes
+  // it forward. Derived from data rather than Date.now() so the render stays
+  // pure (react-hooks/purity). startDate reuses created_at (the stream has been
+  // live since PeakCam catalogued it), so a cam without one — or a resort with
+  // no report yet — gets a plain VideoObject rather than a half-filled
+  // BroadcastEvent.
+  const broadcastEndDate = snow?.updated_at
+    ? new Date(new Date(snow.updated_at).getTime() + 24 * 60 * 60 * 1000).toISOString()
+    : null;
+  const videos = resort.cams.flatMap((cam) => {
+    const source =
+      cam.embed_type === "youtube" && cam.youtube_id
+        ? {
+            thumbnailUrl: `https://img.youtube.com/vi/${cam.youtube_id}/hqdefault.jpg`,
+            embedUrl: `https://www.youtube.com/embed/${cam.youtube_id}`,
+          }
+        : cam.embed_type === "iframe" && cam.embed_url
+          ? { thumbnailUrl: ogImage, embedUrl: cam.embed_url }
+          : null;
+    if (!source) return [];
+    return [
+      {
+        "@type": "VideoObject",
+        name: `${resort.name} — ${camDisplayName(cam)} Live Webcam`,
+        description: `Live webcam at ${resort.name}${cam.elevation ? ` (${cam.elevation})` : ""}.`,
+        ...source,
+        ...(cam.created_at && broadcastEndDate
+          ? {
+              uploadDate: cam.created_at,
+              publication: {
+                "@type": "BroadcastEvent",
+                isLiveBroadcast: true,
+                startDate: cam.created_at,
+                endDate: broadcastEndDate,
+              },
+            }
+          : {}),
+      },
+    ];
+  });
 
   // Collect social / official links for sameAs
   const sameAs: string[] = [];
@@ -163,11 +208,9 @@ export default async function ResortPage({
     "@type": ["SkiResort", "TouristAttraction"],
     "@id": pageUrl,
     name: resort.name,
-    description: snow
-      ? `${resort.name} — ${snow.base_depth ?? "?"}″ base depth, ${snow.conditions ?? "current conditions"}. ${resort.cams.length} live webcams available.`
-      : `Live webcams and snow conditions at ${resort.name}, ${resort.state}.`,
+    description: buildResortSchemaDescription(resort),
     url: pageUrl,
-    image: `${BASE_URL}/resorts/${resort.slug}/opengraph-image`,
+    image: ogImage,
     address: {
       "@type": "PostalAddress",
       addressRegion: resort.state,

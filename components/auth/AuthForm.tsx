@@ -7,13 +7,35 @@ import { safeNext } from "@/lib/safe-redirect";
 import { track, EVENTS } from "@/lib/analytics-events";
 import { authErrorMessage } from "@/lib/auth-errors";
 
-type Mode = "signin" | "signup" | "link" | "reset" | "confirm";
+export type AuthMode = "signin" | "signup" | "link" | "reset" | "confirm";
+type Mode = AuthMode;
 const EMAIL_CODE_ENABLED = process.env.NEXT_PUBLIC_AUTH_EMAIL_CODE_ENABLED === "true";
-export function AuthForm({ redirectTo = "/", initialError, onSignedIn }: { redirectTo?: string; initialError?: string | null; onSignedIn?: () => void }) {
+export function AuthForm({
+  redirectTo = "/",
+  initialError,
+  onSignedIn,
+  initialMode = "signin",
+  initialEmail = "",
+  modeSwitch = "tabs",
+}: {
+  redirectTo?: string;
+  initialError?: string | null;
+  onSignedIn?: () => void;
+  /** Which form to open on. Gates for demonstrably-new visitors pass "signup". */
+  initialMode?: AuthMode;
+  /** Pre-fills the email field (e.g. the address that just subscribed to alerts). */
+  initialEmail?: string;
+  /**
+   * "tabs" — the Sign in / Sign up toggle above the form (the /auth page).
+   * "link" — no tabs; a single "Already have an account? Sign in" / "New to
+   * PeakCam? Create a free account" line under the form (AuthModal).
+   */
+  modeSwitch?: "tabs" | "link";
+}) {
   const id = useId();
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("signin");
-  const [email, setEmail] = useState("");
+  const [mode, setMode] = useState<Mode>(initialMode);
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(initialError ?? null);
@@ -98,9 +120,9 @@ export function AuthForm({ redirectTo = "/", initialError, onSignedIn }: { redir
     <button disabled={loading} type="button" className="min-h-11 underline" onClick={() => changeMode("signin")}>Back to sign in</button>
   </div>;
   return <>
-    <div className="mb-5 grid grid-cols-2 gap-2" aria-label="Account options">
+    {modeSwitch === "tabs" && <div className="mb-5 grid grid-cols-2 gap-2" aria-label="Account options">
       {(["signin", "signup"] as const).map(value => <button key={value} type="button" disabled={loading} aria-pressed={mode === value} onClick={() => changeMode(value)} className={`min-h-11 rounded-full border border-ink px-3 text-sm font-bold ${mode === value ? "bg-ink text-cream-50" : "bg-cream-50 text-ink"}`}>{value === "signin" ? "Sign in" : "Sign up"}</button>)}
-    </div>
+    </div>}
     {(mode === "reset" || mode === "link" || mode === "confirm") && <p className="mb-4 text-sm text-bark">{mode === "reset" ? "We’ll send a link to choose a new password." : mode === "confirm" ? "Request another confirmation for your existing signup." : `Sign in to your existing account with an email ${EMAIL_CODE_ENABLED ? "code" : "link"}.`}</p>}
     <form onSubmit={submit} className="space-y-4">
       <label htmlFor={`${id}-email`} className="block text-sm font-bold">Email address<input id={`${id}-email`} type="email" autoComplete="email" required value={email} disabled={loading} onChange={event => setEmail(event.target.value)} className={inputClass} /></label>
@@ -109,6 +131,8 @@ export function AuthForm({ redirectTo = "/", initialError, onSignedIn }: { redir
       <button type="submit" disabled={loading || !email.trim() || (needsPassword && !password) || (mode !== "signin" && resendIn > 0)} className="min-h-11 w-full rounded-full border border-ink bg-alpen-dk px-4 py-3 text-sm font-bold text-cream-50 disabled:bg-cream disabled:text-bark">{loading ? "Please wait…" : mode !== "signin" && resendIn > 0 ? `Try again in ${resendIn}s` : labels[mode]}</button>
     </form>
     <div className="mt-3 flex flex-col items-start">
+      {modeSwitch === "link" && mode === "signup" && <p className="min-h-11 py-2.5 text-sm text-bark">Already have an account? <button type="button" disabled={loading} className="font-bold text-ink underline" onClick={() => changeMode("signin")}>Sign in</button></p>}
+      {modeSwitch === "link" && mode === "signin" && <p className="min-h-11 py-2.5 text-sm text-bark">New to PeakCam? <button type="button" disabled={loading} className="font-bold text-ink underline" onClick={() => changeMode("signup")}>Create a free account</button></p>}
       {mode === "signin" && <><button type="button" disabled={loading} className="min-h-11 text-sm underline" onClick={() => changeMode("reset")}>Forgot password?</button><button type="button" disabled={loading} className="min-h-11 text-sm underline" onClick={() => changeMode("link")}>Email me a sign-in {EMAIL_CODE_ENABLED ? "code" : "link"} instead</button><button type="button" disabled={loading} className="min-h-11 text-sm underline" onClick={() => changeMode("confirm")}>Resend account confirmation</button></>}
       {(mode === "reset" || mode === "link" || mode === "confirm") && <button type="button" disabled={loading} className="min-h-11 text-sm underline" onClick={() => changeMode("signin")}>Use a password instead</button>}
     </div>

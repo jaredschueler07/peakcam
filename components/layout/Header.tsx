@@ -187,7 +187,7 @@ export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps
               hover:-translate-x-[1px] hover:-translate-y-[1px]
               active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_#faf4e6]
               transition-all duration-100"
-            title="Sign in to save favorites, set powder alerts, and submit reports"
+            title="Sign in to save favorites and file on-mountain reports"
           >
             Sign in
           </Link>
@@ -239,6 +239,7 @@ export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps
               className="px-4 py-3 rounded-full text-sm font-bold text-center
                 bg-alpen-dk text-cream-50 border-[1.5px] border-cream-50
                 shadow-[2px_2px_0_#faf4e6]"
+              title="Sign in to save favorites and file on-mountain reports"
             >
               Sign in
             </Link>

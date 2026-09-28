@@ -1,53 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  findActiveResortIds,
+  findSubscriberByToken,
+  getManageState,
+  replacePreferences,
+} from "@/lib/alerts/manage";
+import { isTimeoutError, SERVICE_TIMEOUT } from "@/lib/alerts/service-fetch";
+import { parseManageUpdate } from "@/lib/alerts/validate";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-function sbFetch(path: string, init?: RequestInit) {
-  return fetch(`${SUPABASE_URL}/rest/v1${path}`, {
-    ...init,
-    headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+function timeoutResponse() {
+  return NextResponse.json(SERVICE_TIMEOUT.body, { status: SERVICE_TIMEOUT.status });
 }
 
 // GET /api/alerts/manage?token=xxx
-// Returns the subscriber's current preferences + all available resorts
+// Returns the subscriber's current preferences + all available resorts.
+// The /alerts/manage page no longer calls this — it reads getManageState
+// directly — but the route keeps the same response shape for other clients.
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
   if (!token) {
     return NextResponse.json({ error: "token is required" }, { status: 400 });
   }
 
-  const subResp = await sbFetch(
-    `/alert_subscribers?manage_token=eq.${encodeURIComponent(token)}&select=id,email,created_at&limit=1`
-  );
-  const subscribers = subResp.ok ? await subResp.json() : [];
-  if (!subscribers.length) {
-    return NextResponse.json({ error: "Invalid or expired token" }, { status: 404 });
+  try {
+    const state = await getManageState(token);
+    if (!state) {
+      return NextResponse.json({ error: "Invalid or expired token" }, { status: 404 });
+    }
+    return NextResponse.json({
+      email: state.subscriber.email,
+      created_at: state.subscriber.created_at,
+      preferences: state.preferences,
+      resorts: state.resorts,
+    });
+  } catch (err) {
+    if (isTimeoutError(err)) return timeoutResponse();
+    throw err;
   }
-  const subscriber = subscribers[0];
-
-  const [prefsResp, resortsResp] = await Promise.all([
-    sbFetch(
-      `/alert_preferences?subscriber_id=eq.${subscriber.id}&select=resort_id,threshold_inches`
-    ),
-    sbFetch(`/resorts?is_active=eq.true&select=id,name,state,region,slug&order=name`),
-  ]);
-
-  const preferences = prefsResp.ok ? await prefsResp.json() : [];
-  const resorts = resortsResp.ok ? await resortsResp.json() : [];
-
-  return NextResponse.json({
-    email: subscriber.email,
-    created_at: subscriber.created_at,
-    preferences,
-    resorts,
-  });
 }
 
 // PUT /api/alerts/manage
@@ -55,46 +44,35 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   const body = await request.json().catch(() => null);
 
-  if (!body?.token) {
-    return NextResponse.json({ error: "token is required" }, { status: 400 });
+  // Shape is validated in full before any database call — see parseManageUpdate.
+  const parsed = parseManageUpdate(body);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
-  if (!Array.isArray(body?.resort_ids)) {
-    return NextResponse.json({ error: "resort_ids must be an array" }, { status: 400 });
+  const { token, resortIds, thresholds } = parsed.update;
+
+  try {
+    const subscriber = await findSubscriberByToken(token);
+    if (!subscriber) {
+      return NextResponse.json({ error: "Invalid or expired token" }, { status: 404 });
+    }
+
+    // Unknown or inactive ids are dropped the way subscribe does. A request
+    // that named resorts but matched none is rejected rather than treated as
+    // "follow nothing" — that would silently delete every alert.
+    const activeIds = await findActiveResortIds(resortIds);
+    if (resortIds.length > 0 && activeIds.length === 0) {
+      return NextResponse.json({ error: "No valid resort IDs provided" }, { status: 400 });
+    }
+
+    const ok = await replacePreferences(subscriber.id, activeIds, thresholds);
+    if (!ok) {
+      return NextResponse.json({ error: "Failed to update preferences" }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, resort_count: activeIds.length });
+  } catch (err) {
+    if (isTimeoutError(err)) return timeoutResponse();
+    throw err;
   }
-
-  const subResp = await sbFetch(
-    `/alert_subscribers?manage_token=eq.${encodeURIComponent(body.token)}&select=id&limit=1`
-  );
-  const subscribers = subResp.ok ? await subResp.json() : [];
-  if (!subscribers.length) {
-    return NextResponse.json({ error: "Invalid or expired token" }, { status: 404 });
-  }
-  const subscriberId = subscribers[0].id;
-
-  // Delete all existing preferences
-  await sbFetch(`/alert_preferences?subscriber_id=eq.${subscriberId}`, { method: "DELETE" });
-
-  // If no resorts selected, subscriber keeps their account but has no active alerts
-  if (body.resort_ids.length === 0) {
-    return NextResponse.json({ ok: true, resort_count: 0 });
-  }
-
-  const thresholds: Record<string, number> = body.thresholds ?? {};
-  const prefs = body.resort_ids.map((rid: string) => ({
-    subscriber_id: subscriberId,
-    resort_id: rid,
-    threshold_inches: Math.max(1, Math.min(48, thresholds[rid] ?? 6)),
-  }));
-
-  const insertResp = await sbFetch("/alert_preferences", {
-    method: "POST",
-    headers: { Prefer: "resolution=ignore-duplicates" },
-    body: JSON.stringify(prefs),
-  });
-
-  if (!insertResp.ok) {
-    return NextResponse.json({ error: "Failed to update preferences" }, { status: 500 });
-  }
-
-  return NextResponse.json({ ok: true, resort_count: prefs.length });
 }

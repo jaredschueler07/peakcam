@@ -31,14 +31,30 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
     slugs.length > 0
       ? `Compare ${slugs.length} Resort${slugs.length > 1 ? "s" : ""}`
       : "Compare Ski Resorts";
+  const description =
+    "Side-by-side snow depth, new snow, trail counts, and webcam comparison for ski resorts across North & South America.";
+  const pageUrl = `${BASE_URL}/compare`;
   return {
     title,
-    description:
-      "Side-by-side snow depth, new snow, trail counts, and webcam comparison for ski resorts across North America.",
+    description,
     // Canonicalize to the bare /compare URL regardless of ?resorts= — the
     // query param produces unbounded combinations that shouldn't each be
     // treated as a distinct indexable page.
-    alternates: { canonical: `${BASE_URL}/compare` },
+    alternates: { canonical: pageUrl },
+    // The root layout's openGraph is replaced, not merged, once a page sets
+    // its own — so siteName is repeated here.
+    openGraph: {
+      type: "website",
+      url: pageUrl,
+      title: "Compare Ski Resorts Side by Side",
+      description,
+      siteName: "PeakCam",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "Compare Ski Resorts Side by Side",
+      description,
+    },
   };
 }
 

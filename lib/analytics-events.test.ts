@@ -20,6 +20,7 @@ test("EVENTS has the required product event names", () => {
     AUTH_SIGNUP_SUBMITTED: "auth_signup_submitted",
     AUTH_SIGNUP_COMPLETED: "auth_signup_completed",
     AUTH_CALLBACK_FAILED: "auth_callback_failed",
+    AUTH_GATE_SHOWN: "auth_gate_shown",
     FAVORITE_ADDED: "favorite_added",
     FAVORITE_REMOVED: "favorite_removed",
     CONDITION_VOTED: "condition_voted",

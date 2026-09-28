@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { Bell, BellOff, Check, Loader2, Trash2 } from "lucide-react";
 import { track, EVENTS } from "@/lib/analytics-events";
+import { thresholdOptionsFor } from "@/lib/alerts/client";
 
 interface Resort {
   id: string;
@@ -24,8 +25,6 @@ interface Props {
   preferences: Preference[];
   resorts: Resort[];
 }
-
-const THRESHOLD_OPTIONS = [3, 6, 12, 18, 24];
 
 export function AlertManagePage({ token, email, preferences, resorts }: Props) {
   // Build initial state from existing prefs
@@ -187,6 +186,7 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
         <div className="space-y-2 mb-8">
           {filteredResorts.map((resort) => {
             const isOn = selected.has(resort.id);
+            const threshold = thresholds[resort.id] ?? 6;
             return (
               <div
                 key={resort.id}
@@ -221,7 +221,7 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
                     <div className="flex items-center gap-1.5 shrink-0">
                       <span className="text-text-muted text-xs">Alert at</span>
                       <select
-                        value={thresholds[resort.id] ?? 6}
+                        value={threshold}
                         onChange={(e) => {
                           setThresholds((t) => ({
                             ...t,
@@ -232,7 +232,12 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
                         className="bg-surface2 border border-border rounded px-2 py-1
                                    text-text-base text-xs outline-none focus:border-cyan/50"
                       >
-                        {THRESHOLD_OPTIONS.map((n) => (
+                        {/* The shared picker list, plus this subscriber's own value
+                            when it came from outside it (the API clamps to 1–48) —
+                            a controlled select with no matching option would
+                            silently show the first one and "Save" would overwrite
+                            the threshold they chose. */}
+                        {thresholdOptionsFor(threshold).map((n) => (
                           <option key={n} value={n}>{n}&quot;</option>
                         ))}
                       </select>

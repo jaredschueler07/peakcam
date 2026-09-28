@@ -31,6 +31,7 @@ export const metadata = {
     description: "Compare live snow conditions, base depths, and powder alerts for 150+ ski resorts across North & South America.",
     url: `${SITE_URL}/snow-report`,
     type: "website" as const,
+    siteName: "PeakCam",
   },
   twitter: {
     card: "summary_large_image" as const,

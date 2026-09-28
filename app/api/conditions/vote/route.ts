@@ -27,13 +27,17 @@ export async function POST(request: NextRequest) {
   if (!snow_quality && !comfort) {
     return NextResponse.json({ error: "At least one of snow_quality or comfort is required" }, { status: 400 });
   }
+  // submitConditionVote slices the comment; a number here used to throw → 500.
+  if (comment != null && typeof comment !== "string") {
+    return NextResponse.json({ error: "comment must be a string" }, { status: 400 });
+  }
 
   const result = await submitConditionVote(
     resort_id,
     session_id,
     snow_quality ?? null,
     comfort ?? null,
-    comment
+    comment ?? undefined
   );
 
   if (!result.ok) {

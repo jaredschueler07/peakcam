@@ -36,6 +36,7 @@ export const metadata = {
     "ski cam live stream",
     "best powder days",
   ],
+  alternates: { canonical: SITE_URL },
   openGraph: {
     title: "Live Ski Resort Webcams, Snow Reports & Conditions",
     description:

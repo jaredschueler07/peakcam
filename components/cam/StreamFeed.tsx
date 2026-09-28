@@ -3,7 +3,10 @@ import { useEffect, useState } from "react";
 import { brownriceCamera, type FeedState } from "@/lib/cam-status/brownrice";
 import { recordBugAction } from "@/lib/bug-reports/client";
 
-export function StreamFeed({ id, url, name, resortUrl }: { id: string; url: string; name: string; resortUrl?: string | null }) {
+/** `onLoad` fires when the player document has loaded — the closest thing to
+ *  "the feed started" an opaque third-party iframe exposes. Re-fires on retry
+ *  (the iframe remounts); callers that want one signal per view dedupe. */
+export function StreamFeed({ id, url, name, resortUrl, onLoad }: { id: string; url: string; name: string; resortUrl?: string | null; onLoad?: () => void }) {
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<FeedState | "checking">("checking");
   const [checkedAt, setCheckedAt] = useState<string | null>(null);
@@ -30,7 +33,7 @@ export function StreamFeed({ id, url, name, resortUrl }: { id: string; url: stri
   // An explicit retry may try playback even while an earlier cached probe says down.
   const failed = trouble || (state === "unavailable" && !manualRetry);
   return <>
-    {!failed && <iframe key={attempt} src={url} title={name} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen onError={() => setTrouble(true)} className="absolute inset-0 w-full h-full border-0" />}
+    {!failed && <iframe key={attempt} src={url} title={name} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen onLoad={onLoad} onError={() => setTrouble(true)} className="absolute inset-0 w-full h-full border-0" />}
     {failed ? <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-ink px-4 py-8 text-center text-cream-50" role="status">
       <p className="text-base font-bold">{state === "unavailable" ? "Camera unavailable" : "Camera not playing?"}</p>
       <p className="text-xs">{state === "unavailable" ? "The camera operator’s stream is unavailable." : "Try reloading the player or checking the resort’s cameras."}</p>

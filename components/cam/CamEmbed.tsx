@@ -6,6 +6,7 @@ import { StreamFeed } from "./StreamFeed";
 import { RefreshCw } from "lucide-react";
 import type { Cam } from "@/lib/types";
 import { camDisplayName } from "@/lib/cam-name";
+import { trackCamPlayed } from "@/lib/posthog";
 
 const REFRESH_MS = { tile: 30_000, lightbox: 15_000 } as const;
 
@@ -15,19 +16,39 @@ function timeAgo(ts: number): string {
 }
 
 /** Auto-refreshing image feed: freshness badge, manual refresh,
- *  paused while the tab is hidden, placeholder on load failure. */
-function ImageFeed({ url, name, refreshMs, allowFill }: { url: string; name: string; refreshMs: number; allowFill: boolean }) {
+ *  paused while the tab is hidden, placeholder on load failure.
+ *  `onLoaded` fires for every frame that lands (including refreshes). */
+function ImageFeed({ url, name, refreshMs, allowFill, onLoaded }: { url: string; name: string; refreshMs: number; allowFill: boolean; onLoaded?: () => void }) {
   const [fill, setFill] = useState(false);
   const [src, setSrc] = useState(url);
   const [refreshedAt, setRefreshedAt] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
   const [, forceTick] = useState(0);
   const timers = useRef<{ refresh?: ReturnType<typeof setInterval>; tick?: ReturnType<typeof setInterval> }>({});
+  const sawFirstFrame = useRef(false);
 
   const refresh = () => {
     const sep = url.includes("?") ? "&" : "?";
     setSrc(`${url}${sep}_t=${Date.now()}`);
     setFailed(false);
+  };
+
+  const markLoaded = () => {
+    sawFirstFrame.current = true;
+    setRefreshedAt(Date.now());
+    onLoaded?.();
+  };
+
+  // The first two tiles on a resort page are server-rendered with their <img>
+  // already in the HTML, so the still can finish downloading before React
+  // hydrates — the browser has fired `load` by then and React never sees it,
+  // leaving the badge on "Loading image…" until the first refresh and never
+  // reporting the play. Read the element's state when the ref attaches; a
+  // callback ref rather than an effect because it is the element, not a
+  // render, that tells us whether the frame is there.
+  const attachImg = (img: HTMLImageElement | null) => {
+    if (!img || sawFirstFrame.current) return;
+    if (img.complete && img.naturalWidth > 0) markLoaded();
   };
 
   useEffect(() => {
@@ -74,11 +95,12 @@ function ImageFeed({ url, name, refreshMs, allowFill }: { url: string; name: str
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
+        ref={attachImg}
         src={src}
         alt={name}
         className={`absolute inset-0 w-full h-full ${fill ? "object-cover" : "object-contain"}`}
         loading="lazy"
-        onLoad={() => setRefreshedAt(Date.now())}
+        onLoad={markLoaded}
         onError={() => setFailed(true)}
       />
       {allowFill && <button type="button" onClick={() => setFill(value => !value)} aria-pressed={fill} className="absolute right-2 top-2 z-10 min-h-11 rounded-full border border-cream-50 bg-ink/90 px-3 text-sm font-bold text-cream-50">{fill ? "Show full frame" : "Fill view"}</button>}
@@ -107,9 +129,31 @@ function ImageFeed({ url, name, refreshMs, allowFill }: { url: string; name: str
  *  clipboard-write; encrypted-media; gyroscope; picture-in-picture" and a
  *  `border-0` class. That exact allow list / className is preserved on both
  *  branches below so embed behavior is unchanged. */
-export function CamEmbed({ cam, variant, resortUrl }: { cam: Cam; resortSlug: string; variant: "tile" | "lightbox"; resortUrl?: string | null }) {
+export function CamEmbed({
+  cam,
+  resortSlug,
+  variant,
+  resortUrl,
+  surface = "resort",
+}: {
+  cam: Cam;
+  resortSlug: string;
+  variant: "tile" | "lightbox";
+  resortUrl?: string | null;
+  /** Placement reported on `cam_played` ("resort", "home_live", …); see trackCamPlayed. */
+  surface?: string;
+}) {
   useEffect(() => { recordBugAction("camera-opened", { cameraId: cam.id }); }, [cam.id]);
   const name = camDisplayName(cam);
+  // `cam_played` is the feed actually showing — the player document or the
+  // first still has loaded — not the click that mounted it (cam_clicked covers
+  // that). Once per mount: still refreshes and player retries are one play.
+  const played = useRef(false);
+  const handlePlayed = () => {
+    if (played.current) return;
+    played.current = true;
+    trackCamPlayed(surface, cam.embed_type, resortSlug);
+  };
   // Default to the still during SSR/hydration; never mount the viewer on mobile.
   const [isDesktop, setIsDesktop] = useState(false);
   useEffect(() => {
@@ -121,19 +165,19 @@ export function CamEmbed({ cam, variant, resortUrl }: { cam: Cam; resortSlug: st
   }, []);
 
   if (cam.embed_type === "youtube" && cam.youtube_id) {
-    return <StreamFeed id={cam.id} url={`https://www.youtube.com/embed/${cam.youtube_id}?autoplay=1&mute=1`} name={name} resortUrl={resortUrl} />;
+    return <StreamFeed id={cam.id} url={`https://www.youtube.com/embed/${cam.youtube_id}?autoplay=1&mute=1`} name={name} resortUrl={resortUrl} onLoad={handlePlayed} />;
   }
   if (cam.embed_type === "iframe" && cam.embed_url) {
     // Palisades' Roundshot viewer is unusable on small screens; serve the still instead.
     const isPalisadesRoundshot = /palisadestahoe\.roundshot\.com\/silverado/i.test(cam.embed_url);
     if (isPalisadesRoundshot && !isDesktop) {
-      return <ImageFeed url="https://palisadestahoe.roundshot.com/cams/249" name={name} refreshMs={REFRESH_MS[variant]} allowFill={variant === "lightbox"} />;
+      return <ImageFeed url="https://palisadestahoe.roundshot.com/cams/249" name={name} refreshMs={REFRESH_MS[variant]} allowFill={variant === "lightbox"} onLoaded={handlePlayed} />;
     }
-    return <StreamFeed id={cam.id} url={cam.embed_url} name={name} resortUrl={resortUrl} />;
+    return <StreamFeed id={cam.id} url={cam.embed_url} name={name} resortUrl={resortUrl} onLoad={handlePlayed} />;
   }
 
   if (cam.embed_type === "image" && cam.embed_url) {
-    return <ImageFeed url={cam.embed_url} name={name} refreshMs={REFRESH_MS[variant]} allowFill={variant === "lightbox"} />;
+    return <ImageFeed url={cam.embed_url} name={name} refreshMs={REFRESH_MS[variant]} allowFill={variant === "lightbox"} onLoaded={handlePlayed} />;
   }
   return null;
 }

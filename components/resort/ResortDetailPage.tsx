@@ -2,7 +2,7 @@
 
 import { useForecastTime } from "@/lib/use-forecast-time";
 import { hasCurrentSnowForecast } from "@/lib/snow-forecast";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { Heart, Maximize2 } from "lucide-react";
@@ -28,6 +28,7 @@ import { isDropInResort } from "@/lib/drop-in";
 import DropInLink from "@/components/drop-in/DropInLink";
 import { useHydrated } from "@/lib/use-hydrated";
 import { formatLocalDateTime, formatUtcDate } from "@/lib/format-date";
+import { ResortAlertCapture } from "@/components/alerts/ResortAlertCapture";
 
 interface Props {
   resort: ResortWithData;
@@ -53,6 +54,30 @@ function UpdatedStamp({ iso }: { iso: string }) {
   const hydrated = useHydrated();
   return <time dateTime={iso}>{hydrated ? formatLocalDateTime(iso) : formatUtcDate(iso)}</time>;
 }
+
+// ─── Breakpoint ──────────────────────────────────────────────────────────────
+
+/**
+ * Tailwind's `lg` (64rem), read as a store so the phone and desktop layouts
+ * below can mount different trees without a hydration mismatch: `false` on the
+ * server and during hydration, the real value from the first client render on.
+ *
+ * Why not CSS alone: on phones the first cam is hoisted above the weather card
+ * (browser-test D5 — it sat ~2,000 px down), and on desktop it stays in the
+ * grid. Both copies are in the server HTML so either width is right before
+ * any JS runs (the wrong one is `display: none`), but two mounted players for
+ * one cam would mean two snapshot refresh timers, two favorite buttons and a
+ * `cam_played` from a tile nobody can see — so once the width is known the
+ * hidden copy is unmounted.
+ */
+const LG_QUERY = "(min-width: 64rem)";
+function subscribeToLg(onChange: () => void) {
+  const media = window.matchMedia(LG_QUERY);
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}
+const readIsLg = () => window.matchMedia(LG_QUERY).matches;
+const readIsLgOnServer = () => false;
 
 // ─── Cam player ──────────────────────────────────────────────────────────────
 
@@ -348,18 +373,51 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
   const forecastTime = useForecastTime();
   const isUS = resort.country === "US";
   const { user, isFavorite, toggle: toggleFav } = useFavorites();
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  // Which surface raised the auth gate (favorite_resort, resort_nudge) — the
+  // modal stamps it on AUTH_GATE_SHOWN; null when closed.
+  const [authSource, setAuthSource] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  // Shared across every ResortAlertCapture on the page so subscribing in one
+  // flips them all to the success state.
+  const [alertSubscribed, setAlertSubscribed] = useState(false);
   const favorited = isFavorite(resort.id);
+
+  const hydrated = useHydrated();
+  const isLg = useSyncExternalStore(subscribeToLg, readIsLg, readIsLgOnServer);
+  // The cam that leads the page on phones: the first one that can embed, else
+  // the first link-out. Until the width is known both placements are mounted
+  // and CSS picks; afterwards only the visible one stays.
+  const leadCam = embeddableCams[0] ?? activeCams[0] ?? null;
+  const mountMobileLead = !hydrated || !isLg;
+  const mountDesktopOnly = !hydrated || isLg;
+
+  const openLightbox = (cam: Cam) => {
+    trackCamClick(resort.slug, cam.name, "lightbox");
+    setLightboxIndex(embeddableCams.findIndex((c) => c.id === cam.id));
+  };
 
   useEffect(() => {
     trackResortView(resort.name, resort.slug);
     trackViewContent(resort.name, resort.slug);
   }, [resort.name, resort.slug]);
 
+  // Deep links such as /resorts/x#cameras landed at scrollY 0 (browser-test
+  // D5): the browser's own fragment jump happens against the pre-hydration
+  // layout, and the sections above the grid then change height. Re-run the
+  // jump once the tree has settled; scroll-mt on the sections keeps the
+  // target clear of the sticky header.
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    if (!id) return;
+    const target = document.getElementById(id);
+    if (!target) return;
+    const frame = requestAnimationFrame(() => target.scrollIntoView());
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
   return (
     <div className="min-h-screen bg-bg">
-      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
+      {authSource && <AuthModal onClose={() => setAuthSource(null)} source={authSource} />}
       <Header showSearch={false} />
 
       {/* ── Hero ──────────────────────────────────────────────── */}
@@ -406,7 +464,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
               <button
                 onClick={event => {
                   event.currentTarget.focus();
-                  if (!user) { setShowAuthModal(true); return; }
+                  if (!user) { setAuthSource("favorite_resort"); return; }
                   toggleFav(resort.id);
                 }}
                 className={`min-h-11 min-w-11 p-2 rounded-lg border transition-all duration-[220ms] ${
@@ -463,6 +521,29 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
 
       {/* ── Content ───────────────────────────────────────────── */}
       <div className="max-w-5xl mx-auto px-4 py-8 md:px-8 space-y-10">
+
+        {/* Phones: the product's core content first. One live cam straight
+            under the hero, then the one-field alert signup, before the weather
+            card and everything else pushes them 2.6 screens down. Desktop keeps
+            the cam in the grid below (see LG_QUERY). */}
+        {mountMobileLead && (
+          <section className="space-y-6 lg:hidden" aria-label={leadCam ? "Live cam and powder alerts" : "Powder alerts"}>
+            {leadCam && (
+              <div id="lead-cam" className="scroll-mt-20">
+                <CamPlayer
+                  cam={leadCam}
+                  resortSlug={resort.slug}
+                  resortName={resort.name}
+                  resortUrl={resort.cam_page_url || resort.website_url}
+                  index={0}
+                  onExpand={leadCam.embed_type !== "link" ? () => openLightbox(leadCam) : undefined}
+                />
+                <CamCaption cam={leadCam} />
+              </div>
+            )}
+            <ResortAlertCapture resort={resort} subscribed={alertSubscribed} onSubscribed={() => setAlertSubscribed(true)} />
+          </section>
+        )}
 
         {/* Drop In — pilot resorts only. The map cards were the only way in, so
             the game's own "Back to conditions" landed you on a page with no way
@@ -524,6 +605,14 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
             <div className="bg-surface border border-border rounded-xl p-6 text-center text-text-muted text-sm">
               No snow data available yet. Check back after the first SNOTEL sync.
             </div>
+          </section>
+        )}
+
+        {/* Desktop: the alert signup directly under the numbers it is about.
+            Phones already have it under the lead cam above. */}
+        {mountDesktopOnly && (
+          <section className="hidden lg:block" aria-label="Powder alerts">
+            <ResortAlertCapture resort={resort} subscribed={alertSubscribed} onSubscribed={() => setAlertSubscribed(true)} />
           </section>
         )}
 
@@ -613,28 +702,38 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {activeCams.map((cam, i) => (
-                <div key={cam.id}>
-                  <CamPlayer
-                    cam={cam}
-                    resortSlug={resort.slug}
-                    resortName={resort.name}
-                    resortUrl={resort.cam_page_url || resort.website_url}
-                    index={i}
-                    onExpand={
-                      cam.embed_type !== "link"
-                        ? () => {
-                            trackCamClick(resort.slug, cam.name, "lightbox");
-                            setLightboxIndex(embeddableCams.findIndex((c) => c.id === cam.id));
-                          }
-                        : undefined
-                    }
-                  />
-                  <CamCaption cam={cam} />
-                </div>
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {activeCams.map((cam, i) => {
+                  // The lead cam already sits under the hero on phones; it
+                  // stays in the grid only on desktop.
+                  const isLead = cam.id === leadCam?.id;
+                  if (isLead && !mountDesktopOnly) return null;
+                  return (
+                    <div key={cam.id} className={isLead ? "hidden lg:block" : undefined}>
+                      <CamPlayer
+                        cam={cam}
+                        resortSlug={resort.slug}
+                        resortName={resort.name}
+                        resortUrl={resort.cam_page_url || resort.website_url}
+                        index={i}
+                        onExpand={cam.embed_type !== "link" ? () => openLightbox(cam) : undefined}
+                      />
+                      <CamCaption cam={cam} />
+                    </div>
+                  );
+                })}
+              </div>
+              {/* A single-cam resort has nothing left for the grid on phones. */}
+              {activeCams.length === 1 && (
+                <p className="text-text-muted text-sm lg:hidden">
+                  The only cam we have for {resort.name} is at the top of this page.{" "}
+                  <a href="#lead-cam" className="text-cyan hover:underline">
+                    Jump to it ↑
+                  </a>
+                </p>
+              )}
+            </>
           )}
         </section>
 
@@ -645,9 +744,18 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
           </h2>
           <div className="space-y-4">
             <ConditionVoter resortId={resort.id} resortSlug={resort.slug} liveConditions={liveConditions ?? null} />
+            {/* Alerts need no account, so the signup replaces the old "Sign in
+                to … get powder alerts" nudge; the account is the secondary ask. */}
+            <ResortAlertCapture resort={resort} subscribed={alertSubscribed} onSubscribed={() => setAlertSubscribed(true)} />
             {!user && (
-              <p className="text-text-muted text-xs text-center mt-2">
-                <Link href="/auth" className="text-cyan hover:underline">Sign in</Link> to save favorites and get powder alerts.
+              <p className="text-text-muted text-xs text-center">
+                <button
+                  type="button"
+                  onClick={() => setAuthSource("resort_nudge")}
+                  className="inline-flex min-h-11 items-center px-1 text-cyan hover:underline"
+                >
+                  Sign in to save favorites
+                </button>
               </p>
             )}
             <UserConditionsForm resortId={resort.id} resortSlug={resort.slug} />

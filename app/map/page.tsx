@@ -18,6 +18,13 @@ export const metadata: Metadata = {
       "Explore ski resorts on an interactive map with live snow data and weather radar.",
     url: `${SITE_URL}/map`,
     type: "website",
+    siteName: "PeakCam",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Interactive Ski Resort Map",
+    description:
+      "Explore ski resorts on an interactive map with live snow data and weather radar.",
   },
   alternates: { canonical: `${SITE_URL}/map` },
 };
@@ -34,6 +41,9 @@ export default async function MapPage() {
 
   return (
     <main id="main-content">
+      {/* The map canvas carries no heading of its own; this is the page's one
+          h1 for assistive tech and crawlers (the sr-only nav below is an h2). */}
+      <h1 className="sr-only">Ski Resort Map — Live Snow Conditions &amp; Webcams</h1>
       {/* Screen-reader equivalent for the map (WCAG 1.1.1). The MapLibre canvas
           (and the whole client-only FullPageMap subtree) exposes no accessible
           representation of its markers, so this server component renders the

@@ -27,6 +27,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { EmailSendError } from "@/lib/email";
+import { clampThreshold, MAX_RESORTS_PER_REQUEST } from "./validate";
 
 /** Formats a thrown email failure the same way across every catch below. */
 function describeEmailError(err: unknown): string {
@@ -74,8 +75,6 @@ export interface SubscribeResult {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const MAX_RESORTS_PER_REQUEST = 200;
-
 /**
  * The single success response. Deliberately carries no information about
  * whether the address was new, how many resorts were stored, or what the
@@ -88,11 +87,6 @@ const SUCCESS: SubscribeResult = {
     message: "Check your email — we've sent you a link to confirm your alerts.",
   },
 };
-
-function clampThreshold(value: unknown): number {
-  const n = typeof value === "number" && Number.isFinite(value) ? value : 6;
-  return Math.max(1, Math.min(48, Math.round(n)));
-}
 
 export async function handleSubscribe(
   body: unknown,

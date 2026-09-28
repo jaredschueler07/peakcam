@@ -1,9 +1,25 @@
-import { SITE_URL as CANONICAL_SITE_URL } from "@/lib/site";
+// Every link is built from the canonical SITE_URL — no env override. The old
+// NEXT_PUBLIC_SITE_URL fallback meant an apex or preview value put a redirect
+// (or a dead localhost link) in front of every CTA a subscriber receives.
+import { SITE_URL } from "@/lib/site";
 import { Resend } from "resend";
 import type { CreateEmailOptions, CreateEmailResponse } from "resend";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || CANONICAL_SITE_URL;
 const FROM = "PeakCam Alerts <alerts@send.peakcam.io>";
+
+/**
+ * Escapes text for interpolation into the HTML templates below. Resort names
+ * are database-controlled today, but they are still the one free-text value
+ * that reaches subscribers' inboxes.
+ */
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 // ─── Sending core ─────────────────────────────────────────────────────────────
 //
@@ -188,7 +204,7 @@ export async function sendWelcomeEmail(
   client?: EmailClient
 ) {
   const manageUrl = `${SITE_URL}/alerts/manage?token=${params.manageToken}`;
-  const resortList = params.resortNames.map((n) => `<li>${n}</li>`).join("");
+  const resortList = params.resortNames.map((n) => `<li>${escapeHtml(n)}</li>`).join("");
 
   await sendOrThrow("welcome", params.email, {
     subject: "Powder alerts activated — PeakCam",
@@ -273,7 +289,7 @@ export async function sendPowderAlertEmail(
         <td style="padding: 12px 0; border-bottom: 1px solid #1e293b;">
           <a href="${SITE_URL}/resorts/${a.slug}"
              style="color: #22d3ee; font-weight: 600; text-decoration: none;">
-            ${a.resortName}
+            ${escapeHtml(a.resortName)}
           </a>
         </td>
         <td style="padding: 12px 0; border-bottom: 1px solid #1e293b; text-align: right;">
@@ -289,7 +305,7 @@ export async function sendPowderAlertEmail(
   await sendOrThrow("powder_alert", params.email, {
     subject,
     html: buildEmailHtml({
-      preheader: `${topResort.newSnow}" of ${topResort.forecastLeadDays ? "forecast" : "fresh"} snow at ${topResort.resortName}${params.alerts.length > 1 ? ` and ${params.alerts.length - 1} more` : ""}.`,
+      preheader: `${topResort.newSnow}" of ${topResort.forecastLeadDays ? "forecast" : "fresh"} snow at ${escapeHtml(topResort.resortName)}${params.alerts.length > 1 ? ` and ${params.alerts.length - 1} more` : ""}.`,
       title: allForecast ? "Storm inbound." : hasForecast ? "Fresh snow and storms ahead." : "Fresh powder dropped.",
       body: `
         <table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
@@ -297,7 +313,7 @@ export async function sendPowderAlertEmail(
         </table>
       `,
       ctaUrl: `${SITE_URL}/resorts/${topResort.slug}`,
-      ctaLabel: `Check conditions at ${topResort.resortName}`,
+      ctaLabel: `Check conditions at ${escapeHtml(topResort.resortName)}`,
       manageUrl,
     }),
   }, client);

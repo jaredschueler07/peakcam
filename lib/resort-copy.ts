@@ -32,13 +32,55 @@ const COUNTRY_NAMES: Record<string, string> = {
 /** Only the codes present in data/resorts.csv; unknown codes pass through. */
 const STATE_NAMES: Record<string, string> = {
   AK: "Alaska", AZ: "Arizona", CA: "California", CO: "Colorado", ID: "Idaho",
-  ME: "Maine", MI: "Michigan", MN: "Minnesota", MT: "Montana", NH: "New Hampshire",
-  NM: "New Mexico", NV: "Nevada", NY: "New York", OR: "Oregon", PA: "Pennsylvania",
-  UT: "Utah", VT: "Vermont", WA: "Washington", WI: "Wisconsin", WY: "Wyoming",
+  MA: "Massachusetts", MD: "Maryland", ME: "Maine", MI: "Michigan", MN: "Minnesota",
+  MT: "Montana", NH: "New Hampshire", NM: "New Mexico", NV: "Nevada", NY: "New York",
+  OR: "Oregon", PA: "Pennsylvania", UT: "Utah", VA: "Virginia", VT: "Vermont",
+  WA: "Washington", WI: "Wisconsin", WV: "West Virginia", WY: "Wyoming",
   BC: "British Columbia", AB: "Alberta", ON: "Ontario", QC: "Quebec",
 };
 
 const inches = (n: number) => `${n} ${n === 1 ? "inch" : "inches"}`;
+const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
+
+/**
+ * Ends `text` with exactly one terminal mark. Narratives arrive from the sync
+ * as "Expect clear skies today.." and callers add their own period, which is
+ * how "today.. 2 webcams" reached the SERPs.
+ */
+function asSentence(text: string): string {
+  const trimmed = text.trim().replace(/\.{2,}$/, ".");
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
+/** Full state/province name, or the country for Andes rows that store it in `state`. */
+function stateLabel(resort: ResortWithData): string {
+  const countryName = COUNTRY_NAMES[resort.country] ?? resort.country;
+  if (resort.state === countryName || resort.state === resort.country) return countryName;
+  return STATE_NAMES[resort.state] ?? resort.state;
+}
+
+/**
+ * "Region, State" for a description — same dedupe rules as locationSentence
+ * (no "Colorado Rockies, Colorado", no "Chile, Chile"), and a missing region
+ * drops to the state alone rather than leaving a dangling comma.
+ */
+function placeLabel(resort: ResortWithData): string {
+  const region = resort.region?.trim() || null;
+  const state = stateLabel(resort);
+  if (!region) return state;
+  return region.includes(state) ? region : `${region}, ${state}`;
+}
+
+/**
+ * The season a resort is waiting for while isOffSeason() is true. Northern
+ * resorts sit out May–Oct ahead of a "2026–27" winter; Andes seasons run
+ * May–Oct inside one calendar year, so a Nov–Apr off-season precedes "2027".
+ */
+function upcomingSeasonLabel(lat: number, now: Date): string {
+  const year = now.getFullYear();
+  if (lat >= 0) return `${year}–${String((year + 1) % 100).padStart(2, "0")}`;
+  return String(now.getMonth() + 1 >= 11 ? year + 1 : year);
+}
 
 /** Geographic features take "the" ("the Wasatch Range"); places don't ("Summit County", "Lake Tahoe"). */
 const REGION_NEEDS_THE =
@@ -86,10 +128,73 @@ function trendPhrase(trend: string | null | undefined): string | null {
  * no "||" there is no narrative — only a tag list ("powder,fresh"), which is
  * not a sentence and must not be published as one.
  */
-function conditionsNarrative(conditions: string | null | undefined): string | null {
+export function conditionsNarrative(conditions: string | null | undefined): string | null {
   if (!conditions || !conditions.includes("||")) return null;
   const narrative = conditions.split("||")[1].trim();
   return narrative || null;
+}
+
+/**
+ * `<meta name="description">` for a resort page. Off-season the live numbers
+ * read as a dead listing in a SERP ("0″ base, Expect clear bluebird skies
+ * today.."), so the copy points at the coming season instead; in season it
+ * leads with the numbers. Cam counts are active cams only.
+ *
+ * Google cuts descriptions at roughly 155–160 characters. The off-season copy
+ * is fixed apart from name, place and season, so it is budgeted against the
+ * longest catalogue name ("Volcán Osorno (Centro de Ski y Montaña Volcán
+ * Osorno)", 53 chars) — lib/resort-copy.test.ts holds the line at 160.
+ */
+export function buildResortMetaDescription(resort: ResortWithData, now: Date): string {
+  const snow = resort.snow_report;
+  const camCount = resort.cams.filter((c) => c.is_active).length;
+
+  if (isOffSeason(resort.lat, now)) {
+    const lead =
+      camCount > 0
+        ? `${resort.name} live webcams and snow report.`
+        : `${resort.name} snow report and ski conditions.`;
+    return `${lead} ${placeLabel(resort)}. Opens ${upcomingSeasonLabel(resort.lat, now)} — first snow and forecasts on PeakCam.`;
+  }
+
+  if (!snow) {
+    return `Live webcams and real-time snow conditions at ${resort.name}, ${stateLabel(resort)}. Check base depth, trail status, and powder reports.`;
+  }
+
+  const parts: string[] = [];
+  if (snow.base_depth != null) parts.push(`${snow.base_depth}″ base`);
+  const narrative = conditionsNarrative(snow.conditions);
+  if (narrative) parts.push(narrative);
+
+  const subject = camCount > 0 ? `${resort.name} live cams` : `${resort.name} snow report`;
+  const lead = parts.length
+    ? `${subject} — ${asSentence(parts.join(", "))}`
+    : camCount > 0
+      ? `${resort.name} live cams and snow report.`
+      : `${resort.name} snow report.`;
+  const cams = camCount > 0 ? ` ${plural(camCount, "webcam")} available.` : "";
+  return `${lead}${cams} Real-time snow report for ${stateLabel(resort)}.`;
+}
+
+/**
+ * `SkiResort.description` for the page JSON-LD: the narrative half of the
+ * overloaded `conditions` string, never the tag list, with one period.
+ */
+export function buildResortSchemaDescription(resort: ResortWithData): string {
+  const snow = resort.snow_report;
+  const camCount = resort.cams.filter((c) => c.is_active).length;
+  if (!snow) return `Live webcams and snow conditions at ${resort.name}, ${stateLabel(resort)}.`;
+
+  const parts: string[] = [];
+  if (snow.base_depth != null) parts.push(`${snow.base_depth}″ base depth`);
+  const narrative = conditionsNarrative(snow.conditions);
+  if (narrative) parts.push(narrative);
+
+  const lead = parts.length
+    ? `${resort.name} — ${asSentence(parts.join(", "))}`
+    : `${resort.name} snow report and webcams.`;
+  const cams = camCount > 0 ? ` ${plural(camCount, "live webcam")} available.` : "";
+  return `${lead}${cams}`;
 }
 
 /**

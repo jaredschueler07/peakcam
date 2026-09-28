@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildAboutParagraphs, buildResortFaq } from "./resort-copy";
+import {
+  buildAboutParagraphs,
+  buildResortFaq,
+  buildResortMetaDescription,
+  buildResortSchemaDescription,
+} from "./resort-copy";
 import type { ResortWithData, SnowReport, Cam } from "./types";
 
 const WINTER = new Date("2026-01-15T12:00:00Z");
@@ -185,4 +190,114 @@ test("faq answers are self-contained (name the resort, no dangling pronoun opene
   for (const f of faq) {
     assert.doesNotMatch(f.answer, /^(It|They|This|That)\b/);
   }
+});
+
+test("meta description: off-season swaps dead numbers for the coming season", () => {
+  const desc = buildResortMetaDescription(makeResort(), SUMMER);
+  assert.equal(
+    desc,
+    "Testline Peak live webcams and snow report. Rockies, Colorado. Opens 2026–27 — first snow and forecasts on PeakCam.",
+  );
+  assert.doesNotMatch(desc, /62″|base,/);
+  // No cams: no webcam claim.
+  const noCams = buildResortMetaDescription(makeResort({ cams: [] }), SUMMER);
+  assert.match(noCams, /^Testline Peak snow report and ski conditions\. Rockies, Colorado\. Opens/);
+  assert.doesNotMatch(noCams, /webcam|\(0/);
+});
+
+test("meta description: off-season copy fits a 160-char SERP snippet for the longest catalogue name", () => {
+  // The longest name in data/resorts.csv with its real region/state; WINTER is
+  // the Andes off-season, so this exercises the off-season branch.
+  const osorno = makeResort({
+    name: "Volcán Osorno (Centro de Ski y Montaña Volcán Osorno)",
+    lat: -41.1278,
+    state: "Chile",
+    country: "CL",
+    region: "Lake District",
+    snotel_station_id: null,
+  });
+  for (const resort of [osorno, makeResort({ ...osorno, cams: [] })]) {
+    const desc = buildResortMetaDescription(resort, WINTER);
+    assert.match(desc, /^Volcán Osorno \(Centro de Ski y Montaña Volcán Osorno\) /);
+    assert.match(desc, /Lake District, Chile\. Opens 2026 — first snow and forecasts on PeakCam\.$/);
+    assert.ok(desc.length <= 160, `${desc.length} chars: ${desc}`);
+  }
+  // Longest northern name + place combination in the catalogue (two-year season label).
+  const fortyNine = makeResort({ name: "49 Degrees North Mountain Resort", state: "WA", region: "Selkirk Mountains" });
+  const northern = buildResortMetaDescription(fortyNine, SUMMER);
+  assert.match(northern, /Selkirk Mountains, Washington\. Opens 2026–27 —/);
+  assert.ok(northern.length <= 160, `${northern.length} chars: ${northern}`);
+});
+
+test("meta description: off-season omits a missing region and dedupes region/state", () => {
+  const noRegion = makeResort({ region: null as unknown as string });
+  assert.match(buildResortMetaDescription(noRegion, SUMMER), /snow report\. Colorado\. Opens/);
+  const vail = makeResort({ region: "Colorado Rockies" });
+  assert.match(buildResortMetaDescription(vail, SUMMER), /snow report\. Colorado Rockies\. Opens/);
+});
+
+test("meta description: southern-hemisphere off-season names a single-year season", () => {
+  const andes = makeResort({ lat: -33.3, state: "Chile", country: "CL", region: "Central Andes", snotel_station_id: null });
+  assert.match(buildResortMetaDescription(andes, WINTER), /Central Andes, Chile\. Opens 2026 — first snow/);
+  assert.match(
+    buildResortMetaDescription(andes, new Date("2026-11-15T12:00:00Z")),
+    /Opens 2027 —/,
+  );
+});
+
+test("meta description: in season leads with the numbers, one period, full state name", () => {
+  const resort = makeResort({
+    snow_report: makeSnow({ conditions: "bluebird||Expect clear bluebird skies today.." }),
+  });
+  const desc = buildResortMetaDescription(resort, WINTER);
+  assert.equal(
+    desc,
+    "Testline Peak live cams — 62″ base, Expect clear bluebird skies today. 2 webcams available. Real-time snow report for Colorado.",
+  );
+  assert.doesNotMatch(desc, /\.\./);
+  assert.doesNotMatch(desc, /\bCO\b/);
+});
+
+test("meta description: in season drops a missing base and tag-only conditions; singular cam", () => {
+  const resort = makeResort({
+    cams: [makeCam("c1")],
+    snow_report: makeSnow({ base_depth: null, conditions: "powder,fresh" }),
+  });
+  assert.equal(
+    buildResortMetaDescription(resort, WINTER),
+    "Testline Peak live cams and snow report. 1 webcam available. Real-time snow report for Colorado.",
+  );
+});
+
+test("meta description: no snow report falls back without a state code", () => {
+  assert.equal(
+    buildResortMetaDescription(makeResort({ snow_report: null }), WINTER),
+    "Live webcams and real-time snow conditions at Testline Peak, Colorado. Check base depth, trail status, and powder reports.",
+  );
+});
+
+test("meta description: Andes rows in season name the country once", () => {
+  const andes = makeResort({ lat: -33.3, state: "Chile", country: "CL", region: "Central Andes" });
+  const desc = buildResortMetaDescription(andes, SUMMER);
+  assert.match(desc, /Real-time snow report for Chile\.$/);
+  assert.doesNotMatch(desc, /Chile, Chile/);
+});
+
+test("schema description uses the narrative half of conditions with one period", () => {
+  const resort = makeResort({
+    snow_report: makeSnow({ conditions: "bluebird||Expect clear bluebird skies today.." }),
+  });
+  assert.equal(
+    buildResortSchemaDescription(resort),
+    "Testline Peak — 62″ base depth, Expect clear bluebird skies today. 2 live webcams available.",
+  );
+  const tagOnly = buildResortSchemaDescription(
+    makeResort({ snow_report: makeSnow({ conditions: "powder,fresh" }) }),
+  );
+  assert.doesNotMatch(tagOnly, /\|\||powder,fresh/);
+  assert.equal(tagOnly, "Testline Peak — 62″ base depth. 2 live webcams available.");
+  assert.equal(
+    buildResortSchemaDescription(makeResort({ snow_report: null })),
+    "Live webcams and snow conditions at Testline Peak, Colorado.",
+  );
 });

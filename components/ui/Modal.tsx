@@ -22,9 +22,13 @@ export function Modal({ open = true, onClose, label, title, footer, children, cl
     };
   }, [open]);
   if (typeof document === "undefined") return null;
+  // Modals nest (AuthModal opens from inside PowderAlertSignup's dialog), and
+  // React re-dispatches every event but scroll up the component tree — portals
+  // included — so without stopPropagation the inner dialog's Escape (cancel)
+  // and backdrop click would run the outer dialog's onClose as well.
   return createPortal(<dialog ref={ref} aria-label={label ?? title}
-    onCancel={event => { event.preventDefault(); onClose(); }}
-    onClick={event => { if (event.target === event.currentTarget) onClose(); }}
+    onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}
+    onClick={event => { if (event.target === event.currentTarget) { event.stopPropagation(); onClose(); } }}
     className={`fixed max-h-[90dvh] overflow-y-auto overscroll-contain border-[1.5px] border-ink bg-cream-50 p-0 text-ink shadow-stamp-lg backdrop:bg-ink/70 ${className}`}>
     {title && <div className="flex items-center justify-between gap-3 border-b border-ink bg-ink px-5 py-4 text-cream-50">
       <h2 className="font-display text-xl font-bold">{title}</h2>
