@@ -1,12 +1,13 @@
 import type { MetadataRoute } from "next";
-import { getResortSitemapEntries } from "@/lib/supabase";
+import { getResortOpenings, getResortSitemapEntries } from "@/lib/supabase";
 import { SITE_URL } from "@/lib/site";
 import { isDropInEnabled } from "@/lib/drop-in";
 import { HUB_BASE_PATH, hubPath, listHubs } from "@/lib/hubs";
 
 // Match the data pages' ISR window: the sitemap's lastModified values come
-// from snow_reports, which the sync jobs append every 6h, so a build-time
-// snapshot goes stale within a day of a deploy.
+// from snow_reports, which the sync jobs append every 6h (and, for
+// /opening-dates, from resort_openings, which the seed re-writes without a
+// deploy), so a build-time snapshot goes stale within a day of a deploy.
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -14,7 +15,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // only the static pages — same failure class as generateStaticParams in
   // app/resorts/[slug]/page.tsx: a transient DB blip during a build must not
   // quietly produce a "successful" sitemap that drops every resort.
-  const entries = await getResortSitemapEntries();
+  // getResortOpenings returns [] only for a database without migration 020
+  // and throws otherwise, so it fails this regeneration the same way.
+  const [entries, openings] = await Promise.all([getResortSitemapEntries(), getResortOpenings()]);
 
   // Per-deploy constant inlined by next.config.ts, NOT the time this ISR
   // regeneration happened to run: the evergreen rows below only change on
@@ -45,6 +48,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (ms > newestReportMs) newestReportMs = ms;
   }
   const dataModified = newestReportMs > 0 ? new Date(newestReportMs) : buildTime;
+
+  // /opening-dates changes when its table does: `npm run seed-openings`
+  // upserts resort_openings straight into the DB (stamping updated_at) and
+  // the ISR page picks it up within the hour with no deploy, so the newest
+  // updated_at is the honest lastModified — build time only until the first
+  // seed lands. A row with an unparseable timestamp is skipped (NaN compares
+  // false), not turned into an Invalid Date.
+  let newestOpeningMs = 0;
+  for (const o of openings) {
+    const ms = new Date(o.updated_at).getTime();
+    if (ms > newestOpeningMs) newestOpeningMs = ms;
+  }
+  const openingsModified = newestOpeningMs > 0 ? new Date(newestOpeningMs) : buildTime;
 
   // /ski-cams/[hub] — one URL per state/province/country and per region with
   // enough resorts, exactly the set app/ski-cams/[hub]/page.tsx's
@@ -77,8 +93,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // has its own canonical (app/alerts/page.tsx) and is not in PRIVATE_PATHS.
     { url: `${SITE_URL}/alerts`, lastModified: buildTime, changeFrequency: "monthly", priority: 0.7 },
     // Pre-season landing page ("when does X open"): the table is re-seeded as
-    // resorts announce, roughly weekly through November, so weekly is honest.
-    { url: `${SITE_URL}/opening-dates`, lastModified: buildTime, changeFrequency: "weekly", priority: 0.7 },
+    // resorts announce, roughly weekly through November, so weekly is honest
+    // and lastModified tracks the seed (openingsModified above), not the deploy.
+    { url: `${SITE_URL}/opening-dates`, lastModified: openingsModified, changeFrequency: "weekly", priority: 0.7 },
     // Hub index: its list of hubs only changes when the catalogue does (a
     // deploy), so build time is the honest lastModified; the hubs themselves
     // carry their newest report below.

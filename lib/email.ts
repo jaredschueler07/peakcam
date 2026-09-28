@@ -249,9 +249,9 @@ export async function sendManageLinkEmail(
       body: `
         <p>Someone just used this address to sign up for powder alerts on PeakCam,
         and it's already subscribed — so nothing has been changed.</p>
-        <p>Use the link below to add resorts, adjust your snow thresholds, or
-        unsubscribe. If this wasn't you, you can ignore this email; your alerts
-        are exactly as you left them.</p>
+        <p>Use the link below to add resorts, adjust your snow thresholds, turn
+        opening-day emails on or off, or unsubscribe. If this wasn't you, you can
+        ignore this email; your alerts are exactly as you left them.</p>
       `,
       ctaUrl: manageUrl,
       ctaLabel: "Manage your alerts",

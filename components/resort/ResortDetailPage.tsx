@@ -756,8 +756,9 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
           </div>
         </section>
 
-        {/* Footer nav */}
-        <div className="border-t border-border pt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+        {/* Footer nav. The "More in {State} →" hub link lives in NearbyResorts
+            above, next to the compare and region links — not repeated here. */}
+        <div className="border-t border-border pt-6">
           <Link
             href="/"
             className="inline-flex items-center gap-1.5 text-text-muted hover:text-cyan text-sm transition-colors"
@@ -767,14 +768,6 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
             </svg>
             Back to all resorts
           </Link>
-          {nearby?.stateHub && (
-            <Link
-              href={nearby.stateHub.href}
-              className="inline-flex min-h-11 items-center text-sm font-bold text-forest underline-offset-2 hover:underline hover:text-forest-dk"
-            >
-              More in {nearby.stateHub.label} →
-            </Link>
-          )}
         </div>
 
       </div>

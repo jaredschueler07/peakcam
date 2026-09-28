@@ -11,6 +11,7 @@ import {
   openingSummary,
   sortForTable,
   toIsoDay,
+  toPacificDay,
   type OpeningResort,
   type ResortOpening,
 } from "./openings";
@@ -48,11 +49,27 @@ test("isIsoDay accepts real YYYY-MM-DD days and nothing else", () => {
 });
 
 test("toIsoDay reads the UTC calendar day of a Date and passes a valid string through", () => {
-  // 23:30 UTC on Sep 27 is Sep 28 in Europe; the cron and the page both use UTC.
+  // 23:30 UTC on Sep 27 is Sep 28 in Europe; the cron uses UTC (the page uses toPacificDay).
   assert.equal(toIsoDay(new Date("2026-09-27T23:30:00Z")), "2026-09-27");
   assert.equal(toIsoDay("2026-09-27"), "2026-09-27");
   assert.throws(() => toIsoDay("garbage"), RangeError);
   assert.throws(() => toIsoDay(new Date("nope")), RangeError);
+});
+
+test("toPacificDay reads the US Pacific calendar day, so the evening before opening day is still the day before", () => {
+  // 2026-11-13T00:00Z is 4 pm PST on Nov 12 at Mammoth (US DST ended Nov 1).
+  assert.equal(toPacificDay(new Date("2026-11-13T00:00:00Z")), "2026-11-12");
+  assert.equal(toPacificDay(new Date("2026-11-13T00:30:00Z")), "2026-11-12");
+  assert.equal(toPacificDay(new Date("2026-11-13T07:59:59Z")), "2026-11-12", "23:59:59 PST");
+  assert.equal(toPacificDay(new Date("2026-11-13T08:00:00Z")), "2026-11-13", "midnight PST");
+  // Daylight time in October is UTC-7.
+  assert.equal(toPacificDay(new Date("2026-10-09T06:59:00Z")), "2026-10-08");
+  assert.equal(toPacificDay(new Date("2026-10-09T07:00:00Z")), "2026-10-09");
+  // At the trigger cron's 13:00 UTC the Pacific day and the UTC day are the same
+  // date, so the email and the page agree on who opens today.
+  const cronRun = new Date("2026-11-13T13:00:00Z");
+  assert.equal(toPacificDay(cronRun), toIsoDay(cronRun));
+  assert.throws(() => toPacificDay(new Date("nope")), RangeError);
 });
 
 test("daysUntil counts whole days in either direction", () => {
@@ -83,6 +100,21 @@ test("openingStatus: confirmed beats projected, and flips to open on the day", (
   assert.equal(openingStatus(row, "2026-11-13"), "open", "opening day itself counts as open");
   assert.equal(openingStatus(row, "2027-02-01"), "open");
   assert.equal(openingStatus(row, new Date("2026-11-13T05:00:00Z")), "open");
+});
+
+test("openingStatus under the page's Pacific day: 00:30Z on opening day is still the evening before", () => {
+  const mammoth = opening({ resort_id: "mammoth", confirmed_open: "2026-11-13" });
+  // Nov 12, 4:30 pm PST — the ISR render that used to flip Mammoth to "Open now".
+  assert.equal(openingStatus(mammoth, toPacificDay(new Date("2026-11-13T00:30:00Z"))), "confirmed");
+  assert.equal(openingStatus(mammoth, toPacificDay(new Date("2026-11-13T08:00:00Z"))), "open", "midnight PST on Nov 13");
+  assert.equal(openingStatus(mammoth, toPacificDay(new Date("2026-11-13T13:00:00Z"))), "open", "the cron's hour");
+
+  // An Andes closing date flips the morning after it, not at 9 pm Chile time
+  // on the closing day: 00:30Z Oct 12 is Oct 11 in Pacific; 07:30Z is 00:30 PDT
+  // Oct 12, which is already 04:30 in Chile.
+  const portillo = opening({ resort_id: "portillo", closing_date: "2026-10-11", season: "2026" });
+  assert.equal(openingStatus(portillo, toPacificDay(new Date("2026-10-12T00:30:00Z"))), "open");
+  assert.equal(openingStatus(portillo, toPacificDay(new Date("2026-10-12T07:30:00Z"))), "closed");
 });
 
 test("openingStatus: a projection never becomes open on its own", () => {

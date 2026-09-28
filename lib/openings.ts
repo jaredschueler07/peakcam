@@ -3,11 +3,12 @@
 //
 // Backed by the `resort_openings` table (migration 020, seeded from
 // data/resort-openings.csv). Everything here is a pure function of its
-// inputs: the page passes the render date in, dates are compared as
-// YYYY-MM-DD strings (lexicographic order == chronological order for that
-// shape), and formatting never consults the machine's locale or timezone —
-// the page is ISR-rendered on a UTC server and must not disagree with
-// itself between revalidations. lib/openings.test.ts covers every rule.
+// inputs: the page passes the render day in (see toPacificDay for which
+// calendar day that is), dates are compared as YYYY-MM-DD strings
+// (lexicographic order == chronological order for that shape), and
+// formatting never consults the machine's locale or timezone — the page is
+// ISR-rendered on a UTC server and must not disagree with itself between
+// revalidations. lib/openings.test.ts covers every rule.
 // ─────────────────────────────────────────────────────────────
 
 import type { Resort } from "./types";
@@ -87,10 +88,16 @@ export function isIsoDay(value: unknown): value is string {
 }
 
 /**
- * The calendar day a `Date` falls on in UTC, as YYYY-MM-DD — the same "today"
- * the trigger cron uses (`new Date().toISOString().slice(0, 10)`), so the
- * page and the email agree on which day a resort opens. A string is
- * validated and passed through.
+ * The calendar day a `Date` falls on in UTC, as YYYY-MM-DD — the "today" the
+ * trigger cron uses (`new Date().toISOString().slice(0, 10)`) to decide which
+ * resorts open today. A string is validated and passed through.
+ *
+ * The page does NOT read its day from this: it revalidates at any hour, and
+ * from 00:00 UTC the UTC date is already tomorrow while it is still 4–7 pm
+ * the evening before at every Northern resort in the catalogue — a
+ * "Confirmed Nov 13" row would read "Open now" up to 16 hours before the
+ * first chair. It uses toPacificDay instead; the two agree at the cron's
+ * 13:00 UTC, so the page and the email never disagree about opening day.
  */
 export function toIsoDay(value: Date | string): string {
   if (value instanceof Date) {
@@ -99,6 +106,42 @@ export function toIsoDay(value: Date | string): string {
   }
   if (!isIsoDay(value)) throw new RangeError(`toIsoDay: "${value}" is not a YYYY-MM-DD day`);
   return value;
+}
+
+/**
+ * The wall clock /opening-dates reads its calendar day in. Every Northern
+ * resort in the catalogue sits between UTC-5 (Vermont) and UTC-8 (Tahoe,
+ * Mammoth, the Cascades), so the US Pacific day is the last of them to turn
+ * over: a resort can never read "Open" before opening day has begun where
+ * its lifts are, only up to three hours after. The Andes rows (UTC-3/-4) flip
+ * to "closed" a few hours after their own midnight rather than at 9 pm on
+ * the closing day itself.
+ */
+export const OPENINGS_TIME_ZONE = "America/Los_Angeles";
+
+// en-CA is the locale whose numeric date is YYYY-MM-DD; the parts are still
+// reassembled by type so the output never depends on the separator.
+const PACIFIC_DAY_FORMAT = new Intl.DateTimeFormat("en-CA", {
+  timeZone: OPENINGS_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/**
+ * The calendar day a `Date` falls on in OPENINGS_TIME_ZONE, as YYYY-MM-DD —
+ * the `today` the page hands to sortForTable/openingSummary. At the trigger
+ * cron's 13:00 UTC this equals toIsoDay of the same instant (05:00 or 06:00
+ * Pacific), which is what keeps the opening-day email and the "Open now"
+ * group on the same date.
+ */
+export function toPacificDay(value: Date): string {
+  if (Number.isNaN(value.getTime())) throw new RangeError("toPacificDay: invalid Date");
+  const parts = PACIFIC_DAY_FORMAT.formatToParts(value);
+  const part = (type: Intl.DateTimeFormatPart["type"]) => parts.find((p) => p.type === type)?.value ?? "";
+  const day = `${part("year")}-${part("month")}-${part("day")}`;
+  if (!isIsoDay(day)) throw new RangeError(`toPacificDay: Intl produced "${day}", not a YYYY-MM-DD day`);
+  return day;
 }
 
 /** Whole days from `today` to `iso`; negative when `iso` is in the past. */

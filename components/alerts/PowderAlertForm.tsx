@@ -194,17 +194,23 @@ export function PowderAlertForm({
             the headline is the same either way. A browser that has subscribed
             before is the one hint we get that this may be a repeat: say so,
             because re-posting the same address with more mountains changes
-            nothing (lib/alerts/subscribe-core.ts). */}
+            nothing (lib/alerts/subscribe-core.ts). The opening-day opt-in is
+            discarded on that path too — it is only written with a brand-new
+            subscriber's preference rows — so when it was ticked the copy must
+            not promise the email outright: point at the manage page, where
+            the toggle lives, in case this address already had a subscription. */}
         <h2 className="mt-4 font-display text-2xl font-black text-ink">You’re subscribed.</h2>
         <p className="mt-2 text-sm leading-relaxed text-bark">
           We just emailed <strong className="break-all font-bold text-ink">{email.trim()}</strong> a link to manage your
           mountains.
           {openingAlerts && " You’ll also hear from us the morning any of them opens for the season."}
         </p>
-        {repeatInBrowser && (
+        {(openingAlerts || repeatInBrowser) && (
           <p className="mt-2 text-sm leading-relaxed text-bark">
-            If this address was already subscribed, nothing changed — add or remove mountains from the manage link in
-            that email.
+            If this address was already subscribed, nothing changed —{" "}
+            {openingAlerts
+              ? "turn on opening-day emails, and add or remove mountains, from the manage link in that email."
+              : "add or remove mountains from the manage link in that email."}
           </p>
         )}
         {doneExtra}

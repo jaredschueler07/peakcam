@@ -140,8 +140,9 @@ function groupTitle(spec: GroupSpec, rows: OpeningRow<OpeningTableResort>[]): st
 
 /**
  * Every active resort, grouped by opening status. A Server Component: the
- * status is decided once per ISR render from the server's UTC day, there is
- * nothing to hydrate, and the HTML is what crawlers index.
+ * status is decided once per ISR render from the page's US-Pacific calendar
+ * day (lib/openings.ts toPacificDay), there is nothing to hydrate, and the
+ * HTML is what crawlers index.
  */
 export function OpeningDatesTable({ groups }: { groups: OpeningGroups<OpeningTableResort> }) {
   return (

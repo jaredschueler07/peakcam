@@ -6,7 +6,7 @@ import { PeakFooter } from "@/components/home/PeakFooter";
 import { PowderAlertForm, type AlertResort } from "@/components/alerts/PowderAlertForm";
 import { OpeningDatesTable, type OpeningTableResort } from "@/components/openings/OpeningDatesTable";
 import { OpeningSummaryChips } from "@/components/openings/OpeningSummaryChips";
-import { formatOpeningDate, openingSummary, SEASON_LABEL, sortForTable, toIsoDay } from "@/lib/openings";
+import { formatOpeningDate, openingSummary, SEASON_LABEL, sortForTable, toPacificDay } from "@/lib/openings";
 import { isOffSeason } from "@/lib/map-utils";
 import { SITE_URL } from "@/lib/site";
 
@@ -79,9 +79,13 @@ export default async function OpeningDatesPage() {
   const [resorts, openings] = await Promise.all([getAllResorts(), getResortOpenings()]);
 
   // One clock read per render; the table, the chips and the pre-season note
-  // all derive from it, so they cannot disagree. UTC day, like the cron.
+  // all derive from it, so they cannot disagree. The calendar day is the US
+  // Pacific one, not UTC: this page revalidates at any hour, and the UTC date
+  // rolls over at 4–7 pm the evening before at every Northern resort here —
+  // a row must not read "Open now" before its first chair (lib/openings.ts
+  // toPacificDay). The cron's 13:00 UTC run sees the same day either way.
   const now = new Date();
-  const today = toIsoDay(now);
+  const today = toPacificDay(now);
 
   const tableResorts: OpeningTableResort[] = resorts.map(({ id, name, slug, state, lat, cams }) => ({
     id,

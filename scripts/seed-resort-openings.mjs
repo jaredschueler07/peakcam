@@ -11,13 +11,19 @@
  * Writes: Supabase resort_openings (upsert on resort_id, service-role key)
  *
  * The CSV is keyed by resort slug; this script resolves slugs to resort ids
- * with one read and upserts one row per resort. Re-running is safe: an
- * existing row is overwritten with the CSV's values (merge-duplicates), so
- * the CSV is the source of truth — edit it, re-run, done. A slug that does
- * not exist in `resorts` is reported and skipped, never guessed.
+ * with one read and makes the table mirror the file. Re-running is safe: an
+ * existing row is overwritten with the CSV's values (merge-duplicates), and
+ * every row whose resort is no longer in the CSV is DELETED — so the CSV is
+ * the source of truth in both directions: edit it, re-run, done. To retract
+ * a date, delete the resort's line (a line with all three dates empty is
+ * rejected instead; the page shows TBA for a resort with no row). A slug
+ * that does not exist in `resorts` is reported and skipped, never guessed.
+ * A CSV that yields no valid rows changes nothing — that is a mistake, not
+ * an instruction to empty the table.
  *
  * Only `confirmed_open` triggers an opening-day email (see migration 020),
- * so a projection must stay in `projected_open` until the resort announces.
+ * so a projection must stay in `projected_open` until the resort announces —
+ * and a retracted announcement must leave the CSV, or the cron still mails.
  */
 
 import fs from "node:fs";
@@ -115,9 +121,20 @@ export function toOpeningRecord(resortId, row) {
     record[column] = toDateOrNull(row[column], column, slug);
   }
   if (!record.projected_open && !record.confirmed_open && !record.closing_date) {
-    throw new Error(`${slug}: row has no projected_open, confirmed_open or closing_date — leave unsourced resorts out of the CSV (the page shows TBA)`);
+    throw new Error(`${slug}: row has no projected_open, confirmed_open or closing_date — delete the line instead; the seed retires its row and the page shows TBA`);
   }
   return record;
+}
+
+/**
+ * PostgREST filter matching every `resort_openings` row whose resort is NOT
+ * among `resortIds` — the rows the CSV no longer vouches for. Quoting as in
+ * fetchResortIds: each id quoted and encoded on its own, commas left raw.
+ */
+export function retiredRowsFilter(resortIds) {
+  if (resortIds.length === 0) throw new Error("retiredRowsFilter: refusing to match every row");
+  const inList = resortIds.map((id) => encodeURIComponent(`"${String(id).replace(/["\\]/g, "")}"`)).join(",");
+  return `resort_id=not.in.(${inList})`;
 }
 
 // ─── Supabase REST helpers ───────────────────────────────────────────────────
@@ -156,6 +173,20 @@ async function upsertOpenings(records) {
     throw new Error(`Supabase resort_openings upsert failed (${res.status}): ${await res.text()}`);
   }
   return res.json();
+}
+
+/** Deletes every row not in `keepResortIds`; returns the deleted rows' resort ids. */
+async function deleteRetiredOpenings(keepResortIds) {
+  const url = `${SUPABASE_URL}/rest/v1/resort_openings?${retiredRowsFilter(keepResortIds)}&select=resort_id`;
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: serviceHeaders({ Prefer: "return=representation" }),
+  });
+  if (!res.ok) {
+    throw new Error(`Supabase resort_openings delete failed (${res.status}): ${await res.text()}`);
+  }
+  const rows = await res.json();
+  return rows.map((r) => r.resort_id);
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
@@ -199,7 +230,7 @@ async function main() {
     .map((r) => toOpeningRecord(slugToId.get(r.slug), r));
 
   if (records.length === 0) {
-    console.warn("  ⚠  No opening records to upsert.");
+    console.warn("  ⚠  No opening records to upsert — leaving the table untouched.");
     return;
   }
 
@@ -208,6 +239,15 @@ async function main() {
   const projected = data.filter((d) => !d.confirmed_open && d.projected_open).length;
   const closing = data.filter((d) => d.closing_date).length;
   console.log(`✅  ${data.length} rows upserted — ${confirmed} confirmed, ${projected} projected, ${closing} with a closing date.`);
+
+  // Mirror the file: a resort dropped from the CSV loses its row, so a
+  // retracted "confirmed" date cannot linger in prod and mail its subscribers.
+  const retired = await deleteRetiredOpenings(records.map((r) => r.resort_id));
+  if (retired.length > 0) {
+    console.log(`🗑  ${retired.length} row${retired.length === 1 ? "" : "s"} retired (resort no longer in the CSV): ${retired.join(", ")}`);
+  } else {
+    console.log("    No rows to retire — the table already mirrors the CSV.");
+  }
   console.log("\n    /opening-dates revalidates within the hour (ISR 3600); the opening-day cron reads confirmed_open live.\n");
 }
 
