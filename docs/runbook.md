@@ -136,14 +136,21 @@ From `lib/analytics-events.ts`:
 | Event | Fires when | Key properties |
 |---|---|---|
 | `browse_opened` | auto via `$pageview` on `/` | — |
-| `resort_viewed` | auto via `$pageview` on `/resorts/[slug]` | — |
+| `resort_viewed` | `ResortDetailPage` mount (queued until PostHog init; see `lib/analytics-events.ts`) | `resort_slug` |
 | `snow_report_opened` | auto via `$pageview` on `/snow-report` | — |
-| `alert_signup_submitted` | after POST `/api/alerts/subscribe` success | `resort_slugs`, `resort_count`, `thresholds` |
-| `alert_confirmed` | on `/alerts/manage` mount | `token` (first 8 chars only) |
+| `resort_card_clicked` / `cam_clicked` / `cam_played` / `search_performed` / `filter_applied` | browse + resort interactions via `lib/posthog.tsx` helpers (all routed through `track()`) | `resort_slug`, `cam_name`, `embed_type`, `surface`, `query`, `filter` |
+| `alert_modal_opened` | powder-alert modal opened | `source` |
+| `alert_signup_submitted` | after POST `/api/alerts/subscribe` success (legacy name; kept for dashboard continuity) | `resort_slugs`, `resort_count`, `thresholds` |
+| `alert_signup_succeeded` | same success handler; also fires Meta `Lead`, Google Ads and Reddit `SignUp` conversions once per browser | `resort_count`, `threshold_min`, `resort_slugs`, `repeat_in_browser` |
+| `alert_confirmed` | on `/alerts/manage` mount | — (token no longer sent) |
 | `auth_signup_started` | before `supabase.auth.signUp()` | `email_domain` |
-| `auth_signup_completed` | after `signUp` success | `email_domain` |
+| `auth_signup_submitted` | after `signUp` returns (email confirmation still pending) | `email_domain` |
+| `auth_signup_completed` | on `/auth/callback` landing with `?welcome=signup` when `email_confirmed_at` is fresh, or immediately when signUp returns a session | `confirmation: "email" \| "none"` |
+| `auth_callback_failed` | `/auth?error=auth_failed` | `reason` (`missing_code`, `missing_code_verifier`, `exchange_failed`) |
 | `favorite_added` / `favorite_removed` | after DB write | `item_id`, `item_type` |
 | `condition_voted` | after vote POST success | `resort_slug`, `snow_quality`, `comfort` |
+
+PostHog `identify(user.id, { email_domain })` runs on sign-in and `reset()` on sign-out (`lib/posthog-auth-sync.tsx`); the `/about` privacy copy describes this.
 
 **Known observational caveats (for the dashboard owner):**
 - `alert_confirmed` fires on every visit to `/alerts/manage` — if a user revisits to edit preferences, the funnel will show >100% step-3 conversion. Read the raw value, not the ratio.

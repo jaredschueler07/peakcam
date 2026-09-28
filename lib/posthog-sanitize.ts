@@ -111,3 +111,43 @@ export function sanitizeCaptureEvent<
     // The spread widens the type past E's constraint; the shape is unchanged.
   } as E;
 }
+
+/**
+ * Removes the named query parameters from `url` outright, as opposed to
+ * redacting their values. For parameters that exist only to hand a one-shot
+ * signal to the client and are then stripped from the address bar by the
+ * component that consumes them (`?welcome=signup`, the alert manage `token`):
+ * that strip re-runs the pageview effect via useSearchParams, so a pageview
+ * keyed on the URL before the strip must equal one keyed after it, or every
+ * such landing records two $pageview rows for one page load. String-based like
+ * redactSensitiveUrl so relative URLs and the caller's encoding survive intact;
+ * parameter names match case-insensitively.
+ */
+export function stripUrlParams(url: string, names: Iterable<string>): string {
+  const wanted = new Set(Array.from(names, (n) => n.toLowerCase()));
+  const hashAt = url.indexOf("#");
+  const beforeHash = hashAt === -1 ? url : url.slice(0, hashAt);
+  const fragment = hashAt === -1 ? "" : url.slice(hashAt);
+
+  const queryAt = beforeHash.indexOf("?");
+  if (queryAt === -1) return url;
+
+  const kept = beforeHash
+    .slice(queryAt + 1)
+    .split("&")
+    .filter((pair) => {
+      if (!pair) return false;
+      const eq = pair.indexOf("=");
+      const key = eq === -1 ? pair : pair.slice(0, eq);
+      let decoded = key;
+      try {
+        decoded = decodeURIComponent(key);
+      } catch {
+        // Malformed percent-encoding — fall back to the raw key.
+      }
+      return !wanted.has(decoded.toLowerCase());
+    });
+
+  const base = beforeHash.slice(0, queryAt);
+  return `${base}${kept.length ? `?${kept.join("&")}` : ""}${fragment}`;
+}

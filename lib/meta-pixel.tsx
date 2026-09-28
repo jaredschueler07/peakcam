@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, Suspense } from "react";
 import Script from "next/script";
 
@@ -8,7 +8,6 @@ const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 
 function MetaPixelPageView() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const isFirstRun = useRef(true);
 
   useEffect(() => {
@@ -23,7 +22,13 @@ function MetaPixelPageView() {
     if (typeof window !== "undefined" && window.fbq) {
       window.fbq("track", "PageView");
     }
-  }, [pathname, searchParams]);
+    // Keyed on the pathname only. Meta PageView is page-level — the query
+    // string is not part of its semantics — and every query-only change here
+    // is an in-page state sync rather than a navigation: SignupWelcomeTracker
+    // stripping ?welcome=signup, AlertManagePage stripping the manage token,
+    // BrowsePage mirroring the search box into ?q=. Each of those fired a
+    // second PageView for the same page.
+  }, [pathname]);
 
   return null;
 }

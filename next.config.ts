@@ -130,6 +130,15 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  env: {
+    // Evaluated once per `next build`, so this is a per-deploy constant. The
+    // sitemap uses it as lastModified for the evergreen pages (/about,
+    // /methodology, /compare, …): the sitemap is ISR-regenerated hourly, and a
+    // runtime `new Date()` there would advertise a lastModified that advances
+    // every hour for pages whose content only changes on deploy — which is
+    // exactly the always-the-crawl-date pattern crawlers learn to ignore.
+    NEXT_PUBLIC_BUILD_TIME: new Date().toISOString(),
+  },
   // The ranked validator opens the same committed packs as the browser.
   outputFileTracingIncludes: {
     "/api/drop-in/*": ["./public/game/terrain/*.height.u16.br", "./public/game/terrain/*.meta.json", "./public/game/terrain/*.trails.json", "./public/game/terrain/*.network.json"],

@@ -19,6 +19,12 @@ export const EVENTS = {
   // callback (SignupWelcomeTracker) once the user actually lands signed in.
   AUTH_SIGNUP_SUBMITTED: "auth_signup_submitted",
   AUTH_SIGNUP_COMPLETED: "auth_signup_completed",
+  // /auth/callback could not exchange the code and sent the user to
+  // /auth?error=auth_failed. `reason` comes from the route; the
+  // missing_code_verifier cohort is confirmed sign-ups whose link was opened in
+  // a different browser (mail-app webview, second device) — real completions
+  // that can never emit AUTH_SIGNUP_COMPLETED, so they are counted here instead.
+  AUTH_CALLBACK_FAILED: "auth_callback_failed",
   FAVORITE_ADDED: "favorite_added",
   FAVORITE_REMOVED: "favorite_removed",
   CONDITION_VOTED: "condition_voted",

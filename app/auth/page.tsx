@@ -1,13 +1,23 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AuthForm } from "@/components/auth/AuthForm";
+import { track, EVENTS } from "@/lib/analytics-events";
 
 function SignIn() {
   const params = useSearchParams();
-  return <AuthForm redirectTo={params.get("next") ?? "/"} initialError={params.get("error") === "auth_failed" ? "That sign-in link expired or couldn’t be opened in this browser. Please request a new link." : null} />;
+  const failed = params.get("error") === "auth_failed";
+  const reason = params.get("reason") ?? "unknown";
+  useEffect(() => {
+    // /auth/callback redirects here when the code exchange fails and tags the
+    // cause in `reason`. Recording it makes the different-browser cohort —
+    // confirmed accounts that never reach the ?welcome=signup landing —
+    // visible next to AUTH_SIGNUP_COMPLETED instead of silently missing.
+    if (failed) track(EVENTS.AUTH_CALLBACK_FAILED, { reason });
+  }, [failed, reason]);
+  return <AuthForm redirectTo={params.get("next") ?? "/"} initialError={failed ? "That sign-in link expired or couldn’t be opened in this browser. Please request a new link." : null} />;
 }
 export default function AuthPage() {
   return <main id="main-content" className="mx-auto min-h-dvh w-full max-w-md px-4 py-8">

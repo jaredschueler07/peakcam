@@ -97,7 +97,7 @@ A self-contained arcade ski descent, live for three pilot resorts (`ski-portillo
 
 ## Environment Variables
 
-`.env.local.example` documents only ~9 of the ~24 vars the code reads. Beyond the example (Supabase ×3, MapTiler, site URL, Resend, CRON_SECRET, cam-report admin/salt), code also reads: `ANTHROPIC_API_KEY`, `SLACK_BOT_TOKEN_*` (9, agents), `NEXT_PUBLIC_POSTHOG_KEY/HOST`, `NEXT_PUBLIC_META_PIXEL_ID`, `NEXT_PUBLIC_GOOGLE_ADS_ID` + `NEXT_PUBLIC_GOOGLE_ADS_ALERT_LABEL` (Google Ads tag + conversion), `NEXT_PUBLIC_REDDIT_PIXEL_ID`, `WEATHER_UNLOCKED_APP_ID/API_KEY`, `XAI_API_KEY`, `PEAKCAM_POLL_INTERVAL/LOG_LEVEL/CLAUDE_MODEL`. Secrets live in `.env.local` (local), Vercel project env (prod), and launchd jobs source `.env.local`.
+`.env.local.example` documents the app-facing vars (Supabase ×3, MapTiler, site URL, Resend, CRON_SECRET, cam-report admin/salt, PostHog, and the env-gated conversion tags listed below). Beyond the example, code also reads: `ANTHROPIC_API_KEY`, `SLACK_BOT_TOKEN_*` (9, agents), `NEXT_PUBLIC_POSTHOG_KEY/HOST`, `NEXT_PUBLIC_META_PIXEL_ID`, `NEXT_PUBLIC_GOOGLE_ADS_ID` + `NEXT_PUBLIC_GOOGLE_ADS_ALERT_LABEL` (Google Ads tag + conversion), `NEXT_PUBLIC_REDDIT_PIXEL_ID`, `WEATHER_UNLOCKED_APP_ID/API_KEY`, `XAI_API_KEY`, `PEAKCAM_POLL_INTERVAL/LOG_LEVEL/CLAUDE_MODEL`. Secrets live in `.env.local` (local), Vercel project env (prod), and launchd jobs source `.env.local`.
 
 ## Key Patterns & Gotchas
 

@@ -22,7 +22,7 @@ export function SignupWelcomeTracker() {
     if (searchParams.get(WELCOME_PARAM) !== WELCOME_SIGNUP) return;
     fired.current = true;
 
-    track(EVENTS.AUTH_SIGNUP_COMPLETED);
+    track(EVENTS.AUTH_SIGNUP_COMPLETED, { confirmation: "email" });
 
     const rest = new URLSearchParams(searchParams.toString());
     rest.delete(WELCOME_PARAM);

@@ -4,6 +4,7 @@ import {
   redactSensitiveUrl,
   sanitizeAnalyticsProperties,
   sanitizeCaptureEvent,
+  stripUrlParams,
 } from "./posthog-sanitize";
 
 const TOKEN = "a".repeat(64);
@@ -110,4 +111,36 @@ test("does not mutate the properties object it is given", () => {
   const original: Record<string, unknown> = { $current_url: `/m?token=${TOKEN}` };
   sanitizeAnalyticsProperties(original);
   assert.strictEqual(original.$current_url, `/m?token=${TOKEN}`);
+});
+
+// ── stripUrlParams ───────────────────────────────────────────────────────────
+
+test("stripUrlParams: the sign-up landing collapses to the same URL before and after the marker is stripped", () => {
+  assert.strictEqual(
+    stripUrlParams("https://www.peakcam.io/?welcome=signup", ["welcome"]),
+    "https://www.peakcam.io/"
+  );
+  assert.strictEqual(
+    stripUrlParams("https://www.peakcam.io/", ["welcome"]),
+    "https://www.peakcam.io/"
+  );
+});
+
+test("stripUrlParams: keeps the other parameters, the fragment and their encoding", () => {
+  assert.strictEqual(
+    stripUrlParams("/resorts/vail?utm_source=email&welcome=signup&q=a%20b#cams", ["welcome"]),
+    "/resorts/vail?utm_source=email&q=a%20b#cams"
+  );
+  assert.strictEqual(
+    stripUrlParams(`/alerts/manage?token=${TOKEN}`, ["welcome", "token"]),
+    "/alerts/manage"
+  );
+});
+
+test("stripUrlParams: is case-insensitive on the name and leaves unrelated URLs alone", () => {
+  assert.strictEqual(stripUrlParams("/x?WELCOME=signup&y=1", ["welcome"]), "/x?y=1");
+  const untouched = "https://www.peakcam.io/map?layer=radar#main-content";
+  assert.strictEqual(stripUrlParams(untouched, ["welcome"]), untouched);
+  assert.strictEqual(stripUrlParams("/dashboard", ["welcome"]), "/dashboard");
+  assert.strictEqual(stripUrlParams("", ["welcome"]), "");
 });

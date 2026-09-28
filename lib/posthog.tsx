@@ -4,9 +4,10 @@ import posthog from "posthog-js";
 import { PostHogProvider as PHProvider } from "posthog-js/react";
 import { useEffect, Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { redactSensitiveUrl, sanitizeCaptureEvent } from "./posthog-sanitize";
+import { redactSensitiveUrl, sanitizeCaptureEvent, stripUrlParams } from "./posthog-sanitize";
 import { EVENTS, track, whenPostHogReady } from "./analytics-events";
 import { PostHogAuthSync } from "./posthog-auth-sync";
+import { WELCOME_PARAM } from "./auth-signup-welcome";
 
 const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com";
@@ -26,11 +27,21 @@ const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posth
 
 let lastPageviewUrl: string | null = null;
 
+// Query parameters that carry a one-shot signal to the client and are then
+// stripped from the address bar by their consumer (SignupWelcomeTracker's
+// router.replace, AlertManagePage's history.replaceState — which Next ≥14.1
+// also syncs into useSearchParams). The strip re-runs PageViewTracker, so the
+// pageview key must be the same with or without them; otherwise every
+// confirmed sign-up and every /alerts/manage open records two $pageview rows
+// for a single page load. Removed from $current_url as well: neither says
+// anything about the page.
+const INTERNAL_URL_PARAMS = [WELCOME_PARAM, "token"];
+
 function capturePageview() {
   // Redacted here as well as in before_send: this is the one call site that
   // hands PostHog a URL explicitly, so it should not depend on the init hook
   // still being wired up.
-  const url = redactSensitiveUrl(window.location.href);
+  const url = redactSensitiveUrl(stripUrlParams(window.location.href, INTERNAL_URL_PARAMS));
   if (url === lastPageviewUrl) return;
   lastPageviewUrl = url;
   posthog.capture("$pageview", { $current_url: url });

@@ -10,17 +10,23 @@ export const WELCOME_PARAM = "welcome";
 export const WELCOME_SIGNUP = "signup";
 
 /**
- * A user whose account was created this recently is completing a sign-up
- * (email confirmation), not signing back in via magic link or password reset.
- * The window is generous enough to cover slow mail delivery on the first
- * confirmation click; a later re-click of the same link is a plain sign-in.
+ * Keyed on the *confirmation* timestamp, not account creation. Supabase stamps
+ * `email_confirmed_at` during the /auth/v1/verify hop immediately before it
+ * redirects to /auth/callback, so on a first confirmation it is seconds old no
+ * matter how long the user took to open the email — whereas `created_at` is
+ * stamped at form submit and would exclude everyone who read their inbox more
+ * than a few minutes later. For a returning magic-link or password-reset user
+ * the confirmation is days old, so those flows stay excluded.
+ *
+ * The window only has to absorb the verify → callback redirect plus clock
+ * skew between Supabase and Vercel; two minutes is generous for that.
  */
-export const SIGNUP_WINDOW_MS = 5 * 60 * 1000;
+export const SIGNUP_WINDOW_MS = 2 * 60 * 1000;
 
-export function isFreshSignup(createdAt: string | null | undefined, now = Date.now()): boolean {
-  if (!createdAt) return false;
-  const created = Date.parse(createdAt);
-  if (Number.isNaN(created)) return false;
-  const age = now - created;
+export function isFreshSignup(confirmedAt: string | null | undefined, now = Date.now()): boolean {
+  if (!confirmedAt) return false;
+  const confirmed = Date.parse(confirmedAt);
+  if (Number.isNaN(confirmed)) return false;
+  const age = now - confirmed;
   return age >= 0 && age <= SIGNUP_WINDOW_MS;
 }

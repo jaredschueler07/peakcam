@@ -15,7 +15,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // quietly produce a "successful" sitemap that drops every resort.
   const entries = await getResortSitemapEntries();
 
-  const buildTime = new Date();
+  // Per-deploy constant inlined by next.config.ts, NOT the time this ISR
+  // regeneration happened to run: the evergreen rows below only change on
+  // deploy, and a lastModified that ticks forward every hour with identical
+  // content is the noise the comment on resortEntries warns about. The
+  // fallback only applies where the env inlining is absent (unit tests).
+  const buildTime = process.env.NEXT_PUBLIC_BUILD_TIME
+    ? new Date(process.env.NEXT_PUBLIC_BUILD_TIME)
+    : new Date();
   const resortEntries: MetadataRoute.Sitemap = entries.map((e) => ({
     url: `${SITE_URL}/resorts/${e.slug}`,
     // Real freshness beats a blanket "now": the page's data-bearing content

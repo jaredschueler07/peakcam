@@ -15,6 +15,31 @@ interface Props {
 
 const THRESHOLD_OPTIONS = [3, 6, 12, 18, 24];
 
+// The subscribe API answers an identical 200 whether it created a subscription
+// or merely re-sent the manage link to an address that already had one
+// (enumeration safety — see lib/alerts/subscribe-core.ts). The client cannot
+// tell the two apart, so the ad-platform conversions are deduped per browser
+// instead: report Lead / conversion / SignUp once, and tag every later success
+// from this browser as a repeat so PostHog can separate the two.
+const LEAD_SENT_KEY = "peakcam_alert_lead_sent";
+
+function readLeadSent(): boolean {
+  try {
+    return window.localStorage.getItem(LEAD_SENT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markLeadSent() {
+  try {
+    window.localStorage.setItem(LEAD_SENT_KEY, "1");
+  } catch {
+    // Storage unavailable (private mode, quota): the conversion still fires
+    // once per page load, which is the pre-existing behaviour.
+  }
+}
+
 /** Which surface opened the modal — the component is mounted on / and /alerts. */
 function alertModalSource(): string {
   const path = window.location.pathname;
@@ -35,6 +60,11 @@ export function PowderAlertSignup({ resorts }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const emailRef = useRef<HTMLInputElement>(null);
+  // Ref rather than the `submitting` state: the email input's Enter handler
+  // calls handleSubmit directly, and a second keypress can land before the
+  // state update that disables the button has re-rendered. Without the latch
+  // one subscriber posts twice and fires every conversion pixel twice.
+  const inFlight = useRef(false);
 
   // Focus email input when step changes
   useEffect(() => {
@@ -75,6 +105,7 @@ export function PowderAlertSignup({ resorts }: Props) {
   );
 
   const handleSubmit = async () => {
+    if (inFlight.current) return;
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setError("Enter a valid email address");
       return;
@@ -84,6 +115,7 @@ export function PowderAlertSignup({ resorts }: Props) {
       return;
     }
 
+    inFlight.current = true;
     setSubmitting(true);
     setError(null);
 
@@ -114,19 +146,26 @@ export function PowderAlertSignup({ resorts }: Props) {
         ),
       });
       // The conversion proper: the API accepted the subscription. Mirrored to
-      // every ad pixel that is configured (each helper no-ops without its id).
+      // every ad pixel that is configured (each helper no-ops without its id),
+      // but only for the first success in this browser — see LEAD_SENT_KEY.
+      const repeat_in_browser = readLeadSent();
       track(EVENTS.ALERT_SIGNUP_SUCCEEDED, {
         resort_count: selected.size,
         threshold_min: Math.min(...thresholdValues),
         resort_slugs,
+        repeat_in_browser,
       });
-      trackLead();
-      trackGoogleConversion();
-      trackRedditSignUp();
+      if (!repeat_in_browser) {
+        trackLead();
+        trackGoogleConversion();
+        trackRedditSignUp();
+        markLeadSent();
+      }
       setStep("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
+      inFlight.current = false;
       setSubmitting(false);
     }
   };
