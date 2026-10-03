@@ -19,6 +19,7 @@ export function SignupWelcomeTracker() {
 
   useEffect(() => {
     if (fired.current) return;
+    if (!searchParams || !pathname) return;
     if (searchParams.get(WELCOME_PARAM) !== WELCOME_SIGNUP) return;
     fired.current = true;
 
