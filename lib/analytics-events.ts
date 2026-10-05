@@ -138,8 +138,9 @@ export function whenPostHogReady(task: () => void): () => void {
  * the pixel script arrives is safe (calls replay in order).
  */
 const META_EVENT_MAP: Partial<Record<EventName, string>> = {
-  // Powder-alert signup confirmed — the conversion the ad pixels mirror.
-  [EVENTS.ALERT_SIGNUP_SUCCEEDED]: "Lead",
+  // Lead is emitted by useAlertSubscribe under its persistent first-success
+  // latch. Mirroring ALERT_SIGNUP_SUCCEEDED here would double-count it and
+  // report repeat subscriptions as new conversions.
   // Email-confirmed account creation.
   [EVENTS.AUTH_SIGNUP_COMPLETED]: "CompleteRegistration",
 };

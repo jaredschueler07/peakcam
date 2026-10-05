@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import Script from "next/script";
 import { usePathname } from "next/navigation";
-import { META_PIXEL_ID, META_PIXEL_SNIPPET } from "@/lib/meta-pixel";
+import { META_PIXEL_ID, META_PIXEL_SNIPPET, fireMetaPixelEvent, flushMetaPixelEvents } from "@/lib/meta-pixel";
 
 /**
  * Loads the Meta Pixel base snippet once and fires PageView on initial mount
@@ -13,16 +13,27 @@ import { META_PIXEL_ID, META_PIXEL_SNIPPET } from "@/lib/meta-pixel";
  */
 export function MetaPixel() {
   const pathname = usePathname();
+  const [ready, setReady] = useState(false);
+  const lastPathname = useRef<string | null>(null);
 
   useEffect(() => {
-    window.fbq?.("track", "PageView");
-  }, [pathname]);
+    // afterInteractive can execute after this component's first effect. Wait
+    // for its queueing stub, then report each pathname once (including under
+    // Strict Mode). Query-only state changes are not new page views.
+    if (!ready || pathname === null || lastPathname.current === pathname) return;
+    lastPathname.current = pathname;
+    fireMetaPixelEvent("PageView");
+  }, [pathname, ready]);
 
   return (
     <>
       <Script
         id="meta-pixel"
         strategy="afterInteractive"
+        onReady={() => {
+          flushMetaPixelEvents();
+          setReady(true);
+        }}
         dangerouslySetInnerHTML={{ __html: META_PIXEL_SNIPPET }}
       />
       <noscript>

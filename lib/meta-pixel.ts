@@ -9,7 +9,7 @@ export const META_PIXEL_ID = "910818501790206";
 
 declare global {
   interface Window {
-    fbq?: (command: "track", eventName: string) => void;
+    fbq?: (...args: unknown[]) => void;
   }
 }
 
@@ -20,16 +20,30 @@ declare global {
  */
 export const META_PIXEL_SNIPPET = `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${META_PIXEL_ID}');`;
 
+const pendingEvents: Array<[string, Record<string, unknown> | undefined]> = [];
+
+/** Replay events captured during hydration before the inline stub existed. */
+export function flushMetaPixelEvents() {
+  if (typeof window === "undefined" || !window.fbq) return;
+  for (const [eventName, params] of pendingEvents.splice(0)) {
+    fireMetaPixelEvent(eventName, params);
+  }
+}
+
 /**
  * Forward a conversion event to the Meta Pixel. Safe to call before
  * fbevents.js finishes loading — the fbq stub queues calls and replays them
  * in order. Never throws: an analytics mirror must not break the app (ad
  * blockers neuter the stub).
  */
-export function fireMetaPixelEvent(eventName: string) {
+export function fireMetaPixelEvent(eventName: string, params?: Record<string, unknown>) {
   if (typeof window === "undefined") return;
   try {
-    window.fbq?.("track", eventName);
+    if (!window.fbq) {
+      pendingEvents.push([eventName, params]);
+      return;
+    }
+    window.fbq("track", eventName, params);
   } catch {
     // ignore — analytics must never throw
   }
