@@ -34,8 +34,8 @@ export function AlertsIntro({ offSeason }: { offSeason: boolean }) {
  */
 export function AlertsPageContent({ resorts, initialOffSeason }: { resorts: AlertResort[]; initialOffSeason: boolean }) {
   const params = useSearchParams();
-  const slugs = useMemo(() => parseResortSlugsParam(params.get("resort")), [params]);
-  const threshold = parseThresholdParam(params.get("threshold"));
+  const slugs = useMemo(() => parseResortSlugsParam(params?.get("resort") ?? null), [params]);
+  const threshold = parseThresholdParam(params?.get("threshold") ?? null);
   // Lazy initializer so the impure new Date() runs once (same pattern as
   // SummitResortCard); this subtree is client-rendered, never hydrated.
   const [now] = useState(() => new Date());

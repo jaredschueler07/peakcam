@@ -37,16 +37,14 @@ const stamp = (background: string, color: string) => ({
 
 /**
  * Per-hub social card: the place name, its resort and cam counts, and the
- * deepest base when one is reporting. A failed lookup renders the generic
- * card rather than failing the request — a share preview must never 500.
+ * deepest base when one is reporting. Let catalog failures propagate so ISR
+ * can keep the previous valid image instead of caching a misleading zero-count
+ * generic card during a transient read outage.
  */
 export default async function OgImage({ params }: { params: Promise<{ hub: string }> }) {
   const { hub: slug } = await params;
 
-  let resolved: ResolvedHub<ResortWithData> | null = null;
-  try {
-    resolved = resolveHub(slug, await getAllResorts());
-  } catch {}
+  const resolved: ResolvedHub<ResortWithData> | null = resolveHub(slug, await getAllResorts());
 
   const label = resolved?.hub.label ?? "Ski resort webcams";
   const count = resolved?.count ?? 0;
