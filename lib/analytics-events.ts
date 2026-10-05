@@ -1,4 +1,5 @@
 import posthog from "posthog-js";
+import { fireMetaPixelEvent } from "./meta-pixel";
 
 export const EVENTS = {
   BROWSE_OPENED: "browse_opened",
@@ -130,8 +131,24 @@ export function whenPostHogReady(task: () => void): () => void {
   };
 }
 
+/**
+ * Meta Pixel conversion mirror. Only conversion-grade events are forwarded —
+ * everything else stays PostHog-only so the pixel doesn't drown in noise.
+ * window.fbq is a queueing stub until fbevents.js loads, so mirroring before
+ * the pixel script arrives is safe (calls replay in order).
+ */
+const META_EVENT_MAP: Partial<Record<EventName, string>> = {
+  // Lead is emitted by useAlertSubscribe under its persistent first-success
+  // latch. Mirroring ALERT_SIGNUP_SUCCEEDED here would double-count it and
+  // report repeat subscriptions as new conversions.
+  // Email-confirmed account creation.
+  [EVENTS.AUTH_SIGNUP_COMPLETED]: "CompleteRegistration",
+};
+
 export function track(event: EventName, properties?: Record<string, unknown>) {
   if (typeof window === "undefined") return;
+  const metaEvent = META_EVENT_MAP[event];
+  if (metaEvent) fireMetaPixelEvent(metaEvent);
   if (!isLoaded()) {
     pending.push([event, properties]);
     drain();
