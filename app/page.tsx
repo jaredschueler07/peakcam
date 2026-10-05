@@ -106,7 +106,7 @@ export default async function Home() {
   };
 
   return (
-    <main id="main-content">
+    <main>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(resortListJsonLd) }}

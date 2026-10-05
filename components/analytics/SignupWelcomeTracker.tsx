@@ -28,7 +28,8 @@ export function SignupWelcomeTracker() {
     const rest = new URLSearchParams(searchParams.toString());
     rest.delete(WELCOME_PARAM);
     const query = rest.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    const destination = query ? `${pathname}?${query}` : pathname;
+    router.replace(`${destination}${window.location.hash}`, { scroll: false });
   }, [searchParams, pathname, router]);
 
   return null;
