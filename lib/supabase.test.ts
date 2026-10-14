@@ -124,11 +124,12 @@ class FakeQuery implements PromiseLike<Result> {
   }
 }
 
-type CatalogTable = "resorts" | "latest_snow_reports" | "cams" | "latest_powder_probabilities";
+type CatalogTable = "resorts" | "latest_snow_reports" | "cams";
+type FakeTable = CatalogTable | "latest_powder_probabilities";
 
 /** Stub `supabase.from` for the duration of `fn`, then restore it. */
 async function withFakeFrom(
-  byTable: Partial<Record<CatalogTable, Result>>,
+  byTable: Partial<Record<FakeTable, Result>>,
   fn: () => Promise<void>,
   options: { delayMs?: number; onQuery?: (table: CatalogTable) => void } = {},
 ) {
