@@ -1,0 +1,26 @@
+# 05 Competitive Analysis
+
+## The market reality
+Trade reporting of NSAA’s preliminary 2025–26 data put US skier visits at **52.6 million**, versus 61.5 million in the prior season. These are visits, not unique people or webcam users; the latest-season number is secondary-reported and preliminary. This establishes a seasonal industry, not PeakCam’s obtainable market. No reliable PeakCam market share, keyword volume, competitor MAU or paid-search CPC was obtained. [M06](https://www.snow-forecast.com/whiteroom/us-skier-visits-drop-dramatically-after-poor-snowfall-winter-in-the-west/) [M07](https://www.forbes.com/sites/michellebruton/2025/05/30/us-ski-resorts-had-second-best-season-on-record-in-202425/)
+
+| Competitor / type | Audience and offer | Current price evidence | Business / channel observations | Wedge implication |
+| --- | --- | --- | --- | --- |
+| OpenSnow | Forecast-led skiers; local experts, custom alerts, maps and conditions | Base $49.99/year; Premium $99.99/year on current official support page | Paid web/mobile product; deep forecast workflow. Premium is NOT a group plan | Do not try to beat forecast depth this season; make camera access simpler |
+| OnTheSnow | Broad resort discovery, snow reports, webcams, favorites and powder alerts | Official mobile page describes free app | Web and native app; resort/region pages, reports and commercial trip modules. App-store rating count is not MAU | A free-feature paywall is weak; narrow reliable corridor execution |
+| Snow-Forecast | Weather-led mountain users and travelers | Localized display roughly $8.08 monthly / $24.28 six months / $29.68 annually; recheck checkout | Free shorter forecast and paid longer forecast; broad mountain pages and commercial rewards | Avoid duplicating model forecasts; source clarity and fast camera handoff |
+| Official resort sites/apps | Visitors seeking authoritative operations, tickets and cameras | Public information often free; transactions priced by resort | Direct booking, pass ecosystem, owned email/app channels | Your partner AND competitor; send credit/traffic, do not pretend authority |
+| Provider portals: Roundshot / Panomax / HDOnTap | Camera viewers and destinations buying infrastructure | Publisher redistribution price not publicly verified; quote required | Own camera discovery networks and B2B services | A potential upstream supply partnership, not simply a site to scrape |
+| SnowStash | Camera-centric resort pages, specific angles and ski planning | Pricing and audience not verified | Observed resort/camera landing pages and contextual trip links; direct product overlap | Camera aggregation is not novel; test measurable speed, reliability and return behavior |
+| General camera aggregators / YouTube | Casual watchers and destination searchers | Public viewing commonly available; exact competitor commercial terms vary | Search distribution and existing video players; individual channels vary | Useful link aggregation alone has low barriers |
+| Ski.com / SnowPak / travel booking platforms | Ski travelers shopping packages/lodging | Trip-specific quote/checkout | Commercial trip conversion and destination guides; some affiliate routes | Refer purchase-intent users instead of becoming a travel agency |
+
+
+Pricing and feature facts above come from current official product/support sources where available. Inferred channel strategy is qualitative; no proprietary traffic panel was purchased. OpenSnow’s current Base/Premium distinction matters because “cheaper snow forecasts” would place PeakCam against an already established paid product. OnTheSnow’s free overlap also undermines favorites or generic powder alerts as a standalone paid proposition. [M01](https://support.opensnow.com/subscription/how-much-does-opensnow-cost) [M02](https://www.onthesnow.com/news/mobile/) [M03](https://apps.apple.com/us/app/onthesnow-ski-snow-report/id300412347) [M04](https://www.snow-forecast.com/pages/membership.php) [M05](https://www.snow-forecast.com/pages/rewards) [M08](https://snowstash.com/usa/california/sugar-bowl/snow-cams) [P01](https://www.roundshot.com/en/messages.html/21/news/946) [P02](https://www.ski.com/affiliates)
+
+## Search and mobile implications
+Incumbents already have resort, region, webcam and report pages. Broad “[resort] snow report” and “best ski resorts” competition should be considered hard, not an immediate win. More specific camera-angle queries, reliable fallback information, small-resort pages, and corridor comparisons offer a more plausible entry point—but this is a hypothesis without measured keyword difficulty.
+
+Mobile web should be the first product. A skier needs a source quickly, not necessarily an installation. The existing third-party player dependencies mean a responsive layout alone does not prove a good mobile experience; test tap targets, loading behavior, full-screen handling, back navigation and cellular conditions before buying traffic.
+
+## Defensible gap to test
+“Fewer dead ends, clear source/timestamp context, and your familiar mountains one tap away.” That is narrower than “all ski information” and creates a measurable promise. If users do not notice or value this distinction after observing the actual product, the wedge is not validated. A bigger resort count is not an adequate substitute.

@@ -1,0 +1,6 @@
+﻿Scenario,12_month_earned_revenue,12_month_operating_result,Peak_cash_funding_need,Extra_monthly_cost_assumption
+Original snapshot,4505.5,-4273.15,4427.95,0
+No display ads,2905.0,-5873.65,5928.65,0
+No ads + $100/month added services,2905.0,-7073.65,7128.65,100
+No ads + $250/month added services,2905.0,-8873.65,8928.65,250
+Zero revenue; original spending retained,0,-8727.5,8727.5,0

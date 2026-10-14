@@ -1,0 +1,22 @@
+{
+  "file_row_counts": {
+    "Action_Register.csv": 43,
+    "Chapter_Coverage.csv": 21,
+    "Camera_Source_Register.csv": 306,
+    "Resort_Coverage.csv": 148,
+    "Event_Mapping.csv": 29,
+    "Prospect_Queue.csv": 100,
+    "Experiment_Plan.csv": 15,
+    "Risk_Review.csv": 28,
+    "Issue_Triage.csv": 39
+  },
+  "action_dependencies": "resolve, acyclic, deadlines ordered",
+  "local_links_checked": 27,
+  "event_code_paths": "all exist",
+  "original_manifest": "all original hashes unchanged",
+  "source_rights": "all unknown pending evidence",
+  "outreach": "all drafts unsent",
+  "original_financial_summaries": "nine reconciled to snapshots",
+  "monthly_workbook_rows": "72 agree with original JSON numeric fields within 1e-6",
+  "review_scope": "Preparation artifacts only; no app or production mutations"
+}

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f4efe4">
+  <title>PeakCam / commercialization tracker</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Primary navigation">
+      <div class="brand"><span class="brand-mark">▲</span><span>Peak<span>Cam</span></span><small>fieldbook</small></div>
+      <div class="season-chip"><span class="live-dot"></span> Season 26/27 <span class="season-date">Source baseline · Sep 13, 2026</span></div>
+      <nav id="nav" class="nav-list"></nav>
+      <div class="sidebar-foot"><span class="mono">LOCAL / SAVED</span><button id="refreshBtn" class="text-button" type="button">Refresh data ↻</button></div>
+    </aside>
+    <main class="main" id="main">
+      <header class="topbar"><button class="menu-button" id="menuBtn" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="nav">☰</button><div><p class="eyebrow">Commercialization / operating view</p><h1 id="pageTitle">Season readiness</h1></div><div class="topbar-actions"><span id="syncStatus" class="sync-status">Connecting…</span><a class="icon-link" href="/api/export" download aria-label="Export tracker JSON">Export ↓</a></div></header>
+      <div id="view" class="view" aria-live="polite"><div class="loading">Loading tracker data<span> · </span>connecting to the fieldbook</div></div>
+    </main>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <dialog id="editor" class="editor-dialog" aria-labelledby="editorTitle"><form id="editorForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow" id="editorKicker">Record editor</p><h2 id="editorTitle">Update record</h2></div><button type="button" class="close-button" id="closeEditor" aria-label="Close editor">×</button></div><div id="editorBody"></div><div class="dialog-actions"><span id="saveState" class="save-state"></span><button type="button" class="button subtle" id="cancelEditor">Cancel</button><button type="submit" class="button primary" id="saveBtn">Save changes</button></div></form></dialog>
+  <script src="/app.js" defer></script>
+</body>
+</html>

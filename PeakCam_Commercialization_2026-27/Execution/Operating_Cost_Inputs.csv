@@ -1,0 +1,12 @@
+﻿Service,Observed_status,Invoice_period,Actual_paid_USD,Committed_monthly_USD,One_time_USD,Renewal_date,Evidence_required,Evidence_link,Owner,Input_status
+Vercel,Pro team verified,,,,,,"Actual invoice, CDN selection, seats, compute and team allocation",,Jared,Unknown — blank is not zero
+Supabase,Production database/auth verified,,,,,,"Plan, database/storage/egress and backup charges",,Jared,Unknown — blank is not zero
+MapTiler,Map integration in code,,,,,,"Commercial plan, key origin restrictions and actual requests",,Jared,Unknown — blank is not zero
+PostHog,SDK and event calls present,,,,,,"Actual usage, retention and replay settings",,Jared,Unknown — blank is not zero
+Resend,Account/alerts/report emails present,,,,,,"Actual plan, delivered volume, limits and domain verification",,Jared,Unknown — blank is not zero
+Open-Meteo,Free endpoint active; commercial migration needed,,,,,,Commercial quote/plan and correct metering for forecast variables and locations,,Jared,Unknown — blank is not zero
+Domains and business mailbox,Domain live; mailbox costs unknown,,,,,,"Renewals, sender mailbox and DNS evidence",,Jared,Unknown — blank is not zero
+Source rights/licenses,No executed terms supplied,,,,,,"Per-camera/provider permitted uses, fees and minimum guarantees",,Jared,Unknown — blank is not zero
+Legal/CPA/entity/insurance,Founder status unknown,,,,,,Scope-specific quotes and already-paid setup costs,,Jared,Unknown — blank is not zero
+Marketing/content/contractors,No actual spending evidence,,,,,,"Chosen seasonal envelope, existing commitments and contractor scope",,Jared,Unknown — blank is not zero
+Other metered services,Code references additional weather/AI/agent integrations,,,,,,Only count active billed usage after verifying jobs and invoices,,Jared,Unknown — blank is not zero

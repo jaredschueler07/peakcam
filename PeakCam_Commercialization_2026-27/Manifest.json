@@ -1,0 +1,235 @@
+{
+  "date": "2026-09-09",
+  "files": [
+    {
+      "path": "Chapters/01_Executive_Summary.md",
+      "bytes": 5501,
+      "sha256": "fbbd04af3fc09edd13eda9fe539f5564fa96377b9c579a136518dfc8c84e9063"
+    },
+    {
+      "path": "Chapters/02_Current_State_Assessment.md",
+      "bytes": 7698,
+      "sha256": "b2123f5038ad548839c8704392503fcb719f921031311a76244bebb71d32b3ea"
+    },
+    {
+      "path": "Chapters/03_PeakCam_Business_Model.md",
+      "bytes": 3338,
+      "sha256": "0a6becce9aa8af1699dd15966c7e4fb16090b32612430d9e9f8c0645b2cb8741"
+    },
+    {
+      "path": "Chapters/04_Target_Customer__Positioning.md",
+      "bytes": 4080,
+      "sha256": "830544a4f8afe5cbce66270c8c7bdcf74da7e11b7c6ba303a0b15981b7887fa2"
+    },
+    {
+      "path": "Chapters/05_Competitive_Analysis.md",
+      "bytes": 5341,
+      "sha256": "b4cce37680807c046f2f321d3117983b589712689f89ede5821572b17ae15e31"
+    },
+    {
+      "path": "Chapters/06_Monetization_Strategy.md",
+      "bytes": 10352,
+      "sha256": "7f38fe5222e774b2000ba0493b2a87e504ab76603f3b8f752ce15e112ce47b3c"
+    },
+    {
+      "path": "Chapters/07_Financial_Model.md",
+      "bytes": 7317,
+      "sha256": "eca2504b8ce37e4323ca4266f24948939f90fd2502d4e8a6186220035b8be1cf"
+    },
+    {
+      "path": "Chapters/08_Legal__Administrative_Setup_Checklist.md",
+      "bytes": 10108,
+      "sha256": "fdab11874dc3cf7e3968d5f097a7eef1a682de77ab5c2bb1c3779e5b5aa3ebc9"
+    },
+    {
+      "path": "Chapters/09_Webcam__Data_Legal_Risk_Assessment.md",
+      "bytes": 7139,
+      "sha256": "04e4f0c2a4da21d678232e967ad38b156178ebc1e21fa229556977fb002aeef9"
+    },
+    {
+      "path": "Chapters/10_Growth_Strategy.md",
+      "bytes": 3719,
+      "sha256": "40f52b7405a58cdb4de057e6859ec43af91a68a56c39a886e969b715e404cd5c"
+    },
+    {
+      "path": "Chapters/11_SEO_Strategy.md",
+      "bytes": 5481,
+      "sha256": "260858b596fad2b67cd829dbd3d67d909d168773abcd28230aab2fe619e39136"
+    },
+    {
+      "path": "Chapters/12_Social__Content_Strategy.md",
+      "bytes": 4706,
+      "sha256": "b93a5a0a76319b0c8b7748d4ce8a2ad7b38e5355ce2ca88cf36f350a993f95f3"
+    },
+    {
+      "path": "Chapters/13_Partnership_Strategy.md",
+      "bytes": 8783,
+      "sha256": "a5d08b9d4cb7f64caffbfb82c32469e87f7b9f205a2e477034190639d70e5b6f"
+    },
+    {
+      "path": "Chapters/14_202627_Ski_Season_Launch_Plan.md",
+      "bytes": 3119,
+      "sha256": "85ad2ce843b461cb598cffbcf007efcaaef7f02d49903a6008455eb0929e1837"
+    },
+    {
+      "path": "Chapters/15_Marketing_Budget.md",
+      "bytes": 3458,
+      "sha256": "d7ade85ee934d6bf83cc7b9d5069760efdfb21b345328678e9fa92bb5b5a2786"
+    },
+    {
+      "path": "Chapters/16_Analytics__KPI_Framework.md",
+      "bytes": 8565,
+      "sha256": "d73a4bc13cac1d0a8db41ae2aba186caa4efe2defc5e9eae4a2690aa931d147e"
+    },
+    {
+      "path": "Chapters/17_Business_Operations_Stack.md",
+      "bytes": 4966,
+      "sha256": "a8d03fb4deacc3d959f62a47d87f32832d4ea779a3cee02c0dc55a84c91f78b2"
+    },
+    {
+      "path": "Chapters/18_Risk_Register.md",
+      "bytes": 9073,
+      "sha256": "c3bb20f760d6f303f71e4e9e9312eb95a0388c2b7614498789b92d71ddd765d8"
+    },
+    {
+      "path": "Chapters/19_Experiment_Backlog.md",
+      "bytes": 5311,
+      "sha256": "e9f317dd0e3d5d64865d0c77e8bab6b3968d2157c1ade640da922100b92d4dbf"
+    },
+    {
+      "path": "Chapters/20_306090-Day_Founder_Action_Plan.md",
+      "bytes": 2894,
+      "sha256": "d8edcd661bb60652a8ac1aa9940b0556a35a22117da307db6e178af4457628c7"
+    },
+    {
+      "path": "Chapters/21_September_2026April_2027_Master_Roadmap.md",
+      "bytes": 10079,
+      "sha256": "6f155da1a3724bf28cf17d33e5e7b05980f602eb44945c241c2cac17ad1fdd56"
+    },
+    {
+      "path": "Executive_Summary.html",
+      "bytes": 10660,
+      "sha256": "7896c85d883ca78ba529b86009c11d02f1b5da3a8b6feba2a8d595ccd6a77968"
+    },
+    {
+      "path": "Executive_Summary.md",
+      "bytes": 5501,
+      "sha256": "fbbd04af3fc09edd13eda9fe539f5564fa96377b9c579a136518dfc8c84e9063"
+    },
+    {
+      "path": "Experiment_Backlog.csv",
+      "bytes": 4032,
+      "sha256": "34079816c67a1d697926ebcf1de7b2d91a1d1e3bc6b6c6367155133d6a77b725"
+    },
+    {
+      "path": "Financial_Model_Data.json",
+      "bytes": 86416,
+      "sha256": "c993788c751eab372e3b2c748a83bab1127207ef8eb6d6c9d31472a874b0f47e"
+    },
+    {
+      "path": "Financial_Monthly_Scenarios.csv",
+      "bytes": 17165,
+      "sha256": "fab6bba47936e712689ed63ed085895e9a70c9ea25d36daa239ce3ae582ac3ec"
+    },
+    {
+      "path": "Financial_Scenario_Summary.csv",
+      "bytes": 856,
+      "sha256": "4353018f8bfa52c08c90931a5568142cf2b847499671898427cb1879f0a3868b"
+    },
+    {
+      "path": "Financial_Traffic_Stages.csv",
+      "bytes": 817,
+      "sha256": "6eb733e9745a4bf2b6bbe0e8a46620d9035774502fe9fecd4d89884ffc0157ac"
+    },
+    {
+      "path": "Master_Roadmap.csv",
+      "bytes": 8317,
+      "sha256": "0d623a43cbeff3417d698986d06b50b5be9cb02f01bd00d07e1f3451b29e91bf"
+    },
+    {
+      "path": "PeakCam_Commercialization_Handbook.html",
+      "bytes": 211555,
+      "sha256": "339c30deb9fdeed2722df667586b60c07f321ce6055aaea0398e8ce71efab817"
+    },
+    {
+      "path": "PeakCam_Commercialization_Handbook.md",
+      "bytes": 159829,
+      "sha256": "7ff38d3855733b8cfba103f630495bfd74751b3619acd5947fe2954a81e62560"
+    },
+    {
+      "path": "PeakCam_Financial_and_Operating_Model.xlsx",
+      "bytes": 102120,
+      "sha256": "ff84439e34f57caa0910f3cdcae2801a8d3122e4cc7cf993753e9f71a54acd55"
+    },
+    {
+      "path": "PeakCam_Outreach_Playbook.html",
+      "bytes": 112877,
+      "sha256": "a9a25758b131ab7b3ee18bbe4285db3c376e564f8e0fd730c5271c2b8dfc0eb3"
+    },
+    {
+      "path": "PeakCam_Outreach_Playbook.md",
+      "bytes": 90967,
+      "sha256": "c758ae77377471013f5ead409aa4a71f75451e2d3a8f03f88d64c19f68a3c24f"
+    },
+    {
+      "path": "PeakCam_Prospect_CRM.xlsx",
+      "bytes": 61500,
+      "sha256": "c9be03c57cb33ba9b06c76aacca54fe7143952f0b59be8d2d84524d47c902091"
+    },
+    {
+      "path": "Prospect_Database.csv",
+      "bytes": 170704,
+      "sha256": "4759ec3ddf84ab1e3d1ed41e6169e490057dfaf0b5ed96ce1bfad28c35a0641f"
+    },
+    {
+      "path": "Research_Data.json",
+      "bytes": 388578,
+      "sha256": "c36179140856e1638cb3a08b802a6c00638619aec94f40afa1640fbe7b06bb4a"
+    },
+    {
+      "path": "Risk_Register.csv",
+      "bytes": 7365,
+      "sha256": "9735cc670d9e6cb287e465a31b56c43befe54df7d7e03262d6e5edca186ca0da"
+    },
+    {
+      "path": "START_HERE.html",
+      "bytes": 10198,
+      "sha256": "cc0ee755eedb8b782a655a6654f95dcf158df3b157826b966d600b5b077fa318"
+    },
+    {
+      "path": "START_HERE.md",
+      "bytes": 4684,
+      "sha256": "f895a3fd5ca1488162c411169bf0e628a2250002f2260df3107ab13886303cda"
+    },
+    {
+      "path": "Sources_and_Evidence.html",
+      "bytes": 48379,
+      "sha256": "e3196d4919e7ef432ac648e7ec0adbfdcce033b4a4a07179a43041970feec432"
+    },
+    {
+      "path": "Sources_and_Evidence.md",
+      "bytes": 27728,
+      "sha256": "6b2420bbba010650abfd12649746da47d88a005e0266ab0dd7e62b2fd8ef42ec"
+    }
+  ],
+  "checks": {
+    "organization_count": 100,
+    "first25_count": 25,
+    "first20_resorts_count": 20,
+    "chapter_count": 21,
+    "workbooks": [
+      [
+        "PeakCam_Financial_and_Operating_Model.xlsx",
+        2290,
+        "No cached Excel error cells found"
+      ],
+      [
+        "PeakCam_Prospect_CRM.xlsx",
+        109,
+        "No cached Excel error cells found"
+      ]
+    ],
+    "financial_formula_check": "Matched independently calculated Python scenario summaries; no formula-error matches",
+    "scope": "No interactive browser/live playback test; no traffic, revenue or billing baseline obtained"
+  }
+}
