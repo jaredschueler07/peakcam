@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { handleSubscribe, type SubscribeDeps, type Subscriber } from "./subscribe-core";
+import { NextRequest } from "next/server";
+import {
+  clampThreshold,
+  handleSubscribe,
+  parsePreferenceUpdate,
+  type SubscribeDeps,
+  type Subscriber,
+} from "./subscribe-core";
 
 const RESORTS = [
   { id: "r-alta", name: "Alta" },
@@ -191,4 +198,126 @@ test("thresholds are clamped to 1-48", async () => {
     calls.prefsInserted.map((p) => p.threshold_inches),
     [48, 1]
   );
+});
+
+// ─── clampThreshold / PUT /api/alerts/manage body validation ──────────────────
+
+const ALTA = "11111111-1111-4111-8111-111111111111";
+const BRIGHTON = "22222222-2222-4222-8222-222222222222";
+
+test("clampThreshold rounds, clamps to 1-48 and defaults anything non-numeric to 6", () => {
+  assert.strictEqual(clampThreshold(12), 12);
+  assert.strictEqual(clampThreshold(11.6), 12);
+  assert.strictEqual(clampThreshold(9999), 48);
+  assert.strictEqual(clampThreshold(-5), 1);
+  assert.strictEqual(clampThreshold(0), 1);
+  for (const bad of [undefined, null, "12", NaN, Infinity, {}]) {
+    assert.strictEqual(clampThreshold(bad), 6, `clampThreshold(${String(bad)})`);
+  }
+});
+
+test("parsePreferenceUpdate accepts a well-formed body, dedupes ids and clamps thresholds", () => {
+  const parsed = parsePreferenceUpdate({
+    token: "tok",
+    resort_ids: [ALTA, BRIGHTON, ALTA],
+    thresholds: { [ALTA]: 12.4, [BRIGHTON]: 500, "ghost": "ignored" },
+  });
+  assert.deepStrictEqual(parsed, {
+    ok: true,
+    value: { token: "tok", resortIds: [ALTA, BRIGHTON], thresholds: { [ALTA]: 12, [BRIGHTON]: 48 } },
+  });
+  // No thresholds at all, and an empty selection, are both valid saves.
+  const bare = parsePreferenceUpdate({ token: "tok", resort_ids: [ALTA] });
+  assert.ok(bare.ok);
+  assert.deepStrictEqual(bare.value.thresholds, { [ALTA]: 6 });
+  const none = parsePreferenceUpdate({ token: "tok", resort_ids: [], thresholds: null });
+  assert.ok(none.ok);
+  assert.deepStrictEqual(none.value, { token: "tok", resortIds: [], thresholds: {} });
+});
+
+test("parsePreferenceUpdate rejects every shape that used to reach the database", () => {
+  const failures: Array<[unknown, RegExp]> = [
+    [null, /token/],
+    [{ resort_ids: [ALTA] }, /token/],
+    [{ token: "", resort_ids: [ALTA] }, /token/],
+    [{ token: "tok" }, /resort_ids/],
+    [{ token: "tok", resort_ids: "alta" }, /resort_ids/],
+    [{ token: "tok", resort_ids: [ALTA, 42] }, /resort_ids/],
+    [{ token: "tok", resort_ids: ["not-a-uuid"] }, /resort_ids/],
+    [{ token: "tok", resort_ids: [ALTA], thresholds: [] }, /thresholds/],
+    // The original data-loss trigger: a non-numeric threshold became NaN.
+    [{ token: "tok", resort_ids: [ALTA], thresholds: { [ALTA]: "six" } }, /threshold for/],
+    [{ token: "tok", resort_ids: [ALTA], thresholds: { [ALTA]: NaN } }, /threshold for/],
+    [{ token: "tok", resort_ids: [ALTA], thresholds: { [ALTA]: {} } }, /threshold for/],
+  ];
+  for (const [body, message] of failures) {
+    const parsed = parsePreferenceUpdate(body);
+    assert.strictEqual(parsed.ok, false, JSON.stringify(body));
+    if (!parsed.ok) assert.match(parsed.error, message);
+  }
+  const tooMany = parsePreferenceUpdate({
+    token: "tok",
+    resort_ids: Array.from({ length: 201 }, (_, i) => `${String(i).padStart(8, "0")}-0000-4000-8000-000000000000`),
+  });
+  assert.strictEqual(tooMany.ok, false);
+});
+
+test("PUT /api/alerts/manage validates before any write and upserts before it prunes", async () => {
+  const savedEnv = { ...process.env };
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://db.test";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service";
+  const { PUT } = await import("../../app/api/alerts/manage/route");
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ method: string; path: string; body?: unknown; prefer?: string }> = [];
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(String(input));
+    const headers = new Headers(init?.headers);
+    calls.push({
+      method: init?.method ?? "GET",
+      path: url.pathname.replace("/rest/v1", "") + url.search,
+      ...(init?.body ? { body: JSON.parse(String(init.body)) } : {}),
+      ...(headers.get("Prefer") ? { prefer: headers.get("Prefer")! } : {}),
+    });
+    if (url.pathname.endsWith("/alert_subscribers")) return new Response(JSON.stringify([{ id: "sub-1" }]));
+    if (url.pathname.endsWith("/resorts")) return new Response(JSON.stringify([{ id: ALTA }]));
+    return new Response("[]", { status: 200 });
+  };
+  const put = (body: unknown) => PUT(new NextRequest("https://peakcam.test/api/alerts/manage", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  }));
+  try {
+    // A body the old code would have DELETEd for, then failed to re-insert.
+    const bad = await put({ token: "tok", resort_ids: [ALTA], thresholds: { [ALTA]: "six" } });
+    assert.strictEqual(bad.status, 400);
+    assert.strictEqual(calls.length, 0, "no database call before validation passes");
+
+    // A resort that no longer exists is dropped in validation, not by the FK.
+    const good = await put({ token: "tok", resort_ids: [ALTA, BRIGHTON], thresholds: { [ALTA]: 12 } });
+    assert.strictEqual(good.status, 200);
+    assert.deepStrictEqual(await good.json(), { ok: true, resort_count: 1 });
+    assert.deepStrictEqual(calls.map((c) => c.method), ["GET", "GET", "POST", "DELETE"]);
+    assert.match(calls[0].path, /^\/alert_subscribers\?manage_token=eq\.tok/);
+    assert.match(calls[1].path, /^\/resorts\?id=in\.\(.*\)&is_active=eq\.true/);
+    assert.strictEqual(calls[2].path, "/alert_preferences?on_conflict=subscriber_id,resort_id");
+    assert.strictEqual(calls[2].prefer, "resolution=merge-duplicates");
+    assert.deepStrictEqual(calls[2].body, [{ subscriber_id: "sub-1", resort_id: ALTA, threshold_inches: 12 }]);
+    // The prune keeps what was just upserted and only removes the rest.
+    assert.strictEqual(calls[3].path, `/alert_preferences?subscriber_id=eq.sub-1&resort_id=not.in.(${encodeURIComponent(`"${ALTA}"`)})`);
+
+    // Clearing every resort keeps the subscriber and deletes all their rows.
+    calls.length = 0;
+    const cleared = await put({ token: "tok", resort_ids: [] });
+    assert.strictEqual(cleared.status, 200);
+    assert.deepStrictEqual(calls.map((c) => `${c.method} ${c.path}`), [
+      "GET /alert_subscribers?manage_token=eq.tok&select=id&limit=1",
+      "DELETE /alert_preferences?subscriber_id=eq.sub-1",
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const key of ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]) {
+      if (savedEnv[key] === undefined) delete process.env[key]; else process.env[key] = savedEnv[key];
+    }
+  }
 });

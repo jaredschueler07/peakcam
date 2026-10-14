@@ -101,7 +101,7 @@ function CamBody({ resolved }: { resolved: Extract<ResolvedWidget, { kind: "cam"
         loading="lazy"
         onError={() => setImgFailed(true)}
       />
-      <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-ink/85 px-2 py-0.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.14em] text-cream-50">
+      <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-ink/85 px-2 py-0.5 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-cream-50">
         {preview.kind === "live" && (
           <span className="h-1.5 w-1.5 rounded-full bg-alpen animate-livePulse" aria-hidden />
         )}

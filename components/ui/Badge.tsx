@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { type ConditionRating } from "@/lib/types";
+import { RATING_RULES } from "@/lib/conditions-engine";
 
 // ── Condition chip (pc-chip) ──────────────────────────────────
 // great: forest + cream, good: moss + cream, fair: mustard + ink, poor: alpen-dk + cream
@@ -26,6 +27,7 @@ interface ConditionBadgeProps {
 export function ConditionBadge({ rating, label, size = "md" }: ConditionBadgeProps) {
   return (
     <span
+      title={`${label}: ${RATING_RULES[rating]}`}
       className={`inline-flex items-center gap-1.5 rounded-full
         font-bold tracking-[0.08em] uppercase
         border

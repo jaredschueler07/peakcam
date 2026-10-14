@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getAllResorts } from "@/lib/supabase";
 import { SnowReportPage } from "@/components/snow-report/SnowReportPage";
 import type { ResortWithData } from "@/lib/types";
@@ -6,7 +7,16 @@ import { SITE_URL } from "@/lib/site";
 
 export const revalidate = 3600;
 
-export const metadata = {
+// A route-level `openGraph` replaces the root's wholesale, so the root
+// app/opengraph-image.tsx is not inherited here — declare the card explicitly.
+const OG_IMAGE = {
+  url: "/opengraph-image",
+  width: 1200,
+  height: 630,
+  alt: "PeakCam — live ski resort webcams and snow reports",
+};
+
+export const metadata: Metadata = {
   title: "Ski Resort Snow Report — Live Base Depth & Trail Conditions",
   alternates: { canonical: `${SITE_URL}/snow-report` },
   description:
@@ -30,12 +40,15 @@ export const metadata = {
     title: "Ski Resort Snow Report — Live Base Depth & Conditions",
     description: "Compare live snow conditions, base depths, and powder alerts for 150+ ski resorts across North & South America.",
     url: `${SITE_URL}/snow-report`,
-    type: "website" as const,
+    type: "website",
+    siteName: "PeakCam",
+    images: [OG_IMAGE],
   },
   twitter: {
-    card: "summary_large_image" as const,
+    card: "summary_large_image",
     title: "Live Ski Snow Report",
     description: "Base depth, fresh snow, and lift status for 150+ ski resorts. Updated hourly.",
+    images: [OG_IMAGE],
   },
 };
 

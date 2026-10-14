@@ -6,7 +6,7 @@ import { BugReportButton } from "@/components/feedback/BugReportProvider";
 // dashed bark rules between sections, mono caption row.
 export function PeakFooter() {
   return (
-    <footer className="relative bg-cream border-t-[1.5px] border-ink pt-7 pb-6 md:pt-14 md:pb-10 px-4 md:px-6">
+    <footer className="relative bg-cream border-t-[1.5px] border-ink pt-7 pb-[max(1.5rem,var(--pc-safe-bottom))] md:pt-14 md:pb-10 px-4 md:px-6">
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-10 mb-6 md:mb-10">
           {/* Brand */}
@@ -129,7 +129,7 @@ export function PeakFooter() {
             >
               Get powder alerts <span aria-hidden>→</span>
             </Link>
-            <p className="font-mono text-[11px] text-bark/80 uppercase tracking-[0.1em] text-center md:text-right">
+            <p className="font-mono text-[11px] text-bark uppercase tracking-[0.1em] text-center md:text-right">
               Always check with the resort before heading out.
             </p>
           </div>

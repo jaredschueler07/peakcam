@@ -108,14 +108,14 @@ export function CamReportModal({
       title={`Report · ${resortName} — ${camDisplayName(cam)}`}
     >
       <form onSubmit={handleSubmit} className="px-6 pt-5 pb-6 space-y-5">
-        <fieldset className="space-y-2">
+        <fieldset className="space-y-1">
           <legend className="pc-eyebrow mb-1.5" style={{ color: "var(--pc-bark)" }}>
             What&rsquo;s wrong?
           </legend>
           {REASONS.map((r) => (
             <label
               key={r.value}
-              className="flex items-center gap-3 cursor-pointer text-ink text-[14px] font-medium"
+              className="flex min-h-11 items-center gap-3 cursor-pointer text-ink text-[14px] font-medium"
             >
               <input
                 type="radio"
@@ -130,7 +130,7 @@ export function CamReportModal({
           ))}
         </fieldset>
 
-        <label className="flex items-center gap-3 cursor-pointer text-ink text-[14px] font-medium">
+        <label className="flex min-h-11 items-center gap-3 cursor-pointer text-ink text-[14px] font-medium">
           <input
             type="checkbox"
             checked={resortLinkDead}
@@ -159,8 +159,7 @@ export function CamReportModal({
             className="w-full bg-snow text-ink placeholder:text-bark
                        border-[1.5px] border-ink rounded-full shadow-stamp-sm
                        px-4 py-2 text-[16px] md:text-[14px] font-medium
-                       focus:shadow-[3px_3px_0_#a93f20] focus:border-alpen-dk
-                       outline-none transition-shadow duration-100"
+                       focus:border-alpen-dk transition-shadow duration-100"
           />
         </div>
 
@@ -172,7 +171,7 @@ export function CamReportModal({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex items-center px-4 py-2 rounded-full
+            className="inline-flex min-h-11 items-center px-4 py-2 rounded-full
                        text-ink text-[13px] font-semibold hover:bg-ink/5
                        transition-colors duration-150"
           >
@@ -181,12 +180,12 @@ export function CamReportModal({
           <button
             type="submit"
             disabled={!reason || submitting}
-            className={`inline-flex items-center px-4 py-2 rounded-full
+            className={`inline-flex min-h-11 items-center px-4 py-2 rounded-full
               border-[1.5px] border-ink text-[14px] font-bold
               transition-[transform,box-shadow] duration-100
               ${!reason || submitting
                 ? "bg-cream text-bark border-bark cursor-not-allowed shadow-none"
-                : "bg-alpen text-cream-50 shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]"
+                : "bg-alpen-dk text-cream-50 shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]"
               }`}
           >
             {submitting ? "Sending…" : "Send report"}

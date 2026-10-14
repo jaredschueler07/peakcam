@@ -107,3 +107,45 @@ test("landscape phones retain touch buttons with the selected handedness", async
   await expect(tuck).toBeVisible();
   await context.close();
 });
+
+/* iPhone-class width (iOS 26 Safari reports 393×852 for the 15/16 Pro). The
+   clipped-first-card bug was Safari painting its bottom-controls strip over a
+   page that never asked for the full screen, compounded by
+   `content-visibility:auto` wrappers whose 560px placeholder did not match the
+   ~488px cards they held. */
+test.describe("iPhone viewport chrome", () => {
+  test.use({ viewport: { width: 393, height: 852 }, hasTouch: true, isMobile: true });
+
+  test("covers the safe area, sizes cards honestly and collapses the search row on scroll", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator('meta[name="viewport"]')).toHaveAttribute("content", /viewport-fit=cover/);
+
+    // The mobile header is the first in document order; the md+ one sits in a
+    // `hidden md:contents` wrapper and is display:none here.
+    const headerHeight = (await page.locator("header").first().boundingBox())!.height;
+    expect(headerHeight).toBeLessThanOrEqual(56);
+
+    const slots = page.locator(".pc-resort-slot");
+    await slots.nth(2).scrollIntoViewIfNeeded();
+    for (let i = 0; i < 3; i++) {
+      // A content-visibility wrapper reports its contain-intrinsic-size, not
+      // the card's height — these must agree.
+      const slot = (await slots.nth(i).boundingBox())!.height;
+      const card = (await slots.nth(i).getByTestId("resort-card").boundingBox())!.height;
+      expect(Math.abs(slot - card)).toBeLessThan(1);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+
+    // scrollBy rather than mouse.wheel: mobile WebKit has no wheel, and
+    // "instant" keeps the travel deterministic against the smooth-scroll rule.
+    const bar = page.locator(".pc-browse-bar");
+    const scrollBy = (top: number) => page.evaluate(t => window.scrollBy({ top: t, behavior: "instant" }), top);
+    await scrollBy(400);
+    await expect(bar).toHaveAttribute("data-search-collapsed", "true");
+    for (const button of await bar.locator("button:visible").all()) {
+      expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    }
+    await scrollBy(-60);
+    await expect(bar).toHaveAttribute("data-search-collapsed", "false");
+  });
+});

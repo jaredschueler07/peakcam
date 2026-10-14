@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { AlertManagePage } from "@/components/alerts/AlertManagePage";
+import { loadManageData } from "@/lib/alerts/manage-data";
 
 interface PageProps {
   searchParams: Promise<{ token?: string }>;
@@ -11,15 +12,6 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-async function getManageData(token: string) {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-  const resp = await fetch(`${baseUrl}/api/alerts/manage?token=${encodeURIComponent(token)}`, {
-    cache: "no-store",
-  });
-  if (!resp.ok) return null;
-  return resp.json();
-}
-
 export default async function AlertsManagePage({ searchParams }: PageProps) {
   const { token } = await searchParams;
 
@@ -27,7 +19,12 @@ export default async function AlertsManagePage({ searchParams }: PageProps) {
   // an alert email — send them to the public signup page instead of a 404.
   if (!token) redirect("/alerts");
 
-  const data = await getManageData(token);
+  // Reads Supabase directly rather than fetching this app's own
+  // /api/alerts/manage over HTTP. That round trip resolved its base URL from
+  // NEXT_PUBLIC_SITE_URL with a localhost:3000 fallback, so on any deployment
+  // where that variable is unset every valid manage link 404'd. The route
+  // handler stays for the client-side PUT/DELETE.
+  const data = await loadManageData(token);
   if (!data) notFound();
 
   return (

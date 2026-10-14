@@ -33,9 +33,12 @@ import { SITE_URL as BASE_URL } from "@/lib/site";
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  // NOTE: no viewportFit:"cover" yet — the sticky Header and edge-pinned
-  // overlays have no safe-area padding, so cover would put them under the
-  // notch/home indicator. Add it together with that padding (roadmap M4).
+  // NOTE: viewport-fit=cover hands the page the whole screen on iPhones, so
+  // the safe-area insets are ours to honour. That handling lives in
+  // app/globals.css (--pc-safe-* tokens, body side padding, --pc-header-h)
+  // and components/layout/Header.tsx (top inset + pinned-chrome geometry);
+  // bottom sheets and the footer pad with --pc-safe-bottom.
+  viewportFit: "cover",
   themeColor: "#2a1f14",
 };
 

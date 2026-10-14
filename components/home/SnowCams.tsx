@@ -5,9 +5,10 @@ import { hasFreshSnowForecast } from "@/lib/snow-forecast";
 import { useState } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
-import { Snowflake, Play } from "lucide-react";
+import { Snowflake, Play, ExternalLink } from "lucide-react";
 import type { Cam, ResortWithData } from "@/lib/types";
 import { camDisplayName } from "@/lib/cam-name";
+import { CamEmbed } from "@/components/cam/CamEmbed";
 
 interface SnowCam {
   cam: Cam;
@@ -99,15 +100,8 @@ function SnowCamCard({
 }) {
   const snow = resort.snow_report;
   const name = camDisplayName(cam);
-
-  const embedSrc =
-    cam.embed_type === "youtube" && cam.youtube_id
-      ? `https://www.youtube.com/embed/${cam.youtube_id}?autoplay=1&mute=1`
-      : cam.embed_type === "image"
-        ? cam.embed_url
-        : cam.embed_url;
-
-  const isImage = cam.embed_type === "image";
+  // Link cams have nothing to embed; CamEmbed renders null for them.
+  const isLink = cam.embed_type === "link";
 
   return (
     <motion.div
@@ -119,27 +113,25 @@ function SnowCamCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
     >
-      {/* Cam embed */}
-      <div className="relative aspect-video bg-cream border-b-[1.5px] border-ink">
+      {/* Cam embed — ink letterbox behind object-contain stills */}
+      <div className={`relative aspect-video border-b-[1.5px] border-ink ${isLoaded ? "bg-ink" : "bg-cream"}`}>
         {isLoaded ? (
-          isImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={cam.embed_url ?? ""}
-              alt={`${name} webcam`}
-              className="w-full h-full object-cover"
-              loading="lazy"
-              decoding="async"
-            />
-          ) : cam.embed_type === "link" ? null : (
-            <iframe
-              src={embedSrc ?? ""}
-              className="w-full h-full border-0"
-              allow="autoplay; encrypted-media"
-              allowFullScreen
-              title={name}
-            />
-          )
+          <CamEmbed cam={cam} variant="tile" resortUrl={resort.cam_page_url || resort.website_url} />
+        ) : isLink && cam.embed_url ? (
+          <a
+            href={cam.embed_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2
+                       hover:bg-ink/5 transition-colors"
+          >
+            <span className="inline-flex items-center justify-center w-12 h-12 rounded-full
+                             bg-alpen text-cream-50 border-[1.5px] border-ink shadow-stamp-sm
+                             group-hover:shadow-stamp transition-shadow">
+              <ExternalLink className="w-5 h-5" />
+            </span>
+            <span className="font-mono text-[11px] text-bark uppercase tracking-[0.14em]">Open camera on resort site</span>
+          </a>
         ) : (
           <button
             onClick={onLoad}
@@ -157,14 +149,14 @@ function SnowCamCard({
 
         {/* Snow forecast badge — alpen stamp */}
         <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-0.5
-                        bg-alpen text-cream-50 border-[1.5px] border-ink rounded-full
+                        bg-alpen-dk text-cream-50 border-[1.5px] border-ink rounded-full
                         shadow-[2px_2px_0_#2a1f14] font-bold text-[11px] uppercase tracking-[0.14em]">
           <Snowflake size={11} strokeWidth={2.5} />
           Snow forecast
         </div>
 
-        {/* Live indicator */}
-        {isLoaded && (
+        {/* Live indicator — stills carry their own "Image loaded" badge instead */}
+        {isLoaded && cam.embed_type !== "image" && (
           <div className="absolute top-3 right-3 inline-flex items-center gap-1 px-2 py-0.5
                           bg-ink text-cream-50 border-[1.5px] border-ink rounded-full">
             <span className="w-1.5 h-1.5 bg-alpen rounded-full animate-pulse-live" />

@@ -212,12 +212,16 @@ Integrate the conditions engine with the existing powder alert system:
 ### 5.6 Condition Rating Calibration
 The rating thresholds in `lib/conditions-engine.ts` are initial values:
 ```typescript
+const USABLE_BASE_MIN_DEPTH_IN = 24;
+
 const RATING_THRESHOLDS = {
-  great: { newSnow24h: 6, newSnow48h: 12 },
-  good:  { newSnow24h: 2, pctOfNormal: 100, minDepth: 24 },
+  great: { newSnow24h: 6, newSnow48h: 12, minDepth: USABLE_BASE_MIN_DEPTH_IN },
+  good:  { newSnow24h: 2, pctOfNormal: 100, minDepth: USABLE_BASE_MIN_DEPTH_IN },
   fair:  { pctOfNormal: 70, minDepth: 20 },
 };
 ```
+Current rule (first match wins): **Great** = 24"+ base with 6"+ new in 24h or 12"+ in 48h; **Good** = 24"+ base with 2"+ new in 24h or ≥100% of normal; **Fair** = 20"+ base at ≥70% of normal (or no normals), or fresh snow with depth unknown; **Poor** = everything else. Every tier above Fair needs a *measured* base because new-snow values are depth-sensor deltas (#68). Temperature does not gate the rating (deferred). `RATING_RULES` renders this table as the badge/legend tooltips and the `/methodology` list, so change the constants, not the copy.
+
 After a full season of data, analyze correlation between ratings and user engagement (PostHog events) to calibrate thresholds. Consider region-specific thresholds (Pacific Northwest gets more snow than Colorado, so "great" might need a higher bar).
 
 ---

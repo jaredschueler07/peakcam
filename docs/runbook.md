@@ -155,12 +155,12 @@ From `lib/analytics-events.ts`:
 Captured from Task 3 discovery + Task 4 review. Not launch blockers.
 
 1. **Pipeline `snow_reports.source` constraint** — migration 010 pending human apply. Until then, `pipeline-backfill.ts` writes to `data_source_readings` + `resort_conditions_summary` but fails on `snow_reports` insert. Alerts work off `snow_reports` populated by `snotel-sync` instead.
-2. **`user_conditions.submitted_at` column missing** — user-reports fetcher selects a column that doesn't exist. Either add via future migration or update the fetcher.
+2. **`user_conditions.submitted_at` column missing** — *resolved in repo, pending apply:* `supabase/migrations/020_user_conditions_submitted_at.sql` adds the column, backfills it from `created_at` and indexes `(resort_id, submitted_at desc)`. Confirmed still absent from prod on 2026-09-19; until it is hand-applied, community reports stay hidden on `/resorts/[slug]` and the 1-report-per-hour submit cooldown fails open.
 3. **SNODAS tar missing file `1036`** — upstream catalog change or stale filename. Every SNODAS fetch fails silently.
 4. **SNOTEL HTML error parsing** — during NRCS outages, fetcher parses HTML `<p class="note">` as a date column. Needs content-type validation.
 5. **`alert_confirmed` re-fires on manage-page revisit** — gate the `useEffect` on a server-supplied "first visit" flag, or move capture to the confirm-callback route.
 
-P2 findings from the cross-browser smoke (Task 2) will be appended here by Task 5.2.
+Task 5.2 never ran, so no P2 findings from the Task 2 cross-browser smoke were appended here; `docs/qa-smoke-2026-04-17.md` remains the only record of that pass.
 
 ## Useful Commands
 

@@ -14,15 +14,21 @@ interface DropInUnavailableProps {
 
 /**
  * "Drop In isn't built here." Rendered for a real resort that isn't in the
- * pilot (named, 200) and by the route's 404 boundary for slugs we can't resolve
- * (unnamed). Never says "resort not found" — most people who land here typed a
- * perfectly real resort into a perfectly real URL shape.
+ * pilot (named, 200), by the route's 404 boundary for slugs we can't resolve
+ * (unnamed), and — while the feature is parked behind
+ * NEXT_PUBLIC_DROP_IN_ENABLED — for every Drop In URL at all. Never says
+ * "resort not found": most people who land here typed a perfectly real resort
+ * into a perfectly real URL shape.
  */
 export default function DropInUnavailable({
   resortName,
   resortSlug,
 }: DropInUnavailableProps) {
   const count = dropInResortCount();
+  // An empty roster means the feature is switched off, not that this resort
+  // missed the cut — so no "live at 0 resorts", no link to the (404) hub, and
+  // no empty "mountains you can ski" section.
+  const parked = count === 0;
   // Only send people to a resort page when we actually resolved the resort —
   // otherwise the back link would point at a slug we couldn't verify.
   const backHref = resortName && resortSlug ? `/resorts/${resortSlug}` : "/";
@@ -35,7 +41,9 @@ export default function DropInUnavailable({
         </p>
 
         <h1 className="pc-display mt-3 text-4xl text-ink sm:text-5xl">
-          {resortName ? (
+          {parked ? (
+            <>Drop In isn&rsquo;t available right now</>
+          ) : resortName ? (
             <>
               No descent built for
               <br />
@@ -47,7 +55,12 @@ export default function DropInUnavailable({
         </h1>
 
         <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-bark-dk">
-          {resortName ? (
+          {parked ? (
+            <>
+              Drop In, our arcade ski descent, is parked while we focus on live
+              cams and snow reports — the resort pages have everything else.
+            </>
+          ) : resortName ? (
             <>
               Drop In is an arcade ski descent we hand-build one mountain at a
               time — terrain seed, vertical, and six named runs each.{" "}
@@ -76,23 +89,29 @@ export default function DropInUnavailable({
             <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
             {backHref === "/" ? "Browse all resorts" : `${resortName} conditions`}
           </Link>
-          <Link
-            href="/drop-in"
-            className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-ink bg-cream-50
-                       px-5 py-2.5 text-[13px] font-bold uppercase tracking-[0.06em] text-ink
-                       shadow-stamp-sm transition-[transform,box-shadow] duration-100
-                       hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-stamp
-                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink
-                       focus-visible:ring-offset-2 focus-visible:ring-offset-cream"
-          >
-            What is Drop In?
-          </Link>
+          {!parked && (
+            <Link
+              href="/drop-in"
+              className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-ink bg-cream-50
+                         px-5 py-2.5 text-[13px] font-bold uppercase tracking-[0.06em] text-ink
+                         shadow-stamp-sm transition-[transform,box-shadow] duration-100
+                         hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-stamp
+                         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink
+                         focus-visible:ring-offset-2 focus-visible:ring-offset-cream"
+            >
+              What is Drop In?
+            </Link>
+          )}
         </div>
 
-        <h2 className="pc-display mt-14 text-2xl text-ink">
-          Mountains you can ski right now
-        </h2>
-        <DropInRoster className="mt-6" exclude={resortSlug} />
+        {!parked && (
+          <>
+            <h2 className="pc-display mt-14 text-2xl text-ink">
+              Mountains you can ski right now
+            </h2>
+            <DropInRoster className="mt-6" exclude={resortSlug} />
+          </>
+        )}
       </div>
     </div>
   );

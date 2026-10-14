@@ -1,9 +1,38 @@
 import type { Cam } from "./types";
 import roundshot from "../scripts/data/camera-previews/roundshot.json";
 
+// Player URL → `/cams/{id}/thumbnail`, harvested from each public player's twitter:image.
+const ROUNDSHOT_THUMBNAILS = roundshot as Record<string, string>;
+
 function webUrl(value: string | null): boolean {
   if (!value) return false;
   try { return ["https:", "http:"].includes(new URL(value).protocol); } catch { return false; }
+}
+
+/** Embed URL for a YouTube stream. `playsinline` is the iOS fix: without it
+ *  Safari pops the muted autoplay into fullscreen. The rest trims YouTube's
+ *  chrome and keeps the end-screen rail to the operator's own channel. */
+export function youtubeEmbedUrl(id: string): string {
+  return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3`;
+}
+
+function roundshotThumbnail(embedUrl: string): string | null {
+  try {
+    return ROUNDSHOT_THUMBNAILS[new URL(embedUrl).href] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Full-size still for a Roundshot player URL, or null when the player is not
+ *  a known Roundshot cam. Roundshot serves the still at the thumbnail URL
+ *  minus its `/thumbnail` suffix (it 302s to the latest capture). */
+export function roundshotStillUrl(embedUrl: string | null): string | null {
+  if (!embedUrl) return null;
+  const thumbnail = roundshotThumbnail(embedUrl);
+  if (!thumbnail) return null;
+  const still = thumbnail.replace(/\/thumbnail\/?$/, "");
+  return still === thumbnail ? null : still;
 }
 
 /** Availability is configuration/health state, never proof of a live broadcast. */
@@ -23,8 +52,7 @@ function previewSource(cam: Cam): { cam: Cam; src: string; label: string } | nul
   if (url.protocol === "https:" && url.hostname === "player.brownrice.com" && stream) {
     return { cam, src: `https://player.brownrice.com/snapshot/${stream}`, label: "Camera still" };
   }
-  // Roundshot thumbnail URLs are harvested from each public player's twitter:image.
-  const thumbnail = (roundshot as Record<string, string>)[url.href];
+  const thumbnail = roundshotThumbnail(cam.embed_url);
   return thumbnail ? { cam, src: thumbnail, label: "Camera still" } : null;
 }
 

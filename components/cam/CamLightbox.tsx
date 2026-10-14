@@ -7,6 +7,7 @@ import { X, ChevronLeft, ChevronRight, ExternalLink, Camera } from "lucide-react
 import type { Cam } from "@/lib/types";
 import { CamEmbed } from "./CamEmbed";
 import { camDisplayName } from "@/lib/cam-name";
+import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 
 interface Props {
   cams: Cam[];
@@ -25,16 +26,14 @@ export function CamLightbox({ cams, initialIndex, resortSlug, resortName, resort
   const prev = () => setIndex(i => (i - 1 + cams.length) % cams.length);
   const next = () => setIndex(i => (i + 1) % cams.length);
 
+  useBodyScrollLock(true);
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
     const dialog = dialogRef.current;
     dialog?.showModal();
     closeRef.current?.focus();
-    document.body.style.overflow = "hidden";
     return () => {
       dialog?.close();
-      document.body.style.overflow = previousOverflow;
       previousFocus?.focus();
     };
   }, []);
@@ -50,7 +49,7 @@ export function CamLightbox({ cams, initialIndex, resortSlug, resortName, resort
         if (event.key === "ArrowLeft") { event.preventDefault(); prev(); }
         if (event.key === "ArrowRight") { event.preventDefault(); next(); }
       }}
-      className="fixed inset-0 m-auto max-h-[95dvh] w-[calc(100%_-_1.5rem)] max-w-5xl overflow-y-auto rounded-[20px] border-[1.5px] border-ink bg-cream-50 p-0 text-ink shadow-stamp backdrop:bg-ink/80">
+      className="fixed inset-0 m-auto max-h-[95dvh] w-[calc(100%_-_1.5rem)] max-w-5xl overflow-y-auto overscroll-contain rounded-[20px] border-[1.5px] border-ink bg-cream-50 p-0 text-ink shadow-stamp backdrop:bg-ink/80">
       <div className="flex items-center justify-between gap-3 px-4 py-4 sm:px-6">
         <div className="min-w-0">
           <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-bark">Live look · {resortName}</p>

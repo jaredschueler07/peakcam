@@ -1,13 +1,13 @@
 # PeakCam Tasks
 
-> Last updated: 2026-03-28 | Sprint 4 (Polish & Launch Prep) | Week 2
+> Last updated: 2026-09-19 | Sprint 4 (Polish & Launch Prep) | Week 2
 
 ## Active — Sprint 4
 
 ### P0 Critical
-- [ ] Wire up alerts system — subscribers, preferences, powder alert triggers — **Engineering** (due 4/4)
+- [x] Wire up alerts system — subscribers, preferences, powder alert triggers — **Engineering** (done 4/17; subscribe/manage/unsubscribe routes + daily Vercel cron `/api/alerts/trigger`, see `docs/launch-gate-check.md`. Inbox deliverability spot-check remains a human ops step.)
 - [ ] QA & cross-browser testing — mobile Safari, Chrome, Firefox — **Engineering** (due 4/4)
-- [ ] Merge open feature branches (`feat/map-overhaul`, `feat/multi-source-data-pipeline`) or close — **Engineering** (due 3/31)
+- [x] Merge open feature branches (`feat/map-overhaul`, `feat/multi-source-data-pipeline`) or close — **Engineering** (done 4/17)
 
 ### P1 High
 - [ ] Populate empty DB tables — `resort_metadata`, `data_source_readings`, `resort_conditions_summary` — **Data** (due 4/4)

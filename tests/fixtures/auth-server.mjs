@@ -30,7 +30,13 @@ createServer(async (req,res) => {
     return send(200,session());
   }
   if(url.pathname==='/auth/v1/signup')return send(200,{user,session:null});
-  if(url.pathname==='/auth/v1/resend'||url.pathname==='/auth/v1/otp'||url.pathname==='/auth/v1/recover')return send(200,{});
+  if(url.pathname==='/auth/v1/otp'){
+    // GoTrue's real reply for an address without an account when shouldCreateUser is false.
+    if(data.email==='unknown@example.invalid')return send(422,{code:'otp_disabled',message:'Signups not allowed for otp'});
+    if(data.email==='ratelimited@example.invalid')return send(429,{code:'over_email_send_rate_limit',message:'Private rate-limit diagnostic'});
+    return send(200,{});
+  }
+  if(url.pathname==='/auth/v1/resend'||url.pathname==='/auth/v1/recover')return send(200,{});
   if(url.pathname==='/auth/v1/verify')return data.token==='123456'?send(200,session()):send(403,{code:'otp_expired',msg:'Private token diagnostic'});
   if(url.pathname==='/auth/v1/logout'){res.writeHead(204);res.end();return;}
   return send(404,{message:'Unknown fixture endpoint'});

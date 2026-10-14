@@ -237,10 +237,10 @@ export function UserConditionsForm({ resortId, resortSlug, onSubmitted }: Props)
                 onChange={(e) => setNotes(e.target.value.slice(0, 500))}
                 placeholder="Anything else riders should know? (e.g. grooming quality, hazards, lift lines)"
                 rows={2}
-                className="w-full bg-surface2 border border-border rounded-lg
-                  px-3 py-2.5 text-[16px] md:text-sm text-text-base placeholder:text-text-muted
-                  outline-none resize-none transition-all duration-[220ms]
-                  focus:border-cyan focus:bg-surface3"
+                className="w-full bg-cream-dk border border-ink/15 rounded-lg
+                  px-3 py-2.5 text-[16px] md:text-sm text-ink placeholder:text-bark
+                  resize-none transition-colors duration-[220ms]
+                  focus:border-forest"
               />
               {notes.length > 400 && (
                 <p className="text-text-muted text-[11px] mt-1 text-right">{500 - notes.length} chars left</p>

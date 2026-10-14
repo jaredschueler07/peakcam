@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { flushSync } from "react-dom";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import Fuse from "fuse.js";
@@ -108,7 +109,7 @@ function FilterChip({
     <button
       onClick={onClick}
       title={title}
-      className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 min-h-[40px] text-[13px] font-semibold border-[1.5px] cursor-pointer select-none transition-colors duration-150 whitespace-nowrap ${
+      className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 min-h-11 md:min-h-10 text-[13px] font-semibold border-[1.5px] cursor-pointer select-none transition-colors duration-150 whitespace-nowrap ${
         active
           ? "bg-ink border-ink text-cream-50"
           : "bg-cream-50 border-bark text-ink hover:border-ink hover:bg-cream"
@@ -336,7 +337,7 @@ function PowderAlert({ resorts }: { resorts: ResortWithData[] }) {
   return (
     /* pc-on-ink: saturated alpenglow fill — the default ember focus ring is
        1.3:1 against it, so links inside get the cream ring (3.6:1) instead. */
-    <div className="pc-on-ink flex items-center gap-3 px-5 py-3 bg-alpen text-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp mb-8">
+    <div className="pc-on-ink flex items-center gap-3 px-5 py-3 bg-alpen-dk text-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp mb-8">
       <span className="relative flex h-3 w-3 shrink-0">
         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cream-50 opacity-75" />
         <span className="relative inline-flex rounded-full h-3 w-3 bg-cream-50" />
@@ -557,15 +558,139 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
     if (hasLiveCams) trackFilter("live_cams", "true");
   }, [hasLiveCams]);
 
+  // ── Phone chrome: collapse the search row on downward scroll ──────────────
+  // Only the chips row stays pinned once the reader is moving down the grid;
+  // the search row slides back in on any upward travel. The bar keeps its
+  // in-flow height (the row is clipped, see .pc-browse-bar in globals.css),
+  // so toggling never reflows the document under a momentum scroll.
+  const barRef = useRef<HTMLDivElement>(null);
+  const searchRowRef = useRef<HTMLDivElement>(null);
+  const [searchCollapsed, setSearchCollapsed] = useState(false);
+  // Read inside the scroll handler without re-subscribing it on every toggle.
+  const panelOpenRef = useRef(false);
+  useEffect(() => {
+    panelOpenRef.current = showStates || showFilterSheet;
+  }, [showStates, showFilterSheet]);
+
+  useEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    const phone = window.matchMedia("(max-width: 767px)");
+    const COLLAPSE_AFTER = 24;
+    const EXPAND_AFTER = 12;
+    let raf = 0;
+    let lastY = 0;
+    let down = 0;
+    let up = 0;
+    let listening = false;
+    // iOS rubber-banding reports scrollY beyond the document; clamped, the
+    // bounce reads as zero travel instead of a direction change.
+    const clampedY = () =>
+      Math.min(Math.max(0, window.scrollY), Math.max(0, document.documentElement.scrollHeight - window.innerHeight));
+    const evaluate = () => {
+      raf = 0;
+      const y = clampedY();
+      const dy = y - lastY;
+      lastY = y;
+      if (dy > 0) { down += dy; up = 0; } else if (dy < 0) { up += -dy; down = 0; }
+      // Pinned once the bar sits at its sticky offset; the computed `top`
+      // already includes the collapsed shift, so this holds in both states.
+      const pinned = bar.getBoundingClientRect().top <= (parseFloat(getComputedStyle(bar).top) || 0) + 1;
+      if (!pinned) { down = 0; up = 0; setSearchCollapsed(false); return; }
+      const input = searchInputRef.current;
+      const held = panelOpenRef.current || (input !== null && (document.activeElement === input || input.value !== ""));
+      if (up >= EXPAND_AFTER) { up = 0; setSearchCollapsed(false); }
+      else if (down >= COLLAPSE_AFTER) { down = 0; if (!held) setSearchCollapsed(true); }
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(evaluate); };
+    // A viewport resize (Safari toolbar show/hide, rotation) moves scrollY
+    // without the reader scrolling; restart the travel count from here.
+    const onResize = () => { lastY = clampedY(); down = 0; up = 0; };
+    const listen = () => {
+      if (listening) return;
+      listening = true;
+      onResize();
+      window.addEventListener("scroll", onScroll, { passive: true });
+      window.addEventListener("resize", onResize);
+    };
+    const unlisten = () => {
+      if (!listening) return;
+      listening = false;
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onResize);
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+    };
+    const onMediaChange = (event: MediaQueryListEvent) => {
+      if (event.matches) listen();
+      else { unlisten(); setSearchCollapsed(false); }
+    };
+    if (phone.matches) listen();
+    phone.addEventListener("change", onMediaChange);
+    return () => { phone.removeEventListener("change", onMediaChange); unlisten(); };
+  }, []);
+
+  const expandSearch = () => {
+    // Flushed synchronously so the row is no longer inert when we focus it,
+    // still inside the tap gesture that iOS requires for the keyboard.
+    flushSync(() => setSearchCollapsed(false));
+    searchInputRef.current?.focus();
+  };
+
+  // Publish the bar's geometry: the search row's height (what collapsing
+  // hides) as a var on the bar, and the bar's visible height on <html> for
+  // the snap experiment's scroll-padding.
+  useEffect(() => {
+    const bar = barRef.current;
+    const row = searchRowRef.current;
+    if (!bar || !row) return;
+    const root = document.documentElement;
+    const publish = () => {
+      const rowH = row.getBoundingClientRect().height + (parseFloat(getComputedStyle(row).marginBottom) || 0);
+      bar.style.setProperty("--pc-search-row-h", `${Math.round(rowH)}px`);
+      const visible = bar.getBoundingClientRect().height - (searchCollapsed ? rowH : 0);
+      root.style.setProperty("--pc-browse-visible-h", `${Math.max(0, Math.round(visible))}px`);
+    };
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(bar);
+    observer.observe(row);
+    return () => observer.disconnect();
+  }, [searchCollapsed]);
+  useEffect(() => () => { document.documentElement.style.removeProperty("--pc-browse-visible-h"); }, []);
+
+  // Root flags: `pc-browse-page` scopes the browse CSS to this route; card
+  // snapping stays an experiment behind ?snap=1 (read from window.location
+  // like ?q= above so the page remains static).
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.add("pc-browse-page");
+    if (new URLSearchParams(window.location.search).get("snap") === "1") root.dataset.cardSnap = "true";
+    return () => {
+      root.classList.remove("pc-browse-page");
+      delete root.dataset.cardSnap;
+    };
+  }, []);
+
   return (
-    <div id="conditions" className="min-h-screen scroll-mt-16 pc-paper">
+    <div id="conditions" className="min-h-screen scroll-mt-(--pc-header-h) pc-paper">
       <div className="hidden md:contents"><Header showSearch={false} /></div>
 
       {/* ── Sticky paper search + filter bar ─────────────────── */}
-      <div className="sticky top-[64px] z-30 border-b-[1.5px] border-ink bg-cream/95 backdrop-blur-md">
-        <div className="max-w-screen-2xl mx-auto px-4 py-3 md:py-5 md:px-8">
-          {/* Top row: search input (pc-input style) */}
-          <div className="flex items-center gap-4 mb-2 md:mb-4">
+      <div
+        ref={barRef}
+        data-search-collapsed={searchCollapsed ? "true" : "false"}
+        className="pc-browse-bar sticky top-(--pc-header-h) z-30 border-b-[1.5px] border-ink bg-cream/90 backdrop-blur-lg"
+      >
+        <div className="max-w-screen-2xl mx-auto px-4 py-2 md:py-5 md:px-8">
+          {/* Top row: search input (pc-input style). Clipped rather than
+              unmounted while collapsed, so it has to leave the tab order. */}
+          <div
+            ref={searchRowRef}
+            inert={searchCollapsed || undefined}
+            aria-hidden={searchCollapsed || undefined}
+            className="flex items-center gap-4 mb-2 md:mb-4"
+          >
             <div className="flex-1 relative">
               <Search
                 className="absolute left-5 top-1/2 -translate-y-1/2 text-bark pointer-events-none"
@@ -577,7 +702,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={`Search ${resorts.length} resorts…`}
-                className="w-full pl-12 pr-10 py-3 bg-snow text-ink placeholder:text-bark
+                className="w-full h-11 py-0 md:h-auto md:py-3 pl-12 pr-10 text-[16px] bg-snow text-ink placeholder:text-bark
                            border-[1.5px] border-ink rounded-full shadow-stamp
                            focus:shadow-[4px_4px_0_#a93f20] focus:border-alpen-dk
                            transition-shadow duration-100 font-medium"
@@ -585,7 +710,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
               {search && (
                 <button
                   onClick={handleClearSearch}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 pointer-coarse:p-3 text-bark hover:text-ink transition-colors"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 grid h-11 w-11 place-items-center text-bark hover:text-ink transition-colors"
                   aria-label="Clear search"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -598,9 +723,19 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
 
           {/* Mobile: single compact row — state, The Goods, everything else in the sheet */}
           <div className="flex md:hidden items-center gap-2">
+            {searchCollapsed && (
+              <button
+                type="button"
+                onClick={expandSearch}
+                aria-label="Search resorts"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-[1.5px] border-bark bg-cream-50 text-ink"
+              >
+                <Search size={18} />
+              </button>
+            )}
             <button
               onClick={() => setShowStates(v => !v)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 min-h-[44px] text-[13px] font-semibold border-[1.5px] cursor-pointer select-none transition-colors duration-150 whitespace-nowrap min-w-0 ${
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 min-h-11 text-[13px] font-semibold border-[1.5px] cursor-pointer select-none transition-colors duration-150 whitespace-nowrap min-w-0 ${
                 stateFilter !== "All"
                   ? "bg-ink border-ink text-cream-50"
                   : "bg-cream-50 border-bark text-ink"
@@ -618,7 +753,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
             />
             <button
               onClick={event => { event.currentTarget.focus(); setShowFilterSheet(true); }}
-              className={`ml-auto inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 min-h-[44px] text-[13px] font-semibold border-[1.5px] cursor-pointer select-none transition-colors duration-150 whitespace-nowrap ${
+              className={`ml-auto inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 min-h-11 text-[13px] font-semibold border-[1.5px] cursor-pointer select-none transition-colors duration-150 whitespace-nowrap ${
                 activeFilterCount > 0
                   ? "bg-ink border-ink text-cream-50"
                   : "bg-cream-50 border-bark text-ink"
@@ -627,7 +762,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
               <SlidersHorizontal size={14} />
               Filters
               {activeFilterCount > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full bg-alpen text-cream-50 font-mono text-[11px] font-bold">
+                <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full bg-alpen-dk text-cream-50 font-mono text-[11px] font-bold">
                   {activeFilterCount}
                 </span>
               )}
@@ -785,12 +920,12 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
                   {visibleResorts.map((resort, i) => (
                     <Fragment key={resort.id}><div
+                      className="pc-resort-slot"
                       onMouseEnter={() => setHoveredSlug(resort.slug)}
                       onMouseLeave={() => setHoveredSlug(null)}
-                      style={{ contentVisibility: "auto", containIntrinsicSize: "0 560px" }}
                     >
                       <SummitResortCard
                         resort={resort}

@@ -147,18 +147,18 @@ export function FavoriteButton({
         size={size}
         onClick={toggleFavorite}
         disabled={isProcessing}
-        className={`${className} group min-w-[36px] relative z-50`}
+        className={`${className} group items-center min-w-[36px] pointer-coarse:min-h-11 pointer-coarse:min-w-11 relative z-50`}
         title={accessibleName}
         aria-label={accessibleName}
       >
         {isProcessing ? (
-          <Loader2 className="w-4 h-4 animate-spin text-cyan" />
+          <Loader2 className="w-4 h-4 animate-spin text-forest" />
         ) : (
           <Star
             className={`w-4 h-4 transition-all duration-200 ${starOpacity} ${
               isFavorited
-                ? "fill-cyan text-cyan"
-                : "text-text-muted group-hover:text-text-subtle"
+                ? "fill-forest text-forest"
+                : "text-bark group-hover:text-bark-dk"
             }`}
           />
         )}

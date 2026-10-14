@@ -43,6 +43,7 @@ interface AlertPreference {
 interface SnowReport {
   resort_id: string;
   new_snow_24h: number | null;
+  updated_at: string | null;
 }
 
 interface ResortLocation {
@@ -69,6 +70,17 @@ interface AlertLog {
 const FORECAST_LOOKBACK_DAYS = 14;
 const FORECAST_COOLDOWN_DAYS = 3;
 const FORECAST_GROWTH_INCHES = 1;
+// Live alerts share the forecast cooldown window but need a bigger jump to
+// re-fire: new_snow_24h is a rolling total that stays above a 6" threshold on
+// every day of a multi-day storm, and each of those days used to mail again.
+const LIVE_COOLDOWN_DAYS = FORECAST_COOLDOWN_DAYS;
+const LIVE_GROWTH_INCHES = 6;
+// latest_snow_reports has no upper bound on row age, so when a feed dies its
+// last total sits there looking current. Older than this it is not evidence
+// about today. (The global runFreshnessCheck below only pages an admin.)
+const MAX_REPORT_AGE_HOURS = 36;
+
+type SkipCounts = { live_cooldown: number; forecast_cooldown: number; stale_report: number };
 
 function dateOffset(date: Date, days: number): string {
   return new Date(date.getTime() + days * 86_400_000).toISOString().slice(0, 10);
@@ -79,6 +91,36 @@ function daysSince(alertDate: string, today: string): number | null {
   const now = Date.parse(`${today}T00:00:00Z`);
   if (!Number.isFinite(then) || !Number.isFinite(now)) return null;
   return Math.floor((now - then) / 86_400_000);
+}
+
+function isFreshReport(updatedAt: string | null | undefined, nowMs: number): boolean {
+  if (!updatedAt) return false;
+  const then = Date.parse(updatedAt);
+  return Number.isFinite(then) && nowMs - then <= MAX_REPORT_AGE_HOURS * 3_600_000;
+}
+
+function shouldSuppressLive(
+  logs: AlertLog[],
+  hasMetadata: boolean,
+  subscriberId: string,
+  resortId: string,
+  newSnow: number,
+  today: string,
+): boolean {
+  const matching = logs.filter((log) => log.subscriber_id === subscriberId && log.resort_id === resortId);
+  // One email per pair per day whatever its kind: a forecast mailed earlier
+  // today already announced this storm.
+  if (matching.some((log) => log.alert_date === today)) return true;
+
+  // Without the `kind` column every row counts as a live send.
+  const recentLive = matching.filter((log) =>
+    (!hasMetadata || log.kind === "live") && (daysSince(log.alert_date, today) ?? 99) < LIVE_COOLDOWN_DAYS
+  );
+  if (recentLive.length === 0) return false;
+  const last = recentLive.reduce((a, b) =>
+    b.alert_date > a.alert_date || (b.alert_date === a.alert_date && b.new_snow_inches > a.new_snow_inches) ? b : a
+  );
+  return newSnow < last.new_snow_inches + LIVE_GROWTH_INCHES;
 }
 
 function shouldSuppressForecast(
@@ -113,7 +155,8 @@ function shouldSuppressForecast(
   );
 }
 
-async function loadAlertLogs(now: Date): Promise<{ logs: AlertLog[]; hasMetadata: boolean }> {
+/** Null when neither query succeeded — the caller must not send blind. */
+async function loadAlertLogs(now: Date): Promise<{ logs: AlertLog[]; hasMetadata: boolean } | null> {
   const lookback = dateOffset(now, -FORECAST_LOOKBACK_DAYS);
   try {
     const response = await sbFetch(
@@ -132,9 +175,9 @@ async function loadAlertLogs(now: Date): Promise<{ logs: AlertLog[]; hasMetadata
     );
     if (response.ok) return { logs: await response.json(), hasMetadata: false };
   } catch {
-    // A failed dedup read is treated as no rows, matching the old behavior.
+    // Reported below as a failed read.
   }
-  return { logs: [], hasMetadata: false };
+  return null;
 }
 
 async function insertAlertLogs(entries: Array<Record<string, unknown>>): Promise<boolean> {
@@ -229,6 +272,7 @@ async function handleTrigger(request: NextRequest) {
     return NextResponse.json({ error: "Failed to load preferences", freshness }, { status: 500 });
   }
   const prefs: AlertPreference[] = await prefsResp.json();
+  const skipped: SkipCounts = { live_cooldown: 0, forecast_cooldown: 0, stale_report: 0 };
 
   if (prefs.length === 0) {
     return NextResponse.json({
@@ -238,20 +282,26 @@ async function handleTrigger(request: NextRequest) {
       failed: 0,
       logFailures: 0,
       message: "No active subscriptions",
+      skipped,
       freshness,
     });
   }
 
-  // 2. Load latest snow reports for all relevant resort IDs
+  // 2. Load latest snow reports for all relevant resort IDs. updated_at comes
+  // along so a resort whose feed has stopped moving can be rejected below.
   const resortIds = [...new Set(prefs.map((p) => p.resort_id))];
   const snowResp = await sbFetch(
-    `/latest_snow_reports?resort_id=in.(${resortIds.map((id) => `"${id}"`).join(",")})&select=resort_id,new_snow_24h`
+    `/latest_snow_reports?resort_id=in.(${resortIds.map((id) => `"${id}"`).join(",")})&select=resort_id,new_snow_24h,updated_at`
   );
   if (!snowResp.ok) {
     return NextResponse.json({ error: "Failed to load snow reports", freshness }, { status: 500 });
   }
   const snowReports: SnowReport[] = await snowResp.json();
-  const snowByResort = new Map(snowReports.map((s) => [s.resort_id, s.new_snow_24h ?? 0]));
+  const nowMs = Date.now();
+  const snowByResort = new Map(snowReports.map((s) => [s.resort_id, {
+    newSnow: s.new_snow_24h ?? 0,
+    fresh: isFreshReport(s.updated_at, nowMs),
+  }]));
 
   // Alerts use seven-day Open-Meteo forecasts. US resort pages use NWS,
   // so their numbers can differ. Forecast failures must not block live alerts.
@@ -277,7 +327,14 @@ async function handleTrigger(request: NextRequest) {
   // Map: subscriber_id → { subscriber, alerts[] }
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
-  const { logs, hasMetadata } = await loadAlertLogs(new Date());
+  const loaded = await loadAlertLogs(new Date());
+  if (!loaded) {
+    // Without the log a first alert is indistinguishable from a repeat, and
+    // re-mailing every subscriber their last storm is worse than a missed run.
+    console.error("[alerts/trigger] alert log read failed — no alerts sent");
+    return NextResponse.json({ error: "Failed to load alert log", freshness }, { status: 500 });
+  }
+  const { logs, hasMetadata } = loaded;
   const todayLog = logs.filter((log) => log.alert_date === today);
 
   type AlertEntry = {
@@ -291,20 +348,39 @@ async function handleTrigger(request: NextRequest) {
     stormStartDate?: string | null;
   };
   const bySubscriber = new Map<string, { subscriber: Subscriber; alerts: AlertEntry[] }>();
+  const staleResorts = new Set<string>();
 
   for (const pref of prefs) {
-    const newSnow = snowByResort.get(pref.resort_id) ?? 0;
+    const report = snowByResort.get(pref.resort_id);
+    const newSnow = report?.newSnow ?? 0;
     const periods = forecastByResort.get(pref.resort_id);
     // Include tomorrow. A qualifying live reading takes priority, and the existing
     // subscriber/resort/day log deduplicates either kind of alert for today.
     const forecast = periods ? findForecastAlert(periods, pref.threshold_inches) : null;
-    const hasLiveAlert = newSnow >= pref.threshold_inches;
+    let hasLiveAlert = newSnow >= pref.threshold_inches;
+    if (hasLiveAlert && !report?.fresh) {
+      // A dead feed's last total must not mail. The forecast is independent
+      // of that feed, so it is still evaluated below.
+      skipped.stale_report++;
+      staleResorts.add(pref.resort_id);
+      hasLiveAlert = false;
+    }
     if (!hasLiveAlert && !forecast) continue;
 
     const todayRows = todayLog.filter((log) =>
       log.subscriber_id === pref.subscriber_id && log.resort_id === pref.resort_id
     );
-    if (hasLiveAlert && todayRows.length > 0) continue;
+    if (hasLiveAlert && shouldSuppressLive(
+      logs,
+      hasMetadata,
+      pref.subscriber_id,
+      pref.resort_id,
+      newSnow,
+      today,
+    )) {
+      skipped.live_cooldown++;
+      continue;
+    }
     if (!hasLiveAlert && todayRows.some((log) => log.kind !== "forecast")) continue;
     if (!hasLiveAlert && forecast && shouldSuppressForecast(
       logs,
@@ -313,7 +389,10 @@ async function handleTrigger(request: NextRequest) {
       pref.resort_id,
       forecast,
       today,
-    )) continue;
+    )) {
+      skipped.forecast_cooldown++;
+      continue;
+    }
 
     const sub = pref.alert_subscribers;
     if (!bySubscriber.has(pref.subscriber_id)) {
@@ -333,6 +412,13 @@ async function handleTrigger(request: NextRequest) {
     });
   }
 
+  if (staleResorts.size > 0) {
+    console.warn(
+      `[alerts/trigger] skipped ${skipped.stale_report} live alert(s): snow report older than ` +
+        `${MAX_REPORT_AGE_HOURS}h or untimestamped for resort(s) ${[...staleResorts].join(", ")}`
+    );
+  }
+
   if (bySubscriber.size === 0) {
     return NextResponse.json({
       ok: true,
@@ -341,6 +427,7 @@ async function handleTrigger(request: NextRequest) {
       failed: 0,
       logFailures: 0,
       message: "No thresholds exceeded",
+      skipped,
       freshness,
     });
   }
@@ -395,6 +482,7 @@ async function handleTrigger(request: NextRequest) {
     sent,
     failed,
     logFailures,
+    skipped,
     ...(errors.size > 0 ? { errors: [...errors] } : {}),
     freshness,
   };

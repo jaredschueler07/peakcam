@@ -8,6 +8,15 @@ import { SITE_URL } from "@/lib/site";
 
 export const revalidate = 3600;
 
+// A route-level `openGraph` replaces the root's wholesale, so the root
+// app/opengraph-image.tsx is not inherited here — declare the card explicitly.
+const OG_IMAGE = {
+  url: "/opengraph-image",
+  width: 1200,
+  height: 630,
+  alt: "PeakCam — live ski resort webcams and snow reports",
+};
+
 export const metadata: Metadata = {
   title: "Interactive Ski Resort Map",
   description:
@@ -18,6 +27,15 @@ export const metadata: Metadata = {
       "Explore ski resorts on an interactive map with live snow data and weather radar.",
     url: `${SITE_URL}/map`,
     type: "website",
+    siteName: "PeakCam",
+    images: [OG_IMAGE],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Interactive Ski Resort Map",
+    description:
+      "Explore ski resorts on an interactive map with live snow data and weather radar.",
+    images: [OG_IMAGE],
   },
   alternates: { canonical: `${SITE_URL}/map` },
 };

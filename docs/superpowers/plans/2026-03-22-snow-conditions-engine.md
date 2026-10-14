@@ -369,9 +369,13 @@ export interface ConditionsOutput {
 
 // ── Thresholds (tunable) ─────────────────────────────────────
 
+// GREAT and GOOD share one base-depth floor: newSnow24h/48h are depth-sensor
+// deltas, so a storm total on its own says nothing about the base beneath it.
+const USABLE_BASE_MIN_DEPTH_IN = 24;
+
 export const RATING_THRESHOLDS = {
-  great: { newSnow24h: 6, newSnow48h: 12 },
-  good:  { newSnow24h: 2, pctOfNormal: 100, minDepth: 24 },
+  great: { newSnow24h: 6, newSnow48h: 12, minDepth: USABLE_BASE_MIN_DEPTH_IN },
+  good:  { newSnow24h: 2, pctOfNormal: 100, minDepth: USABLE_BASE_MIN_DEPTH_IN },
   fair:  { pctOfNormal: 70, minDepth: 20 },
 } as const;
 
@@ -444,33 +448,30 @@ export function computeOutlook(
 
 // ── Condition Rating ─────────────────────────────────────────
 
-export function computeConditionRating(
+// As shipped this is `computeSnotelRating`; `computeConditionRating` wraps it
+// with the 70/30 user-report blend. Rule order matters: first match wins.
+export function computeSnotelRating(
   newSnow24h: number,
   newSnow48h: number,
   snowDepthIn: number | null,
   pctOfNormal: number | null,
 ): ConditionRating {
   const t = RATING_THRESHOLDS;
+  const bigStorm = newSnow24h >= t.great.newSnow24h || newSnow48h >= t.great.newSnow48h;
+  const freshSnow = newSnow24h >= t.good.newSnow24h;
+  const atNormal = pctOfNormal != null && pctOfNormal >= t.good.pctOfNormal;
 
-  // Great: big dump
-  if (newSnow24h >= t.great.newSnow24h || newSnow48h >= t.great.newSnow48h) {
-    return "great";
-  }
+  // Unknown depth: fresh snow is evidence for FAIR at most (never GOOD/GREAT)
+  if (snowDepthIn == null) return bigStorm || freshSnow ? "fair" : "poor";
 
-  // Good: moderate new snow OR healthy snowpack
-  if (newSnow24h >= t.good.newSnow24h) return "good";
-  if (
-    pctOfNormal != null &&
-    pctOfNormal >= t.good.pctOfNormal &&
-    snowDepthIn != null &&
-    snowDepthIn >= t.good.minDepth
-  ) {
-    return "good";
-  }
+  // Great: big dump on a usable base
+  if (bigStorm && snowDepthIn >= t.great.minDepth) return "great";
+
+  // Good: usable base with moderate new snow OR healthy snowpack
+  if (snowDepthIn >= t.good.minDepth && (freshSnow || atNormal)) return "good";
 
   // Fair: adequate base, reasonable snowpack
   if (
-    snowDepthIn != null &&
     snowDepthIn >= t.fair.minDepth &&
     (pctOfNormal == null || pctOfNormal >= t.fair.pctOfNormal)
   ) {

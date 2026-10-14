@@ -13,8 +13,9 @@ npm run dev              # Dev server (localhost:3000)
 npm run build            # Production build
 npm run lint             # ESLint (flat config, next/core-web-vitals + TS)
 npx tsc --noEmit         # Type check
-npm test                 # node:test via tsx — lib/*.test.ts + scripts/*.test.ts
-npm run drop-in:sync-three   # Re-vendor public/drop-in/three.module.js after bumping `three`
+npm test                 # node:test via tsx — lib/**, scripts/** (.ts + .mjs), tests/**/*.test.ts
+npm run test:auth-e2e    # Playwright auth suite (playwright.auth.config.ts) — needs a dev server
+npm run test:mobile-e2e  # Playwright mobile suite (playwright.mobile.config.ts)
 
 # Data & ops scripts (all load .env.local themselves, write via service-role key)
 npm run import-resorts:standalone  # Seed resorts/cams from data/*.csv (the maintained importer). A newly-imported resort has no live page until the next deploy — /resorts/[slug] uses dynamicParams=false, so its static params list is fixed at build time.
@@ -24,7 +25,7 @@ npm run seed-normals     # 30-year SNOTEL normals (run-once/annual)
 npm run cam-health       # Probe all cam URLs, stamp cams.last_checked_at
 ```
 
-Beware: `npm run liftie-sync` and `npm run snodas-sync` reference script files that do not exist (the logic lives in `lib/pipeline/fetchers/`). `npm run import-resorts` (the ts-node variant) is stale and truncates SNOTEL triplet IDs — use `:standalone`.
+Beware: `npm test` runs `scripts/bake-resort.test.ts` and `scripts/dem/gdal.test.ts`, which shell out to `gdal_translate` — without GDAL on PATH those two files fail. Liftie and SNODAS have no npm scripts; their logic lives in `lib/pipeline/fetchers/` and only `pipeline-sync` drives it. `npm run import-resorts` (the ts-node variant) no longer exists — `:standalone` is the maintained importer.
 
 ## Architecture
 
@@ -65,8 +66,10 @@ Cam embeds are click-to-play by `embed_type`: `youtube` (autoplay+mute embed), `
 18 tables + 2 views, migrations `supabase/migrations/001–011`. Migrations are applied **by hand** (SQL Editor / MCP `apply_migration`) — there is no Supabase CLI config, numbering is documentation only, and 004/005 each have two files. RLS postures: public-read (catalog/snow tables), anon-insert (`condition_votes`, `agent_memory`), auth.uid()-scoped (`user_conditions`, `user_favorites`, `dashboard_layouts`), deny-all/service-role-only (alerts tables, `cam_reports`).
 
 Known live-DB drift from the repo migrations (verify against prod before trusting a migration file):
-- `user_conditions.snow_quality`: migration checks `icy/slush`; code and UI submit `crud/ice/spring`.
-- `latest_snow_reports` view was created as `SELECT *` in 001; columns added to `snow_reports` by 005/007 required manual view recreation in prod — no migration records it.
+- `user_conditions.snow_quality`: 004 still checks `icy/slush`, but prod was widened to `powder/packed/crud/ice/spring` (the vocabulary the code submits) by hand around 2026-09-02. **Recorded, after the fact, as `018_user_conditions_snow_quality_vocab.sql`** — do not re-apply 004's check.
+- `user_conditions.submitted_at`: 004 defines the column; the live table never got it, so `getUserConditions`, the submit rate limiter and the snotel-sync user blend all degrade silently. **`020_user_conditions_submitted_at.sql` is written but not yet applied.**
+- `latest_snow_reports` view was created as `SELECT *` in 001; columns added to `snow_reports` by 005/007 required manual view recreation in prod, which 013 finally recorded. **`019_latest_snow_reports_index_and_view.sql` (pending apply)** adds the composite `(resort_id, updated_at desc)` index and rewrites the view as a per-resort `LATERAL … limit 1` with `security_invoker = true`; its `DISTINCT ON` predecessor was the cause of the Sept 2026 statement-timeout wave. Any migration that adds a column to `snow_reports` must still drop and recreate this view.
+- `021_function_hardening.sql` (pending apply) revokes anon/authenticated EXECUTE on `rls_auto_enable()` and pins `drop_in_immutable_morning()`'s `search_path`.
 - `cams` has no unique constraint: re-running the importer duplicates cam rows (`ignore-duplicates` is a no-op).
 
 `snow_reports.conditions` is an overloaded string: `"tag1,tag2||narrative"`. Consumers must split on `||` (done in ConditionsStrip, ComparePage, map-utils). Don't add new consumers without unpacking it.
@@ -77,15 +80,15 @@ Retro ski-poster theme (cream paper / ink / forest / alpenglow; Fraunces display
 
 ### Drop In (`/resorts/[slug]/drop-in`)
 
-A self-contained arcade ski descent, live for three pilot resorts (`ski-portillo`, `breckenridge`, `heavenly`). Entry points: the map popup card, the mobile bottom sheet, and the resort detail page — all gated on `isDropInResort()`.
+An arcade ski descent for three pilot resorts (`ski-portillo`, `breckenridge`, `heavenly`). **Parked in production since 2026-09-17** behind `NEXT_PUBLIC_DROP_IN_ENABLED`: `isDropInEnabled()` in `lib/drop-in.ts` reads it at call time and, when unset, `isDropInResort()`/`getDropInProfile()`/`getDropInRoster()` return empty, every entry point (nav, resort detail, map popup, mobile bottom sheet, `/drop-in` hub, the game page, the sitemap) disappears, and the API routes answer `dropInDisabledResponse()` (404). The code stays in the tree so the v3 engine branch keeps merging cleanly; flip the env var in Vercel to bring it all back at once.
 
-`public/drop-in/engine.html` is the entire game in one file (markup, CSS, and an inline module) and imports a **vendored** `three.module.js` beside it. It is a bundler-free static asset, so it carries its own copy of every resort profile: **`RESORT_PROFILES` in the engine and `PROFILES` in `lib/drop-in.ts` must stay in sync by hand**, and `scripts/drop-in-engine.test.ts` fails the build if they drift. The host mounts it in an iframe sandboxed *without* `allow-same-origin` (`components/drop-in/DropInFrame.tsx`) — the engine therefore has an opaque origin, cannot touch app cookies, and announces itself over `postMessage` authenticated by `event.source`, not by origin. `proxy.ts` excludes `/drop-in/` so the static assets skip the Supabase session round-trip.
+The game itself is bundled TypeScript under `lib/game/` (`core`, `physics`, `rendering`, `terrain`, `runtime`, `server`, …), mounted by `components/drop-in/DropInGame.tsx`, which dynamically imports `@/lib/game/runtime/createGame` on the client. There is no `public/drop-in/engine.html`, no vendored `three.module.js`, and no `DropInFrame` iframe — all three were deleted in 499d787; the pre-parking iframe engine lives on `origin/archive/drop-in-2026-09-17` if you need the old behaviour. Resort profiles now have a single source (`DROP_IN_GAME_PROFILES` in `lib/game/config/profiles.ts`, re-exported by `lib/drop-in.ts`), so the old hand-sync rule is gone. The `drop-in/` exclusion still in `proxy.ts:45` is a leftover of the static-asset era and no longer matches anything the game serves.
 
 ### Adjacent subsystems (same repo, not part of the web app)
 
 - `agents/` — 9-bot Slack "company" (`agents/loop.mjs`, polling + Anthropic API, shared memory in `agent_memory`). Runs via launchd but is effectively dormant.
 - `dashboard/` — standalone Express ops dashboard on port 3333. **Unauthenticated and can spawn `claude --dangerously-skip-permissions`** — never expose beyond localhost/LAN.
-- `generate-images.py` (repo root) — canonical brand-image generator (xAI Grok), driven by the user-level `peakcam-imagegen` skill; `scripts/generate-images.mjs` is its abandoned predecessor. Nothing in `public/images/` is referenced by app code.
+- `generate-images.py` (repo root) — the only brand-image generator (xAI Grok), driven by the user-level `peakcam-imagegen` skill. Its abandoned `scripts/generate-images.mjs` predecessor and the two npm scripts that ran it were deleted. Nothing in `public/images/` is referenced by app code.
 
 ### Scheduling map
 

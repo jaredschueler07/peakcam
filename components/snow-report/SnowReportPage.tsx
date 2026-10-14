@@ -171,7 +171,7 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
                     <td className="px-4 py-3">
                       <Link
                         href={`/resorts/${resort.slug}`}
-                        className="text-text-base font-medium hover:text-cyan transition-colors inline-block py-1.5"
+                        className="text-ink font-medium hover:text-forest transition-colors inline-flex items-center py-1.5 pointer-coarse:min-h-11"
                       >
                         {resort.name}
                       </Link>

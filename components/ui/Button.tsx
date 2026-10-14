@@ -23,8 +23,8 @@ const base = `
 const variants: Record<Variant, string> = {
   // Primary: forest green with cream text
   primary: `bg-forest text-cream-50 shadow-stamp hover:shadow-stamp-hover active:shadow-stamp-sm`,
-  // Accent: alpenglow persimmon with cream text
-  accent:  `bg-alpen text-cream-50 shadow-stamp hover:shadow-stamp-hover active:shadow-stamp-sm`,
+  // Accent: dark alpenglow with cream text (plain alpen is 3.62:1 on cream, below AA at button sizes)
+  accent:  `bg-alpen-dk text-cream-50 shadow-stamp hover:shadow-stamp-hover active:shadow-stamp-sm`,
   // Outline: white paper bg, ink border, ink text (the default pc-btn)
   outline: `bg-snow text-ink shadow-stamp hover:shadow-stamp-hover active:shadow-stamp-sm`,
   // Ghost: transparent, no shadow, no lift

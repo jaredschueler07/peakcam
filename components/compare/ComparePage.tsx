@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Fuse from "fuse.js";
-import { X, Plus, Share2, Camera, ArrowLeft, AlertTriangle } from "lucide-react";
+import { X, Plus, Share2, Camera, ArrowLeft, AlertTriangle, RotateCcw } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { MAX_COMPARE_RESORTS, buildCompareHref } from "@/lib/compare-params";
 import type { ResortWithData, ConditionRating } from "@/lib/types";
@@ -225,8 +225,7 @@ function ResortColumnHeader({
           <Link href={`/resorts/${resort.slug}`} className="hover:text-alpen transition-colors flex-1 min-w-0">
             <h3 className="font-display font-black text-ink text-[16px] leading-[1.05] tracking-[-0.01em]">{resort.name}</h3>
           </Link>
-          {/* Sits above the cam panel in stacking order, with a 32px hit target
-              that grows to 40px on coarse pointers. */}
+          {/* Sits above the cam panel in stacking order; 44px hit target on every pointer. */}
           <button
             type="button"
             onClick={onRemove}
@@ -298,6 +297,17 @@ export function ComparePage({
   const [copied, setCopied] = useState(false);
   const [dismissedNotice, setDismissedNotice] = useState(false);
   const isFirstRender = useRef(true);
+  const [isRetrying, startRetry] = useTransition();
+
+  // After a Retry the server re-renders with the resorts the URL asked for.
+  // Adopt them only on the failed→loaded transition (React's "adjust state on
+  // prop change" pattern, settled before this render commits), so ordinary
+  // add/remove state is never clobbered by a server payload a step behind.
+  const [prevLoadFailed, setPrevLoadFailed] = useState(loadFailed);
+  if (loadFailed !== prevLoadFailed) {
+    setPrevLoadFailed(loadFailed);
+    if (!loadFailed) setResorts(initialResorts);
+  }
 
   // Sync URL when resorts change (skip on initial mount to avoid replacing server URL)
   useEffect(() => {
@@ -457,7 +467,7 @@ export function ComparePage({
               </p>
               <p className="mt-0.5 text-[12.5px] text-bark break-words">
                 {loadFailed ? (
-                  <>Snow reports are temporarily unavailable — please try again in a moment.</>
+                  <>Snow reports are temporarily unavailable — give it a moment, then retry.</>
                 ) : (
                   <>
                     Skipped{" "}
@@ -470,11 +480,22 @@ export function ComparePage({
                   </>
                 )}
               </p>
+              {loadFailed && (
+                <button
+                  type="button"
+                  onClick={() => startRetry(() => router.refresh())}
+                  disabled={isRetrying}
+                  className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-full border-[1.5px] border-ink bg-cream-50 px-4 text-[12.5px] font-bold text-ink shadow-stamp-sm transition-[transform,box-shadow] duration-100 hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-stamp disabled:cursor-wait disabled:opacity-60 disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-stamp-sm"
+                >
+                  <RotateCcw size={13} aria-hidden="true" className={isRetrying ? "animate-spin" : undefined} />
+                  {isRetrying ? "Retrying…" : "Retry"}
+                </button>
+              )}
             </div>
             <button
               type="button"
               onClick={() => setDismissedNotice(true)}
-              className="relative z-10 -mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-bark transition-colors hover:bg-cream hover:text-ink"
+              className="relative z-10 -mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-bark transition-colors hover:bg-cream hover:text-ink pointer-coarse:-mr-2.5 pointer-coarse:-mt-2.5 pointer-coarse:h-11 pointer-coarse:w-11"
               aria-label="Dismiss notice"
             >
               <X size={14} strokeWidth={2.5} />

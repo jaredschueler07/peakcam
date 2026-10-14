@@ -6,23 +6,28 @@ import type { WeatherPeriod, HourlyWeather, ForecastPeriod } from "./types";
 // All fetches MUST be server-side. NWS rate-limits aggressively.
 // ─────────────────────────────────────────────────────────────
 
-const NWS_USER_AGENT = "PeakCam/1.0 (contact@peakcam.io)"; // NWS requires a UA string
+// The constants and helpers below are the single source of truth for every
+// NWS caller, including scripts/snotel-sync.ts (the production feed) and
+// lib/pipeline/fetchers/nws.ts. Do not re-declare them elsewhere — the sync
+// script once carried its own copies and they drifted.
+
+export const NWS_USER_AGENT = "PeakCam/1.0 (contact@peakcam.io)"; // NWS requires a UA string
 
 // Aborts a stuck NWS call after 5s so a slow/hung upstream can't hang the
 // page render — the caller's try/catch below turns the abort into the same
 // `null` result as any other NWS failure, which callers already render
 // around gracefully.
-const NWS_TIMEOUT_MS = 5_000;
+export const NWS_TIMEOUT_MS = 5_000;
 
 /** Snow-related keywords in NWS short forecast strings. */
-const SNOW_KEYWORDS = [
+export const SNOW_KEYWORDS = [
   "snow", "blizzard", "flurr", "wintry", "sleet", "freezing",
 ];
 
 /** Rough snow-inch estimate from NWS forecast string.
  *  NWS doesn't provide a structured snow amount in the basic forecast —
  *  this is a heuristic until we wire up the detailed hourly forecast. */
-function estimateSnow(shortForecast: string): number {
+export function estimateSnow(shortForecast: string): number {
   const lower = shortForecast.toLowerCase();
   if (lower.includes("blizzard") || lower.includes("heavy snow")) return 8;
   if (lower.includes("snow")) return 3;
@@ -83,8 +88,11 @@ interface NWSPeriod {
   probabilityOfPrecipitation?: { value: number | null };
 }
 
-/** Resolve NWS grid point from lat/lng. Returns { office, gridX, gridY, forecastUrl, forecastHourlyUrl }. */
-async function resolveGridPoint(lat: number, lng: number) {
+/** Resolve NWS grid point from lat/lng.
+ *  Returns { office, gridX, gridY, forecastUrl, forecastHourlyUrl, forecastGridDataUrl },
+ *  or null when the points lookup fails. Throws on abort/network error — callers
+ *  wrap it in their own try/catch. */
+export async function resolveGridPoint(lat: number, lng: number) {
   const pointsRes = await fetch(
     `https://api.weather.gov/points/${lat.toFixed(4)},${lng.toFixed(4)}`,
     {
@@ -103,6 +111,7 @@ async function resolveGridPoint(lat: number, lng: number) {
     gridY: props.gridY as number,
     forecastUrl: props.forecast as string,
     forecastHourlyUrl: props.forecastHourly as string,
+    forecastGridDataUrl: props.forecastGridData as string | undefined,
   };
 }
 

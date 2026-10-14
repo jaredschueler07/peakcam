@@ -9,6 +9,10 @@ import { authErrorMessage } from "@/lib/auth-errors";
 
 type Mode = "signin" | "signup" | "link" | "reset" | "confirm";
 const EMAIL_CODE_ENABLED = process.env.NEXT_PUBLIC_AUTH_EMAIL_CODE_ENABLED === "true";
+/** With shouldCreateUser=false GoTrue answers 422 otp_disabled for addresses without an account. Showing that would reveal which emails are registered, so it is treated like a sent email. */
+function isUnknownOtpAccount(error: { code?: string; message?: string }) {
+  return error.code === "otp_disabled" || /signups not allowed for otp/i.test(error.message ?? "");
+}
 export function AuthForm({ redirectTo = "/", initialError, onSignedIn }: { redirectTo?: string; initialError?: string | null; onSignedIn?: () => void }) {
   const id = useId();
   const router = useRouter();
@@ -61,7 +65,7 @@ export function AuthForm({ redirectTo = "/", initialError, onSignedIn }: { redir
         setSent(true);
       } else {
         const { error } = await client.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: callback.href, shouldCreateUser: false } });
-        if (error) throw error;
+        if (error && !isUnknownOtpAccount(error)) throw error;
         setSent(true);
       }
       if (requestMode !== "signin") { setResendIn(60); setPassword(""); }

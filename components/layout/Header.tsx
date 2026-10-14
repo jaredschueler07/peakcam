@@ -94,12 +94,23 @@ export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps
   return (
     /* pc-on-ink — the header surface is ink, so the global ember
        :focus-visible ring (3.1:1 on ink) is upgraded to the cream ring
-       (14.7:1 on ink) by the rule in app/globals.css. */
-    <header ref={headerRef} className="pc-on-ink sticky top-0 z-50 h-[64px] flex items-center gap-5 px-6 md:px-7
-      bg-ink text-cream-50 border-b-[1.5px] border-ink">
+       (14.7:1 on ink) by the rule in app/globals.css.
+
+       Geometry: the header is exactly --pc-header-h tall (52px row on phones,
+       64px at md+, plus the status-bar inset it absorbs as top padding), so
+       everything that pins beneath it can read the same token. The negative
+       side margins bleed the ink under a landscape notch, where body is
+       already inset by the safe-area; content inside stays clear of it via
+       the max() padding. */
+    <header ref={headerRef} className="pc-on-ink sticky top-0 z-50 h-(--pc-header-h) pt-(--pc-safe-top)
+      -ml-[var(--pc-safe-left)] -mr-[var(--pc-safe-right)]
+      pl-[max(1rem,var(--pc-safe-left))] pr-[max(1rem,var(--pc-safe-right))] md:px-7
+      bg-ink/90 backdrop-blur-md md:bg-ink md:backdrop-blur-none
+      text-cream-50 border-b-[1.5px] border-ink">
+     <div className="flex h-full items-center gap-3 md:gap-5">
 
       {/* Logo — Fraunces display, italic, PEAK cream + CAM alpen */}
-      <Link href="/" className="flex items-center flex-shrink-0 group">
+      <Link href="/" className="inline-flex min-h-11 items-center flex-shrink-0 group">
         <span className="font-display italic font-black text-[22px] tracking-tight leading-none group-hover:opacity-90 transition-opacity duration-150">
           <span className="text-cream-50">Peak</span>
           <span className="text-alpen">Cam</span>
@@ -115,8 +126,10 @@ export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps
         >
           <Search size={15} strokeWidth={2.5}
             className="absolute left-4 top-1/2 -translate-y-1/2 text-bark pointer-events-none" />
-          {/* 16px base font keeps iOS Safari from zooming the viewport on focus;
-              no `outline-none` — the focus shadow alone isn't a reliable focus
+          {/* 16px keeps iOS Safari from zooming the viewport on focus; the
+              compact 13.5px only applies to fine pointers, so a landscape
+              phone crossing the md breakpoint keeps the touch size. No
+              `outline-none` — the focus shadow alone isn't a reliable focus
               indicator (forced-colors mode drops box-shadows entirely). */}
           <input
             ref={inputRef}
@@ -127,7 +140,7 @@ export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps
             placeholder="Search resorts, states, regions…"
             className="w-full bg-cream-50 border-[1.5px] border-ink
               rounded-full shadow-[2px_2px_0_#2a1f14]
-              pl-10 pr-9 py-2 text-[16px] md:text-[13.5px] text-ink placeholder:text-bark
+              pl-10 pr-9 py-2 text-[16px] md:pointer-fine:text-[13.5px] text-ink placeholder:text-bark
               transition-shadow duration-100
               focus:shadow-[3px_3px_0_#a93f20] focus:border-alpen-dk"
           />
@@ -135,8 +148,8 @@ export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps
             <button
               type="button"
               onClick={clearSearch}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-bark
-                text-lg px-1 hover:text-ink transition-colors duration-150"
+              className="absolute right-1 top-1/2 -translate-y-1/2 grid min-h-11 min-w-11 place-items-center
+                text-bark text-lg hover:text-ink transition-colors duration-150"
               aria-label="Clear search"
             >
               ×
@@ -201,10 +214,15 @@ export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps
       >
         {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
+     </div>
 
       {/* Mobile Menu Overlay */}
       {isMenuOpen && (
-        <nav id="mobile-navigation" aria-label="Main navigation" className="max-h-[calc(100dvh-64px)] overflow-y-auto overscroll-contain absolute top-[64px] left-0 right-0 bg-ink border-b-[1.5px] border-ink shadow-lg p-4 flex flex-col gap-1 md:hidden">
+        <nav id="mobile-navigation" aria-label="Main navigation"
+          className="absolute top-full left-0 right-0 max-h-[calc(100dvh_-_var(--pc-header-h))] overflow-y-auto overscroll-contain
+            bg-ink border-b-[1.5px] border-ink shadow-lg
+            pt-4 pb-[max(1rem,var(--pc-safe-bottom))] pl-[max(1rem,var(--pc-safe-left))] pr-[max(1rem,var(--pc-safe-right))]
+            flex flex-col gap-1 md:hidden">
           {navLinks.filter((link) => !("authOnly" in link && link.authOnly) || user).map((link) => (
             <Link
               key={link.href}

@@ -10,7 +10,7 @@
 ## Pre-Flight
 
 - [ ] Pull branch `feat/map-overhaul`
-- [ ] Confirm `.env.local` has `NEXT_PUBLIC_MAPTILER_KEY=guCHrtCSAe1r8NgZ4BY5`
+- [ ] Confirm `.env.local` has `NEXT_PUBLIC_MAPTILER_KEY=<redacted>` (take the value from Vercel project env or MapTiler Cloud; never commit it)
 - [ ] Run `npm install && npm run dev`
 - [ ] Open Chrome DevTools (Console tab visible for errors)
 

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SITE_URL } from "@/lib/site";
+import { RATING_THRESHOLDS } from "@/lib/conditions-engine";
 
 const PAGE_URL = `${SITE_URL}/methodology`;
 
@@ -112,14 +113,38 @@ export default function MethodologyPage() {
         <H2 id="conditions">Ratings, trends, and outlook</H2>
         <p className="mb-4">
           The condition rating is a fixed function of the measured data, not editorial
-          judgment: <strong>Great</strong> is 6 inches of new snow in 24 hours or 12 in 48;
-          <strong> Good</strong> is 2 inches new, or a 24-inch base at 100% of normal or
-          better; <strong>Fair</strong> is a 20-inch base at 70% of normal;
-          otherwise <strong>Poor</strong>. Temperature does not move the rating. The 7-day
-          trend arrow tracks whether the station&apos;s SWE is building or shrinking. The
-          outlook label combines that trend with the next 48 hours of forecast snowfall and
-          high temperature — National Weather Service forecasts in the U.S., Open-Meteo
-          elsewhere.
+          judgment. The rules are checked top to bottom and the first match wins. Every
+          tier above Fair needs a measured base, because the new-snow figure is a change
+          in what the depth sensor reads and says nothing about what is underneath it: a
+          6-inch reading on a 2-inch base is a blip, not a powder day.
+        </p>
+        <ul className="mb-4 pl-5 list-disc space-y-1.5 marker:text-bark">
+          <li>
+            <strong>Great</strong> — {RATING_THRESHOLDS.great.newSnow24h} inches or more of
+            new snow in 24 hours (or {RATING_THRESHOLDS.great.newSnow48h} in 48), on a base
+            of at least {RATING_THRESHOLDS.great.minDepth} inches.
+          </li>
+          <li>
+            <strong>Good</strong> — a base of at least {RATING_THRESHOLDS.good.minDepth}{" "}
+            inches with either {RATING_THRESHOLDS.good.newSnow24h} inches of new snow in 24
+            hours or a snowpack at {RATING_THRESHOLDS.good.pctOfNormal}% of normal or better.
+          </li>
+          <li>
+            <strong>Fair</strong> — a base of at least {RATING_THRESHOLDS.fair.minDepth}{" "}
+            inches at {RATING_THRESHOLDS.fair.pctOfNormal}% of normal or better, or with no
+            normals to compare against. Fresh snow on a base of unknown depth also stops
+            here.
+          </li>
+          <li>
+            <strong>Poor</strong> — everything else: a thin base, or a snowpack well below
+            normal with no qualifying new snow.
+          </li>
+        </ul>
+        <p className="mb-4">
+          Temperature does not move the rating. The 7-day trend arrow tracks whether the
+          station&apos;s SWE is building or shrinking. The outlook label combines that trend
+          with the next 48 hours of forecast snowfall and high temperature — National
+          Weather Service forecasts in the U.S., Open-Meteo elsewhere.
         </p>
 
         <H2 id="user-reports">On-mountain reports</H2>

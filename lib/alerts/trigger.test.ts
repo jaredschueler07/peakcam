@@ -46,7 +46,11 @@ test("trigger evaluates subscribers separately and preserves live alerts during 
             alert_subscribers: { id: String(threshold), email: `${threshold}@example.com`, manage_token: "t" },
             resorts: { name: "X", slug: "x" },
           })));
-          if (url.includes("/latest_snow_reports?")) return json([{ resort_id: "x", new_snow_24h: scenario.includes("failure") || scenario === "malformed forecast" ? 3 : 0 }]);
+          if (url.includes("/latest_snow_reports?")) return json([{
+            resort_id: "x",
+            new_snow_24h: scenario.includes("failure") || scenario === "malformed forecast" ? 3 : 0,
+            updated_at: new Date().toISOString(),
+          }]);
           if (url.includes("/resorts?")) {
             if (scenario === "location failure") throw new Error("locations offline");
             return json([{ id: "x", lat: 39, lng: -120 }]);
@@ -137,7 +141,7 @@ test("does not re-alert the same forecast storm on the following day", async () 
         alert_subscribers: { id: "sub", email: "ski@example.com", manage_token: "token" },
         resorts: { name: "X", slug: "x" },
       }]);
-      if (url.includes("/latest_snow_reports?")) return json([{ resort_id: "resort", new_snow_24h: 0 }]);
+      if (url.includes("/latest_snow_reports?")) return json([{ resort_id: "resort", new_snow_24h: 0, updated_at: currentDay }]);
       if (url.includes("/resorts?")) return json([{ id: "resort", lat: 39, lng: -120 }]);
       if (url.includes("/powder_alert_log")) {
         if (init?.method === "POST") {
@@ -215,7 +219,7 @@ test("rounds fractional forecast totals and reports a failed log insert", async 
         alert_subscribers: { id: "sub", email: "ski@example.com", manage_token: "token" },
         resorts: { name: "X", slug: "x" },
       }]);
-      if (url.includes("/latest_snow_reports?")) return json([{ resort_id: "resort", new_snow_24h: 0 }]);
+      if (url.includes("/latest_snow_reports?")) return json([{ resort_id: "resort", new_snow_24h: 0, updated_at: new Date().toISOString() }]);
       if (url.includes("/resorts?")) return json([{ id: "resort", lat: 39, lng: -120 }]);
       if (url.includes("/powder_alert_log")) {
         if (init?.method === "POST") {
@@ -243,5 +247,230 @@ test("rounds fractional forecast totals and reports a failed log insert", async 
     for (const key of ["CRON_SECRET", "NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "RESEND_API_KEY"]) {
       if (savedEnv[key] === undefined) delete process.env[key]; else process.env[key] = savedEnv[key];
     }
+  }
+});
+
+// ─── Shared scaffolding for the cases below ───────────────────────────────────
+
+const TRIGGER_ENV: Record<string, string> = {
+  CRON_SECRET: "test-secret",
+  NEXT_PUBLIC_SUPABASE_URL: "https://db.test",
+  SUPABASE_SERVICE_ROLE_KEY: "test-service",
+  RESEND_API_KEY: "re_test_key_1234567890",
+};
+
+function installTriggerEnv(): () => void {
+  const saved = { ...process.env };
+  Object.assign(process.env, TRIGGER_ENV);
+  return () => {
+    for (const key of Object.keys(TRIGGER_ENV)) {
+      if (saved[key] === undefined) delete process.env[key]; else process.env[key] = saved[key];
+    }
+  };
+}
+
+function captureEmails(): string[] {
+  const sent: string[] = [];
+  setEmailClientForTests({ emails: { send: async (payload: { to: string }) => {
+    sent.push(payload.to);
+    return { data: { id: "test" }, error: null };
+  } } } as unknown as EmailClient);
+  return sent;
+}
+
+function noSnowForecast(): Response {
+  const days = 9;
+  return new Response(JSON.stringify({ daily: {
+    time: Array.from({ length: days }, (_, i) => `2026-09-${String(8 + i).padStart(2, "0")}`),
+    weathercode: Array(days).fill(0), temperature_2m_max: Array(days).fill(5),
+    temperature_2m_min: Array(days).fill(-2), snowfall_sum: Array(days).fill(0),
+    precipitation_probability_max: Array(days).fill(0), wind_gusts_10m_max: Array(days).fill(10),
+    wind_direction_10m_dominant: Array(days).fill(0),
+  } }));
+}
+
+const ONE_PREF = [{
+  subscriber_id: "sub", resort_id: "resort", threshold_inches: 6,
+  alert_subscribers: { id: "sub", email: "ski@example.com", manage_token: "token" },
+  resorts: { name: "X", slug: "x" },
+}];
+
+const triggerRequest = () => new NextRequest("https://peakcam.test/api/alerts/trigger", {
+  headers: { authorization: "Bearer test-secret" },
+});
+
+test("does not re-alert a live storm inside the cooldown unless it grows by the increment", async () => {
+  const restoreEnv = installTriggerEnv();
+  const originalFetch = globalThis.fetch;
+  const originalDate = globalThis.Date;
+  const { GET } = await import("../../app/api/alerts/trigger/route");
+  const sent = captureEmails();
+  const posts: Array<Record<string, unknown>> = [];
+  const logRows: Array<Record<string, unknown>> = [];
+  let currentDay = "2026-09-10T12:00:00.000Z";
+  let newSnow = 0;
+  class TestDate extends originalDate {
+    constructor(value?: string | number | Date) {
+      super(value === undefined ? currentDay : value);
+    }
+    static now() { return originalDate.parse(currentDay); }
+  }
+  try {
+    globalThis.Date = TestDate as DateConstructor;
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      const json = (data: unknown) => new Response(JSON.stringify(data));
+      if (url.includes("api.open-meteo.com")) return noSnowForecast();
+      if (url.includes("/snow_reports?")) return json([{ updated_at: currentDay }]);
+      if (url.includes("/alert_preferences?")) return json(ONE_PREF);
+      if (url.includes("/latest_snow_reports?")) return json([{ resort_id: "resort", new_snow_24h: newSnow, updated_at: currentDay }]);
+      if (url.includes("/resorts?")) return json([{ id: "resort", lat: 39, lng: -120 }]);
+      if (url.includes("/powder_alert_log")) {
+        if (init?.method === "POST") {
+          const body = JSON.parse(String(init.body)) as Array<Record<string, unknown>>;
+          posts.push(...body);
+          logRows.push(...body);
+          return json([]);
+        }
+        const since = new URL(url).searchParams.get("alert_date")?.slice(4) ?? "";
+        return json(logRows.filter((row) => String(row.alert_date) >= since));
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    };
+
+    const run = async (day: string, inches: number) => {
+      currentDay = `${day}T12:00:00.000Z`;
+      newSnow = inches;
+      const response = await GET(triggerRequest());
+      assert.equal(response.status, 200);
+      return response.json() as Promise<{ sent: number; skipped: { live_cooldown: number } }>;
+    };
+
+    // Day 1: the storm crosses the threshold.
+    assert.equal((await run("2026-09-10", 8)).sent, 1);
+    assert.deepEqual(posts.map((p) => [p.kind, p.new_snow_inches]), [["live", 8]]);
+    // Day 2: still above threshold but only 3" more — same storm, stay quiet.
+    const day2 = await run("2026-09-11", 11);
+    assert.equal(day2.sent, 0);
+    assert.equal(day2.skipped.live_cooldown, 1);
+    // Day 3: grew by the full increment over the last alert — it dumped again.
+    assert.equal((await run("2026-09-12", 14)).sent, 1);
+    assert.deepEqual(posts.map((p) => p.new_snow_inches), [8, 14]);
+    // Day 4: no growth since day 3, still inside its window.
+    assert.equal((await run("2026-09-13", 14)).sent, 0);
+    // Day 6: the cooldown from day 3 has lapsed, a new modest total re-alerts.
+    assert.equal((await run("2026-09-15", 7)).sent, 1);
+    assert.deepEqual(sent, ["ski@example.com", "ski@example.com", "ski@example.com"]);
+  } finally {
+    globalThis.Date = originalDate;
+    globalThis.fetch = originalFetch;
+    setEmailClientForTests(null);
+    restoreEnv();
+  }
+});
+
+test("a stale live report never mails, but does not block a qualifying forecast", async (t) => {
+  const restoreEnv = installTriggerEnv();
+  const originalFetch = globalThis.fetch;
+  const { GET } = await import("../../app/api/alerts/trigger/route");
+  const twoDaysAgo = new Date(Date.now() - 48 * 3_600_000).toISOString();
+  try {
+    for (const scenario of ["stale", "untimestamped", "stale with forecast"] as const) {
+      await t.test(scenario, async () => {
+        const sent = captureEmails();
+        const posts: Array<Record<string, unknown>> = [];
+        const warnings: string[] = [];
+        const originalWarn = console.warn;
+        console.warn = (...args: unknown[]) => { warnings.push(args.map(String).join(" ")); };
+        globalThis.fetch = async (input, init) => {
+          const url = String(input);
+          const json = (data: unknown) => new Response(JSON.stringify(data));
+          if (url.includes("api.open-meteo.com")) {
+            if (scenario !== "stale with forecast") return noSnowForecast();
+            const snowfall = [0, 0, 3, 3, 3, 0, 0];
+            return json({ daily: {
+              time: snowfall.map((_, i) => `2026-09-${String(8 + i).padStart(2, "0")}`),
+              weathercode: snowfall.map(() => 71), temperature_2m_max: snowfall.map(() => -1),
+              temperature_2m_min: snowfall.map(() => -5), snowfall_sum: snowfall.map((n) => n * 2.54),
+              precipitation_probability_max: snowfall.map(() => 80), wind_gusts_10m_max: snowfall.map(() => 10),
+              wind_direction_10m_dominant: snowfall.map(() => 0),
+            } });
+          }
+          if (url.includes("/snow_reports?")) return json([{ updated_at: new Date().toISOString() }]);
+          if (url.includes("/alert_preferences?")) return json(ONE_PREF);
+          if (url.includes("/latest_snow_reports?")) {
+            assert.match(new URL(url).searchParams.get("select") ?? "", /updated_at/);
+            return json([{ resort_id: "resort", new_snow_24h: 12, updated_at: scenario === "untimestamped" ? null : twoDaysAgo }]);
+          }
+          if (url.includes("/resorts?")) return json([{ id: "resort", lat: 39, lng: -120 }]);
+          if (url.includes("/powder_alert_log")) {
+            if (init?.method === "POST") posts.push(...JSON.parse(String(init.body)));
+            return json([]);
+          }
+          throw new Error(`Unexpected fetch: ${url}`);
+        };
+        try {
+          const response = await GET(triggerRequest());
+          assert.equal(response.status, 200);
+          const payload = await response.json();
+          assert.equal(payload.skipped.stale_report, 1);
+          assert.equal(warnings.length, 1, "stale feed is logged once per run");
+          assert.match(warnings[0], /resort/);
+          if (scenario === "stale with forecast") {
+            assert.equal(payload.sent, 1);
+            assert.deepEqual(posts.map((p) => p.kind), ["forecast"]);
+          } else {
+            assert.equal(payload.sent, 0);
+            assert.deepEqual(sent, []);
+            assert.deepEqual(posts, []);
+          }
+        } finally {
+          console.warn = originalWarn;
+        }
+      });
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+    setEmailClientForTests(null);
+    restoreEnv();
+  }
+});
+
+test("returns 500 and mails nobody when the alert log cannot be read", async () => {
+  const restoreEnv = installTriggerEnv();
+  const originalFetch = globalThis.fetch;
+  const { GET } = await import("../../app/api/alerts/trigger/route");
+  const sent = captureEmails();
+  const originalError = console.error;
+  console.error = () => {};
+  let logPosts = 0;
+  let logReads = 0;
+  try {
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      const json = (data: unknown) => new Response(JSON.stringify(data));
+      if (url.includes("api.open-meteo.com")) return noSnowForecast();
+      if (url.includes("/snow_reports?")) return json([{ updated_at: new Date().toISOString() }]);
+      if (url.includes("/alert_preferences?")) return json(ONE_PREF);
+      if (url.includes("/latest_snow_reports?")) return json([{ resort_id: "resort", new_snow_24h: 12, updated_at: new Date().toISOString() }]);
+      if (url.includes("/resorts?")) return json([{ id: "resort", lat: 39, lng: -120 }]);
+      if (url.includes("/powder_alert_log")) {
+        if (init?.method === "POST") { logPosts++; return json([]); }
+        logReads++;
+        return new Response("", { status: 503 });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    };
+    const response = await GET(triggerRequest());
+    assert.equal(response.status, 500);
+    assert.equal((await response.json()).error, "Failed to load alert log");
+    assert.equal(logReads, 2, "the legacy-schema fallback query was also attempted");
+    assert.deepEqual(sent, []);
+    assert.equal(logPosts, 0);
+  } finally {
+    console.error = originalError;
+    globalThis.fetch = originalFetch;
+    setEmailClientForTests(null);
+    restoreEnv();
   }
 });

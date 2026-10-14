@@ -71,11 +71,42 @@ export interface ConditionsOutput {
 
 // ── Thresholds (tunable) ─────────────────────────────────────
 
+// GREAT and GOOD share one base-depth floor: newSnow24h/48h are depth-sensor
+// deltas (scripts/snotel-sync.ts computeDeltas), so a storm total on its own
+// says nothing about the base underneath it.
+const USABLE_BASE_MIN_DEPTH_IN = 24;
+
 export const RATING_THRESHOLDS = {
-  great: { newSnow24h: 6, newSnow48h: 12 },
-  good:  { newSnow24h: 2, pctOfNormal: 100, minDepth: 24 },
+  great: { newSnow24h: 6, newSnow48h: 12, minDepth: USABLE_BASE_MIN_DEPTH_IN },
+  good:  { newSnow24h: 2, pctOfNormal: 100, minDepth: USABLE_BASE_MIN_DEPTH_IN },
   fair:  { pctOfNormal: 70, minDepth: 20 },
 } as const;
+
+/**
+ * One-line, user-facing definition of each tier. Built from RATING_THRESHOLDS
+ * so badge tooltips, the map legend and the methodology page cannot drift
+ * from computeSnotelRating. Wording mirrors the rule order: first match wins.
+ */
+export function describeRatingRule(rating: ConditionRating): string {
+  const t = RATING_THRESHOLDS;
+  switch (rating) {
+    case "great":
+      return `${t.great.newSnow24h}"+ of new snow in 24h (or ${t.great.newSnow48h}"+ in 48h) on a base of at least ${t.great.minDepth}"`;
+    case "good":
+      return `A base of at least ${t.good.minDepth}" with ${t.good.newSnow24h}"+ of new snow in 24h, or snowpack at ${t.good.pctOfNormal}%+ of normal`;
+    case "fair":
+      return `A base of at least ${t.fair.minDepth}" at ${t.fair.pctOfNormal}%+ of normal (or with no normals to compare), or fresh snow where base depth is unknown`;
+    case "poor":
+      return `Base under ${t.fair.minDepth}", or snowpack under ${t.fair.pctOfNormal}% of normal without qualifying new snow`;
+  }
+}
+
+export const RATING_RULES: Record<ConditionRating, string> = {
+  great: describeRatingRule("great"),
+  good: describeRatingRule("good"),
+  fair: describeRatingRule("fair"),
+  poor: describeRatingRule("poor"),
+};
 
 const TREND_THRESHOLD_IN = 0.5;  // SWE change in inches
 const SNOW_FORECAST_THRESHOLD = 3; // inches for "more_snow"
@@ -149,34 +180,77 @@ export function computeOutlook(
 
 // ── User Conditions Score ────────────────────────────────────
 
-const SNOW_QUALITY_SCORES: Record<UserSnowQuality, number> = {
+// These four maps are the single source of truth for how a user-submitted
+// vocabulary value scores. Anything that needs a per-dimension number — the
+// blend below, or the pipeline's user-reports fetcher — must derive it from
+// these rather than restating the numbers. Each map has its own scale, so
+// divide by the matching *_SCORE_MAX to normalize to 0–1.
+export const SNOW_QUALITY_SCORES: Record<UserSnowQuality, number> = {
   powder: 4, packed: 3, crud: 2, ice: 1, spring: 2,
 };
-const VISIBILITY_SCORES: Record<UserVisibility, number> = {
+export const VISIBILITY_SCORES: Record<UserVisibility, number> = {
   clear: 3, foggy: 2, whiteout: 1,
 };
-const WIND_SCORES: Record<UserWind, number> = {
+export const WIND_SCORES: Record<UserWind, number> = {
   calm: 3, breezy: 2, gusty: 1, high: 0,
 };
-const TRAIL_SCORES: Record<UserTrailConditions, number> = {
+export const TRAIL_SCORES: Record<UserTrailConditions, number> = {
   groomed: 3, ungroomed: 2, moguls: 2, variable: 1,
 };
+
+export const SNOW_QUALITY_SCORE_MAX = 4;
+export const VISIBILITY_SCORE_MAX = 3;
+export const WIND_SCORE_MAX = 3;
+export const TRAIL_SCORE_MAX = 3;
+
+/** Midpoint of a 0–1 normalized scale, used when a value is off-vocabulary. */
+const NORMALIZED_FALLBACK = 0.5;
+
+function normalize<K extends string>(
+  scores: Record<K, number>,
+  max: number,
+  value: K | string | null | undefined,
+): number {
+  const raw = (scores as Record<string, number | undefined>)[value as string];
+  return raw == null ? NORMALIZED_FALLBACK : raw / max;
+}
+
+/** Visibility as a 0–1 score derived from VISIBILITY_SCORES. */
+export function normalizeVisibility(v: UserVisibility | string | null | undefined): number {
+  return normalize(VISIBILITY_SCORES, VISIBILITY_SCORE_MAX, v);
+}
+
+/** Wind as a 0–1 score derived from WIND_SCORES. */
+export function normalizeWind(w: UserWind | string | null | undefined): number {
+  return normalize(WIND_SCORES, WIND_SCORE_MAX, w);
+}
+
+/** Snow quality as a 0–1 score derived from SNOW_QUALITY_SCORES. */
+export function normalizeSnowQuality(q: UserSnowQuality | string | null | undefined): number {
+  return normalize(SNOW_QUALITY_SCORES, SNOW_QUALITY_SCORE_MAX, q);
+}
+
+/** Trail conditions as a 0–1 score derived from TRAIL_SCORES. */
+export function normalizeTrailConditions(t: UserTrailConditions | string | null | undefined): number {
+  return normalize(TRAIL_SCORES, TRAIL_SCORE_MAX, t);
+}
 
 /**
  * Aggregate user reports into a normalized 0–1 quality score.
  * Snow quality is weighted most heavily (40%), with visibility (20%),
  * wind (20%), and trail conditions (20%) splitting the remainder.
- * Returns null if no reports are available.
+ * Returns null if no reports are available. Off-vocabulary values fall back
+ * to the midpoint of their scale rather than poisoning the average with NaN.
  */
 export function computeUserScore(reports: UserConditionReport[]): number | null {
   if (reports.length === 0) return null;
 
   let totalScore = 0;
   for (const r of reports) {
-    const snowNorm = SNOW_QUALITY_SCORES[r.snow_quality] / 4;   // 0–1
-    const visNorm = VISIBILITY_SCORES[r.visibility] / 3;         // 0–1
-    const windNorm = WIND_SCORES[r.wind] / 3;                    // 0–1
-    const trailNorm = TRAIL_SCORES[r.trail_conditions] / 3;      // 0–1
+    const snowNorm = normalizeSnowQuality(r.snow_quality);
+    const visNorm = normalizeVisibility(r.visibility);
+    const windNorm = normalizeWind(r.wind);
+    const trailNorm = normalizeTrailConditions(r.trail_conditions);
     totalScore += snowNorm * 0.4 + visNorm * 0.2 + windNorm * 0.2 + trailNorm * 0.2;
   }
   return totalScore / reports.length;
@@ -195,7 +269,10 @@ function indexToRating(i: number): ConditionRating {
   return RATING_ORDER[Math.max(0, Math.min(3, Math.round(i)))];
 }
 
-/** SNOTEL-only rating based on snow depth, new snow, and % of normal. */
+/**
+ * SNOTEL-only rating based on snow depth, new snow, and % of normal.
+ * Evaluated top-to-bottom, first match wins; RATING_RULES is the prose form.
+ */
 export function computeSnotelRating(
   newSnow24h: number,
   newSnow48h: number,
@@ -203,16 +280,19 @@ export function computeSnotelRating(
   pctOfNormal: number | null,
 ): ConditionRating {
   const t = RATING_THRESHOLDS;
+  const bigStorm = newSnow24h >= t.great.newSnow24h || newSnow48h >= t.great.newSnow48h;
+  const freshSnow = newSnow24h >= t.good.newSnow24h;
+  const atNormal = pctOfNormal != null && pctOfNormal >= t.good.pctOfNormal;
 
-  if (newSnow24h >= t.great.newSnow24h || newSnow48h >= t.great.newSnow48h) return "great";
-  // A fresh-snow spike is not a usable base: GOOD requires at least 24in
-  // of settled base depth as well as 2in of recent snow. This keeps warm,
-  // thin conditions (for example 74°F with a 2in base) from reading as GOOD.
-  if (newSnow24h >= t.good.newSnow24h && snowDepthIn != null && snowDepthIn >= t.good.minDepth) return "good";
-  // Unknown depth cannot qualify for GOOD, but fresh snow is still evidence
-  // for FAIR. Keep the existing fallback path for other missing-depth cases.
-  if (snowDepthIn == null && newSnow24h >= t.good.newSnow24h) return "fair";
-  if (snowDepthIn != null && snowDepthIn >= t.fair.minDepth && (pctOfNormal == null || pctOfNormal >= t.fair.pctOfNormal)) return "fair";
+  // A new-snow spike is not a usable base: a 6" sensor delta on a 2" base
+  // (or at 74°F) must not read as a powder day. GREAT and GOOD therefore both
+  // require a measured base; with depth unknown, fresh snow is evidence for
+  // FAIR at most.
+  if (snowDepthIn == null) return bigStorm || freshSnow ? "fair" : "poor";
+
+  if (bigStorm && snowDepthIn >= t.great.minDepth) return "great";
+  if (snowDepthIn >= t.good.minDepth && (freshSnow || atNormal)) return "good";
+  if (snowDepthIn >= t.fair.minDepth && (pctOfNormal == null || pctOfNormal >= t.fair.pctOfNormal)) return "fair";
 
   return "poor";
 }

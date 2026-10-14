@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { startTransition, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowLeft, RotateCcw } from "lucide-react";
 
 /**
@@ -18,9 +19,21 @@ export default function CompareError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const router = useRouter();
+
   useEffect(() => {
     console.error("[PeakCam] /compare failed to render:", error);
   }, [error]);
+
+  // `reset` alone only clears the boundary's state and re-renders the same
+  // errored server payload, so a Server Component throw lands straight back
+  // here. Refreshing in the same transition re-fetches the route first.
+  const retry = () => {
+    startTransition(() => {
+      router.refresh();
+      reset();
+    });
+  };
 
   return (
     <div className="min-h-screen pc-paper flex items-center justify-center px-4 py-16">
@@ -42,8 +55,8 @@ export default function CompareError({
         <div className="mt-7 flex flex-wrap items-center gap-3">
           <button
             type="button"
-            onClick={reset}
-            className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-ink bg-alpen px-5 py-2.5 text-[13px] font-semibold text-cream-50
+            onClick={retry}
+            className="inline-flex min-h-11 items-center gap-2 rounded-full border-[1.5px] border-ink bg-alpen-dk px-5 py-2.5 text-[13px] font-semibold text-cream-50
                        shadow-stamp-sm transition-[transform,box-shadow] duration-100
                        hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-stamp"
           >
@@ -53,7 +66,7 @@ export default function CompareError({
 
           <Link
             href="/compare"
-            className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-ink bg-cream-50 px-5 py-2.5 text-[13px] font-semibold text-ink
+            className="inline-flex min-h-11 items-center gap-2 rounded-full border-[1.5px] border-ink bg-cream-50 px-5 py-2.5 text-[13px] font-semibold text-ink
                        shadow-stamp-sm transition-[transform,box-shadow] duration-100
                        hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-stamp"
           >
@@ -62,7 +75,7 @@ export default function CompareError({
 
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-bark transition-colors hover:text-ink"
+            className="inline-flex min-h-11 items-center gap-1.5 text-[13px] font-semibold text-bark transition-colors hover:text-ink"
           >
             <ArrowLeft size={14} aria-hidden="true" />
             Back to resorts

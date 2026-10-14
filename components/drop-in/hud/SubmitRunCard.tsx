@@ -106,7 +106,7 @@ export default function SubmitRunCard({
           placeholder="Anonymous"
           autoComplete="off"
           disabled={submitting}
-          className="min-w-0 flex-1 rounded-sm border-[1.5px] border-ink bg-cream-50 px-3 py-1.5 font-mono text-sm text-ink placeholder:text-bark-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+          className="min-w-0 flex-1 rounded-sm border-[1.5px] border-ink bg-cream-50 px-3 py-1.5 font-mono text-[16px] text-ink placeholder:text-bark-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink md:text-sm"
         />
         <button
           type="button"

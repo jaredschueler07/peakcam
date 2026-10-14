@@ -57,7 +57,7 @@ export default function MapCamPreview({
     <button
       type="button"
       onClick={onClick}
-      className={`group/cam relative block w-full overflow-hidden rounded-[10px] border-[1.5px] border-ink text-left ${className}`}
+      className={`relative block w-full overflow-hidden rounded-[10px] border-[1.5px] border-ink text-left ${className}`}
       aria-label={`${preview.kind === "live" ? "Live webcam" : "Webcam preview"}: ${camName} at ${resortName} — view resort`}
     >
       {/* Plain <img>: cam hosts are arbitrary external domains (matches CamEmbed). */}
@@ -65,13 +65,13 @@ export default function MapCamPreview({
       <img
         src={preview.src}
         alt={`${camName} webcam at ${resortName}`}
-        className="h-24 w-full object-cover transition-transform duration-200 group-hover/cam:scale-[1.03]"
+        className="h-24 w-full object-contain bg-ink"
         loading="lazy"
         onError={() => setFailed(true)}
       />
       {/* Freshness badge — pulsing LIVE only for genuinely-fresh image
           snapshots; static YouTube thumbnails say "Preview". */}
-      <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-ink/85 px-2 py-0.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.14em] text-cream-50">
+      <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-ink/85 px-2 py-0.5 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-cream-50">
         {preview.kind === "live" && (
           <span className="h-1.5 w-1.5 rounded-full bg-alpen animate-livePulse" aria-hidden />
         )}

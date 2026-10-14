@@ -69,7 +69,7 @@ export default function MapBottomSheet({
         role="dialog"
         aria-label={`${resort.name} conditions`}
       >
-        <div className="bg-cream-50 border-t-[1.5px] border-ink rounded-t-[18px] px-5 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] max-h-[80dvh] overflow-y-auto shadow-[0_-6px_20px_-8px_rgba(42,31,20,0.35)]">
+        <div className="bg-cream-50 border-t-[1.5px] border-ink rounded-t-[18px] pl-[max(1.25rem,var(--pc-safe-left,env(safe-area-inset-left,0px)))] pr-[max(1.25rem,var(--pc-safe-right,env(safe-area-inset-right,0px)))] pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] max-h-[80dvh] overflow-y-auto overscroll-contain shadow-[0_-6px_20px_-8px_rgba(42,31,20,0.35)]">
           {/* Drag handle */}
           <div className="flex justify-center mb-3">
             <div className="w-10 h-1 bg-bark/40 rounded-full" />

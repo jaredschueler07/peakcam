@@ -1,10 +1,11 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Camera, Play } from "lucide-react";
+import { Camera, ExternalLink, Play } from "lucide-react";
 import { useState } from "react";
 import type { Cam } from "@/lib/types";
 import { camDisplayName } from "@/lib/cam-name";
+import { CamEmbed } from "@/components/cam/CamEmbed";
 
 interface LiveWebcamsProps {
   cams: Cam[];
@@ -84,32 +85,22 @@ function WebcamTile({
   isHero?: boolean;
 }) {
   const name = camDisplayName(cam);
-
-  const embedSrc =
-    cam.embed_type === "youtube" && cam.youtube_id
-      ? `https://www.youtube.com/embed/${cam.youtube_id}?autoplay=1&mute=1`
-      : cam.embed_url;
+  // Link cams have nothing to embed; CamEmbed renders null for them.
+  const isLink = cam.embed_type === "link";
 
   return (
     <motion.div
-      className="group relative aspect-video rounded-[18px] overflow-hidden cursor-pointer
-                 bg-cream-50 border-[1.5px] border-ink shadow-stamp
-                 hover:shadow-stamp-hover transition-shadow duration-150"
+      className={`group relative aspect-video rounded-[18px] overflow-hidden cursor-pointer
+                 border-[1.5px] border-ink shadow-stamp
+                 hover:shadow-stamp-hover transition-shadow duration-150
+                 ${isLoaded ? "bg-ink" : "bg-cream-50"}`}
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       whileHover={{ y: -2, x: -1 }}
     >
-      {/* Loaded state: actual embed */}
-      {isLoaded && embedSrc && (
-        <iframe
-          src={embedSrc}
-          className="w-full h-full border-0"
-          allow="autoplay; encrypted-media"
-          allowFullScreen
-          title={name}
-        />
-      )}
+      {/* Loaded state: shared embed (still fallback, inline YouTube, stream health) */}
+      {isLoaded && <CamEmbed cam={cam} variant="tile" />}
 
       {/* Unloaded poster overlay */}
       {!isLoaded && (
@@ -132,24 +123,40 @@ function WebcamTile({
               </span>
             )}
           </div>
-          <button
-            onClick={onLoad}
-            className="inline-flex items-center gap-2 px-5 py-2.5 pointer-coarse:min-h-11
-                       bg-alpen text-cream-50 font-semibold text-[14px]
-                       rounded-full border-[1.5px] border-ink shadow-stamp
-                       hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]
-                       transition-[transform,box-shadow] duration-100"
-          >
-            <Play size={16} />
-            Load live feed
-          </button>
+          {isLink && cam.embed_url ? (
+            <a
+              href={cam.embed_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-5 py-2.5 min-h-11
+                         bg-alpen-dk text-cream-50 font-semibold text-[14px]
+                         rounded-full border-[1.5px] border-ink shadow-stamp
+                         hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]
+                         transition-[transform,box-shadow] duration-100"
+            >
+              <ExternalLink size={16} />
+              Open on resort site
+            </a>
+          ) : (
+            <button
+              onClick={onLoad}
+              className="inline-flex items-center gap-2 px-5 py-2.5 min-h-11
+                         bg-alpen-dk text-cream-50 font-semibold text-[14px]
+                         rounded-full border-[1.5px] border-ink shadow-stamp
+                         hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]
+                         transition-[transform,box-shadow] duration-100"
+            >
+              <Play size={16} />
+              Load live feed
+            </button>
+          )}
         </motion.div>
       )}
 
-      {/* Live indicator on loaded cams — alpen stamp pill */}
-      {isLoaded && (
+      {/* Live indicator — stills carry their own "Image loaded" badge instead */}
+      {isLoaded && cam.embed_type !== "image" && (
         <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-0.5
-                        bg-alpen text-cream-50 border-[1.5px] border-ink rounded-full
+                        bg-alpen-dk text-cream-50 border-[1.5px] border-ink rounded-full
                         shadow-[2px_2px_0_#2a1f14] font-bold text-[11px] uppercase tracking-[0.14em]">
           <span className="w-1.5 h-1.5 bg-cream-50 rounded-full animate-pulse-live" />
           Live

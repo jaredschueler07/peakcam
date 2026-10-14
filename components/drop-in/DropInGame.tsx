@@ -573,17 +573,17 @@ export default function DropInGame({ profile, conditions, courseChoices }: {
                   setTrailId(id); clearGhost();
                   applyTicketState(NO_TICKET);
                   if (modeRef.current === "time_trial") mintTicket("time_trial", false, id);
-                }} className="mt-1 min-h-11 w-full min-w-0 rounded border-[1.5px] border-ink bg-cream-50 px-3 text-sm focus-visible:ring-2 focus-visible:ring-alpen">
+                }} className="mt-1 min-h-11 w-full min-w-0 rounded border-[1.5px] border-ink bg-cream-50 px-3 text-[16px] focus-visible:ring-2 focus-visible:ring-alpen md:text-sm">
                   {courseChoices.map((course) => <option key={course.id} value={course.id}>{course.name} · {course.difficulty ?? "unrated"} · {Math.round(course.lengthM)} m</option>)}
                 </select>
                 {selectedCourse && <span className="mt-1 block font-normal">{Math.round(selectedCourse.topElevationM * 3.28084).toLocaleString()} → {Math.round(selectedCourse.bottomElevationM * 3.28084).toLocaleString()} ft</span>}
               </label>
               <div className="mt-5 flex flex-wrap justify-center gap-3 text-sm text-ink">
-                <label>Gear <select aria-label="Rider mode" value={riderMode} onChange={event => { setRiderMode(event.target.value as RiderMode); selectMode("free_ski"); }} className="min-h-11 rounded border border-ink bg-cream-50 p-2"><option value="skier">Skis</option><option value="snowboarder">Snowboard</option></select></label>
-                {riderMode === "snowboarder" && <label>Stance <select aria-label="Snowboard stance" value={stance} onChange={event => { setStance(event.target.value as SnowboardStance); selectMode("free_ski"); }} className="min-h-11 rounded border border-ink bg-cream-50 p-2"><option value="regular">Regular</option><option value="goofy">Goofy</option></select></label>}
+                <label>Gear <select aria-label="Rider mode" value={riderMode} onChange={event => { setRiderMode(event.target.value as RiderMode); selectMode("free_ski"); }} className="min-h-11 rounded border border-ink bg-cream-50 p-2 text-[16px] md:text-sm"><option value="skier">Skis</option><option value="snowboarder">Snowboard</option></select></label>
+                {riderMode === "snowboarder" && <label>Stance <select aria-label="Snowboard stance" value={stance} onChange={event => { setStance(event.target.value as SnowboardStance); selectMode("free_ski"); }} className="min-h-11 rounded border border-ink bg-cream-50 p-2 text-[16px] md:text-sm"><option value="regular">Regular</option><option value="goofy">Goofy</option></select></label>}
               </div>
               {riderMode === "snowboarder" && <p className="text-sm text-bark-dk">Hold jump to flex the tail; release to ollie. Hold again in the air to grab, and steer to spin.</p>}
-              {mode === "free_ski" && <label className="mt-3 block text-sm">Snow <select aria-label="Snow surface" value={snowSurface} onChange={event => setSnowSurface(event.target.value as typeof snowSurface)} className="min-h-11 rounded border border-ink bg-cream-50 p-2">
+              {mode === "free_ski" && <label className="mt-3 block text-sm">Snow <select aria-label="Snow surface" value={snowSurface} onChange={event => setSnowSurface(event.target.value as typeof snowSurface)} className="min-h-11 rounded border border-ink bg-cream-50 p-2 text-[16px] md:text-sm">
                 <option value="live">Today’s mountain</option><option value="powder">Deep powder</option><option value="packed">Groomed corduroy</option><option value="firm">Hardpack</option><option value="ice">Ice</option><option value="slush">Spring slush</option>
               </select></label>}
               <p className="mt-2 text-sm text-bark-dk">{({ powder: "Float through soft snow with slower, heavier turns.", packed: "Quick edges and predictable grip on groomed snow.", firm: "Fast, firm snow with a little drift.", ice: "Fast glide, long braking distances. Set your edge early.", slush: "Heavy, wet snow pulls at your gear and scrubs speed." })[snowSurface === "live" ? conditions.surface : snowSurface]}</p>

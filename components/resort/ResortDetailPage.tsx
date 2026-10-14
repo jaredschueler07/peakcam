@@ -26,6 +26,7 @@ import { trackViewContent } from "@/lib/meta-pixel-events";
 import { FavoriteButton } from "../ui/FavoriteButton";
 import { isDropInResort } from "@/lib/drop-in";
 import DropInLink from "@/components/drop-in/DropInLink";
+import { ResortAlertCard } from "@/components/alerts/ResortAlertCard";
 
 interface Props {
   resort: ResortWithData;
@@ -65,7 +66,7 @@ function CamCaption({ cam }: { cam: Cam }) {
     <p className="text-bark text-xs mt-1.5 px-1">
       {label}
       {elevation && (
-        <span className={label ? "ml-1.5 text-bark/60" : "text-bark/60"}>
+        <span className={label ? "ml-1.5 text-bark" : "text-bark"}>
           {label ? "· " : ""}
           {elevation}
         </span>
@@ -511,6 +512,12 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
           </section>
         )}
 
+        {/* Powder alerts — the resort is already chosen, so this is a one-field
+            signup; the multi-resort picker lives on /alerts. */}
+        <section>
+          <ResortAlertCard resortId={resort.id} resortName={resort.name} resortSlug={resort.slug} />
+        </section>
+
         {/* ForecastTable — 5-day morning/afternoon/evening */}
         {forecastPeriods && forecastPeriods.length > 0 ? (
           <section id="forecast" className="scroll-mt-20">
@@ -630,8 +637,8 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
           <div className="space-y-4">
             <ConditionVoter resortId={resort.id} resortSlug={resort.slug} liveConditions={liveConditions ?? null} />
             {!user && (
-              <p className="text-text-muted text-xs text-center mt-2">
-                <Link href="/auth" className="text-cyan hover:underline">Sign in</Link> to save favorites and get powder alerts.
+              <p className="text-bark text-xs text-center mt-2">
+                <Link href={`/auth?next=/resorts/${resort.slug}`} className="underline text-forest">Sign in</Link> to save favorites.
               </p>
             )}
             <UserConditionsForm resortId={resort.id} resortSlug={resort.slug} />

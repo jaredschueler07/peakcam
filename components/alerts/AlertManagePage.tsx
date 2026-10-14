@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
-import { Bell, BellOff, Check, Loader2, Trash2 } from "lucide-react";
+import { Bell, BellOff, Check, ChevronDown, Loader2, Trash2 } from "lucide-react";
 import { track, EVENTS } from "@/lib/analytics-events";
 
 interface Resort {
@@ -27,6 +27,12 @@ interface Props {
 
 const THRESHOLD_OPTIONS = [3, 6, 12, 18, 24];
 
+// 16px at every breakpoint keeps iOS Safari from zooming the page on focus, and
+// WebKit's default `menulist` select ignores min-height — hence appearance-none
+// plus an explicit chevron to reach the 44px touch target.
+const SELECT =
+  "min-h-11 min-w-16 appearance-none rounded-md border border-bark bg-cream-50 py-2 pl-2 pr-7 text-[16px] text-ink";
+
 export function AlertManagePage({ token, email, preferences, resorts }: Props) {
   // Build initial state from existing prefs
   const initSelected = new Set(preferences.map((p) => p.resort_id));
@@ -43,10 +49,14 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
   const [unsubscribed, setUnsubscribed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fire ALERT_CONFIRMED once on mount — by the time this component renders,
-  // the token has already been validated server-side and preferences loaded.
   useEffect(() => {
-    track(EVENTS.ALERT_CONFIRMED, { token: token.slice(0, 8) });
+    // ALERT_CONFIRMED is the funnel's step 3 and must count each subscription
+    // once. Every alert email links here too, so gate it on the `confirmed=1`
+    // marker that only the welcome email's link carries, not on mount.
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("confirmed") === "1") {
+      track(EVENTS.ALERT_CONFIRMED, { token: token.slice(0, 8) });
+    }
 
     // The manage_token is a non-expiring bearer capability (read this
     // subscriber's email, rewrite their alerts, delete the subscription). It
@@ -136,14 +146,14 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
 
   if (unsubscribed) {
     return (
-      <div className="min-h-screen bg-bg flex items-center justify-center p-8">
+      <div className="flex min-h-screen items-center justify-center bg-cream p-8">
         <div className="max-w-md text-center">
-          <BellOff size={48} className="text-text-muted mx-auto mb-6" />
-          <h1 className="text-2xl font-bold text-text-base mb-3">Unsubscribed</h1>
-          <p className="text-text-subtle mb-6">
+          <BellOff size={48} className="mx-auto mb-6 text-bark" />
+          <h1 className="mb-3 font-display text-2xl font-bold text-ink">Unsubscribed</h1>
+          <p className="mb-6 text-bark-dk">
             You've been removed from all powder alerts. No more emails.
           </p>
-          <Link href="/" className="text-cyan hover:underline text-sm">
+          <Link href="/" className="text-sm font-semibold text-forest hover:underline">
             Back to PeakCam
           </Link>
         </div>
@@ -152,73 +162,74 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-bg">
+    <div className="min-h-screen bg-cream">
       {/* Header */}
-      <div className="border-b border-border bg-surface/80 backdrop-blur-md sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-cyan font-bold text-lg tracking-wider">PEAKCAM</Link>
-          <span className="text-text-muted text-sm">{email}</span>
+      <div className="sticky top-0 z-10 border-b border-ink/15 bg-cream-50/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-4">
+          <Link href="/" className="font-display text-lg font-black tracking-wider text-forest">PEAKCAM</Link>
+          <span className="text-sm text-bark">{email}</span>
         </div>
       </div>
 
-      <main id="main-content" className="max-w-2xl mx-auto px-4 py-10">
+      <main id="main-content" className="mx-auto max-w-2xl px-4 py-10">
         {/* Title */}
-        <div className="flex items-center gap-3 mb-2">
-          <Bell size={24} className="text-cyan" />
-          <h1 className="text-2xl font-bold text-text-base">Powder Alert Settings</h1>
+        <div className="mb-2 flex items-center gap-3">
+          <Bell size={24} className="text-forest" />
+          <h1 className="font-display text-2xl font-bold text-ink">Powder Alert Settings</h1>
         </div>
-        <p className="text-text-subtle text-sm mb-8">
+        <p className="mb-8 text-sm text-bark-dk">
           You'll get an email when a resort you follow hits your snow threshold,
-          including when the forecast reaches it up to a week ahead. Currently tracking <strong className="text-text-base">{selected.size}</strong> resort{selected.size !== 1 ? "s" : ""}.
+          including when the forecast reaches it up to a week ahead. Currently tracking <strong className="text-ink">{selected.size}</strong> resort{selected.size !== 1 ? "s" : ""}.
         </p>
 
-        {/* Resort search */}
+        {/* Resort search — 16px so iOS Safari does not zoom the page on focus */}
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Filter resorts..."
-          className="w-full px-4 py-2.5 bg-surface border border-border rounded-lg text-text-base
-                     placeholder:text-text-muted outline-none focus:border-cyan/50 mb-4 text-[16px] md:text-sm"
+          aria-label="Filter resorts"
+          className="mb-4 min-h-11 w-full rounded-lg border border-bark bg-cream-50 px-4 py-2.5
+                     text-[16px] text-ink placeholder:text-bark"
         />
 
         {/* Resort list */}
-        <div className="space-y-2 mb-8">
+        <ul className="mb-8 space-y-2">
           {filteredResorts.map((resort) => {
             const isOn = selected.has(resort.id);
             return (
-              <div
+              <li
                 key={resort.id}
-                className={`rounded-lg border transition-colors duration-150 ${
-                  isOn
-                    ? "bg-cyan/5 border-cyan/30"
-                    : "bg-surface border-border hover:border-border-hi"
+                className={`flex items-center gap-2 rounded-lg border py-1 pl-1 pr-3 transition-colors duration-150 ${
+                  isOn ? "border-forest bg-forest/5" : "border-ink/15 bg-cream-50 hover:border-ink/30"
                 }`}
               >
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <button
-                    onClick={() => toggleResort(resort.id)}
-                    className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
-                      isOn
-                        ? "bg-cyan border-cyan"
-                        : "border-border hover:border-text-muted"
-                    }`}
-                    aria-label={isOn ? `Remove ${resort.name}` : `Add ${resort.name}`}
-                  >
-                    {isOn && <Check size={12} className="text-bg" strokeWidth={3} />}
-                  </button>
-
-                  <div className="flex-1 min-w-0">
-                    <p className={`font-medium text-sm truncate ${isOn ? "text-text-base" : "text-text-subtle"}`}>
+                <button
+                  type="button"
+                  onClick={() => toggleResort(resort.id)}
+                  aria-pressed={isOn}
+                  className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-md text-left"
+                >
+                  <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center">
+                    <span className={`flex h-5 w-5 items-center justify-center rounded border-[1.5px] ${
+                      isOn ? "border-forest bg-forest" : "border-bark"
+                    }`}>
+                      {isOn && <Check size={12} className="text-cream-50" strokeWidth={3} />}
+                    </span>
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className={`block truncate text-sm font-medium ${isOn ? "text-ink" : "text-bark-dk"}`}>
                       {resort.name}
-                    </p>
-                    <p className="text-text-muted text-xs">{resort.region}, {resort.state}</p>
-                  </div>
+                    </span>
+                    <span className="block text-xs text-bark">{resort.region}, {resort.state}</span>
+                  </span>
+                </button>
 
-                  {/* Threshold selector — only visible when selected */}
-                  {isOn && (
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-text-muted text-xs">Alert at</span>
+                {/* Threshold selector — only visible when selected */}
+                {isOn && (
+                  <span className="flex shrink-0 items-center gap-1.5">
+                    <span aria-hidden="true" className="text-xs text-bark">Alert at</span>
+                    <span className="relative flex items-center">
                       <select
                         value={thresholds[resort.id] ?? 6}
                         onChange={(e) => {
@@ -228,49 +239,53 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
                           }));
                           setSaved(false);
                         }}
-                        className="bg-surface2 border border-border rounded px-2 py-1
-                                   text-text-base text-xs outline-none focus:border-cyan/50"
+                        aria-label={`Snow threshold for ${resort.name}`}
+                        className={SELECT}
                       >
                         {THRESHOLD_OPTIONS.map((n) => (
                           <option key={n} value={n}>{n}&quot;</option>
                         ))}
                       </select>
-                    </div>
-                  )}
-                </div>
-              </div>
+                      <ChevronDown size={14} aria-hidden="true"
+                        className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-bark" />
+                    </span>
+                  </span>
+                )}
+              </li>
             );
           })}
 
           {filteredResorts.length === 0 && (
-            <p className="text-text-muted text-sm text-center py-8">No resorts match your search.</p>
+            <li className="py-8 text-center text-sm text-bark">No resorts match your search.</li>
           )}
-        </div>
+        </ul>
 
         {error && (
-          <p className="text-red-400 text-sm mb-4">{error}</p>
+          <p className="mb-4 text-sm text-alpen-dk" role="alert">{error}</p>
         )}
 
         {/* Actions */}
         <div className="flex items-center justify-between gap-4">
           <button
+            type="button"
             onClick={handleUnsubscribe}
             disabled={unsubscribing}
-            className="flex items-center gap-2 text-text-muted hover:text-red-400 text-sm
-                       px-2 py-2 pointer-coarse:min-h-11 transition-colors disabled:opacity-50"
+            className="flex min-h-11 items-center gap-2 px-2 py-2 text-sm text-bark
+                       transition-colors hover:text-alpen-dk disabled:opacity-50"
           >
             <Trash2 size={14} />
             {unsubscribing ? "Unsubscribing..." : "Unsubscribe from all alerts"}
           </button>
 
           <button
+            type="button"
             onClick={handleSave}
             disabled={saving || saved}
-            className={`flex items-center gap-2 px-5 py-2.5 pointer-coarse:min-h-11 rounded-lg text-sm font-semibold
+            className={`flex min-h-11 items-center gap-2 rounded-full border-[1.5px] px-5 py-2.5 text-sm font-semibold
                         transition-colors disabled:opacity-60 ${
                           saved
-                            ? "bg-green-500/20 border border-green-500/40 text-green-400"
-                            : "bg-cyan text-bg hover:bg-cyan/90"
+                            ? "border-forest bg-forest/10 text-forest"
+                            : "border-ink bg-forest text-cream-50 shadow-stamp-sm hover:bg-forest-dk"
                         }`}
           >
             {saving ? (

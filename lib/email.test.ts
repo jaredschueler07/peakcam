@@ -4,16 +4,24 @@ import {
   checkResendApiKey,
   EmailSendError,
   sendEmail,
+  sendManageLinkEmail,
   sendPowderAlertEmail,
   sendWelcomeEmail,
   setEmailClientForTests,
+  unsubscribeHeaders,
   type EmailClient,
 } from "./email";
 import { sendCamReportEmail, type CamReportEmailInput } from "./cam-reports/email";
 
 // ─── Fakes ────────────────────────────────────────────────────────────────────
 
-type SentPayload = { from: string; to: string | string[]; subject: string; html: string };
+type SentPayload = {
+  from: string;
+  to: string | string[];
+  subject: string;
+  html: string;
+  headers?: Record<string, string>;
+};
 
 function okClient(): EmailClient & { sent: SentPayload[] } {
   const sent: SentPayload[] = [];
@@ -303,4 +311,33 @@ test("mixed and forecast-only digests distinguish future snow from observed snow
     assert.match(client.sent[0].html, mixed ? /Fresh snow and storms ahead/ : /Storm inbound/);
     assert.doesNotMatch(client.sent[0].html, /Fresh powder dropped/);
   }
+});
+
+// ─── List-Unsubscribe (RFC 8058 one-click) ────────────────────────────────────
+
+test("unsubscribeHeaders points one-click unsubscribe at the canonical origin", () => {
+  const headers = unsubscribeHeaders("tok/with+chars");
+  assert.strictEqual(headers["List-Unsubscribe-Post"], "List-Unsubscribe=One-Click");
+  // https URI first, then a mailto fallback; the token is URL-encoded in both.
+  assert.match(
+    headers["List-Unsubscribe"],
+    /^<https:\/\/www\.peakcam\.io\/api\/alerts\/unsubscribe\?token=tok%2Fwith%2Bchars>, <mailto:[^>@]+@[^>]+tok%2Fwith%2Bchars>$/
+  );
+  assert.deepStrictEqual(Object.keys(headers).sort(), ["List-Unsubscribe", "List-Unsubscribe-Post"]);
+});
+
+test("every alert email carries the unsubscribe headers for its own manage token", async () => {
+  const client = okClient();
+  await sendWelcomeEmail({ email: "a@example.com", manageToken: "tok-welcome", resortNames: ["Alta"] }, client);
+  await sendManageLinkEmail({ email: "a@example.com", manageToken: "tok-manage" }, client);
+  await sendPowderAlertEmail(
+    { email: "a@example.com", manageToken: "tok-alert", alerts: [{ resortName: "Alta", slug: "alta", newSnow: 12, threshold: 6 }] },
+    client
+  );
+  const tokens = ["tok-welcome", "tok-manage", "tok-alert"];
+  assert.strictEqual(client.sent.length, tokens.length);
+  tokens.forEach((token, i) => {
+    assert.deepStrictEqual(client.sent[i].headers, unsubscribeHeaders(token));
+    assert.match(client.sent[i].headers!["List-Unsubscribe"], new RegExp(`token=${token}>`));
+  });
 });

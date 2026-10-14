@@ -8,6 +8,12 @@ async function signIn(page: Page) {
   await page.locator('form').getByRole('button',{name:'Sign in',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Your account.'})).toBeVisible();
 }
+async function requestCode(page: Page, email: string) {
+  await page.goto('/auth');
+  await page.getByRole('button',{name:'Email me a sign-in code instead'}).click();
+  await page.getByLabel('Email address',{exact:true}).fill(email);
+  await page.getByRole('button',{name:'Email sign-in code',exact:true}).click();
+}
 test.beforeEach(async ({ page }) => { await page.request.get(`${fixture}/_test/reset`); });
 
 test('protected account redirects logged-out visitors and preserves their destination', async ({page}) => {
@@ -47,6 +53,27 @@ test('email codes handle expiration, establish a session and never enter the URL
   await expect(page.getByRole('heading',{name:'Your account.'})).toBeVisible();
   expect(page.url()).not.toContain('123456');
   expect(page.url()).not.toContain('token');
+});
+
+test('email code requests do not reveal whether an address has an account', async ({page}) => {
+  await page.clock.install();
+  const sentCopy = (email: string) => `If ${email} has a PeakCam account, we’ll send a sign-in code.`;
+  await requestCode(page, 'unknown@example.invalid');
+  await expect(page.getByRole('status')).toHaveText(sentCopy('unknown@example.invalid'));
+  await expect(page.locator('main').getByRole('alert')).toHaveCount(0);
+  await expect(page.getByRole('button',{name:/Resend in/})).toBeDisabled();
+  await page.clock.runFor(61_000);
+  await page.getByRole('button',{name:'Resend email',exact:true}).click();
+  await expect.poll(async()=> (await requests(page)).filter((x:{path:string})=>x.path==='/auth/v1/otp').length).toBe(2);
+  await expect(page.getByRole('status')).toHaveText(sentCopy('unknown@example.invalid'));
+  await expect(page.locator('main').getByRole('alert')).toHaveCount(0);
+  await expect(page.getByRole('button',{name:/Resend in/})).toBeDisabled();
+  await requestCode(page, 'fixture@example.invalid');
+  await expect(page.getByRole('status')).toHaveText(sentCopy('fixture@example.invalid'));
+  await requestCode(page, 'ratelimited@example.invalid');
+  await expect(page.locator('main').getByRole('alert')).toContainText('Too many attempts');
+  await expect(page.locator('main').getByRole('alert')).not.toContainText('Private rate-limit');
+  await expect(page.getByRole('status')).toHaveCount(0);
 });
 
 test('account password validation and all-device logout use the authenticated session', async ({page}) => {

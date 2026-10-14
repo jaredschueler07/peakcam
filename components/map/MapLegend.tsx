@@ -1,16 +1,23 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import type { MapMetric } from "@/lib/map-utils";
+import { RATING_RULES } from "@/lib/conditions-engine";
 
-// Categorical rating swatches — matches MapView marker colors.
+// Categorical rating swatches — matches MapView marker colors. Each row's
+// tooltip is the rating rule itself, derived from RATING_THRESHOLDS.
 const RATING_ITEMS = [
-  { color: "#3c5a3a", label: "Great" },       // pc-forest
-  { color: "#6d8a4a", label: "Good" },        // pc-good (moss)
-  { color: "#e2a740", label: "Fair" },        // pc-mustard
-  { color: "#a93f20", label: "Poor" },        // pc-alpen-dk
+  { color: "#3c5a3a", label: "Great", title: `Great: ${RATING_RULES.great}` }, // pc-forest
+  { color: "#6d8a4a", label: "Good",  title: `Good: ${RATING_RULES.good}` },   // pc-good (moss)
+  { color: "#e2a740", label: "Fair",  title: `Fair: ${RATING_RULES.fair}` },   // pc-mustard
+  { color: "#a93f20", label: "Poor",  title: `Poor: ${RATING_RULES.poor}` },   // pc-alpen-dk
 ] as const;
-const OFF_SEASON = { color: "#b59b74", label: "Off-season" }; // neutral bark
+const OFF_SEASON = {
+  color: "#b59b74", // neutral bark
+  label: "Off-season",
+  title: "Off-season: outside the local snow season, so no rating is shown",
+};
 
 // Sequential ramp legend — mirrors MapView's METRIC_RAMP + RAMP_LIGHT..DARK.
 const RAMP_CSS = "linear-gradient(90deg, #dbe6d4, #1f3322)";
@@ -50,7 +57,7 @@ export default function MapLegend({ metric }: MapLegendProps) {
         <div className="bg-cream-50 border-[1.5px] border-ink rounded-[14px] shadow-stamp p-3 transition-all">
           <button
             onClick={() => setOpen(false)}
-            className="pc-eyebrow mb-2 py-1 pointer-coarse:min-h-10 pointer-coarse:min-w-11 text-left hover:text-ink transition-colors"
+            className="pc-eyebrow mb-2 py-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11 text-left hover:text-ink transition-colors"
             style={{ color: "var(--pc-bark)" }}
           >
             Legend ×
@@ -70,7 +77,10 @@ export default function MapLegend({ metric }: MapLegendProps) {
                 <span>0&quot;</span>
                 <span>{seq.max}</span>
               </div>
-              <div className="flex items-center gap-2 pt-1.5 border-t-[1.5px] border-dashed border-bark/50">
+              <div
+                className="flex items-center gap-2 pt-1.5 border-t-[1.5px] border-dashed border-bark/50"
+                title={OFF_SEASON.title}
+              >
                 <span
                   className="inline-block w-3 h-3 rounded-full shrink-0 border-[1.5px] border-ink"
                   style={{ backgroundColor: OFF_SEASON.color }}
@@ -83,8 +93,8 @@ export default function MapLegend({ metric }: MapLegendProps) {
           ) : (
             // Categorical rating swatches.
             <div className="flex flex-col gap-1.5">
-              {[...RATING_ITEMS, OFF_SEASON].map(({ color, label }) => (
-                <div key={label} className="flex items-center gap-2">
+              {[...RATING_ITEMS, OFF_SEASON].map(({ color, label, title }) => (
+                <div key={label} className="flex items-center gap-2" title={title}>
                   <span
                     className="inline-block w-3 h-3 rounded-full shrink-0 border-[1.5px] border-ink"
                     style={{ backgroundColor: color }}
@@ -94,6 +104,13 @@ export default function MapLegend({ metric }: MapLegendProps) {
                   </span>
                 </div>
               ))}
+              {/* Tooltips need a hover; touch users get the same rules here. */}
+              <Link
+                href="/methodology#conditions"
+                className="mt-1 pt-1.5 border-t-[1.5px] border-dashed border-bark/50 font-mono text-[10px] text-bark underline underline-offset-2 hover:text-ink transition-colors pointer-coarse:min-h-11 pointer-coarse:flex pointer-coarse:items-center"
+              >
+                How ratings work
+              </Link>
             </div>
           )}
         </div>

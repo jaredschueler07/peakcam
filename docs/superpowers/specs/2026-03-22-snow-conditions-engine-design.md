@@ -200,24 +200,26 @@ interface ConditionsOutput {
 
 ### Condition Rating Rules (Skier-Experience Focus)
 
-Evaluated top-to-bottom, first match wins. Thresholds are initial values subject to calibration — they should be defined as a config object for easy adjustment.
+Evaluated top-to-bottom, first match wins. Thresholds are initial values subject to calibration — they are defined as a config object (`RATING_THRESHOLDS` in `lib/conditions-engine.ts`) for easy adjustment, and `RATING_RULES` / `describeRatingRule()` render the same table as one-line prose for the badge tooltips, the map legend and `/methodology`.
 
 ```typescript
+const USABLE_BASE_MIN_DEPTH_IN = 24;
+
 const RATING_THRESHOLDS = {
-  great: { newSnow24h: 6, newSnow48h: 12 },
-  good:  { newSnow24h: 2, pctOfNormal: 100, minDepth: 24 },
+  great: { newSnow24h: 6, newSnow48h: 12, minDepth: USABLE_BASE_MIN_DEPTH_IN },
+  good:  { newSnow24h: 2, pctOfNormal: 100, minDepth: USABLE_BASE_MIN_DEPTH_IN },
   fair:  { pctOfNormal: 70, minDepth: 20 },
 } as const;
 ```
 
 | Rating | Rule |
 |---|---|
-| **Great** | `newSnow24h >= 6` OR `newSnow48h >= 12` |
-| **Good** | `newSnow24h >= 2` OR (`pctOfNormal >= 100` AND `snowDepthIn >= 24`) |
-| **Fair** | `snowDepthIn >= 20` AND (`pctOfNormal >= 70` OR `pctOfNormal` is null) |
+| **Great** | `snowDepthIn >= 24` AND (`newSnow24h >= 6` OR `newSnow48h >= 12`) |
+| **Good** | `snowDepthIn >= 24` AND (`newSnow24h >= 2` OR `pctOfNormal >= 100`) |
+| **Fair** | (`snowDepthIn >= 20` AND (`pctOfNormal >= 70` OR `pctOfNormal` is null)) OR (`snowDepthIn` is null AND `newSnow24h >= 2` or a Great-sized storm) |
 | **Poor** | Everything else (thin base, well below normal, no new snow) |
 
-The "Fair" rule now uses 70% (not 80%) and allows null `pctOfNormal` (for resorts without normals data). A resort with 60" of base and 95% of normal correctly falls into "Good" via the depth+pctOfNormal rule.
+`newSnow24h` / `newSnow48h` are depth-sensor deltas (see `computeDeltas` in `scripts/snotel-sync.ts`), so a storm total alone says nothing about the base beneath it. Every tier above Fair therefore requires a *known* base of at least 24" (GitHub #68: a 6" delta on a 2" base at 74 °F used to rate Great); with depth unknown, fresh snow is evidence for Fair at most. Temperature is not an input to the rating (a warm-temperature cap is a separate, deferred product decision). The "Fair" rule uses 70% (not 80%) and allows null `pctOfNormal` for resorts without normals data. A resort with 60" of base and 100% of normal and no new snow falls into "Good" via the depth+pctOfNormal rule.
 
 ### Percent of Normal
 

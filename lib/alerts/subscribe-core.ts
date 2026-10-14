@@ -89,9 +89,71 @@ const SUCCESS: SubscribeResult = {
   },
 };
 
-function clampThreshold(value: unknown): number {
+export function clampThreshold(value: unknown): number {
   const n = typeof value === "number" && Number.isFinite(value) ? value : 6;
   return Math.max(1, Math.min(48, Math.round(n)));
+}
+
+// ─── PUT /api/alerts/manage — body validation ─────────────────────────────────
+//
+// The manage route replaces the subscriber's whole preference set, so every
+// check that could fail mid-write has to run here first, while the stored rows
+// are still intact. Before this existed a non-numeric threshold reached
+// Postgres as NaN and the insert failed after the old rows were already gone.
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export interface PreferenceUpdate {
+  token: string;
+  /** Deduplicated, in request order. */
+  resortIds: string[];
+  /** Clamped threshold per selected resort; absent entries default to 6. */
+  thresholds: Record<string, number>;
+}
+
+export type ParsedPreferenceUpdate =
+  | { ok: true; value: PreferenceUpdate }
+  | { ok: false; error: string };
+
+export function parsePreferenceUpdate(body: unknown): ParsedPreferenceUpdate {
+  const input = (body && typeof body === "object" ? body : {}) as {
+    token?: unknown;
+    resort_ids?: unknown;
+    thresholds?: unknown;
+  };
+
+  if (typeof input.token !== "string" || input.token.length === 0) {
+    return { ok: false, error: "token is required" };
+  }
+  if (!Array.isArray(input.resort_ids)) {
+    return { ok: false, error: "resort_ids must be an array" };
+  }
+  const resortIds: string[] = [];
+  for (const id of new Set(input.resort_ids)) {
+    // resorts.id is a uuid column: anything else fails the PostgREST filter.
+    if (typeof id !== "string" || !UUID_RE.test(id)) {
+      return { ok: false, error: "resort_ids must contain resort ids" };
+    }
+    resortIds.push(id);
+  }
+  if (resortIds.length > MAX_RESORTS_PER_REQUEST) {
+    return { ok: false, error: `resort_ids may hold at most ${MAX_RESORTS_PER_REQUEST} entries` };
+  }
+
+  const rawThresholds = input.thresholds ?? {};
+  if (typeof rawThresholds !== "object" || Array.isArray(rawThresholds)) {
+    return { ok: false, error: "thresholds must be an object keyed by resort id" };
+  }
+  const thresholds: Record<string, number> = {};
+  for (const id of resortIds) {
+    const value = (rawThresholds as Record<string, unknown>)[id];
+    if (value != null && (typeof value !== "number" || !Number.isFinite(value))) {
+      return { ok: false, error: `threshold for ${id} must be a number` };
+    }
+    thresholds[id] = clampThreshold(value);
+  }
+
+  return { ok: true, value: { token: input.token, resortIds, thresholds } };
 }
 
 export async function handleSubscribe(

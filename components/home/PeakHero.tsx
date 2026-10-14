@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { motion } from "motion/react";
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
 import { navLinks } from "@/components/layout/Header";
 
 interface PeakHeroProps {
@@ -12,7 +10,6 @@ interface PeakHeroProps {
 }
 
 export function PeakHero({ resortCount }: PeakHeroProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const countLabel =
     typeof resortCount === "number" && resortCount > 0
       ? `${resortCount} Resorts`
@@ -53,37 +50,7 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
             Sign In
           </Link>
         </div>
-        <button
-          className="md:hidden text-ink p-2"
-          onClick={() => setMenuOpen(!menuOpen)}
-          aria-label="Toggle menu"
-        >
-          {menuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
       </nav>
-
-      {/* Mobile menu dropdown */}
-      {menuOpen && (
-        <div className="absolute top-[72px] left-4 right-4 bg-cream-50 border-[1.5px] border-ink rounded-2xl shadow-stamp p-3 flex flex-col gap-1 md:hidden z-20">
-          {navLinks.filter(l => !l.authOnly).map(l => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className="px-4 py-3 rounded-full text-sm font-semibold text-ink hover:bg-ink/5 transition-colors"
-              onClick={() => setMenuOpen(false)}
-            >
-              {l.label}
-            </Link>
-          ))}
-          <Link
-            href="/auth"
-            className="mt-1 px-4 py-3 rounded-full text-sm font-bold text-center bg-forest text-cream-50 border-[1.5px] border-ink shadow-stamp-sm"
-            onClick={() => setMenuOpen(false)}
-          >
-            Sign In
-          </Link>
-        </div>
-      )}
 
       {/* Content — massive Fraunces headline with italic alpen accent */}
       <div className="relative z-10 h-full flex flex-col items-center justify-center px-6">

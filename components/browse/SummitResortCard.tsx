@@ -5,7 +5,7 @@ import { hasFreshSnowForecast } from "@/lib/snow-forecast";
 import { useCallback, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
-import { Play, ArrowLeftRight, TrendingUp, TrendingDown, Minus, Snowflake, Sun, Thermometer, Heart } from "lucide-react";
+import { ArrowLeftRight, TrendingUp, TrendingDown, Minus, Snowflake, Sun, Thermometer, Heart } from "lucide-react";
 import dynamic from "next/dynamic";
 import { availableCameras } from "@/lib/cam-preview";
 import { CardCameraPreview } from "./CardCameraPreview";
@@ -58,15 +58,17 @@ interface Props {
   favorited?: boolean;
   onToggleFavorite?: () => void;
   /**
-   * Entrance animation. Only the first screenful of cards should
-   * animate — with all 148 on, every card mounts an IntersectionObserver and fast scrolls can hit blank not-yet-revealed patches.
+   * Entrance animation for the first screenful of cards. CSS-only on purpose:
+   * a motion `whileInView` entrance starts at opacity 0 and waits on an
+   * IntersectionObserver that Safari misfires under sticky/backdrop-blur
+   * ancestors, leaving cards invisible. The keyframes run only for fine
+   * pointers, so touch devices never depend on an observer to see a card.
    */
   animate?: boolean;
 }
 
 export function SummitResortCard({ resort, favorited, onToggleFavorite, animate = true }: Props) {
   const reducedMotion = useReducedMotion();
-  const entrance = animate && !reducedMotion;
   const snow = resort.snow_report;
   const forecastTime = useForecastTime();
   const baseDepth = snow?.base_depth ?? 0;
@@ -93,10 +95,7 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
   return (
     <motion.div
       data-testid="resort-card" data-resort-slug={resort.slug}
-      className="group relative rounded-[18px] "
-      initial={entrance ? { opacity: 0, y: 20 } : false}
-      whileInView={entrance ? { opacity: 1, y: 0 } : undefined}
-      viewport={{ once: true }}
+      className={`group relative rounded-[18px]${animate ? " motion-safe:pointer-fine:[animation:slideUp_220ms_ease]" : ""}`}
       whileHover={reducedMotion ? undefined : { y: -4, x: -1 }}
       transition={{ duration: 0.15 }}
     >
@@ -106,20 +105,31 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
         overflow-hidden">
 
         <CardCameraPreview key={cams.map(cam => `${cam.id}:${cam.embed_url}:${cam.youtube_id}`).join("|")} cams={cams} resortName={resort.name} onOpen={openCamera} />
-        {onToggleFavorite && <button type="button" onClick={event => { event.currentTarget.focus(); onToggleFavorite(); }}
-          aria-label={favorited ? `Remove ${resort.name} from favorites` : `Add ${resort.name} to favorites`}
-          aria-pressed={Boolean(favorited)}
-          className="absolute right-3 top-3 grid h-11 w-11 place-items-center rounded-full border border-ink bg-cream-50 text-ink shadow-stamp-sm focus-visible:ring-2 focus-visible:ring-alpen">
-          <Heart size={17} className={favorited ? "text-alpen" : ""} fill={favorited ? "currentColor" : "none"} aria-hidden />
-        </button>}
+        {/* Overlay actions — siblings of the preview button and the main link, never nested inside either */}
+        <div className="absolute right-3 top-3 flex items-center gap-2">
+          <Link
+            href={`/compare?resorts=${resort.slug}`}
+            aria-label={`Compare ${resort.name}`}
+            title="Compare"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-ink bg-cream-50 text-ink shadow-stamp-sm focus-visible:ring-2 focus-visible:ring-alpen"
+          >
+            <ArrowLeftRight size={18} aria-hidden />
+          </Link>
+          {onToggleFavorite && <button type="button" onClick={event => { event.currentTarget.focus(); onToggleFavorite(); }}
+            aria-label={favorited ? `Remove ${resort.name} from favorites` : `Add ${resort.name} to favorites`}
+            aria-pressed={Boolean(favorited)}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-ink bg-cream-50 text-ink shadow-stamp-sm focus-visible:ring-2 focus-visible:ring-alpen">
+            <Heart size={17} className={favorited ? "text-alpen" : ""} fill={favorited ? "currentColor" : "none"} aria-hidden />
+          </button>}
+        </div>
 
         {/* Main card link */}
         <Link
           href={`/resorts/${resort.slug}`}
-          className="block px-5 pt-5 pb-3 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-alpen"
+          className="block px-4 pt-3 pb-3 md:px-5 md:pt-5 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-alpen"
           onClick={() => trackResortCardClick(resort.name, resort.slug)}
         >
-          <div className="relative space-y-3">
+          <div className="relative space-y-2 md:space-y-3">
             {/* Eyebrow: state / region */}
             <div className="flex items-center gap-2 font-mono font-bold text-[10.5px] text-bark uppercase tracking-[0.14em]">
               <span className="px-2 py-0.5 bg-ink text-cream-50 rounded-full">
@@ -129,14 +139,14 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
             </div>
 
             {/* Resort name — Fraunces 900, tight */}
-            <h3 className="font-display font-black text-[28px] leading-[0.95] tracking-[-0.02em] text-ink [overflow-wrap:anywhere]">
+            <h3 className="font-display font-black text-[25px] leading-none md:text-[28px] md:leading-[0.95] tracking-[-0.02em] text-ink [overflow-wrap:anywhere]">
               {resort.name}
             </h3>
 
             {(isFresh || hasSnowForecast) && <span className="inline-flex items-center gap-1 rounded-full border border-alpen-dk bg-alpen-dk px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wide text-white"><Snowflake size={11} aria-hidden />{isFresh ? "Fresh snow" : "Snow forecast"}</span>}
 
             {/* Data strip — dashed bark rule top/bottom, mono numbers */}
-            <div className="grid grid-cols-4 gap-2 py-3 border-t border-b border-dashed border-bark/60">
+            <div className="grid grid-cols-4 gap-2 py-2 md:py-3 border-t border-b border-dashed border-bark/60">
               <div className="text-center">
                 <div className="font-mono font-bold text-lg text-ink tabular-nums">{snow?.base_depth != null ? `${baseDepth}″` : "—"}</div>
                 <div className="font-mono text-[10px] text-bark uppercase tracking-widest mt-0.5">Base</div>
@@ -199,25 +209,6 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
             </div>
           </div>
         </Link>
-
-        {/* Ghost compare button — separate link outside main card link */}
-        <div className="grid grid-cols-[1fr_auto] gap-2 px-5 pb-5 pt-1">
-          <button type="button" disabled={!cams.length} onClick={event => { event.currentTarget.focus(); openCamera(); }}
-            className="flex min-h-11 items-center justify-center gap-2 rounded-full border-[1.5px] border-ink bg-alpen-dk px-4 text-sm font-bold text-white shadow-stamp-sm transition-colors hover:bg-ink disabled:bg-cream disabled:text-bark disabled:shadow-none focus-visible:ring-2 focus-visible:ring-alpen">
-            <Play size={14} aria-hidden />{cams.length ? "Live look" : "No cameras yet"}
-          </button>
-          <Link
-            href={`/compare?resorts=${resort.slug}`}
-            className="flex items-center justify-center gap-1.5 min-h-11 px-3 py-2 rounded-full
-              border-[1.5px] border-ink/20 text-bark hover:text-ink hover:border-ink
-              hover:bg-ink/5 transition-colors duration-150
-              text-[12px] font-bold tracking-wide uppercase"
-          >
-            <ArrowLeftRight size={12} strokeWidth={2.5} />
-            Compare
-          </Link>
-        </div>
-
       </div>
       {cameraIndex !== null && cams.length > 0 && <CamLightbox cams={cams} initialIndex={cameraIndex} resortSlug={resort.slug} resortName={resort.name} resortUrl={resort.cam_page_url || resort.website_url} onClose={closeCamera} />}
     </motion.div>
