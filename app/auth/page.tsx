@@ -7,6 +7,16 @@ import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { track, EVENTS } from "@/lib/analytics-events";
 import { safeNext } from "@/lib/safe-redirect";
 
+// Shared field styling. `pc-auth-input` (app/globals.css) forces the cream/ink
+// palette through Chromium's `:-webkit-autofill` UA layer, which otherwise wins
+// over author `background-color` and paints a dark box in a dark color-scheme.
+const AUTH_INPUT_CLASS = `w-full appearance-none [color-scheme:light] pc-auth-input
+  bg-surface2 border border-border rounded-lg
+  px-3 py-2.5 text-[16px] md:text-sm text-text-base caret-[#2a1f14] placeholder:text-text-muted
+  outline-none transition-all duration-[220ms]
+  focus:border-cyan focus:bg-surface3
+  focus-visible:shadow-[0_0_0_3px_rgba(189,70,36,0.45)]`;
+
 function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -21,10 +31,20 @@ function AuthForm() {
     urlError === "auth_failed" ? "Sign-in link expired or invalid. Please try again." : null
   );
   const [signupDone, setSignupDone] = useState(false);
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const isValidPassword = mode === "signup" ? password.length >= 6 : password.length > 0;
+  const canSubmit = isValidEmail && isValidPassword;
+  const showEmailError = emailTouched && !isValidEmail;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email.trim() || !password) return;
+    if (!canSubmit) {
+      setEmailTouched(true);
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -115,34 +135,48 @@ function AuthForm() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            onBlur={() => setEmailTouched(true)}
             placeholder="you@example.com"
             required
             autoFocus
             autoComplete="email"
-            className="w-full bg-surface2 border border-border rounded-lg
-              px-3 py-2.5 text-[16px] md:text-sm text-text-base placeholder:text-text-muted
-              outline-none transition-all duration-[220ms]
-              focus:border-cyan focus:bg-surface3"
+            aria-invalid={showEmailError || undefined}
+            aria-describedby={showEmailError ? "auth-email-error" : undefined}
+            className={AUTH_INPUT_CLASS}
           />
+          {showEmailError && (
+            <p id="auth-email-error" role="alert" className="text-poor text-xs font-medium mt-1.5">
+              Enter a valid email address
+            </p>
+          )}
         </div>
 
         <div>
           <label htmlFor="auth-password" className="block text-text-muted text-xs font-medium mb-1.5">
             Password
           </label>
-          <input
-            id="auth-password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder={mode === "signup" ? "Min. 6 characters" : "Your password"}
-            required
-            autoComplete={mode === "signin" ? "current-password" : "new-password"}
-            className="w-full bg-surface2 border border-border rounded-lg
-              px-3 py-2.5 text-[16px] md:text-sm text-text-base placeholder:text-text-muted
-              outline-none transition-all duration-[220ms]
-              focus:border-cyan focus:bg-surface3"
-          />
+          <div className="relative">
+            <input
+              id="auth-password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={mode === "signup" ? "Min. 6 characters" : "Your password"}
+              required
+              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              className={`${AUTH_INPUT_CLASS} pr-16`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-pressed={showPassword}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded
+                text-text-muted text-xs font-medium hover:text-text-base transition-colors"
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -151,11 +185,11 @@ function AuthForm() {
 
         <button
           type="submit"
-          disabled={loading || !email.trim() || !password}
+          disabled={loading || !canSubmit}
           className={`
             w-full rounded-lg px-4 py-3 min-h-[44px] text-sm font-semibold
             border transition-all duration-[220ms]
-            ${!loading && email.trim() && password
+            ${!loading && canSubmit
               ? "bg-cyan-dim border-cyan/30 text-cyan hover:bg-cyan/20 cursor-pointer"
               : "bg-surface2 border-border text-text-muted cursor-not-allowed"}
           `}
@@ -171,7 +205,7 @@ function AuthForm() {
 
 export default function AuthPage() {
   return (
-    <div className="min-h-[calc(100vh-60px)] flex items-center justify-center px-4 py-12">
+    <main id="main-content" className="min-h-[calc(100vh-60px)] flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
         {/* Brand */}
         <Link href="/" className="flex justify-center mb-8">
@@ -188,12 +222,12 @@ export default function AuthPage() {
 
         <p className="text-text-muted text-xs text-center mt-4">
           By signing in, you agree to our{" "}
-          <Link href="/about" className="text-text-subtle hover:text-cyan underline transition-colors inline-block py-2 px-1">
+          <Link href="/about#terms" className="text-text-subtle hover:text-cyan underline transition-colors inline-block py-2 px-1">
             terms of use
           </Link>
           .
         </p>
       </div>
-    </div>
+    </main>
   );
 }

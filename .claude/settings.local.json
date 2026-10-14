@@ -1,6 +1,8 @@
 {
   "permissions": {
     "allow": [
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
       "Bash(cd /c/Users/jared/live_cam_web/peakcam && npm install 2>&1)",
       "Bash(cd /c/Users/jared/live_cam_web/peakcam && rm -f node_modules node_modules_fresh && rm -rf node_modules_old node_modules_new)",
       "Bash(cd /c/Users/jared/live_cam_web/peakcam && npm run dev 2>&1)",

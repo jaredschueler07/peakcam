@@ -108,7 +108,7 @@ function FilterChip({
     <button
       onClick={onClick}
       title={title}
-      className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 min-h-[40px] text-[13px] font-semibold border-[1.5px] cursor-pointer select-none transition-colors duration-150 whitespace-nowrap ${
+      className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 min-h-[44px] text-[13px] font-semibold border-[1.5px] cursor-pointer select-none transition-colors duration-150 whitespace-nowrap ${
         active
           ? "bg-ink border-ink text-cream-50"
           : "bg-cream-50 border-bark text-ink hover:border-ink hover:bg-cream"
@@ -494,13 +494,38 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
   // app/page.tsx and per-resort SSG pages; the grid is a browsing surface.
   const PAGE_SIZE = 24;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  useEffect(() => {
+  // Reset paging whenever the filter set changes. Done during render (React's
+  // "adjust state on prop change" pattern) rather than in an effect, so the
+  // reset lands in the same commit as the filter change instead of one behind.
+  const filterKey = JSON.stringify([search, stateFilter, condFilter, hasLiveCams, freshSnow, showFavoritesOnly, sort]);
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
     setVisibleCount(PAGE_SIZE);
-  }, [search, stateFilter, condFilter, hasLiveCams, freshSnow, showFavoritesOnly, sort]);
+  }
   const visibleResorts = useMemo(
     () => filtered.slice(0, visibleCount),
     [filtered, visibleCount],
   );
+
+  // Header search on inner pages routes here as /?q=… (the resort list only
+  // exists on this page). Read it from window.location on mount rather than
+  // useSearchParams() so the home page stays statically rendered.
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q")?.trim();
+    if (!q) return;
+    // One-shot hand-off from the URL on mount; can't be a useState initialiser
+    // because `window` doesn't exist during the server render of this page.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSearch(q);
+    searchInputRef.current?.focus();
+    // Drop ?q= so a reload doesn't re-apply a search the user has since cleared.
+    params.delete("q");
+    const qs = params.toString();
+    window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash);
+  }, []);
 
   // Debounced search tracking
   const searchTrackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -539,8 +564,8 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
       <Header showSearch={false} />
 
       {/* ── Sticky paper search + filter bar ─────────────────── */}
-      <div className="sticky top-[64px] z-30 border-b-[1.5px] border-ink bg-cream/95 backdrop-blur-md">
-        <div className="max-w-screen-2xl mx-auto px-4 py-5 md:px-8">
+      <div className="relative md:sticky md:top-[64px] z-30 border-b-[1.5px] border-ink bg-cream/95 backdrop-blur-md">
+        <div className="max-w-screen-2xl mx-auto px-4 py-3 md:py-5 md:px-8">
           {/* Top row: search input (pc-input style) */}
           <div className="flex items-center gap-4 mb-4">
             <div className="flex-1 relative">
@@ -549,6 +574,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
                 size={18}
               />
               <input
+                ref={searchInputRef}
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -573,7 +599,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
           </div>
 
           {/* Mobile: single compact row — state, The Goods, everything else in the sheet */}
-          <div className="flex md:hidden items-center gap-2">
+          <div className="flex md:hidden items-center gap-2 flex-wrap">
             <button
               onClick={() => setShowStates(v => !v)}
               className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 min-h-[44px] text-[13px] font-semibold border-[1.5px] cursor-pointer select-none transition-colors duration-150 whitespace-nowrap min-w-0 ${
@@ -615,7 +641,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
             {/* State dropdown */}
             <button
               onClick={() => setShowStates(v => !v)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 min-h-[40px] text-[13px] font-semibold border-[1.5px] cursor-pointer select-none transition-colors duration-150 whitespace-nowrap ${
+              className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 min-h-[44px] text-[13px] font-semibold border-[1.5px] cursor-pointer select-none transition-colors duration-150 whitespace-nowrap ${
                 stateFilter !== "All"
                   ? "bg-ink border-ink text-cream-50"
                   : "bg-cream-50 border-bark text-ink hover:border-ink hover:bg-cream"
@@ -728,16 +754,20 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
         {/* Powder alert signup banner — forest card.
             pc-on-ink flips the focus ring to cream: ember-on-forest is
             1.50:1, cream-on-forest is 7.05:1. */}
-        <div className="pc-on-ink flex items-center justify-between gap-4 px-6 py-5 bg-forest text-cream-50
+        <div className="pc-on-ink flex items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-5 bg-forest text-cream-50
                         border-[1.5px] border-ink rounded-[18px] shadow-stamp mb-8">
           <div>
             <p className="font-display font-black text-lg leading-tight">
               Never miss a <em className="text-mustard italic">pow day</em>.
             </p>
-            <p className="text-cream-50/80 text-sm mt-1">Email alerts when your resorts hit your snow threshold.</p>
+            <p className="hidden sm:block text-cream-50/80 text-sm mt-1">Email alerts when your resorts hit your snow threshold.</p>
           </div>
           <PowderAlertSignup resorts={resorts} />
         </div>
+
+        <Link href="/compare" className="inline-flex min-h-11 items-center rounded-full border-[1.5px] border-ink px-4 py-2 mb-4 text-sm font-semibold hover:bg-ink/5">
+          Compare resorts
+        </Link>
 
         {/* Section header */}
         <div className="flex items-end justify-between gap-4 mb-8 flex-wrap">
@@ -770,13 +800,13 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                <div className="resort-snap-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
                   {visibleResorts.map((resort, i) => (
                     <div
                       key={resort.id}
                       onMouseEnter={() => setHoveredSlug(resort.slug)}
                       onMouseLeave={() => setHoveredSlug(null)}
-                      style={{ contentVisibility: "auto", containIntrinsicSize: "0 560px" }}
+                      className="resort-snap-card"
                     >
                       <SummitResortCard
                         resort={resort}

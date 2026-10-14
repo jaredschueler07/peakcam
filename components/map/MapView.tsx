@@ -99,6 +99,12 @@ interface MapViewProps {
   variant?: "sidebar" | "fullpage";
   /** Radar frames (past + nowcast, oldest first) fetched server-side */
   radarFrames?: RadarFrame[];
+  /**
+   * Fired when MapLibre itself fails to create a WebGL context (the probe in
+   * the parent can pass while the real context creation still fails). The
+   * parent may use this to swap in a no-WebGL notice.
+   */
+  onWebGLError?: () => void;
   className?: string;
 }
 
@@ -112,6 +118,7 @@ export default function MapView({
   onViewResort,
   variant = "sidebar",
   radarFrames = [],
+  onWebGLError,
   className = "",
 }: MapViewProps) {
   const mapRef = useRef<MapRef>(null);
@@ -442,6 +449,21 @@ export default function MapView({
     [onViewResort],
   );
 
+  // MapLibre reports a failed WebGL context creation through the map's `error`
+  // event. Surface only WebGL-shaped failures to the parent; everything else
+  // (tile 404s, style hiccups) is non-fatal and stays a console warning.
+  const handleMapError = useCallback(
+    (e: { error?: Error }) => {
+      const message = e?.error?.message ?? "";
+      if (/webgl/i.test(message)) {
+        onWebGLError?.();
+      } else if (process.env.NODE_ENV !== "production") {
+        console.warn("[MapView] map error:", message || e);
+      }
+    },
+    [onWebGLError],
+  );
+
   // ── Render ──────────────────────────────────────────────────────
 
   return (
@@ -458,6 +480,7 @@ export default function MapView({
         onMouseLeave={onMouseLeave}
         onMouseMove={onMouseMove}
         onClick={onClick}
+        onError={handleMapError}
         attributionControl={{}}
         /* Sidebar map lives inside a scrollable page — require a modifier /
            two-finger gesture to pan/zoom so it doesn't hijack page scroll.

@@ -5,7 +5,7 @@ import { hasFreshSnowForecast } from "@/lib/snow-forecast";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
-import { Camera, ArrowLeftRight, TrendingUp, TrendingDown, Minus, Snowflake, Sun, Thermometer, Heart } from "lucide-react";
+import { Camera, TrendingUp, TrendingDown, Minus, Snowflake, Sun, Thermometer, Heart } from "lucide-react";
 import type { ResortWithData, ConditionRating, SnowTrend, SnowOutlook } from "@/lib/types";
 import { isOffSeason, OFF_SEASON_COLOR } from "@/lib/map-utils";
 import { trackResortCardClick } from "@/lib/posthog";
@@ -194,10 +194,10 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
         {/* Main card link */}
         <Link
           href={`/resorts/${resort.slug}`}
-          className="block p-6"
+          className="block p-4 sm:p-5"
           onClick={() => trackResortCardClick(resort.name, resort.slug)}
         >
-          <div className="relative space-y-5">
+          <div className="relative space-y-3">
             {/* Eyebrow: state / region */}
             <div className="flex items-center gap-2 font-mono font-bold text-[10.5px] text-bark uppercase tracking-[0.14em]">
               <span className="px-2 py-0.5 bg-ink text-cream-50 rounded-full">
@@ -207,7 +207,7 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
             </div>
 
             {/* Resort name — Fraunces 900, tight */}
-            <h3 className="font-display font-black text-[28px] leading-[0.95] tracking-[-0.02em] text-ink">
+            <h3 className="font-display font-black text-[25px] leading-[0.95] tracking-[-0.02em] text-ink">
               {resort.name}
             </h3>
 
@@ -216,10 +216,10 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
                 up and are therefore momentarily wrong; the sr-only line below
                 carries the real, final number (and never a live region, so
                 nothing is announced mid-animation). */}
-            <div className="text-center py-4">
+            <div className="text-center py-1">
               <div
                 aria-hidden="true"
-                className="font-display font-black text-[6.5rem] leading-none text-ink tracking-[-0.04em] group-hover:scale-[1.03] transition-transform duration-200"
+                className="font-display font-black text-[5rem] leading-none text-ink tracking-[-0.04em] group-hover:scale-[1.03] transition-transform duration-200"
                 style={{ fontVariantNumeric: "tabular-nums" }}
               >
                 {baseDepth > 0 ? (
@@ -242,7 +242,7 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
             </div>
 
             {/* Data strip — dashed bark rule top/bottom, mono numbers */}
-            <div className="grid grid-cols-3 gap-4 py-4 border-t border-b border-dashed border-bark/60">
+            <div className="grid grid-cols-3 gap-3 py-3 border-t border-b border-dashed border-bark/60">
               <div className="text-center">
                 <div className="font-mono font-bold text-xl text-ink tabular-nums">{snow24h}&quot;</div>
                 <div className="font-mono text-[10px] text-bark uppercase tracking-widest mt-0.5">24H</div>
@@ -262,7 +262,7 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
             </div>
 
             {/* Footer: condition chip + trend + cameras + favorite */}
-            <div className="flex items-center justify-between pt-1">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
               <div className="flex items-center gap-2">
                 {offSeason ? (
                   /* border matches MapPopupCard/MapBottomSheet's off-season chip */
@@ -299,7 +299,7 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 text-bark-dk" role="img" aria-label={`${camCount} webcam${camCount !== 1 ? 's' : ''} available`}>
+                <div className="flex items-center gap-1 rounded-full bg-alpen px-2.5 py-1 text-cream-50" role="img" aria-label={`${camCount} webcam${camCount !== 1 ? 's' : ''} available`}>
                   <Camera size={14} strokeWidth={2.3} />
                   <span className="font-mono font-bold text-[13px] tabular-nums">{camCount}</span>
                 </div>
@@ -321,19 +321,6 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
           </div>
         </Link>
 
-        {/* Ghost compare button — separate link outside main card link */}
-        <div className="px-6 pb-5 pt-0">
-          <Link
-            href={`/compare?resorts=${resort.slug}`}
-            className="flex items-center justify-center gap-1.5 w-full py-2 rounded-full
-              border-[1.5px] border-ink/20 text-bark hover:text-ink hover:border-ink
-              hover:bg-ink/5 transition-colors duration-150
-              text-[12px] font-bold tracking-wide uppercase"
-          >
-            <ArrowLeftRight size={12} strokeWidth={2.5} />
-            Compare
-          </Link>
-        </div>
 
       </div>
     </motion.div>

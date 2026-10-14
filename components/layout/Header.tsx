@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import type { User } from "@supabase/supabase-js";
@@ -24,6 +24,7 @@ export const navLinks = [
 
 export function Header({ onSearch, showSearch = true }: HeaderProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -52,6 +53,17 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
     onSearch?.(e.target.value);
   }
 
+  // Without an `onSearch` prop there is no local list to filter (only the home
+  // page holds the resort data), so submitting hands the query to the home
+  // page's search via ?q=.
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (onSearch) return;
+    const q = query.trim();
+    if (!q) return;
+    router.push(`/?q=${encodeURIComponent(q)}`);
+  }
+
   function clearSearch() {
     setQuery("");
     onSearch?.("");
@@ -62,8 +74,8 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
     /* pc-on-ink — the header surface is ink, so the global ember
        :focus-visible ring (3.1:1 on ink) is upgraded to the cream ring
        (14.7:1 on ink) by the rule in app/globals.css. */
-    <header className="pc-on-ink sticky top-0 z-50 h-[64px] flex items-center gap-5 px-6 md:px-7
-      bg-ink text-cream-50 border-b-[1.5px] border-ink">
+    <header className="pc-on-ink sticky top-0 z-50 h-14 md:h-[64px] flex items-center gap-3 md:gap-5 px-4 md:px-7
+      bg-ink/90 md:bg-ink backdrop-blur-md text-cream-50 border-b-[1.5px] border-ink">
 
       {/* Logo — Fraunces display, italic, PEAK cream + CAM alpen */}
       <Link href="/" className="flex items-center flex-shrink-0 group">
@@ -75,7 +87,11 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
 
       {/* Search — cream bg, ink border, stamp shadow, pill radius */}
       {showSearch && (
-        <div className="flex-1 max-w-[420px] relative hidden sm:block">
+        <form
+          role="search"
+          onSubmit={handleSubmit}
+          className="flex-1 max-w-[420px] relative hidden sm:block"
+        >
           <Search size={15} strokeWidth={2.5}
             className="absolute left-4 top-1/2 -translate-y-1/2 text-bark pointer-events-none" />
           {/* 16px base font keeps iOS Safari from zooming the viewport on focus;
@@ -86,6 +102,7 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
             type="text"
             value={query}
             onChange={handleChange}
+            aria-label="Search resorts"
             placeholder="Search resorts, states, regions…"
             className="w-full bg-cream-50 border-[1.5px] border-ink
               rounded-full shadow-[2px_2px_0_#2a1f14]
@@ -95,6 +112,7 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
           />
           {query && (
             <button
+              type="button"
               onClick={clearSearch}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-bark
                 text-lg px-1 hover:text-ink transition-colors duration-150"
@@ -103,7 +121,8 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
               ×
             </button>
           )}
-        </div>
+          <button type="submit" className="sr-only">Search</button>
+        </form>
       )}
 
       {/* Desktop Nav */}
@@ -153,8 +172,9 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
 
       {/* Mobile Menu Toggle */}
       <button
-        className="md:hidden ml-auto p-2 text-cream-50/80 hover:text-cream-50 flex-shrink-0"
+        className="md:hidden ml-auto min-h-11 min-w-11 p-2 text-cream-50/80 hover:text-cream-50 flex-shrink-0"
         onClick={() => setIsMenuOpen(!isMenuOpen)}
+        aria-expanded={isMenuOpen}
         aria-label="Toggle menu"
       >
         {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -162,7 +182,7 @@ export function Header({ onSearch, showSearch = true }: HeaderProps) {
 
       {/* Mobile Menu Overlay */}
       {isMenuOpen && (
-        <div className="absolute top-[64px] left-0 right-0 bg-ink border-b-[1.5px] border-ink shadow-lg p-4 flex flex-col gap-1 md:hidden">
+        <div className="absolute top-full left-0 right-0 bg-ink border-b-[1.5px] border-ink shadow-lg p-4 flex flex-col gap-1 md:hidden">
           {navLinks.filter((link) => !("authOnly" in link && link.authOnly) || user).map((link) => (
             <Link
               key={link.href}

@@ -104,23 +104,25 @@ export default async function Home() {
   };
 
   return (
-    <main id="main-content">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(resortListJsonLd) }}
-      />
-      <PeakHero resortCount={resorts.length} />
-      <PowderTicker alerts={powderAlerts} />
-      {snowCams.length > 0 && (
+    <>
+      <main id="main-content">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(resortListJsonLd) }}
+        />
+        <PeakHero resortCount={resorts.length} />
+        <PowderTicker alerts={powderAlerts} />
+        {snowCams.length > 0 && (
+          <Suspense fallback={<div className="h-96 animate-pulse bg-surface rounded-lg" />}>
+            <SnowCams snowCams={snowCams} />
+          </Suspense>
+        )}
+        <BrowsePage resorts={resorts} radarFrames={radarFrames} />
         <Suspense fallback={<div className="h-96 animate-pulse bg-surface rounded-lg" />}>
-          <SnowCams snowCams={snowCams} />
+          <LiveWebcams cams={featuredCams} resortCount={resorts.length} />
         </Suspense>
-      )}
-      <BrowsePage resorts={resorts} radarFrames={radarFrames} />
-      <Suspense fallback={<div className="h-96 animate-pulse bg-surface rounded-lg" />}>
-        <LiveWebcams cams={featuredCams} resortCount={resorts.length} />
-      </Suspense>
+      </main>
       <PeakFooter />
-    </main>
+    </>
   );
 }

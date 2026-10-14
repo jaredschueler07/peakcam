@@ -1,20 +1,23 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import { Bell, Check, Loader2, X, Search } from "lucide-react";
 import type { ResortWithData } from "@/lib/types";
 import { track, EVENTS } from "@/lib/analytics-events";
 
 interface Props {
   resorts: ResortWithData[];
+  /** Open the dialog on mount — used by the dedicated /alerts page. */
+  defaultOpen?: boolean;
 }
 
 const THRESHOLD_OPTIONS = [3, 6, 12, 18, 24];
 
 type Step = "pick" | "email" | "done";
 
-export function PowderAlertSignup({ resorts }: Props) {
-  const [open, setOpen] = useState(false);
+export function PowderAlertSignup({ resorts, defaultOpen = false }: Props) {
+  const [open, setOpen] = useState(defaultOpen);
   const [step, setStep] = useState<Step>("pick");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -24,14 +27,13 @@ export function PowderAlertSignup({ resorts }: Props) {
   const [error, setError] = useState<string | null>(null);
   const emailRef = useRef<HTMLInputElement>(null);
 
-  // Close on Escape
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const continueRef = useRef<HTMLButtonElement>(null);
+  useBodyScrollLock(open);
+
+  // The native top layer keeps the picker above sticky headers and contains focus.
   useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleClose();
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
+    if (open) dialogRef.current?.showModal();
   }, [open]);
 
   // Focus email input when step changes
@@ -133,16 +135,17 @@ export function PowderAlertSignup({ resorts }: Props) {
 
       {/* Modal backdrop */}
       {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4
-                     bg-black/80 backdrop-blur-sm"
+        <dialog
+          ref={dialogRef}
+          onCancel={(event) => { event.preventDefault(); handleClose(); }}
+          className="fixed inset-0 m-auto h-dvh max-h-none w-full max-w-none items-center justify-center bg-transparent p-2 text-text-base open:flex sm:p-4 backdrop:bg-black/80 backdrop:backdrop-blur-sm"
           onClick={(e) => e.target === e.currentTarget && handleClose()}
           aria-modal="true"
           role="dialog"
           aria-label="Powder alert signup"
         >
           <div className="w-full max-w-lg bg-surface border border-border rounded-xl
-                          overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                          overflow-hidden shadow-2xl flex flex-col max-h-[calc(100dvh-1rem)] sm:max-h-[90dvh]">
 
             {/* Modal header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
@@ -175,6 +178,7 @@ export function PowderAlertSignup({ resorts }: Props) {
                       type="text"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
+                      aria-label="Search resorts"
                       placeholder="Search resorts..."
                       className="w-full pl-9 pr-3 py-2 bg-bg border border-border rounded-lg
                                  text-text-base text-[16px] md:text-sm placeholder:text-text-muted outline-none focus:border-cyan/50"
@@ -187,8 +191,11 @@ export function PowderAlertSignup({ resorts }: Props) {
                   )}
                 </div>
 
+                <button type="button" className="sr-only focus:not-sr-only focus:px-5 focus:py-3"
+                  onClick={() => continueRef.current?.focus()}>Skip to Continue</button>
+
                 {/* Scrollable resort list */}
-                <div className="overflow-y-auto flex-1 px-5 pb-2">
+                <div className="min-h-0 overflow-y-auto overscroll-contain flex-1 px-5 pb-2">
                   <div className="space-y-1.5">
                     {filteredResorts.map((resort) => {
                       const isOn = selected.has(resort.id);
@@ -199,30 +206,25 @@ export function PowderAlertSignup({ resorts }: Props) {
                              }`}>
                           <div className="flex items-center gap-3 px-3 py-2.5 pointer-coarse:min-h-11">
                             <button
+                              type="button"
                               onClick={() => toggleResort(resort.id)}
-                              className={`w-4.5 h-4.5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
-                                isOn ? "bg-cyan border-cyan" : "border-border"
-                              }`}
-                              style={{ width: 18, height: 18 }}
-                              aria-label={isOn ? `Remove ${resort.name}` : `Add ${resort.name}`}
+                              aria-pressed={isOn}
+                              className="flex min-h-11 flex-1 min-w-0 items-center gap-3 text-left"
                             >
-                              {isOn && <Check size={10} className="text-bg" strokeWidth={3} />}
-                            </button>
-
-                            <button
-                              onClick={() => toggleResort(resort.id)}
-                              className="flex-1 min-w-0 text-left"
-                            >
-                              <p className={`font-medium text-sm truncate ${isOn ? "text-text-base" : "text-text-subtle"}`}>
-                                {resort.name}
-                              </p>
-                              <p className="text-text-muted text-xs">{resort.state}</p>
+                              <span aria-hidden className={`h-[18px] w-[18px] shrink-0 rounded border flex items-center justify-center ${isOn ? "bg-cyan border-cyan" : "border-border"}`}>
+                                {isOn && <Check size={10} className="text-bg" strokeWidth={3} />}
+                              </span>
+                              <span className="min-w-0">
+                                <span className={`block font-medium text-sm truncate ${isOn ? "text-text-base" : "text-text-subtle"}`}>{resort.name}</span>
+                                <span className="block text-text-muted text-xs">{resort.state}</span>
+                              </span>
                             </button>
 
                             {isOn && (
                               <div className="flex items-center gap-1.5 shrink-0">
                                 <span className="text-text-muted text-[11px]">≥</span>
                                 <select
+                                  aria-label={`Snow threshold for ${resort.name}`}
                                   value={thresholds[resort.id] ?? 6}
                                   onChange={(e) => {
                                     e.stopPropagation();
@@ -231,7 +233,7 @@ export function PowderAlertSignup({ resorts }: Props) {
                                       [resort.id]: Number(e.target.value),
                                     }));
                                   }}
-                                  className="bg-surface2 border border-border rounded px-1.5 py-1
+                                  className="bg-surface2 border border-border rounded px-1.5 py-1 min-h-11
                                              text-text-base text-xs outline-none focus:border-cyan/50"
                                   onClick={(e) => e.stopPropagation()}
                                 >
@@ -251,12 +253,17 @@ export function PowderAlertSignup({ resorts }: Props) {
                   </div>
                 </div>
 
-                <div className="px-5 py-4 border-t border-border shrink-0">
+                <div className="px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-border shrink-0 bg-surface">
+                  <p id="powder-selection-help" className="text-text-subtle text-xs mb-2" aria-live="polite">
+                    {selected.size === 0 ? "Select at least one resort to continue." : `${selected.size} resort${selected.size === 1 ? "" : "s"} selected. Ready to continue.`}
+                  </p>
                   <button
                     onClick={() => { if (selected.size > 0) { setStep("email"); setError(null); } }}
-                    disabled={selected.size === 0}
-                    className="w-full py-2.5 pointer-coarse:min-h-11 rounded-lg bg-cyan text-bg font-semibold text-sm
-                               hover:bg-cyan/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    ref={continueRef}
+                    aria-describedby="powder-selection-help"
+                    aria-disabled={selected.size === 0}
+                    className="w-full py-3 min-h-12 rounded-lg bg-cyan text-bg font-semibold text-sm
+                               hover:bg-cyan/90 transition-colors aria-disabled:opacity-40 aria-disabled:cursor-not-allowed"
                   >
                     Continue →
                   </button>
@@ -266,26 +273,41 @@ export function PowderAlertSignup({ resorts }: Props) {
 
             {/* Step: Email */}
             {step === "email" && (
-              <div className="px-5 py-6 space-y-4">
+              <div className="min-h-0 overflow-y-auto px-5 py-6 space-y-4">
                 <p className="text-text-subtle text-sm">
                   Alerts set up for <strong className="text-text-base">{selected.size}</strong> resort{selected.size !== 1 ? "s" : ""}.
                   Where should we send them?
                 </p>
 
-                <input
-                  ref={emailRef}
-                  type="email"
-                  value={email}
-                  onChange={(e) => { setEmail(e.target.value); setError(null); }}
-                  onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-                  placeholder="your@email.com"
-                  autoComplete="email"
-                  inputMode="email"
-                  className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text-base
-                             placeholder:text-text-muted outline-none focus:border-cyan/50 text-[16px] md:text-sm"
-                />
+                <div>
+                  <label
+                    htmlFor="powder-alert-email"
+                    className="block text-text-muted text-xs font-medium mb-1.5"
+                  >
+                    Email address
+                  </label>
+                  <input
+                    id="powder-alert-email"
+                    ref={emailRef}
+                    type="email"
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); setError(null); }}
+                    onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+                    placeholder="your@email.com"
+                    autoComplete="email"
+                    inputMode="email"
+                    aria-invalid={error ? true : undefined}
+                    aria-describedby={error ? "powder-alert-email-error" : undefined}
+                    className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text-base
+                               placeholder:text-text-muted outline-none focus:border-cyan/50 text-[16px] md:text-sm"
+                  />
+                </div>
 
-                {error && <p className="text-red-400 text-sm">{error}</p>}
+                {error && (
+                  <p id="powder-alert-email-error" className="text-red-400 text-sm">
+                    {error}
+                  </p>
+                )}
 
                 <div className="flex gap-3">
                   <button
@@ -318,7 +340,7 @@ export function PowderAlertSignup({ resorts }: Props) {
 
             {/* Step: Done */}
             {step === "done" && (
-              <div className="px-5 py-10 text-center space-y-4">
+              <div className="min-h-0 overflow-y-auto px-5 py-10 text-center space-y-4">
                 <div className="w-14 h-14 rounded-full bg-cyan/10 border border-cyan/30 flex items-center
                                 justify-center mx-auto">
                   <Check size={24} className="text-cyan" />
@@ -342,7 +364,7 @@ export function PowderAlertSignup({ resorts }: Props) {
               </div>
             )}
           </div>
-        </div>
+        </dialog>
       )}
     </>
   );

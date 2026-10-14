@@ -5,11 +5,11 @@ import Link from "next/link";
 // dashed bark rules between sections, mono caption row.
 export function PeakFooter() {
   return (
-    <footer className="relative bg-cream border-t-[1.5px] border-ink pt-14 pb-10 px-6">
+    <footer className="relative bg-cream border-t-[1.5px] border-ink pt-7 pb-6 md:pt-14 md:pb-10 px-4 md:px-6">
       <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-10">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-10 mb-6 md:mb-10">
           {/* Brand */}
-          <div className="md:col-span-2">
+          <div className="col-span-2">
             <div className="flex items-center gap-3 mb-4">
               <span className="inline-flex items-center justify-center w-11 h-11 rounded-full bg-ink border-[1.5px] border-ink shadow-stamp-sm">
                 <Mountain className="text-alpen" size={22} strokeWidth={2.25} />
@@ -69,7 +69,7 @@ export function PeakFooter() {
                 { href: "/snow-report", label: "Snow reports" },
                 { href: "/compare", label: "Compare" },
                 { href: "/map", label: "Map" },
-                { href: "/alerts/manage", label: "Powder alerts" },
+                { href: "/alerts", label: "Powder alerts" },
               ].map((item) => (
                 <li key={item.href}>
                   <Link
@@ -121,7 +121,7 @@ export function PeakFooter() {
               &copy; {new Date().getFullYear()} PeakCam · Updated every 5 min
             </p>
             <Link
-              href="/alerts/manage"
+              href="/alerts"
               className="inline-flex items-center gap-1.5 font-semibold text-[13px] text-alpen-dk
                          hover:text-alpen transition-colors duration-150"
             >

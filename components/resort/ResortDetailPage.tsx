@@ -122,7 +122,7 @@ function CamPlayer({
           </div>
         </a>
         <div className="absolute top-2 right-2 z-20">
-          <FavoriteButton itemId={cam.id} itemType="cam" variant="ghost" className="bg-surface/50 backdrop-blur-sm" />
+          <FavoriteButton itemId={cam.id} itemType="cam" label={cam.name} variant="ghost" className="bg-surface/50 backdrop-blur-sm" />
         </div>
       </div>
     );
@@ -172,7 +172,7 @@ function CamPlayer({
           </>
         )}
         <div className="absolute top-2 right-2 z-20">
-          <FavoriteButton itemId={cam.id} itemType="cam" variant="ghost" className="bg-surface/50 backdrop-blur-sm" />
+          <FavoriteButton itemId={cam.id} itemType="cam" label={cam.name} variant="ghost" className="bg-surface/50 backdrop-blur-sm" />
         </div>
       </div>
     );
@@ -225,7 +225,7 @@ function CamPlayer({
 
       {/* Favorite Button (overlay) */}
       <div className="absolute top-2 right-2 z-20">
-        <FavoriteButton itemId={cam.id} itemType="cam" variant="ghost" className="bg-surface/50 backdrop-blur-sm" />
+        <FavoriteButton itemId={cam.id} itemType="cam" label={cam.name} variant="ghost" className="bg-surface/50 backdrop-blur-sm" />
       </div>
     </div>
   );
@@ -371,7 +371,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
                 <h1 className="text-3xl md:text-4xl font-heading font-bold text-text-base uppercase tracking-wider leading-tight">
                   {resort.name}
                 </h1>
-                <FavoriteButton itemId={resort.id} itemType="resort" size="md" variant="outline" className="mt-1" />
+                <FavoriteButton itemId={resort.id} itemType="resort" label={resort.name} size="md" variant="outline" className="mt-1" />
               </div>
               <p className="text-text-muted text-sm mt-1.5">
                 {resort.region} · {resort.state}

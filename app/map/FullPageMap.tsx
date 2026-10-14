@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -29,6 +29,31 @@ interface Props {
 export function FullPageMap({ resorts, radarFrames }: Props) {
   const router = useRouter();
   const [selectedResort, setSelectedResort] = useState<ResortWithData | null>(null);
+  // null = not probed yet (render the map as usual so SSR/first paint is
+  // unchanged); false = this browser can't give us a WebGL context.
+  const [webglSupported, setWebglSupported] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    // Probed off the effect's synchronous path so the first commit isn't
+    // immediately invalidated (and so the state stays `null` → map renders).
+    const raf = requestAnimationFrame(() => {
+      let supported = false;
+      try {
+        const canvas = document.createElement("canvas");
+        supported = Boolean(
+          canvas.getContext("webgl2") ||
+            canvas.getContext("webgl") ||
+            canvas.getContext("experimental-webgl"),
+        );
+      } catch {
+        supported = false;
+      }
+      setWebglSupported(supported);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  const handleWebGLError = useCallback(() => setWebglSupported(false), []);
 
   const handleResortSelect = useCallback(
     (slug: string) => {
@@ -67,17 +92,47 @@ export function FullPageMap({ resorts, radarFrames }: Props) {
         </Link>
       </div>
 
-      {/* Full-page map */}
-      <MapView
-        resorts={resorts}
-        onResortSelect={handleResortSelect}
-        onViewResort={handleViewResort}
-        radarFrames={radarFrames}
-        variant="fullpage"
-      />
+      {/* Full-page map — or a friendly notice when WebGL is unavailable */}
+      {webglSupported === false ? (
+        <div
+          role="status"
+          className="pc-topo h-full w-full flex items-center justify-center px-6"
+        >
+          <div className="max-w-md text-center">
+            <h2 className="font-display text-2xl sm:text-3xl text-ink">The map needs WebGL</h2>
+            <p className="mt-3 text-bark text-sm sm:text-base leading-relaxed">
+              This browser could not start WebGL, so the interactive map can&rsquo;t run here. Try
+              another browser, or close some tabs and reload.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <Link
+                href="/"
+                className="inline-flex items-center gap-1.5 px-3 py-2 pointer-coarse:min-h-11 pointer-coarse:px-4 bg-cream-50 border-[1.5px] border-ink rounded-full text-ink text-sm font-semibold shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px] transition-[transform,box-shadow] duration-100"
+              >
+                Browse all resorts
+              </Link>
+              <Link
+                href="/snow-report"
+                className="inline-flex items-center gap-1.5 px-3 py-2 pointer-coarse:min-h-11 pointer-coarse:px-4 bg-cream-50 border-[1.5px] border-ink rounded-full text-ink text-sm font-semibold shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px] transition-[transform,box-shadow] duration-100"
+              >
+                Snow report
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <MapView
+          resorts={resorts}
+          onResortSelect={handleResortSelect}
+          onViewResort={handleViewResort}
+          radarFrames={radarFrames}
+          variant="fullpage"
+          onWebGLError={handleWebGLError}
+        />
+      )}
 
       {/* Mobile bottom sheet */}
-      {selectedResort && (
+      {webglSupported !== false && selectedResort && (
         <MapBottomSheet
           resort={selectedResort}
           onClose={() => setSelectedResort(null)}

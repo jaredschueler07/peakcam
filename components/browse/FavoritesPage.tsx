@@ -33,7 +33,7 @@ export function FavoritesPage({ resorts }: Props) {
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} redirectTo="/favorites" />}
       <Header showSearch={false} />
 
-      <div className="max-w-screen-2xl mx-auto px-4 py-8 md:px-8">
+      <main id="main-content" className="max-w-screen-2xl mx-auto px-4 py-8 md:px-8">
         <div className="mb-8">
           <h1 className="font-display text-5xl md:text-6xl text-text-base mb-2">
             MY FAVORITES
@@ -95,7 +95,7 @@ export function FavoritesPage({ resorts }: Props) {
             ))}
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }
