@@ -243,3 +243,81 @@ export type ResolvedWidget =
   | { kind: "resort"; resort: Resort; snow: SnowReport | null; cams: Cam[] }
   | { kind: "cam"; cam: Cam; resort: Resort | null }
   | { kind: "missing"; type: FavoriteType };
+
+// ── Powder Probabilities (WeatherNext 3, migration 021) ──────
+// Derived P(new snow >= 6/8/12 in) per resort and window, from
+// per-member ensemble accumulations — never summed per-hour
+// percentiles. NOT part of ResortWithData on purpose: browse/map
+// must not pay for this until calibration + terms gates pass and a
+// surface is approved. See docs/weathernext-powder-probability.md.
+export type PowderWindowKind = "next_72h" | "best_7d";
+export type PowderProbabilityKind = "raw_frequency" | "calibrated";
+
+/** One `powder_probabilities` row (also the `latest_powder_probabilities` view shape). */
+export interface PowderProbability {
+  resort_id: string;
+  /** WeatherNext run initialization time (ISO). */
+  model_init_at: string;
+  /** t0: first issuable hour (>= init + ~7h45m dissemination latency). */
+  horizon_start_at: string;
+  window_kind: PowderWindowKind;
+  valid_start: string;
+  valid_end: string;
+  /** Raw member frequencies until a calibrated variant exists. */
+  probability_kind: PowderProbabilityKind;
+  calibration_version: string | null;
+  p_ge_6in: number;   // 0..1
+  p_ge_8in: number;   // 0..1
+  p_ge_12in: number;  // 0..1
+  members_total: number;
+  members_valid: number;
+  /** True when fewer than half the members were valid for the window. */
+  degraded: boolean;
+  members_ge_6in: number;
+  members_ge_8in: number;
+  members_ge_12in: number;
+  /** Distribution of per-member window totals, inches of snow. */
+  p10_snow_in: number;
+  p25_snow_in: number;
+  p50_snow_in: number;
+  p75_snow_in: number;
+  p90_snow_in: number;
+  mean_snow_in: number;
+  horizon_truncated: boolean;
+  source: string;
+  model_version: string | null;
+  method_version: string;
+  computed_at: string;
+  created_at: string;
+}
+
+/** The window fields a consumer of a grouped forecast needs. */
+export interface PowderProbabilityWindow {
+  window_kind: PowderWindowKind;
+  valid_start: string;
+  valid_end: string;
+  p_ge_6in: number;
+  p_ge_8in: number;
+  p_ge_12in: number;
+  p10_snow_in: number;
+  p50_snow_in: number;
+  p90_snow_in: number;
+  degraded: boolean;
+}
+
+/**
+ * The latest run for one resort, grouped by window. `model_init_at`
+ * is the run time (surface it as such — windows are anchored at
+ * `horizon_start_at`, not at "now"). `best7d` is null when the
+ * latest run has no matching best-window row.
+ */
+export interface PowderProbabilityForecast {
+  resort_id: string;
+  model_init_at: string;
+  horizon_start_at: string;
+  computed_at: string;
+  probability_kind: PowderProbabilityKind;
+  method_version: string;
+  next72h: PowderProbabilityWindow;
+  best7d: PowderProbabilityWindow | null;
+}

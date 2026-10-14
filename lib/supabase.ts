@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
-import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition } from "./types";
+import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition, PowderProbability, PowderProbabilityForecast, PowderProbabilityWindow } from "./types";
 import type { ResortOpening } from "./openings";
 import { withResolvedCamNames } from "./cam-name";
 
@@ -247,6 +247,77 @@ export async function getResortOpenings(): Promise<ResortOpening[]> {
     throw error;
   }
   return data ?? [];
+}
+
+// ─────────────────────────────────────────────────────────────
+// Powder probabilities (WeatherNext 3, migration 021)
+// ─────────────────────────────────────────────────────────────
+
+function toPowderWindow(row: PowderProbability): PowderProbabilityWindow {
+  return {
+    window_kind: row.window_kind,
+    valid_start: row.valid_start,
+    valid_end: row.valid_end,
+    p_ge_6in: row.p_ge_6in,
+    p_ge_8in: row.p_ge_8in,
+    p_ge_12in: row.p_ge_12in,
+    p10_snow_in: row.p10_snow_in,
+    p50_snow_in: row.p50_snow_in,
+    p90_snow_in: row.p90_snow_in,
+    degraded: row.degraded,
+  };
+}
+
+/**
+ * Latest derived powder probabilities for one resort, grouped by
+ * window (migration 021's `latest_powder_probabilities` view).
+ *
+ * Optional enrichment, never core data: every failure mode returns
+ * null so callers render nothing. That covers a database without
+ * migration 021 yet (MISSING_TABLE_CODES), the pre-gate RLS posture
+ * (zero rows until calibration + terms review pass), a resort with
+ * no forecast, and a partial run missing its `next_72h` row. A
+ * `best_7d` row is only paired when it comes from the same run and
+ * method as the `next_72h` row — mixing runs would pair one run's
+ * probabilities with another run's dates. Freshness is the caller's
+ * decision: runs disseminate ~7h45m after init, so surface
+ * `model_init_at`; windows anchor at `horizon_start_at`, not "now".
+ * No UI calls this yet.
+ */
+export async function getPowderProbabilities(resortId: string): Promise<PowderProbabilityForecast | null> {
+  const { data, error } = await supabase
+    .from("latest_powder_probabilities")
+    .select("*")
+    .eq("resort_id", resortId);
+
+  if (error) {
+    if (MISSING_TABLE_CODES.has(error.code)) {
+      console.warn("[PeakCam] latest_powder_probabilities missing — apply migration 021; powder probabilities unavailable");
+    } else {
+      console.warn("[PeakCam] Could not fetch powder probabilities:", error.message);
+    }
+    return null;
+  }
+
+  const rows = (data ?? []) as PowderProbability[];
+  const next = rows.find((r) => r.window_kind === "next_72h");
+  if (!next) return null;
+  const best = rows.find(
+    (r) => r.window_kind === "best_7d"
+      && r.model_init_at === next.model_init_at
+      && r.method_version === next.method_version,
+  );
+
+  return {
+    resort_id: next.resort_id,
+    model_init_at: next.model_init_at,
+    horizon_start_at: next.horizon_start_at,
+    computed_at: next.computed_at,
+    probability_kind: next.probability_kind,
+    method_version: next.method_version,
+    next72h: toPowderWindow(next),
+    best7d: best ? toPowderWindow(best) : null,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────

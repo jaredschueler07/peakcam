@@ -83,3 +83,7 @@ REPORT-*.md
 
 # Local rider/gameplay review captures
 /artifacts/drop-in-forest/
+
+# WeatherNext harness: project-local Python environment (recreate with uv sync)
+scripts/weathernext/.venv/
+scripts/weathernext/**/__pycache__/
