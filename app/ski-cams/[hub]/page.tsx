@@ -125,6 +125,11 @@ export default async function HubPage({ params }: { params: Params }) {
   const linkedRegionSlugs = new Set(groupByRegion(allResorts).map((group) => group.hub.slug));
   const stateHubs = hub.kind === "region" ? hub.stateCodes.map(stateHub) : neighbouringStateHubs(hub.key, allResorts);
   const regionHubs = hub.kind === "region" ? [] : regionHubsForState(hub.key, allResorts);
+  // /opening-dates groups its Northern table by state under the state hub's
+  // own slug (lib/openings.ts groupOpeningsByState), so a state hub can link
+  // to its section. Region hubs and Southern-hemisphere hubs have no section.
+  const openingDatesHref =
+    hub.kind !== "region" && resorts.some((r) => r.lat >= 0) ? `/opening-dates#${hub.slug}` : "/opening-dates";
 
   const kindLine =
     hub.kind === "region"
@@ -254,7 +259,7 @@ export default async function HubPage({ params }: { params: Params }) {
         </section>
 
         <HubFaq faq={faq} label={hub.label} />
-        <HubLinks hub={hub} stateHubs={stateHubs} regionHubs={regionHubs} />
+        <HubLinks hub={hub} stateHubs={stateHubs} regionHubs={regionHubs} openingDatesHref={openingDatesHref} />
       </main>
       <PeakFooter />
     </>

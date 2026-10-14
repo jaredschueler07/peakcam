@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getAllResorts } from "@/lib/supabase";
 import { ComparePage } from "@/components/compare/ComparePage";
-import { parseCompareSlugs } from "@/lib/compare-params";
+import { isCompareIndexable, parseCompareSlugs } from "@/lib/compare-params";
 import type { ResortWithData } from "@/lib/types";
 
 import { SITE_URL as BASE_URL } from "@/lib/site";
@@ -41,6 +41,11 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
     // query param produces unbounded combinations that shouldn't each be
     // treated as a distinct indexable page.
     alternates: { canonical: pageUrl },
+    // The canonical alone was not enough: Google indexed `/compare?resorts=x`
+    // stubs and ranked them instead of /resorts/x for "<resort> cam" queries.
+    // noindex is a directive; `follow` keeps the resort links crawlable so
+    // the signals still flow to the pages that should rank.
+    ...(isCompareIndexable(slugs) ? {} : { robots: { index: false, follow: true } }),
     // The root layout's openGraph is replaced, not merged, once a page sets
     // its own — so siteName is repeated here.
     openGraph: {

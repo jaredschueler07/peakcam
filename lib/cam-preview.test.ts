@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Cam } from "./types";
-import { availableCameras, cameraPreviews } from "./cam-preview";
+import { availableCameras, cameraPreview, cameraPreviews } from "./cam-preview";
 const cam = (patch: Partial<Cam> = {}): Cam => ({ id: "image", resort_id: "resort", name: "Summit", elevation: null, embed_type: "image", embed_url: "https://cam.example/summit.jpg", youtube_id: null, is_active: true, auto_disabled: false, consecutive_failures: 0, last_checked_at: null, created_at: "2026-01-01", ...patch });
 test("counts only enabled cameras with a usable source and rejects non-web URLs", () => {
   const cams=[cam(),cam({id:"disabled",is_active:false}),cam({id:"auto",auto_disabled:true}),cam({id:"bad",embed_url:"javascript:alert(1)"}),cam({id:"empty",embed_url:null}),cam({id:"site",embed_type:"link"})];
@@ -30,4 +30,11 @@ test("supported player thumbnails use provider-published URLs and reject lookali
   assert.equal(cameraPreviews([brown])[0].src,"https://player.brownrice.com/snapshot/vailch21");
   assert.equal(cameraPreviews([cam({embed_type:"iframe",embed_url:"https://aspen.roundshot.com/aspen/"})])[0].src,"https://aspen.roundshot.com/cams/91/thumbnail");
   assert.deepEqual(cameraPreviews([cam({...brown,embed_url:"https://player.brownrice.com.evil.example/embed/vailch21"})]),[]);
+});
+test("cameraPreview resolves one cam's still and never throws on a malformed URL", () => {
+  assert.equal(cameraPreview(cam({embed_type:"iframe",embed_url:"https://player.brownrice.com/embed/mammothmain"}))?.src,"https://player.brownrice.com/snapshot/mammothmain");
+  assert.equal(cameraPreview(cam({embed_type:"youtube",youtube_id:"awxz_oIlJE0",embed_url:null}))?.src,"https://i.ytimg.com/vi/awxz_oIlJE0/hqdefault.jpg");
+  assert.equal(cameraPreview(cam({embed_type:"iframe",embed_url:"not a url"})),null);
+  assert.equal(cameraPreview(cam({embed_type:"iframe",embed_url:"https://g1.ipcamlive.com/player/player.php?alias=x"})),null);
+  assert.equal(cameraPreview(cam({embed_type:"link"})),null);
 });

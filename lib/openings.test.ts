@@ -5,6 +5,7 @@ import {
   CURRENT_SEASON,
   daysUntil,
   formatOpeningDate,
+  groupOpeningsByState,
   isIsoDay,
   isOpeningToday,
   openingStatus,
@@ -334,4 +335,49 @@ test("data/resort-openings.csv only names real resorts and well-formed, sourced 
       assert.ok(!(row.projected_open && row.confirmed_open), `${row.slug}: once confirmed, drop the projection`);
     }
   }
+});
+
+// ── By state ─────────────────────────────────────────────────
+
+test("groupOpeningsByState cuts the Northern table by state, keeps table order, and leaves the Andes out", () => {
+  const resorts = [
+    resort("abasin", "Arapahoe Basin"),
+    resort("keystone", "Keystone"),
+    resort("vail", "Vail"),
+    resort("alta", "Alta", 40.5, "UT"),
+    resort("portillo", "Portillo", -32.8, "Chile"),
+    resort("blank", "No State", 44, ""),
+  ];
+  const rows = [
+    opening({ resort_id: "abasin", confirmed_open: "2026-09-20" }), // open
+    opening({ resort_id: "keystone", projected_open: "2026-10-30" }),
+    opening({ resort_id: "vail", confirmed_open: "2026-11-13", projected_open: "2026-11-13" }),
+    opening({ resort_id: "alta", projected_open: "2026-11-20" }),
+    opening({ resort_id: "portillo", closing_date: "2026-10-04" }),
+  ];
+  const states = groupOpeningsByState(sortForTable(rows, resorts, TODAY), TODAY);
+  assert.deepEqual(states.map((s) => [s.key, s.label, s.slug]), [
+    ["CO", "Colorado", "colorado"],
+    ["UT", "Utah", "utah"],
+  ]);
+  const co = states[0];
+  // open → confirmed → projected, same order as the national table.
+  assert.deepEqual(co.rows.map((r) => r.resort.id), ["abasin", "vail", "keystone"]);
+  assert.equal(co.summary.open, 1);
+  assert.equal(co.summary.confirmed, 2);
+  assert.equal(co.summary.projected, 1);
+  assert.equal(co.summary.nextToOpen?.resort.id, "vail");
+  const ut = states[1];
+  assert.deepEqual(ut.rows.map((r) => r.resort.id), ["alta"]);
+  assert.equal(ut.summary.nextToOpen?.resort.id, "alta");
+  assert.equal(ut.summary.tba, 0);
+});
+
+test("groupOpeningsByState normalises state codes and lists TBA resorts alphabetically", () => {
+  const resorts = [resort("b", "Bravo", 44, "vt"), resort("a", "Alpha", 44, "VT")];
+  const states = groupOpeningsByState(sortForTable([], resorts, TODAY), TODAY);
+  assert.equal(states.length, 1);
+  assert.equal(states[0].label, "Vermont");
+  assert.deepEqual(states[0].rows.map((r) => r.resort.id), ["a", "b"]);
+  assert.equal(states[0].summary.tba, 2);
 });

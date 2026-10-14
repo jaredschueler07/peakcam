@@ -8,6 +8,12 @@ interface Props {
   stateHubs: StateHub[];
   /** State hubs only: region hubs with resorts in this state. */
   regionHubs: RegionGroup[];
+  /**
+   * `/opening-dates#<state>` for a state hub with Northern resorts, so the
+   * hub links to its own section of the opening-dates page rather than the
+   * top of the national table. Defaults to the bare page.
+   */
+  openingDatesHref?: string;
 }
 
 const pill =
@@ -30,7 +36,8 @@ function PillList({ title, children }: { title: string; children: ReactNode }) {
  * the pages that rank into the ones that don't. Every target here is a page
  * generateStaticParams emits — the callers filter with the lib/hubs helpers.
  */
-export function HubLinks({ hub, stateHubs, regionHubs }: Props) {
+export function HubLinks({ hub, stateHubs, regionHubs, openingDatesHref = "/opening-dates" }: Props) {
+  const stateOpenings = openingDatesHref.includes("#");
   const isRegion = hub.kind === "region";
   return (
     <section aria-labelledby="hub-links-heading" className="mt-14 space-y-6">
@@ -80,8 +87,8 @@ export function HubLinks({ hub, stateHubs, regionHubs }: Props) {
           </Link>
         </li>
         <li>
-          <Link href="/opening-dates" className={pill}>
-            Opening dates
+          <Link href={openingDatesHref} className={pill}>
+            {stateOpenings ? `${hub.label} opening dates` : "Opening dates"}
           </Link>
         </li>
         <li>

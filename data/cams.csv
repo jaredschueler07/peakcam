@@ -3,10 +3,13 @@ vail,Sun Up Bowl,11250,iframe,https://player.brownrice.com/embed/vailch11,,true
 vail,Back Bowl,11250,iframe,https://player.brownrice.com/embed/vailch21,,true
 vail,Gore Range,11250,iframe,https://player.brownrice.com/embed/vailch2,,true
 vail,Snow Stake,10350,iframe,https://timecam.tv/view_cam_embed.aspx?C=FDBEBCIPC5B3,,true
+vail,Eagle's Nest,,iframe,https://player.brownrice.com/embed/vaileaglesnest,,true
+vail,Snow Stake Summit,,iframe,https://player.brownrice.com/embed/vailsnowsummit,,true
 breckenridge,Peak 7,12998,iframe,https://player.brownrice.com/embed/breckenridge7,,true
 breckenridge,Peak 8 from Peak 9,12998,iframe,https://player.brownrice.com/embed/breckenridge9,,true
 breckenridge,Main Street,9600,youtube,https://www.youtube.com/embed/SH63YaIWyK0,SH63YaIWyK0,true
 breckenridge,Peak 8,12998,youtube,https://www.youtube.com/embed/mHTTPNYltZo,mHTTPNYltZo,true
+breckenridge,Peak 9,,iframe,https://player.brownrice.com/embed/breckenridge10,,true
 keystone,North Peak,11640,iframe,https://player.brownrice.com/embed/keystonenorthpeak,,true
 keystone,Dercum,11640,iframe,https://player.brownrice.com/embed/keystonedercum,,true
 keystone,River Run,9280,iframe,https://player.brownrice.com/embed/keystoneriverrun,,true
@@ -74,9 +77,16 @@ brian-head,Giant Steps Base,,image,https://img.hdrelay.com/camera/bcca39a1-43c0-
 sundance,Bearclaw,6100,iframe,https://vauth.command.verkada.com/__v/sundance-mountain-resort/embed/html/78238dd4-916b-42a4-94b5-830413e9b852/,,true
 sundance,Mandan Summit,,image,https://www.skiutah.com/files/blob/webcam/1286533593,,true
 mammoth,Summit,11053,youtube,https://www.youtube.com/embed/awxz_oIlJE0,awxz_oIlJE0,true
-mammoth,McCoy Station,9200,youtube,https://www.youtube.com/embed/lpGHpWtXGsk,lpGHpWtXGsk,true
-mammoth,Main Lodge,8900,youtube,https://www.youtube.com/embed/UpfvBbw6kSY,UpfvBbw6kSY,true
-mammoth,Canyon Lodge,8000,youtube,https://www.youtube.com/embed/9--ZgYEZBhk,9--ZgYEZBhk,true
+mammoth,McCoy Station,9630,youtube,https://www.youtube.com/embed/jFK8bVYad0M,jFK8bVYad0M,true
+mammoth,Main Lodge,8909,youtube,https://www.youtube.com/embed/UpfvBbw6kSY,UpfvBbw6kSY,true
+mammoth,Canyon Lodge,8343,youtube,https://www.youtube.com/embed/9--ZgYEZBhk,9--ZgYEZBhk,true
+mammoth,The Village,8100,youtube,https://www.youtube.com/embed/MwHWDokyUhw,MwHWDokyUhw,true
+mammoth,Woolly Cam at Main Lodge,8909,youtube,https://www.youtube.com/embed/AXyxIFY3JaA,AXyxIFY3JaA,true
+mammoth,The Outpost,9327,youtube,https://www.youtube.com/embed/xaf6OzA-i6M,xaf6OzA-i6M,true
+mammoth,Unbound Main Park,9508,youtube,https://www.youtube.com/embed/gelXqzE1Xi0,gelXqzE1Xi0,true
+mammoth,Tube Park,8655,youtube,https://www.youtube.com/embed/ELdPHcv-2vI,ELdPHcv-2vI,true
+mammoth,Eagle Lodge,7953,youtube,https://www.youtube.com/embed/BH-9QONvk1A,BH-9QONvk1A,true
+mammoth,Tamarack XC Ski Center,8600,youtube,https://www.youtube.com/embed/s_lziIKyUT4,s_lziIKyUT4,true
 palisades-tahoe,Base Area,6200,iframe,https://relay.ozolio.com/pub.api?cmd=embed&oid=EMB_ZIGI00000147,,true
 palisades-tahoe,Scope,7200,iframe,https://relay.ozolio.com/pub.api?cmd=embed&oid=EMB_EIFC0000015B,,true
 palisades-tahoe,Silverado 360,8200,iframe,https://palisadestahoe.roundshot.com/silverado/#/,,true
@@ -84,6 +94,7 @@ sugar-bowl,Webcams,7800,link,https://www.sugarbowl.com/webcams,,true
 northstar,Snow Stake,7800,iframe,https://player.brownrice.com/embed/northstarsnowstake,,true
 northstar,Mid Mountain,7600,iframe,https://player.brownrice.com/embed/northstarmidmountain,,true
 northstar,Summit,8610,iframe,https://player.brownrice.com/embed/northstarspluto,,true
+northstar,Northstar Village,,iframe,https://player.brownrice.com/embed/northstarvillage,,true
 heavenly,Gondola Mid Station,9100,iframe,https://player.brownrice.com/embed/heavenlymidstation,,true
 heavenly,Snow Stake,9500,iframe,https://player.brownrice.com/embed/heavenlysnowstake,,true
 heavenly,Tram Summit,10067,iframe,https://player.brownrice.com/embed/heavenlytram,,true
@@ -128,6 +139,8 @@ bear-valley,Summit,8500,iframe,https://camstreamer.com/embed/RFmy0SK1VyqlMtIBCgV
 stevens-pass,Snow Stake,,iframe,https://player.brownrice.com/embed/stevenspasssnowstake,,true
 stevens-pass,Jupiter,,iframe,https://player.brownrice.com/embed/stevenspassjupiter,,true
 stevens-pass,Courtyard,,iframe,https://player.brownrice.com/embed/stevenspasscourtyard,,true
+stevens-pass,Ski and Snowboard School,,iframe,https://player.brownrice.com/embed/stevenspassschool,,true
+stevens-pass,Skyline,,iframe,https://player.brownrice.com/embed/stevenspassskyline,,true
 crystal-mountain,Summit Roundshot,,iframe,https://crystalmountainresort.roundshot.com/summit/,,true
 crystal-mountain,Snow Stake,,image,https://webcams.opensnow.com/current/2003.jpg,,true
 crystal-mountain,Base,,image,https://webcams.opensnow.com/current/2005.jpg,,true

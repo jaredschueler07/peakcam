@@ -5,7 +5,8 @@
  * Requires ONLY Node.js 18+ (no npm install needed).
  *
  * Usage:
- *   node scripts/import-resorts-standalone.mjs
+ *   node scripts/import-resorts-standalone.mjs              # resorts, metadata, then cams
+ *   node scripts/import-resorts-standalone.mjs --cams-only  # only data/cams.csv, against resorts already in the table
  *
  * Reads:  .env.local, data/resorts.csv, data/cams.csv
  * Writes: Supabase (resorts table, then cams table)
@@ -108,6 +109,20 @@ async function supabaseUpsert(table, records, onConflict) {
   }
 
   return res.json();
+}
+
+/** slug → id for every resort already in the table (cams-only runs). */
+async function fetchSlugToId() {
+  const url = `${SUPABASE_URL}/rest/v1/resorts?select=id,slug`;
+  const res = await fetch(url, {
+    headers: { "apikey": SERVICE_KEY, "Authorization": `Bearer ${SERVICE_KEY}` },
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Supabase resorts select failed (${res.status}): ${err}`);
+  }
+  const data = await res.json();
+  return new Map(data.map((d) => [d.slug, d.id]));
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -269,13 +284,23 @@ async function importCams(slugToId) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log("\n🏔  PeakCam — Standalone Resort & Cam Import");
+  console.log("\n🏔  PeakCam — Standalone Resort & Cam Import" + (process.argv.includes("--cams-only") ? " (cams only)" : ""));
   console.log("─────────────────────────────────────────────");
   console.log(`    Supabase: ${SUPABASE_URL}`);
 
-  const { slugToId, rows } = await importResorts();
-  await importResortMetadata(rows, slugToId);
-  await importCams(slugToId);
+  // `--cams-only` upserts data/cams.csv against the resorts already in the
+  // table and leaves resorts/resort_metadata untouched — the usual case when
+  // a resort adds a cam, and it avoids re-writing 148 resort rows (and any
+  // hand edits made in prod) just to add one feed.
+  if (process.argv.includes("--cams-only")) {
+    const slugToId = await fetchSlugToId();
+    console.log(`\n📋 Cams only: ${slugToId.size} resort IDs loaded from the table.`);
+    await importCams(slugToId);
+  } else {
+    const { slugToId, rows } = await importResorts();
+    await importResortMetadata(rows, slugToId);
+    await importCams(slugToId);
+  }
 
   console.log("\n🎉  Import complete.\n");
   console.log("    Note: newly-added resorts won't get a live page until the next deploy — /resorts/[slug] uses dynamicParams=false, so its static params list is fixed at build time.\n");

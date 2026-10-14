@@ -51,3 +51,14 @@ export function buildCompareHref(slugs: string[]): string {
   if (clean.length === 0) return "/compare";
   return `/compare?resorts=${clean.map(encodeURIComponent).join(",")}`;
 }
+
+/**
+ * Only the bare /compare page is indexable. Every `?resorts=` variant is a
+ * 40–100 word stub whose canonical already points at /compare, yet Google was
+ * observed indexing and ranking the stubs *instead of* the resort pages for
+ * "<resort> cam" queries (SEO audit, Oct 13, 2026). A canonical is a hint;
+ * `noindex` is a directive, so the page emits one whenever slugs are present.
+ */
+export function isCompareIndexable(slugs: readonly string[]): boolean {
+  return slugs.length === 0;
+}

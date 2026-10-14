@@ -10,6 +10,7 @@ import { getWeatherForecast, getHourlyForecast, bucketIntoPeriods } from "@/lib/
 import { getOpenMeteoForecast, getOpenMeteoHourly } from "@/lib/open-meteo";
 import { ResortDetailPage } from "@/components/resort/ResortDetailPage";
 import { camDisplayName } from "@/lib/cam-name";
+import { cameraPreview } from "@/lib/cam-preview";
 import {
   buildResortMetaDescription,
   buildResortSchemaDescription,
@@ -190,6 +191,15 @@ export default async function ResortPage({
   const broadcastEndDate = snow?.updated_at
     ? new Date(new Date(snow.updated_at).getTime() + 24 * 60 * 60 * 1000).toISOString()
     : null;
+  // Stills per active cam (lib/cam-preview): the same provider-published
+  // snapshots the tiles render, so the structured data describes the images
+  // that are actually on the page. Players with no known still fall back to
+  // the resort's OG card as before.
+  const activeCams = resort.cams.filter((cam) => cam.is_active && !cam.auto_disabled);
+  const camStills = activeCams.flatMap((cam) => {
+    const still = cameraPreview(cam);
+    return still ? [still.src] : [];
+  });
   const videos = resort.cams.flatMap((cam) => {
     const source =
       cam.embed_type === "youtube" && cam.youtube_id
@@ -198,7 +208,7 @@ export default async function ResortPage({
             embedUrl: `https://www.youtube.com/embed/${cam.youtube_id}`,
           }
         : cam.embed_type === "iframe" && cam.embed_url
-          ? { thumbnailUrl: ogImage, embedUrl: cam.embed_url }
+          ? { thumbnailUrl: cameraPreview(cam)?.src ?? ogImage, embedUrl: cam.embed_url }
           : null;
     if (!source) return [];
     return [
@@ -236,7 +246,9 @@ export default async function ResortPage({
     name: resort.name,
     description: buildResortSchemaDescription(resort),
     url: pageUrl,
-    image: ogImage,
+    // OG card first (the share image), then one still per cam, so image
+    // search has the mountain views and not only the generated poster.
+    image: camStills.length ? [ogImage, ...camStills] : ogImage,
     address: {
       "@type": "PostalAddress",
       addressRegion: resort.state,
