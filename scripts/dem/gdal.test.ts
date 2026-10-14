@@ -7,6 +7,16 @@ import path from "node:path";
 import { fillNodata, fillNodataArgs, readRaster, transformPoint, warpArgs, vrtArgs } from "./gdal";
 import { WARP_NODATA } from "./nodata";
 
+function hasGdal(): boolean {
+  try {
+    execFileSync("gdal_translate", ["--version"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+const gdalReady = hasGdal();
+
 test("warp targets the resort's UTM zone at an exact resolution", () => {
   const args = warpArgs("in.vrt", "out.tif", 32613, 4);
   assert.ok(args.includes("-t_srs"), "must set target SRS");
@@ -48,7 +58,7 @@ test("nodata fill interpolates from hole edges without smoothing real terrain", 
   assert.deepEqual(args.slice(-2), ["in.tif", "out.tif"]);
 });
 
-test("gdal_fillnodata replaces a tagged interior hole with interpolated terrain", async (t) => {
+test("gdal_fillnodata replaces a tagged interior hole with interpolated terrain", { skip: !gdalReady }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "peakcam-fill-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const vrt = path.join(dir, "hole.vrt");
@@ -82,7 +92,7 @@ test("gdal_fillnodata replaces a tagged interior hole with interpolated terrain"
   assert.equal(after.values[12], 2000);
 });
 
-test("coordinate transform places Breckenridge in its UTM metre grid", async () => {
+test("coordinate transform places Breckenridge in its UTM metre grid", { skip: !gdalReady }, async () => {
   const [east, north] = await transformPoint(-106.081, 39.4749, 4326, 32613);
   assert.ok(east > 400_000 && east < 410_000, `unexpected easting ${east}`);
   assert.ok(north > 4_365_000 && north < 4_375_000, `unexpected northing ${north}`);
