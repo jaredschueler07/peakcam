@@ -8,12 +8,6 @@ import type { WeatherPeriod, HourlyWeather, ForecastPeriod } from "./types";
 
 const NWS_USER_AGENT = "PeakCam/1.0 (contact@peakcam.io)"; // NWS requires a UA string
 
-// Aborts a stuck NWS call after 5s so a slow/hung upstream can't hang the
-// page render — the caller's try/catch below turns the abort into the same
-// `null` result as any other NWS failure, which callers already render
-// around gracefully.
-const NWS_TIMEOUT_MS = 5_000;
-
 /** Snow-related keywords in NWS short forecast strings. */
 const SNOW_KEYWORDS = [
   "snow", "blizzard", "flurr", "wintry", "sleet", "freezing",
@@ -90,7 +84,6 @@ async function resolveGridPoint(lat: number, lng: number) {
     {
       headers: { "User-Agent": NWS_USER_AGENT },
       next: { revalidate: 3600 },
-      signal: AbortSignal.timeout(NWS_TIMEOUT_MS),
     }
   );
   if (!pointsRes.ok) return null;
@@ -121,7 +114,6 @@ export async function getWeatherForecast(
     const forecastRes = await fetch(grid.forecastUrl, {
       headers: { "User-Agent": NWS_USER_AGENT },
       next: { revalidate: 3600 },
-      signal: AbortSignal.timeout(NWS_TIMEOUT_MS),
     });
     if (!forecastRes.ok) return null;
     const forecastData = await forecastRes.json();
@@ -181,7 +173,6 @@ export async function getHourlyForecast(
     const res = await fetch(grid.forecastHourlyUrl, {
       headers: { "User-Agent": NWS_USER_AGENT },
       next: { revalidate: 3600 },
-      signal: AbortSignal.timeout(NWS_TIMEOUT_MS),
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -291,10 +282,7 @@ export function bucketIntoPeriods(hourly: HourlyWeather[]): ForecastPeriod[] {
       windSpeed: Math.round(items.reduce((sum, it) => sum + it.windSpeed, 0) / items.length),
       windGust: Math.max(...items.map((it) => it.windSpeed)),
       windDirection: dominantDir,
-      // Re-round after summing: the per-hour values are rounded to 0.1", but
-      // adding them accumulates binary float error (0.3+0.3+0.3 renders as
-      // "0.8999999999999999" without this).
-      snowInches: Math.round(items.reduce((sum, it) => sum + it.snowInches, 0) * 10) / 10,
+      snowInches: items.reduce((sum, it) => sum + it.snowInches, 0),
       precipProbability: Math.max(...items.map((it) => it.precipProbability)),
       shortForecast: representative.shortForecast,
     });

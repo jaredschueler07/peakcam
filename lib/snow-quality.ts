@@ -74,8 +74,7 @@ export function validateReading(
 ): QualityResult {
   let qcFlag: QCFlag = "valid";
   let notes: string | null = null;
-  let { snowDepthIn, sweIn } = current;
-  const { precipAccumIn } = current;
+  let { snowDepthIn, sweIn, precipAccumIn } = current;
 
   // ── Missing data
   if (snowDepthIn == null && sweIn == null) {

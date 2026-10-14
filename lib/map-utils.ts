@@ -14,7 +14,6 @@ export interface ResortFeatureProperties {
   state: string;
   region: string;
   condRating: ConditionRating;
-  offSeason: boolean;
   baseDepth: number | null;
   snow24h: number | null;
   snow48h: number | null;
@@ -24,26 +23,6 @@ export interface ResortFeatureProperties {
   liftsTotal: number | null;
   camCount: number;
   conditions: string | null;
-}
-
-// ── Off-season heuristic ─────────────────────────────────────
-//
-// A resort is "off-season" when the current month falls in the local warm half
-// of the year. This is a DISPLAY heuristic only (no schema/data change): it lets
-// summer resorts render as a neutral "Off-season" marker instead of a false red
-// "Poor" dot — the rating engine still scores base depth as usual.
-//
-// Hemisphere comes from latitude. Northern ski season is treated as Nov–Apr,
-// Southern (Andes) as May–Oct — a clean symmetric split. Deliberately crude at
-// the shoulders (an early-Nov opening or summer glacier skiing may misclassify);
-// the tradeoff is zero new data and full reversibility.
-export function isOffSeason(lat: number, date: Date): boolean {
-  const month = date.getMonth() + 1; // 1–12
-  const northern = lat >= 0;
-  const inSeason = northern
-    ? month >= 11 || month <= 4 // Nov–Apr
-    : month >= 5 && month <= 10; // May–Oct
-  return !inSeason;
 }
 
 export interface ResortFeature {
@@ -65,8 +44,7 @@ export type MapMetric = "baseDepth" | "snow24h" | "conditions";
 // ── GeoJSON Conversion ───────────────────────────────────────
 
 export function resortsToGeoJSON(
-  resorts: ResortWithData[],
-  now: Date = new Date()
+  resorts: ResortWithData[]
 ): ResortFeatureCollection {
   return {
     type: "FeatureCollection",
@@ -84,7 +62,6 @@ export function resortsToGeoJSON(
           state: resort.state,
           region: resort.region,
           condRating: resort.cond_rating,
-          offSeason: isOffSeason(resort.lat, now),
           baseDepth: snow?.base_depth ?? null,
           snow24h: snow?.new_snow_24h ?? null,
           snow48h: snow?.new_snow_48h ?? null,
@@ -114,23 +91,6 @@ const CONDITION_COLORS: Record<ConditionRating, string> = {
 
 export function conditionColor(rating: ConditionRating): string {
   return CONDITION_COLORS[rating];
-}
-
-/** Neutral fill for off-season / closed markers and chips (hue-neutral bark). */
-export const OFF_SEASON_COLOR = "#b59b74";
-
-/** "3h ago" / "just now" from an ISO timestamp; null if absent/unparseable. */
-export function timeAgo(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return null;
-  const mins = Math.floor((Date.now() - then) / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
 }
 
 // ── Metric Display ───────────────────────────────────────────
@@ -201,24 +161,3 @@ export const DEFAULT_VIEW_STATE = {
   pitch: 0,
   bearing: 0,
 } as const;
-
-// Andes corridor (Santiago → Bariloche; Cerro Castor is a short pan south).
-export const ANDES_VIEW_STATE = {
-  longitude: -70.5,
-  latitude: -39.5,
-  zoom: 3.8,
-  pitch: 0,
-  bearing: 0,
-} as const;
-
-/**
- * Season-aware default view: the map opens on whichever hemisphere is in ski
- * season (same month split as isOffSeason). Deliberately NOT geolocation- or
- * IP-based — both map pages are ISR-cached (one HTML for everyone), and the
- * explicit GeolocateControl already covers "near me".
- */
-export function seasonalDefaultViewState(date: Date) {
-  const month = date.getMonth() + 1;
-  const southernSeason = month >= 5 && month <= 10; // NH summer = Andes winter
-  return southernSeason ? ANDES_VIEW_STATE : DEFAULT_VIEW_STATE;
-}

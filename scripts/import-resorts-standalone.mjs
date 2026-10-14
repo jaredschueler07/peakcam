@@ -13,7 +13,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -117,18 +117,6 @@ const toBool = (v) => v.toLowerCase() === "true";
 const toNullInt = (v) => { const n = parseInt(v, 10); return isNaN(n) ? null : n; };
 const toNullFloat = (v) => { const n = parseFloat(v); return isNaN(n) ? null : n; };
 
-export function hasElevationData(row) {
-  return Boolean(row.elevation_base_ft) && Boolean(row.elevation_summit_ft);
-}
-
-export function toResortMetadataRecord(resortId, row) {
-  return {
-    resort_id: resortId,
-    elevation_base_ft: parseInt(row.elevation_base_ft, 10),
-    elevation_summit_ft: parseInt(row.elevation_summit_ft, 10),
-  };
-}
-
 function dedupeBy(arr, key) {
   const seen = new Set();
   return arr.filter((item) => {
@@ -173,7 +161,6 @@ async function importResorts() {
       facebook_url:       blankToNull(r.facebook_url),
       instagram_url:      blankToNull(r.instagram_url),
       is_active:          toBool(r.is_active),
-      country:            r.country || "US",
     }));
 
     const data = await supabaseUpsert("resorts", batch, "slug");
@@ -182,25 +169,7 @@ async function importResorts() {
   }
 
   console.log(`✅  Resorts done. ${slugToId.size} IDs mapped.`);
-  return { slugToId, rows };
-}
-
-// ─── Import resort_metadata (elevation) ──────────────────────────────────────
-
-async function importResortMetadata(rows, slugToId) {
-  const records = rows
-    .filter(hasElevationData)
-    .map((r) => toResortMetadataRecord(slugToId.get(r.slug), r))
-    .filter((r) => r.resort_id); // drop rows whose slug didn't map (shouldn't happen, defensive)
-
-  if (records.length === 0) {
-    console.log("\nℹ️  No resort_metadata rows to import (no elevation data in CSV).");
-    return;
-  }
-
-  console.log(`\n⛰  Resort metadata: ${records.length} rows with elevation data`);
-  const data = await supabaseUpsert("resort_metadata", records, "resort_id");
-  console.log(`✅  Resort metadata done. ${data.length} upserted.`);
+  return slugToId;
 }
 
 // ─── Import cams ─────────────────────────────────────────────────────────────
@@ -229,16 +198,8 @@ async function importCams(slugToId) {
       embed_type:      r.embed_type,
       embed_url:       blankToNull(r.embed_url),
       youtube_id:      blankToNull(r.youtube_id),
-      // Deliberately NOT sending is_active or last_checked_at:
-      // cam-health-check.mjs owns a cam's active state (auto-disable
-      // after 3 consecutive failures, auto-recovery on success) and its
-      // check timestamps. Sending is_active from the CSV re-enabled all
-      // 47 auto-disabled dead cams on a full-CSV re-import (observed
-      // live, 2026-07-13). New rows get the schema defaults
-      // (is_active=true, last_checked_at=null); existing rows keep the
-      // health checker's authoritative state. Every cams.csv row is
-      // is_active=true anyway — nothing depended on CSV-driven
-      // deactivation.
+      is_active:       toBool(r.is_active),
+      last_checked_at: new Date().toISOString(),
     }));
 
   if (skipped.length > 0) {
@@ -251,19 +212,36 @@ async function importCams(slugToId) {
     return;
   }
 
-  // Migration 012 added a unique index on (resort_id, embed_url, name) — real
-  // upsert now, instead of the old ignore-duplicates insert (which was a
-  // no-op without a unique constraint and duplicated cams on re-run).
+  // Cams don't have a natural unique key for upsert — use insert with ignore-duplicates
   const BATCH = 100;
   let total = 0;
   for (let i = 0; i < records.length; i += BATCH) {
     const batch = records.slice(i, i + BATCH);
-    const data = await supabaseUpsert("cams", batch, "resort_id,embed_url,name");
+    const url = `${SUPABASE_URL}/rest/v1/cams`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey":        SERVICE_KEY,
+        "Authorization": `Bearer ${SERVICE_KEY}`,
+        "Prefer":        "resolution=ignore-duplicates,return=representation",
+      },
+      body: JSON.stringify(batch),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      // Log but don't crash — duplicate cams are common on re-runs
+      console.warn(`  ⚠  Cam batch warning (${res.status}): ${err.slice(0, 200)}`);
+      continue;
+    }
+
+    const data = await res.json();
     total += data.length;
-    process.stdout.write(`  ✓ Batch ${Math.floor(i / BATCH) + 1}: ${data.length} cams upserted\n`);
+    process.stdout.write(`  ✓ Batch ${Math.floor(i / BATCH) + 1}: ${data.length} cams inserted\n`);
   }
 
-  console.log(`✅  Cams done. ${total} upserted.`);
+  console.log(`✅  Cams done. ${total} inserted.`);
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -273,24 +251,13 @@ async function main() {
   console.log("─────────────────────────────────────────────");
   console.log(`    Supabase: ${SUPABASE_URL}`);
 
-  const { slugToId, rows } = await importResorts();
-  await importResortMetadata(rows, slugToId);
+  const slugToId = await importResorts();
   await importCams(slugToId);
 
   console.log("\n🎉  Import complete.\n");
-  console.log("    Note: newly-added resorts won't get a live page until the next deploy — /resorts/[slug] uses dynamicParams=false, so its static params list is fixed at build time.\n");
 }
 
-// Only run main() when this file is executed directly (e.g.
-// `node scripts/import-resorts-standalone.mjs`), not when it's imported
-// as a module (e.g. by scripts/import-resorts-standalone.test.mjs) — an
-// import must never have the side effect of writing to the live database.
-const isDirectRun =
-  process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
-
-if (isDirectRun) {
-  main().catch((err) => {
-    console.error("\n❌  Fatal error:", err.message);
-    process.exit(1);
-  });
-}
+main().catch((err) => {
+  console.error("\n❌  Fatal error:", err.message);
+  process.exit(1);
+});

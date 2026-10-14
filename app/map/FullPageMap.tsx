@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import MapBottomSheet from "@/components/map/MapBottomSheet";
-import type { RadarFrame } from "@/lib/weather-radar";
 import type { ResortWithData } from "@/lib/types";
 
 // MapLibre needs window — dynamic import with no SSR
@@ -14,8 +13,8 @@ const MapView = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="pc-topo h-full w-full flex items-center justify-center">
-        <span className="font-mono text-bark text-xs uppercase tracking-[0.14em]">Loading map…</span>
+      <div className="h-full w-full bg-bg flex items-center justify-center">
+        <span className="text-text-muted text-sm">Loading map...</span>
       </div>
     ),
   },
@@ -23,26 +22,24 @@ const MapView = dynamic(
 
 interface Props {
   resorts: ResortWithData[];
-  radarFrames: RadarFrame[];
+  radarTileUrl: string | null;
 }
 
-export function FullPageMap({ resorts, radarFrames }: Props) {
+export function FullPageMap({ resorts, radarTileUrl }: Props) {
   const router = useRouter();
   const [selectedResort, setSelectedResort] = useState<ResortWithData | null>(null);
 
-  const handleResortSelect = useCallback(
+  const handleResortClick = useCallback(
     (slug: string) => {
-      // Tapping a marker SELECTS it — it never navigates. On mobile we show the
-      // bottom sheet; on desktop MapView renders its own in-map popup card, so
-      // there's nothing to do here. Navigation is the explicit second action
-      // ("View resort" → handleViewResort). This kills the old race where a
-      // hard nav / flyTo fired at the same instant as the popup.
+      // On mobile: show bottom sheet. On desktop: navigate.
       if (typeof window !== "undefined" && window.innerWidth < 1024) {
         const resort = resorts.find((r) => r.slug === slug) ?? null;
         setSelectedResort(resort);
+      } else {
+        router.push(`/resorts/${slug}`);
       }
     },
-    [resorts],
+    [resorts, router],
   );
 
   const handleViewResort = useCallback(
@@ -53,12 +50,12 @@ export function FullPageMap({ resorts, radarFrames }: Props) {
   );
 
   return (
-    <div className="h-screen supports-[height:100dvh]:h-[100dvh] w-full relative bg-cream">
+    <div className="h-screen w-full relative bg-bg">
       {/* Back nav overlay */}
       <div className="absolute top-4 left-16 z-20">
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 px-3 py-2 pointer-coarse:min-h-11 pointer-coarse:px-4 bg-cream-50 border-[1.5px] border-ink rounded-full text-ink text-sm font-semibold shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px] transition-[transform,box-shadow] duration-100"
+          className="flex items-center gap-1.5 px-3 py-2 bg-surface/90 backdrop-blur-md border border-border rounded-lg text-text-subtle text-sm hover:text-cyan transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -70,9 +67,8 @@ export function FullPageMap({ resorts, radarFrames }: Props) {
       {/* Full-page map */}
       <MapView
         resorts={resorts}
-        onResortSelect={handleResortSelect}
-        onViewResort={handleViewResort}
-        radarFrames={radarFrames}
+        onResortClick={handleResortClick}
+        radarTileUrl={radarTileUrl}
         variant="fullpage"
       />
 

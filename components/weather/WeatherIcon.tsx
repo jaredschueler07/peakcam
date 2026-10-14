@@ -21,11 +21,8 @@ export const CONDITION_LABELS: Record<string, string> = {
   "cold": "Cold",
 };
 
-// Inherit the parent's text color so the icon reads correctly on any
-// background — ink on cream (forecast table, radar-off pill), cream on
-// alpen (radar-on pill). Replaces the old hardcoded dark-theme hex.
-const STROKE = "currentColor";
-const CYAN = "currentColor";
+const STROKE = "#E8E8E8";
+const CYAN = "#22D3EE";
 
 export default function WeatherIcon({
   condition,

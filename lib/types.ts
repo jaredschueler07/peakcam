@@ -5,7 +5,7 @@
 
 export type ConditionRating = "great" | "good" | "fair" | "poor";
 export type EmbedType = "youtube" | "iframe" | "image" | "link";
-export type SnowReportSource = "snotel" | "manual" | "resort" | "pipeline" | "open_meteo";
+export type SnowReportSource = "snotel" | "manual" | "resort";
 
 // ── Resorts ──────────────────────────────────────────────────
 export interface Resort {
@@ -13,7 +13,6 @@ export interface Resort {
   name: string;
   slug: string;
   state: string;
-  country: string;         // "US" | "CA" | "CL" | "AR"
   region: string;
   lat: number;
   lng: number;
@@ -38,8 +37,6 @@ export interface Cam {
   embed_url: string | null;      // iframe src URL or link-out URL
   youtube_id: string | null;     // YouTube video/stream ID
   is_active: boolean;
-  consecutive_failures: number;
-  auto_disabled: boolean;
   last_checked_at: string | null;
   created_at: string;
 }
@@ -81,7 +78,7 @@ export interface SnowReport {
   trend_7d: SnowTrend | null;
   outlook: SnowOutlook | null;
   auto_cond_rating: ConditionRating | null;
-  snowing_now: boolean;          // legacy name: current-hour snow forecast, not an observation
+  snowing_now: boolean;
 }
 
 // ── Snowpack & Conditions Engine Types ───────────────────────
@@ -234,10 +231,3 @@ export interface DashboardLayout {
   };
   updated_at: string;
 }
-
-/** A dashboard widget with its referenced resort/cam resolved from the DB.
- *  `missing` marks a favorite whose resort/cam has since been deleted or deactivated. */
-export type ResolvedWidget =
-  | { kind: "resort"; resort: Resort; snow: SnowReport | null; cams: Cam[] }
-  | { kind: "cam"; cam: Cam; resort: Resort | null }
-  | { kind: "missing"; type: FavoriteType };

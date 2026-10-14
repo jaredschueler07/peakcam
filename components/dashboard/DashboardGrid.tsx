@@ -1,37 +1,24 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Responsive, WidthProvider } from "react-grid-layout/legacy";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
-import { type WidgetConfig, type ResolvedWidget } from "@/lib/types";
-import { DashboardWidget } from "./DashboardWidget";
+import { type WidgetConfig } from "@/lib/types";
 
 // Import styles (standard for react-grid-layout)
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
-// Stable identities: both feed the sync effect's dep array, and a fresh `[]` or
-// `new Map()` per render would re-run it forever.
-const EMPTY_LAYOUT: WidgetConfig[] = [];
-const EMPTY_RESOLVED = new Map<string, ResolvedWidget>();
 
 interface DashboardGridProps {
   initialLayout?: WidgetConfig[];
-  resolved?: Map<string, ResolvedWidget>;
 }
 
-export function DashboardGrid({ initialLayout = EMPTY_LAYOUT, resolved = EMPTY_RESOLVED }: DashboardGridProps) {
+export function DashboardGrid({ initialLayout = [] }: DashboardGridProps) {
   const [layout, setLayout] = useState<WidgetConfig[]>(initialLayout);
   const [isEditMode, setIsEditMode] = useState(false);
   const supabase = createSupabaseBrowserClient();
-
-  // refresh() replaces initialLayout; skip during edit so in-progress drags are not clobbered.
-  useEffect(() => {
-    if (isEditMode) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync from parent, not an external store
-    setLayout(initialLayout);
-  }, [initialLayout, isEditMode]);
 
   // Map our WidgetConfig to RGL Layout format
   const rglLayout = useMemo(() => {
@@ -71,7 +58,7 @@ export function DashboardGrid({ initialLayout = EMPTY_LAYOUT, resolved = EMPTY_R
           user_id: user.id,
           config: { widgets: updatedWidgets },
           updated_at: new Date().toISOString(),
-        }, { onConflict: "user_id" });
+        });
     }
   };
 
@@ -80,7 +67,7 @@ export function DashboardGrid({ initialLayout = EMPTY_LAYOUT, resolved = EMPTY_R
       <div className="flex justify-end mb-4 gap-2">
         <button
           onClick={() => setIsEditMode(!isEditMode)}
-          className={`px-4 py-2 pointer-coarse:min-h-11 rounded-full text-[13px] font-semibold border-[1.5px] transition-[transform,box-shadow] duration-100 ${
+          className={`px-4 py-2 rounded-full text-[13px] font-semibold border-[1.5px] transition-[transform,box-shadow] duration-100 ${
             isEditMode
               ? "bg-alpen text-cream-50 border-ink shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]"
               : "bg-cream-50 text-ink border-ink shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]"
@@ -106,17 +93,15 @@ export function DashboardGrid({ initialLayout = EMPTY_LAYOUT, resolved = EMPTY_R
             key={widget.id}
             className="bg-cream-50 border-[1.5px] border-ink rounded-[18px] overflow-hidden group shadow-stamp"
           >
-            {/* Always visible in edit mode — hover-reveal left touch users with no way to drag */}
             {isEditMode && (
-              <div className="drag-handle absolute top-2 left-2 z-30 p-1 pointer-coarse:p-2.5 bg-ink/80 text-cream-50 rounded cursor-move transition-opacity">
+              <div className="drag-handle absolute top-2 left-2 z-30 p-1 bg-ink/80 text-cream-50 rounded cursor-move opacity-0 group-hover:opacity-100 transition-opacity">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>
               </div>
             )}
 
-            {/* inert while editing: the body is a link, and a drag or a stray
-                Tab+Enter must not navigate away mid-layout-change. */}
-            <div className="w-full h-full" inert={isEditMode || undefined}>
-              <DashboardWidget widget={widget} resolved={resolved.get(widget.id)} />
+            <div className="w-full h-full flex flex-col items-center justify-center p-4">
+              <span className="pc-eyebrow" style={{ color: "var(--pc-bark)" }}>{widget.type}</span>
+              <span className="font-display font-black text-ink mt-1">{widget.id.slice(0, 8)}</span>
             </div>
           </div>
         ))}

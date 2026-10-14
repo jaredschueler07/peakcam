@@ -1,13 +1,6 @@
 "use client";
 
-import { useForecastTime } from "@/lib/use-forecast-time";
-import { hasFreshSnowForecast } from "@/lib/snow-forecast";
-import type { MouseEvent } from "react";
 import type { ResortWithData, ConditionRating } from "@/lib/types";
-import { isOffSeason, timeAgo, OFF_SEASON_COLOR } from "@/lib/map-utils";
-import { isDropInResort } from "@/lib/drop-in";
-import DropInLink from "@/components/drop-in/DropInLink";
-import MapCamPreview from "./MapCamPreview";
 
 // Condition chip palette — matches ConditionBadge
 const conditionChip: Record<ConditionRating, string> = {
@@ -19,38 +12,17 @@ const conditionChip: Record<ConditionRating, string> = {
 
 interface MapPopupCardProps {
   resort: ResortWithData;
-  onViewResort?: (slug: string) => void;
+  onViewResort: (slug: string) => void;
 }
 
 // Poster popup — paper bg is applied by the wrapping maplibregl popup CSS in globals.css
-export default function MapPopupCard({ resort, onViewResort }: MapPopupCardProps) {
+export default function MapPopupCard({ resort }: MapPopupCardProps) {
   const snow = resort.snow_report;
-  const forecastTime = useForecastTime();
   const chipCls = conditionChip[resort.cond_rating] ?? "bg-cream-50 text-ink border-bark";
   const ratingLabel =
     resort.cond_rating.charAt(0).toUpperCase() + resort.cond_rating.slice(1);
 
   const resortHref = `/resorts/${resort.slug}`;
-  const updated = timeAgo(snow?.updated_at);
-  const offSeason = isOffSeason(resort.lat, new Date());
-
-  // Prefer SPA navigation when the parent provides it (/map uses next/router);
-  // otherwise the anchor's href handles a normal navigation. Let modifier /
-  // middle clicks fall through to the browser so "open in new tab/window"
-  // still works — only intercept a plain left click.
-  const handleNav = (e: MouseEvent<HTMLAnchorElement>) => {
-    if (
-      onViewResort &&
-      e.button === 0 &&
-      !e.metaKey &&
-      !e.ctrlKey &&
-      !e.shiftKey &&
-      !e.altKey
-    ) {
-      e.preventDefault();
-      onViewResort(resort.slug);
-    }
-  };
 
   return (
     <div className="min-w-[240px] cursor-default">
@@ -58,7 +30,7 @@ export default function MapPopupCard({ resort, onViewResort }: MapPopupCardProps
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="min-w-0">
           <h3 className="font-display font-black text-ink text-[17px] leading-[1.05] tracking-[-0.01em]">
-            <a href={resortHref} onClick={handleNav} className="hover:text-alpen transition-colors">
+            <a href={resortHref} className="hover:text-alpen transition-colors">
               {resort.name}
             </a>
           </h3>
@@ -66,31 +38,11 @@ export default function MapPopupCard({ resort, onViewResort }: MapPopupCardProps
             {resort.region} · {resort.state}
           </p>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          {offSeason ? (
-            /* Neutral bark pill — matches the off-season map marker; the rating
-               engine's "poor" is meaningless in the local summer. */
-            <span
-              className="rounded-full border-[1.5px] border-ink px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] leading-tight text-ink"
-              style={{ backgroundColor: OFF_SEASON_COLOR }}
-            >
-              Off-season
-            </span>
-          ) : (
-            <span
-              className={`rounded-full border-[1.5px] px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] leading-tight ${chipCls}`}
-            >
-              {ratingLabel}
-            </span>
-          )}
-          {!offSeason && hasFreshSnowForecast(snow, forecastTime ?? NaN) && (
-            /* pale "sky/snow" pill, ink text — deliberately NOT a rating hue
-               so it never collides with the forest "great" chip above it. */
-            <span className="inline-flex items-center gap-1 rounded-full border-[1.5px] border-ink bg-sky px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] leading-tight text-ink">
-              <span aria-hidden>❄</span> Snow forecast
-            </span>
-          )}
-        </div>
+        <span
+          className={`shrink-0 rounded-full border-[1.5px] px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] leading-tight ${chipCls}`}
+        >
+          {ratingLabel}
+        </span>
       </div>
 
       {/* Snow stats — dashed bark rule strip */}
@@ -117,34 +69,14 @@ export default function MapPopupCard({ resort, onViewResort }: MapPopupCardProps
         </div>
       </div>
 
-      {/* Live cam glance — conditions + map + webcam in one view.
-          key: full remount on resort switch — resets the internal `failed`
-          state (a broken cam on resort A must not suppress resort B's
-          preview) and re-busts the snapshot cache. */}
-      <MapCamPreview
-        key={resort.id}
-        cams={resort.cams}
-        resortName={resort.name}
-        onClick={() => (onViewResort ? onViewResort(resort.slug) : (window.location.href = resortHref))}
-        className="mb-3"
-      />
-
-      {/* Drop In — pilot resorts only. Its own row so it never competes with
-          the "View resort" link for the footer's attention. */}
-      {isDropInResort(resort.slug) && (
-        <DropInLink slug={resort.slug} variant="pill" className="mb-3" />
-      )}
-
       {/* Footer */}
       <div className="flex items-center justify-between">
         <span className="font-mono text-bark text-[11px] uppercase tracking-[0.1em]">
           {resort.cams.length} cam{resort.cams.length !== 1 ? "s" : ""}
-          {updated && <> · Updated {updated}</>}
         </span>
         <a
           href={resortHref}
-          onClick={handleNav}
-          className="text-alpen-dk text-[12px] font-bold hover:text-alpen transition-colors uppercase tracking-[0.06em] cursor-pointer inline-flex items-center py-2 pointer-coarse:min-h-11"
+          className="text-alpen-dk text-[12px] font-bold hover:text-alpen transition-colors uppercase tracking-[0.06em] cursor-pointer"
         >
           View resort &rarr;
         </a>

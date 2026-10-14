@@ -39,9 +39,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // `drop-in` is excluded because the game's static assets (a ~100KB HTML file
-    // and the three.js bundle) otherwise get a full Supabase getUser() round-trip
-    // ahead of the filesystem check on every single game load.
-    "/((?!_next/static|_next/image|favicon.ico|drop-in/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

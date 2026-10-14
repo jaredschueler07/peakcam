@@ -1,40 +1,21 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getResortBySlug, getAllResortSlugs, getLiveConditions, getUserConditions, getResortElevationFt } from "@/lib/supabase";
-import { ResortAboutSection } from "@/components/resort/ResortAboutSection";
+import { getResortBySlug, getAllResortSlugs, getLiveConditions, getUserConditions } from "@/lib/supabase";
 import { getWeatherForecast, getHourlyForecast, bucketIntoPeriods } from "@/lib/weather";
-import { getOpenMeteoForecast, getOpenMeteoHourly } from "@/lib/open-meteo";
 import { ResortDetailPage } from "@/components/resort/ResortDetailPage";
-import { camDisplayName } from "@/lib/cam-name";
 
-import { SITE_URL as BASE_URL } from "@/lib/site";
+const BASE_URL = "https://peakcam.io";
 
 export const revalidate = 3600;
 
-// Reject any slug not returned by generateStaticParams at the router layer,
-// before the page function runs. Without this, Next's full-route-cache for
-// this SSG segment caches a notFound() render as a 200 (it stores the HTML,
-// not the status code) — garbage slugs would 200 forever once first hit.
-// Trade-off: a resort added to the DB between deploys 404s until the next
-// build regenerates the static params list.
-export const dynamicParams = false;
-
-// Pre-render all active resort pages at build time.
-//
-// Must NOT swallow a listing failure into `[]`: with dynamicParams=false
-// above, whatever this returns *is* the entire set of resort pages that
-// will ever serve for this deployment — there is no on-demand fallback to
-// recover unlisted slugs at request time. A `catch { return [] }` here used
-// to be safe because dynamicParams defaulted to true (missing slugs just
-// rendered on demand); now that it's false, the same catch would let a
-// transient DB blip during build silently produce zero resort pages, the
-// build would report SUCCESS, and every /resorts/[slug] URL would 404 at
-// the router — no page code even runs, so nothing here can catch or serve
-// stale. Letting this throw fails the build instead, and Vercel keeps
-// serving the previous (good) deployment.
+// Pre-render all active resort pages at build time
 export async function generateStaticParams() {
-  const slugs = await getAllResortSlugs();
-  return slugs.map((slug) => ({ slug }));
+  try {
+    const slugs = await getAllResortSlugs();
+    return slugs.map((slug) => ({ slug }));
+  } catch {
+    return [];
+  }
 }
 
 // Dynamic metadata per resort
@@ -44,50 +25,50 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  // getResortBySlug only returns null for a genuine "no such resort" (query
-  // succeeded, zero rows). A failed query throws and is intentionally left
-  // uncaught here: it fails this ISR revalidation so Next.js keeps serving
-  // the last good metadata instead of caching an empty `{}` at 200.
-  const resort = await getResortBySlug(slug);
-  if (!resort) return {};
-  const snow = resort.snow_report;
-  const conditionsNarrative = snow?.conditions
-    ? (snow.conditions.includes("||") ? snow.conditions.split("||")[1] : snow.conditions)
-    : "current conditions";
+  try {
+    const resort = await getResortBySlug(slug);
+    if (!resort) return {};
+    const snow = resort.snow_report;
+    const conditionsNarrative = snow?.conditions 
+      ? (snow.conditions.includes("||") ? snow.conditions.split("||")[1] : snow.conditions) 
+      : "current conditions";
 
-  const desc = snow
-    ? `${resort.name} live cams — ${snow.base_depth ?? "?"}″ base, ${conditionsNarrative}. ${resort.cams.length} webcam${resort.cams.length !== 1 ? "s" : ""} available. Real-time snow report for ${resort.state}.`
-    : `Live webcams and real-time snow conditions at ${resort.name}, ${resort.state}. Check base depth, trail status, and powder reports.`;
+    const desc = snow
+      ? `${resort.name} live cams — ${snow.base_depth ?? "?"}″ base, ${conditionsNarrative}. ${resort.cams.length} webcam${resort.cams.length !== 1 ? "s" : ""} available. Real-time snow report for ${resort.state}.`
+      : `Live webcams and real-time snow conditions at ${resort.name}, ${resort.state}. Check base depth, trail status, and powder reports.`;
 
-  const pageUrl = `${BASE_URL}/resorts/${slug}`;
+    const pageUrl = `${BASE_URL}/resorts/${slug}`;
 
-  return {
-    title: `${resort.name} Live Webcams — Snow Report & Ski Conditions`,
-    description: desc,
-    keywords: [
-      `${resort.name} webcam`,
-      `${resort.name} snow report`,
-      `${resort.name} ski conditions`,
-      `${resort.name} live cam`,
-      `${resort.state} ski resort webcam`,
-      "live ski cam",
-      "ski resort snow report",
-      "mountain webcam",
-    ],
-    openGraph: {
-      type: "website",
-      url: pageUrl,
-      title: `${resort.name} Live Webcams`,
+    return {
+      title: `${resort.name} Live Webcams — Snow Report & Ski Conditions`,
       description: desc,
-      siteName: "PeakCam",
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: `${resort.name} Live Webcams`,
-      description: desc,
-    },
-    alternates: { canonical: pageUrl },
-  };
+      keywords: [
+        `${resort.name} webcam`,
+        `${resort.name} snow report`,
+        `${resort.name} ski conditions`,
+        `${resort.name} live cam`,
+        `${resort.state} ski resort webcam`,
+        "live ski cam",
+        "ski resort snow report",
+        "mountain webcam",
+      ],
+      openGraph: {
+        type: "website",
+        url: pageUrl,
+        title: `${resort.name} Live Webcams`,
+        description: desc,
+        siteName: "PeakCam",
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: `${resort.name} Live Webcams`,
+        description: desc,
+      },
+      alternates: { canonical: pageUrl },
+    };
+  } catch {
+    return {};
+  }
 }
 
 export default async function ResortPage({
@@ -102,16 +83,9 @@ export default async function ResortPage({
   if (!resort) return notFound();
 
   // Fetch weather, live conditions, and user reports server-side
-  const isUS = resort.country === "US";
-  const elevationFt = isUS ? null : await getResortElevationFt(resort.id);
-
   const [weather, hourlyRaw, liveConditions, userConditions] = await Promise.all([
-    isUS
-      ? getWeatherForecast(resort.lat, resort.lng)
-      : getOpenMeteoForecast(resort.lat, resort.lng, elevationFt),
-    isUS
-      ? getHourlyForecast(resort.lat, resort.lng)
-      : getOpenMeteoHourly(resort.lat, resort.lng, elevationFt),
+    getWeatherForecast(resort.lat, resort.lng),
+    getHourlyForecast(resort.lat, resort.lng),
     getLiveConditions(resort.id),
     getUserConditions(resort.id),
   ]);
@@ -144,7 +118,7 @@ export default async function ResortPage({
   const youtubeCams = resort.cams.filter((c) => c.youtube_id);
   const videos = youtubeCams.map((cam) => ({
     "@type": "VideoObject",
-    name: `${resort.name} — ${camDisplayName(cam)} Live Webcam`,
+    name: `${resort.name} — ${cam.name} Live Webcam`,
     description: `Live webcam at ${resort.name}${cam.elevation ? ` (${cam.elevation})` : ""}.`,
     thumbnailUrl: `https://img.youtube.com/vi/${cam.youtube_id}/hqdefault.jpg`,
     embedUrl: `https://www.youtube.com/embed/${cam.youtube_id}`,
@@ -161,7 +135,6 @@ export default async function ResortPage({
   const skiResortLd = {
     "@context": "https://schema.org",
     "@type": ["SkiResort", "TouristAttraction"],
-    "@id": pageUrl,
     name: resort.name,
     description: snow
       ? `${resort.name} — ${snow.base_depth ?? "?"}″ base depth, ${snow.conditions ?? "current conditions"}. ${resort.cams.length} live webcams available.`
@@ -171,7 +144,7 @@ export default async function ResortPage({
     address: {
       "@type": "PostalAddress",
       addressRegion: resort.state,
-      addressCountry: resort.country,
+      addressCountry: "US",
     },
     geo: {
       "@type": "GeoCoordinates",
@@ -195,20 +168,6 @@ export default async function ResortPage({
     ],
   };
 
-  // SkiResort is a Place, which schema.org gives no dateModified — so freshness
-  // rides on a WebPage node instead: dateModified is the latest snow report's
-  // updated_at, the moment this page's data-bearing content last changed.
-  const webPageLd = snow
-    ? {
-        "@context": "https://schema.org",
-        "@type": "WebPage",
-        url: pageUrl,
-        name: `${resort.name} Snow Report & Webcams`,
-        dateModified: snow.updated_at,
-        mainEntity: { "@id": pageUrl },
-      }
-    : null;
-
   return (
     <main id="main-content">
       <script
@@ -219,14 +178,7 @@ export default async function ResortPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
       />
-      {webPageLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageLd) }}
-        />
-      )}
       <ResortDetailPage resort={resort} weather={weather} forecastPeriods={forecastPeriods} hourlyData={hourlyRaw} liveConditions={liveConditions} userConditions={userConditions} />
-      <ResortAboutSection resort={resort} />
     </main>
   );
 }

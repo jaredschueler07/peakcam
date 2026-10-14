@@ -1,89 +1,37 @@
 "use client";
 
-import { useForecastTime } from "@/lib/use-forecast-time";
-import { hasFreshSnowForecast } from "@/lib/snow-forecast";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import { Camera, ArrowLeftRight, TrendingUp, TrendingDown, Minus, Snowflake, Sun, Thermometer, Heart } from "lucide-react";
 import type { ResortWithData, ConditionRating, SnowTrend, SnowOutlook } from "@/lib/types";
-import { isOffSeason, OFF_SEASON_COLOR } from "@/lib/map-utils";
 import { trackResortCardClick } from "@/lib/posthog";
 
 // ── Animated count-up number ─────────────────────────────────────────────────
 
-const COUNT_UP_MS = 600;
-
-/**
- * Poster-style count-up for the big base-depth stat.
- *
- * The number this renders is *transiently wrong* while it climbs, so it is
- * purely decorative: it renders inside `aria-hidden` and the true value is
- * exposed separately (see the `sr-only` line in the card body). There is
- * deliberately no live region here.
- *
- * Three guards keep the count-up from ever showing stale/bogus snow data:
- *  1. It no-ops when the target already equals what is on screen, so a
- *     re-render / data refresh with an unchanged value never restarts from 0
- *     (that restart is what briefly painted e.g. "6″" for a 94″ base).
- *  2. A mid-flight target change animates from the *currently displayed*
- *     number rather than resetting to 0.
- *  3. `prefers-reduced-motion: reduce` jumps straight to the final value.
- *
- * `animate={false}` (below-the-fold cards on the animation diet) renders the
- * final value immediately and never runs the count-up.
- */
-function AnimatedNumber({ value, animate = true }: { value: number; animate?: boolean }) {
-  const [count, setCount] = useState(animate ? 0 : value);
-  // What is actually painted right now, and what the last completed run
-  // settled on. Refs (not state) so reading them can't re-trigger the effect.
-  const displayedRef = useRef(animate ? 0 : value);
-  const settledRef = useRef<number | null>(animate ? null : value);
+function AnimatedNumber({ value }: { value: number }) {
+  const [count, setCount] = useState(0);
 
   useEffect(() => {
-    // Guard 1 — already showing this number: do nothing.
-    if (settledRef.current === value) return;
+    const duration = 600;
+    const steps = 30;
+    const increment = value / steps;
+    let current = 0;
 
-    const settle = () => {
-      displayedRef.current = value;
-      settledRef.current = value;
-      setCount(value);
-    };
-
-    const prefersReducedMotion =
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    const from = displayedRef.current;
-    // Guard 3 (reduced motion) + animation diet + degenerate no-distance case.
-    if (!animate || prefersReducedMotion || from === value) {
-      settle();
-      return;
-    }
-
-    // Guard 2 — count from whatever is on screen to the new target.
-    let frame = 0;
-    const start = performance.now();
-    const tick = (now: number) => {
-      const t = Math.min((now - start) / COUNT_UP_MS, 1);
-      if (t >= 1) {
-        settle();
-        return;
+    const timer = setInterval(() => {
+      current += increment;
+      if (current >= value) {
+        setCount(value);
+        clearInterval(timer);
+      } else {
+        setCount(Math.floor(current));
       }
-      const next = Math.round(from + (value - from) * t);
-      displayedRef.current = next;
-      setCount(next);
-      frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
+    }, duration / steps);
 
-    // Cancelled on unmount and on target change — no leaked rAF, no stale
-    // closure writing an old target into state after the value moved on.
-    return () => cancelAnimationFrame(frame);
-  }, [value, animate]);
+    return () => clearInterval(timer);
+  }, [value]);
 
-  return <span aria-hidden="true">{count}</span>;
+  return <>{count}</>;
 }
 
 // ── Condition palette (earth tones) ──────────────────────────────────────────
@@ -99,7 +47,7 @@ const conditionColors: Record<ConditionRating, { bg: string; text: string; borde
 
 const trendConfig: Record<SnowTrend, { icon: typeof TrendingUp; color: string; label: string }> = {
   rising:  { icon: TrendingUp,   color: "#3c5a3a", label: "Rising"  },
-  stable:  { icon: Minus,        color: "#63482d", label: "Stable"  },
+  stable:  { icon: Minus,        color: "#7a5a3a", label: "Stable"  },
   falling: { icon: TrendingDown, color: "#a93f20", label: "Falling" },
 };
 
@@ -117,7 +65,7 @@ function TrendBadge({ trend }: { trend: SnowTrend }) {
 
 const outlookConfig: Record<SnowOutlook, { icon: typeof Snowflake; color: string; label: string }> = {
   more_snow:  { icon: Snowflake,  color: "#3c5a3a", label: "More snow" },
-  stable:     { icon: Minus,      color: "#63482d", label: "Stable"    },
+  stable:     { icon: Minus,      color: "#7a5a3a", label: "Stable"    },
   warming:    { icon: Sun,        color: "#e2a740", label: "Warming"   },
   melt_risk:  { icon: Thermometer,color: "#a93f20", label: "Melt risk" },
 };
@@ -128,19 +76,10 @@ interface Props {
   resort: ResortWithData;
   favorited?: boolean;
   onToggleFavorite?: () => void;
-  /**
-   * Entrance animation + count-up. Only the first screenful of cards should
-   * animate — with all 148 on, every card mounts an IntersectionObserver and
-   * an interval timer, and fast scrolls hit blank not-yet-revealed patches.
-   */
-  animate?: boolean;
 }
 
-export function SummitResortCard({ resort, favorited, onToggleFavorite, animate = true }: Props) {
-  const reducedMotion = useReducedMotion();
-  const entrance = animate && !reducedMotion;
+export function SummitResortCard({ resort, favorited, onToggleFavorite }: Props) {
   const snow = resort.snow_report;
-  const forecastTime = useForecastTime();
   const baseDepth = snow?.base_depth ?? 0;
   const snow24h = snow?.new_snow_24h ?? 0;
   const snow48h = snow?.new_snow_48h ?? 0;
@@ -152,20 +91,15 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
   const pctNormal = snow?.pct_of_normal;
   const trend = snow?.trend_7d as SnowTrend | null;
   const outlook = snow?.outlook as SnowOutlook | null;
-  // Off-season (display heuristic, matches the map): the rating engine's
-  // "poor" is meaningless in the local summer — show a neutral chip instead,
-  // and suppress the snowing badge. Lazy-initialized so the impure new Date()
-  // runs once per mount, not on every hover-triggered grid re-render.
-  const [offSeason] = useState(() => isOffSeason(resort.lat, new Date()));
-  const hasSnowForecast = hasFreshSnowForecast(snow, forecastTime ?? NaN) && !offSeason;
+  const isSnowing = snow?.snowing_now ?? false;
 
   return (
     <motion.div
       className="group relative rounded-[18px] cursor-pointer"
-      initial={entrance ? { opacity: 0, y: 20 } : false}
-      whileInView={entrance ? { opacity: 1, y: 0 } : undefined}
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      whileHover={reducedMotion ? undefined : { y: -4, x: -1 }}
+      whileHover={{ y: -4, x: -1 }}
       transition={{ duration: 0.15 }}
     >
       {/* Card paper — cream-50 bg, ink border, stamp shadow */}
@@ -182,12 +116,12 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
           </div>
         )}
 
-        {/* Snow forecast badge */}
-        {hasSnowForecast && !isFresh && (
+        {/* Snowing now badge */}
+        {isSnowing && !isFresh && (
           <div className="absolute top-4 right-4 z-10 px-3 py-1 bg-ink text-cream-50
             border-[1.5px] border-ink rounded-full font-mono font-bold text-[10.5px]
             tracking-[0.14em] uppercase flex items-center gap-1">
-            <Snowflake size={11} strokeWidth={2.5} /> Snow forecast
+            <Snowflake size={11} strokeWidth={2.5} /> Snowing
           </div>
         )}
 
@@ -211,34 +145,24 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
               {resort.name}
             </h3>
 
-            {/* Giant base depth stat — centered poster-style.
-                The whole visual block is aria-hidden because the digits count
-                up and are therefore momentarily wrong; the sr-only line below
-                carries the real, final number (and never a live region, so
-                nothing is announced mid-animation). */}
+            {/* Giant base depth stat — centered poster-style */}
             <div className="text-center py-4">
               <div
-                aria-hidden="true"
                 className="font-display font-black text-[6.5rem] leading-none text-ink tracking-[-0.04em] group-hover:scale-[1.03] transition-transform duration-200"
                 style={{ fontVariantNumeric: "tabular-nums" }}
               >
                 {baseDepth > 0 ? (
                   <>
-                    <AnimatedNumber value={baseDepth} animate={entrance} />
+                    <AnimatedNumber value={baseDepth} />
                     <span className="text-alpen">&quot;</span>
                   </>
                 ) : (
-                  <span className="text-bark text-6xl">&mdash;</span>
+                  <span className="text-bark/60 text-6xl">&mdash;</span>
                 )}
               </div>
-              <div aria-hidden="true" className="font-mono font-bold text-[10.5px] text-bark tracking-[0.18em] uppercase mt-1">
+              <div className="font-mono font-bold text-[10.5px] text-bark tracking-[0.18em] uppercase mt-1">
                 Base Depth
               </div>
-              <p className="sr-only">
-                {baseDepth > 0
-                  ? `Base depth: ${baseDepth} inches`
-                  : "Base depth: no report"}
-              </p>
             </div>
 
             {/* Data strip — dashed bark rule top/bottom, mono numbers */}
@@ -264,16 +188,7 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
             {/* Footer: condition chip + trend + cameras + favorite */}
             <div className="flex items-center justify-between pt-1">
               <div className="flex items-center gap-2">
-                {offSeason ? (
-                  /* border matches MapPopupCard/MapBottomSheet's off-season chip */
-                  <span
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
-                      border-[1.5px] border-ink font-bold text-[11.5px] tracking-[0.08em] uppercase text-ink"
-                    style={{ backgroundColor: OFF_SEASON_COLOR }}
-                  >
-                    Off-season
-                  </span>
-                ) : cond ? (
+                {cond ? (
                   <span
                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
                       border font-bold text-[11.5px] tracking-[0.08em] uppercase
@@ -282,13 +197,11 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
                     {cond.label}
                   </span>
                 ) : (
-                  <span className="text-bark text-xs">&mdash;</span>
+                  <span className="text-bark/70 text-xs">&mdash;</span>
                 )}
                 {trend && <TrendBadge trend={trend} />}
-                {/* mustard-dk, not mustard: raw mustard is 1.74:1 on the cream
-                    card — unreadable for an 11px readout. */}
                 {pctNormal != null && (
-                  <span className={`font-mono font-bold text-[11px] tabular-nums ${pctNormal >= 110 ? "text-forest" : pctNormal >= 90 ? "text-bark-dk" : pctNormal >= 70 ? "text-mustard-dk" : "text-alpen-dk"}`}>
+                  <span className={`font-mono font-bold text-[11px] tabular-nums ${pctNormal >= 110 ? "text-forest" : pctNormal >= 90 ? "text-bark-dk" : pctNormal >= 70 ? "text-mustard" : "text-alpen-dk"}`}>
                     {pctNormal}%
                   </span>
                 )}
@@ -306,7 +219,7 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
                 {onToggleFavorite && (
                   <button
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(); }}
-                    className={`p-1.5 pointer-coarse:p-3 rounded-full border-[1.5px] transition-all duration-100 ${
+                    className={`p-1.5 rounded-full border-[1.5px] transition-all duration-100 ${
                       favorited
                         ? "bg-alpen/15 border-alpen text-alpen shadow-[2px_2px_0_#2a1f14]"
                         : "bg-cream-50 border-ink/30 text-bark hover:text-alpen hover:border-ink hover:shadow-[2px_2px_0_#2a1f14]"

@@ -1,17 +1,12 @@
 "use client";
 
-import { useForecastTime } from "@/lib/use-forecast-time";
-import { hasCurrentSnowForecast } from "@/lib/snow-forecast";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
-import { Heart, Maximize2 } from "lucide-react";
+import { Heart } from "lucide-react";
 import { ConditionBadge } from "@/components/ui/Badge";
 import type { ResortWithData, WeatherPeriod, LiveConditions, Cam, UserCondition, ForecastPeriod, HourlyWeather } from "@/lib/types";
 import { CamReportButton } from "@/components/cam/CamReportButton";
-import { CamEmbed } from "@/components/cam/CamEmbed";
-import { camDisplayName } from "@/lib/cam-name";
-import { CamLightbox } from "@/components/cam/CamLightbox";
 import { ConditionsHero } from "@/components/resort/ConditionsHero";
 import { ForecastTable } from "@/components/resort/ForecastTable";
 import { HourlyTimeline } from "@/components/resort/HourlyTimeline";
@@ -24,8 +19,6 @@ import { AuthModal } from "@/components/auth/AuthModal";
 import { trackResortView, trackCamClick } from "@/lib/posthog";
 import { trackViewContent } from "@/lib/meta-pixel-events";
 import { FavoriteButton } from "../ui/FavoriteButton";
-import { isDropInResort } from "@/lib/drop-in";
-import DropInLink from "@/components/drop-in/DropInLink";
 
 interface Props {
   resort: ResortWithData;
@@ -36,62 +29,45 @@ interface Props {
   userConditions?: UserCondition[];
 }
 
-// ─── Cam player ──────────────────────────────────────────────────────────────
+// ─── Auto-refreshing image cam ───────────────────────────────────────────────
 
-/**
- * `cams.elevation` is a free-text column: most rows hold a number as a string,
- * but blanks, whitespace, and non-numeric junk all occur. `Number("")` is 0,
- * so a naive `Number.isFinite` check printed "0′" for a blank cell, while a
- * plain truthiness check elsewhere printed "NaN′ elevation" for junk. One
- * parser, used by both the caption and the player.
- */
-function camElevationFt(elevation: Cam["elevation"]): string | null {
-  const raw = elevation?.trim();
-  if (!raw) return null;
-  const feet = Number(raw);
-  if (!Number.isFinite(feet) || feet <= 0) return null;
-  return `${feet.toLocaleString()}′`;
-}
+function ImageCam({ url, name }: { url: string; name: string }) {
+  const [src, setSrc] = useState(url);
 
-/** Caption under a cam tile. Some imported cam rows have a blank `name`, which
- *  used to render an empty <p>; fall back to the feed name and, failing that,
- *  drop the caption entirely. */
-function CamCaption({ cam }: { cam: Cam }) {
-  const label = camDisplayName(cam, "");
-  const elevation = camElevationFt(cam.elevation);
-  if (!label && !elevation) return null;
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const sep = url.includes("?") ? "&" : "?";
+      setSrc(`${url}${sep}_t=${Date.now()}`);
+    }, 30_000); // refresh every 30 seconds
+    return () => clearInterval(interval);
+  }, [url]);
 
   return (
-    <p className="text-bark text-xs mt-1.5 px-1">
-      {label}
-      {elevation && (
-        <span className={label ? "ml-1.5 text-bark/60" : "text-bark/60"}>
-          {label ? "· " : ""}
-          {elevation}
-        </span>
-      )}
-    </p>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={name}
+      className="absolute inset-0 w-full h-full object-cover"
+      loading="lazy"
+    />
   );
 }
+
+// ─── Cam player ──────────────────────────────────────────────────────────────
 
 function CamPlayer({
   cam,
   resortSlug,
   resortName,
   index = 99,
-  onExpand,
 }: {
   cam: Cam;
   resortSlug: string;
   resortName: string;
   index?: number;
-  onExpand?: () => void;
 }) {
-  // Auto-load first 2 image cams; lazy-load the rest (each image cam re-fetches
-  // every 30s once live, so the deferred tiles are a deliberate bandwidth guard)
+  // Auto-load first 2 image cams; lazy-load the rest
   const [loaded, setLoaded] = useState(cam.embed_type !== "image" || index < 2);
-  const label = camDisplayName(cam);
-  const elevation = camElevationFt(cam.elevation);
 
   // Link-out cams — no embed available
   if (cam.embed_type === "link") {
@@ -116,7 +92,7 @@ function CamPlayer({
           </div>
           <div className="text-center px-4">
             <p className="text-text-subtle text-sm font-medium group-hover:text-cyan transition-colors">
-              {label}
+              {cam.name}
             </p>
             <p className="text-text-muted text-xs mt-0.5">Opens on resort website</p>
           </div>
@@ -147,29 +123,17 @@ function CamPlayer({
               </svg>
             </div>
             <div className="text-center px-4">
-              <p className="text-text-subtle text-sm font-medium">{label}</p>
-              {elevation && (
-                <p className="text-bark text-xs mt-0.5">{elevation} elevation</p>
+              <p className="text-text-subtle text-sm font-medium">{cam.name}</p>
+              {cam.elevation && (
+                <p className="text-text-muted text-xs mt-0.5">
+                  {Number(cam.elevation).toLocaleString()}′ elevation
+                </p>
               )}
-              <span className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
-                               border-[1.5px] border-forest text-forest text-[11px] font-semibold uppercase tracking-wider">
-                Click to load snapshot
-              </span>
+              <p className="text-text-muted text-xs mt-1">Click to load snapshot</p>
             </div>
           </button>
         ) : (
-          <>
-            <CamEmbed cam={cam} resortSlug={resortSlug} variant="tile" />
-            {onExpand && (
-              <button
-                onClick={onExpand}
-                aria-label="Open fullscreen"
-                className="absolute bottom-3 right-3 z-20 p-1.5 bg-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp text-ink hover:-translate-y-0.5 transition-transform"
-              >
-                <Maximize2 size={14} strokeWidth={2.5} />
-              </button>
-            )}
-          </>
+          <ImageCam url={cam.embed_url ?? ""} name={cam.name} />
         )}
         <div className="absolute top-2 right-2 z-20">
           <FavoriteButton itemId={cam.id} itemType="cam" variant="ghost" className="bg-surface/50 backdrop-blur-sm" />
@@ -179,6 +143,11 @@ function CamPlayer({
   }
 
   // YouTube + iframe — click-to-play
+  const embedSrc =
+    cam.embed_type === "youtube" && cam.youtube_id
+      ? `https://www.youtube.com/embed/${cam.youtube_id}?autoplay=1&mute=1`
+      : cam.embed_url ?? "";
+
   return (
     <div className="relative aspect-video bg-surface2 rounded-xl overflow-hidden border border-border group">
       <CamReportButton cam={cam} resortName={resortName} />
@@ -196,33 +165,31 @@ function CamPlayer({
             </svg>
           </div>
           <div className="text-center px-4">
-            <p className="text-text-subtle text-sm font-medium">{label}</p>
-            {elevation && (
-              <p className="text-bark text-xs mt-0.5">{elevation} elevation</p>
+            <p className="text-text-subtle text-sm font-medium">{cam.name}</p>
+            {cam.elevation && (
+              <p className="text-text-muted text-xs mt-0.5">
+                {Number(cam.elevation).toLocaleString()}′ elevation
+              </p>
             )}
-            <span className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
-                             border-[1.5px] border-forest text-forest text-[11px] font-semibold uppercase tracking-wider">
+            <p className="text-text-muted text-xs mt-1 flex items-center justify-center gap-1">
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-[livePulse_2s_ease-in-out_infinite]" />
               Click to load live cam
-            </span>
+            </p>
           </div>
         </button>
       )}
 
       {/* Actual embed */}
-      {loaded && <CamEmbed cam={cam} resortSlug={resortSlug} variant="tile" />}
-
-      {/* Expand to fullscreen (overlay) */}
-      {loaded && onExpand && (
-        <button
-          onClick={onExpand}
-          aria-label="Open fullscreen"
-          className="absolute bottom-3 right-3 z-20 p-1.5 bg-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp text-ink hover:-translate-y-0.5 transition-transform"
-        >
-          <Maximize2 size={14} strokeWidth={2.5} />
-        </button>
+      {loaded && (
+        <iframe
+          src={embedSrc}
+          title={cam.name}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          className="absolute inset-0 w-full h-full border-0"
+        />
       )}
-
+      
       {/* Favorite Button (overlay) */}
       <div className="absolute top-2 right-2 z-20">
         <FavoriteButton itemId={cam.id} itemType="cam" variant="ghost" className="bg-surface/50 backdrop-blur-sm" />
@@ -323,13 +290,9 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
 
 export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData, liveConditions, userConditions = [] }: Props) {
   const activeCams = resort.cams.filter((c) => c.is_active);
-  const embeddableCams = activeCams.filter((c) => c.embed_type !== "link");
   const snow = resort.snow_report;
-  const forecastTime = useForecastTime();
-  const isUS = resort.country === "US";
   const { user, isFavorite, toggle: toggleFav } = useFavorites();
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const favorited = isFavorite(resort.id);
 
   useEffect(() => {
@@ -347,7 +310,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
         <div className="max-w-5xl mx-auto">
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 text-text-muted hover:text-cyan text-sm py-2 px-1 pointer-coarse:min-h-11 transition-colors mb-4"
+            className="inline-flex items-center gap-1.5 text-text-muted hover:text-cyan text-sm transition-colors mb-4"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -355,13 +318,13 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
             All Resorts
           </Link>
 
-          {hasCurrentSnowForecast(hourlyData, forecastTime ?? NaN) && (
+          {snow?.snowing_now && (
             <div className="flex items-center gap-2 px-3 py-1.5 mb-4 bg-cyan/10 border border-cyan/30 rounded-lg w-fit">
               <svg className="w-4 h-4 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M12 2v4m0 12v4m-6.93-2.93l2.83-2.83m8.2-8.2l2.83-2.83M2 12h4m12 0h4m-2.93 6.93l-2.83-2.83m-8.2-8.2L4.07 5.07" />
               </svg>
-              <span className="text-cyan text-sm font-semibold">Snow forecast</span>
+              <span className="text-cyan text-sm font-semibold">Snowing Now</span>
             </div>
           )}
 
@@ -402,7 +365,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
               <div className="flex items-center gap-2">
                 {resort.instagram_url && (
                   <a href={resort.instagram_url} target="_blank" rel="noopener noreferrer"
-                    className="text-text-muted hover:text-cyan transition-colors p-2 pointer-coarse:p-3 -m-1" aria-label="Instagram" title="Instagram">
+                    className="text-text-muted hover:text-cyan transition-colors" title="Instagram">
                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
                     </svg>
@@ -410,7 +373,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
                 )}
                 {resort.facebook_url && (
                   <a href={resort.facebook_url} target="_blank" rel="noopener noreferrer"
-                    className="text-text-muted hover:text-cyan transition-colors p-2 pointer-coarse:p-3 -m-1" aria-label="Facebook" title="Facebook">
+                    className="text-text-muted hover:text-cyan transition-colors" title="Facebook">
                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                     </svg>
@@ -418,7 +381,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
                 )}
                 {resort.x_url && (
                   <a href={resort.x_url} target="_blank" rel="noopener noreferrer"
-                    className="text-text-muted hover:text-cyan transition-colors p-2 pointer-coarse:p-3 -m-1" aria-label="X (Twitter)" title="X (Twitter)">
+                    className="text-text-muted hover:text-cyan transition-colors" title="X (Twitter)">
                     <svg className="w-[18px] h-[18px]" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                     </svg>
@@ -443,15 +406,6 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
 
       {/* ── Content ───────────────────────────────────────────── */}
       <div className="max-w-5xl mx-auto px-4 py-8 md:px-8 space-y-10">
-
-        {/* Drop In — pilot resorts only. The map cards were the only way in, so
-            the game's own "Back to conditions" landed you on a page with no way
-            to return to it. */}
-        {isDropInResort(resort.slug) && (
-          <section>
-            <DropInLink slug={resort.slug} variant="block" />
-          </section>
-        )}
 
         {/* ConditionsHero — big glanceable numbers */}
         {weather && weather.length > 0 ? (
@@ -484,7 +438,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
                   href={`https://www.nrcs.usda.gov/wps/portal/wcc/home/snowpackProfile?station=${resort.snotel_station_id}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-text-muted hover:text-cyan text-xs py-2 px-1 pointer-coarse:min-h-11 inline-flex items-center transition-colors"
+                  className="text-text-muted hover:text-cyan text-xs transition-colors"
                 >
                   SNOTEL Source ↗
                 </a>
@@ -511,36 +465,30 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
           <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">5-Day Forecast</h2>
-              {isUS && (
-                <a
-                  href={`https://forecast.weather.gov/MapClick.php?lat=${resort.lat}&lon=${resort.lng}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-text-muted hover:text-cyan text-xs py-2 px-1 pointer-coarse:min-h-11 inline-flex items-center transition-colors"
-                >
-                  NWS Forecast ↗
-                </a>
-              )}
+              <a
+                href={`https://forecast.weather.gov/MapClick.php?lat=${resort.lat}&lon=${resort.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-text-muted hover:text-cyan text-xs transition-colors"
+              >
+                NWS Forecast ↗
+              </a>
             </div>
             <ForecastTable periods={forecastPeriods} />
-            <p className="text-text-muted text-xs mt-2">
-              {isUS ? "Via National Weather Service · Updated hourly" : "Via Open-Meteo · Updated hourly"}
-            </p>
+            <p className="text-text-muted text-xs mt-2">Via National Weather Service · Updated hourly</p>
           </section>
         ) : (
           <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">5-Day Forecast</h2>
-              {isUS && (
-                <a
-                  href={`https://forecast.weather.gov/MapClick.php?lat=${resort.lat}&lon=${resort.lng}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-text-muted hover:text-cyan text-xs py-2 px-1 pointer-coarse:min-h-11 inline-flex items-center transition-colors"
-                >
-                  NWS Forecast ↗
-                </a>
-              )}
+              <a
+                href={`https://forecast.weather.gov/MapClick.php?lat=${resort.lat}&lon=${resort.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-text-muted hover:text-cyan text-xs transition-colors"
+              >
+                NWS Forecast ↗
+              </a>
             </div>
             <div className="bg-surface border border-border rounded-xl p-6 text-center text-text-muted text-sm">
               Weather data temporarily unavailable.
@@ -560,14 +508,9 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">
               Live Cams
-              {/* Real separator text — a CSS margin alone glued the count onto
-                  "Cams" in the accessibility tree ("Live Cams3 available"). */}
-              {activeCams.length > 0 && (
-                <span className="text-bark text-sm font-normal">
-                  {" · "}
-                  {activeCams.length} available
-                </span>
-              )}
+              <span className="ml-2 text-text-muted text-sm font-normal">
+                {activeCams.length} available
+              </span>
             </h2>
             {resort.cam_page_url && (
               <a
@@ -595,21 +538,15 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {activeCams.map((cam, i) => (
                 <div key={cam.id}>
-                  <CamPlayer
-                    cam={cam}
-                    resortSlug={resort.slug}
-                    resortName={resort.name}
-                    index={i}
-                    onExpand={
-                      cam.embed_type !== "link"
-                        ? () => {
-                            trackCamClick(resort.slug, cam.name, "lightbox");
-                            setLightboxIndex(embeddableCams.findIndex((c) => c.id === cam.id));
-                          }
-                        : undefined
-                    }
-                  />
-                  <CamCaption cam={cam} />
+                  <CamPlayer cam={cam} resortSlug={resort.slug} resortName={resort.name} index={i} />
+                  <p className="text-text-muted text-xs mt-1.5 px-1">
+                    {cam.name}
+                    {cam.elevation && (
+                      <span className="ml-1.5 text-text-muted/60">
+                        · {Number(cam.elevation).toLocaleString()}′
+                      </span>
+                    )}
+                  </p>
                 </div>
               ))}
             </div>
@@ -647,16 +584,6 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
         </div>
 
       </div>
-
-      {lightboxIndex !== null && (
-        <CamLightbox
-          cams={embeddableCams}
-          initialIndex={lightboxIndex}
-          resortSlug={resort.slug}
-          resortName={resort.name}
-          onClose={() => setLightboxIndex(null)}
-        />
-      )}
     </div>
   );
 }

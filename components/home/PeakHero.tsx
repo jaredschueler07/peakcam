@@ -6,20 +6,11 @@ import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { navLinks } from "@/components/layout/Header";
 
-interface PeakHeroProps {
-  /** Live resort count from the data layer — keeps the eyebrow honest as coverage grows. */
-  resortCount?: number;
-}
-
-export function PeakHero({ resortCount }: PeakHeroProps) {
+export function PeakHero() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const countLabel =
-    typeof resortCount === "number" && resortCount > 0
-      ? `${resortCount} Resorts`
-      : "Both Hemispheres";
 
   return (
-    <div className="pc-topo relative h-screen supports-[height:100svh]:h-[100svh] w-full overflow-hidden">
+    <div className="pc-topo relative h-screen w-full overflow-hidden">
       {/* Subtle warmth radials layered over topo */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(1200px_600px_at_10%_-10%,rgba(217,85,47,0.10),transparent_60%)]" />
@@ -100,10 +91,10 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.6 }}
           >
-            Est. 2025 · {countLabel}
+            Est. 2025 · 128 Resorts
           </motion.div>
 
-          <h1 className="font-display font-black text-[20vw] sm:text-[18vw] md:text-[18vw] lg:text-[15rem] xl:text-[18rem] leading-[0.88] tracking-[-0.03em] mb-4">
+          <h1 className="font-display font-black text-[26vw] sm:text-[22vw] md:text-[18vw] lg:text-[15rem] xl:text-[18rem] leading-[0.88] tracking-[-0.03em] mb-4">
             <span className="text-ink">Peak</span>
             <span className="text-alpen italic font-bold">Cam</span>
           </h1>
@@ -114,7 +105,7 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4, duration: 0.8 }}
           >
-            Where&rsquo;s it good?
+            Got the goods?
           </motion.p>
 
           <motion.p
@@ -123,8 +114,8 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6, duration: 0.8 }}
           >
-            Live webcams and real snow reports from the Rockies to the Andes.
-            Pick a mountain before you leave.
+            Live webcams + real-time snow reports for 128+ ski resorts across North America.
+            No marketing noise. Just the mountain.
           </motion.p>
 
           <motion.a
@@ -138,7 +129,7 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.8, duration: 0.6 }}
           >
-            See conditions &rarr;
+            Check Conditions &rarr;
           </motion.a>
         </motion.div>
       </div>

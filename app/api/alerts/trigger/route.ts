@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { EmailSendError, sendPowderAlertEmail } from "@/lib/email";
-import { checkFreshness } from "@/lib/feed-freshness";
-import { sendFeedFreshnessAlertEmail } from "@/lib/alerts/freshness-email";
+import { sendPowderAlertEmail } from "@/lib/email";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -10,10 +8,6 @@ const CRON_SECRET = process.env.CRON_SECRET;
 function sbFetch(path: string, init?: RequestInit) {
   return fetch(`${SUPABASE_URL}/rest/v1${path}`, {
     ...init,
-    // Without this, a hung DB hangs every one of this route's five
-    // sequential queries (and the cron run with it) — the anon-client
-    // timeout wrapper doesn't cover this raw service-role fetch.
-    signal: AbortSignal.timeout(8_000),
     headers: {
       apikey: SERVICE_KEY,
       Authorization: `Bearer ${SERVICE_KEY}`,
@@ -42,52 +36,6 @@ interface SnowReport {
   new_snow_24h: number | null;
 }
 
-interface FreshnessSummary {
-  ageHours: number | null;
-  stale: boolean;
-  alerted: boolean;
-}
-
-// Dead-man's switch on the two production snow feeds (snotel-sync,
-// model-sync — both write snow_reports on independent 6h schedules, and
-// nothing else watches them). Fully isolated from the powder-alert path
-// below in both directions: a broken freshness check must never block
-// powder alerts, and a broken powder-alert run must never skip it. Detection
-// latency is bounded by this cron's own schedule (daily, 13:00 UTC) — a feed
-// that dies right after a run stays undetected for up to ~24h.
-async function runFreshnessCheck(): Promise<FreshnessSummary> {
-  try {
-    const latestResp = await sbFetch(
-      `/snow_reports?select=updated_at&order=updated_at.desc&limit=1`
-    );
-    // A failed query is treated the same as an empty table — stale, not a crash.
-    const latestRows: Array<{ updated_at: string }> = latestResp.ok ? await latestResp.json() : [];
-    const latest = latestRows[0]?.updated_at ?? null;
-    const { ageHours, stale } = checkFreshness(Date.now(), latest);
-
-    let alerted = false;
-    if (stale) {
-      try {
-        const result = await sendFeedFreshnessAlertEmail({ ageHours });
-        alerted = result.ok;
-        if (!result.ok) {
-          console.error(`[alerts/trigger] freshness alert email failed: ${result.error.kind}`);
-        }
-      } catch (err) {
-        console.error(`[alerts/trigger] freshness alert email threw:`, err);
-      }
-    }
-    return {
-      ageHours: ageHours === null ? null : Math.round(ageHours * 10) / 10,
-      stale,
-      alerted,
-    };
-  } catch (err) {
-    console.error(`[alerts/trigger] freshness check failed:`, err);
-    return { ageHours: null, stale: true, alerted: false };
-  }
-}
-
 // Shared handler for both GET (Vercel Cron) and POST (script) invocations.
 // Protected by Authorization: Bearer <CRON_SECRET>
 // Checks latest SNOTEL data against subscriber thresholds and fires emails.
@@ -101,27 +49,17 @@ async function handleTrigger(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Runs regardless of what happens below — see runFreshnessCheck's isolation note.
-  const freshness = await runFreshnessCheck();
-
   // 1. Load all alert preferences with subscriber + resort info
   const prefsResp = await sbFetch(
     `/alert_preferences?select=subscriber_id,resort_id,threshold_inches,alert_subscribers(id,email,manage_token),resorts(name,slug)`
   );
   if (!prefsResp.ok) {
-    return NextResponse.json({ error: "Failed to load preferences", freshness }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load preferences" }, { status: 500 });
   }
   const prefs: AlertPreference[] = await prefsResp.json();
 
   if (prefs.length === 0) {
-    return NextResponse.json({
-      ok: true,
-      attempted: 0,
-      sent: 0,
-      failed: 0,
-      message: "No active subscriptions",
-      freshness,
-    });
+    return NextResponse.json({ ok: true, sent: 0, message: "No active subscriptions" });
   }
 
   // 2. Load latest snow reports for all relevant resort IDs
@@ -130,7 +68,7 @@ async function handleTrigger(request: NextRequest) {
     `/latest_snow_reports?resort_id=in.(${resortIds.map((id) => `"${id}"`).join(",")})&select=resort_id,new_snow_24h`
   );
   if (!snowResp.ok) {
-    return NextResponse.json({ error: "Failed to load snow reports", freshness }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load snow reports" }, { status: 500 });
   }
   const snowReports: SnowReport[] = await snowResp.json();
   const snowByResort = new Map(snowReports.map((s) => [s.resort_id, s.new_snow_24h ?? 0]));
@@ -172,23 +110,12 @@ async function handleTrigger(request: NextRequest) {
   }
 
   if (bySubscriber.size === 0) {
-    return NextResponse.json({
-      ok: true,
-      attempted: 0,
-      sent: 0,
-      failed: 0,
-      message: "No thresholds exceeded",
-      freshness,
-    });
+    return NextResponse.json({ ok: true, sent: 0, message: "No thresholds exceeded" });
   }
 
   // 4. Send emails and log
-  const attempted = bySubscriber.size;
   let sent = 0;
   let failed = 0;
-  // Distinct failure reasons, surfaced in the response so a dead API key shows
-  // up in the cron result itself instead of only in the logs.
-  const errors = new Set<string>();
 
   for (const [subscriberId, { subscriber, alerts }] of bySubscriber) {
     try {
@@ -216,31 +143,11 @@ async function handleTrigger(request: NextRequest) {
     } catch (err) {
       console.error(`[alerts/trigger] Failed to send to ${subscriber.email}:`, err);
       failed++;
-      if (err instanceof EmailSendError) {
-        errors.add(`${err.kind}${err.resendErrorName ? `:${err.resendErrorName}` : ""}`);
-      } else {
-        errors.add(err instanceof Error ? err.name : "unknown_error");
-      }
     }
   }
 
-  const summary = {
-    ok: failed === 0,
-    attempted,
-    sent,
-    failed,
-    ...(errors.size > 0 ? { errors: [...errors] } : {}),
-    freshness,
-  };
-
-  console.log(
-    `[alerts/trigger] Done — ${sent}/${attempted} emails sent, ${failed} failed` +
-      (errors.size > 0 ? ` (${[...errors].join(", ")})` : "")
-  );
-
-  // Any failure is reported as a failed cron run — otherwise a broken key stays
-  // invisible until someone reads the logs.
-  return NextResponse.json(summary, { status: failed > 0 ? 500 : 200 });
+  console.log(`[alerts/trigger] Done — ${sent} emails sent, ${failed} failed`);
+  return NextResponse.json({ ok: true, sent, failed });
 }
 
 // GET — Vercel Cron invokes routes via GET

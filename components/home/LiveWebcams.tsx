@@ -4,16 +4,13 @@ import { motion } from "motion/react";
 import { Camera, Play } from "lucide-react";
 import { useState } from "react";
 import type { Cam } from "@/lib/types";
-import { camDisplayName } from "@/lib/cam-name";
 
 interface LiveWebcamsProps {
   cams: Cam[];
-  /** Live resort count for copy — avoids hardcoding coverage numbers. */
-  resortCount?: number;
 }
 
 // Poster "Live feeds" — paper section, Fraunces headline with alpen italic, stamped cam tiles
-export function LiveWebcams({ cams, resortCount }: LiveWebcamsProps) {
+export function LiveWebcams({ cams }: LiveWebcamsProps) {
   const [loadedCams, setLoadedCams] = useState<Set<string>>(new Set());
 
   if (cams.length === 0) return null;
@@ -24,10 +21,6 @@ export function LiveWebcams({ cams, resortCount }: LiveWebcamsProps) {
 
   const heroCam = cams[0];
   const secondaryCams = cams.slice(1);
-  const countPhrase =
-    typeof resortCount === "number" && resortCount > 0
-      ? `${resortCount} resorts across both hemispheres`
-      : "resorts across both hemispheres";
 
   return (
     <section className="relative py-20 px-6 pc-topo">
@@ -41,7 +34,7 @@ export function LiveWebcams({ cams, resortCount }: LiveWebcamsProps) {
             Live <em className="text-alpen italic font-bold">feeds</em>.
           </h2>
           <p className="text-bark text-lg mt-3">
-            Real-time conditions from {countPhrase}.
+            Real-time conditions from 128 resorts across North America.
           </p>
         </div>
 
@@ -83,8 +76,6 @@ function WebcamTile({
   onLoad: () => void;
   isHero?: boolean;
 }) {
-  const name = camDisplayName(cam);
-
   const embedSrc =
     cam.embed_type === "youtube" && cam.youtube_id
       ? `https://www.youtube.com/embed/${cam.youtube_id}?autoplay=1&mute=1`
@@ -107,7 +98,7 @@ function WebcamTile({
           className="w-full h-full border-0"
           allow="autoplay; encrypted-media"
           allowFullScreen
-          title={name}
+          title={cam.name}
         />
       )}
 
@@ -124,7 +115,7 @@ function WebcamTile({
             <Camera className="text-ink" size={isHero ? 40 : 32} strokeWidth={2} />
           </span>
           <div className="text-center px-4">
-            <h3 className="font-display font-black text-ink text-2xl leading-tight">{name}</h3>
+            <h3 className="font-display font-black text-ink text-2xl leading-tight">{cam.name}</h3>
             {cam.elevation && (
               <span className="mt-2 inline-block font-mono font-bold text-[10.5px] px-2.5 py-0.5
                                rounded-full bg-ink text-cream-50 uppercase tracking-[0.14em]">
@@ -134,7 +125,7 @@ function WebcamTile({
           </div>
           <button
             onClick={onLoad}
-            className="inline-flex items-center gap-2 px-5 py-2.5 pointer-coarse:min-h-11
+            className="inline-flex items-center gap-2 px-5 py-2.5
                        bg-alpen text-cream-50 font-semibold text-[14px]
                        rounded-full border-[1.5px] border-ink shadow-stamp
                        hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]

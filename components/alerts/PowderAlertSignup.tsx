@@ -123,7 +123,7 @@ export function PowderAlertSignup({ resorts }: Props) {
       {/* Trigger button */}
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 px-4 py-2 pointer-coarse:min-h-11 rounded-lg border border-border
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border
                    bg-surface hover:bg-surface2 hover:border-cyan/40 text-text-subtle
                    hover:text-cyan text-sm font-medium transition-colors duration-150"
       >
@@ -154,7 +154,7 @@ export function PowderAlertSignup({ resorts }: Props) {
               </div>
               <button
                 onClick={handleClose}
-                className="w-7 h-7 pointer-coarse:w-11 pointer-coarse:h-11 flex items-center justify-center rounded-md border border-border
+                className="w-7 h-7 flex items-center justify-center rounded-md border border-border
                            text-text-muted hover:text-text-base transition-colors"
                 aria-label="Close"
               >
@@ -177,7 +177,7 @@ export function PowderAlertSignup({ resorts }: Props) {
                       onChange={(e) => setSearch(e.target.value)}
                       placeholder="Search resorts..."
                       className="w-full pl-9 pr-3 py-2 bg-bg border border-border rounded-lg
-                                 text-text-base text-[16px] md:text-sm placeholder:text-text-muted outline-none focus:border-cyan/50"
+                                 text-text-base text-sm placeholder:text-text-muted outline-none focus:border-cyan/50"
                     />
                   </div>
                   {selected.size > 0 && (
@@ -197,7 +197,7 @@ export function PowderAlertSignup({ resorts }: Props) {
                              className={`rounded-lg border transition-colors duration-100 ${
                                isOn ? "bg-cyan/5 border-cyan/30" : "bg-bg border-border hover:border-border-hi"
                              }`}>
-                          <div className="flex items-center gap-3 px-3 py-2.5 pointer-coarse:min-h-11">
+                          <div className="flex items-center gap-3 px-3 py-2.5">
                             <button
                               onClick={() => toggleResort(resort.id)}
                               className={`w-4.5 h-4.5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
@@ -255,7 +255,7 @@ export function PowderAlertSignup({ resorts }: Props) {
                   <button
                     onClick={() => { if (selected.size > 0) { setStep("email"); setError(null); } }}
                     disabled={selected.size === 0}
-                    className="w-full py-2.5 pointer-coarse:min-h-11 rounded-lg bg-cyan text-bg font-semibold text-sm
+                    className="w-full py-2.5 rounded-lg bg-cyan text-bg font-semibold text-sm
                                hover:bg-cyan/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     Continue →
@@ -279,10 +279,8 @@ export function PowderAlertSignup({ resorts }: Props) {
                   onChange={(e) => { setEmail(e.target.value); setError(null); }}
                   onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
                   placeholder="your@email.com"
-                  autoComplete="email"
-                  inputMode="email"
                   className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text-base
-                             placeholder:text-text-muted outline-none focus:border-cyan/50 text-[16px] md:text-sm"
+                             placeholder:text-text-muted outline-none focus:border-cyan/50 text-sm"
                 />
 
                 {error && <p className="text-red-400 text-sm">{error}</p>}
@@ -290,7 +288,7 @@ export function PowderAlertSignup({ resorts }: Props) {
                 <div className="flex gap-3">
                   <button
                     onClick={() => setStep("pick")}
-                    className="flex-1 py-2.5 pointer-coarse:min-h-11 rounded-lg border border-border text-text-subtle
+                    className="flex-1 py-2.5 rounded-lg border border-border text-text-subtle
                                hover:text-text-base text-sm transition-colors"
                   >
                     Back
@@ -298,7 +296,7 @@ export function PowderAlertSignup({ resorts }: Props) {
                   <button
                     onClick={handleSubmit}
                     disabled={submitting}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 pointer-coarse:min-h-11 rounded-lg
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg
                                bg-cyan text-bg font-semibold text-sm hover:bg-cyan/90
                                transition-colors disabled:opacity-60"
                   >
@@ -323,18 +321,14 @@ export function PowderAlertSignup({ resorts }: Props) {
                                 justify-center mx-auto">
                   <Check size={24} className="text-cyan" />
                 </div>
-                {/* Wording is deliberately the same whether or not this address
-                    was already subscribed — the endpoint cannot tell the caller
-                    which it was without leaking who has an account. */}
-                <h2 className="text-text-base font-semibold text-lg">Check your inbox</h2>
+                <h2 className="text-text-base font-semibold text-lg">Powder alerts activated</h2>
                 <p className="text-text-subtle text-sm leading-relaxed">
-                  We&apos;ve emailed <strong className="text-text-base">{email}</strong> a link to
-                  confirm and manage your powder alerts. If that address is already subscribed,
-                  the link lets you change what you follow.
+                  We'll email <strong className="text-text-base">{email}</strong> when your resorts
+                  get fresh snow. Check your inbox for a welcome message.
                 </p>
                 <button
                   onClick={handleClose}
-                  className="mt-2 px-6 py-2.5 pointer-coarse:min-h-11 bg-surface2 border border-border rounded-lg
+                  className="mt-2 px-6 py-2.5 bg-surface2 border border-border rounded-lg
                              text-text-subtle hover:text-text-base text-sm transition-colors"
                 >
                   Close

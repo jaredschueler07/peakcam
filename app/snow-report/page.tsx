@@ -2,15 +2,12 @@ import { getAllResorts } from "@/lib/supabase";
 import { SnowReportPage } from "@/components/snow-report/SnowReportPage";
 import type { ResortWithData } from "@/lib/types";
 
-import { SITE_URL } from "@/lib/site";
-
 export const revalidate = 3600;
 
 export const metadata = {
   title: "Ski Resort Snow Report — Live Base Depth & Trail Conditions",
-  alternates: { canonical: `${SITE_URL}/snow-report` },
   description:
-    "Compare live snow conditions across 150+ ski resorts in North & South America. " +
+    "Compare live snow conditions across 128 North American ski resorts. " +
     "Base depth, 24h & 48h fresh snow, open trails, lift status, and powder day alerts — updated hourly.",
   keywords: [
     "ski snow report",
@@ -21,21 +18,18 @@ export const metadata = {
     "powder day",
     "ski resort conditions today",
     "North America snow report",
-    "South America snow report",
-    "Chile ski snow report",
-    "Argentina ski snow report",
     "ski resort base depth comparison",
   ],
   openGraph: {
     title: "Ski Resort Snow Report — Live Base Depth & Conditions",
-    description: "Compare live snow conditions, base depths, and powder alerts for 150+ ski resorts across North & South America.",
-    url: `${SITE_URL}/snow-report`,
+    description: "Compare live snow conditions, base depths, and powder alerts for 128 North American ski resorts.",
+    url: "https://peakcam.io/snow-report",
     type: "website" as const,
   },
   twitter: {
     card: "summary_large_image" as const,
     title: "Live Ski Snow Report",
-    description: "Base depth, fresh snow, and lift status for 150+ ski resorts. Updated hourly.",
+    description: "Base depth, fresh snow, and lift status for 128 ski resorts. Updated hourly.",
   },
 };
 
@@ -44,20 +38,23 @@ const jsonLd = {
   "@type": "WebPage",
   name: "Snow Report — PeakCam",
   description:
-    "Compare live snow conditions across 150+ ski resorts in North & South America. Base depth, fresh snow, trail counts, and lift status at a glance.",
-  url: `${SITE_URL}/snow-report`,
+    "Compare live snow conditions across 128 North American ski resorts. Base depth, fresh snow, trail counts, and lift status at a glance.",
+  url: "https://peakcam.io/snow-report",
   isPartOf: {
     "@type": "WebSite",
     name: "PeakCam",
-    url: SITE_URL,
+    url: "https://peakcam.io",
   },
 };
 
 export default async function SnowReport() {
-  // Let a fetch failure propagate — it fails this ISR revalidation so
-  // Next.js keeps serving the last good page instead of caching an empty
-  // snow report at 200.
-  const resorts: ResortWithData[] = await getAllResorts();
+  let resorts: ResortWithData[] = [];
+
+  try {
+    resorts = await getAllResorts();
+  } catch {
+    console.warn("[PeakCam] Could not fetch resorts for snow report.");
+  }
 
   return (
     <>

@@ -1,99 +1,43 @@
 # PeakCam Tasks
 
-> Last updated: 2026-03-28 | Sprint 4 (Polish & Launch Prep) | Week 2
+> Last updated: 2026-06-10 | Phase: Soft Launch (sub-project #2) | Sources: Linear (RUN-63…73), Notion roadmap, Slack #all-peakcam, repo docs
+> Site: live at peakcam.io (128 resorts, latest deploy 2026-04-21). Project idle since 4/21 — this file reflects actual state, replacing the stale March sprint plan.
 
-## Active — Sprint 4
+## Active — Soft Launch Rollout
 
 ### P0 Critical
-- [ ] Wire up alerts system — subscribers, preferences, powder alert triggers — **Engineering** (due 4/4)
-- [ ] QA & cross-browser testing — mobile Safari, Chrome, Firefox — **Engineering** (due 4/4)
-- [ ] Merge open feature branches (`feat/map-overhaul`, `feat/multi-source-data-pipeline`) or close — **Engineering** (due 3/31)
+- [ ] Soft launch & social media rollout — **Marketing/Jared** (Linear RUN-68, overdue since 4/7)
+  - Launch content ready in Notion (Product Hunt copy, social posts). Final checklist → submit → monitor PostHog 48h.
+- [ ] Finish cross-browser QA smoke — **Engineering/Jared** (residual from launch gate)
+  - Chromium desktop done 4/19 (0 P0/P1). Remaining: mobile Safari, Chrome mobile, Firefox — checklist in `docs/qa-smoke-2026-04-17.md`.
+- [ ] Set cam-reports env vars in Vercel — **Operations** (PR #8 follow-up)
+  - Admin notification email + IP salt per `.env.local.example`; feature is deployed but silent without them.
 
 ### P1 High
-- [ ] Populate empty DB tables — `resort_metadata`, `data_source_readings`, `resort_conditions_summary` — **Data** (due 4/4)
-- [ ] Performance optimization — Core Web Vitals audit, image lazy-loading, bundle size — **Engineering** (due 4/4)
-- [ ] Soft launch & social media rollout (Product Hunt, social content ready in Notion) — **Marketing** (due 4/7)
-- [ ] Analytics dashboard & baseline metrics — PostHog funnels, retention, key events — **Data** (due 4/7)
+- [ ] Analytics baseline & retention cohorts — **Data** (Linear RUN-69, partially done)
+  - PostHog dashboard live since 4/17 (4 funnels + 3 trends). Remaining: retention cohorts, documented pre-launch baseline.
+- [ ] Verify data pipeline still populating — **Data**
+  - Migration 010 applied + pipeline enabled 4/17. Confirm `snow_reports`/`resort_metadata` have fresh rows after 7 idle weeks; check launchd job on host.
+- [ ] Merge or close stale feature branches — **Engineering** (Linear RUN-65)
+  - `origin/feat/launch-readiness` still exists (merged); check `feat/map-overhaul`, `feat/multi-source-data-pipeline`, Claude worktree branches.
 
 ### P2 Medium
-- [ ] Deployment runbook & incident response plan — **Operations** (due 4/7)
-- [ ] Affiliate program research report — **Sales** (due 4/7)
-- [ ] V0 cost analysis & revenue model report — **Finance** (due 4/10)
-- [ ] V0 retrospective & V0.5 planning — **Product** (due 4/10)
+- [ ] Fix 3 P2s from Chromium smoke (map marker popup, `submitted_at` column, SNOTEL upstream) — **Engineering** (filed 4/19)
+- [ ] Lint cleanup — 36 errors / 48 warnings, mostly `no-explicit-any` + unused vars in `scripts/` — **Engineering**
+- [ ] Populate remaining empty DB tables (`data_source_readings`, `resort_conditions_summary`) — **Data** (Linear RUN-66, partial)
 
-## Backlog — V0.5
+## Backlog — Post-Launch (V0.5)
+- [ ] V0 cost analysis & revenue model report — **Finance** (Linear RUN-72)
+- [ ] V0 retrospective & V0.5 planning — **Product** (Linear RUN-73)
+  - Candidate themes: alerts expansion, lift status, historical charts, trip planner.
+- [ ] Affiliate program: act on research — **Sales** (Linear RUN-71; research doc already in Notion)
+- [ ] Update Linear: close RUN-70 (runbook done — `docs/runbook.md`), reconcile RUN-66/69 partials
 
-- [ ] Push notification support for powder alerts
-- [ ] Resort photo gallery / user-submitted photos
-- [ ] Historical snow data charts (SNOTEL normals vs actual)
-- [ ] Lift status integration (Liftie API wired but not surfaced in UI)
-- [ ] SNODAS snowmelt/runoff data visualization
-- [ ] Multi-resort trip planner
-- [ ] Embed widget for resort websites
-- [ ] API for third-party integrations
-
-## Done — Sprint 1 (Foundation, March 16–20)
-
-- [x] All-hands meeting — all teams presented V0 plans (3/16)
-- [x] Notion roadmap populated — 12 workstreams (3/16)
-- [x] Notion sprint tasks created — 27 tasks across 4 sprints (3/16)
-- [x] Slack bot infrastructure — 8 agents, all channels joined (3/16)
-- [x] Agent plugin skills installed — 66 skills across 8 teams (3/16)
-- [x] Vercel project setup & deployment pipeline (3/17)
-- [x] Alpine Bold design tokens — Tailwind config + CSS custom properties (3/17)
-- [x] Initial scaffold — phases 1–3, browse page, resort detail (3/16)
-- [x] Fuse.js fuzzy search replacing naive string search (3/17)
-- [x] Browse filters, powder alert threshold, custom 404 (3/17)
-- [x] Agent loop service — polling, handoffs, rate limiting (3/17)
-- [x] SNOTEL lib + COO agent + Day 1 planning docs (3/17)
-- [x] Hosting infrastructure on Vercel (3/17)
-- [x] Brand positioning & about page content (3/18)
-- [x] Agent workflow documentation (3/17)
-
-## Done — Sprint 2 (Core Features, March 20–27)
-
-- [x] Summit Light UI redesign — hero, ticker, cards, webcams, footer (3/20)
-- [x] SEO structured data, sitemap, robots.txt, PostHog integration (3/20)
-- [x] Resort comparison page at /compare (3/20)
-- [x] User-submitted conditions reports with auth + moderation (3/20)
-- [x] Expanded to 128 resorts (from initial ~70) (3/21)
-- [x] Dynamic OG share cards for social sharing (3/21)
-- [x] Ops dashboard with auto-refresh and remote permissions (3/21)
-- [x] Brand image generation system with versioning (3/21)
-- [x] SNOTEL sync pipeline — quality checks, history, conditions engine (3/22)
-- [x] SNOTEL normals seed script — 30-year medians (17,202 records) (3/22)
-- [x] Conditions engine — rating, trend arrows, % of normal, outlook (3/22)
-- [x] Snow data quality validation and water-year helpers (3/22)
-- [x] Map overhaul — Leaflet → MapLibre GL JS with dark terrain tiles (3/22)
-- [x] 301 real webcam URLs imported from resort research (3/22)
-- [x] Social media links for all 128 resorts (3/22)
-- [x] Monitoring & observability — cam health checker, dashboard (3/22)
-- [x] Vercel Web Analytics + Speed Insights installed (3/22)
-- [x] Domain updated to peakcam.io (3/23)
-- [x] Snow report page implementation at /snow-report (3/22)
-- [x] /about page implementation (3/22)
-- [x] Content drafts: about page & resort descriptions (3/22)
-
-## Done — Sprint 3 (Auth, Polish & SEO, March 23–28)
-
-- [x] Email + password auth system at /auth (3/23)
-- [x] Auth middleware for session refresh (3/23)
-- [x] Favorites / saved resorts system (3/23)
-- [x] Share button with PostHog tracking on resort detail (3/23)
-- [x] SEO keyword optimization — structured data, sitemap coverage (3/23)
-- [x] Canonical URL fix to prevent duplicate content indexing (3/24)
-- [x] Google Search Console verification (3/24)
-- [x] Agent loop bug fixes — silence bug, crash recovery (3/24)
-- [x] Conditions engine UI — trend arrows, % of normal, outlook labels (3/25)
-- [x] Cam health checker with proper headers, retries, architecture doc (3/25)
-- [x] Snowing Now detection + badge on resort detail (3/26)
-- [x] Snow Cams section — live cams from resorts with active snowfall (3/26)
-- [x] Fixed 16 broken cam URLs with verified working sources (3/26)
-- [x] User dashboard with drag-and-drop widget management (3/27)
-- [x] Multi-source data pipeline (SNOTEL + NWS + Liftie + SNODAS) (3/27)
-- [x] Mobile header improvements (3/27)
-- [x] Auth UI page polish (3/28)
-- [x] Core Web Vitals optimization, JSON-LD, routing improvements (3/28)
-- [x] Launch readiness checklist completed in Notion (3/24)
-- [x] SEO strategy doc written (3/23)
-- [x] Launch content prepared — Product Hunt, social posts (3/21)
+## Done (high-water mark)
+- [x] Sprints 1–2: site live at peakcam.io, 145 pages, auth, favorites, SEO, OG cards, PostHog (3/23)
+- [x] Sprint 3: map UX overhaul, weather forecast overhaul, perf optimization, alerts cron (RUN-63/64/67) (4/4)
+- [x] Launch readiness sub-project #1: alerts E2E verified, migration 010 + 128 resorts seeded, PostHog dashboard, Chromium smoke, runbook (4/17)
+- [x] Retro ski-poster design system across 22 components (PR #7) (4/19)
+- [x] Cam reports: users flag broken cams + suggest replacements (PR #8) (4/21)
+- [x] Popular sort default — curated 12-resort list (4/21)
+- [x] Local repo synced with origin/main, deps reinstalled (6/10)

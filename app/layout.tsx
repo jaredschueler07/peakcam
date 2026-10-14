@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from "next";
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Fraunces, DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
@@ -28,16 +28,7 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
-import { SITE_URL as BASE_URL } from "@/lib/site";
-
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  // NOTE: no viewportFit:"cover" yet — the sticky Header and edge-pinned
-  // overlays have no safe-area padding, so cover would put them under the
-  // notch/home indicator. Add it together with that padding (roadmap M4).
-  themeColor: "#2a1f14",
-};
+const BASE_URL = "https://peakcam.io";
 
 export const metadata: Metadata = {
   title: {
@@ -45,8 +36,8 @@ export const metadata: Metadata = {
     template: "%s | PeakCam",
   },
   description:
-    "Live cams, snow reports, and weather forecasts for ski resorts across North & South America. " +
-    "Browse 150+ resorts on an interactive map.",
+    "Live cams, snow reports, and weather forecasts for ski resorts across North America. " +
+    "Browse 128 resorts on an interactive map.",
   keywords: [
     "ski cams",
     "live mountain cams",
@@ -57,8 +48,6 @@ export const metadata: Metadata = {
     "powder day",
     "ski resort weather",
     "trail conditions",
-    "Chile ski resorts",
-    "Argentina ski resorts",
   ],
   metadataBase: new URL(BASE_URL),
   alternates: { canonical: "/" },
@@ -66,12 +55,12 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "PeakCam",
     title: "PeakCam — Live Mountain Cams & Snow Reports",
-    description: "Browse live cams and snow conditions for 150+ ski resorts across North & South America.",
+    description: "Browse live cams and snow conditions for 128 North American ski resorts.",
   },
   twitter: {
     card: "summary_large_image",
     title: "PeakCam — Live Mountain Cams",
-    description: "Browse live cams and snow conditions for 150+ ski resorts across North & South America.",
+    description: "Browse live cams and snow conditions for 128 North American ski resorts.",
   },
   robots: { index: true, follow: true },
   verification: {

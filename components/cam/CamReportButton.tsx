@@ -5,7 +5,6 @@ import { useEffect, useState, useCallback } from "react";
 import { Flag } from "lucide-react";
 import type { Cam } from "@/lib/types";
 import { CamReportModal } from "./CamReportModal";
-import { camDisplayName } from "@/lib/cam-name";
 
 const STORAGE_KEY = "peakcam_cam_reports";       // { [cam_id]: isoTimestamp }
 const REPORT_COOLDOWN_MS = 24 * 3600 * 1000;
@@ -71,7 +70,7 @@ export function CamReportButton({ cam, resortName }: Props) {
         onClick={() => setOpen(true)}
         disabled={disabled}
         className={`absolute top-3 left-3 z-10 inline-flex items-center gap-1.5
-          px-2.5 py-0.5 pointer-coarse:min-h-10 pointer-coarse:px-3.5 rounded-full border-[1.5px] text-[11px] font-bold
+          px-2.5 py-0.5 rounded-full border-[1.5px] text-[11px] font-bold
           uppercase tracking-[0.14em] shadow-[2px_2px_0_#2a1f14]
           transition-[transform,box-shadow] duration-100
           ${disabled
@@ -83,7 +82,7 @@ export function CamReportButton({ cam, resortName }: Props) {
             ? "Report submitted"
             : status === "alreadyReported"
             ? "Already reported"
-            : `Report ${camDisplayName(cam)} broken`
+            : `Report ${cam.name} broken`
         }
       >
         <Flag size={11} strokeWidth={2.5} />

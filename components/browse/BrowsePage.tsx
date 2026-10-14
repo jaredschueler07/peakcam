@@ -4,27 +4,20 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import Fuse from "fuse.js";
-import { Search, SlidersHorizontal, MapPin, ChevronDown, Snowflake } from "lucide-react";
+import { Search, SlidersHorizontal, MapPin, ChevronDown } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { SummitResortCard } from "@/components/browse/SummitResortCard";
 import { PowderAlertSignup } from "@/components/alerts/PowderAlertSignup";
 import { useFavorites } from "@/lib/useFavorites";
-import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import { AuthModal } from "@/components/auth/AuthModal";
 import type { ResortWithData } from "@/lib/types";
-import type { RadarFrame } from "@/lib/weather-radar";
-import { isOffSeason } from "@/lib/map-utils";
-// Curated popularity ranking — order matters, top of list = top of grid. Based
-// on brand recognition / skier visits; SA heroes featured for Andes season.
-// Shared with the 404 page, so it can't live in this "use client" module.
-import { POPULAR_RANK } from "@/lib/popular-resorts";
 import { trackSearch, trackFilter } from "@/lib/posthog";
 
 // MapLibre map — dynamic import, no SSR (requires window)
 const MapView = dynamic(() => import("@/components/map/MapView"), {
   ssr: false,
   loading: () => (
-    <div className="pc-topo h-full w-full animate-pulse rounded-[18px] border-[1.5px] border-ink flex items-center justify-center">
+    <div className="h-full w-full bg-cream animate-pulse rounded-[18px] border-[1.5px] border-ink flex items-center justify-center">
       <span className="font-mono text-bark text-xs uppercase tracking-[0.14em]">Loading map…</span>
     </div>
   ),
@@ -34,14 +27,10 @@ const MapView = dynamic(() => import("@/components/map/MapView"), {
 
 interface Props {
   resorts: ResortWithData[];
-  /** RainViewer radar frames for the sidebar map's radar loop (best-effort). */
-  radarFrames?: RadarFrame[];
 }
 
 type StateFilter = string;
-// "goods" is a one-tap shortcut for great OR good — the core "which resort has
-// the goods right now" job, surfaced as its own prominent chip.
-type ConditionFilter = "all" | "goods" | "great" | "good" | "fair" | "poor";
+type ConditionFilter = "all" | "great" | "good" | "fair" | "poor";
 type SortOption = "popular" | "best" | "snow" | "name";
 
 const SORT_LABEL: Record<SortOption, string> = {
@@ -57,8 +46,25 @@ const CONDITION_ORDER: Record<string, number> = {
   great: 0, good: 1, fair: 2, poor: 3,
 };
 
-/** Full-country state values (not US/CA abbreviations). */
-const SA_STATES = new Set(["Chile", "Argentina"]);
+// Curated popularity ranking — order matters, top of list = top of grid.
+// Based on brand recognition / skier visits; adjust freely.
+const POPULAR_SLUGS: string[] = [
+  "vail",
+  "aspen-snowmass",
+  "park-city",
+  "jackson-hole",
+  "whistler-blackcomb",
+  "mammoth",
+  "breckenridge",
+  "palisades-tahoe",
+  "big-sky",
+  "killington",
+  "stowe",
+  "alta",
+];
+const POPULAR_RANK: Record<string, number> = Object.fromEntries(
+  POPULAR_SLUGS.map((slug, idx) => [slug, idx]),
+);
 
 const STATE_NAMES: Record<string, string> = {
   AZ: "Arizona", BC: "British Columbia", CA: "California", CO: "Colorado",
@@ -67,17 +73,7 @@ const STATE_NAMES: Record<string, string> = {
   NM: "New Mexico", NV: "Nevada", NY: "New York", OR: "Oregon",
   PA: "Pennsylvania", UT: "Utah", VA: "Virginia", VT: "Vermont",
   WA: "Washington", WI: "Wisconsin", WV: "West Virginia", WY: "Wyoming",
-  Chile: "Chile",
-  Argentina: "Argentina",
 };
-
-function stateButtonLabel(stateFilter: string): string {
-  if (stateFilter === "All") return "All States";
-  // Full-country values (Chile, Argentina) — no "CODE — Name" redundancy
-  if (SA_STATES.has(stateFilter) || stateFilter.length > 2) return stateFilter;
-  const full = STATE_NAMES[stateFilter];
-  return full ? `${stateFilter} — ${full}` : stateFilter;
-}
 
 const FUSE_OPTIONS: import("fuse.js").IFuseOptions<ResortWithData> = {
   keys: [
@@ -120,113 +116,12 @@ function FilterChip({
   );
 }
 
-// ── Mobile filter sheet ──────────────────────────────────────────────────────
-// Below md the chip stack wraps to ~5 rows and eats a third of the viewport
-// while sticky; on phones everything but state + "The Goods" lives in here.
-
-function FilterSheet({
-  open,
-  onClose,
-  condFilter,
-  setCondFilter,
-  freshSnow,
-  setFreshSnow,
-  hasLiveCams,
-  setHasLiveCams,
-  showFavorites,
-  setShowFavorites,
-  canFavorite,
-  sort,
-  setSort,
-}: {
-  open: boolean;
-  onClose: () => void;
-  condFilter: ConditionFilter;
-  setCondFilter: (c: ConditionFilter) => void;
-  freshSnow: boolean;
-  setFreshSnow: (v: boolean) => void;
-  hasLiveCams: boolean;
-  setHasLiveCams: (v: boolean) => void;
-  showFavorites: boolean;
-  setShowFavorites: (v: boolean) => void;
-  canFavorite: boolean;
-  sort: SortOption;
-  setSort: (s: SortOption) => void;
-}) {
-  useBodyScrollLock(open);
-  if (!open) return null;
-
-  return (
-    <div className="md:hidden">
-      <div className="fixed inset-0 z-40 bg-ink/40 animate-fadeIn" onClick={onClose} />
-      <div
-        className="fixed bottom-0 left-0 right-0 z-50 animate-slideUp"
-        role="dialog"
-        aria-label="Filters and sort"
-      >
-        <div className="bg-cream-50 border-t-[1.5px] border-ink rounded-t-[18px] px-5 pt-3
-                        pb-[max(1.5rem,env(safe-area-inset-bottom))] max-h-[85dvh] overflow-y-auto
-                        shadow-[0_-6px_20px_-8px_rgba(42,31,20,0.35)]">
-          <div className="flex justify-center mb-4">
-            <div className="w-10 h-1 bg-bark/40 rounded-full" />
-          </div>
-
-          <div className="pc-eyebrow mb-2" style={{ color: "var(--pc-bark)" }}>Conditions</div>
-          <div className="flex flex-wrap gap-2 mb-5">
-            <FilterChip
-              label="The Goods"
-              icon={<Snowflake size={14} />}
-              active={condFilter === "goods"}
-              onClick={() => setCondFilter(condFilter === "goods" ? "all" : "goods")}
-            />
-            {(["all", "great", "good", "fair", "poor"] as ConditionFilter[]).map((c) => (
-              <FilterChip
-                key={c}
-                label={c === "all" ? "Any Condition" : c.charAt(0).toUpperCase() + c.slice(1)}
-                active={condFilter === c}
-                onClick={() => setCondFilter(condFilter === c ? "all" : c)}
-              />
-            ))}
-          </div>
-
-          <div className="pc-eyebrow mb-2" style={{ color: "var(--pc-bark)" }}>Features</div>
-          <div className="flex flex-wrap gap-2 mb-5">
-            <FilterChip label="Fresh Snow" active={freshSnow} onClick={() => setFreshSnow(!freshSnow)} />
-            <FilterChip label="Live Cams" active={hasLiveCams} onClick={() => setHasLiveCams(!hasLiveCams)} />
-            {canFavorite && (
-              <FilterChip label="My Favorites" active={showFavorites} onClick={() => setShowFavorites(!showFavorites)} />
-            )}
-          </div>
-
-          <div className="pc-eyebrow mb-2" style={{ color: "var(--pc-bark)" }}>Sort by</div>
-          <div className="flex flex-wrap gap-2 mb-6">
-            {(["popular", "best", "snow", "name"] as SortOption[]).map((opt) => (
-              <FilterChip key={opt} label={SORT_LABEL[opt]} active={sort === opt} onClick={() => setSort(opt)} />
-            ))}
-          </div>
-
-          <button
-            onClick={onClose}
-            className="w-full py-3 min-h-11 bg-ink text-cream-50 border-[1.5px] border-ink rounded-full
-                       font-bold text-[14px] uppercase tracking-[0.06em] shadow-stamp-sm"
-          >
-            Done
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── TODAY'S TOP CONDITIONS — editorial strip ─────────────────────────────────
 
 function FeaturedRow({ resorts }: { resorts: ResortWithData[] }) {
   const featured = useMemo(() => {
-    const now = new Date();
     const sorted = resorts
-      // In-season only: a stale "great" on a summer-closed resort shouldn't
-      // headline "Today's Top" (matches the map's off-season treatment).
-      .filter((r) => r.snow_report && r.cond_rating && !isOffSeason(r.lat, now))
+      .filter((r) => r.snow_report && r.cond_rating)
       .sort((a, b) => {
         const condDiff = (CONDITION_ORDER[a.cond_rating] ?? 99) - (CONDITION_ORDER[b.cond_rating] ?? 99);
         if (condDiff !== 0) return condDiff;
@@ -253,7 +148,7 @@ function FeaturedRow({ resorts }: { resorts: ResortWithData[] }) {
         Today&apos;s Top
       </div>
       <h2 className="font-display font-black text-4xl md:text-5xl text-ink mb-1 leading-[0.95] tracking-[-0.02em]">
-        Best <em className="text-alpen not-italic font-bold italic">right now</em>.
+        Got the <em className="text-alpen not-italic font-bold italic">goods</em>.
       </h2>
       <p className="text-bark text-sm mb-5">Ranked by condition rating and recent snowfall.</p>
       <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 scrollbar-hide">
@@ -266,7 +161,8 @@ function FeaturedRow({ resorts }: { resorts: ResortWithData[] }) {
               href={`/resorts/${resort.slug}`}
               className="group relative flex-shrink-0 w-72 bg-cream-50 border-[1.5px] border-ink rounded-[18px] overflow-hidden
                          shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]
-                         transition-[transform,box-shadow] duration-150"
+                         transition-[transform,box-shadow] duration-150
+                         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alpen"
             >
               <div className="p-5">
                 <div className="flex items-start justify-between gap-2 mb-4">
@@ -327,9 +223,7 @@ function PowderAlert({ resorts }: { resorts: ResortWithData[] }) {
   if (alerts.length === 0) return null;
 
   return (
-    /* pc-on-ink: saturated alpenglow fill — the default ember focus ring is
-       1.3:1 against it, so links inside get the cream ring (3.6:1) instead. */
-    <div className="pc-on-ink flex items-center gap-3 px-5 py-3 bg-alpen text-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp mb-8">
+    <div className="flex items-center gap-3 px-5 py-3 bg-alpen text-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp mb-8">
       <span className="relative flex h-3 w-3 shrink-0">
         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cream-50 opacity-75" />
         <span className="relative inline-flex rounded-full h-3 w-3 bg-cream-50" />
@@ -351,45 +245,9 @@ function PowderAlert({ resorts }: { resorts: ResortWithData[] }) {
   );
 }
 
-// ── Southern Hemisphere season callout ───────────────────────────────────────
-// Uses the same FilterChip setState pattern — no new filter system.
-// Visible only when Chile/Argentina resorts exist in the dataset.
-
-function SouthernSeasonBanner({
-  saCount,
-  stateFilter,
-  onFilterChile,
-  onFilterArgentina,
-}: {
-  saCount: number;
-  stateFilter: string;
-  onFilterChile: () => void;
-  onFilterArgentina: () => void;
-}) {
-  if (saCount === 0) return null;
-
-  return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-4 mb-8
-                    bg-cream-50 border-[1.5px] border-ink rounded-[18px] shadow-stamp-sm">
-      <div className="min-w-0">
-        <div className="font-mono font-bold text-[10.5px] text-bark uppercase tracking-[0.14em] mb-1">
-          Southern Hemisphere · in season now
-        </div>
-        <p className="text-ink text-sm font-medium">
-          Chile &amp; Argentina are live — {saCount} Andes resorts with cams and snow reports.
-        </p>
-      </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <FilterChip label="Chile" active={stateFilter === "Chile"} onClick={onFilterChile} />
-        <FilterChip label="Argentina" active={stateFilter === "Argentina"} onClick={onFilterArgentina} />
-      </div>
-    </div>
-  );
-}
-
 // ── Main BrowsePage ──────────────────────────────────────────────────────────
 
-export function BrowsePage({ resorts, radarFrames = [] }: Props) {
+export function BrowsePage({ resorts }: Props) {
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState<StateFilter>("All");
   const [condFilter, setCondFilter] = useState<ConditionFilter>("all");
@@ -401,32 +259,11 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
   const [showMap, setShowMap] = useState(false);
   const [showStates, setShowStates] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showFilterSheet, setShowFilterSheet] = useState(false);
-
-  // Badge on the mobile "Filters" trigger — non-default choices hidden in the sheet
-  const activeFilterCount =
-    (condFilter !== "all" && condFilter !== "goods" ? 1 : 0) +
-    (freshSnow ? 1 : 0) +
-    (hasLiveCams ? 1 : 0) +
-    (showFavoritesOnly ? 1 : 0) +
-    (sort !== "popular" ? 1 : 0);
   const { user, isFavorite, toggle: toggleFav } = useFavorites();
 
-  // SA full-country labels first, then US/CA abbreviations alphabetically
   const availableStates = useMemo(() => {
-    const states = [...new Set(resorts.map((r) => r.state))];
-    return states.sort((a, b) => {
-      const aSa = SA_STATES.has(a) ? 0 : 1;
-      const bSa = SA_STATES.has(b) ? 0 : 1;
-      if (aSa !== bSa) return aSa - bSa;
-      return a.localeCompare(b);
-    });
+    return [...new Set(resorts.map((r) => r.state))].sort();
   }, [resorts]);
-
-  const saCount = useMemo(
-    () => resorts.filter((r) => SA_STATES.has(r.state)).length,
-    [resorts],
-  );
 
   const fuse = useMemo(() => new Fuse(resorts, FUSE_OPTIONS), [resorts]);
 
@@ -438,11 +275,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
     }
 
     if (stateFilter !== "All") list = list.filter((r) => r.state === stateFilter);
-    if (condFilter === "goods") {
-      list = list.filter((r) => r.cond_rating === "great" || r.cond_rating === "good");
-    } else if (condFilter !== "all") {
-      list = list.filter((r) => r.cond_rating === condFilter);
-    }
+    if (condFilter !== "all") list = list.filter((r) => r.cond_rating === condFilter);
     if (hasLiveCams) list = list.filter((r) => r.cams.some((c) => c.is_active));
     if (freshSnow) list = list.filter((r) => (r.snow_report?.new_snow_24h ?? 0) >= 8);
     if (showFavoritesOnly) list = list.filter((r) => isFavorite(r.id));
@@ -489,19 +322,6 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
 
   const handleClearSearch = useCallback(() => setSearch(""), []);
 
-  // Progressive disclosure: render 24 cards at a time instead of all ~148.
-  // Full-list SEO is preserved by the server-rendered ItemList JSON-LD in
-  // app/page.tsx and per-resort SSG pages; the grid is a browsing surface.
-  const PAGE_SIZE = 24;
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
-  }, [search, stateFilter, condFilter, hasLiveCams, freshSnow, showFavoritesOnly, sort]);
-  const visibleResorts = useMemo(
-    () => filtered.slice(0, visibleCount),
-    [filtered, visibleCount],
-  );
-
   // Debounced search tracking
   const searchTrackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -539,7 +359,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
       <Header showSearch={false} />
 
       {/* ── Sticky paper search + filter bar ─────────────────── */}
-      <div className="sticky top-[64px] z-30 border-b-[1.5px] border-ink bg-cream/95 backdrop-blur-md">
+      <div className="sticky top-0 z-30 border-b-[1.5px] border-ink bg-cream/95 backdrop-blur-md">
         <div className="max-w-screen-2xl mx-auto px-4 py-5 md:px-8">
           {/* Top row: search input (pc-input style) */}
           <div className="flex items-center gap-4 mb-4">
@@ -552,16 +372,16 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder={`Search ${resorts.length} resorts…`}
+                placeholder="Search 128 resorts…"
                 className="w-full pl-12 pr-10 py-3 bg-snow text-ink placeholder:text-bark
                            border-[1.5px] border-ink rounded-full shadow-stamp
                            focus:shadow-[4px_4px_0_#a93f20] focus:border-alpen-dk
-                           transition-shadow duration-100 font-medium"
+                           outline-none transition-shadow duration-100 font-medium"
               />
               {search && (
                 <button
                   onClick={handleClearSearch}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 pointer-coarse:p-3 text-bark hover:text-ink transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-bark hover:text-ink transition-colors"
                   aria-label="Clear search"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -572,46 +392,8 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
             </div>
           </div>
 
-          {/* Mobile: single compact row — state, The Goods, everything else in the sheet */}
-          <div className="flex md:hidden items-center gap-2">
-            <button
-              onClick={() => setShowStates(v => !v)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 min-h-[44px] text-[13px] font-semibold border-[1.5px] cursor-pointer select-none transition-colors duration-150 whitespace-nowrap min-w-0 ${
-                stateFilter !== "All"
-                  ? "bg-ink border-ink text-cream-50"
-                  : "bg-cream-50 border-bark text-ink"
-              }`}
-            >
-              <MapPin size={14} className="shrink-0" />
-              <span className="truncate">{stateFilter === "All" ? "All States" : stateFilter}</span>
-              <ChevronDown size={14} className={`shrink-0 transition-transform ${showStates ? "rotate-180" : ""}`} />
-            </button>
-            <FilterChip
-              label="The Goods"
-              icon={<Snowflake size={14} />}
-              active={condFilter === "goods"}
-              onClick={() => setCondFilter(condFilter === "goods" ? "all" : "goods")}
-            />
-            <button
-              onClick={() => setShowFilterSheet(true)}
-              className={`ml-auto inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 min-h-[44px] text-[13px] font-semibold border-[1.5px] cursor-pointer select-none transition-colors duration-150 whitespace-nowrap ${
-                activeFilterCount > 0
-                  ? "bg-ink border-ink text-cream-50"
-                  : "bg-cream-50 border-bark text-ink"
-              }`}
-            >
-              <SlidersHorizontal size={14} />
-              Filters
-              {activeFilterCount > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full bg-alpen text-cream-50 font-mono text-[11px] font-bold">
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
-          </div>
-
-          {/* Filter chips row (md+) */}
-          <div className="hidden md:flex items-center gap-2 flex-wrap">
+          {/* Filter chips row */}
+          <div className="flex items-center gap-2 flex-wrap">
             {/* State dropdown */}
             <button
               onClick={() => setShowStates(v => !v)}
@@ -622,7 +404,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
               }`}
             >
               <MapPin size={14} />
-              {stateButtonLabel(stateFilter)}
+              {stateFilter === "All" ? "All States" : `${stateFilter} — ${STATE_NAMES[stateFilter] ?? stateFilter}`}
               <ChevronDown size={14} className={`transition-transform ${showStates ? "rotate-180" : ""}`} />
             </button>
 
@@ -637,16 +419,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
 
             <span className="w-px h-5 bg-bark/40 mx-1 hidden sm:block" />
 
-            {/* Condition filters — "The Goods" (great+good) is the headline
-                one-tap shortcut for the core user job, then the granular
-                rating chips. */}
-            <FilterChip
-              label="The Goods"
-              icon={<Snowflake size={14} />}
-              active={condFilter === "goods"}
-              onClick={() => setCondFilter(condFilter === "goods" ? "all" : "goods")}
-              title="Great or Good conditions only"
-            />
+            {/* Condition filters */}
             {(["all", "great", "good", "fair", "poor"] as ConditionFilter[]).map((c) => (
               <FilterChip
                 key={c}
@@ -658,12 +431,9 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
 
             {/* Sort + Map toggle */}
             <div className="ml-auto flex items-center gap-1.5">
-              {/* lg: matches the map wrapper's `hidden lg:block` — the toggle
-                  is only shown when the map can actually appear, so there's no
-                  dead tap on 768–1023px tablets. */}
               <button
                 onClick={() => setShowMap((v) => !v)}
-                className="hidden lg:flex items-center gap-2 text-ink text-[13px] font-semibold
+                className="hidden md:flex items-center gap-2 text-ink text-[13px] font-semibold
                            bg-cream-50 border-[1.5px] border-ink rounded-full px-3.5 py-2 shadow-stamp-sm
                            hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]
                            transition-[transform,box-shadow] duration-100 mr-2"
@@ -680,7 +450,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
                 <button
                   key={opt}
                   onClick={() => setSort(opt)}
-                  className={`text-[12px] font-semibold px-3 py-1 pointer-coarse:min-h-11 pointer-coarse:px-4 rounded-full border-[1.5px] transition-colors duration-150 ${
+                  className={`text-[12px] font-semibold px-3 py-1 rounded-full border-[1.5px] transition-colors duration-150 ${
                     sort === opt
                       ? "bg-ink border-ink text-cream-50"
                       : "border-bark text-ink hover:border-ink hover:bg-cream-50"
@@ -695,13 +465,9 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
             <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t-[1.5px] border-dashed border-bark">
               <FilterChip label="All" active={stateFilter === "All"} onClick={() => { setStateFilter("All"); setShowStates(false); }} />
               {availableStates.map((s) => (
-                <FilterChip
-                  key={s}
-                  label={s}
-                  active={stateFilter === s}
+                <FilterChip key={s} label={s} active={stateFilter === s}
                   onClick={() => { setStateFilter(stateFilter === s ? "All" : s); setShowStates(false); }}
-                  title={STATE_NAMES[s] ?? s}
-                />
+                  title={STATE_NAMES[s] ?? s} />
               ))}
             </div>
           )}
@@ -710,25 +476,11 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
 
       {/* ── Body ──────────────────────────────────────────────── */}
       <div className="max-w-screen-2xl mx-auto px-4 py-8 md:px-8">
-        <SouthernSeasonBanner
-          saCount={saCount}
-          stateFilter={stateFilter}
-          onFilterChile={() => {
-            setStateFilter((s) => (s === "Chile" ? "All" : "Chile"));
-            setShowStates(false);
-          }}
-          onFilterArgentina={() => {
-            setStateFilter((s) => (s === "Argentina" ? "All" : "Argentina"));
-            setShowStates(false);
-          }}
-        />
         <FeaturedRow resorts={resorts} />
         <PowderAlert resorts={resorts} />
 
-        {/* Powder alert signup banner — forest card.
-            pc-on-ink flips the focus ring to cream: ember-on-forest is
-            1.50:1, cream-on-forest is 7.05:1. */}
-        <div className="pc-on-ink flex items-center justify-between gap-4 px-6 py-5 bg-forest text-cream-50
+        {/* Powder alert signup banner — forest card */}
+        <div className="flex items-center justify-between gap-4 px-6 py-5 bg-forest text-cream-50
                         border-[1.5px] border-ink rounded-[18px] shadow-stamp mb-8">
           <div>
             <p className="font-display font-black text-lg leading-tight">
@@ -769,54 +521,32 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
                 </button>
               </div>
             ) : (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {visibleResorts.map((resort, i) => (
-                    <div
-                      key={resort.id}
-                      onMouseEnter={() => setHoveredSlug(resort.slug)}
-                      onMouseLeave={() => setHoveredSlug(null)}
-                      style={{ contentVisibility: "auto", containIntrinsicSize: "0 560px" }}
-                    >
-                      <SummitResortCard
-                        resort={resort}
-                        favorited={isFavorite(resort.id)}
-                        onToggleFavorite={user ? () => toggleFav(resort.id) : () => setShowAuthModal(true)}
-                        animate={i < 12}
-                      />
-                    </div>
-                  ))}
-                </div>
-                {visibleCount < filtered.length && (
-                  <div className="flex justify-center mt-10">
-                    <button
-                      onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}
-                      className="inline-flex items-center gap-2 px-7 py-3 min-h-11 bg-cream-50 text-ink
-                                 border-[1.5px] border-ink rounded-full shadow-stamp font-bold text-[14px]
-                                 hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]
-                                 active:translate-x-[2px] active:translate-y-[2px] active:shadow-stamp-sm
-                                 transition-transform duration-100"
-                    >
-                      Show more
-                      <span className="font-mono text-[11px] text-bark uppercase tracking-[0.1em]">
-                        {filtered.length - visibleCount} left
-                      </span>
-                    </button>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {filtered.map((resort) => (
+                  <div
+                    key={resort.id}
+                    onMouseEnter={() => setHoveredSlug(resort.slug)}
+                    onMouseLeave={() => setHoveredSlug(null)}
+                  >
+                    <SummitResortCard
+                      resort={resort}
+                      favorited={isFavorite(resort.id)}
+                      onToggleFavorite={user ? () => toggleFav(resort.id) : () => setShowAuthModal(true)}
+                    />
                   </div>
-                )}
-              </>
+                ))}
+              </div>
             )}
           </div>
 
-          {/* Map sidebar — top clears header (64px) + pinned filter bar (~191px) + gap */}
+          {/* Map sidebar */}
           {showMap && (
-            <div className="hidden lg:block sticky top-[271px] h-[calc(100vh-287px)] rounded-[18px] overflow-hidden border-[1.5px] border-ink shadow-stamp">
+            <div className="hidden lg:block sticky top-20 h-[calc(100vh-6rem)] rounded-[18px] overflow-hidden border-[1.5px] border-ink shadow-stamp">
               <MapView
                 resorts={filtered}
                 hoveredSlug={hoveredSlug}
                 onResortHover={setHoveredSlug}
-                onViewResort={(slug) => { window.location.href = `/resorts/${slug}`; }}
-                radarFrames={radarFrames}
+                onResortClick={(slug) => { window.location.href = `/resorts/${slug}`; }}
                 variant="sidebar"
               />
             </div>
@@ -825,21 +555,6 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
       </div>
 
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
-      <FilterSheet
-        open={showFilterSheet}
-        onClose={() => setShowFilterSheet(false)}
-        condFilter={condFilter}
-        setCondFilter={setCondFilter}
-        freshSnow={freshSnow}
-        setFreshSnow={setFreshSnow}
-        hasLiveCams={hasLiveCams}
-        setHasLiveCams={setHasLiveCams}
-        showFavorites={showFavoritesOnly}
-        setShowFavorites={setShowFavoritesOnly}
-        canFavorite={!!user}
-        sort={sort}
-        setSort={setSort}
-      />
     </div>
   );
 }
