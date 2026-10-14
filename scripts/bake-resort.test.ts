@@ -95,7 +95,7 @@ test("warped TIFF sampler preserves north-west row-major orientation", { skip: !
 
 const BOUNDS = { west: 0, south: 0, east: 100, north: 100 };
 
-test("a fully covered warp is sampled as-is", async (t) => {
+test("a fully covered warp is sampled as-is", { skip: !gdalReady }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "peakcam-nodata-clean-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const values = new Float32Array(100 * 100).fill(2500);
@@ -105,7 +105,7 @@ test("a fully covered warp is sampled as-is", async (t) => {
   assert.equal(raster.values[0], 2500);
 });
 
-test("a gap at the fill threshold is interpolated rather than failing the bake", async (t) => {
+test("a gap at the fill threshold is interpolated rather than failing the bake", { skip: !gdalReady }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "peakcam-nodata-fill-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const values = new Float32Array(100 * 100).fill(2500);
@@ -119,7 +119,7 @@ test("a gap at the fill threshold is interpolated rather than failing the bake",
   }
 });
 
-test("a gap past the fill threshold fails with the coverage diagnosis and the offending corners", async (t) => {
+test("a gap past the fill threshold fails with the coverage diagnosis and the offending corners", { skip: !gdalReady }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "peakcam-nodata-fail-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const values = new Float32Array(100 * 100).fill(2500);
