@@ -44,7 +44,7 @@ test("brownrice stills resolve from regional hosts, snapshot URLs and longer pla
   assert.equal(still("https://live2.brownrice.com/embed/wolfcreektreasure&em=1"),"https://player.brownrice.com/snapshot/wolfcreektreasure");
   assert.equal(still("https://player.brownrice.com/embed/windhammountainclub/timelapse/24hr"),"https://player.brownrice.com/snapshot/windhammountainclub");
   assert.equal(still("https://player.brownrice.com/snapshot/santafe"),"https://player.brownrice.com/snapshot/santafe");
-  assert.equal(still("https://tsvweather.brownrice.com/poco-webcam.php"),null);
+  assert.equal(still("https://tsvweather.brownrice.com/embed/poco"),null);
   assert.equal(still("https://live1.brownrice.com.evil.example/embed/afbasearea"),null);
   assert.equal(still("http://live1.brownrice.com/embed/afbasearea"),null);
 });
