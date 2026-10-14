@@ -57,3 +57,11 @@ test("ipcamlive stills come from the player's own snapshot endpoint and reject l
   assert.equal(still("https://g1.ipcamlive.com/player/player.php?alias=bad%20alias%2F.."),null);
   assert.equal(still("https://g1.ipcamlive.com/other.php?alias=x"),null);
 });
+test("ozolio posters and the Taos weather still resolve; lookalikes and other commands do not", () => {
+  const still=(embed_url:string)=>cameraPreview(cam({embed_type:"iframe",embed_url}))?.src ?? null;
+  assert.equal(still("https://relay.ozolio.com/pub.api?cmd=embed&oid=EMB_ZIGI00000147"),"https://relay.ozolio.com/pub.api?cmd=poster&oid=EMB_ZIGI00000147");
+  assert.equal(still("https://relay.ozolio.com/pub.api?cmd=poster&oid=EMB_ZIGI00000147"),null);
+  assert.equal(still("https://relay.ozolio.com.evil.example/pub.api?cmd=embed&oid=EMB_X"),null);
+  assert.equal(still("https://tsvweather.brownrice.com/poco-webcam.php"),"https://tsvweather.brownrice.com/img/poco.jpg");
+  assert.equal(still("https://tsvweather.brownrice.com/other.php"),null);
+});

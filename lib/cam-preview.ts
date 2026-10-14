@@ -50,6 +50,15 @@ function previewSource(cam: Cam): CameraPreview | null {
   if (/^(?:www|g\d{1,2})\.ipcamlive\.com$/.test(url.hostname) && url.pathname === "/player/player.php" && alias && /^[\w-]{1,64}$/.test(alias)) {
     return { cam, src: `https://${url.hostname}/player/snapshot.php?alias=${encodeURIComponent(alias)}`, label: "Camera still" };
   }
+  // Ozolio's player fetches its own poster frame from pub.api?cmd=poster (refreshed every 15 min).
+  const oid = url.searchParams.get("oid");
+  if (url.hostname === "relay.ozolio.com" && url.pathname === "/pub.api" && url.searchParams.get("cmd") === "embed" && oid && /^[\w-]{1,64}$/.test(oid)) {
+    return { cam, src: `https://relay.ozolio.com/pub.api?cmd=poster&oid=${encodeURIComponent(oid)}`, label: "Camera still" };
+  }
+  // Taos Ski Valley's weather page is a plain <img> refreshed in place.
+  if (url.hostname === "tsvweather.brownrice.com" && url.pathname === "/poco-webcam.php") {
+    return { cam, src: "https://tsvweather.brownrice.com/img/poco.jpg", label: "Camera still" };
+  }
   // Roundshot thumbnail URLs are harvested from each public player's twitter:image.
   const thumbnail = (roundshot as Record<string, string>)[url.href];
   return thumbnail ? { cam, src: thumbnail, label: "Camera still" } : null;
