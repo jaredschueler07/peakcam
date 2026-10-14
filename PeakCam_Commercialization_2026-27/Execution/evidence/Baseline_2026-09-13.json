@@ -1,0 +1,407 @@
+{
+  "as_of_local": "2026-09-13",
+  "timezone": "America/Chicago",
+  "head": "6211ff8c2eba53281de22fc2d2ef59a5edb19b51",
+  "deployment_id": "dpl_31mp2xB4TVEBtgfLQhkeLc4uPosx",
+  "deployment_state": "READY",
+  "vercel_plan": "pro",
+  "inventory": [
+    {
+      "section": "inventory",
+      "data": {
+        "users": 7,
+        "cams_total": 351,
+        "cams_active": 306,
+        "newest_check": "2026-09-13T11:04:37.225+00:00",
+        "oldest_check": "2026-09-13T11:00:03.604+00:00",
+        "resorts_total": 148,
+        "resorts_active": 148,
+        "colorado_active": 20,
+        "alert_subscribers": 2,
+        "cams_auto_disabled": 0,
+        "cams_missing_check": 0,
+        "placeholder_matches": 0,
+        "cams_active_not_disabled": 306
+      }
+    },
+    {
+      "section": "snow_freshness",
+      "data": [
+        {
+          "newest": "2026-09-14T03:11:32.674+00:00",
+          "oldest": "2026-09-14T03:10:48.94+00:00",
+          "source": "open_meteo",
+          "resorts": 59,
+          "older_24h": 0
+        },
+        {
+          "newest": "2026-09-13T23:41:39.884+00:00",
+          "oldest": "2026-09-13T23:38:04.682+00:00",
+          "source": "snotel",
+          "resorts": 89,
+          "older_24h": 0
+        }
+      ]
+    },
+    {
+      "section": "camera_modes",
+      "data": [
+        {
+          "count": 20,
+          "embed_type": "link"
+        },
+        {
+          "count": 73,
+          "embed_type": "youtube"
+        },
+        {
+          "count": 119,
+          "embed_type": "iframe"
+        },
+        {
+          "count": 94,
+          "embed_type": "image"
+        }
+      ]
+    },
+    {
+      "section": "duplicate_groups",
+      "data": [
+        {
+          "count": 2,
+          "embed_url": "https://redriverskiarea.com/explore/about/webcams/",
+          "resort_id": "56132ad6-e6e3-4a92-8a53-710f667433e2",
+          "embed_type": "link",
+          "youtube_id": null
+        }
+      ]
+    }
+  ],
+  "disabled": [
+    {
+      "auto_disabled_all": 42,
+      "manually_inactive": 3,
+      "active_with_failures": 0
+    }
+  ],
+  "issues": [
+    {
+      "number": 68,
+      "title": "[Bug] Conditions rating inconsistent with observed data",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/68"
+    },
+    {
+      "number": 67,
+      "title": "[UI] Resort tile cleanup: drop 'Live Look', orange cams pill, smaller tiles",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/67"
+    },
+    {
+      "number": 65,
+      "title": "[Mobile] Top/bottom banners crowd content on mobile",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/65"
+    },
+    {
+      "number": 66,
+      "title": "[UX] Resort list should snap cards into view instead of infinite scroll",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/66"
+    },
+    {
+      "number": 64,
+      "title": "[Enhancement] Forecast-based powder alerts with multi-day lead time",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/64"
+    },
+    {
+      "number": 63,
+      "title": "[Bug] Set-alerts form: Continue is hard to hit",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/63"
+    },
+    {
+      "number": 61,
+      "title": "[Mobile] Drop In HUD covers the whole screen on mobile",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/61"
+    },
+    {
+      "number": 62,
+      "title": "[Mobile] Palisades 360 cam embed unusable on mobile",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/62"
+    },
+    {
+      "number": 48,
+      "title": "Performance check",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/48"
+    },
+    {
+      "number": 47,
+      "title": "A11y depth for the game",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/47"
+    },
+    {
+      "number": 46,
+      "title": "Focus visibility",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/46"
+    },
+    {
+      "number": 45,
+      "title": "Contrast pass",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/45"
+    },
+    {
+      "number": 44,
+      "title": "\"Drop In BETA\" pill on whitelisted resort pages",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/44"
+    },
+    {
+      "number": 43,
+      "title": "Post-run engagement",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/43"
+    },
+    {
+      "number": 42,
+      "title": "First-run onboarding in the game",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/42"
+    },
+    {
+      "number": 41,
+      "title": "Expand the whitelist",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/41"
+    },
+    {
+      "number": 39,
+      "title": "Thin, sometimes custom-tinted focus indicators (1px outline)",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/39"
+    },
+    {
+      "number": 40,
+      "title": "Global discoverability for drop-in",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/40"
+    },
+    {
+      "number": 38,
+      "title": "Low-contrast small text: \"SORT:\" label (and similar muted labels) fail WCAG AA for small text",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/38"
+    },
+    {
+      "number": 37,
+      "title": "Forecast wind cells render dangling \"Wind from \" with missing direction",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/37"
+    },
+    {
+      "number": 36,
+      "title": "Resort cam heading text bug: \"LIVE CAMS3 AVAILABLE\" / \"LIVE CAMS0 AVAILABLE\"",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/36"
+    },
+    {
+      "number": 35,
+      "title": "Misleading \"RESORT NOT FOUND\" on drop-in URL for existing non-whitelisted resorts",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/35"
+    },
+    {
+      "number": 34,
+      "title": "Drop-in has no global entry point \u2014 feature is effectively hidden",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/34"
+    },
+    {
+      "number": 33,
+      "title": "Remove-button stability",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/33"
+    },
+    {
+      "number": 32,
+      "title": "Compare error resilience",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/32"
+    },
+    {
+      "number": 31,
+      "title": "Remove-resort button is unreliable when a panel has a loaded live webcam",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/31"
+    },
+    {
+      "number": 30,
+      "title": "Compare route throws a server-side 500 (Vercel application error) for certain resort combinations",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/30"
+    },
+    {
+      "number": 29,
+      "title": "MapTiler API key visible client-side",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/29"
+    },
+    {
+      "number": 28,
+      "title": "Home directory cards could show \"Updated\" freshness inline",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/28"
+    },
+    {
+      "number": 27,
+      "title": "Inconsistent snow-report data sources across resorts",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/27"
+    },
+    {
+      "number": 26,
+      "title": "Map page renders no visible content in WebGL-disabled contexts",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/26"
+    },
+    {
+      "number": 25,
+      "title": "Hero is text-on-solid-beige with no imagery",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/25"
+    },
+    {
+      "number": 24,
+      "title": "Duplicate favoriting affordances on resort pages",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/24"
+    },
+    {
+      "number": 22,
+      "title": "YouTube embed suggestions leak off-topic content into cam players",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/22"
+    },
+    {
+      "number": 23,
+      "title": "404 page is minimal",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/23"
+    },
+    {
+      "number": 21,
+      "title": "Home page lacks og:image",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/21"
+    },
+    {
+      "number": 20,
+      "title": "Caviahue cam captions inconsistent \u2014 one cam's caption text missing, cam load behavior differs within the same page",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/20"
+    },
+    {
+      "number": 19,
+      "title": "`/resorts` directory URL returns HTTP 404 while the nav \"Resorts\" item points to the homepage",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/19"
+    },
+    {
+      "number": 18,
+      "title": "Home directory cards show wrong base-depth values during count-up animation (resets to 0 and climbs on each data refresh)",
+      "url": "https://github.com/jaredschueler07/peakcam/issues/18"
+    }
+  ],
+  "browser_check": "Unavailable: no CUA browser",
+  "build": "Not run; existing production deployment READY",
+  "tests": {
+    "total": 1446,
+    "passed": 1442,
+    "failed": 4,
+    "reason": "gdal_translate executable missing"
+  },
+  "typescript": "Passed",
+  "lint": {
+    "errors": 2,
+    "warnings": 54,
+    "error_file": "lib/descent/render/Renderer.ts",
+    "note": "Existing untracked descent work"
+  },
+  "camera_register_rows": 306,
+  "resort_register_rows": 148,
+  "colorado_active_camera_records": 46,
+  "resorts_without_active_camera_records": [
+    "batea-mahuida",
+    "cerro-perito-moreno",
+    "mountain-high",
+    "mt-baldy",
+    "cerro-mirador",
+    "lagunillas",
+    "loveland",
+    "powderhorn",
+    "ski-cooper",
+    "sugarloaf",
+    "burke-mountain",
+    "pico",
+    "smugglers-notch",
+    "granite-peak",
+    "snowshoe"
+  ],
+  "original_roadmap_hours": 255.0,
+  "original_roadmap_cost_allowances_USD": 2800.0,
+  "original_manifest_mismatches": [],
+  "financial_reconciliation": [
+    {
+      "Case": "Conservative",
+      "Horizon_months": 6,
+      "Snapshot_summary_reconciles": true
+    },
+    {
+      "Case": "Conservative",
+      "Horizon_months": 12,
+      "Snapshot_summary_reconciles": true
+    },
+    {
+      "Case": "Conservative",
+      "Horizon_months": 24,
+      "Snapshot_summary_reconciles": true
+    },
+    {
+      "Case": "Base",
+      "Horizon_months": 6,
+      "Snapshot_summary_reconciles": true
+    },
+    {
+      "Case": "Base",
+      "Horizon_months": 12,
+      "Snapshot_summary_reconciles": true
+    },
+    {
+      "Case": "Base",
+      "Horizon_months": 24,
+      "Snapshot_summary_reconciles": true
+    },
+    {
+      "Case": "Breakout",
+      "Horizon_months": 6,
+      "Snapshot_summary_reconciles": true
+    },
+    {
+      "Case": "Breakout",
+      "Horizon_months": 12,
+      "Snapshot_summary_reconciles": true
+    },
+    {
+      "Case": "Breakout",
+      "Horizon_months": 24,
+      "Snapshot_summary_reconciles": true
+    }
+  ],
+  "financial_stress": [
+    {
+      "Scenario": "Original snapshot",
+      "12_month_earned_revenue": 4505.5,
+      "12_month_operating_result": -4273.15,
+      "Peak_cash_funding_need": 4427.95,
+      "Extra_monthly_cost_assumption": 0
+    },
+    {
+      "Scenario": "No display ads",
+      "12_month_earned_revenue": 2905.0,
+      "12_month_operating_result": -5873.65,
+      "Peak_cash_funding_need": 5928.65,
+      "Extra_monthly_cost_assumption": 0
+    },
+    {
+      "Scenario": "No ads + $100/month added services",
+      "12_month_earned_revenue": 2905.0,
+      "12_month_operating_result": -7073.65,
+      "Peak_cash_funding_need": 7128.65,
+      "Extra_monthly_cost_assumption": 100
+    },
+    {
+      "Scenario": "No ads + $250/month added services",
+      "12_month_earned_revenue": 2905.0,
+      "12_month_operating_result": -8873.65,
+      "Peak_cash_funding_need": 8928.65,
+      "Extra_monthly_cost_assumption": 250
+    },
+    {
+      "Scenario": "Zero revenue; original spending retained",
+      "12_month_earned_revenue": 0,
+      "12_month_operating_result": -8727.5,
+      "Peak_cash_funding_need": 8727.5,
+      "Extra_monthly_cost_assumption": 0
+    }
+  ],
+  "workbook_review": "Artifact Tool read-only import and error scan; imported 72 monthly rows agree with JSON within 1e-6. No native Excel recalculation or edits performed."
+}

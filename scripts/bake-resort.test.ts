@@ -53,7 +53,17 @@ test("projected raster pixel centres span exactly the configured square", () => 
   assert.ok(Math.abs(northCentre - southCentre - sizeM) < 1);
 });
 
-test("warped TIFF sampler preserves north-west row-major orientation", async (t) => {
+function hasGdal(): boolean {
+  try {
+    execFileSync("gdal_translate", ["--version"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+const gdalReady = hasGdal();
+
+test("warped TIFF sampler preserves north-west row-major orientation", { skip: !gdalReady }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "peakcam-warped-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const vrt = path.join(dir, "fixture.vrt");

@@ -1,0 +1,50 @@
+# 08 Legal & Administrative Setup Checklist
+
+## Scope
+This is founder-level issue spotting, not a legal opinion or tax advice. Your state of residence, operating location, business entity, employer IP agreement and present insurance were not established. **America/Chicago is a timezone, not proof of Illinois incorporation.** Confirm the operating state before filing. Use a US small-business CPA and an attorney experienced in media/IP, consumer internet and privacy for the specific high-risk questions.
+
+| Item | Classification | Practical action | Timing / cost treatment |
+| --- | --- | --- | --- |
+| Legal right to use content and marks | Required when applicable | Obtain appropriate permission/license or use a lawful limited alternative; do not infer rights from public URLs | Before relevant use; quote-specific |
+| Truthful ads / affiliate disclosure | Required when applicable | Label ads, disclose material connections near link/post, no invented traction or safety claims | Before first commercial placement |
+| Taxes and records | Required | Track all revenue/expenses and state/federal filing obligations; separate tax categories | From first business activity |
+| LLC | Strongly recommended for commercial contracting/risk; not universally required to test a website | Compare home-state LLC vs sole proprietor with counsel; liability protection is not absolute | Before meaningful paid contracts/content exposure; budget state-specific |
+| DBA / local license / home business rules | Required when applicable | Check city/county/state rules for trade name, home occupation and relevant activity | Before operation where required |
+| Registered agent | Required for entity where state law requires | Use eligible physical state address; paid agent can reduce public home-address exposure | Annual vendor quote; not automatically necessary for sole proprietor |
+| EIN | Required in specified tax/employer situations; often useful for banking | Apply free directly through IRS after entity formation if forming one | Do not pay a formation upsell for a free IRS application |
+| Bank account / card | Strongly recommended; supports separation and entity formalities | Separate business receipts/expenses; no rewards-chasing balance or commingling | Before paid contracts; compare bank terms |
+| Bookkeeping / contracts | Strongly recommended | Monthly reconciliation; written scope, rights, payment, termination, reporting and liability allocation | Start now, simple ledger and one-page order form |
+| Privacy / cookies / data retention | Required depending on practices and jurisdiction; strongly recommended accurate notice now | Inventory tags/embeds/vendors, explain data use, limit retention and honor applicable rights | Before collection/ad technology changes |
+| Consumer subscriptions | Required when launched | Clear recurring price, affirmative consent, required reminders and easy cancellation; review states served | Before recurring checkout, not a later cleanup |
+| Email compliance | Required for commercial outreach/marketing | Accurate identity, subject, business postal address and opt-out; maintain suppression list | Before first outbound sequence |
+| General liability / cyber / E&O / media coverage | Usually risk/contract driven rather than universal mandate | Broker review of actual publishing, advice, data and contractor risks; check IP exclusions | Before substantial monetization; quote not assumed |
+| Trademark clearance and filing | Clearance strongly recommended; registration useful later | Search similar marks and relevant services; filing does not itself establish no conflict | Clear before major brand spend; file after scope settled |
+| Accessibility | Applicable obligations need assessment; practical core accessibility is essential | Keyboard/focus/labels/contrast, nonvisual source links, reachable fallback | Before growth; do not confuse private site with public-entity deadlines |
+| COPPA / minors | Required if child-directed or actual-knowledge collection triggers apply | Avoid under-13 account/UGC expansion; family travel audience alone not definitive | Before collecting new account/community data |
+| Incident and takedown process | Strongly recommended; notification duties may be required | Owner, quick disable, evidence log, breach counsel and state-specific notification assessment | Before growth |
+| Complex corporate stack / S-corp election | Useful later only if justified | No automatic payroll/tax election, Delaware structure or financing documents | Revisit sustained profit or actual financing need |
+
+
+### Entity choice without startup theater
+A sole proprietor can test demand without pretending to be a corporation, but personal exposure, contracts, assets and banking need care. A single-member LLC does not automatically change federal income-tax treatment; the default generally remains disregarded absent an election. Formation in a different state can create an additional foreign-registration burden where you actually operate. A home-state LLC is the default option to investigate, not a universal legal answer. [L02](https://www.irs.gov/businesses/small-businesses-self-employed/single-member-limited-liability-companies)
+
+Illinois provides a useful **example**, not a personalized filing instruction: the official LLC instructions list $150 standard and $250 expedited formation. A paid registered agent is optional if the entity has another eligible agent/address. Check annual reports, local licenses and state tax registrations separately. EIN applications are free from the IRS. [L01](https://www.irs.gov/businesses/small-businesses-self-employed/get-an-employer-identification-number) [L03](https://www.ilsos.gov/departments/business-services/organization/llc-instructions.html)
+
+### September 2026 rules that are easy to get wrong
+FinCEN’s August 2026 final rule exempts US-created companies from BOI reporting; foreign-formed reporting companies have different rules. Do not buy a BOI filing service based on an obsolete blanket checklist. The FTC’s 2024 negative-option rule was vacated; its March 2026 rulemaking is not a final nationwide replacement. That does **not** remove ROSCA, FTC Act or state automatic-renewal duties. [L04](https://www.fincen.gov/boi) [L05](https://www.ftc.gov/news-events/news/press-releases/2026/03/ftc-seeks-public-comment-response-advance-notice-proposed-rulemaking-regarding-negative-option)
+
+California’s strengthened automatic-renewal requirements include important consent, notice and cancellation obligations. State privacy coverage also depends on thresholds and actual data practices, not only whether PeakCam is “small.” CCPA applicability requires an actual analysis, particularly before targeted ads or selling/sharing personal information. Other states differ. Use minimal data and no ad-tech stack until that review is complete. [L06](https://oag.ca.gov/news/press-releases/attorney-general-bonta-issues-consumer-alert-california%E2%80%99s-automatic-renewal-law) [L07](https://www.oag.ca.gov/privacy/ccpa)
+
+### Tax workstream
+Classify affiliate commissions, ad/sponsor revenue, service fees and consumer subscriptions separately. All may contribute to taxable business income; receiving no information return does not make receipts tax-free. Sales/use tax treatment of digital subscriptions, advertising and services varies by jurisdiction and can depend on nexus and customer location. Interstate online income does not automatically require forming an entity in every customer state. A CPA should determine registrations, estimated tax payments, business-use deductions and treatment of setup costs; the model intentionally does not invent a personal effective tax rate. [L02](https://www.irs.gov/businesses/small-businesses-self-employed/single-member-limited-liability-companies)
+
+### Brand/IP and publishing protection
+The USPTO base trademark application fee is currently $350 per class, with possible additional fees. No professional clearance of “PeakCam” was performed. Domain ownership and a GitHub repository are not proof of trademark availability. Separately document ownership of code, photographs and contractor work; review any employment invention-assignment or moonlighting restrictions before investing heavily. [L12](https://www.uspto.gov/trademarks/trademark-fee-information)
+
+### Operational compliance
+Commercial B2B email is not exempt from CAN-SPAM. Use an accurate founder identity and a legitimate business postal address, include an opt-out and honor requests within the applicable period; the operating system uses suppression immediately rather than waiting. Keep research contacts separate from a newsletter list—public contact information is not newsletter consent. [L08](https://www.ftc.gov/business-guidance/resources/can-spam-act-compliance-guide-business)
+
+Privacy statements must describe the actual embed/analytics stack, not a generic template. Set a documented deletion schedule; avoid sending raw emails, precise location or free-text reports to analytics. A 90-day event-log retention test is a **proposed minimization choice**, not a universal legal rule. Children’s and accessibility obligations should be assessed before expanding data collection; practical keyboard and fallback accessibility belongs in the first launch gate. [L10](https://www.ftc.gov/legal-library/browse/rules/childrens-online-privacy-protection-rule-coppa) [L11](https://www.ada.gov/resources/web-guidance/)
+
+### Minimal professional review brief
+Ask counsel for: (1) a permitted-use matrix for links, embeds, preview photos and social screenshots; (2) a short source permission/pilot agreement; (3) review of actual policies and advertising disclosures; (4) a takedown process and whether any DMCA agent/safe-harbor steps are relevant to the chosen service; and (5) the subscription/privacy changes required **only if** Pro or accounts launch. Ask the CPA for entity/tax/bookkeeping recommendations grounded in your actual state and employment circumstances. This is a focused review, not a $10,000 generic startup package.

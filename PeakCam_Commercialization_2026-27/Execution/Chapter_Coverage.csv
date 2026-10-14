@@ -1,0 +1,22 @@
+﻿Chapter,Source_file,Review_disposition,Execution_actions
+01,Chapters/01_Executive_Summary.md,Retain proof-season thesis; replace obsolete product baseline,R03;R10;R24;R26;R35
+02,Chapters/02_Current_State_Assessment.md,Replace three-resort snapshot with production verification,R01;R02;R03;C04;C05
+03,Chapters/03_PeakCam_Business_Model.md,Retain utility-to-repeat-to-approved-revenue model; accounts already exist,R12;R16;R23;R29
+04,Chapters/04_Target_Customer__Positioning.md,Colorado is a provisional commercial cohort within a broader product,R10;R17;R32
+05,Chapters/05_Competitive_Analysis.md,Use competitor claims as research leads; reverify before publishing comparisons,R10;R20;R32
+06,Chapters/06_Monetization_Strategy.md,Approved affiliate and small sponsor pilots first; premium and ads conditional,R15;R16;R23;R27;R31
+07,Chapters/07_Financial_Model.md,Arithmetic reconciles; actual service costs and pricing/ads decisions must be rebased,R03;C02;R26;R35
+08,Chapters/08_Legal__Administrative_Setup_Checklist.md,"Apply professional review to existing auth, reports, analytics and email",R07;R08;C03;C07
+09,Chapters/09_Webcam__Data_Legal_Risk_Assessment.md,Inventory live embeds and preview derivatives; supersede permission-free capture assumption,R02;R07;C01;C06
+10,Chapters/10_Growth_Strategy.md,Test clubs/concierges; do not delete existing regions or rebuild accounts,R10;R12;R17;R30
+11,Chapters/11_SEO_Strategy.md,Build on live sitemap and routes; certify useful pages before guides,R11;R13;R14
+12,Chapters/12_Social__Content_Strategy.md,Use permissioned assets or original text/diagrams; measure production effort,R19;R25
+13,Chapters/13_Partnership_Strategy.md,"Separate suppliers, distributors, affiliates and buyers; refresh first-wave sources",R06;R15;R17;R23;C07
+14,Chapters/14_202627_Ski_Season_Launch_Plan.md,Keep Thanksgiving/Christmas gates; rebase September tasks,R24;R28;R35
+15,Chapters/15_Marketing_Budget.md,Lean marketing envelope conflicts with model spend; resolve before release,C02;R17;R19;R23
+16,Chapters/16_Analytics__KPI_Framework.md,Map all 29 events to current code; distinguish load/intent/confirmed outcome,R05;C03;R21;R26
+17,Chapters/17_Business_Operations_Stack.md,"Actual stack includes Supabase, maps, email and model forecasts",R03;C01;C02;C05
+18,Chapters/18_Risk_Register.md,Retain all 28 risks with current exposure and control owners,R02;R07;C03;C04;C05;C06
+19,Chapters/19_Experiment_Backlog.md,Schedule all 15 experiments behind evidence gates; no automatic commitment,R04;R10;R17;R20;R29;R31
+20,Chapters/20_306090-Day_Founder_Action_Plan.md,Rebase from September 14 with 20-hour/week provisional capacity,R01;R02;R03;R04;R05;R06;R10
+21,Chapters/21_September_2026April_2027_Master_Roadmap.md,All 36 original IDs retained plus seven current-state gap actions,R24;R26;R29;R35;R36
