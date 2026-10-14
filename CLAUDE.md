@@ -25,7 +25,7 @@ npm run seed-normals     # 30-year SNOTEL normals (run-once/annual)
 npm run cam-health       # Probe all cam URLs, stamp cams.last_checked_at
 ```
 
-Beware: `npm run liftie-sync` and `npm run snodas-sync` reference script files that do not exist (the logic lives in `lib/pipeline/fetchers/`). `npm run import-resorts` (the ts-node variant) is stale and truncates SNOTEL triplet IDs — use `:standalone`.
+There are no `liftie-sync` / `snodas-sync` npm scripts — that logic lives in `lib/pipeline/fetchers/` and runs only via `pipeline-sync`. `npm run import-resorts` (the ts-node variant) is stale and truncates SNOTEL triplet IDs — use `:standalone`.
 
 ## Architecture
 
@@ -88,7 +88,7 @@ A self-contained arcade ski descent, live for three pilot resorts (`ski-portillo
 
 - `agents/` — 9-bot Slack "company" (`agents/loop.mjs`, polling + Anthropic API, shared memory in `agent_memory`). Runs via launchd but is effectively dormant.
 - `dashboard/` — standalone Express ops dashboard on port 3333. **Unauthenticated and can spawn `claude --dangerously-skip-permissions`** — never expose beyond localhost/LAN.
-- `generate-images.py` (repo root) — canonical brand-image generator (xAI Grok), driven by the user-level `peakcam-imagegen` skill; `scripts/generate-images.mjs` is its abandoned predecessor. Nothing in `public/images/` is referenced by app code.
+- `generate-images.py` (repo root) — canonical brand-image generator (xAI Grok), driven by the user-level `peakcam-imagegen` skill (its abandoned predecessor `scripts/generate-images.mjs` was removed Sept 2026). Nothing in `public/images/` is referenced by app code.
 
 ### Scheduling map
 

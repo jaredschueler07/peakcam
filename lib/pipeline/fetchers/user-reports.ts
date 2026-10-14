@@ -6,7 +6,12 @@
 
 import { SourceReading, emptyReading, ResortContext } from "../types";
 import { getUserConditions } from "../../supabase";
-import { computeUserScore, type UserConditionReport } from "../../conditions-engine";
+import {
+  computeUserScore,
+  normalizeVisibility,
+  normalizeWind,
+  type UserConditionReport,
+} from "../../conditions-engine";
 
 export async function fetchUserReports(
   resort: ResortContext,
@@ -29,13 +34,16 @@ export async function fetchUserReports(
 
     reading.quality_score = qualityScore;
 
-    // Compute individual dimension scores
+    // Compute individual dimension scores.
+    // SourceReading.visibility_score / wind_score are documented as normalized
+    // 0.0–1.0 and land in data_source_readings numeric(3,2), so the pipeline
+    // needs the 0–1 form — not the conditions-engine's raw 1–3 tiers. Derive it
+    // from the canonical maps via normalizeVisibility / normalizeWind so these
+    // stay consistent with quality_score, which computeUserScore builds from
+    // the same maps. Do not reintroduce a second literal score table here.
     if (reports.length > 0) {
-      const visScores: Record<string, number> = { clear: 1.0, foggy: 0.5, whiteout: 0.0 };
-      const windScores: Record<string, number> = { calm: 1.0, breezy: 0.66, gusty: 0.33, high: 0.0 };
-
-      const avgVis = reports.reduce((sum, r) => sum + (visScores[r.visibility] ?? 0.5), 0) / reports.length;
-      const avgWind = reports.reduce((sum, r) => sum + (windScores[r.wind] ?? 0.5), 0) / reports.length;
+      const avgVis = reports.reduce((sum, r) => sum + normalizeVisibility(r.visibility), 0) / reports.length;
+      const avgWind = reports.reduce((sum, r) => sum + normalizeWind(r.wind), 0) / reports.length;
 
       reading.visibility_score = Math.round(avgVis * 100) / 100;
       reading.wind_score = Math.round(avgWind * 100) / 100;
