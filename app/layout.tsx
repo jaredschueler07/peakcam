@@ -5,6 +5,7 @@ import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ClientProviders } from "./client-providers";
+import { MetaPixel } from "@/components/analytics/MetaPixel";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -128,6 +129,7 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteLd) }}
         />
+        <MetaPixel />
         <ClientProviders release={process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 40) ?? "local"}>{children}</ClientProviders>
         <Suspense>
           <Analytics />

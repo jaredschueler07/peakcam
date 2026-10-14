@@ -134,3 +134,17 @@ test("track() is a no-op on the server", () => {
     posthog.capture = originalCapture;
   }
 });
+
+test("registration mirrors once while alert tracking leaves Lead to the existing first-success latch", async () => {
+  await withBrowserPostHog(async (posthogCalls) => {
+    ph.__loaded = true;
+    const pixelCalls: unknown[][] = [];
+    window.fbq = (...args: unknown[]) => { pixelCalls.push(args); };
+    track(EVENTS.AUTH_SIGNUP_COMPLETED);
+    track(EVENTS.ALERT_SIGNUP_SUCCEEDED, { repeat_in_browser: false });
+    track(EVENTS.ALERT_SIGNUP_SUCCEEDED, { repeat_in_browser: true });
+    track(EVENTS.BROWSE_OPENED);
+    assert.deepStrictEqual(pixelCalls, [["track", "CompleteRegistration", undefined]]);
+    assert.equal(posthogCalls.length, 4);
+  });
+});

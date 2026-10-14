@@ -11,10 +11,6 @@ import { SignupWelcomeTracker } from "@/components/analytics/SignupWelcomeTracke
 // the server emit an empty shell for the whole site (no <main>, no JSON-LD,
 // fragment links like /about#terms had nothing to scroll to on a direct
 // load). The provider is SSR-safe — posthog.init() only runs in an effect.
-const MetaPixel = dynamic(
-  () => import("@/lib/meta-pixel").then((mod) => mod.MetaPixel),
-  { ssr: false }
-);
 // Ad conversion tags. Each component returns null without its NEXT_PUBLIC_* id;
 // the render is additionally gated on the (build-time inlined) env var so an
 // unconfigured tag mounts nothing at all. The conversion helpers in the same
@@ -38,7 +34,6 @@ export function ClientProviders({ children, release = "local" }: { children: Rea
       <Suspense>
         <SignupWelcomeTracker />
       </Suspense>
-      <MetaPixel />
       {GOOGLE_ADS_ENABLED && <GoogleTag />}
       {REDDIT_PIXEL_ENABLED && <RedditPixel />}
     </PostHogProvider></BugReportProvider>
