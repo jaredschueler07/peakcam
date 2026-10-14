@@ -3,6 +3,7 @@ import assert from "node:assert";
 import type {
   supabase as SupabaseClient,
   getResortBySlug as GetResortBySlug,
+  getPowderProbabilities as GetPowderProbabilities,
   withFetchTimeout as WithFetchTimeout,
 } from "./supabase";
 
@@ -15,12 +16,13 @@ import type {
 // dynamically in a `before` hook, after the env vars are set.
 let supabase: typeof SupabaseClient;
 let getResortBySlug: typeof GetResortBySlug;
+let getPowderProbabilities: typeof GetPowderProbabilities;
 let withFetchTimeout: typeof WithFetchTimeout;
 
 before(async () => {
   process.env.NEXT_PUBLIC_SUPABASE_URL ??= "http://localhost:54321";
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??= "test-anon-key";
-  ({ supabase, getResortBySlug, withFetchTimeout } = await import("./supabase"));
+  ({ supabase, getResortBySlug, getPowderProbabilities, withFetchTimeout } = await import("./supabase"));
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -113,7 +115,7 @@ class FakeQuery implements PromiseLike<Result> {
 
 /** Stub `supabase.from` for the duration of `fn`, then restore it. */
 async function withFakeFrom(
-  byTable: Partial<Record<"resorts" | "latest_snow_reports" | "cams", Result>>,
+  byTable: Partial<Record<"resorts" | "latest_snow_reports" | "cams" | "latest_powder_probabilities", Result>>,
   fn: () => Promise<void>
 ) {
   const original = supabase.from;
@@ -182,6 +184,84 @@ test("getResortBySlug throws when the cams query fails, even though the resort w
         () => getResortBySlug("breckenridge"),
         (err: Error) => err.message === "cams table unavailable"
       );
+    }
+  );
+});
+
+// ─────────────────────────────────────────────────────────────
+// getPowderProbabilities (migration 021; pre-gate, no UI yet)
+// ─────────────────────────────────────────────────────────────
+
+const POWDER_ROW = {
+  resort_id: "r1",
+  model_init_at: "2026-10-12T00:00:00Z",
+  horizon_start_at: "2026-10-12T08:00:00Z",
+  valid_start: "2026-10-12T08:00:00Z",
+  valid_end: "2026-10-15T08:00:00Z",
+  probability_kind: "raw_frequency",
+  method_version: "wn3-powder-v1:test",
+  computed_at: "2026-10-12T08:30:00Z",
+  p_ge_6in: 0.5, p_ge_8in: 0.25, p_ge_12in: 0.125,
+  p10_snow_in: 0, p50_snow_in: 6, p90_snow_in: 14,
+  degraded: false,
+};
+
+test("getPowderProbabilities returns null when the view is missing (migration 021 not applied)", async () => {
+  await withFakeFrom(
+    { latest_powder_probabilities: { data: null, error: { code: "PGRST205", message: "relation not found" } } },
+    async () => {
+      assert.strictEqual(await getPowderProbabilities("r1"), null);
+    }
+  );
+});
+
+test("getPowderProbabilities returns null on zero rows (pre-gate RLS) and without a next_72h row", async () => {
+  await withFakeFrom(
+    { latest_powder_probabilities: { data: [], error: null } },
+    async () => {
+      assert.strictEqual(await getPowderProbabilities("r1"), null);
+    }
+  );
+  await withFakeFrom(
+    { latest_powder_probabilities: { data: [{ ...POWDER_ROW, window_kind: "best_7d" }], error: null } },
+    async () => {
+      assert.strictEqual(await getPowderProbabilities("r1"), null);
+    }
+  );
+});
+
+test("getPowderProbabilities groups same-run windows and drops a best_7d row from another run", async () => {
+  await withFakeFrom(
+    {
+      latest_powder_probabilities: {
+        data: [
+          { ...POWDER_ROW, window_kind: "next_72h" },
+          { ...POWDER_ROW, window_kind: "best_7d", p_ge_8in: 0.75 },
+        ],
+        error: null,
+      },
+    },
+    async () => {
+      const result = await getPowderProbabilities("r1");
+      assert.strictEqual(result?.next72h.p_ge_8in, 0.25);
+      assert.strictEqual(result?.best7d?.p_ge_8in, 0.75);
+      assert.strictEqual(result?.horizon_start_at, "2026-10-12T08:00:00Z");
+    }
+  );
+  await withFakeFrom(
+    {
+      latest_powder_probabilities: {
+        data: [
+          { ...POWDER_ROW, window_kind: "next_72h" },
+          { ...POWDER_ROW, window_kind: "best_7d", model_init_at: "2026-10-11T18:00:00Z" },
+        ],
+        error: null,
+      },
+    },
+    async () => {
+      const result = await getPowderProbabilities("r1");
+      assert.ok(result);
+      assert.strictEqual(result?.best7d, null);
     }
   );
 });

@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "peakcam-weathernext"
+version = "0.1.0"
+description = "Phase 0 offline powder-probability harness for WeatherNext 3 ensembles (no live WeatherNext access yet)"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26"]
+
+[project.scripts]
+peakcam-weathernext = "peakcam_weathernext.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/peakcam_weathernext"]

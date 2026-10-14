@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>__LABEL__</string>
+
+    <!-- GATED: "sync-latest" is the future CLI subcommand for the
+         allowlisted WeatherNext 3 Zarr source. It does not exist in
+         the Phase 0 harness yet, so provision-studio.sh renders this
+         plist but does not load it by default. If loaded early, the
+         CLI exits nonzero on the unknown subcommand and writes
+         nothing: no synthetic or partial data is ever produced.
+         All paths are absolute because launchd provides a near-empty
+         environment (no /opt/homebrew/bin on PATH). -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>__VENV_PYTHON__</string>
+        <string>-m</string>
+        <string>peakcam_weathernext</string>
+        <string>sync-latest</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__WN_DIR__</string>
+
+    <!-- WeatherNext 3 6-hourly inits (00/06/12/18 UTC) disseminate
+         about 7h45m after init. An hourly wake plus an in-code UTC
+         gate (process the newest init with init+8h <= now that has
+         not run yet) lands after expected dissemination without
+         depending on local time; StartCalendarInterval fires in
+         system local time and would drift one hour against UTC
+         across DST changes. The gate lives in the future
+         sync-latest implementation, not in this plist. -->
+    <key>StartInterval</key>
+    <integer>3600</integer>
+
+    <key>RunAtLoad</key>
+    <false/>
+    <key>KeepAlive</key>
+    <false/>
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <key>StandardOutPath</key>
+    <string>__LOG_DIR__/out.log</string>
+    <key>StandardErrorPath</key>
+    <string>__LOG_DIR__/err.log</string>
+
+    <!-- No secrets in this file. After the allowlist grant, add
+         WN_BILLING_PROJECT (a project ID) and
+         GOOGLE_APPLICATION_CREDENTIALS (a path under
+         ~/.config/peakcam-weathernext/, never a key value). -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME</key>
+        <string>__HOME__</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+    </dict>
+</dict>
+</plist>
