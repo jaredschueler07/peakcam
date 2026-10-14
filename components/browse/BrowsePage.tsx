@@ -562,7 +562,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
       <div className="hidden md:contents"><Header showSearch={false} /></div>
 
       {/* ── Sticky paper search + filter bar ─────────────────── */}
-      <div className="sticky top-[64px] z-30 border-b-[1.5px] border-ink bg-cream/95 backdrop-blur-md">
+      <div id="main-content" tabIndex={-1} className="sticky top-[64px] scroll-mt-[64px] z-30 border-b-[1.5px] border-ink bg-cream/95 backdrop-blur-md">
         <div className="max-w-screen-2xl mx-auto px-4 py-3 md:py-5 md:px-8">
           {/* Top row: search input (pc-input style) */}
           <div className="flex items-center gap-4 mb-2 md:mb-4">

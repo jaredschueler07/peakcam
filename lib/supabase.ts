@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { unstable_cache } from "next/cache";
 import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition } from "./types";
 import type { ResortOpening } from "./openings";
 import { withResolvedCamNames } from "./cam-name";
@@ -18,6 +19,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 const SUPABASE_FETCH_TIMEOUT_MS = 8_000;
+const RESORT_CATALOG_REVALIDATE_SECONDS = 60 * 60;
 
 /**
  * Wraps `fetch` so every request the client makes aborts after `ms` instead
@@ -42,8 +44,29 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 // Queries
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * Share a cold catalog load between overlapping requests in this runtime.
+ * Next's Data Cache below handles reuse across requests and function instances;
+ * this promise only lives for the duration of a load and is cleared on success
+ * or failure, so it cannot extend the data freshness window or retain errors.
+ */
+function singleFlight<T>(load: () => Promise<T>): () => Promise<T> {
+  let inFlight: Promise<T> | undefined;
+  return () => {
+    if (inFlight) return inFlight;
+
+    const current = Promise.resolve().then(load);
+    inFlight = current;
+    current.then(
+      () => { if (inFlight === current) inFlight = undefined; },
+      () => { if (inFlight === current) inFlight = undefined; },
+    );
+    return current;
+  };
+}
+
 /** Fetch all active resorts with their latest snow report. */
-export async function getAllResorts(): Promise<ResortWithData[]> {
+async function fetchAllResorts(): Promise<ResortWithData[]> {
   const { data: resorts, error: resortError } = await supabase
     .from("resorts")
     .select("*")
@@ -95,6 +118,25 @@ export async function getAllResorts(): Promise<ResortWithData[]> {
     snow_report: snowByResort.get(r.id) ?? null,
     cams: camsByResort.get(r.id) ?? [],
   }));
+}
+
+// This is public, anon-readable catalog data: it contains no session-specific
+// rows or credentials. Persist it across routes/instances for the same one-hour
+// window as their ISR pages. Next's cache writes only a successfully resolved
+// value; failed cold loads still throw and stale cache entries are served while
+// Next retries revalidation. During ISR, a failed refresh can therefore extend
+// the age of the last good value until a later refresh succeeds. The process-local
+// single-flight above also avoids duplicate PostgREST work when several cold
+// renders overlap in one runtime.
+const fetchAllResortsSingleFlight = singleFlight(fetchAllResorts);
+const getAllResortsCached = unstable_cache(
+  () => fetchAllResortsSingleFlight(),
+  ["peakcam:get-all-resorts:v1", supabaseUrl],
+  { revalidate: RESORT_CATALOG_REVALIDATE_SECONDS, tags: ["peakcam-resort-catalog"] },
+);
+
+export function getAllResorts(): Promise<ResortWithData[]> {
+  return getAllResortsCached();
 }
 
 /**

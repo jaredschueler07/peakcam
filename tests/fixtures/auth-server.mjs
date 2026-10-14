@@ -17,6 +17,8 @@ createServer(async (req,res) => {
   if(url.pathname==='/health')return send(200,{ok:true});
   if(url.pathname==='/_test/reset'){requests=[];return send(200,{});}
   if(url.pathname==='/_test/requests')return send(200,requests);
+  // Empty public catalog is enough to exercise the home page's navigation.
+  if(req.method==='GET'&&url.pathname.startsWith('/rest/v1/'))return send(200,[]);
   requests.push({method:req.method,path:url.pathname,scope:url.searchParams.get('scope'),type:data.type,hasPassword:typeof data.password==='string',passwordLength:data.password?.length,email:data.email});
   const authenticated=req.headers.authorization===`Bearer ${token}`;
   if(url.pathname==='/auth/v1/user') {

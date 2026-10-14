@@ -1,7 +1,9 @@
 import { test, before } from "node:test";
 import assert from "node:assert";
+import { AsyncLocalStorage } from "node:async_hooks";
 import type {
   supabase as SupabaseClient,
+  getAllResorts as GetAllResorts,
   getResortBySlug as GetResortBySlug,
   withFetchTimeout as WithFetchTimeout,
 } from "./supabase";
@@ -14,13 +16,17 @@ import type {
 // supported by this project's CJS test transform), so the module is loaded
 // dynamically in a `before` hook, after the env vars are set.
 let supabase: typeof SupabaseClient;
+let getAllResorts: typeof GetAllResorts;
 let getResortBySlug: typeof GetResortBySlug;
 let withFetchTimeout: typeof WithFetchTimeout;
 
 before(async () => {
   process.env.NEXT_PUBLIC_SUPABASE_URL ??= "http://localhost:54321";
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??= "test-anon-key";
-  ({ supabase, getResortBySlug, withFetchTimeout } = await import("./supabase"));
+  // Next normally supplies this runtime global. Unit tests run outside the
+  // Next server, so provide Node's equivalent before importing next/cache.
+  (globalThis as typeof globalThis & { AsyncLocalStorage?: typeof AsyncLocalStorage }).AsyncLocalStorage ??= AsyncLocalStorage;
+  ({ supabase, getAllResorts, getResortBySlug, withFetchTimeout } = await import("./supabase"));
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -98,23 +104,31 @@ type Result = { data: unknown; error: unknown };
  * for the `cams` query, and sometimes calls `.maybeSingle()` first).
  */
 class FakeQuery implements PromiseLike<Result> {
-  constructor(private readonly result: Result) {}
+  constructor(private readonly result: Result, private readonly delayMs = 0) {}
   select() { return this; }
   eq() { return this; }
   order() { return this; }
-  maybeSingle() { return Promise.resolve(this.result); }
+  in() { return this; }
+  private async resolve() {
+    if (this.delayMs > 0) await new Promise((resolve) => setTimeout(resolve, this.delayMs));
+    return this.result;
+  }
+  maybeSingle() { return this.resolve(); }
   then<T1 = Result, T2 = never>(
     onfulfilled?: ((value: Result) => T1 | PromiseLike<T1>) | null,
     onrejected?: ((reason: unknown) => T2 | PromiseLike<T2>) | null
   ): PromiseLike<T1 | T2> {
-    return Promise.resolve(this.result).then(onfulfilled, onrejected);
+    return this.resolve().then(onfulfilled, onrejected);
   }
 }
 
+type CatalogTable = "resorts" | "latest_snow_reports" | "cams";
+
 /** Stub `supabase.from` for the duration of `fn`, then restore it. */
 async function withFakeFrom(
-  byTable: Partial<Record<"resorts" | "latest_snow_reports" | "cams", Result>>,
-  fn: () => Promise<void>
+  byTable: Partial<Record<CatalogTable, Result>>,
+  fn: () => Promise<void>,
+  options: { delayMs?: number; onQuery?: (table: CatalogTable) => void } = {},
 ) {
   const original = supabase.from;
   // @ts-expect-error — test seam: `supabase.from` is a mutable object
@@ -123,7 +137,8 @@ async function withFakeFrom(
   supabase.from = (table: string) => {
     const result = byTable[table as keyof typeof byTable];
     if (!result) throw new Error(`unexpected table in test: ${table}`);
-    return new FakeQuery(result);
+    options.onQuery?.(table as CatalogTable);
+    return new FakeQuery(result, options.delayMs);
   };
   try {
     await fn();
@@ -131,6 +146,148 @@ async function withFakeFrom(
     supabase.from = original;
   }
 }
+
+type CachedFetchValue = {
+  kind: string;
+  data: { body?: string; headers: Record<string, string>; status: number; url: string };
+  revalidate: number;
+};
+
+/** Minimal Next incremental-cache seam for exercising `unstable_cache` in node:test. */
+class FakeIncrementalCache {
+  private entries = new Map<string, { value: CachedFetchValue; expiresAt: number }>();
+  writes = 0;
+  isOnDemandRevalidate = false;
+
+  async generateCacheKey(key: string) { return key; }
+  async get(key: string) {
+    const entry = this.entries.get(key);
+    if (!entry) return null;
+    return { value: entry.value, isStale: Date.now() >= entry.expiresAt };
+  }
+  async set(key: string, value: CachedFetchValue) {
+    this.writes += 1;
+    this.entries.set(key, { value, expiresAt: Date.now() + value.revalidate * 1000 });
+  }
+  expireAll() {
+    for (const entry of this.entries.values()) entry.expiresAt = 0;
+  }
+  get onlyEntry() {
+    return this.entries.values().next().value as { value: CachedFetchValue; expiresAt: number } | undefined;
+  }
+}
+
+type GlobalWithIncrementalCache = typeof globalThis & { __incrementalCache?: unknown };
+const globalWithIncrementalCache = globalThis as GlobalWithIncrementalCache;
+
+async function withIncrementalCache(cache: FakeIncrementalCache, fn: () => Promise<void>) {
+  const hadPrevious = Object.prototype.hasOwnProperty.call(globalWithIncrementalCache, "__incrementalCache");
+  const previous = globalWithIncrementalCache.__incrementalCache;
+  globalWithIncrementalCache.__incrementalCache = cache;
+  try {
+    await fn();
+  } finally {
+    if (hadPrevious) globalWithIncrementalCache.__incrementalCache = previous;
+    else delete globalWithIncrementalCache.__incrementalCache;
+  }
+}
+
+function successfulCatalog(): Record<CatalogTable, Result> {
+  return {
+    resorts: {
+      data: [{ id: "r1", name: "Breckenridge", slug: "breckenridge", state: "CO", country: "US", region: "Colorado Rockies", lat: 39.48, lng: -106.07, cond_rating: "good", is_active: true }],
+      error: null,
+    },
+    latest_snow_reports: {
+      data: [{ resort_id: "r1", base_depth: 40, updated_at: "2026-10-02T12:00:00Z" }],
+      error: null,
+    },
+    cams: {
+      data: [{ id: "c1", resort_id: "r1", name: "Peak 8", embed_type: "youtube", youtube_id: "abcdefghijk", is_active: true }],
+      error: null,
+    },
+  };
+}
+
+test("getAllResorts coalesces concurrent cold loads and reuses the one-hour catalog cache", async () => {
+  const incrementalCache = new FakeIncrementalCache();
+  const rows = successfulCatalog();
+  const queryCounts: Record<CatalogTable, number> = { resorts: 0, latest_snow_reports: 0, cams: 0 };
+
+  await withIncrementalCache(incrementalCache, async () => {
+    await withFakeFrom(rows, async () => {
+      const [first, second, third] = await Promise.all([
+        getAllResorts(),
+        getAllResorts(),
+        getAllResorts(),
+      ]);
+      assert.deepStrictEqual(first, second);
+      assert.deepStrictEqual(second, third);
+      assert.strictEqual(first[0]?.snow_report?.base_depth, 40);
+      assert.strictEqual(first[0]?.cams.length, 1);
+
+      // A later route request reads the shared result without hitting PostgREST.
+      const cached = await getAllResorts();
+      assert.deepStrictEqual(cached, first);
+      assert.strictEqual(incrementalCache.onlyEntry?.value.revalidate, 3600);
+    }, {
+      delayMs: 10,
+      onQuery: (table) => { queryCounts[table] += 1; },
+    });
+  });
+
+  assert.deepStrictEqual(queryCounts, { resorts: 1, latest_snow_reports: 1, cams: 1 });
+});
+
+test("getAllResorts refreshes a successful expired entry", async () => {
+  const incrementalCache = new FakeIncrementalCache();
+  const rows = successfulCatalog();
+  const queryCounts: Record<CatalogTable, number> = { resorts: 0, latest_snow_reports: 0, cams: 0 };
+
+  await withIncrementalCache(incrementalCache, async () => {
+    await withFakeFrom(rows, async () => {
+      const first = await getAllResorts();
+      assert.strictEqual(first[0]?.name, "Breckenridge");
+
+      incrementalCache.expireAll();
+      (rows.resorts.data as Array<{ name: string }>)[0].name = "Updated Breckenridge";
+      const refreshed = await getAllResorts();
+      assert.strictEqual(refreshed[0]?.name, "Updated Breckenridge");
+      assert.strictEqual(queryCounts.resorts, 2);
+    }, {
+      onQuery: (table) => { queryCounts[table] += 1; },
+    });
+  });
+});
+
+test("getAllResorts does not cache a failed cold catalog read and retries it later", async () => {
+  const incrementalCache = new FakeIncrementalCache();
+  const rows = successfulCatalog();
+  rows.latest_snow_reports = { data: null, error: { message: "view unavailable" } };
+  const queryCounts: Record<CatalogTable, number> = { resorts: 0, latest_snow_reports: 0, cams: 0 };
+
+  await withIncrementalCache(incrementalCache, async () => {
+    await withFakeFrom(rows, async () => {
+      await assert.rejects(
+        () => getAllResorts(),
+        (error: Error) => error.message === "view unavailable",
+      );
+      assert.strictEqual(incrementalCache.writes, 0, "a failed cold load must not write an error/partial result");
+    }, {
+      onQuery: (table) => { queryCounts[table] += 1; },
+    });
+
+    rows.latest_snow_reports = { data: [{ resort_id: "r1", base_depth: 44 }], error: null };
+    await withFakeFrom(rows, async () => {
+      const retried = await getAllResorts();
+      assert.strictEqual(retried[0]?.snow_report?.base_depth, 44);
+      assert.strictEqual(queryCounts.resorts, 2, "a failed cold load is not memoized; a later request retries");
+      assert.strictEqual(incrementalCache.writes, 1);
+    }, {
+      onQuery: (table) => { queryCounts[table] += 1; },
+    });
+  });
+});
 
 test("getResortBySlug throws when the resort query fails (does not treat a DB error as not-found)", async () => {
   await withFakeFrom(

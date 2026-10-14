@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
-  testDir: './tests/e2e', testMatch: /auth-account\.spec/, workers: 1, timeout: 60_000,
+  testDir: './tests/e2e', testMatch: /(?:auth-account|reliability-ux)\.spec/, workers: 1, timeout: 60_000,
   expect: { timeout: 15_000 }, reporter: 'line',
   use: { baseURL: 'http://127.0.0.1:3118', trace: 'retain-on-failure' },
   projects: [
