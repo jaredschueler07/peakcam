@@ -369,3 +369,71 @@ powderhorn,Cam 3,,image,https://img.hdrelay.com/camera/635ff973ec60cc4e98eca6ec/
 ski-cooper,Top o' the Mountain,,iframe,https://skicooper.com:8443/top_mtn/,,true
 ski-cooper,Ridgeview,,iframe,https://skicooper.com:8443/ridge/,,true
 ski-cooper,Snow Stake,,iframe,https://skicooper.com:8443/stake/,,true
+monarch-mountain,Pano Flats,,iframe,https://player.brownrice.com/embed/skimonarchpanoflats,,true
+monarch-mountain,Sundeck,,iframe,https://player.brownrice.com/embed/skimonarchsundeck,,true
+mt-ashland,Lodge,,iframe,https://player.brownrice.com/embed/mtashlandlodge,,true
+lookout-pass,Summit,,iframe,https://g1.ipcamlive.com/player/player.php?alias=6345e54d48886,,true
+lookout-pass,Chair 1 Base,,iframe,https://g1.ipcamlive.com/player/player.php?alias=6345e3cb46ea4,,true
+lookout-pass,Bottom of Chair 4,,iframe,https://g1.ipcamlive.com/player/player.php?alias=63485bb43c85b,,true
+jiminy-peak,Express Cam,,image,https://b15.hdrelay.com/camera/6901323e2fc3303fedc9199e/snapshot,,true
+jiminy-peak,Express Cam 2,,image,https://b16.hdrelay.com/camera/6966d9dc2fc3303fedc919fd/snapshot,,true
+jiminy-peak,Triple Cam,,image,https://b15.hdrelay.com/camera/690131fa2fc3303fedc9199d/snapshot,,true
+camelback,Trails End,,iframe,https://api.wetmet.net/widgets/stream/frame.php?uid=53cf5492578b967abf5b7a3ca67ad0c9,,true
+camelback,Sunbowl,,iframe,https://api.wetmet.net/widgets/stream/frame.php?uid=87ad025e1bcc5a85742ec231f3c0c758,,true
+camelback,Snow Tubing,,iframe,https://api.wetmet.net/widgets/stream/frame.php?uid=3215d5a1e6fdb73f7b162d4a26f4557a,,true
+camelback,Base Area,,iframe,https://api.wetmet.net/widgets/stream/frame.php?uid=7db2868a418b5b0f3344cc99e827e9c1,,true
+deer-valley,Ontario Snowstake,,youtube,,4vi7EiWba7E,true
+deer-valley,Snow Park Lodge,,youtube,,QozKoFs-hL0,true
+deer-valley,Silver Lake Lodge,,youtube,,uE_ent5rC3Y,true
+deer-valley,Galena Express Chairlift,,youtube,,0shWeR7Fvpg,true
+deer-valley,Hoodoo Express Chairlift,,youtube,,RaX_MhXETq4,true
+snow-summit,Beginner Area,,youtube,,Kn4IAs67hNo,true
+solitude,Sunshine Bowl,,youtube,,Lnznapxh2xM,true
+solitude,Moonbeam Lift Line,,youtube,,NSiItCGabfo,true
+solitude,Apex Express and Sunrise Lift Lines,,youtube,,l2X9DlRzX54,true
+solitude,Snowstake,,youtube,,lkEM6EC8NVA,true
+solitude,Powderhorn II Lift Line,,youtube,,yeoBog_kSzc,true
+tahoe-donner,Downhill Ski Deck,,youtube,,5mrWOcpOs5E,true
+tahoe-donner,Alder Creek Adventure Center,,youtube,,H88v9HduSdo,true
+tahoe-donner,Alder Creek Adventure Center - Side,,youtube,,feHCVBs81Vs,true
+sugar-bowl,Mt. Disney (village),,image,https://sugar3.sugarbowl.com/graphics/webcams/village/image261014_084655_10.jpg,,true
+powder-mountain,Paradise,,image,https://storage.googleapis.com/prism-cam-00112/720.jpg,,true
+powder-mountain,Timberline,,image,https://storage.googleapis.com/prism-cam-00113/720.jpg,,true
+red-river,Broadway,,iframe,https://player.brownrice.com/embed/rrsabroadway,,true
+red-river,Copper Mid Chair,,iframe,https://player.brownrice.com/embed/rrsacoppermidchair,,true
+red-river,Gold,,iframe,https://player.brownrice.com/embed/rrsagold,,true
+red-river,Platinum,,iframe,https://player.brownrice.com/embed/rrsaplatinum,,true
+red-river,Summit Cam,,iframe,https://player.brownrice.com/embed/rrsasummitcam,,true
+seven-springs,Mountain,,iframe,https://player.brownrice.com/embed/sevensprings,,true
+seven-springs,Avalanche,,iframe,https://player.brownrice.com/embed/sevenspringsavalanche,,true
+seven-springs,Tahoe,,iframe,https://player.brownrice.com/embed/sevenspringstahoe,,true
+seven-springs,North Face Base,,iframe,https://player.brownrice.com/embed/sevenspringsnorthface,,true
+seven-springs,Tubing,,iframe,https://player.brownrice.com/embed/sevenspringstubing,,true
+red-lodge,Top of Stache,,iframe,https://v.angelcam.com/iframe?v=16rb82kzr4&autoplay=1&mute=1,,true
+red-lodge,Showoff Alley,,iframe,https://v.angelcam.com/iframe?v=16lb823dl4&autoplay=1&mute=1,,true
+red-lodge,Turnpike from Midway,,iframe,https://v.angelcam.com/iframe?v=2dy6e2kprk&autoplay=1&mute=1,,true
+nubs-nob,Front Side,,iframe,https://v.angelcam.com/iframe?v=ger25omkrm&autoplay=1,,true
+donner-ski-ranch,Mountain Cam,,youtube,,OTgva8-OwaY,true
+donner-ski-ranch,Deck Cam,,youtube,,Yx6uWhysHDw,true
+snowshoe,Boathouse,,iframe,https://evovision.citynet.net/snowshoe/cam2.cfm?feed=3,,true
+snowshoe,Village,,iframe,https://evovision.citynet.net/snowshoe/cam2.cfm?feed=5,,true
+mt-bachelor,Rock Bar Patio,,image,https://api.mtbachelor.com/api/v1/cams/mtn/2,,true
+mt-bachelor,The Cone,,image,https://api.mtbachelor.com/api/v1/cams/mtn/3,,true
+mt-bachelor,Sunrise Base,,image,https://api.mtbachelor.com/api/v1/cams/mtn/5,,true
+mt-bachelor,Pine Marten Lodge,,image,https://api.mtbachelor.com/api/v1/cams/mtn/9,,true
+mt-bachelor,Outback Lift Line,,image,https://api.mtbachelor.com/api/v1/cams/mtn/11,,true
+mt-bachelor,Tumalo Mountain & Top of Pine Marten,,image,https://api.mtbachelor.com/api/v1/cams/mtn/12,,true
+mt-bachelor,Nordic Center,,image,https://api.mtbachelor.com/api/v1/cams/mtn/16,,true
+mt-bachelor,Top of Sunrise Lift,,youtube,,pXHMtXbmo7k,true
+mt-bachelor,Mid-Mountain Pine Marten Lodge,,youtube,,lyN2JG7zowo,true
+loveland,Basin Deck,,image,https://cams.skiloveland.com/lsacams/basindeck/basindeck.jpg,,true
+loveland,Chet's Top,,image,https://cams.skiloveland.com/lsacams/chetstop/chetstop.jpg,,true
+loveland,Valley Deck,,image,https://cams.skiloveland.com/lsacams/valleydeck/valleydeck.jpg,,true
+bogus-basin,J.R. Simplot Base Area,,youtube,,t1cm2D-1TLY,true
+bogus-basin,"Snow Marker (6,230 ft)",,youtube,,g714uvR8Rjg,true
+granby-ranch,Granby Base Cam,,iframe,https://player.brownrice.com/embed/granby2,,true
+cranmore,Meister Cam (Mount Washington Observatory),,youtube,,TMwZInXDfvI,true
+la-parva,Escuela de Ski,,youtube,,LYq7Zt-O81Y,true
+la-parva,Sector 3100,,youtube,,4SjBn7MXbaQ,true
+la-parva,Placa Comercial,,youtube,,rV6JR-lvNQk,true
+monarch-mountain,Mountain Cam (webcam.io),,image,https://webcam.io/webcams/MwKk2M/latest.jpg,,true

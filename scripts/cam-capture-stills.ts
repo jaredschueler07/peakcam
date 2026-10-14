@@ -72,7 +72,11 @@ type Capture = { file: string; source: string } | { error: string; source: strin
 async function get(url: string, opts: { referer?: string; redirect?: RequestRedirect; timeout?: number } = {}) {
   return fetch(url, { headers: { "User-Agent": UA, ...(opts.referer ? { Referer: opts.referer } : {}) }, redirect: opts.redirect ?? "follow", signal: AbortSignal.timeout(opts.timeout ?? 20_000) });
 }
-const m3u8In = (html: string) => html.match(/https?:\/\/[^"'\s<>\\]+\.m3u8[^"'\s<>\\]*/)?.[0]?.replace(/\\\//g, "/") ?? null;
+/** First HLS manifest a player page references. Angelcam and friends write it into a JS string with \uXXXX and \/ escapes, so decode those first. */
+const m3u8In = (html: string) => {
+  const text = html.replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16))).replace(/\\\//g, "/");
+  return text.match(/https?:\/\/[^"'\s<>\\]+\.m3u8[^"'\s<>\\]*/)?.[0] ?? null;
+};
 const ogImage = (html: string) =>
   html.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]+content=["']([^"']+)["']/i)?.[1]
   ?? html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["'](?:og:image|twitter:image)["']/i)?.[1] ?? null;
