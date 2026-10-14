@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Cam } from "./types";
-import { availableCameras, cameraPreview, cameraPreviews } from "./cam-preview";
+import { availableCameras, cameraPreview, cameraPreviews, providerStill } from "./cam-preview";
 const cam = (patch: Partial<Cam> = {}): Cam => ({ id: "image", resort_id: "resort", name: "Summit", elevation: null, embed_type: "image", embed_url: "https://cam.example/summit.jpg", youtube_id: null, is_active: true, auto_disabled: false, consecutive_failures: 0, last_checked_at: null, created_at: "2026-01-01", ...patch });
 test("counts only enabled cameras with a usable source and rejects non-web URLs", () => {
   const cams=[cam(),cam({id:"disabled",is_active:false}),cam({id:"auto",auto_disabled:true}),cam({id:"bad",embed_url:"javascript:alert(1)"}),cam({id:"empty",embed_url:null}),cam({id:"site",embed_type:"link"})];
@@ -64,4 +64,24 @@ test("ozolio posters and the Taos weather still resolve; lookalikes and other co
   assert.equal(still("https://relay.ozolio.com.evil.example/pub.api?cmd=embed&oid=EMB_X"),null);
   assert.equal(still("https://tsvweather.brownrice.com/poco-webcam.php"),"https://tsvweather.brownrice.com/img/poco.jpg");
   assert.equal(still("https://tsvweather.brownrice.com/other.php"),null);
+});
+test("a captured still fills in only when the provider publishes none, and carries its capture time", () => {
+  const captured=cam({id:"hls",embed_type:"iframe",embed_url:"https://tv.streamcasthd.com/live-stream-video-widget/laslenas",still_url:"https://x.supabase.co/storage/v1/object/public/cam-stills/hls/20261014-1500.jpg",still_captured_at:"2026-10-14T15:00:00Z"});
+  assert.equal(providerStill(captured),null);
+  assert.deepEqual(cameraPreview(captured),{cam:captured,src:captured.still_url,label:"Captured still",capturedAt:"2026-10-14T15:00:00Z"});
+  const brown=cam({id:"brown",embed_type:"iframe",embed_url:"https://player.brownrice.com/embed/vailch21",still_url:"https://x.supabase.co/old.jpg",still_captured_at:"2026-10-01T00:00:00Z"});
+  assert.equal(cameraPreview(brown)?.src,"https://player.brownrice.com/snapshot/vailch21");
+  assert.equal(cameraPreview(brown)?.capturedAt,null);
+  assert.equal(cameraPreview(cam({embed_type:"iframe",embed_url:"https://tv.streamcasthd.com/x",still_url:"http://insecure.example/still.jpg"})),null);
+});
+test("card order honours preview_rank and card_preview before health and provider type", () => {
+  const cams=[
+    cam({id:"unranked-healthy"}),
+    cam({id:"excluded",preview_rank:0,card_preview:false}),
+    cam({id:"rank2",preview_rank:2,consecutive_failures:2}),
+    cam({id:"rank1-youtube",embed_type:"youtube",youtube_id:"dQw4w9WgXcQ",embed_url:null,preview_rank:1}),
+    cam({id:"unranked-failing",consecutive_failures:1}),
+  ];
+  assert.deepEqual(cameraPreviews(cams).map(p=>p.cam.id),["rank1-youtube","rank2","unranked-healthy","unranked-failing"]);
+  assert.equal(availableCameras(cams).length,5,"card_preview=false still counts as an available camera on the resort page");
 });

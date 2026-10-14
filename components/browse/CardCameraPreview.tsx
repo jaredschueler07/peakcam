@@ -2,12 +2,26 @@
 import { useState } from "react";
 import { Camera, ArrowUpRight, Play } from "lucide-react";
 import type { Cam } from "@/lib/types";
-import { cameraPreviews } from "@/lib/cam-preview";
+import { cameraPreviews, type CameraPreview } from "@/lib/cam-preview";
 import { camDisplayName } from "@/lib/cam-name";
+import { formatLocalDateTime, formatUtcDate } from "@/lib/format-date";
+import { useHydrated } from "@/lib/use-hydrated";
+
+/**
+ * "Still from Oct 14, 3:40 PM" for a frame our capture job stored (local time
+ * after hydration; a timezone-free UTC date during SSR so server and client
+ * HTML agree), else the provider label with no inferred capture time.
+ */
+function previewCaption(preview: CameraPreview, hydrated: boolean): string {
+  if (!preview.capturedAt) return `${preview.label} · Capture time unavailable`;
+  const when = hydrated ? formatLocalDateTime(preview.capturedAt) : formatUtcDate(preview.capturedAt);
+  return when ? `Still from ${when}` : preview.label;
+}
 
 export function CardCameraPreview({ cams, resortName, onOpen }: { cams: Cam[]; resortName: string; onOpen: (id?: string) => void }) {
   const [failed, setFailed] = useState<Set<string>>(() => new Set());
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+  const hydrated = useHydrated();
   const preview = cameraPreviews(cams).find(item => !failed.has(item.src));
   const loading = Boolean(preview && preview.src !== loadedSrc);
   const count = `${cams.length} cam${cams.length === 1 ? "" : "s"} available`;
@@ -22,8 +36,8 @@ export function CardCameraPreview({ cams, resortName, onOpen }: { cams: Cam[]; r
           // eslint-disable-next-line @next/next/no-img-element
           <img key={preview.src} src={preview.src} alt={`${camDisplayName(preview.cam)} at ${resortName}`}
             loading="lazy" decoding="async"
-            // YouTube's hqdefault bakes 4:3 letterbox bars into a 16:9 frame; cover crops exactly those bars.
-            className={`h-full w-full ${preview.cam.embed_type === "youtube" ? "object-cover" : "object-contain"}`}
+            // Fill the 16:9 box: crops YouTube's baked letterbox bars and the sides of ultra-wide panoramas instead of letterboxing them.
+            className="h-full w-full object-cover"
             onLoad={() => setLoadedSrc(preview.src)}
             onError={() => setFailed(previous => new Set(previous).add(preview.src))} />
         ) : (
@@ -37,7 +51,7 @@ export function CardCameraPreview({ cams, resortName, onOpen }: { cams: Cam[]; r
           <span className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/85 to-transparent" aria-hidden />
           <span className="absolute bottom-3 left-4 right-16 text-white">
             <span className="block truncate text-sm font-semibold">{camDisplayName(preview.cam)}</span>
-            <span className="mt-0.5 block font-mono text-[9px] uppercase tracking-wide">{loading ? "Loading preview…" : `${preview.label} · Capture time unavailable`}</span>
+            <span className="mt-0.5 block font-mono text-[9px] uppercase tracking-wide">{loading ? "Loading preview…" : previewCaption(preview, hydrated)}</span>
           </span>
           <span className="absolute bottom-3 right-3 grid h-10 w-10 place-items-center rounded-full border border-white/60 bg-black/30 text-white"><Play size={17} fill="currentColor" aria-hidden /></span>
         </>}

@@ -42,6 +42,12 @@ export interface Cam {
   auto_disabled: boolean;
   last_checked_at: string | null;
   created_at: string;
+  // Migration 022 — optional so older fixtures and rows still type-check.
+  preview_rank?: number | null;      // card-preview order within the resort; lower first, null last
+  card_preview?: boolean;            // false: never front the resort card (dead/placeholder/wrong view)
+  still_url?: string | null;         // frame captured by scripts/cam-capture-stills.ts
+  still_captured_at?: string | null;
+  still_source?: string | null;
 }
 
 // ── Cam reports ──────────────────────────────────────────────
