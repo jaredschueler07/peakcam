@@ -21,7 +21,9 @@ export function CardCameraPreview({ cams, resortName, onOpen }: { cams: Cam[]; r
           // Provider-supplied image or YouTube thumbnail; no video is loaded in the grid.
           // eslint-disable-next-line @next/next/no-img-element
           <img key={preview.src} src={preview.src} alt={`${camDisplayName(preview.cam)} at ${resortName}`}
-            loading="lazy" decoding="async" className="h-full w-full object-contain"
+            loading="lazy" decoding="async"
+            // YouTube's hqdefault bakes 4:3 letterbox bars into a 16:9 frame; cover crops exactly those bars.
+            className={`h-full w-full ${preview.cam.embed_type === "youtube" ? "object-cover" : "object-contain"}`}
             onLoad={() => setLoadedSrc(preview.src)}
             onError={() => setFailed(previous => new Set(previous).add(preview.src))} />
         ) : (

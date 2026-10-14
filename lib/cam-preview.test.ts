@@ -35,6 +35,25 @@ test("cameraPreview resolves one cam's still and never throws on a malformed URL
   assert.equal(cameraPreview(cam({embed_type:"iframe",embed_url:"https://player.brownrice.com/embed/mammothmain"}))?.src,"https://player.brownrice.com/snapshot/mammothmain");
   assert.equal(cameraPreview(cam({embed_type:"youtube",youtube_id:"awxz_oIlJE0",embed_url:null}))?.src,"https://i.ytimg.com/vi/awxz_oIlJE0/hqdefault.jpg");
   assert.equal(cameraPreview(cam({embed_type:"iframe",embed_url:"not a url"})),null);
-  assert.equal(cameraPreview(cam({embed_type:"iframe",embed_url:"https://g1.ipcamlive.com/player/player.php?alias=x"})),null);
+  assert.equal(cameraPreview(cam({embed_type:"iframe",embed_url:"https://g1.ipcamlive.com/player/player.php?alias=x"}))?.src,"https://g1.ipcamlive.com/player/snapshot.php?alias=x");
   assert.equal(cameraPreview(cam({embed_type:"link"})),null);
+});
+test("brownrice stills resolve from regional hosts, snapshot URLs and longer player paths", () => {
+  const still=(embed_url:string)=>cameraPreview(cam({embed_type:"iframe",embed_url}))?.src ?? null;
+  assert.equal(still("https://live3.brownrice.com/embed/mtrose1"),"https://player.brownrice.com/snapshot/mtrose1");
+  assert.equal(still("https://live2.brownrice.com/embed/wolfcreektreasure&em=1"),"https://player.brownrice.com/snapshot/wolfcreektreasure");
+  assert.equal(still("https://player.brownrice.com/embed/windhammountainclub/timelapse/24hr"),"https://player.brownrice.com/snapshot/windhammountainclub");
+  assert.equal(still("https://player.brownrice.com/snapshot/santafe"),"https://player.brownrice.com/snapshot/santafe");
+  assert.equal(still("https://tsvweather.brownrice.com/poco-webcam.php"),null);
+  assert.equal(still("https://live1.brownrice.com.evil.example/embed/afbasearea"),null);
+  assert.equal(still("http://live1.brownrice.com/embed/afbasearea"),null);
+});
+test("ipcamlive stills come from the player's own snapshot endpoint and reject lookalikes", () => {
+  const still=(embed_url:string)=>cameraPreview(cam({embed_type:"iframe",embed_url}))?.src ?? null;
+  assert.equal(still("https://www.ipcamlive.com/player/player.php?alias=corralco1&autoplay=1"),"https://www.ipcamlive.com/player/snapshot.php?alias=corralco1");
+  assert.equal(still("https://g3.ipcamlive.com/player/player.php?alias=laguna"),"https://g3.ipcamlive.com/player/snapshot.php?alias=laguna");
+  assert.equal(still("https://ipcamlive.com.evil.example/player/player.php?alias=x"),null);
+  assert.equal(still("https://g1.ipcamlive.com/player/player.php"),null);
+  assert.equal(still("https://g1.ipcamlive.com/player/player.php?alias=bad%20alias%2F.."),null);
+  assert.equal(still("https://g1.ipcamlive.com/other.php?alias=x"),null);
 });

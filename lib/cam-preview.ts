@@ -36,10 +36,19 @@ function previewSource(cam: Cam): CameraPreview | null {
   if (cam.embed_type === "youtube") return { cam, src: `https://i.ytimg.com/vi/${cam.youtube_id}/hqdefault.jpg`, label: "Stream preview" };
   if (cam.embed_type !== "iframe" || !cam.embed_url) return null;
   const url = new URL(cam.embed_url);
-  // Brownrice publishes this exact snapshot URL in its player's og:image.
-  const stream = url.pathname.match(/^\/embed\/([a-zA-Z0-9_-]+)\/?$/)?.[1];
-  if (url.protocol === "https:" && url.hostname === "player.brownrice.com" && stream) {
+  if (url.protocol !== "https:") return null;
+  // Brownrice publishes player.brownrice.com/snapshot/<stream> in its player's
+  // og:image, and the same stream id is served from the regional liveN hosts,
+  // from /snapshot/ URLs stored as iframes, and from longer player paths such
+  // as /embed/<stream>/timelapse/24hr or /embed/<stream>&em=1.
+  const stream = url.pathname.match(/^\/(?:embed|snapshot)\/([A-Za-z0-9_-]{1,80})(?:[/&]|$)/)?.[1];
+  if (stream && (url.hostname === "player.brownrice.com" || /^live\d{1,3}\.brownrice\.com$/.test(url.hostname))) {
     return { cam, src: `https://player.brownrice.com/snapshot/${stream}`, label: "Camera still" };
+  }
+  // ipcamlive serves a per-alias snapshot next to each player (302 to the latest JPEG).
+  const alias = url.searchParams.get("alias");
+  if (/^(?:www|g\d{1,2})\.ipcamlive\.com$/.test(url.hostname) && url.pathname === "/player/player.php" && alias && /^[\w-]{1,64}$/.test(alias)) {
+    return { cam, src: `https://${url.hostname}/player/snapshot.php?alias=${encodeURIComponent(alias)}`, label: "Camera still" };
   }
   // Roundshot thumbnail URLs are harvested from each public player's twitter:image.
   const thumbnail = (roundshot as Record<string, string>)[url.href];
