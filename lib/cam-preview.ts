@@ -13,7 +13,25 @@ export function availableCameras(cams: readonly Cam[]): Cam[] {
   ));
 }
 
-function previewSource(cam: Cam): { cam: Cam; src: string; label: string } | null {
+export interface CameraPreview { cam: Cam; src: string; label: string }
+
+/**
+ * The still a cam can show before anything plays: the image feed itself, the
+ * YouTube poster, or a provider-published snapshot for the players we know.
+ * Null when the provider exposes no still (generic iframes, link-outs). Safe
+ * on any row — a malformed URL is "no preview", never a throw — so resort
+ * pages can server-render an <img> per cam tile and crawlers see a picture
+ * of the mountain instead of an empty "Tap to load" box.
+ */
+export function cameraPreview(cam: Cam): CameraPreview | null {
+  try {
+    return previewSource(cam);
+  } catch {
+    return null;
+  }
+}
+
+function previewSource(cam: Cam): CameraPreview | null {
   if (cam.embed_type === "image" && cam.embed_url?.startsWith("https://")) return { cam, src: cam.embed_url, label: "Camera still" };
   if (cam.embed_type === "youtube") return { cam, src: `https://i.ytimg.com/vi/${cam.youtube_id}/hqdefault.jpg`, label: "Stream preview" };
   if (cam.embed_type !== "iframe" || !cam.embed_url) return null;
@@ -28,7 +46,7 @@ function previewSource(cam: Cam): { cam: Cam; src: string; label: string } | nul
   return thumbnail ? { cam, src: thumbnail, label: "Camera still" } : null;
 }
 
-export function cameraPreviews(cams: readonly Cam[]): { cam: Cam; src: string; label: string }[] {
+export function cameraPreviews(cams: readonly Cam[]): CameraPreview[] {
   return availableCameras(cams).map(previewSource)
     .filter((item): item is NonNullable<typeof item> => item !== null)
     .sort((a, b) => (a.cam.consecutive_failures ?? 0) - (b.cam.consecutive_failures ?? 0) || Number(a.cam.embed_type === "youtube") - Number(b.cam.embed_type === "youtube"));

@@ -4,6 +4,7 @@ import { useForecastTime } from "@/lib/use-forecast-time";
 import { hasFreshSnowForecast } from "@/lib/snow-forecast";
 import { useCallback, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import { Play, ArrowLeftRight, TrendingUp, TrendingDown, Minus, Snowflake, Sun, Thermometer, Heart } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -80,6 +81,7 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
   const trailsOpen = snow?.trails_open;
   const trailsTotal = snow?.trails_total;
   const cams = availableCameras(resort.cams);
+  const router = useRouter();
   const [cameraIndex, setCameraIndex] = useState<number | null>(null);
   const closeCamera = useCallback(() => setCameraIndex(null), []);
   const openCamera = (id?: string) => { if (cams.length) setCameraIndex(Math.max(0, cams.findIndex(cam => cam.id === id))); };
@@ -211,16 +213,23 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
             className="flex min-h-11 items-center justify-center gap-2 rounded-full border-[1.5px] border-ink bg-alpen-dk px-4 text-sm font-bold text-white shadow-stamp-sm transition-colors hover:bg-ink disabled:bg-cream disabled:text-bark disabled:shadow-none focus-visible:ring-2 focus-visible:ring-alpen">
             <Play size={14} aria-hidden />{cams.length ? "Live look" : "No cameras yet"}
           </button>
-          <Link
-            href={`/compare?resorts=${resort.slug}`}
+          {/* A button, not an <a>: 24 crawlable `/compare?resorts=<slug>`
+              links on the home page got those stubs indexed and ranking in
+              place of the resort pages (SEO audit, Oct 13, 2026). The route
+              is also noindex now, but a link crawlers never see is cheaper
+              than one they have to be told to ignore. */}
+          <button
+            type="button"
+            onClick={() => router.push(`/compare?resorts=${resort.slug}`)}
+            aria-label={`Compare ${resort.name} with other resorts`}
             className="flex items-center justify-center gap-1.5 min-h-11 px-3 py-2 rounded-full
               border-[1.5px] border-ink/20 text-bark hover:text-ink hover:border-ink
               hover:bg-ink/5 transition-colors duration-150
-              text-[12px] font-bold tracking-wide uppercase"
+              text-[12px] font-bold tracking-wide uppercase focus-visible:ring-2 focus-visible:ring-alpen"
           >
             <ArrowLeftRight size={12} strokeWidth={2.5} />
             Compare
-          </Link>
+          </button>
         </div>
 
       </div>

@@ -12,6 +12,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { Resort } from "./types";
+import { stateHub } from "./hubs";
 
 /** The `season` value the seed writes for Northern-hemisphere rows. */
 export const CURRENT_SEASON = "2026-27";
@@ -287,4 +288,66 @@ export function openingSummary<R extends OpeningResort>(groups: OpeningGroups<R>
     open: groups.open.length,
     nextToOpen: groups.confirmed[0] ?? nextProjected,
   };
+}
+
+// ── By state ─────────────────────────────────────────────────
+
+export interface OpeningStateGroup<R extends OpeningResort = OpeningResort> {
+  /** Normalised `resorts.state` value ("CO"). */
+  key: string;
+  /** "Colorado". */
+  label: string;
+  /**
+   * Anchor id on /opening-dates — the same slug as the state's /ski-cams hub,
+   * so `/opening-dates#colorado` and `/ski-cams/colorado` always agree.
+   */
+  slug: string;
+  /** The state's slice of the page groups, in the same buckets. */
+  groups: OpeningGroups<R>;
+  /** open → confirmed → projected (soonest first) → TBA (alphabetical). */
+  rows: OpeningRow<R>[];
+  summary: OpeningSummary<R>;
+}
+
+/**
+ * The Northern-hemisphere table re-cut by state, for the per-state sections
+ * on /opening-dates: "colorado ski resort opening dates" is a question about
+ * one state, and the national table answered it only by scrolling. The
+ * `closing` (Andes) bucket is left out — those resorts keep their own section.
+ * States sort alphabetically by label; row order inside a state mirrors the
+ * national table, so the two never disagree about who opens first.
+ */
+export function groupOpeningsByState<R extends OpeningResort>(
+  groups: OpeningGroups<R>,
+  today: Date | string,
+): OpeningStateGroup<R>[] {
+  const byKey = new Map<string, OpeningStateGroup<R>>();
+  const buckets: Array<keyof Omit<OpeningGroups<R>, "closing">> = ["open", "confirmed", "projected", "tba"];
+  for (const bucket of buckets) {
+    for (const row of groups[bucket]) {
+      const code = (row.resort.state ?? "").trim();
+      if (!code) continue;
+      const hub = stateHub(code);
+      let entry = byKey.get(hub.key);
+      if (!entry) {
+        entry = {
+          key: hub.key,
+          label: hub.label,
+          slug: hub.slug,
+          groups: { open: [], confirmed: [], projected: [], tba: [], closing: [] },
+          rows: [],
+          // Filled below once every bucket is in.
+          summary: { confirmed: 0, projected: 0, tba: 0, open: 0, nextToOpen: null },
+        };
+        byKey.set(hub.key, entry);
+      }
+      entry.groups[bucket].push(row);
+    }
+  }
+  const states = [...byKey.values()];
+  for (const state of states) {
+    state.rows = [...state.groups.open, ...state.groups.confirmed, ...state.groups.projected, ...state.groups.tba];
+    state.summary = openingSummary(state.groups, today);
+  }
+  return states.sort((a, b) => a.label.localeCompare(b.label, "en"));
 }

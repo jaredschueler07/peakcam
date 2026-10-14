@@ -11,6 +11,7 @@ import type { ResortWithData, WeatherPeriod, LiveConditions, Cam, UserCondition,
 import { CamReportButton } from "@/components/cam/CamReportButton";
 import { CamEmbed } from "@/components/cam/CamEmbed";
 import { camDisplayName, camElevationFt } from "@/lib/cam-name";
+import { cameraPreview } from "@/lib/cam-preview";
 import { CamLightbox } from "@/components/cam/CamLightbox";
 import { ConditionsHero } from "@/components/resort/ConditionsHero";
 import { ForecastTable } from "@/components/resort/ForecastTable";
@@ -125,6 +126,32 @@ function CamPlayer({
   const [loaded, setLoaded] = useState(cam.embed_type === "image" && index < 2);
   const label = camDisplayName(cam);
   const elevation = camElevationFt(cam.elevation);
+  // A still of the view sits behind every click-to-play placeholder. It is in
+  // the server-rendered HTML (this component hydrates, it does not mount
+  // blind), so the page carries one descriptive <img> per cam for crawlers
+  // and image search, and a visitor sees the mountain before deciding to
+  // start a third-party player. Nothing plays until they tap.
+  const still = cameraPreview(cam);
+  const [stillFailed, setStillFailed] = useState(false);
+  const onStill = still !== null && !stillFailed;
+  const stillAlt = `${label} webcam at ${resortName}${elevation ? `, ${elevation}` : ""}`;
+  const titleClass = onStill ? "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]" : "text-text-subtle";
+  const subClass = onStill ? "text-white/85 drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]" : "text-bark";
+  const pillClass = onStill ? "border-white/80 bg-black/35 text-white" : "border-forest text-forest";
+  const stillLayer = onStill ? (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={still.src}
+        alt={stillAlt}
+        loading={index < 2 ? "eager" : "lazy"}
+        decoding="async"
+        className="absolute inset-0 h-full w-full object-cover"
+        onError={() => setStillFailed(true)}
+      />
+      <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-black/15" />
+    </>
+  ) : null;
 
   // Link-out cams — no embed available
   if (cam.embed_type === "link") {
@@ -167,29 +194,32 @@ function CamPlayer({
       <div className="relative aspect-video bg-surface2 rounded-xl overflow-hidden border border-border group">
         <CamReportButton cam={cam} resortName={resortName} />
         {!loaded ? (
-          <button
-            onClick={() => { setLoaded(true); trackCamClick(resortSlug, cam.name, cam.embed_type); }}
-            className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-3
-                       hover:bg-white/5 transition-colors"
-          >
-            <div className="w-14 h-14 rounded-full bg-cyan/10 border border-cyan/30 flex items-center justify-center
-                            group-hover:bg-cyan/20 group-hover:border-cyan transition-all duration-220">
-              <svg className="w-6 h-6 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                  d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.91M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
-              </svg>
-            </div>
-            <div className="text-center px-4">
-              <p className="text-text-subtle text-sm font-medium">{label}</p>
-              {elevation && (
-                <p className="text-bark text-xs mt-0.5">{elevation} elevation</p>
-              )}
-              <span className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
-                               border-[1.5px] border-forest text-forest text-[11px] font-semibold uppercase tracking-wider">
-                Tap to load snapshot
-              </span>
-            </div>
-          </button>
+          <>
+            {stillLayer}
+            <button
+              onClick={() => { setLoaded(true); trackCamClick(resortSlug, cam.name, cam.embed_type); }}
+              className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-3
+                         hover:bg-white/5 transition-colors"
+            >
+              <div className="w-14 h-14 rounded-full bg-cyan/10 border border-cyan/30 flex items-center justify-center
+                              group-hover:bg-cyan/20 group-hover:border-cyan transition-all duration-220">
+                <svg className={`w-6 h-6 ${onStill ? "text-white" : "text-cyan"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                    d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.91M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+                </svg>
+              </div>
+              <div className="text-center px-4">
+                <p className={`${titleClass} text-sm font-medium`}>{label}</p>
+                {elevation && (
+                  <p className={`${subClass} text-xs mt-0.5`}>{elevation} elevation</p>
+                )}
+                <span className={`mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
+                                 border-[1.5px] ${pillClass} text-[11px] font-semibold uppercase tracking-wider`}>
+                  Tap to load snapshot
+                </span>
+              </div>
+            </button>
+          </>
         ) : (
           <>
             <CamEmbed cam={cam} resortSlug={resortSlug} variant="tile" resortUrl={resortUrl} />
@@ -217,29 +247,32 @@ function CamPlayer({
       <CamReportButton cam={cam} resortName={resortName} />
       {/* Placeholder until user clicks */}
       {!loaded && (
-        <button
-          onClick={() => { setLoaded(true); trackCamClick(resortSlug, cam.name, cam.embed_type); }}
-          className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-3
-                     hover:bg-white/5 transition-colors"
-        >
-          <div className="w-14 h-14 rounded-full bg-cyan/10 border border-cyan/30 flex items-center justify-center
-                          group-hover:bg-cyan/20 group-hover:border-cyan transition-all duration-220">
-            <svg className="w-6 h-6 text-cyan ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </div>
-          <div className="text-center px-4">
-            <p className="text-text-subtle text-sm font-medium">{label}</p>
-            {elevation && (
-              <p className="text-bark text-xs mt-0.5">{elevation} elevation</p>
-            )}
-            <span className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
-                             border-[1.5px] border-forest text-forest text-[11px] font-semibold uppercase tracking-wider">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-[livePulse_2s_ease-in-out_infinite]" />
-              Tap to load live cam
-            </span>
-          </div>
-        </button>
+        <>
+          {stillLayer}
+          <button
+            onClick={() => { setLoaded(true); trackCamClick(resortSlug, cam.name, cam.embed_type); }}
+            className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-3
+                       hover:bg-white/5 transition-colors"
+          >
+            <div className="w-14 h-14 rounded-full bg-cyan/10 border border-cyan/30 flex items-center justify-center
+                            group-hover:bg-cyan/20 group-hover:border-cyan transition-all duration-220">
+              <svg className={`w-6 h-6 ml-0.5 ${onStill ? "text-white" : "text-cyan"}`} fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </div>
+            <div className="text-center px-4">
+              <p className={`${titleClass} text-sm font-medium`}>{label}</p>
+              {elevation && (
+                <p className={`${subClass} text-xs mt-0.5`}>{elevation} elevation</p>
+              )}
+              <span className={`mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
+                               border-[1.5px] ${pillClass} text-[11px] font-semibold uppercase tracking-wider`}>
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-[livePulse_2s_ease-in-out_infinite]" />
+                Tap to load live cam
+              </span>
+            </div>
+          </button>
+        </>
       )}
 
       {/* Actual embed */}

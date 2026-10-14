@@ -3,6 +3,7 @@ import assert from "node:assert";
 import {
   MAX_COMPARE_RESORTS,
   buildCompareHref,
+  isCompareIndexable,
   parseCompareSlugs,
 } from "./compare-params";
 
@@ -101,4 +102,11 @@ test("buildCompareHref round-trips a normalised, encoded URL", () => {
     parseCompareSlugs("vail,alta"),
     parseCompareSlugs(["vail", "alta"]),
   );
+});
+
+test("only the bare /compare page is indexable; every ?resorts= stub is not", () => {
+  assert.strictEqual(isCompareIndexable([]), true);
+  assert.strictEqual(isCompareIndexable(parseCompareSlugs(undefined)), true);
+  assert.strictEqual(isCompareIndexable(["mammoth"]), false);
+  assert.strictEqual(isCompareIndexable(parseCompareSlugs("vail,alta")), false);
 });

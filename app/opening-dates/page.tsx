@@ -6,7 +6,8 @@ import { PeakFooter } from "@/components/home/PeakFooter";
 import { PowderAlertForm, type AlertResort } from "@/components/alerts/PowderAlertForm";
 import { OpeningDatesTable, type OpeningTableResort } from "@/components/openings/OpeningDatesTable";
 import { OpeningSummaryChips } from "@/components/openings/OpeningSummaryChips";
-import { formatOpeningDate, openingSummary, SEASON_LABEL, sortForTable, toPacificDay } from "@/lib/openings";
+import { OpeningDatesByState, OpeningStateNav } from "@/components/openings/OpeningDatesByState";
+import { formatOpeningDate, groupOpeningsByState, openingSummary, SEASON_LABEL, sortForTable, toPacificDay } from "@/lib/openings";
 import { isOffSeason } from "@/lib/map-utils";
 import { SITE_URL } from "@/lib/site";
 
@@ -97,6 +98,8 @@ export default async function OpeningDatesPage() {
   }));
   const groups = sortForTable(openings, tableResorts, today);
   const summary = openingSummary(groups, today);
+  // Per-state sections (#colorado, #utah …): the state hubs deep-link here.
+  const states = groupOpeningsByState(groups, today);
   // Pre-season until the data says otherwise: isOffSeason is a pure month
   // split (true through October) but Colorado opens in October, so the note
   // flips to "In season" the moment the first Northern resort is Open rather
@@ -189,6 +192,8 @@ export default async function OpeningDatesPage() {
           <OpeningSummaryChips summary={summary} />
         </div>
 
+        <OpeningStateNav states={states} />
+
         <OpeningDatesTable groups={groups} />
 
         <p className="mt-4 text-xs text-bark">
@@ -196,6 +201,8 @@ export default async function OpeningDatesPage() {
           confirmed dates link to the announcement. A projection can move with the weather — only a confirmed date
           triggers an opening-day email.
         </p>
+
+        <OpeningDatesByState states={states} />
 
         <section id="alerts" className="mt-14 scroll-mt-20" aria-labelledby="opening-alerts-heading">
           <p className="pc-eyebrow mb-2">Opening-day alerts</p>

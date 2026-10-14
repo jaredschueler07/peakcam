@@ -146,7 +146,7 @@ export function NearbyResorts({ resortName, resortSlug, resorts, stateHub, regio
             </Link>
           )}
           {nearest && (
-            <Link href={buildCompareHref([resortSlug, nearest.slug])} className={linkClass}>
+            <Link href={buildCompareHref([resortSlug, nearest.slug])} rel="nofollow" className={linkClass}>
               Compare {resortName} vs {nearest.name} →
             </Link>
           )}
