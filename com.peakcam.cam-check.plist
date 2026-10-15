@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Studio: recurring camera-preview check with the Glimmer → Muse Code → Muse Wonder ladder.
+         Install: cp com.peakcam.cam-check.plist ~/Library/LaunchAgents/ && launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.peakcam.cam-check.plist -->
+    <key>Label</key>
+    <string>com.peakcam.cam-check</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/totcho_admin/hermes-studio/workspace/peakcam/scripts/cam-check.sh</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/totcho_admin/hermes-studio/workspace/peakcam</string>
+    <key>StartInterval</key>
+    <integer>10800</integer>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>StandardOutPath</key>
+    <string>/Users/totcho_admin/Library/Logs/peakcam-cam-check.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/totcho_admin/Library/Logs/peakcam-cam-check.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/totcho_admin/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/totcho_admin</string>
+    </dict>
+</dict>
+</plist>

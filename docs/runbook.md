@@ -42,8 +42,18 @@ Then spot-check `/`, a `/resorts/<slug>`, `/snow-report`, `/about`.
 |---|---|---|---|
 | `com.peakcam.agents` | 9-agent Slack bot loop | always-on | **running** |
 | `com.peakcam.snotel-sync` | SNOTEL data sync → `snow_reports` | daily 07:00 | running (scheduled) |
-| `com.peakcam.cam-health-check` | Verify 248 cams, deactivate dead | weekly | running (scheduled) |
+| `com.peakcam.cam-health-check` | Probe every cam, bump `consecutive_failures`, auto-disable dead ones | daily 06:00 | running (scheduled) |
+| `com.peakcam.cam-stills` | Capture one frame per click-to-play cam → bucket `cam-stills`, `cams.still_url` (`scripts/cam-capture-stills.ts`) | every 2 h | running (scheduled) |
+| `com.peakcam.model-sync` | Weather-model sync (`scripts/model-sync.ts`) | scheduled | running (scheduled) |
 | `com.peakcam.pipeline` | Multi-source blender | daily 06:00 | **prepared but Disabled=true** — awaits migration 010 |
+
+## Launchd Services (Studio)
+
+| Label | Purpose | Schedule | Status |
+|---|---|---|---|
+| `com.peakcam.cam-check` | Camera-preview health check with an escalation ladder (`scripts/cam-check.sh`) | every 3 h | running (scheduled) |
+
+`cam-check.sh` runs four tiers: `scripts/cam-check.ts` collects facts (Supabase stills + card coverage via `lib/cam-preview.ts`, the mini's launchd jobs and log tails over ssh, www.peakcam.io + stored-still HEADs) and applies fixed rules; Muse Glimmer (local Ollama on the Studio) triages the facts; when either flags an issue, Muse Code (`muse exec --model muse-spark-1.3`) investigates read-only in the repo; it can hand off to Muse Wonder (`muse-wonder-full-1.0`). Nothing is modified by the ladder. Reports: `~/Library/Application Support/peakcam-cam-check/runs/<stamp>/report.md` (`latest.md` is the newest); log `~/Library/Logs/peakcam-cam-check.log`. WhatsApp (via `hermes send`) gets a message on status change, after any escalation, and once a day after 07:00. The same alert set is not re-investigated within 24 h. Manual: `bash scripts/cam-check.sh --dry-run` (tier 0 only), `--force-escalate --no-notify` to exercise the ladder. Install: `cp com.peakcam.cam-check.plist ~/Library/LaunchAgents/ && launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.peakcam.cam-check.plist`.
 
 ## Incident Scenarios
 
@@ -128,6 +138,9 @@ See `docs/alerts-verification.md` for the E2E run log.
 | Analytics | PostHog dashboard (https://us.posthog.com/project/350200/dashboard/1486208) |
 | Resend deliveries | Resend dashboard → Logs |
 | Launchd jobs | `launchctl list \| grep com.peakcam` |
+| Still capture (mini) | `~/peakcam/peakcam/scripts/cam-capture-stills.log` |
+| Cam health check (mini) | `~/peakcam/peakcam/scripts/cam-health-check.log` |
+| Camera-preview check (Studio) | `~/Library/Application Support/peakcam-cam-check/latest.md`, `~/Library/Logs/peakcam-cam-check.log` |
 
 ## Analytics Events Reference
 

@@ -1,0 +1,56 @@
+{
+  "type": "object",
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "healthy",
+        "false_alarm",
+        "known_limitation",
+        "needs_fix",
+        "needs_wonder"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "diagnosis": {
+      "type": "string"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "recommended_actions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "escalate_to_wonder": {
+      "type": "boolean"
+    },
+    "wonder_question": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "verdict",
+    "severity",
+    "diagnosis",
+    "evidence",
+    "recommended_actions",
+    "escalate_to_wonder",
+    "wonder_question"
+  ],
+  "additionalProperties": false
+}

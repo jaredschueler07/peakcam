@@ -1,0 +1,20 @@
+# PeakCam camera-preview check — escalated investigation
+
+You are investigating an alert from PeakCam's recurring camera-preview check. You are running headless from a scheduled job; nobody can answer questions, and you must not change anything: do not edit files, do not run commands that write, deploy, push, restart jobs, or touch the database. Read, reason, report.
+
+## What the pipeline is
+
+- `lib/cam-preview.ts` picks one preview image per resort card: a provider still (image feeds, YouTube thumbnails, brownrice/ipcamlive/Ozolio snapshots) or, for click-to-play players, a frame captured by `scripts/cam-capture-stills.ts` and stored in the Supabase bucket `cam-stills` (`cams.still_url`, `still_captured_at`). Ranking uses `cams.preview_rank` and `card_preview` (migration 022).
+- `scripts/cam-capture-stills.ts` runs on the Mac mini every 2 h via launchd (`com.peakcam.cam-stills.plist`, log `scripts/cam-capture-stills.log`). It resolves each player's HLS stream, grabs one frame with ffmpeg, rejects blank/black frames, uploads, and prunes objects older than 7 days. A failed or blank capture keeps the previous still.
+- `scripts/cam-health-check.mjs` runs daily at 06:00 on the mini (`com.peakcam.cam-health-check.plist`), probes every cam, increments `consecutive_failures` and auto-disables dead cams. It is expected to log `[cam-health] Done` once a day.
+- The site is Next.js on Vercel (www.peakcam.io), reads Supabase at request time; resort pages embed the still URL in an `<img>`.
+- The facts below were collected by `scripts/cam-check.ts` (read it for the exact rules and thresholds). "baseline" is the best card coverage seen so far.
+
+## Your task
+
+1. Decide whether the alert is real. Known benign patterns: a stable handful of failed captures (dead wetmet streams, camstreamer "not live", pages without og:image); card coverage equal to the baseline; `[info]` items alone.
+2. If it is real, find the most likely cause from the facts and the code in this repository. Quote the evidence (log lines, file:line, numbers).
+3. Recommend concrete actions an operator can run (commands, files, order). Prefer the smallest fix.
+4. Set `escalate_to_wonder` to true only when you cannot determine the cause from the available evidence and a stronger model with the same evidence would plausibly do better; say what it should focus on in `wonder_question`.
+
+Answer in the required JSON shape only. Verdict meanings: healthy (no real problem), false_alarm (rules fired but nothing is wrong), known_limitation (real but expected and documented), needs_fix (real, cause identified), needs_wonder (real, cause not identified). Keep diagnosis under 1200 characters and each action under 300.
