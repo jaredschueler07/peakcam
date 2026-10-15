@@ -11,7 +11,7 @@
 # Per-run artefacts: $STATE_DIR/runs/<stamp>/ (facts, prompts, raw model
 # output, report.md). $STATE_DIR/latest.md is the last report.
 #
-# Notifications (WhatsApp via `hermes send`) go out when the status changes,
+# Notifications (WhatsApp via `hermes send`, Slack #village-agents as fallback) go out when the status changes,
 # whenever tier 2/3 ran, and once a day as a digest. An unchanged alert set
 # does not re-escalate inside the cooldown window.
 #
@@ -28,6 +28,7 @@ MUSE_CODE_MODEL="${CAM_CHECK_MUSE_CODE:-muse-spark-1.3}"
 MUSE_WONDER_MODEL="${CAM_CHECK_MUSE_WONDER:-muse-wonder-full-1.0}"
 MUSE_BIN="${CAM_CHECK_MUSE:-$HOME/.local/bin/muse}"
 NOTIFY_TARGET="${CAM_CHECK_NOTIFY:-whatsapp}"
+NOTIFY_FALLBACK="${CAM_CHECK_NOTIFY_FALLBACK:-slack:village-agents}"   # the only channel the Hermes bot is in; used when the primary target fails
 HERMES_SEND="${CAM_CHECK_HERMES_SEND:-docker exec -i hermes-studio-gateway hermes send}"
 DIGEST_HOUR="${CAM_CHECK_DIGEST_HOUR:-7}"
 COOLDOWN_H="${CAM_CHECK_COOLDOWN_H:-24}"
@@ -184,9 +185,15 @@ cp "$RUN/report.md" "$STATE_DIR/latest.md"
 send="$(printf '%s' "$decision" | python3 -c 'import json,sys;print(json.load(sys.stdin)["send"])')"
 reason="$(printf '%s' "$decision" | python3 -c 'import json,sys;print(json.load(sys.stdin)["reason"])')"
 log "report: $RUN/report.md (send=$send: $reason)"
+notify_to() { # <target>
+  printf '%s' "$decision" | python3 -c 'import json,sys;sys.stdout.write(json.load(sys.stdin)["message"])' \
+    | with_timeout 120 $HERMES_SEND -t "$1" -s "PeakCam cam-check: $status" -f - >> "$RUN/notify.log" 2>&1
+}
 if [ "$send" = "True" ] && [ "$NOTIFY" = 1 ]; then
-  if printf '%s' "$decision" | python3 -c 'import json,sys;sys.stdout.write(json.load(sys.stdin)["message"])' | with_timeout 120 $HERMES_SEND -t "$NOTIFY_TARGET" -s "PeakCam cam-check: $status" -f - > "$RUN/notify.log" 2>&1; then
+  if notify_to "$NOTIFY_TARGET"; then
     log "notified $NOTIFY_TARGET"
+  elif [ -n "$NOTIFY_FALLBACK" ] && notify_to "$NOTIFY_FALLBACK"; then
+    log "notify to $NOTIFY_TARGET failed, delivered to fallback $NOTIFY_FALLBACK; see $RUN/notify.log"
   else
     log "notify failed; see $RUN/notify.log"
   fi
