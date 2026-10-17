@@ -148,3 +148,30 @@ test("registration mirrors once while alert tracking leaves Lead to the existing
     assert.equal(posthogCalls.length, 4);
   });
 });
+
+test("only completed accounts reach the Google signup conversion, without user properties", async () => {
+  const previousId = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
+  const previousLabel = process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL;
+  process.env.NEXT_PUBLIC_GOOGLE_ADS_ID = "AW-123456";
+  process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL = "accounts_2";
+  try {
+    await withBrowserPostHog(async () => {
+      ph.__loaded = true;
+      window.fbq = () => {};
+      const calls: unknown[][] = [];
+      window.gtag = (...args: unknown[]) => { calls.push(args); };
+      track(EVENTS.AUTH_SIGNUP_SUBMITTED);
+      track(EVENTS.AUTH_SIGNUP_COMPLETED, { email_domain: "example.com" });
+      track(EVENTS.ALERT_SIGNUP_SUCCEEDED);
+      track(EVENTS.BROWSE_OPENED);
+      assert.deepStrictEqual(calls.filter((call) => call[0] === "event"), [
+        ["event", "conversion", { send_to: "AW-123456/accounts_2" }],
+      ]);
+    });
+  } finally {
+    if (previousId === undefined) delete process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
+    else process.env.NEXT_PUBLIC_GOOGLE_ADS_ID = previousId;
+    if (previousLabel === undefined) delete process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL;
+    else process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL = previousLabel;
+  }
+});
