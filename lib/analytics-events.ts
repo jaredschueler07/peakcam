@@ -1,5 +1,6 @@
 import posthog from "posthog-js";
 import { fireMetaPixelEvent } from "./meta-pixel";
+import { trackGoogleSignup } from "./google-ads";
 
 export const EVENTS = {
   BROWSE_OPENED: "browse_opened",
@@ -149,6 +150,7 @@ export function track(event: EventName, properties?: Record<string, unknown>) {
   if (typeof window === "undefined") return;
   const metaEvent = META_EVENT_MAP[event];
   if (metaEvent) fireMetaPixelEvent(metaEvent);
+  if (event === EVENTS.AUTH_SIGNUP_COMPLETED) trackGoogleSignup();
   if (!isLoaded()) {
     pending.push([event, properties]);
     drain();
