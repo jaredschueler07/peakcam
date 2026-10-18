@@ -17,6 +17,21 @@ import {
 const STATION = { id: "531:CO:SNTL", name: "Hoosier Pass", elevationFt: 11400 };
 const AT = "2026-12-20T12:00:00.000Z"; // 05:00 MST
 
+const EMPTY_PROFILE: ResortPublic["profile"] = {
+  runsTotal: null,
+  liftsTotal: null,
+  skiableAcres: null,
+  verticalFt: null,
+  annualSnowfallIn: null,
+  longestRunMi: null,
+  description: null,
+  descriptionSource: null,
+  trailMapUrl: null,
+  wikidataId: null,
+  aliases: [],
+  passes: [],
+};
+
 function m(value: number | null, unit: "in" | "percent" = "in", source: "snotel" | "open_meteo" | null = "snotel") {
   return { value, unit, source, measuredAt: AT, ...(source === "snotel" ? { station: STATION } : {}) };
 }
@@ -33,6 +48,9 @@ function cam(over: Partial<CamPublic> = {}): CamPublic {
     embedType: "image",
     pageUrl: "https://www.peakcam.io/resorts/breckenridge",
     sourceUrl: "https://cams.example.com/summit.jpg",
+    kind: null,
+    credit: null,
+    sourceTermsUrl: null,
     ...over,
   };
 }
@@ -43,7 +61,8 @@ function resort(over: Partial<ResortPublic> = {}): ResortPublic {
     name: "Breckenridge",
     canonicalUrl: "https://www.peakcam.io/resorts/breckenridge",
     apiUrl: "https://www.peakcam.io/api/v1/resorts/breckenridge",
-    location: { state: "CO", region: "Summit County", country: "US", lat: 39.48, lon: -106.07, baseElevationFt: 9600 },
+    location: { state: "CO", region: "Summit County", country: "US", lat: 39.48, lon: -106.07, baseElevationFt: 9600, summitElevationFt: 12998 },
+    profile: EMPTY_PROFILE,
     snow: {
       baseDepth: m(42),
       newSnow24h: m(6),
@@ -138,7 +157,7 @@ test("the resort summary sentence is dated, labelled by source, and uses the nar
 test("a model-estimated resort says so and never claims a station", () => {
   const r = resort({
     name: "Whistler Blackcomb",
-    location: { state: "BC", region: "Coast Mountains", country: "CA", lat: 50.1, lon: -122.9, baseElevationFt: null },
+    location: { state: "BC", region: "Coast Mountains", country: "CA", lat: 50.1, lon: -122.9, baseElevationFt: null, summitElevationFt: null },
     snow: {
       ...resort().snow!,
       baseDepth: m(80, "in", "open_meteo"),
