@@ -50,7 +50,16 @@ Cam embeds are click-to-play by `embed_type`: `youtube` (autoplay+mute embed), `
 
 ### Write path (API routes)
 
-7 route handlers in `app/api/`, each with a different auth model: alerts subscribe/manage/unsubscribe (capability `manage_token`, service-role writes, deny-all RLS), `alerts/trigger` (Bearer `CRON_SECRET`; Vercel cron daily 13:00 UTC per `vercel.json`), `conditions/vote` (anonymous, localStorage session UUID), `user-conditions/submit` (auth session + RLS + profanity flag), `cam-reports/submit` (anonymous, validated by `lib/cam-reports/validate.ts`, salted IP hash, Resend admin email).
+Route handlers under `app/api/` (23 `route.ts` files as of 2026-10-18), each with its own auth model: alerts subscribe/manage/unsubscribe (capability `manage_token`, service-role writes, deny-all RLS; `manage` also adds/tests/removes webhook destinations), `alerts/trigger` (Bearer `CRON_SECRET`; Vercel cron daily 13:00 UTC per `vercel.json`; writes a `powder_alert_runs` row, fans out Standard-Webhooks deliveries, `maxDuration` 60), `conditions/vote` (anonymous, localStorage session UUID), `user-conditions/submit` (auth session + RLS + profanity flag), `cam-reports/submit` (anonymous, validated by `lib/cam-reports/validate.ts`, salted IP hash, Resend admin email), `csp-report` (CSP violation sink, 1-in-20 sampled to PostHog), `v1/*` (public read-only JSON API, no auth), `mcp` (read-only MCP server, no auth).
+
+### Agent surface (public, read-only, no auth)
+
+- `/api/v1/resorts`, `/api/v1/resorts/{slug}`, `/api/v1/resorts/{slug}/cams`, `/api/v1/powder`, `/api/v1/openapi.json`, `/.well-known/api-catalog`: every value carries `{value, unit, source, measuredAt, station?}` provenance; serializer in `lib/public-api/` (`serialize.ts`, `schema.ts` zod 4, `headers.ts`, `data.ts`). Header set: CORS `*`, `X-Attribution`, `Link rel=author/license`, `Cache-Control s-maxage=900`. Exporting `OPTIONS` makes a route non-static, so caching is `Cache-Control` + `unstable_cache`, not `revalidate`.
+- `/api/mcp`: MCP server `io.peakcam/snow` on `mcp-handler@2` (MCP SDK v2 packages, stateless Streamable HTTP, route is `app/api/mcp/route.ts`, no `[transport]` segment). Eight tools in `lib/mcp/tools.ts` (pure builders over an injected data source; `lib/mcp/data.ts` is the production source), resource `peakcam://resorts/{slug}`. Verify with `npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/list`. Docs: `docs/mcp.md`, user-facing `/connect`, server card at `/.well-known/mcp/server-card.json`, registry manifest `server.json`.
+- Markdown alternates `/resorts/{slug}/index.md` and `/index.md` (`lib/public-api/markdown-page.ts`, noindex, canonical Link); the compact `lib/public-api/markdown.ts` renders MCP tool text. `Link` discovery headers on `/` and `/resorts/:slug` come from `next.config.ts`.
+- `robots.txt` is a route handler (`lib/robots.ts`) with a `Content-Signal` line; `llms.txt` has a "For agents" block; IndexNow ping (`scripts/indexnow-ping.ts`) runs at the end of `snotel-sync` only when `INDEXNOW_ENABLED=1`.
+- Feeds: `/resorts/{slug}/powder.xml` (Atom), `/alerts/feed/{manage_token}` (Atom, `?format=ics`). Webhook contract and agent recipes: `docs/alerts-verification.md`.
+- Freshness copy: `lib/quotable.ts` builds the dated, source-labelled sentences on `/`, resort pages and `/snow-report/percent-of-normal`; `lib/stations.ts` names the SNOTEL station. Timestamps are the report's `updated_at` in Mountain time, never render time.
 
 ### Data ingestion — two pipelines, one live
 
@@ -63,7 +72,7 @@ Cam embeds are click-to-play by `embed_type`: `youtube` (autoplay+mute embed), `
 
 ### Database
 
-18 tables + 2 views, migrations `supabase/migrations/001–011`. Migrations are applied **by hand** (SQL Editor / MCP `apply_migration`) — there is no Supabase CLI config, numbering is documentation only, and 004/005 each have two files. RLS postures: public-read (catalog/snow tables), anon-insert (`condition_votes`, `agent_memory`), auth.uid()-scoped (`user_conditions`, `user_favorites`, `dashboard_layouts`), deny-all/service-role-only (alerts tables, `cam_reports`).
+26 tables + 4 views in `public` as of 2026-10-18 (migrations through `024`; 2026-10-18 added `powder_alert_runs`, `alert_destinations` in 023 and `cams.archive_allowed` + `cam_stills` + view `cam_still_timeline` in 024; note that 022's `cam_stills` table was never applied in prod, 024 created it). Migrations are applied **by hand** (SQL Editor / MCP `apply_migration`) — there is no Supabase CLI config, numbering is documentation only, and 004/005 each have two files. RLS postures: public-read (catalog/snow tables), anon-insert (`condition_votes`, `agent_memory`), auth.uid()-scoped (`user_conditions`, `user_favorites`, `dashboard_layouts`), deny-all/service-role-only (alerts tables, `cam_reports`).
 
 Known live-DB drift from the repo migrations (verify against prod before trusting a migration file):
 - `user_conditions.snow_quality`: the 004 file still checks `icy/slush`, but prod's CHECK is already `powder/packed/crud/ice/spring` (changed by hand; matches code and UI). Migration 019 records the prod definition idempotently.
@@ -93,7 +102,7 @@ A self-contained arcade ski descent, live for three pilot resorts (`ski-portillo
 ### Scheduling map
 
 - Vercel cron: `/api/alerts/trigger` daily 13:00 UTC (`vercel.json`).
-- Mac Mini launchd (`~/Library/LaunchAgents/com.peakcam.*`, user `maestro_admin`, ops checkout at `/Users/maestro_admin/peakcam/peakcam`, reachable as `mac-mini-ha-1` over Tailscale): snotel-sync every 6h, model-sync every 6h, cam-health-check daily, agents (KeepAlive); the pipeline plist is renamed `.disabled`. Logs are `scripts/*.log` and `agents/loop.log` in that checkout. Plists are the scheduling ground truth — `docs/runbook.md`'s job table is stale. The Mini's `.env.local` is the canonical secrets file; the dev checkout must copy it.
+- Mac Mini launchd (`~/Library/LaunchAgents/com.peakcam.*`, user `maestro_admin`, ops checkout at `/Users/maestro_admin/peakcam/peakcam`, reachable as `mac-mini-ha-1` over Tailscale): snotel-sync every 6h, model-sync every 6h, cam-stills every 6h (21,600 s since 2026-10-18; archives frames for `archive_allowed` cams into `cam_stills`, prunes non-keepers after 30 days), cam-health-check daily, agents (KeepAlive); the pipeline plist is renamed `.disabled`. The Mac Studio runs only `com.peakcam.cam-check` and has no checkout. Logs are `scripts/*.log` and `agents/loop.log` in that checkout. Plists are the scheduling ground truth — `docs/runbook.md`'s job table is stale. The Mini's `.env.local` is the canonical secrets file; the dev checkout must copy it.
 
 ## Environment Variables
 
