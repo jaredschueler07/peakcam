@@ -43,7 +43,7 @@ Then spot-check `/`, a `/resorts/<slug>`, `/snow-report`, `/about`.
 | `com.peakcam.agents` | 9-agent Slack bot loop | always-on | **running** |
 | `com.peakcam.snotel-sync` | SNOTEL data sync → `snow_reports` | daily 07:00 | running (scheduled) |
 | `com.peakcam.cam-health-check` | Probe every cam, bump `consecutive_failures`, auto-disable dead ones | daily 06:00 | running (scheduled) |
-| `com.peakcam.cam-stills` | Capture one frame per click-to-play cam → bucket `cam-stills`, `cams.still_url`; archive a frame for every `archive_allowed` cam → `cam_stills` + `archive/` prefix, prune by retention (`scripts/cam-capture-stills.ts`, policy `docs/cams/still-archive-policy.md`) | every 6 h (21,600 s, since 2026-10-18; was 2 h) | running on the mini (scheduled) — deploy note below |
+| `com.peakcam.cam-stills` | Capture one frame per click-to-play cam → bucket `cam-stills`, `cams.still_url` (latest-only cams at most every 6 h); archive a frame for every `archive_allowed` cam → `cam_stills` + `archive/` prefix; prune: all frames 48 h, one per 6 h to 30 d, keepers to 365 d (`scripts/cam-capture-stills.ts`, policy `docs/cams/still-archive-policy.md`) | every 15 min (900 s, P8 block 1; was 21,600 s earlier on 2026-10-18, 7,200 s before that) | running on the mini (scheduled) — deploy note below |
 | `com.peakcam.model-sync` | Weather-model sync (`scripts/model-sync.ts`) | every 6 h | running (scheduled) |
 | `com.peakcam.pipeline` | Multi-source blender | daily 06:00 | **prepared but Disabled=true** — awaits migration 010 |
 
@@ -54,10 +54,10 @@ directory; `com.peakcam.snotel-sync` (21600), `model-sync`, `cam-health-check` a
 `agents` share the path. The clone was on `main` at `5583736` with one dirty file, so it
 is behind `origin/main` until the next pull.
 
-**Deploying a change to `com.peakcam.cam-stills` (e.g. the Sprint 8 archive, 2026-10-18):**
-on the Mac mini as `maestro_admin`, pull `main` in `/Users/maestro_admin/peakcam/peakcam`
-and reload the plist (the repo plist already points at that path; the interval moves
-from 7,200 s to 21,600 s):
+**Deploying a change to `com.peakcam.cam-stills` (e.g. the P8 15-min cadence, 2026-10-18):**
+on the Mac mini as `maestro_admin` (`ssh mini`), pull `main` in
+`/Users/maestro_admin/peakcam/peakcam` and reload the plist (the repo plist already
+points at that path; the interval is now 900 s):
 
 ```bash
 cd /Users/maestro_admin/peakcam/peakcam && git pull
@@ -65,7 +65,13 @@ cp com.peakcam.cam-stills.plist ~/Library/LaunchAgents/
 launchctl bootout gui/$(id -u)/com.peakcam.cam-stills 2>/dev/null
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.peakcam.cam-stills.plist
 launchctl kickstart -k gui/$(id -u)/com.peakcam.cam-stills   # first run now; expect "archived N" in the log
+tail -3 scripts/cam-capture-stills.log                         # "... archive frames pruned (N selected of M candidates, 7 d lookback)"
 ```
+
+After a cadence change or any gap longer than a week, run one full retention pass by
+hand so the band the job re-thins each run (7 days behind the 48 h edge) is not left
+with unthinned history: `npx tsx scripts/cam-capture-stills.ts --prune-only --prune-lookback-days 30`
+(add `--dry-run` first to see the count).
 
 After the first run `select count(*) from cam_stills` should grow by roughly the number
 of archive-allowed active cams (249 on 2026-10-18) per run. The Studio runs only
@@ -272,6 +278,14 @@ cached catalogue (`getAllResorts()`, 1 h) plus `resort_openings` and
 | `GET /api/v1/powder?window=24h\|48h&state=&minInches=&source=&limit=` | Ranked new snow; `source=snotel` = measured only | ISR 900 s per URL |
 | `GET /api/v1/openapi.json` | OpenAPI 3.1, generated from the zod registry in `lib/public-api/schema.ts` | static, 1 h / 24 h CDN |
 | `GET /.well-known/api-catalog` | RFC 9727 linkset pointing at the OpenAPI document | static, 1 h / 24 h CDN |
+| `GET /api/v1/resorts/search-index` | Slug, name, aliases (`lib/ask/aliases.ts`), state, country, lat/lon, page URL per resort (P9) | 1 h / 24 h CDN |
+| `GET /api/v1/status` | Report freshness (≤ 12 h) and cam health (≥ 90 % live) with thresholds; 200 `degraded`, 503 only when the read throws (P9) | 5 min CDN |
+| `GET\|POST /api/v1/ask` | Deterministic answer endpoint (`lib/ask/*`): `?q=` or `{"query"}`; `AskAnswer` with `answerable`, `sentence`, `data`, `citations`; 400 only for a missing/oversized question (P9) | 900 s; `no-store` when unanswerable |
+| `GET\|POST /ask` | NLWeb-shaped wrapper over the same router (`query_id`, `results[]`, `peakcam`); excluded from `proxy.ts` like `/api/v1` (P9) | same |
+| `POST /api/v1/batch` | ≤ 10 GET paths (`{"requests":[{"path"}]}` or a string array) dispatched in-process to the route handlers, results in order; 400 names a disallowed path (P9) | `no-store` |
+| `GET /.well-known/schemas` + `/{file}.json` | Standalone JSON Schemas (draft 2020-12) per registered shape, `lib/public-api/json-schemas.ts` | static, 1 h / 24 h CDN |
+| `GET /llms-full.txt` | Long agent guide built from the tool definitions and `lib/mcp/examples.ts` (`lib/public-api/llms-full.ts`) | static, 1 h / 24 h CDN |
+| `GET /gpt-instructions.md` | Custom GPT instructions (`lib/public-api/gpt-instructions.ts`) | static, 1 h / 24 h CDN |
 
 All routes answer `OPTIONS` with 204. Unknown slugs 404 with `Cache-Control:
 no-store`; all other responses carry `public, s-maxage=900,
@@ -316,7 +330,61 @@ Smoke check after a deploy:
 curl -sI https://www.peakcam.io/api/v1/resorts/breckenridge | grep -iE '^(x-attribution|link|cache-control|access-control|x-vercel-cache)'
 curl -s https://www.peakcam.io/api/v1/powder?source=snotel | jq '.results[:3] | map({slug, in24: .newSnow24h.value})'
 curl -s https://www.peakcam.io/api/v1/openapi.json | npx --yes @redocly/cli lint --format=summary -
+# P9 block 1
+curl -s 'https://www.peakcam.io/api/v1/ask?q=is+alta+open' | jq '{answerable, intent, tool, sentence, citations}'
+curl -s https://www.peakcam.io/api/v1/ask -H 'content-type: application/json' -d '{"query":"where did it snow most in Colorado, measured only"}' | jq '{intent, arguments, sentence}'
+curl -s 'https://www.peakcam.io/ask?query=compare+vail+and+keystone' | jq '{query_id, n: (.results|length), first: .results[0].description}'
+curl -s https://www.peakcam.io/api/v1/batch -H 'content-type: application/json' -d '{"requests":[{"path":"/api/v1/resorts/alta"},{"path":"/api/v1/resorts/vail/cams"},{"path":"/api/v1/powder?state=UT&limit=3"},{"path":"/api/v1/nope"}]}' | jq '{status: .status, error}'   # 400 disallowed_path
+curl -s https://www.peakcam.io/api/v1/batch -H 'content-type: application/json' -d '{"requests":[{"path":"/api/v1/resorts/alta"},{"path":"/api/v1/status"}]}' | jq '.results[] | {path, status}'
+curl -s https://www.peakcam.io/api/v1/resorts/search-index | jq '{count, breck: (.resorts[] | select(.slug=="breckenridge") | .aliases)}'
+curl -s https://www.peakcam.io/api/v1/status | jq '{status, age: .checks.snowReports.ageHours, live: .checks.cams.liveRatio, issues}'
+curl -s https://www.peakcam.io/.well-known/schemas | jq '.count'
+curl -s https://www.peakcam.io/.well-known/schemas/resort.json | jq '."$id"'
+curl -s https://www.peakcam.io/llms-full.txt | grep -c '^### '          # 14 tools + 10 REST routes = 24
+curl -sI https://www.peakcam.io/gpt-instructions.md | grep -i '^content-type'
 ```
+
+Unmatched `/ask` questions land in `agent_memory` (`entity = 'ask:unmatched'`, `source_agent`
+`ask-api` or `ask-mcp`, `source_thread` = salted day-scoped IP hash or null, `expires_at` 30
+days). Review with
+`select fact, source_agent, created_at from agent_memory where entity = 'ask:unmatched' order by created_at desc limit 50;`
+and turn recurring misses into alias or intent rules in `lib/ask/aliases.ts` / `lib/ask/router.ts`.
+
+## Parity data model (migrations 025–028)
+
+Added 2026-10-18 (branch `feat/p0-schema`, parity plan block P0 in
+`docs/research/ai-assistant-first/2026-10-18-parity-plan.md`). The tables
+exist in prod and are empty; each is filled by a later block's job on the
+Mac Mini (launchd, service role, like `snotel-sync`). Nothing in the app
+writes any of them. RLS on every new table: public `select`, no insert /
+update / delete policy, so only the service role writes. The zod shapes for
+all of it are already on the v1 contract (`lib/public-api/schema.ts`):
+`Resort.profile` is served now (nulls until filled); `stations`,
+`measuredNow`, `forecast`, `forecastScores`, `score` and `Cam.timelapses`
+are optional until their block lands.
+
+| Table / columns | Migration | Written by | Read by |
+| --- | --- | --- | --- |
+| `resorts.runs_total, lifts_total, skiable_acres, vertical_ft, annual_snowfall_in, longest_run_mi, description, description_source, trail_map_url, wikidata_id, aliases[], passes[], elevation_base_ft, elevation_summit_ft` | 025 | `scripts/import-resorts-standalone.mjs` (optional CSV columns), later the P2 enrichment job | `/api/v1` `profile` + `location`, resort pages (P2) |
+| `cams.kind, credit, source_terms_url` | 025 | importer (optional `cams.csv` columns), P8 cam audit | `/api/v1` cams |
+| `cam_timelapses` (`"window"` is quoted in SQL: reserved word) | 025 | P8 timelapse job (mini, ffmpeg, Storage bucket pending the user's budget call) | cam pages, `Cam.timelapses` |
+| `stations`, `resort_stations` | 026 | P3 station-discovery job | `Resort.stations` |
+| `station_observations` (PK `(station_id, observed_at)` is the read index) | 026 | P3 per-source fetchers (NWS, METAR, GHCN, ECCC, BC ASWS, road cams) | `Resort.measuredNow` |
+| `forecast_runs`, `forecast_daily` | 027 | P4 forecast-sync job | `Resort.forecast` |
+| `forecast_scores` | 027 | P4 verification job (rewrites per resort/model/window) | `Resort.forecastScores` |
+| `resort_scores` | 028 | P7 scoring job | `Resort.score`, leaderboards |
+
+Elevations: `resorts.elevation_base_ft/summit_ft` are the canonical home from
+025 on (backfilled from `resort_metadata` for 145 resorts); `getResortElevationIndex()`
+still reads `resort_metadata` until P2 switches the read path, and the
+serializer falls back to the resort row when the metadata row is absent.
+`season_stats` (the plan's view over `snowpack_daily` + `resort_scores`) is
+not created yet: its powder-day threshold is an editorial call (plan §4).
+
+Apply / re-apply: the four files are idempotent; `apply_migration` via the
+Supabase MCP or paste into the SQL Editor. Verify with
+`select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE'`
+(34 after 028).
 
 ## Discovery surface (markdown alternates, Link headers, robots, llms.txt, IndexNow)
 
@@ -396,7 +464,8 @@ static; nothing here reads the database.
 | `GET /api/mcp/server-card` | `app/api/mcp/server-card/route.ts`, re-exports the `.well-known` handlers (SEP-2127 reserved location `<streamable-http-url>/server-card`) | same, byte-identical |
 | `server.json` (repo root) | MCP Registry manifest, read by `mcp-publisher publish` from the repo root; not served | n/a |
 | Footer "Developers" column | `components/home/PeakFooter.tsx`: `/connect`, `/api/mcp`, `/api/v1/resorts`, `/api/v1/openapi.json`, `/llms.txt` | static |
-| `llms.txt` "For agents" MCP line | `app/llms.txt/route.ts` | ISR 3600 s |
+| `llms.txt` "For agents" MCP line | `app/llms.txt/route.ts` (tool list from `PEAKCAM_TOOL_NAMES`) | ISR 3600 s |
+| `GET /llms-full.txt` | `app/llms-full.txt/route.ts` → `lib/public-api/llms-full.ts` | static per deploy, 24 h CDN |
 
 The server card follows the SEP-2127 **v1** shape (schema
 `https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json`):
@@ -408,7 +477,16 @@ documentation) is under `_meta["io.peakcam/connect"]`. The SEP's reserved
 location is `<streamable-http-url>/server-card`, i.e. `/api/mcp/server-card`,
 served since 2026-10-18 by re-exporting the same handlers, so the two documents
 cannot drift. An `/.well-known/ai-catalog.json` pointing at the card is the
-discovery entry the extension expects and is not shipped yet.
+discovery entry the extension expects and is not shipped yet (the parity plan
+drops it: no consumer reads it).
+
+MCP tool verification after a deploy (expect 14 names, `ask` last):
+
+```bash
+npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/list | jq -r '.tools[].name'
+npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name ask --tool-arg question="is Breck open"
+npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_cam_timeline --tool-arg slug=breckenridge --tool-arg hours=24
+```
 
 Guard rails: `tests/connect-links.test.ts` walks every internal href in
 `CONNECT_LINKS` and fails if it does not match a `page.tsx`/`route.ts` under

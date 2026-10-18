@@ -8,7 +8,7 @@
 // whatever they fetched, and the tests build fixtures by hand.
 // ─────────────────────────────────────────────────────────────
 
-import type { Cam, ResortWithData, SnowReport } from "@/lib/types";
+import type { Cam, Resort, ResortWithData, SnowReport } from "@/lib/types";
 import { SITE_URL } from "@/lib/site";
 import { cameraPreview } from "@/lib/cam-preview";
 import { camDisplayName } from "@/lib/cam-name";
@@ -25,6 +25,8 @@ import type {
   PowderWindow,
   ResortLightPublic,
   ResortListPublic,
+  ResortPass,
+  ResortProfilePublic,
   ResortPublic,
   SeasonPublic,
   SeasonStatus,
@@ -262,6 +264,51 @@ export function serializeCam(cam: Cam, resort: Pick<ResortWithData, "slug">, opt
     embedType: cam.embed_type,
     pageUrl: resortCanonicalUrl(resort.slug, options.baseUrl),
     sourceUrl: camSourceUrl(cam),
+    // Migration 025 metadata; null until the cam audit (P8) classifies the cam.
+    kind: cam.kind ?? null,
+    credit: cam.credit ?? null,
+    sourceTermsUrl: cam.source_terms_url ?? null,
+  };
+}
+
+// ── Profile ──────────────────────────────────────────────────
+
+const finiteOrNull = (v: number | null | undefined): number | null => (v == null || !Number.isFinite(v) ? null : v);
+
+/**
+ * Migration 025 profile columns straight off the resort row. Every field is
+ * null (or an empty list) until the importer / P2 enrichment fills it; the
+ * object itself is always present so "not known" is explicit, per the
+ * contract rules at the top of schema.ts.
+ */
+export function serializeProfile(resort: Resort): ResortProfilePublic {
+  return {
+    runsTotal: finiteOrNull(resort.runs_total),
+    liftsTotal: finiteOrNull(resort.lifts_total),
+    skiableAcres: finiteOrNull(resort.skiable_acres),
+    verticalFt: finiteOrNull(resort.vertical_ft),
+    annualSnowfallIn: finiteOrNull(resort.annual_snowfall_in),
+    longestRunMi: finiteOrNull(resort.longest_run_mi),
+    description: resort.description ?? null,
+    descriptionSource: resort.description ? (resort.description_source ?? null) : null,
+    trailMapUrl: resort.trail_map_url ?? null,
+    wikidataId: resort.wikidata_id ?? null,
+    aliases: Array.isArray(resort.aliases) ? resort.aliases.filter((a): a is string => typeof a === "string" && a.length > 0) : [],
+    passes: Array.isArray(resort.passes) ? resort.passes.filter((p): p is ResortPass => KNOWN_PASSES.has(p)) : [],
+  };
+}
+
+const KNOWN_PASSES = new Set<ResortPass>(["ikon", "epic", "mountain-collective", "indy", "power"]);
+
+/**
+ * Base / summit elevation: the explicit option (resort_metadata, the legacy
+ * home) wins when the caller passed one, else the resort row's own columns
+ * (migration 025, the canonical home going forward).
+ */
+export function resolveElevation(resort: Resort, options: SerializeOptions = {}): { baseFt: number | null; summitFt: number | null } {
+  return {
+    baseFt: finiteOrNull(options.elevation?.baseFt) ?? finiteOrNull(resort.elevation_base_ft),
+    summitFt: finiteOrNull(options.elevation?.summitFt) ?? finiteOrNull(resort.elevation_summit_ft),
   };
 }
 
@@ -287,6 +334,7 @@ export function serializeCams(resort: ResortWithData, options: SerializeOptions 
 export function serializeResort(resort: ResortWithData, options: SerializeOptions = {}): ResortPublic {
   const snow = serializeSnow(resort, options);
   const cams = activeCams(resort).map((cam) => serializeCam(cam, resort, options));
+  const elevation = resolveElevation(resort, options);
   return {
     slug: resort.slug,
     name: resort.name,
@@ -298,8 +346,10 @@ export function serializeResort(resort: ResortWithData, options: SerializeOption
       country: resort.country,
       lat: resort.lat,
       lon: resort.lng,
-      baseElevationFt: options.elevation?.baseFt ?? null,
+      baseElevationFt: elevation.baseFt,
+      summitElevationFt: elevation.summitFt,
     },
+    profile: serializeProfile(resort),
     snow,
     season: serializeSeason(resort, options),
     cams,

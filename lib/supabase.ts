@@ -452,47 +452,55 @@ export interface ResortElevationRow {
 }
 
 async function fetchResortElevationIndex(): Promise<Record<string, ResortElevationRow>> {
-  const { data, error } = await supabase
-    .from("resort_metadata")
-    .select("resort_id, elevation_base_ft, elevation_summit_ft");
-  if (error) {
-    if (MISSING_TABLE_CODES.has(error.code)) return {};
-    throw error;
-  }
+  // Migration 025 made resorts.elevation_base_ft/summit_ft the canonical
+  // home; resort_metadata (migration 007) is the legacy copy and only fills a
+  // gap the profile row leaves. A missing legacy table is not an outage.
+  const [profileRes, legacyRes] = await Promise.all([
+    supabase.from("resorts").select("id, elevation_base_ft, elevation_summit_ft").eq("is_active", true),
+    supabase.from("resort_metadata").select("resort_id, elevation_base_ft, elevation_summit_ft"),
+  ]);
+  if (profileRes.error) throw profileRes.error;
+  if (legacyRes.error && !MISSING_TABLE_CODES.has(legacyRes.error.code)) throw legacyRes.error;
   const out: Record<string, ResortElevationRow> = {};
-  for (const row of data ?? []) {
+  for (const row of legacyRes.data ?? []) {
     out[row.resort_id] = { base_ft: row.elevation_base_ft ?? null, summit_ft: row.elevation_summit_ft ?? null };
+  }
+  for (const row of profileRes.data ?? []) {
+    const legacy = out[row.id];
+    out[row.id] = {
+      base_ft: row.elevation_base_ft ?? legacy?.base_ft ?? null,
+      summit_ft: row.elevation_summit_ft ?? legacy?.summit_ft ?? null,
+    };
   }
   return out;
 }
 
 /**
- * Base/summit elevation for every resort with a `resort_metadata` row, keyed
- * by resort id. One query for the whole catalogue (the public API serialises
- * all 148 resorts per revalidation), cached alongside the catalogue for the
- * same window and tag. A failed query throws like getAllResorts so the ISR
- * route keeps serving its last good document.
+ * Base/summit elevation for every resort, keyed by resort id: the `resorts`
+ * profile columns first, the legacy `resort_metadata` row where the profile
+ * is blank. One pass for the whole catalogue (the public API serialises all
+ * resorts per revalidation), cached alongside the catalogue for the same
+ * window and tag. A failed query throws like getAllResorts so the ISR route
+ * keeps serving its last good document.
  */
 export const getResortElevationIndex = unstable_cache(
   fetchResortElevationIndex,
-  ["peakcam:resort-elevations:v1", supabaseUrl],
+  ["peakcam:resort-elevations:v2", supabaseUrl],
   { revalidate: RESORT_CATALOG_REVALIDATE_SECONDS, tags: ["peakcam-resort-catalog"] },
 );
 
-/** Midpoint elevation (base+summit)/2 in feet, for resorts with resort_metadata. Returns base-only or null if incomplete/missing. */
+/** Midpoint elevation (base+summit)/2 in feet from the cached index (profile columns, legacy fallback). Base-only or null when incomplete. */
 export async function getResortElevationFt(resortId: string): Promise<number | null> {
-  const { data, error } = await supabase
-    .from("resort_metadata")
-    .select("elevation_base_ft, elevation_summit_ft")
-    .eq("resort_id", resortId)
-    .maybeSingle();
-
-  if (error || !data) return null;
-  const { elevation_base_ft, elevation_summit_ft } = data;
-  if (elevation_base_ft != null && elevation_summit_ft != null) {
-    return Math.round((elevation_base_ft + elevation_summit_ft) / 2);
+  let index: Record<string, ResortElevationRow>;
+  try {
+    index = await getResortElevationIndex();
+  } catch {
+    return null;
   }
-  return elevation_base_ft ?? null;
+  const row = index[resortId];
+  if (!row) return null;
+  if (row.base_ft != null && row.summit_ft != null) return Math.round((row.base_ft + row.summit_ft) / 2);
+  return row.base_ft ?? null;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -596,6 +604,17 @@ async function fetchCamStillRows(filter: { camId?: string; resortId?: string }, 
     rows.push(row);
   }
   return rows;
+}
+
+/**
+ * Archived frames for one cam or one resort as public-URL frames, for the MCP
+ * `get_cam_timeline` tool and the ask router: every in-window frame plus the
+ * newest keeper per query, deduplicated, any order (the tool shapes them with
+ * lib/cam-timeline shapeTimeline). Null when the view is unavailable.
+ */
+export async function getCamStillFrames(filter: { camId?: string; resortId?: string }, hours = 24): Promise<CamTimelineFrame[] | null> {
+  const rows = await fetchCamStillRows(filter, clampHours(hours), new Date());
+  return rows ? rows.map((row) => toFrame(row, supabaseUrl)) : null;
 }
 
 /**

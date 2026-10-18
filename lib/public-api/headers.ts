@@ -39,6 +39,8 @@ export interface PublicApiHeaderOptions {
   extraLinks?: string[];
   /** Override the cache policy (error responses use `no-store`). */
   cacheControl?: string;
+  /** `Access-Control-Allow-Methods` for routes that accept more than GET (the batch and ask POSTs). */
+  allowMethods?: string;
 }
 
 /** The full header set as a plain object, for `new Response(body, { headers })`. */
@@ -49,7 +51,7 @@ export function publicApiHeaders(options: PublicApiHeaderOptions = {}): Record<s
     "Cache-Control": options.cacheControl ?? PUBLIC_API_CACHE_CONTROL,
     Vary: "Accept",
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": PUBLIC_API_ALLOWED_METHODS,
+    "Access-Control-Allow-Methods": options.allowMethods ?? PUBLIC_API_ALLOWED_METHODS,
     "Access-Control-Allow-Headers": "Accept, Content-Type",
     "Access-Control-Expose-Headers": "Link, X-Attribution",
     "Access-Control-Max-Age": "86400",
@@ -85,6 +87,9 @@ export function publicError(status: number, error: string, detail?: string): Res
 }
 
 /** CORS preflight: no body, the same header set, 204. */
-export function publicOptions(): Response {
-  return new Response(null, { status: 204, headers: publicApiHeaders({ cacheControl: "public, max-age=86400" }) });
+export function publicOptions(options: Pick<PublicApiHeaderOptions, "allowMethods"> = {}): Response {
+  return new Response(null, { status: 204, headers: publicApiHeaders({ cacheControl: "public, max-age=86400", ...options }) });
 }
+
+/** Methods header for the two routes that also take a POST body. */
+export const PUBLIC_API_POST_METHODS = "GET, POST, OPTIONS";

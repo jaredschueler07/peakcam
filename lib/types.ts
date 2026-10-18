@@ -26,9 +26,8 @@ export interface Resort {
   instagram_url: string | null;
   is_active: boolean;
   created_at: string;
-  // Profile columns (parity plan P0, migration 025). Optional everywhere: the
-  // site renders without them until the migration and scripts/import-profiles.ts
-  // have run, and every consumer drops a sentence rather than printing null.
+  // Migration 025 — resort profile. Optional so older fixtures still type-check;
+  // null in prod until the P2 enrichment / importer fills them.
   runs_total?: number | null;
   lifts_total?: number | null;
   skiable_acres?: number | null;
@@ -36,19 +35,20 @@ export interface Resort {
   annual_snowfall_in?: number | null;
   longest_run_mi?: number | null;
   description?: string | null;
-  description_source?: ResortDescriptionSource | null;
+  description_source?: DescriptionSource | null;
   trail_map_url?: string | null;
   wikidata_id?: string | null;
-  aliases?: string[] | null;
-  passes?: SeasonPass[] | null;
-  elevation_base_ft?: number | null;
+  aliases?: string[];
+  passes?: ResortPass[];
+  elevation_base_ft?: number | null;    // canonical home from 025 (resort_metadata is the legacy copy)
   elevation_summit_ft?: number | null;
 }
 
-/** Who wrote `resorts.description`: the operator's own text, an editor, or a generated paragraph. */
-export type ResortDescriptionSource = "operator" | "editor" | "generated";
-/** The multi-resort passes `resorts.passes` can name. */
-export type SeasonPass = "ikon" | "epic" | "mountain-collective" | "indy" | "power";
+export type DescriptionSource = "operator" | "generated" | "editor";
+export type ResortPass = "ikon" | "epic" | "mountain-collective" | "indy" | "power";
+/** Aliases used by lib/resort-profile.ts and the importer (P2). */
+export type ResortDescriptionSource = DescriptionSource;
+export type SeasonPass = ResortPass;
 
 // ── Cams ─────────────────────────────────────────────────────
 export interface Cam {
@@ -72,6 +72,104 @@ export interface Cam {
   still_source?: string | null;
   // Migration 024 — rights switch for the still archive (docs/cams/still-archive-policy.md).
   archive_allowed?: boolean;
+  // Migration 025 — what the cam looks at, credit line, operator terms.
+  kind?: CamKind | null;
+  credit?: string | null;
+  source_terms_url?: string | null;
+}
+
+export type CamKind = "summit" | "mid" | "base" | "snow-stake" | "village" | "approach";
+
+/** Migration 025 — rendered clip per cam (P8 writes these). */
+export interface CamTimelapse {
+  id: string;
+  cam_id: string;
+  window: string;               // "24h" | "storm" | a label the render job defines
+  url: string;
+  frames: number | null;
+  rendered_at: string;
+  storm_date: string | null;    // YYYY-MM-DD for storm clips
+}
+
+// ── Station layer (migration 026, P3 writes these) ───────────
+export type StationKind = "snotel" | "scan" | "nws_obs" | "metar" | "ghcn" | "bc_asws" | "eccc" | "road_cam";
+export type StationRole = "summit" | "mid" | "base" | "approach";
+
+export interface StationRow {
+  id: string;
+  source: string;
+  source_id: string;
+  name: string | null;
+  lat: number | null;
+  lng: number | null;
+  elevation_ft: number | null;
+  kind: StationKind;
+}
+
+export interface ResortStation {
+  resort_id: string;
+  station_id: string;
+  role: StationRole;
+  distance_km: number | null;
+  rank: number;
+}
+
+export interface StationObservation {
+  station_id: string;
+  observed_at: string;
+  snow_depth_in: number | null;
+  swe_in: number | null;
+  new_snow_in: number | null;
+  temp_f: number | null;
+  wind_mph: number | null;
+  source_payload: Record<string, unknown> | null;
+}
+
+// ── Forecasts (migration 027, P4 writes these) ───────────────
+export type ForecastPoint = "summit" | "base";
+
+export interface ForecastRunRow {
+  id: string;
+  resort_id: string;
+  point: ForecastPoint;
+  model: string;
+  issued_at: string;
+  horizon_days: number;
+}
+
+export interface ForecastDailyRow {
+  run_id: string;
+  date: string;                 // YYYY-MM-DD
+  snowfall_cm: number | null;
+  snowfall_lo: number | null;
+  snowfall_hi: number | null;
+  temp_max: number | null;
+  temp_min: number | null;
+  precip_prob: number | null;
+  wind_gust: number | null;
+  weather_code: number | null;
+}
+
+export interface ForecastScoreRow {
+  resort_id: string;
+  model: string;
+  period_days: number;
+  day1_mae: number | null;
+  day3_mae: number | null;
+  day7_mae: number | null;
+  samples: number | null;
+  bias_ratio: number | null;
+  computed_at: string;
+}
+
+// ── Scores (migration 028, P7 writes these) ──────────────────
+export interface ResortScoreRow {
+  resort_id: string;
+  date: string;                 // YYYY-MM-DD
+  score: number;                // 0–100
+  rating: ConditionRating | null;
+  components: Record<string, number | null>;
+  scored_by: string | null;
 }
 
 // ── Cam reports ──────────────────────────────────────────────
