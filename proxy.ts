@@ -45,6 +45,7 @@ export const config = {
     // `api/v1/` and `api/mcp` are the anonymous public API and MCP endpoint:
     // they never read a session, and the getUser() round-trip would otherwise
     // sit in front of every cached JSON response (and every agent tool call).
-    "/((?!_next/static|_next/image|favicon.ico|drop-in/|api/v1/|api/mcp(?:/|$)|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // `ask` is the NLWeb answer endpoint: anonymous like /api/v1/ask.
+    "/((?!_next/static|_next/image|favicon.ico|drop-in/|api/v1/|api/mcp(?:/|$)|ask(?:/|$)|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
