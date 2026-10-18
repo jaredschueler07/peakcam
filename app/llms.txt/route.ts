@@ -73,7 +73,7 @@ often quote their upper mountain). Full details: ${SITE_URL}/methodology
 - API catalog (RFC 9727): ${SITE_URL}/.well-known/api-catalog
 - Markdown alternates: ${SITE_URL}/index.md and ${SITE_URL}/resorts/{slug}/index.md (also rel="alternate" in each HTML page's Link header)
 - Powder feed per resort (Atom): ${SITE_URL}/resorts/{slug}/powder.xml
-- MCP: (coming) ${SITE_URL}/api/mcp
+- MCP server io.peakcam/snow (Streamable HTTP, no auth, read-only; search_resorts, get_resort_conditions, get_resort_cams, find_powder, compare_resorts, get_forecast, get_snow_history, get_opening_dates): ${SITE_URL}/api/mcp — setup per client: ${SITE_URL}/connect — server card: ${SITE_URL}/.well-known/mcp/server-card.json
 - Attribution: cite the resort's PeakCam page URL; SNOTEL data is USDA NRCS, forecasts are NWS/Open-Meteo, cams belong to their operators. Terms: ${SITE_URL}/about#terms
 
 ## Key pages

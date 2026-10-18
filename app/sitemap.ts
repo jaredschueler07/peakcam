@@ -110,6 +110,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ? [{ url: `${SITE_URL}/drop-in`, lastModified: buildTime, changeFrequency: "monthly" as const, priority: 0.5 }]
       : []),
     { url: `${SITE_URL}/about`, lastModified: buildTime, changeFrequency: "monthly", priority: 0.4 },
+    // /connect: static recipes for AI clients and the API; changes on deploy.
+    { url: `${SITE_URL}/connect`, lastModified: buildTime, changeFrequency: "monthly", priority: 0.5 },
     { url: `${SITE_URL}/methodology`, lastModified: buildTime, changeFrequency: "monthly", priority: 0.5 },
     ...hubEntries,
     ...resortEntries,
