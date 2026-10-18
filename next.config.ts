@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Content-Security-Policy — REPORT-ONLY for now.
+// Content-Security-Policy — the full policy is REPORT-ONLY; a small slice that
+// cannot break cam embeds (CSP_ENFORCED below) is enforced. Both report to
+// /api/csp-report, which samples and forwards to PostHog as `csp_violation`.
 //
 // Shipped report-only deliberately: cam embeds are third-party URLs stored in
 // the database (`cams.embed_url`, embed_type youtube/iframe/image), so the set
@@ -77,12 +79,42 @@ const CSP_DIRECTIVES = [
   // Clickjacking control; the modern equivalent of X-Frame-Options, kept in
   // sync with the SAMEORIGIN header below.
   "frame-ancestors 'self'",
+
+  // Violation reports: `report-uri` for browsers that still POST
+  // application/csp-report, `report-to` (Reporting API, declared by the
+  // Reporting-Endpoints header below) for the rest. Same route either way.
+  "report-uri /api/csp-report",
+  "report-to csp-endpoint",
+].join("; ");
+
+// Enforced today. These four directives do not depend on which hosts the cam
+// tiles load from, so they are safe to block on now: nothing on the site uses
+// <object>/<embed>, no page sets <base>, every form is handled by an onSubmit
+// (no cross-origin form posts; Supabase auth uses fetch and redirects), and
+// X-Frame-Options already pins framing to SAMEORIGIN. Widen this list as the
+// report-only policy's violation stream comes back clean per directive.
+const CSP_ENFORCED = [
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'self'",
+  "report-uri /api/csp-report",
+  "report-to csp-endpoint",
 ].join("; ");
 
 const securityHeaders = [
   {
+    key: "Content-Security-Policy",
+    value: CSP_ENFORCED,
+  },
+  {
     key: "Content-Security-Policy-Report-Only",
     value: CSP_DIRECTIVES,
+  },
+  {
+    // Names the Reporting API endpoint that both policies' `report-to` use.
+    key: "Reporting-Endpoints",
+    value: 'csp-endpoint="/api/csp-report"',
   },
   {
     // Clickjacking protection for /auth in particular: the sign-in form is
@@ -130,6 +162,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // No `x-powered-by: Next.js` on every response; it is framework
+  // fingerprinting with no benefit to the site.
+  poweredByHeader: false,
   env: {
     // Evaluated once per `next build`, so this is a per-deploy constant. The
     // sitemap uses it as lastModified for the evergreen pages (/about,
