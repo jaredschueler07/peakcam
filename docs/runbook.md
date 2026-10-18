@@ -344,6 +344,42 @@ days). Review with
 `select fact, source_agent, created_at from agent_memory where entity = 'ask:unmatched' order by created_at desc limit 50;`
 and turn recurring misses into alias or intent rules in `lib/ask/aliases.ts` / `lib/ask/router.ts`.
 
+## Parity data model (migrations 025–028)
+
+Added 2026-10-18 (branch `feat/p0-schema`, parity plan block P0 in
+`docs/research/ai-assistant-first/2026-10-18-parity-plan.md`). The tables
+exist in prod and are empty; each is filled by a later block's job on the
+Mac Mini (launchd, service role, like `snotel-sync`). Nothing in the app
+writes any of them. RLS on every new table: public `select`, no insert /
+update / delete policy, so only the service role writes. The zod shapes for
+all of it are already on the v1 contract (`lib/public-api/schema.ts`):
+`Resort.profile` is served now (nulls until filled); `stations`,
+`measuredNow`, `forecast`, `forecastScores`, `score` and `Cam.timelapses`
+are optional until their block lands.
+
+| Table / columns | Migration | Written by | Read by |
+| --- | --- | --- | --- |
+| `resorts.runs_total, lifts_total, skiable_acres, vertical_ft, annual_snowfall_in, longest_run_mi, description, description_source, trail_map_url, wikidata_id, aliases[], passes[], elevation_base_ft, elevation_summit_ft` | 025 | `scripts/import-resorts-standalone.mjs` (optional CSV columns), later the P2 enrichment job | `/api/v1` `profile` + `location`, resort pages (P2) |
+| `cams.kind, credit, source_terms_url` | 025 | importer (optional `cams.csv` columns), P8 cam audit | `/api/v1` cams |
+| `cam_timelapses` (`"window"` is quoted in SQL: reserved word) | 025 | P8 timelapse job (mini, ffmpeg, Storage bucket pending the user's budget call) | cam pages, `Cam.timelapses` |
+| `stations`, `resort_stations` | 026 | P3 station-discovery job | `Resort.stations` |
+| `station_observations` (PK `(station_id, observed_at)` is the read index) | 026 | P3 per-source fetchers (NWS, METAR, GHCN, ECCC, BC ASWS, road cams) | `Resort.measuredNow` |
+| `forecast_runs`, `forecast_daily` | 027 | P4 forecast-sync job | `Resort.forecast` |
+| `forecast_scores` | 027 | P4 verification job (rewrites per resort/model/window) | `Resort.forecastScores` |
+| `resort_scores` | 028 | P7 scoring job | `Resort.score`, leaderboards |
+
+Elevations: `resorts.elevation_base_ft/summit_ft` are the canonical home from
+025 on (backfilled from `resort_metadata` for 145 resorts); `getResortElevationIndex()`
+still reads `resort_metadata` until P2 switches the read path, and the
+serializer falls back to the resort row when the metadata row is absent.
+`season_stats` (the plan's view over `snowpack_daily` + `resort_scores`) is
+not created yet: its powder-day threshold is an editorial call (plan §4).
+
+Apply / re-apply: the four files are idempotent; `apply_migration` via the
+Supabase MCP or paste into the SQL Editor. Verify with
+`select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE'`
+(34 after 028).
+
 ## Discovery surface (markdown alternates, Link headers, robots, llms.txt, IndexNow)
 
 Added 2026-10-18 (branch `feat/discovery-surface`, execution plan Sprint 4). All

@@ -104,6 +104,150 @@ export const SeasonSchema = z
   })
   .register(publicApiRegistry, { id: "Season" });
 
+// ── Parity data model (migrations 025–028) ───────────────────
+//
+// Shapes for data the P2–P8 blocks will fill. They are on the contract now
+// so OpenAPI, the markdown alternates and the MCP output schemas can grow
+// without a breaking change; every field that may be empty today is nullable
+// and every collection that is not yet served is `.optional()` on its parent.
+
+export const CamKindSchema = z
+  .enum(["summit", "mid", "base", "snow-stake", "village", "approach"])
+  .register(publicApiRegistry, {
+    id: "CamKind",
+    description: "What the cam looks at. `approach` is a road / access cam.",
+  });
+
+export const CamTimelapseSchema = z
+  .object({
+    id: z.string(),
+    window: z.string().describe("Which clip: `24h` (rolling day), `storm` (one storm, see `stormDate`), or another label."),
+    url: z.string().describe("Public MP4 URL."),
+    frames: z.number().int().nullable(),
+    renderedAt: z.string().describe("ISO-8601 instant the clip was rendered."),
+    stormDate: z.string().nullable().describe("YYYY-MM-DD of the storm a `storm` clip covers."),
+  })
+  .register(publicApiRegistry, { id: "CamTimelapse", description: "A rendered timelapse clip for a cam." });
+
+export const ResortPassSchema = z.enum(["ikon", "epic", "mountain-collective", "indy", "power"]);
+export const DescriptionSourceSchema = z.enum(["operator", "generated", "editor"]);
+
+export const ResortProfileSchema = z
+  .object({
+    runsTotal: z.number().int().nullable(),
+    liftsTotal: z.number().int().nullable(),
+    skiableAcres: z.number().nullable(),
+    verticalFt: z.number().int().nullable(),
+    annualSnowfallIn: z.number().nullable().describe("Operator-stated average annual snowfall, inches."),
+    longestRunMi: z.number().nullable(),
+    description: z.string().nullable(),
+    descriptionSource: DescriptionSourceSchema.nullable().describe(
+      "`operator`: the resort's own copy. `generated`: a model-written draft, labelled as such on the page. `editor`: hand-written by PeakCam.",
+    ),
+    trailMapUrl: z.string().nullable().describe("The operator's trail map (linked, never copied)."),
+    wikidataId: z.string().nullable(),
+    aliases: z.array(z.string()).describe("Other names the resort is known by, e.g. `A-Basin`."),
+    passes: z.array(ResortPassSchema).describe("Multi-resort passes the resort is on."),
+  })
+  .register(publicApiRegistry, {
+    id: "ResortProfile",
+    description: "Static identity facts about the resort. Null fields are not yet known to PeakCam.",
+  });
+
+export const StationKindSchema = z
+  .enum(["snotel", "scan", "nws_obs", "metar", "ghcn", "bc_asws", "eccc", "road_cam"])
+  .register(publicApiRegistry, { id: "StationKind", description: "The observation network a station belongs to." });
+
+export const StationRoleSchema = z.enum(["summit", "mid", "base", "approach"]);
+
+export const ObservationStationSchema = z
+  .object({
+    id: z.string().describe("PeakCam station id (UUID)."),
+    source: z.string().describe("Provider, e.g. `nrcs`, `nws`, `eccc`, `udot`."),
+    sourceId: z.string().describe("The provider's own identifier (SNOTEL triplet, ICAO code, GHCN id)."),
+    name: z.string().nullable(),
+    kind: StationKindSchema,
+    role: StationRoleSchema.describe("Where the station sits relative to the resort."),
+    lat: z.number().nullable(),
+    lon: z.number().nullable(),
+    elevationFt: z.number().nullable(),
+    distanceKm: z.number().nullable().describe("Great-circle distance from the resort's coordinates."),
+    rank: z.number().int().describe("1 = the preferred station for its role."),
+  })
+  .register(publicApiRegistry, {
+    id: "ObservationStation",
+    description: "A station (of any network) that serves this resort. Distinct from `Station`, which is the NRCS sensor behind a Measurement.",
+  });
+
+export const MeasuredNowSchema = z
+  .object({
+    stationId: z.string(),
+    observedAt: z.string().describe("ISO-8601 instant of the observation."),
+    snowDepthIn: z.number().nullable(),
+    sweIn: z.number().nullable(),
+    newSnowIn: z.number().nullable().describe("New snow since the previous observation, inches."),
+    tempF: z.number().nullable(),
+    windMph: z.number().nullable(),
+  })
+  .register(publicApiRegistry, { id: "MeasuredNow", description: "The latest observation from one station." });
+
+export const ForecastPointSchema = z.enum(["summit", "base"]);
+
+export const ForecastDailySchema = z
+  .object({
+    date: z.string().describe("YYYY-MM-DD, local to the resort."),
+    snowfallCm: z.number().nullable(),
+    snowfallLo: z.number().nullable().describe("Low end of the spread across models / members; null for a single model."),
+    snowfallHi: z.number().nullable(),
+    tempMax: z.number().nullable().describe("°C as the models report it."),
+    tempMin: z.number().nullable(),
+    precipProb: z.number().nullable().describe("0–100."),
+    windGust: z.number().nullable().describe("km/h."),
+    weatherCode: z.number().int().nullable().describe("WMO weather interpretation code."),
+  })
+  .register(publicApiRegistry, { id: "ForecastDaily", description: "One forecast day." });
+
+export const ForecastRunSchema = z
+  .object({
+    id: z.string(),
+    point: ForecastPointSchema,
+    model: z.string().describe("Model id as the provider names it, or `blend` for PeakCam's skill-weighted blend."),
+    issuedAt: z.string(),
+    horizonDays: z.number().int(),
+    days: z.array(ForecastDailySchema),
+  })
+  .register(publicApiRegistry, { id: "ForecastRun", description: "One model run for one point, with its daily values." });
+
+export const ForecastScoreSchema = z
+  .object({
+    model: z.string(),
+    periodDays: z.number().int().describe("Trailing verification window, days."),
+    day1Mae: z.number().nullable().describe("Mean absolute error of the day-1 snowfall forecast, cm."),
+    day3Mae: z.number().nullable(),
+    day7Mae: z.number().nullable(),
+    samples: z.number().int().nullable(),
+    biasRatio: z.number().nullable().describe("Sum(forecast) / sum(observed); above 1 means the model over-forecasts snow."),
+    computedAt: z.string(),
+  })
+  .register(publicApiRegistry, { id: "ForecastScore", description: "How a model has verified at this resort." });
+
+export const ScoreComponentsSchema = z
+  .record(z.string(), z.number().nullable())
+  .register(publicApiRegistry, {
+    id: "ScoreComponents",
+    description: "Named contributions to the score, e.g. `{\"newSnow24h\": 32, \"baseDepth\": 18}`.",
+  });
+
+export const ResortScoreSchema = z
+  .object({
+    date: z.string().describe("YYYY-MM-DD the score is for."),
+    score: z.number().int().min(0).max(100),
+    rating: ConditionRatingSchema.nullable(),
+    components: ScoreComponentsSchema,
+    scoredBy: z.string().nullable().describe("Scorer version, e.g. `score-v1`."),
+  })
+  .register(publicApiRegistry, { id: "ResortScore", description: "PeakCam's 0–100 conditions score with its components." });
+
 export const EmbedTypeSchema = z.enum(["youtube", "iframe", "image", "link"]);
 
 export const CamSchema = z
@@ -124,6 +268,10 @@ export const CamSchema = z
     embedType: EmbedTypeSchema,
     pageUrl: z.string().describe("The PeakCam page that plays this cam."),
     sourceUrl: z.string().nullable().describe("The operator's stream or page. Attribution and rights belong to the operator."),
+    kind: CamKindSchema.nullable().describe("What the cam looks at. Null when not classified."),
+    credit: z.string().nullable().describe("Attribution line to show with the frame. Null means credit the resort."),
+    sourceTermsUrl: z.string().nullable().describe("The operator's terms governing reuse of this feed, when known."),
+    timelapses: z.array(CamTimelapseSchema).optional().describe("Rendered clips, once PeakCam renders them for this cam."),
   })
   .register(publicApiRegistry, { id: "Cam" });
 
@@ -135,6 +283,7 @@ export const LocationSchema = z
     lat: z.number(),
     lon: z.number(),
     baseElevationFt: z.number().nullable(),
+    summitElevationFt: z.number().nullable(),
   })
   .register(publicApiRegistry, { id: "Location" });
 
@@ -145,9 +294,15 @@ export const ResortSchema = z
     canonicalUrl: z.string().describe("The resort's PeakCam page. Cite this."),
     apiUrl: z.string(),
     location: LocationSchema,
+    profile: ResortProfileSchema,
     snow: SnowSchema.nullable().describe("Null when the resort has never had a snow report."),
     season: SeasonSchema,
     cams: z.array(CamSchema),
+    stations: z.array(ObservationStationSchema).optional().describe("Observation stations serving the resort, once the station layer is live."),
+    measuredNow: z.array(MeasuredNowSchema).optional().describe("Latest observation per station, once the station layer is live."),
+    forecast: z.array(ForecastRunSchema).optional().describe("Latest run per model and point, once stored forecasts are live."),
+    forecastScores: z.array(ForecastScoreSchema).optional().describe("Per-model verification at this resort, once computed."),
+    score: ResortScoreSchema.nullable().optional().describe("Today's 0–100 score, once the scorer is live."),
     websiteUrl: z.string().nullable(),
     attribution: z.string(),
     license: z.string().describe("URL of the terms that govern reuse."),
@@ -161,7 +316,7 @@ export const ResortLightSchema = z
     name: z.string(),
     canonicalUrl: z.string(),
     apiUrl: z.string(),
-    location: LocationSchema.omit({ baseElevationFt: true }),
+    location: LocationSchema.omit({ baseElevationFt: true, summitElevationFt: true }),
     snow: z
       .object({
         baseDepth: z.number().nullable(),
@@ -367,6 +522,17 @@ export type SnowPublic = z.infer<typeof SnowSchema>;
 export type SeasonPublic = z.infer<typeof SeasonSchema>;
 export type SeasonStatus = z.infer<typeof SeasonStatusSchema>;
 export type CamPublic = z.infer<typeof CamSchema>;
+export type CamKind = z.infer<typeof CamKindSchema>;
+export type CamTimelapsePublic = z.infer<typeof CamTimelapseSchema>;
+export type ResortProfilePublic = z.infer<typeof ResortProfileSchema>;
+export type ResortPass = z.infer<typeof ResortPassSchema>;
+export type ObservationStationPublic = z.infer<typeof ObservationStationSchema>;
+export type MeasuredNowPublic = z.infer<typeof MeasuredNowSchema>;
+export type ForecastDailyPublic = z.infer<typeof ForecastDailySchema>;
+export type ForecastRunPublic = z.infer<typeof ForecastRunSchema>;
+export type ForecastScorePublic = z.infer<typeof ForecastScoreSchema>;
+export type ScoreComponents = z.infer<typeof ScoreComponentsSchema>;
+export type ResortScorePublic = z.infer<typeof ResortScoreSchema>;
 export type LocationPublic = z.infer<typeof LocationSchema>;
 export type ResortPublic = z.infer<typeof ResortSchema>;
 export type ResortLightPublic = z.infer<typeof ResortLightSchema>;
