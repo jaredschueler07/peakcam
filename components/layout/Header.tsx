@@ -29,6 +29,9 @@ export const navLinks = [
 
 export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps) {
   const pathname = usePathname();
+  // Plain /auth on the home page so the href matches PeakHero's overlay nav
+  // (one prefetch target instead of two); /auth already defaults `next` to "/".
+  const authHref = !pathname || pathname === "/" ? "/auth" : `/auth?next=${encodeURIComponent(pathname)}`;
   const router = useRouter();
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -182,7 +185,7 @@ export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps
           </Link>
         ) : (
           <Link
-            href={`/auth?next=${encodeURIComponent(pathname ?? "/")}`}
+            href={authHref}
             className="ml-2 px-4 py-1.5 rounded-full text-[13px] font-bold whitespace-nowrap
               bg-alpen-dk text-cream-50 border-[1.5px] border-ink
               shadow-[2px_2px_0_#faf4e6] hover:shadow-[3px_3px_0_#faf4e6]
@@ -237,7 +240,7 @@ export function Header({ onSearch, showSearch = true, searchValue }: HeaderProps
             </button></>
           ) : (
             <Link
-              href={`/auth?next=${encodeURIComponent(pathname ?? "/")}`}
+              href={authHref}
               className="px-4 py-3 rounded-full text-sm font-bold text-center
                 bg-alpen-dk text-cream-50 border-[1.5px] border-cream-50
                 shadow-[2px_2px_0_#faf4e6]"

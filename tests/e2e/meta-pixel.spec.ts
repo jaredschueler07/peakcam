@@ -1,5 +1,10 @@
 import { test, expect, type Page } from '@playwright/test';
 
+// The pixel is env-gated (lib/meta-pixel.ts) and the id is inlined at build
+// time, so this suite only applies to a build made with the var set.
+const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
+test.skip(!PIXEL_ID, 'Meta pixel is env-gated: build and run with NEXT_PUBLIC_META_PIXEL_ID set');
+
 async function pixelCalls(page: Page) {
   return page.evaluate(() => {
     const fbq = window.fbq as typeof window.fbq & { queue?: IArguments[] };
@@ -25,7 +30,7 @@ test('one init and PageView per pathname, including initial hydration and back n
   await page.goto('/about');
   await expect(page.locator('main')).toBeVisible();
   await expect.poll(() => pixelCalls(page)).toEqual([
-    ['init', '910818501790206'], ['track', 'PageView', undefined],
+    ['init', PIXEL_ID], ['track', 'PageView', undefined],
   ]);
   await expect(page.locator('script#meta-pixel')).toHaveCount(1);
   await page.evaluate(() => window.history.pushState({}, '', '/about?q=fixture'));

@@ -28,7 +28,7 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
 
       {/* Overlay navigation — cream text on topo, logo italic */}
       <nav className="absolute top-0 left-0 right-0 z-20 px-6 md:px-8 py-5 hidden md:flex items-center justify-between">
-        <Link href="/" className="font-display italic font-black text-[26px] md:text-[30px] tracking-tight leading-none">
+        <Link href="/" prefetch={false} className="font-display italic font-black text-[26px] md:text-[30px] tracking-tight leading-none">
           <span className="text-ink">Peak</span>
           <span className="text-alpen">Cam</span>
         </Link>
@@ -37,6 +37,7 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
             <Link
               key={l.href}
               href={l.href}
+              prefetch={false}
               className="text-ink/80 hover:text-ink font-semibold text-[14px] px-3 py-1.5 rounded-full hover:bg-ink/5 transition-colors"
             >
               {l.label}
@@ -44,6 +45,7 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
           ))}
           <Link
             href="/auth"
+            prefetch={false}
             className="ml-2 bg-forest text-cream-50 font-bold text-[14px] border-[1.5px] border-ink
               rounded-full px-5 py-2 shadow-stamp
               hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-stamp-hover
@@ -69,6 +71,7 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
             <Link
               key={l.href}
               href={l.href}
+              prefetch={false}
               className="px-4 py-3 rounded-full text-sm font-semibold text-ink hover:bg-ink/5 transition-colors"
               onClick={() => setMenuOpen(false)}
             >
@@ -77,6 +80,7 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
           ))}
           <Link
             href="/auth"
+            prefetch={false}
             className="mt-1 px-4 py-3 rounded-full text-sm font-bold text-center bg-forest text-cream-50 border-[1.5px] border-ink shadow-stamp-sm"
             onClick={() => setMenuOpen(false)}
           >

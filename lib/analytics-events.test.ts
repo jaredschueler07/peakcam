@@ -136,17 +136,42 @@ test("track() is a no-op on the server", () => {
 });
 
 test("registration mirrors once while alert tracking leaves Lead to the existing first-success latch", async () => {
-  await withBrowserPostHog(async (posthogCalls) => {
-    ph.__loaded = true;
-    const pixelCalls: unknown[][] = [];
-    window.fbq = (...args: unknown[]) => { pixelCalls.push(args); };
-    track(EVENTS.AUTH_SIGNUP_COMPLETED);
-    track(EVENTS.ALERT_SIGNUP_SUCCEEDED, { repeat_in_browser: false });
-    track(EVENTS.ALERT_SIGNUP_SUCCEEDED, { repeat_in_browser: true });
-    track(EVENTS.BROWSE_OPENED);
-    assert.deepStrictEqual(pixelCalls, [["track", "CompleteRegistration", undefined]]);
-    assert.equal(posthogCalls.length, 4);
-  });
+  // The Meta mirror is env-gated (lib/meta-pixel.ts); enable it for this test.
+  const previousPixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID;
+  process.env.NEXT_PUBLIC_META_PIXEL_ID = "910818501790206";
+  try {
+    await withBrowserPostHog(async (posthogCalls) => {
+      ph.__loaded = true;
+      const pixelCalls: unknown[][] = [];
+      window.fbq = (...args: unknown[]) => { pixelCalls.push(args); };
+      track(EVENTS.AUTH_SIGNUP_COMPLETED);
+      track(EVENTS.ALERT_SIGNUP_SUCCEEDED, { repeat_in_browser: false });
+      track(EVENTS.ALERT_SIGNUP_SUCCEEDED, { repeat_in_browser: true });
+      track(EVENTS.BROWSE_OPENED);
+      assert.deepStrictEqual(pixelCalls, [["track", "CompleteRegistration", undefined]]);
+      assert.equal(posthogCalls.length, 4);
+    });
+  } finally {
+    if (previousPixelId === undefined) Reflect.deleteProperty(process.env, "NEXT_PUBLIC_META_PIXEL_ID");
+    else process.env.NEXT_PUBLIC_META_PIXEL_ID = previousPixelId;
+  }
+});
+
+test("the Meta mirror stays silent when the pixel is not configured", async () => {
+  const previousPixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID;
+  Reflect.deleteProperty(process.env, "NEXT_PUBLIC_META_PIXEL_ID");
+  try {
+    await withBrowserPostHog(async (posthogCalls) => {
+      ph.__loaded = true;
+      const pixelCalls: unknown[][] = [];
+      window.fbq = (...args: unknown[]) => { pixelCalls.push(args); };
+      track(EVENTS.AUTH_SIGNUP_COMPLETED);
+      assert.deepStrictEqual(pixelCalls, []);
+      assert.equal(posthogCalls.length, 1);
+    });
+  } finally {
+    if (previousPixelId !== undefined) process.env.NEXT_PUBLIC_META_PIXEL_ID = previousPixelId;
+  }
 });
 
 test("only completed accounts reach the Google signup conversion, without user properties", async () => {

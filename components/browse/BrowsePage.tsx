@@ -559,7 +559,9 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
 
   return (
     <div id="conditions" className="min-h-screen scroll-mt-16 pc-paper">
-      <div className="hidden md:contents"><Header showSearch={false} /></div>
+      {/* Single Header for the home page: sticky on mobile (the hero has no nav
+          below md), unwrapped on desktop where the Header is sticky by itself. */}
+      <div className="sticky top-0 z-50 md:contents"><Header showSearch={false} /></div>
 
       {/* ── Sticky paper search + filter bar ─────────────────── */}
       <div id="main-content" tabIndex={-1} className="sticky top-[64px] scroll-mt-[64px] z-30 border-b-[1.5px] border-ink bg-cream/95 backdrop-blur-md">
