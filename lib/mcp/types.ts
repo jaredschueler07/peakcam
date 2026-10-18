@@ -9,6 +9,7 @@
 
 import type { ResortWithData, WeatherPeriod } from "@/lib/types";
 import type { PublicApiCatalog } from "@/lib/public-api/data";
+import type { CamTimelineFrame } from "@/lib/cam-timeline";
 
 /** One `snowpack_daily` row (migration 005), the columns the history tool reads. */
 export interface SnowHistoryRow {
@@ -24,6 +25,22 @@ export interface SnowHistoryRow {
   qc_flag: string;
 }
 
+/** Which cams' archived frames `camStills` should read. Exactly one key is set. */
+export interface CamStillFilter {
+  camId?: string;
+  resortId?: string;
+}
+
+/** An unmatched /ask question, logged for review. No raw IP, no account data. */
+export interface UnmatchedQuestion {
+  /** The question, trimmed and truncated by the caller. */
+  question: string;
+  /** Salted hash of the caller's IP, or null when the caller had none (MCP). */
+  ipHash: string | null;
+  /** `api` for /api/v1/ask and /ask, `mcp` for the ask tool. */
+  via: "api" | "mcp";
+}
+
 export interface McpDataSource {
   /** The cached catalogue read shared with /api/v1 (resorts, openings, elevations, now). */
   catalog(): Promise<PublicApiCatalog>;
@@ -31,4 +48,16 @@ export interface McpDataSource {
   forecast(resort: Pick<ResortWithData, "lat" | "lng" | "country">): Promise<WeatherPeriod[] | null>;
   /** The most recent `days` rows of `snowpack_daily` for a resort, newest first. */
   snowHistory(resortId: string, days: number): Promise<SnowHistoryRow[]>;
+  /**
+   * Archived frames from the public `cam_still_timeline` view (migration 024)
+   * for one cam or every archive-allowed cam of a resort: everything inside
+   * the last `hours` plus the newest storm keeper per cam, any order. Null
+   * when the view is unavailable (the tool then answers "no archive").
+   */
+  camStills(filter: CamStillFilter, hours: number): Promise<CamTimelineFrame[] | null>;
+  /**
+   * Record a question the ask router could not answer. Optional and
+   * fire-and-forget: a failure must never surface to the caller.
+   */
+  logUnmatchedQuestion?(entry: UnmatchedQuestion): Promise<void>;
 }

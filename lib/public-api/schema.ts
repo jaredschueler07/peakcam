@@ -17,8 +17,9 @@
 // ─────────────────────────────────────────────────────────────
 
 import { z } from "zod";
+import { ASK_INTENTS } from "@/lib/ask/intents";
 
-export const PUBLIC_API_VERSION = "1.0.0";
+export const PUBLIC_API_VERSION = "1.1.0";
 
 /** Everything zod knows about is registered here so openapi.ts can emit $refs by id. */
 export const publicApiRegistry = z.registry<{ id: string; description?: string }>();
@@ -241,6 +242,123 @@ export const ApiErrorSchema = z
   })
   .register(publicApiRegistry, { id: "Error" });
 
+// ── Sprint P9: search index, status, batch, ask ──────────────
+
+export const SearchIndexEntrySchema = z
+  .object({
+    slug: z.string(),
+    name: z.string(),
+    aliases: z.array(z.string()).describe("Lowercase ASCII phrases the ask router also accepts for this resort: nicknames and the name minus generic suffixes. Empty when none."),
+    state: z.string().describe("US state / CA province code, or the country name for Andes resorts."),
+    country: z.string().describe("ISO 3166-1 alpha-2."),
+    lat: z.number(),
+    lon: z.number(),
+    canonicalUrl: z.string(),
+  })
+  .register(publicApiRegistry, { id: "SearchIndexEntry" });
+
+export const SearchIndexSchema = z
+  .object({
+    count: z.number().int(),
+    resorts: z.array(SearchIndexEntrySchema).describe("Alphabetical by name."),
+    attribution: z.string(),
+    license: z.string(),
+    generatedAt: z.string(),
+  })
+  .register(publicApiRegistry, { id: "SearchIndex", description: "Every active resort's slug, name, aliases and coordinates, for client-side matching. Cached a day." });
+
+export const StatusLevelSchema = z.enum(["ok", "degraded"]);
+
+export const StatusSchema = z
+  .object({
+    status: StatusLevelSchema.describe("`degraded` when any check below is failing; the HTTP status stays 200 so the body can be read."),
+    generatedAt: z.string(),
+    checks: z.object({
+      snowReports: z.object({
+        status: StatusLevelSchema,
+        resorts: z.number().int().describe("Active resorts in the catalogue."),
+        reporting: z.number().int().describe("Resorts with at least one snow report."),
+        newestReportAt: z.string().nullable().describe("Newest `latest_snow_reports.updated_at` across the catalogue."),
+        ageHours: z.number().nullable().describe("Hours since `newestReportAt`. The sync jobs run every 6 h, so above 12 h is degraded."),
+        staleResorts: z.number().int().describe("Reporting resorts whose latest report is older than 24 h."),
+        bySource: z.record(z.string(), z.number().int()).describe("Reporting resorts per `source` (`snotel`, `open_meteo`, …)."),
+      }),
+      cams: z.object({
+        status: StatusLevelSchema,
+        total: z.number().int(),
+        live: z.number().int().describe("Last health check passed."),
+        down: z.number().int(),
+        unchecked: z.number().int(),
+        liveRatio: z.number().nullable().describe("live / (live + down); null when nothing has been checked. Below 0.9 is degraded."),
+        newestCheckAt: z.string().nullable(),
+      }),
+    }),
+    thresholds: z.object({
+      reportMaxAgeHours: z.number(),
+      camLiveMinRatio: z.number(),
+    }),
+    issues: z.array(z.string()).describe("One sentence per failing check; empty when `ok`."),
+    attribution: z.string(),
+  })
+  .register(publicApiRegistry, { id: "Status", description: "Service status derived from the data itself: snow-report freshness and cam health." });
+
+export const BatchRequestSchema = z
+  .object({
+    requests: z
+      .array(z.object({ path: z.string().describe("A GET path under /api/v1, with its query string, e.g. `/api/v1/resorts/alta`.") }))
+      .min(1)
+      .max(10),
+  })
+  .register(publicApiRegistry, { id: "BatchRequest" });
+
+export const BatchResultSchema = z
+  .object({
+    path: z.string(),
+    status: z.number().int().describe("The HTTP status that path would have answered on its own."),
+    body: z.unknown().describe("That route's JSON body (its documented schema), or its error envelope."),
+  })
+  .register(publicApiRegistry, { id: "BatchResult" });
+
+export const BatchResponseSchema = z
+  .object({
+    count: z.number().int(),
+    results: z.array(BatchResultSchema).describe("In request order."),
+    attribution: z.string(),
+    license: z.string(),
+    generatedAt: z.string(),
+  })
+  .register(publicApiRegistry, { id: "BatchResponse" });
+
+export const AskIntentSchema = z.enum(ASK_INTENTS).register(publicApiRegistry, {
+  id: "AskIntent",
+  description: "What the router decided the question asks for. `unknown` means it declined to guess.",
+});
+
+export const AskResortRefSchema = z
+  .object({ slug: z.string(), name: z.string(), canonicalUrl: z.string() })
+  .register(publicApiRegistry, { id: "AskResortRef" });
+
+export const AskAnswerSchema = z
+  .object({
+    question: z.string(),
+    answerable: z.boolean().describe("False when the router found no resort or no intent it could serve; `data` is then null and `suggestions` says what to ask."),
+    intent: AskIntentSchema,
+    tool: z.string().nullable().describe("The PeakCam MCP tool whose result is in `data`."),
+    arguments: z.record(z.string(), z.unknown()).nullable().describe("The arguments that tool was called with, so the call can be repeated over MCP."),
+    resort: AskResortRefSchema.nullable().describe("The resort the question named (the first, for a comparison)."),
+    resorts: z.array(AskResortRefSchema).describe("Every resort the question named, in order."),
+    place: z.object({ state: z.string().nullable(), country: z.string().nullable() }).nullable(),
+    sentence: z.string().describe("A dated, source-labelled sentence that can be quoted verbatim."),
+    asOf: z.string().nullable().describe("ISO instant of the newest report the sentence used; null when it used none."),
+    data: z.unknown().nullable().describe("The tool's structured result (its documented `outputSchema`), or null."),
+    citations: z.array(z.string()).describe("PeakCam URLs to cite, the resort page first."),
+    suggestions: z.array(z.string()).describe("Questions the router can answer, offered when it could not answer this one."),
+    attribution: z.string(),
+    license: z.string(),
+    generatedAt: z.string(),
+  })
+  .register(publicApiRegistry, { id: "AskAnswer", description: "A deterministic answer: the tool result the question routed to plus a quotable sentence. No language model is involved." });
+
 export type MeasurementSource = z.infer<typeof MeasurementSourceSchema>;
 export type Station = z.infer<typeof StationSchema>;
 export type Measurement = z.infer<typeof MeasurementSchema>;
@@ -258,3 +376,10 @@ export type PowderWindow = z.infer<typeof PowderWindowSchema>;
 export type PowderEntryPublic = z.infer<typeof PowderEntrySchema>;
 export type PowderListPublic = z.infer<typeof PowderListSchema>;
 export type ApiError = z.infer<typeof ApiErrorSchema>;
+export type SearchIndexEntryPublic = z.infer<typeof SearchIndexEntrySchema>;
+export type SearchIndexPublic = z.infer<typeof SearchIndexSchema>;
+export type StatusPublic = z.infer<typeof StatusSchema>;
+export type BatchRequestPublic = z.infer<typeof BatchRequestSchema>;
+export type BatchResponsePublic = z.infer<typeof BatchResponseSchema>;
+export type AskAnswerPublic = z.infer<typeof AskAnswerSchema>;
+export type AskResortRef = z.infer<typeof AskResortRefSchema>;
