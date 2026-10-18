@@ -43,7 +43,27 @@ Then spot-check `/`, a `/resorts/<slug>`, `/snow-report`, `/about`.
 | `com.peakcam.agents` | 9-agent Slack bot loop | always-on | **running** |
 | `com.peakcam.snotel-sync` | SNOTEL data sync → `snow_reports` | daily 07:00 | running (scheduled) |
 | `com.peakcam.cam-health-check` | Probe every cam, bump `consecutive_failures`, auto-disable dead ones | daily 06:00 | running (scheduled) |
-| `com.peakcam.cam-stills` | Capture one frame per click-to-play cam → bucket `cam-stills`, `cams.still_url` (`scripts/cam-capture-stills.ts`) | every 2 h | running (scheduled) |
+| `com.peakcam.cam-stills` | Capture one frame per click-to-play cam → bucket `cam-stills`, `cams.still_url`; archive a frame for every `archive_allowed` cam → `cam_stills` + `archive/` prefix, prune by retention (`scripts/cam-capture-stills.ts`, policy `docs/cams/still-archive-policy.md`) | every 6 h (21,600 s, since 2026-10-18; was 2 h) | **host unverified, see below** |
+
+**Deploying a change to `com.peakcam.cam-stills` (e.g. the Sprint 8 archive, 2026-10-18):**
+pull `main` on whichever machine runs `com.peakcam.cam-stills` — verify with
+`launchctl list | grep peakcam` on the mini **and** the Studio — then reload the plist:
+
+```bash
+cd <that machine's peakcam checkout> && git pull
+cp com.peakcam.cam-stills.plist ~/Library/LaunchAgents/
+launchctl bootout gui/$(id -u)/com.peakcam.cam-stills 2>/dev/null
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.peakcam.cam-stills.plist
+launchctl kickstart -k gui/$(id -u)/com.peakcam.cam-stills   # first run now; expect "archived N" in the log
+```
+
+Finding of 2026-10-18: the repo plist points at `/Users/maestro_admin/peakcam/peakcam`
+with a 7,200 s interval, but the Mac Studio (user `totcho_admin`) has no `maestro_admin`
+user, no peakcam clone and only `com.peakcam.cam-check.plist` loaded, so the stills job is
+**not** running on the Studio. It most likely runs on the Mac mini like the other
+`com.peakcam.*` jobs, but that was not verified. Edit the plist paths for the real
+checkout before copying it. After the first run: `select count(*) from cam_stills` should
+grow by roughly the number of archive-allowed active cams (249 on 2026-10-18) per run.
 | `com.peakcam.model-sync` | Weather-model sync (`scripts/model-sync.ts`) | scheduled | running (scheduled) |
 | `com.peakcam.pipeline` | Multi-source blender | daily 06:00 | **prepared but Disabled=true** — awaits migration 010 |
 
@@ -138,7 +158,7 @@ See `docs/alerts-verification.md` for the E2E run log.
 | Analytics | PostHog dashboard (https://us.posthog.com/project/350200/dashboard/1486208) |
 | Resend deliveries | Resend dashboard → Logs |
 | Launchd jobs | `launchctl list \| grep com.peakcam` |
-| Still capture (mini) | `~/peakcam/peakcam/scripts/cam-capture-stills.log` |
+| Still capture + archive (mini, unverified) | `~/peakcam/peakcam/scripts/cam-capture-stills.log`; `select count(*), max(captured_at) from cam_stills` |
 | Cam health check (mini) | `~/peakcam/peakcam/scripts/cam-health-check.log` |
 | Camera-preview check (Studio) | `~/Library/Application Support/peakcam-cam-check/latest.md`, `~/Library/Logs/peakcam-cam-check.log` |
 
