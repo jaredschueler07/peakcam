@@ -1,30 +1,39 @@
 #!/usr/bin/env tsx
 /**
- * cam-capture-stills — grab one frame from every click-to-play cam that has
- * no provider-published still, store it in Supabase Storage (bucket
- * `cam-stills`, migration 022) and point cams.still_url at it.
+ * cam-capture-stills — two jobs in one pass over the cams table.
  *
- * Why: the resort card shows one still per resort, and lib/cam-preview.ts can
- * only derive a still for providers with a snapshot endpoint (brownrice,
- * ipcamlive, Ozolio, roundshot, YouTube, image feeds). HLS/iframe-only players
- * (wetmet, skicooper, streamcasthd, rtsp.me, Verkada, camstreamer when it is
- * not fronted by YouTube, …) left the card empty. This job fills that gap.
+ * 1. Latest frame (migration 022). For every click-to-play cam that has no
+ *    provider-published still, grab one frame, store it in Supabase Storage
+ *    (bucket `cam-stills`, path <camId>/<stamp>.jpg) and point cams.still_url
+ *    at it. lib/cam-preview.ts can only derive a still for providers with a
+ *    snapshot endpoint; HLS/iframe-only players (wetmet, skicooper,
+ *    streamcasthd, rtsp.me, Verkada, camstreamer, …) left the card empty.
+ *
+ * 2. History archive (migration 024). For every cam with
+ *    cams.archive_allowed = true — PeakCam-captured cams plus operator-public
+ *    snapshot endpoints and image feeds, see docs/cams/still-archive-policy.md —
+ *    store the same frame a second time under archive/<camId>/<iso>.jpg and
+ *    insert a cam_stills row carrying the resort's latest 24 h number. A frame
+ *    taken while that number is >= 6 in. is a storm `keeper`. Non-keepers are
+ *    pruned after 30 days, keepers after a year (object and row). The site
+ *    reads the archive through the cam_still_timeline view
+ *    (lib/supabase.ts getCamTimeline); the rules live in lib/cam-timeline.ts.
  *
  * Rules:
- *   - Targets exactly the cams where providerStill(cam) is null (active, not
- *     auto-disabled, not link-outs). Provider stills are never replaced.
- *   - A new frame replaces still_url only when it passes the blank-frame check
+ *   - Provider stills are never replaced on the card: cams.still_url is only
+ *     written for cams where providerStill(cam) is null.
+ *   - A frame is stored (either job) only when it passes the blank-frame check
  *     (not near-uniform, not near-black). A cam that is offline or dark now
- *     keeps its last good still, which the card labels "Still from <time>".
+ *     keeps its last good still; the archive simply has a gap.
  *   - Nothing provider-specific is persisted except the method name; signed
  *     stream URLs stay in the log.
- *   - Old frames for a cam are deleted after RETENTION_DAYS so storage stays
- *     bounded (dated object paths, long cache headers).
+ *   - Latest-frame objects older than RETENTION_DAYS are deleted per cam so
+ *     the <camId>/ prefix stays bounded; the archive/ prefix is pruned by row.
  *
- * Usage: npx tsx scripts/cam-capture-stills.ts [--dry-run] [--only <slug|cam-id>] [--concurrency 4]
+ * Usage: npx tsx scripts/cam-capture-stills.ts [--dry-run] [--only <slug|cam-id>] [--concurrency 4] [--no-archive]
  * Needs: ffmpeg + ffprobe on PATH, .env.local with NEXT_PUBLIC_SUPABASE_URL and
- * SUPABASE_SERVICE_ROLE_KEY. Scheduled on the Mac mini via
- * com.peakcam.cam-stills.plist (every 2 h).
+ * SUPABASE_SERVICE_ROLE_KEY. Scheduled via com.peakcam.cam-stills.plist every
+ * 6 h (21,600 s), aligned with the SNOTEL sync so the 24 h number is fresh.
  */
 import fs from "node:fs";
 import os from "node:os";
@@ -34,6 +43,7 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import type { Cam } from "../lib/types.js";
 import { providerStill } from "../lib/cam-preview.js";
+import { archivePath, isKeeper, pruneCutoffs } from "../lib/cam-timeline.js";
 
 const exec = promisify(execFile);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -58,7 +68,9 @@ const args = process.argv.slice(2);
 const DRY = args.includes("--dry-run");
 const ONLY = args.includes("--only") ? args[args.indexOf("--only") + 1] : null;
 const CONCURRENCY = Number(args.includes("--concurrency") ? args[args.indexOf("--concurrency") + 1] : 4) || 4;
+const NO_ARCHIVE = args.includes("--no-archive");
 const BUCKET = "cam-stills";
+/** Latest-frame objects (<camId>/ prefix) kept per cam. The archive/ prefix has its own retention in lib/cam-timeline.ts. */
 const RETENTION_DAYS = 7;
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
 const FFMPEG = process.env.FFMPEG ?? "ffmpeg";
@@ -184,36 +196,102 @@ async function record(camId: string, patch: Record<string, unknown>) {
   if (!res.ok) throw new Error(`cams PATCH ${res.status}: ${(await res.text()).slice(0, 200)}`);
 }
 
+// ─── archive (migration 024) ─────────────────────────────────────────────
+type ArchiveRow = { cam_id: string; captured_at: string; path: string; source: string; width: number; height: number; bytes: number; mean_luma: number; spread: number; snow_24h_at_capture: number | null; keeper: boolean };
+
+/** resort_id → latest 24 h number, read once per run so every frame in the run is stamped against the same report set. */
+async function latestSnow24h(): Promise<Map<string, number | null>> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/latest_snow_reports?select=resort_id,new_snow_24h`, { headers: sb });
+  if (!res.ok) { console.log(`  ! latest_snow_reports GET ${res.status}: frames this run get no 24 h number`); return new Map(); }
+  return new Map(((await res.json()) as { resort_id: string; new_snow_24h: number | null }[]).map(r => [r.resort_id, r.new_snow_24h]));
+}
+async function insertArchiveRow(row: ArchiveRow) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/cam_stills`, { method: "POST", headers: { ...sb, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(row) });
+  if (!res.ok) throw new Error(`cam_stills POST ${res.status}: ${(await res.text()).slice(0, 200)}`);
+}
+/**
+ * Retention: non-keepers older than 30 days, keepers older than a year
+ * (lib/cam-timeline.ts). Objects first, then rows; a failed object delete
+ * leaves the rows for the next run rather than orphaning storage.
+ */
+async function pruneArchive() {
+  const cut = pruneCutoffs(new Date());
+  const filter = `or=(and(keeper.eq.false,captured_at.lt.${cut.plain}),and(keeper.eq.true,captured_at.lt.${cut.keeper}))`;
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/cam_stills?select=id,path&${filter}&order=captured_at.asc&limit=1000`, { headers: sb });
+  if (!res.ok) { console.log(`  ! prune: cam_stills GET ${res.status}`); return 0; }
+  const rows = (await res.json()) as { id: number; path: string }[];
+  if (!rows.length) return 0;
+  let removed = 0;
+  for (let i = 0; i < rows.length; i += 100) {
+    const batch = rows.slice(i, i + 100);
+    const del = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}`, { method: "DELETE", headers: { ...sb, "Content-Type": "application/json" }, body: JSON.stringify({ prefixes: batch.map(r => r.path) }) });
+    if (!del.ok) { console.log(`  ! prune: object DELETE ${del.status}: ${(await del.text()).slice(0, 120)}`); continue; }
+    const rowDel = await fetch(`${SUPABASE_URL}/rest/v1/cam_stills?id=in.(${batch.map(r => r.id).join(",")})`, { method: "DELETE", headers: { ...sb, Prefer: "return=minimal" } });
+    if (!rowDel.ok) { console.log(`  ! prune: cam_stills DELETE ${rowDel.status}`); continue; }
+    removed += batch.length;
+  }
+  return removed;
+}
+
 // ─── main ────────────────────────────────────────────────────────────────
 async function main() {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/cams?select=*,resorts(slug)&is_active=eq.true&auto_disabled=eq.false&embed_type=neq.link&order=resort_id,name`, { headers: sb });
   if (!res.ok) throw new Error(`cams GET ${res.status}`);
-  const cams = ((await res.json()) as CamRow[]).filter(c => providerStill(c) === null).filter(c => !ONLY || c.id === ONLY || c.resorts?.slug === ONLY);
-  console.log(`[cam-stills] ${new Date().toISOString()} ${cams.length} click-to-play cams without a provider still${DRY ? " (dry run)" : ""}`);
+  // Two target sets, one pass: cams that need a latest frame (no provider
+  // still) and cams whose history we may keep (archive_allowed). A cam can be
+  // both; it is captured once and stored twice.
+  const wantsLatest = (c: CamRow) => providerStill(c) === null;
+  const wantsArchive = (c: CamRow) => !NO_ARCHIVE && c.archive_allowed === true;
+  const cams = ((await res.json()) as CamRow[]).filter(c => wantsLatest(c) || wantsArchive(c)).filter(c => !ONLY || c.id === ONLY || c.resorts?.slug === ONLY);
+  const nLatest = cams.filter(wantsLatest).length, nArchive = cams.filter(wantsArchive).length;
+  console.log(`[cam-stills] ${new Date().toISOString()} ${cams.length} cams: ${nLatest} need a latest frame, ${nArchive} archive-allowed${DRY ? " (dry run)" : ""}`);
+  const snow24h = nArchive ? await latestSnow24h() : new Map<string, number | null>();
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "cam-stills-"));
-  const summary = { stored: 0, blank: 0, failed: 0, kept: 0 };
+  const summary = { stored: 0, archived: 0, keepers: 0, blank: 0, failed: 0 };
   let i = 0;
   async function worker() {
     while (i < cams.length) {
       const cam = cams[i++]; const tag = `${cam.resorts?.slug ?? "?"}/${cam.name}`;
+      const latest = wantsLatest(cam), archive = wantsArchive(cam);
       const out = path.join(tmp, `${cam.id}.jpg`);
-      const cap = await capture(cam, out);
-      if ("error" in cap) { summary.failed++; console.log(`  ✗ ${tag}: ${cap.error}${cam.still_url ? " (keeping previous still)" : ""}`); continue; }
+      // Archive-only cams have a provider still by definition; fetch that
+      // snapshot directly instead of resolving a player page.
+      const provider = latest ? null : providerStill(cam);
+      const cap: Capture = provider
+        ? await downloadImage(provider.src, out, cam.embed_url ?? undefined).then(() => ({ file: out, source: "provider-snapshot" }), (e: unknown) => ({ error: ((e as { message?: string }).message ?? String(e)).replace(/\s+/g, " ").slice(0, 200), source: "provider-snapshot" }))
+        : await capture(cam, out);
+      if ("error" in cap) { summary.failed++; console.log(`  ✗ ${tag}: ${cap.error}${latest && cam.still_url ? " (keeping previous still)" : ""}`); continue; }
       let stats; try { stats = await checkFrame(out); } catch (e) { summary.failed++; console.log(`  ✗ ${tag}: unreadable frame (${(e as Error).message.slice(0, 80)})`); continue; }
-      if (stats.blank) { summary.blank++; console.log(`  ○ ${tag}: blank/dark frame (mean ${stats.mean.toFixed(0)}, spread ${stats.spread.toFixed(1)})${cam.still_url ? " — keeping previous still" : ""}`); continue; }
-      if (DRY) { summary.stored++; console.log(`  ✓ ${tag}: ${stats.width}x${stats.height} via ${cap.source} (dry run, not stored)`); continue; }
-      try {
-        const objectPath = `${cam.id}/${stamp()}.jpg`;
-        const publicUrl = await upload(objectPath, out);
-        await record(cam.id, { still_url: publicUrl, still_captured_at: new Date().toISOString(), still_source: cap.source });
-        await pruneOld(cam.id, objectPath);
-        summary.stored++; console.log(`  ✓ ${tag}: ${stats.width}x${stats.height} via ${cap.source}`);
-      } catch (e) { summary.failed++; console.log(`  ✗ ${tag}: store failed: ${(e as Error).message.slice(0, 120)}`); }
+      if (stats.blank) { summary.blank++; console.log(`  ○ ${tag}: blank/dark frame (mean ${stats.mean.toFixed(0)}, spread ${stats.spread.toFixed(1)})${latest && cam.still_url ? " — keeping previous still" : ""}`); continue; }
+      const snow = snow24h.get(cam.resort_id) ?? null; const keeper = archive && isKeeper(snow);
+      const note = archive ? ` · archive${keeper ? ` KEEPER ${snow}"` : snow != null ? ` ${snow}"` : ""}` : "";
+      if (DRY) { if (latest) summary.stored++; if (archive) summary.archived++; if (keeper) summary.keepers++; console.log(`  ✓ ${tag}: ${stats.width}x${stats.height} via ${cap.source}${note} (dry run, not stored)`); continue; }
+      const now = new Date();
+      if (latest) {
+        try {
+          const objectPath = `${cam.id}/${stamp(now)}.jpg`;
+          const publicUrl = await upload(objectPath, out);
+          await record(cam.id, { still_url: publicUrl, still_captured_at: now.toISOString(), still_source: cap.source });
+          await pruneOld(cam.id, objectPath);
+          summary.stored++; console.log(`  ✓ ${tag}: ${stats.width}x${stats.height} via ${cap.source}${note}`);
+        } catch (e) { summary.failed++; console.log(`  ✗ ${tag}: store failed: ${(e as Error).message.slice(0, 120)}`); }
+      }
+      if (archive) {
+        try {
+          const objectPath = archivePath(cam.id, now);
+          await upload(objectPath, out);
+          await insertArchiveRow({ cam_id: cam.id, captured_at: now.toISOString(), path: objectPath, source: cap.source, width: stats.width, height: stats.height, bytes: fs.statSync(out).size, mean_luma: Math.round(stats.mean * 10) / 10, spread: Math.round(stats.spread * 10) / 10, snow_24h_at_capture: snow, keeper });
+          summary.archived++; if (keeper) summary.keepers++;
+          // Archive-only successes are counted, not logged line by line: ~250 per run.
+          if (keeper && !latest) console.log(`  ✓ ${tag}: ${stats.width}x${stats.height} via ${cap.source}${note}`);
+        } catch (e) { summary.failed++; console.log(`  ✗ ${tag}: archive failed: ${(e as Error).message.slice(0, 120)}`); }
+      }
     }
   }
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
   fs.rmSync(tmp, { recursive: true, force: true });
-  console.log(`[cam-stills] done: ${summary.stored} stored, ${summary.blank} blank, ${summary.failed} failed`);
+  const pruned = DRY || NO_ARCHIVE ? 0 : await pruneArchive();
+  console.log(`[cam-stills] done: ${summary.stored} latest stored, ${summary.archived} archived (${summary.keepers} keepers), ${summary.blank} blank, ${summary.failed} failed, ${pruned} archive frames pruned`);
 }
 
 const invokedDirectly = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);

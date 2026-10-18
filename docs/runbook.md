@@ -43,9 +43,33 @@ Then spot-check `/`, a `/resorts/<slug>`, `/snow-report`, `/about`.
 | `com.peakcam.agents` | 9-agent Slack bot loop | always-on | **running** |
 | `com.peakcam.snotel-sync` | SNOTEL data sync → `snow_reports` | daily 07:00 | running (scheduled) |
 | `com.peakcam.cam-health-check` | Probe every cam, bump `consecutive_failures`, auto-disable dead ones | daily 06:00 | running (scheduled) |
-| `com.peakcam.cam-stills` | Capture one frame per click-to-play cam → bucket `cam-stills`, `cams.still_url` (`scripts/cam-capture-stills.ts`) | every 2 h | running (scheduled) |
-| `com.peakcam.model-sync` | Weather-model sync (`scripts/model-sync.ts`) | scheduled | running (scheduled) |
+| `com.peakcam.cam-stills` | Capture one frame per click-to-play cam → bucket `cam-stills`, `cams.still_url`; archive a frame for every `archive_allowed` cam → `cam_stills` + `archive/` prefix, prune by retention (`scripts/cam-capture-stills.ts`, policy `docs/cams/still-archive-policy.md`) | every 6 h (21,600 s, since 2026-10-18; was 2 h) | running on the mini (scheduled) — deploy note below |
+| `com.peakcam.model-sync` | Weather-model sync (`scripts/model-sync.ts`) | every 6 h | running (scheduled) |
 | `com.peakcam.pipeline` | Multi-source blender | daily 06:00 | **prepared but Disabled=true** — awaits migration 010 |
+
+All of the above run from the ops checkout `/Users/maestro_admin/peakcam/peakcam` on the
+Mac mini (hostname `Maestros-Mini`, user `maestro_admin`). Verified 2026-10-18 over ssh:
+`com.peakcam.cam-stills` is loaded there with `StartInterval` 7200 and that working
+directory; `com.peakcam.snotel-sync` (21600), `model-sync`, `cam-health-check` and
+`agents` share the path. The clone was on `main` at `5583736` with one dirty file, so it
+is behind `origin/main` until the next pull.
+
+**Deploying a change to `com.peakcam.cam-stills` (e.g. the Sprint 8 archive, 2026-10-18):**
+on the Mac mini as `maestro_admin`, pull `main` in `/Users/maestro_admin/peakcam/peakcam`
+and reload the plist (the repo plist already points at that path; the interval moves
+from 7,200 s to 21,600 s):
+
+```bash
+cd /Users/maestro_admin/peakcam/peakcam && git pull
+cp com.peakcam.cam-stills.plist ~/Library/LaunchAgents/
+launchctl bootout gui/$(id -u)/com.peakcam.cam-stills 2>/dev/null
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.peakcam.cam-stills.plist
+launchctl kickstart -k gui/$(id -u)/com.peakcam.cam-stills   # first run now; expect "archived N" in the log
+```
+
+After the first run `select count(*) from cam_stills` should grow by roughly the number
+of archive-allowed active cams (249 on 2026-10-18) per run. The Studio runs only
+`com.peakcam.cam-check` and has no peakcam clone (checked 2026-10-18).
 
 ## Launchd Services (Studio)
 
@@ -138,7 +162,7 @@ See `docs/alerts-verification.md` for the E2E run log.
 | Analytics | PostHog dashboard (https://us.posthog.com/project/350200/dashboard/1486208) |
 | Resend deliveries | Resend dashboard → Logs |
 | Launchd jobs | `launchctl list \| grep com.peakcam` |
-| Still capture (mini) | `~/peakcam/peakcam/scripts/cam-capture-stills.log` |
+| Still capture + archive (mini) | `~/peakcam/peakcam/scripts/cam-capture-stills.log`; `select count(*), max(captured_at) from cam_stills` |
 | Cam health check (mini) | `~/peakcam/peakcam/scripts/cam-health-check.log` |
 | Camera-preview check (Studio) | `~/Library/Application Support/peakcam-cam-check/latest.md`, `~/Library/Logs/peakcam-cam-check.log` |
 

@@ -48,6 +48,8 @@ export interface Cam {
   still_url?: string | null;         // frame captured by scripts/cam-capture-stills.ts
   still_captured_at?: string | null;
   still_source?: string | null;
+  // Migration 024 — rights switch for the still archive (docs/cams/still-archive-policy.md).
+  archive_allowed?: boolean;
 }
 
 // ── Cam reports ──────────────────────────────────────────────

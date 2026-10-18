@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache";
 import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition, PowderProbability, PowderProbabilityForecast, PowderProbabilityWindow } from "./types";
 import type { ResortOpening } from "./openings";
 import { withResolvedCamNames } from "./cam-name";
+import { clampHours, pickResortTimeline, shapeTimeline, toFrame, MAX_TIMELINE_HOURS, type CamStillRow, type CamTimeline, type CamTimelineFrame } from "./cam-timeline";
 
 // ─────────────────────────────────────────────────────────────
 // Client
@@ -542,4 +543,91 @@ export async function getAllResortSlugs(): Promise<string[]> {
 
   if (error) throw error;
   return data?.map((r) => r.slug) ?? [];
+}
+
+// ─────────────────────────────────────────────────────────────
+// Cam still archive (migration 024)
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Rows from the public `cam_still_timeline` view for one cam: everything in
+ * the last `hours` plus the newest keeper of any age, deduplicated. The view
+ * only exposes archive_allowed, active cams, so a cam switched off returns
+ * nothing. Fails soft (null): the strip is decoration on a page whose core
+ * data comes from getResortBySlug, and a missing view (migration 024 not
+ * applied) must not fail the ISR revalidation.
+ */
+async function fetchCamStillRows(filter: { camId?: string; resortId?: string }, hours: number, now: Date): Promise<CamStillRow[] | null> {
+  const since = new Date(now.getTime() - hours * 3_600_000).toISOString();
+  const base = () => {
+    let q = supabase.from("cam_still_timeline").select("*");
+    if (filter.camId) q = q.eq("cam_id", filter.camId);
+    if (filter.resortId) q = q.eq("resort_id", filter.resortId);
+    return q;
+  };
+  const [win, keep] = await Promise.all([
+    base().gte("captured_at", since).order("captured_at", { ascending: false }).limit(filter.camId ? MAX_TIMELINE_HOURS : 240),
+    base().eq("keeper", true).order("captured_at", { ascending: false }).limit(filter.camId ? 1 : 12),
+  ]);
+  const error = win.error ?? keep.error;
+  if (error) {
+    if (MISSING_TABLE_CODES.has(error.code)) {
+      console.warn("[PeakCam] cam_still_timeline missing — apply migration 024; cam history unavailable");
+    } else {
+      console.warn("[PeakCam] Could not fetch cam still timeline:", error.message);
+    }
+    return null;
+  }
+  const seen = new Set<number>();
+  const rows: CamStillRow[] = [];
+  for (const row of [...(win.data ?? []), ...(keep.data ?? [])] as CamStillRow[]) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    rows.push(row);
+  }
+  return rows;
+}
+
+/**
+ * Timeline for one archive-allowed cam: up to four frames from the last
+ * `hours` (clamped to 48) and the newest storm keeper. Null when nothing is
+ * on tape, the cam is not archive-allowed, or the query failed. This is the
+ * function the MCP `get_cam_timeline(slug, camId, hours)` tool should call.
+ */
+export async function getCamTimeline(camId: string, hours = 24): Promise<CamTimeline | null> {
+  const h = clampHours(hours);
+  const now = new Date();
+  const rows = await fetchCamStillRows({ camId }, h, now);
+  if (!rows) return null;
+  return shapeTimeline(rows, { camId, hours: h, now, supabaseUrl });
+}
+
+/**
+ * The strip for a resort page: one query for every archived cam the resort
+ * has, then the lead cam's timeline when it has frames, else the first cam
+ * that does (lib/cam-timeline pickResortTimeline). `camOrder` is the page's
+ * cam order, lead cam first.
+ */
+export async function getResortCamTimeline(resortId: string, camOrder: readonly string[], hours = 24): Promise<CamTimeline | null> {
+  const h = clampHours(hours);
+  const now = new Date();
+  const rows = await fetchCamStillRows({ resortId }, h, now);
+  if (!rows) return null;
+  return pickResortTimeline(rows, camOrder, { hours: h, now, supabaseUrl });
+}
+
+/** Newest archived frame for a resort (any cam, any age) — the OG image background. Null when none. */
+export async function getLatestArchivedStill(resortId: string): Promise<CamTimelineFrame | null> {
+  const { data, error } = await supabase
+    .from("cam_still_timeline")
+    .select("*")
+    .eq("resort_id", resortId)
+    .order("captured_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    if (!MISSING_TABLE_CODES.has(error.code)) console.warn("[PeakCam] Could not fetch latest archived still:", error.message);
+    return null;
+  }
+  return data ? toFrame(data as CamStillRow, supabaseUrl) : null;
 }

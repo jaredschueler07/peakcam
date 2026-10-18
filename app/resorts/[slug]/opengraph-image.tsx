@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
-import { getResortBySlug } from "@/lib/supabase";
+import { getResortBySlug, getLatestArchivedStill } from "@/lib/supabase";
+import type { CamTimelineFrame } from "@/lib/cam-timeline";
 
 export const runtime = "nodejs";
 export const size = { width: 1200, height: 630 };
@@ -23,6 +24,16 @@ export default async function OgImage({
   try {
     resort = await getResortBySlug(slug);
   } catch {}
+
+  // Still archive (migration 024): the newest archived frame for the resort
+  // becomes the card background. Fails soft to the drawn design: a share card
+  // must never 500 because the archive is empty or unreachable.
+  let still: CamTimelineFrame | null = null;
+  if (resort) {
+    try {
+      still = await getLatestArchivedStill(resort.id);
+    } catch {}
+  }
 
   const condColor = resort
     ? (COND_COLOR[resort.cond_rating] ?? "#60C8FF")
@@ -49,6 +60,31 @@ export default async function OgImage({
           overflow: "hidden",
         }}
       >
+        {/* Archived cam still as the photo background, darkened so the type
+            stays legible; the drawn silhouette below shows when there is none. */}
+        {still && (
+          <>
+            <img
+              src={still.url}
+              alt=""
+              width={1200}
+              height={630}
+              style={{ position: "absolute", top: 0, left: 0, width: 1200, height: 630, objectFit: "cover" }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: 1200,
+                height: 630,
+                background: "linear-gradient(180deg, rgba(6,11,18,0.55) 0%, rgba(6,11,18,0.35) 45%, rgba(6,11,18,0.88) 100%)",
+                display: "flex",
+              }}
+            />
+          </>
+        )}
+
         {/* Mountain silhouette — decorative background layer */}
         <div
           style={{
@@ -108,8 +144,15 @@ export default async function OgImage({
           >
             PEAKCAM
           </div>
-          <div style={{ fontSize: 14, color: "#2E4A68", letterSpacing: "0.05em" }}>
-            peakcam.io
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            {still && (
+              <div style={{ fontSize: 13, color: "#8AA3BE", letterSpacing: "0.1em", display: "flex" }}>
+                CAM STILL · {new Date(still.capturedAt).toISOString().slice(0, 16).replace("T", " ")} UTC
+              </div>
+            )}
+            <div style={{ fontSize: 14, color: still ? "#8AA3BE" : "#2E4A68", letterSpacing: "0.05em", display: "flex" }}>
+              peakcam.io
+            </div>
           </div>
         </div>
 
