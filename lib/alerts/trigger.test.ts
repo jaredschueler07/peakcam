@@ -23,6 +23,9 @@ test("trigger evaluates subscribers separately and preserves live alerts during 
         } } } as unknown as EmailClient);
         globalThis.fetch = async (input, init) => {
           const url = String(input);
+      // Migration 023 tables: an open run row and no webhook destinations.
+      if (url.includes("/powder_alert_runs")) return new Response(JSON.stringify([{ id: "run-1" }]));
+      if (url.includes("/alert_destinations")) return new Response("[]");
           const json = (data: unknown) => new Response(JSON.stringify(data));
           // Nobody opens today; the opening-day branch is covered by its own tests below.
           if (url.includes("/resort_openings?")) return json([]);
@@ -122,6 +125,9 @@ test("does not re-alert the same forecast storm on the following day", async () 
     } } } as unknown as EmailClient);
     globalThis.fetch = async (input, init) => {
       const url = String(input);
+      // Migration 023 tables: an open run row and no webhook destinations.
+      if (url.includes("/powder_alert_runs")) return new Response(JSON.stringify([{ id: "run-1" }]));
+      if (url.includes("/alert_destinations")) return new Response("[]");
       const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
       if (url.includes("/resort_openings?")) return json([]);
       if (url.includes("api.open-meteo.com")) {
@@ -201,6 +207,9 @@ test("rounds fractional forecast totals and reports a failed log insert", async 
     } } } as unknown as EmailClient);
     globalThis.fetch = async (input, init) => {
       const url = String(input);
+      // Migration 023 tables: an open run row and no webhook destinations.
+      if (url.includes("/powder_alert_runs")) return new Response(JSON.stringify([{ id: "run-1" }]));
+      if (url.includes("/alert_destinations")) return new Response("[]");
       const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
       if (url.includes("/resort_openings?")) return json([]);
       if (url.includes("api.open-meteo.com")) {
@@ -294,6 +303,9 @@ test("opening day: one email per opted-in subscriber, logged as kind=opening, ne
     const sent = captureMail();
     globalThis.fetch = async (input, init) => {
       const url = String(input);
+      // Migration 023 tables: an open run row and no webhook destinations.
+      if (url.includes("/powder_alert_runs")) return new Response(JSON.stringify([{ id: "run-1" }]));
+      if (url.includes("/alert_destinations")) return new Response("[]");
       const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
       if (url.includes("/snow_reports?")) return json([{ updated_at: new Date().toISOString() }]);
       if (url.includes("/resort_openings?")) {
@@ -380,6 +392,9 @@ test("an opening-day log row never suppresses that subscriber's powder alert", a
     const sent = captureMail();
     globalThis.fetch = async (input, init) => {
       const url = String(input);
+      // Migration 023 tables: an open run row and no webhook destinations.
+      if (url.includes("/powder_alert_runs")) return new Response(JSON.stringify([{ id: "run-1" }]));
+      if (url.includes("/alert_destinations")) return new Response("[]");
       const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
       if (url.includes("/resort_openings?")) return json([]);
       if (url.includes("api.open-meteo.com")) return json({});
@@ -424,6 +439,9 @@ test("a failed openings query fails the run loudly but never blocks powder alert
     const sent = captureMail();
     globalThis.fetch = async (input, init) => {
       const url = String(input);
+      // Migration 023 tables: an open run row and no webhook destinations.
+      if (url.includes("/powder_alert_runs")) return new Response(JSON.stringify([{ id: "run-1" }]));
+      if (url.includes("/alert_destinations")) return new Response("[]");
       const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
       // Migration 020 not applied, or the table is unreachable.
       if (url.includes("/resort_openings?")) return json({ message: "relation does not exist" }, 404);
@@ -463,6 +481,9 @@ test("opening day: a failed dedupe read sends nothing rather than risk a second 
     const sent = captureMail();
     globalThis.fetch = async (input, init) => {
       const url = String(input);
+      // Migration 023 tables: an open run row and no webhook destinations.
+      if (url.includes("/powder_alert_runs")) return new Response(JSON.stringify([{ id: "run-1" }]));
+      if (url.includes("/alert_destinations")) return new Response("[]");
       const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
       if (url.includes("/snow_reports?")) return json([{ updated_at: new Date().toISOString() }]);
       if (url.includes("/resort_openings?")) return json([{ resort_id: "r-mammoth", resorts: { name: "Mammoth Mountain", slug: "mammoth" } }]);
@@ -484,6 +505,140 @@ test("opening day: a failed dedupe read sends nothing rather than risk a second 
     assert.equal(body.openings.resortsOpening, 1);
     assert.equal(body.openings.attempted, 0);
     assert.deepEqual(body.openings.errors, ["openings_log_query_failed"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    setEmailClientForTests(null);
+    restoreEnv();
+  }
+});
+
+// ── Run log + webhook fan-out (migration 023) ────────────────
+// Every run opens a powder_alert_runs row before the queries and closes it
+// after the response is decided; each alerted subscriber's enabled webhooks
+// get one signed powder.alert per resort.
+
+test("writes a run row around the run and delivers a verifiable signed webhook per alert", async () => {
+  const restoreEnv = withTriggerEnv();
+  const originalFetch = globalThis.fetch;
+  const { GET } = await import("../../app/api/alerts/trigger/route");
+  const { verifyWebhook } = await import("./webhooks");
+  const secret = "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw";
+  const runWrites: Array<{ method?: string; url: string; body: Record<string, unknown> }> = [];
+  const destinationPatches: Array<Record<string, unknown>> = [];
+  const deliveries: Array<{ headers: Record<string, string>; body: string }> = [];
+  try {
+    const sent = captureMail();
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
+      if (url.includes("/powder_alert_runs")) {
+        runWrites.push({ method: init?.method, url, body: JSON.parse(String(init?.body ?? "{}")) });
+        return init?.method === "POST" ? json([{ id: "run-42" }], 201) : new Response(null, { status: 204 });
+      }
+      if (url.includes("/alert_destinations")) {
+        if (init?.method === "PATCH") {
+          destinationPatches.push(JSON.parse(String(init.body)));
+          return new Response(null, { status: 204 });
+        }
+        assert.ok(url.includes("kind=eq.webhook") && url.includes("disabled_at=is.null"), "only enabled webhooks are loaded");
+        return json([{
+          id: "dest-1", subscriber_id: "sub", kind: "webhook", target: "https://hooks.example.test/peakcam", secret,
+          created_at: "2026-11-01T00:00:00.000Z", last_delivered_at: null, failures: 2, disabled_at: null,
+        }]);
+      }
+      if (url === "https://hooks.example.test/peakcam") {
+        deliveries.push({ headers: init!.headers as Record<string, string>, body: String(init!.body) });
+        return new Response(null, { status: 204 });
+      }
+      if (url.includes("/resort_openings?")) return json([]);
+      if (url.includes("api.open-meteo.com")) return json({});
+      if (url.includes("/snow_reports?")) return json([{ updated_at: new Date().toISOString() }]);
+      if (url.includes("/alert_preferences?")) return json([{
+        subscriber_id: "sub", resort_id: "r-alta", threshold_inches: 6,
+        alert_subscribers: { id: "sub", email: "ski@example.com", manage_token: "token" },
+        resorts: { name: "Alta", slug: "alta" },
+      }]);
+      if (url.includes("/latest_snow_reports?")) {
+        assert.ok(url.includes("updated_at"), "measuredAt needs the report timestamp");
+        return json([{ resort_id: "r-alta", new_snow_24h: 11, updated_at: "2026-12-01T12:30:00.000Z" }]);
+      }
+      if (url.includes("/resorts?")) return json([{ id: "r-alta", lat: 40.6, lng: -111.6 }]);
+      if (url.includes("/powder_alert_log")) return init?.method === "POST" ? json([]) : json([]);
+      throw new Error(`Unexpected fetch: ${url}`);
+    };
+
+    const response = await GET(authed());
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.deepEqual(sent.map((m) => m.to), ["ski@example.com"]);
+
+    // Run row: opened first, closed last, with the counts and the full summary.
+    assert.equal(runWrites.length, 2);
+    assert.equal(runWrites[0].method, "POST");
+    assert.equal(runWrites[1].method, "PATCH");
+    assert.ok(runWrites[1].url.endsWith("/powder_alert_runs?id=eq.run-42"));
+    assert.equal(runWrites[1].body.alerts_sent, 1);
+    assert.equal(runWrites[1].body.webhooks_sent, 1);
+    assert.equal(runWrites[1].body.subscribers, 1);
+    assert.deepEqual(runWrites[1].body.errors, []);
+    assert.equal(typeof runWrites[1].body.finished_at, "string");
+    assert.deepEqual(body.run, { id: "run-42", logged: true, startedAt: body.run.startedAt, finishedAt: body.run.finishedAt });
+    assert.deepEqual(body.webhooks, { destinations: 1, attempted: 1, delivered: 1, failed: 0, disabled: 0 });
+
+    // The delivery verifies against the destination's secret and carries the contract.
+    assert.equal(deliveries.length, 1);
+    const [delivery] = deliveries;
+    assert.match(delivery.headers["webhook-id"], /^msg_[0-9a-f]{24}$/);
+    assert.deepEqual(verifyWebhook(secret, delivery.headers, delivery.body), { ok: true });
+    const event = JSON.parse(delivery.body);
+    assert.deepEqual(event, {
+      type: "powder.alert",
+      resort: { slug: "alta", name: "Alta", url: "https://www.peakcam.io/resorts/alta" },
+      inches: 11,
+      kind: "measured",
+      measuredAt: "2026-12-01T12:30:00.000Z",
+      url: "https://www.peakcam.io/resorts/alta",
+      threshold: 6,
+    });
+
+    // Success resets the destination's consecutive-failure count.
+    assert.equal(destinationPatches.length, 1);
+    assert.equal(destinationPatches[0].failures, 0);
+    assert.equal(typeof destinationPatches[0].last_delivered_at, "string");
+  } finally {
+    globalThis.fetch = originalFetch;
+    setEmailClientForTests(null);
+    restoreEnv();
+  }
+});
+
+test("a run that finds no subscriptions still closes its run row", async () => {
+  const restoreEnv = withTriggerEnv();
+  const originalFetch = globalThis.fetch;
+  const { GET } = await import("../../app/api/alerts/trigger/route");
+  const runWrites: Array<{ method?: string; body: Record<string, unknown> }> = [];
+  try {
+    captureMail();
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
+      if (url.includes("/powder_alert_runs")) {
+        runWrites.push({ method: init?.method, body: JSON.parse(String(init?.body ?? "{}")) });
+        return init?.method === "POST" ? json([{ id: "run-7" }], 201) : new Response(null, { status: 204 });
+      }
+      if (url.includes("/resort_openings?")) return json([]);
+      if (url.includes("/snow_reports?")) return json([{ updated_at: new Date().toISOString() }]);
+      if (url.includes("/alert_preferences?")) return json([]);
+      throw new Error(`Unexpected fetch: ${url}`);
+    };
+    const response = await GET(authed());
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.message, "No active subscriptions");
+    assert.equal(body.run.id, "run-7");
+    assert.equal(runWrites.length, 2);
+    assert.equal(runWrites[1].body.subscribers, 0);
+    assert.equal(runWrites[1].body.alerts_sent, 0);
   } finally {
     globalThis.fetch = originalFetch;
     setEmailClientForTests(null);
