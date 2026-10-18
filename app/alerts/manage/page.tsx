@@ -33,6 +33,8 @@ export default async function AlertsManagePage({ searchParams }: PageProps) {
       email={state.subscriber.email}
       preferences={state.preferences}
       resorts={state.resorts}
+      destinations={state.destinations}
+      feeds={state.feeds}
     />
   );
 }

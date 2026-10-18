@@ -11,6 +11,8 @@
 // the subscriber's real alerts — an error page is the safer failure.
 // ─────────────────────────────────────────────────────────────
 
+import { SITE_URL } from "@/lib/site";
+import { listDestinations, type DestinationView } from "./destinations";
 import { inList, serviceFetch } from "./service-fetch";
 import { clampThreshold } from "./validate";
 
@@ -35,10 +37,30 @@ export interface ManageResort {
   slug: string;
 }
 
+export interface ManageFeeds {
+  /** Atom feed of this subscriber's powder days and forecast storms. */
+  atom: string;
+  /** iCalendar of forecast storm windows (`?format=ics`). */
+  ics: string;
+}
+
 export interface ManageState {
   subscriber: ManageSubscriber;
   preferences: ManagePreference[];
   resorts: ManageResort[];
+  /** Webhooks (and, later, extra emails) this subscriber registered. Never carries secrets. */
+  destinations: DestinationView[];
+  feeds: ManageFeeds;
+}
+
+/**
+ * The per-subscriber feed URLs. They embed the manage_token — the same
+ * capability the email links carry — so the page presents them with the
+ * same care (copy on demand, no third-party embedding).
+ */
+export function feedUrlsFor(token: string): ManageFeeds {
+  const base = `${SITE_URL}/alerts/feed/${encodeURIComponent(token)}`;
+  return { atom: base, ics: `${base}?format=ics` };
 }
 
 async function fetchRows<T>(path: string, what: string): Promise<T[]> {
@@ -68,15 +90,16 @@ export async function getManageState(token: string): Promise<ManageState | null>
   const subscriber = await findSubscriberByToken(token);
   if (!subscriber) return null;
 
-  const [preferences, resorts] = await Promise.all([
+  const [preferences, resorts, destinations] = await Promise.all([
     fetchPreferences(subscriber.id),
     fetchRows<ManageResort>(
       `/resorts?is_active=eq.true&select=id,name,state,region,slug&order=name`,
       "resorts"
     ),
+    listDestinations(subscriber.id),
   ]);
 
-  return { subscriber, preferences, resorts };
+  return { subscriber, preferences, resorts, destinations, feeds: feedUrlsFor(token) };
 }
 
 /**

@@ -121,3 +121,42 @@ export function parseManageUpdate(body: unknown): ManageUpdateParse {
 
   return { ok: true, update: { token: input.token, resortIds, thresholds, openingAlerts: openingAlerts.value } };
 }
+
+export type ManageAction =
+  | { kind: "add_webhook"; token: string; url: string }
+  | { kind: "test_webhook"; token: string; destinationId: string };
+
+export type ManageActionParse =
+  | { ok: true; action: ManageAction }
+  | { ok: false; error: string };
+
+/**
+ * Validates the body of POST /api/alerts/manage. Shape only: whether the
+ * URL is an acceptable webhook target is decided by validateWebhookUrl in
+ * the route (it depends on an environment flag), and whether the token or
+ * destination exist is a database question.
+ */
+export function parseManageAction(body: unknown): ManageActionParse {
+  const input = (body && typeof body === "object" ? body : {}) as {
+    token?: unknown;
+    action?: unknown;
+    url?: unknown;
+    destination_id?: unknown;
+  };
+  if (typeof input.token !== "string" || input.token.length === 0) {
+    return { ok: false, error: "token is required" };
+  }
+  if (input.action === "add_webhook") {
+    if (typeof input.url !== "string" || input.url.trim().length === 0) {
+      return { ok: false, error: "url is required" };
+    }
+    return { ok: true, action: { kind: "add_webhook", token: input.token, url: input.url.trim() } };
+  }
+  if (input.action === "test_webhook") {
+    if (!isUuid(input.destination_id)) {
+      return { ok: false, error: "destination_id must be a destination UUID" };
+    }
+    return { ok: true, action: { kind: "test_webhook", token: input.token, destinationId: input.destination_id.toLowerCase() } };
+  }
+  return { ok: false, error: "action must be add_webhook or test_webhook" };
+}

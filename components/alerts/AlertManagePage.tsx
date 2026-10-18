@@ -5,6 +5,9 @@ import Link from "next/link";
 import { Bell, BellOff, Check, Loader2, Trash2 } from "lucide-react";
 import { track, EVENTS } from "@/lib/analytics-events";
 import { thresholdOptionsFor } from "@/lib/alerts/client";
+import { AlertDestinations } from "@/components/alerts/AlertDestinations";
+import type { DestinationView } from "@/lib/alerts/destinations";
+import type { ManageFeeds } from "@/lib/alerts/manage";
 
 interface Resort {
   id: string;
@@ -26,9 +29,13 @@ interface Props {
   email: string;
   preferences: Preference[];
   resorts: Resort[];
+  /** Registered webhooks (no secrets) — absent on a pre-migration-023 read. */
+  destinations?: DestinationView[];
+  /** This subscriber's Atom / iCal feed URLs. */
+  feeds?: ManageFeeds;
 }
 
-export function AlertManagePage({ token, email, preferences, resorts }: Props) {
+export function AlertManagePage({ token, email, preferences, resorts, destinations = [], feeds }: Props) {
   // Build initial state from existing prefs
   const initSelected = new Set(preferences.map((p) => p.resort_id));
   const initThresholds = Object.fromEntries(
@@ -284,6 +291,10 @@ export function AlertManagePage({ token, email, preferences, resorts }: Props) {
             </span>
           </span>
         </label>
+
+        {/* Webhooks + feeds: saved immediately through their own API calls,
+            independent of the resort list's Save button. */}
+        <AlertDestinations token={token} initialDestinations={destinations} feeds={feeds} />
 
         {error && (
           <p className="text-red-400 text-sm mb-4">{error}</p>

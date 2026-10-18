@@ -12,6 +12,18 @@ import {
 } from "@/lib/alerts/opening-day";
 import { formatOpeningDate } from "@/lib/openings";
 import type { WeatherPeriod } from "@/lib/types";
+import { SITE_URL } from "@/lib/site";
+import { capturePostHogEvent, closeRun, openRun, RUN_EVENT_NAME, runEventProperties, shapeRunRow } from "@/lib/alerts/run-log";
+import { loadWebhookDestinations } from "@/lib/alerts/destinations";
+import { fanOutWebhooks } from "@/lib/alerts/fanout";
+import { buildPowderAlertEvent, type PowderAlertEvent } from "@/lib/alerts/webhooks";
+
+// Webhook retries wait 1 s then 5 s between three attempts, with a 5 s
+// timeout each, so one slow endpoint can hold a run ~20 s on top of the
+// queries and emails. 60 s is inside every Vercel plan's ceiling; the
+// fan-out gets whatever is left after this much of it.
+export const maxDuration = 60;
+const WEBHOOK_BUDGET_MS = 45_000;
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -50,6 +62,8 @@ interface AlertPreference {
 interface SnowReport {
   resort_id: string;
   new_snow_24h: number | null;
+  /** When the report was written — the webhook payload's measuredAt. */
+  updated_at?: string | null;
 }
 
 interface ResortLocation {
@@ -355,26 +369,25 @@ async function runOpeningDayAlerts(today: string): Promise<OpeningsSummary> {
   }
 }
 
-// Shared handler for both GET (Vercel Cron) and POST (script) invocations.
-// Protected by Authorization: Bearer <CRON_SECRET>
-// Checks latest SNOTEL data against subscriber thresholds and fires emails.
-async function handleTrigger(request: NextRequest) {
-  // Auth check — fail closed when CRON_SECRET is not configured
-  if (!CRON_SECRET) {
-    return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
-  }
-  const auth = request.headers.get("authorization");
-  if (auth !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+// ── The run ─────────────────────────────────────────────────
+// Checks latest SNOTEL data against subscriber thresholds, fires emails and
+// signed webhooks. Returns the response body and status; handleTrigger
+// wraps it with the run log and the PostHog event so every exit path below
+// — early returns included — closes the run row.
 
+interface TriggerResult {
+  status: number;
+  body: Record<string, unknown>;
+}
+
+async function runTrigger(startedAt: Date): Promise<TriggerResult> {
   // Runs regardless of what happens below — see runFreshnessCheck's isolation note.
   const freshness = await runFreshnessCheck();
 
   // One calendar day for the whole run (UTC, matching alert_date and
   // resort_openings.confirmed_open), so the opening branch and the powder
   // branch cannot straddle midnight and disagree.
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const today = startedAt.toISOString().slice(0, 10); // YYYY-MM-DD
 
   // Independent of the powder path below — see runOpeningDayAlerts. Its
   // failures are reported in every response and fail the run like any other.
@@ -386,33 +399,39 @@ async function handleTrigger(request: NextRequest) {
     `/alert_preferences?select=subscriber_id,resort_id,threshold_inches,alert_subscribers(id,email,manage_token),resorts(name,slug)`
   );
   if (!prefsResp.ok) {
-    return NextResponse.json({ error: "Failed to load preferences", freshness, openings }, { status: 500 });
+    return { status: 500, body: { error: "Failed to load preferences", freshness, openings } };
   }
   const prefs: AlertPreference[] = await prefsResp.json();
+  const subscribers = new Set(prefs.map((p) => p.subscriber_id)).size;
 
   if (prefs.length === 0) {
-    return NextResponse.json({
-      ok: openings.failed === 0,
-      attempted: 0,
-      sent: 0,
-      failed: 0,
-      logFailures: 0,
-      message: "No active subscriptions",
-      freshness,
-      openings,
-    }, { status: openingsStatus });
+    return {
+      status: openingsStatus,
+      body: {
+        ok: openings.failed === 0,
+        attempted: 0,
+        sent: 0,
+        failed: 0,
+        logFailures: 0,
+        subscribers,
+        message: "No active subscriptions",
+        freshness,
+        openings,
+      },
+    };
   }
 
   // 2. Load latest snow reports for all relevant resort IDs
   const resortIds = [...new Set(prefs.map((p) => p.resort_id))];
   const snowResp = await sbFetch(
-    `/latest_snow_reports?resort_id=in.(${resortIds.map((id) => `"${id}"`).join(",")})&select=resort_id,new_snow_24h`
+    `/latest_snow_reports?resort_id=in.(${resortIds.map((id) => `"${id}"`).join(",")})&select=resort_id,new_snow_24h,updated_at`
   );
   if (!snowResp.ok) {
-    return NextResponse.json({ error: "Failed to load snow reports", freshness, openings }, { status: 500 });
+    return { status: 500, body: { error: "Failed to load snow reports", freshness, openings } };
   }
   const snowReports: SnowReport[] = await snowResp.json();
   const snowByResort = new Map(snowReports.map((s) => [s.resort_id, s.new_snow_24h ?? 0]));
+  const snowMeasuredAt = new Map(snowReports.map((s) => [s.resort_id, s.updated_at ?? null]));
 
   // Alerts use seven-day Open-Meteo forecasts. US resort pages use NWS,
   // so their numbers can differ. Forecast failures must not block live alerts.
@@ -493,16 +512,20 @@ async function handleTrigger(request: NextRequest) {
   }
 
   if (bySubscriber.size === 0) {
-    return NextResponse.json({
-      ok: openings.failed === 0,
-      attempted: 0,
-      sent: 0,
-      failed: 0,
-      logFailures: 0,
-      message: "No thresholds exceeded",
-      freshness,
-      openings,
-    }, { status: openingsStatus });
+    return {
+      status: openingsStatus,
+      body: {
+        ok: openings.failed === 0,
+        attempted: 0,
+        sent: 0,
+        failed: 0,
+        logFailures: 0,
+        subscribers,
+        message: "No thresholds exceeded",
+        freshness,
+        openings,
+      },
+    };
   }
 
   // 4. Send emails and log
@@ -549,20 +572,60 @@ async function handleTrigger(request: NextRequest) {
     }
   }
 
+  // 5. Webhooks: one signed powder.alert per (destination, resort), for the
+  //    same alerts the emails carried. Independent of the email outcome — a
+  //    Resend outage must not silence a subscriber's own endpoint — and
+  //    never a reason to fail the run: a dead endpoint is the subscriber's,
+  //    and the consecutive-failure counter disables it after ten runs.
+  //    Dedupe across days rides on powder_alert_log like the emails do, so
+  //    an alert whose email failed (and was not logged) is re-sent to the
+  //    webhook the next day under a new webhook-id; receivers that need
+  //    exactly-once should key on resort slug + measuredAt.
+  const eventsBySubscriber = new Map<string, PowderAlertEvent[]>();
+  for (const [subscriberId, { alerts }] of bySubscriber) {
+    eventsBySubscriber.set(
+      subscriberId,
+      alerts.map((a) => {
+        const url = `${SITE_URL}/resorts/${a.slug}`;
+        const forecast = a.forecastLeadDays != null;
+        return buildPowderAlertEvent({
+          resort: { slug: a.slug, name: a.resortName, url },
+          inches: a.newSnow,
+          kind: forecast ? "forecast" : "measured",
+          measuredAt: (forecast ? null : snowMeasuredAt.get(a.resort_id)) ?? startedAt.toISOString(),
+          url,
+          threshold: a.threshold,
+          ...(forecast
+            ? { stormStartDate: a.stormStartDate ?? null, forecastDays: a.forecastDays, leadDays: a.forecastLeadDays }
+            : {}),
+        });
+      }),
+    );
+  }
+  const destinations = await loadWebhookDestinations([...bySubscriber.keys()]);
+  const webhooks = await fanOutWebhooks(
+    destinations,
+    eventsBySubscriber,
+    startedAt.getTime() + WEBHOOK_BUDGET_MS,
+  );
+
   const summary = {
     ok: failed === 0 && openings.failed === 0,
     attempted,
     sent,
     failed,
     logFailures,
+    subscribers,
     ...(errors.size > 0 ? { errors: [...errors] } : {}),
     freshness,
     openings,
+    webhooks,
   };
 
   console.log(
     `[alerts/trigger] Done — ${sent}/${attempted} emails sent, ${failed} failed` +
       (errors.size > 0 ? ` (${[...errors].join(", ")})` : "") +
+      (webhooks.attempted > 0 ? `; webhooks ${webhooks.delivered}/${webhooks.attempted} delivered` : "") +
       (openings.resortsOpening > 0
         ? `; opening day at ${openings.resortsOpening} resort${openings.resortsOpening === 1 ? "" : "s"}: ${openings.sent}/${openings.attempted} emails sent`
         : "")
@@ -570,7 +633,44 @@ async function handleTrigger(request: NextRequest) {
 
   // Any failure is reported as a failed cron run — otherwise a broken key stays
   // invisible until someone reads the logs.
-  return NextResponse.json(summary, { status: failed > 0 || openings.failed > 0 ? 500 : 200 });
+  return { status: failed > 0 || openings.failed > 0 ? 500 : 200, body: summary };
+}
+
+// Shared handler for both GET (Vercel Cron) and POST (script) invocations.
+// Protected by Authorization: Bearer <CRON_SECRET>
+async function handleTrigger(request: NextRequest) {
+  // Auth check — fail closed when CRON_SECRET is not configured
+  if (!CRON_SECRET) {
+    return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
+  }
+  const auth = request.headers.get("authorization");
+  if (auth !== `Bearer ${CRON_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Run log (migration 023): a row is opened before anything else runs and
+  // closed on every exit, so a run that crashed mid-way is visible as a row
+  // with finished_at null. Both writes are best-effort — see lib/alerts/run-log.
+  const startedAt = new Date();
+  const runId = await openRun(startedAt);
+
+  let result: TriggerResult;
+  try {
+    result = await runTrigger(startedAt);
+  } catch (err) {
+    console.error("[alerts/trigger] run threw:", err);
+    result = { status: 500, body: { ok: false, error: err instanceof Error && err.name !== "Error" ? err.name : "trigger_threw" } };
+  }
+
+  const finishedAt = new Date();
+  const row = shapeRunRow(result.body, finishedAt, result.status);
+  const runLogged = await closeRun(runId, row);
+  await capturePostHogEvent(RUN_EVENT_NAME, runEventProperties(row, startedAt, finishedAt, result.status));
+
+  return NextResponse.json(
+    { ...result.body, run: { id: runId, logged: runLogged, startedAt: startedAt.toISOString(), finishedAt: finishedAt.toISOString() } },
+    { status: result.status },
+  );
 }
 
 // GET — Vercel Cron invokes routes via GET
