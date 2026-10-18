@@ -77,6 +77,7 @@ export function PeakFooter() {
                 <li key={item.href}>
                   <Link
                     href={item.href}
+                    prefetch={false}
                     className="text-ink/80 hover:text-alpen transition-colors duration-150 text-[14px] font-medium"
                   >
                     {item.label}
@@ -99,6 +100,7 @@ export function PeakFooter() {
                 <li key={item.href}>
                   <Link
                     href={item.href}
+                    prefetch={false}
                     className="text-ink/80 hover:text-alpen transition-colors duration-150 text-[14px] font-medium"
                   >
                     {item.label}
@@ -122,10 +124,11 @@ export function PeakFooter() {
         <div className="pt-6 border-t-[1.5px] border-dashed border-bark">
           <div className="flex flex-col md:flex-row justify-between items-center gap-3">
             <p className="font-mono text-[11px] text-bark uppercase tracking-[0.12em]">
-              &copy; {new Date().getFullYear()} PeakCam · Updated every 5 min
+              &copy; {new Date().getFullYear()} PeakCam · Sensor data synced every 6 h · pages refresh hourly
             </p>
             <Link
               href="/alerts"
+              prefetch={false}
               className="inline-flex items-center gap-1.5 font-semibold text-[13px] text-alpen-dk
                          hover:text-alpen transition-colors duration-150"
             >
