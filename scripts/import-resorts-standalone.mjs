@@ -9,7 +9,10 @@
  *   node scripts/import-resorts-standalone.mjs --cams-only  # only data/cams.csv, against resorts already in the table
  *
  * Reads:  .env.local, data/resorts.csv, data/cams.csv
- * Writes: Supabase (resorts table, then cams table)
+ * Writes: Supabase (resorts table, resort_metadata, then cams table)
+ *
+ * Optional profile columns (migration 025) are accepted in both CSVs; see
+ * the "Profile columns" section below for the list and the blank/absent rule.
  */
 
 import fs from "node:fs";
@@ -41,12 +44,16 @@ loadEnv(path.join(ROOT, ".env"));
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!SUPABASE_URL || !SERVICE_KEY) {
-  console.error(
-    "\n❌  Missing env vars.\n" +
-    "    Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local\n"
-  );
-  process.exit(1);
+// Checked in main(), not at import time, so the unit tests can import the
+// pure row builders below on a machine without the service-role key.
+function requireEnv() {
+  if (!SUPABASE_URL || !SERVICE_KEY) {
+    console.error(
+      "\n❌  Missing env vars.\n" +
+      "    Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local\n"
+    );
+    process.exit(1);
+  }
 }
 
 // ─── CSV parser (no csv-parse package) ───────────────────────────────────────
@@ -144,6 +151,134 @@ export function toResortMetadataRecord(resortId, row) {
   };
 }
 
+// ─── Profile columns (migration 025) ─────────────────────────────────────────
+//
+// Every column below is OPTIONAL in the CSV. A column that is absent from the
+// header is not sent at all, so an upsert keeps whatever prod already holds
+// (hand edits, the P2 enrichment job's values). A column that is present but
+// blank is sent as null / empty — the CSV is then the source of truth for it.
+// Exception: the two elevation columns, which are sent only when non-blank.
+//
+// resorts.csv may add:  runs_total, lifts_total, skiable_acres, vertical_ft,
+//   annual_snowfall_in, longest_run_mi, description, description_source,
+//   trail_map_url, wikidata_id, aliases (pipe-separated), passes (pipe-separated).
+// cams.csv may add:     kind, credit, source_terms_url.
+
+/** Allowed `resorts.passes` values (CHECK resorts_passes_check). */
+export const RESORT_PASSES = ["ikon", "epic", "mountain-collective", "indy", "power"];
+/** Allowed `resorts.description_source` values. */
+export const DESCRIPTION_SOURCES = ["operator", "generated", "editor"];
+/** Allowed `cams.kind` values (CHECK cams_kind_check). */
+export const CAM_KINDS = ["summit", "mid", "base", "snow-stake", "village", "approach"];
+
+/** `"A-Basin|Arapahoe Basin"` → `["A-Basin", "Arapahoe Basin"]`; blank → `[]`. */
+export function parseList(value) {
+  if (!value) return [];
+  return value.split("|").map((s) => s.trim()).filter(Boolean);
+}
+
+/**
+ * Pipe-separated passes, lower-cased, de-duplicated, unknown values dropped
+ * with a warning rather than failing the whole batch on the CHECK.
+ */
+export function parsePasses(value, warn = console.warn) {
+  const out = [];
+  for (const raw of parseList(value)) {
+    const pass = raw.toLowerCase();
+    if (!RESORT_PASSES.includes(pass)) {
+      warn(`  ⚠  Unknown pass "${raw}" dropped (allowed: ${RESORT_PASSES.join(", ")})`);
+      continue;
+    }
+    if (!out.includes(pass)) out.push(pass);
+  }
+  return out;
+}
+
+/** A value from a closed set, or null (with a warning) when it is not in the set. */
+function parseEnum(value, allowed, label, warn) {
+  if (!value) return null;
+  const v = value.trim().toLowerCase();
+  if (allowed.includes(v)) return v;
+  warn(`  ⚠  Unknown ${label} "${value}" dropped (allowed: ${allowed.join(", ")})`);
+  return null;
+}
+
+const RESORT_INT_COLUMNS   = ["runs_total", "lifts_total", "vertical_ft"];
+const RESORT_FLOAT_COLUMNS = ["skiable_acres", "annual_snowfall_in", "longest_run_mi"];
+const RESORT_TEXT_COLUMNS  = ["description", "trail_map_url", "wikidata_id"];
+// Elevations have always been in the CSV header but blank for a few rows, and
+// prod's values were backfilled by migration 025; a blank must not null them.
+const RESORT_ELEVATION_COLUMNS = ["elevation_base_ft", "elevation_summit_ft"];
+
+/**
+ * One data/resorts.csv row → the `resorts` upsert body. The original columns
+ * are always sent (as before); the migration-025 profile columns only when
+ * their header is present in the CSV.
+ */
+export function toResortRecord(row, warn = console.warn) {
+  const record = {
+    name:               row.name,
+    slug:               row.slug,
+    state:              row.state,
+    region:             row.region,
+    lat:                toNullFloat(row.lat),
+    lng:                toNullFloat(row.lng),
+    website_url:        blankToNull(row.website_url),
+    cam_page_url:       blankToNull(row.cam_page_url),
+    snotel_station_id:  blankToNull(row.snotel_station_id),
+    x_url:              blankToNull(row.x_url),
+    facebook_url:       blankToNull(row.facebook_url),
+    instagram_url:      blankToNull(row.instagram_url),
+    is_active:          toBool(row.is_active ?? ""),
+    country:            row.country || "US",
+  };
+
+  for (const col of RESORT_INT_COLUMNS) {
+    if (col in row) record[col] = toNullInt(row[col]);
+  }
+  for (const col of RESORT_ELEVATION_COLUMNS) {
+    const n = toNullInt(row[col] ?? "");
+    if (n != null) record[col] = n;
+  }
+  for (const col of RESORT_FLOAT_COLUMNS) {
+    if (col in row) record[col] = toNullFloat(row[col]);
+  }
+  for (const col of RESORT_TEXT_COLUMNS) {
+    if (col in row) record[col] = blankToNull(row[col]);
+  }
+  if ("description_source" in row) {
+    record.description_source = parseEnum(row.description_source, DESCRIPTION_SOURCES, "description_source", warn);
+  }
+  if ("aliases" in row) record.aliases = parseList(row.aliases);
+  if ("passes" in row) record.passes = parsePasses(row.passes, warn);
+
+  // A description without a source is a CHECK-safe but meaningless row; a
+  // source without a description is noise. Keep the pair consistent.
+  if (record.description == null && record.description_source != null) record.description_source = null;
+
+  return record;
+}
+
+/**
+ * One data/cams.csv row → the `cams` upsert body. `kind`, `credit` and
+ * `source_terms_url` (migration 025) are sent only when their header is
+ * present. is_active / last_checked_at are never sent (see importCams).
+ */
+export function toCamRecord(resortId, row, warn = console.warn) {
+  const record = {
+    resort_id:  resortId,
+    name:       row.name,
+    elevation:  blankToNull(row.elevation ?? ""),
+    embed_type: row.embed_type,
+    embed_url:  blankToNull(row.embed_url ?? ""),
+    youtube_id: blankToNull(row.youtube_id ?? ""),
+  };
+  if ("kind" in row) record.kind = parseEnum(row.kind, CAM_KINDS, "cam kind", warn);
+  if ("credit" in row) record.credit = blankToNull(row.credit);
+  if ("source_terms_url" in row) record.source_terms_url = blankToNull(row.source_terms_url);
+  return record;
+}
+
 function dedupeBy(arr, key) {
   const seen = new Set();
   return arr.filter((item) => {
@@ -174,22 +309,7 @@ async function importResorts() {
   const slugToId = new Map();
 
   for (let i = 0; i < rows.length; i += BATCH) {
-    const batch = rows.slice(i, i + BATCH).map((r) => ({
-      name:               r.name,
-      slug:               r.slug,
-      state:              r.state,
-      region:             r.region,
-      lat:                toNullFloat(r.lat),
-      lng:                toNullFloat(r.lng),
-      website_url:        blankToNull(r.website_url),
-      cam_page_url:       blankToNull(r.cam_page_url),
-      snotel_station_id:  blankToNull(r.snotel_station_id),
-      x_url:              blankToNull(r.x_url),
-      facebook_url:       blankToNull(r.facebook_url),
-      instagram_url:      blankToNull(r.instagram_url),
-      is_active:          toBool(r.is_active),
-      country:            r.country || "US",
-    }));
+    const batch = rows.slice(i, i + BATCH).map((r) => toResortRecord(r));
 
     const data = await supabaseUpsert("resorts", batch, "slug");
     for (const d of data) slugToId.set(d.slug, d.id);
@@ -237,14 +357,8 @@ async function importCams(slugToId) {
       if (!id) { skipped.push(r.resort_slug); return false; }
       return true;
     })
-    .map((r) => ({
-      resort_id:       slugToId.get(r.resort_slug),
-      name:            r.name,
-      elevation:       blankToNull(r.elevation),
-      embed_type:      r.embed_type,
-      embed_url:       blankToNull(r.embed_url),
-      youtube_id:      blankToNull(r.youtube_id),
-      // Deliberately NOT sending is_active or last_checked_at:
+    .map((r) => toCamRecord(slugToId.get(r.resort_slug), r));
+    // toCamRecord deliberately does NOT send is_active or last_checked_at:
       // cam-health-check.mjs owns a cam's active state (auto-disable
       // after 3 consecutive failures, auto-recovery on success) and its
       // check timestamps. Sending is_active from the CSV re-enabled all
@@ -254,7 +368,6 @@ async function importCams(slugToId) {
       // health checker's authoritative state. Every cams.csv row is
       // is_active=true anyway — nothing depended on CSV-driven
       // deactivation.
-    }));
 
   if (skipped.length > 0) {
     const unique = [...new Set(skipped)];
@@ -284,6 +397,7 @@ async function importCams(slugToId) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
+  requireEnv();
   console.log("\n🏔  PeakCam — Standalone Resort & Cam Import" + (process.argv.includes("--cams-only") ? " (cams only)" : ""));
   console.log("─────────────────────────────────────────────");
   console.log(`    Supabase: ${SUPABASE_URL}`);
