@@ -178,8 +178,10 @@ answer `405` by design.
 
 ## Discovery (Sprint 6)
 
-Still to add: `/.well-known/mcp/server-card.json`, `server.json` for the MCP Registry, the MCP
-line in `llms.txt`, the `/connect` page and the footer link. Everything they need is exported
+Shipped 2026-10-18: `/.well-known/mcp/server-card.json` (also at the SEP-2127 reserved
+`/api/mcp/server-card`), `server.json` for the MCP Registry (published as `io.peakcam/snow`
+0.1.0, re-publish steps in `docs/runbook.md`), the MCP line in `llms.txt`, the `/connect` page
+and the footer link. Everything they need is exported
 from `lib/mcp/server.ts` (`PEAKCAM_MCP_NAME`, `PEAKCAM_MCP_TITLE`, `PEAKCAM_MCP_VERSION`,
 `PEAKCAM_MCP_ENDPOINT`, `PEAKCAM_MCP_INSTRUCTIONS`) and `lib/mcp/tools.ts`
 (`PEAKCAM_TOOL_NAMES`, `buildTools()` for titles and descriptions).

@@ -5,9 +5,9 @@ import { buildServerCard, SERVER_CARD_MEDIA_TYPE } from "@/components/connect/se
 // GET /.well-known/mcp/server-card.json — the `io.peakcam/snow` MCP Server
 // Card (SEP-2127 v1 shape, see components/connect/server-card.ts). The SEP's
 // reserved location is `<streamable-http-url>/server-card`, i.e.
-// /api/mcp/server-card, which lives with the MCP route on its own branch;
-// this .well-known copy is the address the execution plan and the early
-// clients use, and the two must stay byte-identical when both exist.
+// /api/mcp/server-card, which app/api/mcp/server-card/route.ts serves by
+// re-exporting these handlers; this .well-known copy is the address the
+// execution plan, llms.txt and server.json advertise. Both are byte-identical.
 //
 // Static (changes only on deploy), cached a day, CORS open, ETag per the
 // extension's discovery doc (clients send If-None-Match on re-fetch).
