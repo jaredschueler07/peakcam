@@ -66,6 +66,16 @@ Sensor-fed numbers are measured, not scraped from resort marketing, so they can
 differ from a resort's own report (a station sits at one fixed elevation; resorts
 often quote their upper mountain). Full details: ${SITE_URL}/methodology
 
+## For agents
+
+- API base: ${SITE_URL}/api/v1 (JSON, anonymous, CORS open; resorts, resorts/{slug}, resorts/{slug}/cams, powder)
+- OpenAPI 3.1: ${SITE_URL}/api/v1/openapi.json
+- API catalog (RFC 9727): ${SITE_URL}/.well-known/api-catalog
+- Markdown alternates: ${SITE_URL}/index.md and ${SITE_URL}/resorts/{slug}/index.md (also rel="alternate" in each HTML page's Link header)
+- Powder feed per resort (Atom): ${SITE_URL}/resorts/{slug}/powder.xml
+- MCP: (coming) ${SITE_URL}/api/mcp
+- Attribution: cite the resort's PeakCam page URL; SNOTEL data is USDA NRCS, forecasts are NWS/Open-Meteo, cams belong to their operators. Terms: ${SITE_URL}/about#terms
+
 ## Key pages
 
 - [Snow Report](${SITE_URL}/snow-report): every resort's base depth, fresh snow, and conditions in one sortable table — the fastest answer to "where is the snow right now"
