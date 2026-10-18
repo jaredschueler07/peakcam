@@ -33,6 +33,8 @@ import { ResortAlertCapture } from "@/components/alerts/ResortAlertCapture";
 import { NearbyResorts, type NearbyResortsData } from "@/components/resort/NearbyResorts";
 import { HubBreadcrumb, type BreadcrumbItem } from "@/components/hubs/HubBreadcrumb";
 import type { Quotable } from "@/lib/quotable";
+import { CamTimelineStrip } from "@/components/resort/CamTimelineStrip";
+import type { CamTimeline } from "@/lib/cam-timeline";
 
 interface Props {
   resort: ResortWithData;
@@ -47,6 +49,8 @@ interface Props {
   freshness?: Pick<Quotable, "segments"> | null;
   /** Home / {State hub} / {Resort}; the page emits the matching BreadcrumbList JSON-LD. Omitted → the plain "All Resorts" link. */
   breadcrumb?: BreadcrumbItem[] | null;
+  /** Server-fetched still archive for one cam (getResortCamTimeline); null/omitted → no strip. */
+  camTimeline?: CamTimeline | null;
 }
 
 // ─── "Updated …" stamp ───────────────────────────────────────────────────────
@@ -393,7 +397,7 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData, liveConditions, userConditions = [], nearby = null, freshness = null, breadcrumb = null }: Props) {
+export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData, liveConditions, userConditions = [], nearby = null, freshness = null, breadcrumb = null, camTimeline = null }: Props) {
   const activeCams = resort.cams.filter((c) => c.is_active);
   const embeddableCams = activeCams.filter((c) => c.embed_type !== "link");
   const snow = resort.snow_report;
@@ -775,6 +779,10 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
                   );
                 })}
               </div>
+              {/* Still archive (migration 024): "Last 24 h" frames + the last
+                  storm keeper for one archive-allowed cam. Renders nothing
+                  until the capture job has stored frames for this resort. */}
+              <CamTimelineStrip timeline={camTimeline} cams={activeCams} />
               {/* A single-cam resort has nothing left for the grid on phones. */}
               {activeCams.length === 1 && (
                 <p className="text-text-muted text-sm lg:hidden">

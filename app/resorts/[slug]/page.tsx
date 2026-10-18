@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getResortBySlug, getAllResortSlugs, getAllResorts, getLiveConditions, getUserConditions, getResortElevationFt, getResortOpenings } from "@/lib/supabase";
+import { getResortBySlug, getAllResortSlugs, getAllResorts, getLiveConditions, getUserConditions, getResortElevationFt, getResortOpenings, getResortCamTimeline } from "@/lib/supabase";
 import { resortSentence } from "@/lib/quotable";
 import type { BreadcrumbItem } from "@/components/hubs/HubBreadcrumb";
 import { ResortAboutSection } from "@/components/resort/ResortAboutSection";
@@ -118,7 +118,15 @@ export default async function ResortPage({
   const isUS = resort.country === "US";
   const elevationFt = isUS ? null : await getResortElevationFt(resort.id);
 
-  const [weather, hourlyRaw, liveConditions, userConditions, allResorts, openings] = await Promise.all([
+  // Still-archive strip (migration 024): the page's lead cam first — the same
+  // "first embeddable active cam" rule ResortDetailPage uses — so the strip
+  // shows the cam the visitor is already looking at when it has frames.
+  const camOrder = [
+    ...resort.cams.filter((cam) => cam.is_active && !cam.auto_disabled && cam.embed_type !== "link"),
+    ...resort.cams.filter((cam) => cam.is_active && !cam.auto_disabled && cam.embed_type === "link"),
+  ].map((cam) => cam.id);
+
+  const [weather, hourlyRaw, liveConditions, userConditions, allResorts, openings, camTimeline] = await Promise.all([
     isUS
       ? getWeatherForecast(resort.lat, resort.lng)
       : getOpenMeteoForecast(resort.lat, resort.lng, elevationFt),
@@ -131,6 +139,7 @@ export default async function ResortPage({
     // The freshness sentence names the opening date only for a resort with no
     // report yet, so the openings table is read only in that case.
     resort.snow_report ? Promise.resolve([]) : getResortOpenings(),
+    getResortCamTimeline(resort.id, camOrder, 24),
   ]);
 
   // First sentence under the H1 (lib/quotable.ts): dated by the report's own
@@ -332,7 +341,7 @@ export default async function ResortPage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageLd) }}
         />
       )}
-      <ResortDetailPage resort={resort} weather={weather} forecastPeriods={forecastPeriods} hourlyData={hourlyRaw} liveConditions={liveConditions} userConditions={userConditions} nearby={nearby} freshness={{ segments: freshness.segments }} breadcrumb={breadcrumb} />
+      <ResortDetailPage resort={resort} weather={weather} forecastPeriods={forecastPeriods} hourlyData={hourlyRaw} liveConditions={liveConditions} userConditions={userConditions} nearby={nearby} freshness={{ segments: freshness.segments }} breadcrumb={breadcrumb} camTimeline={camTimeline} />
       <ResortAboutSection resort={resort} />
     </main>
   );
