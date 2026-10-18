@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getResortBySlug, getAllResortSlugs, getAllResorts, getLiveConditions, getUserConditions, getResortElevationFt, getResortOpenings, getResortCamTimeline } from "@/lib/supabase";
 import { resortSentence } from "@/lib/quotable";
+import { stationFor } from "@/lib/stations";
 import type { BreadcrumbItem } from "@/components/hubs/HubBreadcrumb";
 import { ResortAboutSection } from "@/components/resort/ResortAboutSection";
 import type { NearbyResortsData } from "@/components/resort/NearbyResorts";
@@ -143,11 +144,14 @@ export default async function ResortPage({
   ]);
 
   // First sentence under the H1 (lib/quotable.ts): dated by the report's own
-  // updated_at, labelled by its source. Station name/elevation are not in the
-  // database yet, so the SNOTEL wording names the resort's station without
-  // the parenthetical. `new Date()` only decides whether an opening date is
-  // still ahead; same hourly ISR cadence as generateMetadata above.
+  // updated_at, labelled by its source. The SNOTEL wording names the station
+  // ("Copper Mountain, 10,500 ft") from the bundled NRCS table in
+  // lib/stations.ts — the same lookup the public API and its markdown
+  // alternate use — and drops the parenthetical for a triplet the table does
+  // not know. `new Date()` only decides whether an opening date is still
+  // ahead; same hourly ISR cadence as generateMetadata above.
   const freshness = resortSentence(resort, new Date(), {
+    station: stationFor(resort),
     opening: openings.find((row) => row.resort_id === resort.id) ?? null,
   });
 

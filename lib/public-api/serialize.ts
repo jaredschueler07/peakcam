@@ -31,7 +31,7 @@ import type {
   Station,
   TrendMeasurement,
 } from "./schema";
-import stationIndex from "./stations.json";
+import { STATION_INDEX, type StationMeta } from "../stations";
 
 // ── Options ──────────────────────────────────────────────────
 
@@ -53,18 +53,16 @@ export interface SerializeOptions {
   stations?: Record<string, StationMeta>;
 }
 
-export interface StationMeta {
-  name: string;
-  elevationFt: number | null;
-}
+export type { StationMeta };
 
 /**
  * NRCS station names/elevations for every triplet the catalogue references,
  * trimmed from data/snotel_stations.json (17 MB, too large to ship in a
  * route). Regenerate when a resort gets a new station:
  *   node -e 'const a=require("./data/snotel_stations.json");…' — see PR #78.
+ * Shared with the resort page sentence through lib/stations.ts.
  */
-const STATIONS: Record<string, StationMeta> = stationIndex as Record<string, StationMeta>;
+const STATIONS: Record<string, StationMeta> = STATION_INDEX;
 
 // ── Helpers ──────────────────────────────────────────────────
 
