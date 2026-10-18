@@ -444,6 +444,39 @@ export async function getResortWithMetadata(slug: string) {
   return data;
 }
 
+export interface ResortElevationRow {
+  base_ft: number | null;
+  summit_ft: number | null;
+}
+
+async function fetchResortElevationIndex(): Promise<Record<string, ResortElevationRow>> {
+  const { data, error } = await supabase
+    .from("resort_metadata")
+    .select("resort_id, elevation_base_ft, elevation_summit_ft");
+  if (error) {
+    if (MISSING_TABLE_CODES.has(error.code)) return {};
+    throw error;
+  }
+  const out: Record<string, ResortElevationRow> = {};
+  for (const row of data ?? []) {
+    out[row.resort_id] = { base_ft: row.elevation_base_ft ?? null, summit_ft: row.elevation_summit_ft ?? null };
+  }
+  return out;
+}
+
+/**
+ * Base/summit elevation for every resort with a `resort_metadata` row, keyed
+ * by resort id. One query for the whole catalogue (the public API serialises
+ * all 148 resorts per revalidation), cached alongside the catalogue for the
+ * same window and tag. A failed query throws like getAllResorts so the ISR
+ * route keeps serving its last good document.
+ */
+export const getResortElevationIndex = unstable_cache(
+  fetchResortElevationIndex,
+  ["peakcam:resort-elevations:v1", supabaseUrl],
+  { revalidate: RESORT_CATALOG_REVALIDATE_SECONDS, tags: ["peakcam-resort-catalog"] },
+);
+
 /** Midpoint elevation (base+summit)/2 in feet, for resorts with resort_metadata. Returns base-only or null if incomplete/missing. */
 export async function getResortElevationFt(resortId: string): Promise<number | null> {
   const { data, error } = await supabase
