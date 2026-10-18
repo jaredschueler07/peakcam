@@ -71,11 +71,16 @@ export function assignStations(candidates: readonly Candidate[], resort: ResortE
       chosen.push({ ...hit, role: band, rank: 0 });
     }
   }
+  // Leftover slots: the best remaining candidates, but a band already held
+  // by the same network is not filled twice (two NWS base sensors say the
+  // same thing; a SNOTEL pillow next to an NWS base sensor does not).
   for (const c of pool) {
     if (chosen.length >= max) break;
     if (taken.has(c)) continue;
+    const band = roleForElevation(c.observation.elevationFt, resort);
+    if (band && chosen.some((x) => x.role === band && x.observation.source === c.observation.source)) continue;
     taken.add(c);
-    chosen.push({ ...c, role: roleForElevation(c.observation.elevationFt, resort) ?? "mid", rank: 0 });
+    chosen.push({ ...c, role: band ?? "mid", rank: 0 });
   }
 
   // No elevations on file: name the extremes by what we do know.

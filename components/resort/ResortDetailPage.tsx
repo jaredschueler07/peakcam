@@ -35,6 +35,8 @@ import { HubBreadcrumb, type BreadcrumbItem } from "@/components/hubs/HubBreadcr
 import type { Quotable } from "@/lib/quotable";
 import { CamTimelineStrip } from "@/components/resort/CamTimelineStrip";
 import type { CamTimeline } from "@/lib/cam-timeline";
+import { MeasuredNow } from "@/components/resort/MeasuredNow";
+import type { MeasuredNowPublic } from "@/lib/public-api/schema";
 
 interface Props {
   resort: ResortWithData;
@@ -51,6 +53,8 @@ interface Props {
   breadcrumb?: BreadcrumbItem[] | null;
   /** Server-fetched still archive for one cam (getResortCamTimeline); null/omitted → no strip. */
   camTimeline?: CamTimeline | null;
+  /** Station layer rows (lib/public-api/serialize.ts serializeStations); empty/omitted → no "What the instruments say" block. */
+  measuredNow?: MeasuredNowPublic[] | null;
 }
 
 // ─── "Updated …" stamp ───────────────────────────────────────────────────────
@@ -397,7 +401,7 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData, liveConditions, userConditions = [], nearby = null, freshness = null, breadcrumb = null, camTimeline = null }: Props) {
+export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData, liveConditions, userConditions = [], nearby = null, freshness = null, breadcrumb = null, camTimeline = null, measuredNow = null }: Props) {
   const activeCams = resort.cams.filter((c) => c.is_active);
   const embeddableCams = activeCams.filter((c) => c.embed_type !== "link");
   const snow = resort.snow_report;
@@ -719,6 +723,11 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
             <HourlyTimeline hourlyData={hourlyData} />
           </section>
         )}
+
+        {/* Station layer (migration 026): the nearest instruments by elevation
+            band, each with its network and the age of its reading. Rendered
+            from the same serialised rows the public API returns. */}
+        {measuredNow && measuredNow.length > 0 && <MeasuredNow rows={measuredNow} resortName={resort.name} />}
 
         {/* Live cams */}
         <section id="cameras" className="scroll-mt-20">

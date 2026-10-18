@@ -92,6 +92,27 @@ test("assignStations: without resort elevations the highest is summit and the lo
   );
 });
 
+test("assignStations: a band is not filled twice by the same network, but a second network may join it", () => {
+  const picked = assignStations(
+    [
+      { observation: obs("nws", "ATB", 8560), distanceKm: 0.1 },
+      { observation: obs("nws", "AGD", 8799), distanceKm: 0.2 },
+      { observation: obs("nws", "AMB", 11066), distanceKm: 2.3 },
+      { observation: obs("snotel", "S1", 8750), distanceKm: 0.3 },
+    ],
+    ALTA,
+  );
+  assert.deepEqual(
+    picked.map((p) => [p.role, p.observation.sourceId]),
+    [
+      ["summit", "AMB"],
+      ["base", "S1"],
+      ["base", "ATB"],
+    ],
+    "AGD (a second NWS base sensor) is left out; the SNOTEL pillow and one NWS base sensor both stay",
+  );
+});
+
 test("assignStations: duplicates by (source, sourceId) collapse; empty input is empty", () => {
   const c = { observation: obs("nws", "X", 9000), distanceKm: 1 };
   assert.equal(assignStations([c, { ...c, distanceKm: 2 }], ALTA).length, 1);

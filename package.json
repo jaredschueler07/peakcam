@@ -20,6 +20,8 @@
     "agents:extract-plugins": "for f in plugins/*.plugin; do name=$(basename \"$f\" .plugin); mkdir -p \"agents/plugins/$name\" && unzip -o \"$f\" -d \"agents/plugins/$name\"; done",
     "snotel-sync": "tsx scripts/snotel-sync.ts",
     "model-sync": "tsx scripts/model-sync.ts",
+    "stations-sync": "tsx scripts/stations-sync.ts",
+    "approach-cams-sync": "tsx scripts/approach-cams-sync.ts",
     "pipeline-sync": "tsx scripts/pipeline-sync.ts",
     "seed-normals": "tsx scripts/seed-snotel-normals.ts",
     "seed-openings": "node scripts/seed-resort-openings.mjs",
