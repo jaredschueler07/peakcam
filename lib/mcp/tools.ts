@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// MCP server — the nine read-only tools, as pure builders.
+// MCP server — the fifteen read-only tools, as pure builders.
 //
 // `buildTools(data)` returns tool definitions over an injected McpDataSource
 // so lib/mcp/server.test.ts can run every tool against fixtures with no
@@ -14,7 +14,15 @@ import { z } from "zod";
 import type { CallToolResult } from "@modelcontextprotocol/server";
 import type { ResortWithData, WeatherPeriod } from "@/lib/types";
 import type { PublicApiCatalog } from "@/lib/public-api/data";
+import { SITE_URL } from "@/lib/site";
+import { stateHubPath, stateLabel } from "@/lib/hubs";
+import { KEEPER_MIN_SNOW_24H_IN, MAX_TIMELINE_HOURS, clampHours, type CamTimelineFrame } from "@/lib/cam-timeline";
+import { PCT_OF_NORMAL_RULE, buildPctOfNormalPage } from "@/lib/percent-of-normal";
+import { answerQuestion } from "@/lib/ask/answer";
+import { MAX_QUESTION_LENGTH } from "@/lib/ask/router";
+
 import {
+  AskAnswerSchema,
   CamListSchema,
   MeasuredNowSchema,
   MeasurementSourceSchema,
@@ -28,15 +36,16 @@ import {
   type MeasurementSource,
 } from "@/lib/public-api/schema";
 import {
+  camLive,
   rankPowder,
+  resortApiUrl,
+  resortCanonicalUrl,
   serializeCams,
   serializeResort,
   serializeResortLight,
   serializeSeason,
   serializeSnow,
   serializeStations,
-  type ResortElevation,
-  type SerializeOptions,
 } from "@/lib/public-api/serialize";
 import { STATION_SOURCES } from "@/lib/stations/index";
 import {
@@ -52,6 +61,23 @@ import {
   sourceLabel,
 } from "@/lib/public-api/markdown";
 import type { McpDataSource } from "./types";
+import { PEAKCAM_TOOL_NAMES, type PeakCamToolName } from "./tool-names";
+import {
+  closeMatches,
+  diceSimilarity,
+  editDistance,
+  findResort,
+  isValidSlug,
+  matchResorts,
+  normalizeText,
+  sameCode,
+  scoreResort,
+  serializeOptionsFor,
+  type MatchFilters,
+} from "./catalog";
+
+export { PEAKCAM_TOOL_NAMES, type PeakCamToolName };
+export { closeMatches, diceSimilarity, editDistance, findResort, isValidSlug, matchResorts, normalizeText, scoreResort, serializeOptionsFor, type MatchFilters };
 
 // ── Limits ───────────────────────────────────────────────────
 
@@ -63,19 +89,11 @@ export const MAX_SEARCH_RESULTS = 20;
 export const MAX_POWDER_RESULTS = 25;
 export const MAX_COMPARE = 6;
 export const MAX_OPENING_ROWS = 150;
-
-export const PEAKCAM_TOOL_NAMES = [
-  "search_resorts",
-  "get_resort_conditions",
-  "get_resort_cams",
-  "find_powder",
-  "compare_resorts",
-  "get_forecast",
-  "get_snow_history",
-  "get_opening_dates",
-  "get_stations",
-] as const;
-export type PeakCamToolName = (typeof PEAKCAM_TOOL_NAMES)[number];
+export const MAX_PCT_ROWS = 50;
+/** Archived frames per cam in a get_cam_timeline payload (links only). */
+export const MAX_TIMELINE_FRAMES_PER_CAM = 8;
+/** Cams per get_cam_timeline payload for a whole resort. */
+export const MAX_TIMELINE_CAMS = 12;
 
 // ── Definition shape ─────────────────────────────────────────
 
@@ -100,131 +118,7 @@ function err(message: string): CallToolResult {
   return { content: [{ type: "text", text: message }], isError: true };
 }
 
-// ── Catalogue helpers ────────────────────────────────────────
-
-/**
- * Mirrors `optionsFor()` in lib/public-api/data.ts, which cannot be imported
- * here because that module pulls in next/cache and the Supabase client at
- * load time (the tests run without either). Keep the two in step.
- */
-export function serializeOptionsFor(catalog: PublicApiCatalog, resort: ResortWithData): SerializeOptions {
-  const row = catalog.elevations[resort.id];
-  const elevation: ResortElevation | null = row ? { baseFt: row.base_ft, summitFt: row.summit_ft } : null;
-  return {
-    now: catalog.now,
-    opening: catalog.openings.get(resort.id) ?? null,
-    elevation,
-    observationStations: catalog.stations ? (catalog.stations[resort.id] ?? []) : null,
-  };
-}
-
-/** Lowercase ASCII words: strips accents and punctuation (`Mt. Bachelor` → `mt bachelor`). */
-export function normalizeText(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-function bigrams(value: string): Map<string, number> {
-  const out = new Map<string, number>();
-  const s = value.replace(/\s+/g, "");
-  for (let i = 0; i < s.length - 1; i++) {
-    const g = s.slice(i, i + 2);
-    out.set(g, (out.get(g) ?? 0) + 1);
-  }
-  return out;
-}
-
-/** Sørensen–Dice similarity on character bigrams, 0..1. Cheap typo tolerance. */
-export function diceSimilarity(a: string, b: string): number {
-  if (!a || !b) return 0;
-  if (a === b) return 1;
-  const ga = bigrams(a);
-  const gb = bigrams(b);
-  let overlap = 0;
-  for (const [g, n] of ga) overlap += Math.min(n, gb.get(g) ?? 0);
-  const total = [...ga.values()].reduce((s, n) => s + n, 0) + [...gb.values()].reduce((s, n) => s + n, 0);
-  return total ? (2 * overlap) / total : 0;
-}
-
-/**
- * Optimal-string-alignment edit distance (insert, delete, substitute, swap
- * adjacent). Catches the transpositions bigrams miss (`vial` → `vail`).
- */
-export function editDistance(a: string, b: string): number {
-  const m = a.length;
-  const n = b.length;
-  if (!m) return n;
-  if (!n) return m;
-  const d: number[][] = Array.from({ length: m + 1 }, (_, i) => [i, ...new Array<number>(n).fill(0)]);
-  for (let j = 1; j <= n; j++) d[0][j] = j;
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
-      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
-    }
-  }
-  return d[m][n];
-}
-
-/** 0 = no match; 100 = exact name or slug. */
-export function scoreResort(query: string, resort: ResortWithData): number {
-  const q = normalizeText(query);
-  if (!q) return 0;
-  const name = normalizeText(resort.name);
-  const slug = resort.slug.replace(/-/g, " ");
-  if (q === name || q === slug) return 100;
-  if (name.startsWith(q) || slug.startsWith(q)) return 85;
-  if (name.includes(q) || slug.includes(q)) return 70;
-  const haystack = `${name} ${slug} ${normalizeText(resort.region)} ${normalizeText(resort.state)} ${normalizeText(resort.country)}`;
-  if (q.split(" ").every((t) => haystack.includes(t))) return 50;
-  const sim = Math.max(diceSimilarity(q, name), diceSimilarity(q, slug));
-  if (sim >= 0.45) return Math.round(sim * 40);
-  // One edit per four characters, at least one: a typo, not a different resort.
-  const budget = Math.max(1, Math.floor(Math.min(q.length, name.length) / 4));
-  const distance = Math.min(editDistance(q, name), editDistance(q, slug));
-  return distance <= budget ? 30 - distance * 5 : 0;
-}
-
-function sameCode(a: string | null | undefined, b: string | null | undefined): boolean {
-  return normalizeText(a ?? "") === normalizeText(b ?? "");
-}
-
-export interface MatchFilters {
-  state?: string | null;
-  country?: string | null;
-  limit?: number;
-}
-
-/** Resorts ranked by `scoreResort`, filtered by state/country, zero scores dropped. */
-export function matchResorts(resorts: readonly ResortWithData[], query: string, filters: MatchFilters = {}): ResortWithData[] {
-  const limit = filters.limit ?? 10;
-  return resorts
-    .filter((r) => (!filters.state || sameCode(r.state, filters.state)) && (!filters.country || sameCode(r.country, filters.country)))
-    .map((r) => ({ r, score: scoreResort(query, r) }))
-    .filter((x) => x.score > 0)
-    .sort((a, b) => b.score - a.score || a.r.name.localeCompare(b.r.name, "en"))
-    .slice(0, limit)
-    .map((x) => x.r);
-}
-
-/** Up to five resorts whose slug or name is close to a slug that did not resolve. */
-export function closeMatches(resorts: readonly ResortWithData[], slug: string, limit = 5): ResortWithData[] {
-  return matchResorts(resorts, slug.replace(/-/g, " "), { limit });
-}
-
-export function isValidSlug(slug: string): boolean {
-  return /^[a-z0-9][a-z0-9-]{0,99}$/.test(slug);
-}
-
-export function findResort(catalog: PublicApiCatalog, slug: string): ResortWithData | null {
-  if (!isValidSlug(slug)) return null;
-  return catalog.resorts.find((r) => r.slug === slug) ?? null;
-}
+// ── Catalogue helpers (lib/mcp/catalog.ts) ───────────────────
 
 export function notFoundResult(catalog: PublicApiCatalog, slug: string): CallToolResult {
   const close = closeMatches(catalog.resorts, slug);
@@ -692,6 +586,459 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
     },
   });
 
+  // ── P9 block 1: tools over data already in production ────────
+
+  const ProfileLocationSchema = z.object({
+    region: z.string(),
+    state: z.string().describe("Code as stored (`CO`, `BC`) or the country name for Andes resorts."),
+    stateLabel: z.string().describe("Spelled out (`Colorado`, `British Columbia`, `Chile`)."),
+    country: z.string().describe("ISO 3166-1 alpha-2."),
+    lat: z.number(),
+    lon: z.number(),
+    baseElevationFt: z.number().nullable(),
+    summitElevationFt: z.number().nullable(),
+  });
+
+  const getResortProfile = defineTool({
+    name: "get_resort_profile",
+    title: "Resort profile",
+    description:
+      "Who and where a resort is, without the snow numbers: location and elevations, website and social links, PeakCam's cam page, the SNOTEL station its numbers come from (if any), season status, cam counts, and every URL PeakCam publishes for it (page, JSON, markdown, Atom feed, state hub). Use get_resort_conditions for today's snow.",
+    inputSchema: z.object({ slug: SlugInput }),
+    outputSchema: z.object({
+      slug: z.string(),
+      name: z.string(),
+      canonicalUrl: z.string().describe("The resort's PeakCam page. Cite this."),
+      urls: z.object({
+        api: z.string(),
+        markdown: z.string().describe("The page as markdown (also the MCP resource peakcam://resorts/{slug})."),
+        cams: z.string().describe("JSON cam list."),
+        powderFeed: z.string().describe("Per-resort Atom feed of powder events."),
+        stateHub: z.string().describe("PeakCam's webcam hub for the resort's state, province or country."),
+      }),
+      location: ProfileLocationSchema,
+      websiteUrl: z.string().nullable().describe("The operator's site."),
+      camPageUrl: z.string().nullable().describe("The operator's own webcam page, when PeakCam records one."),
+      socials: z.object({ x: z.string().nullable(), facebook: z.string().nullable(), instagram: z.string().nullable() }),
+      station: StationSchema.nullable().describe("The NRCS station PeakCam reads for this resort; null means model estimates."),
+      dataSource: MeasurementSourceSchema.nullable().describe("Source of the latest snow report, so you know which label to use."),
+      season: SeasonSchema,
+      camCount: z.number().int(),
+      liveCamCount: z.number().int(),
+      generatedAt: ISO_INSTANT,
+    }),
+    async handler({ slug }) {
+      const catalog = await data.catalog();
+      const hit = resolve(catalog, slug);
+      if (!hit.ok) return hit.result;
+      const resort = hit.resort;
+      const options = serializeOptionsFor(catalog, resort);
+      const snow = serializeSnow(resort, options);
+      const station = snowStation(snow) ?? (resort.snotel_station_id ? { id: resort.snotel_station_id, name: null, elevationFt: null } : null);
+      const canonicalUrl = resortCanonicalUrl(resort.slug);
+      const doc = {
+        slug: resort.slug,
+        name: resort.name,
+        canonicalUrl,
+        urls: {
+          api: resortApiUrl(resort.slug),
+          markdown: `${canonicalUrl}/index.md`,
+          cams: `${resortApiUrl(resort.slug)}/cams`,
+          powderFeed: `${canonicalUrl}/powder.xml`,
+          stateHub: `${SITE_URL}${stateHubPath(resort.state)}`,
+        },
+        location: {
+          region: resort.region,
+          state: resort.state,
+          stateLabel: stateLabel(resort.state),
+          country: resort.country,
+          lat: resort.lat,
+          lon: resort.lng,
+          baseElevationFt: options.elevation?.baseFt ?? null,
+          summitElevationFt: options.elevation?.summitFt ?? null,
+        },
+        websiteUrl: resort.website_url,
+        camPageUrl: resort.cam_page_url,
+        socials: { x: resort.x_url, facebook: resort.facebook_url, instagram: resort.instagram_url },
+        station,
+        dataSource: snow?.source ?? null,
+        season: serializeSeason(resort, options),
+        camCount: resort.cams.length,
+        liveCamCount: resort.cams.filter((c) => camLive(c) === true).length,
+        generatedAt: catalog.now.toISOString(),
+      };
+      const elev = doc.location.baseElevationFt != null || doc.location.summitElevationFt != null
+        ? ` Elevation: base ${doc.location.baseElevationFt?.toLocaleString("en-US") ?? "n/a"} ft, summit ${doc.location.summitElevationFt?.toLocaleString("en-US") ?? "n/a"} ft.`
+        : "";
+      const stationText = formatStation(station);
+      const lines = [
+        `# ${resort.name} — ${canonicalUrl}`,
+        "",
+        `${doc.location.region}, ${doc.location.stateLabel}, ${doc.location.country} (${resort.lat}, ${resort.lng}).${elev}`,
+        `Season: ${seasonSummary(doc.season)}`,
+        `Snow data: ${stationText ? `SNOTEL station ${stationText}` : "weather-model estimates (no station assigned)"}.`,
+        `Cams: ${doc.camCount} (${doc.liveCamCount} live).${resort.cam_page_url ? ` Operator cam page: ${resort.cam_page_url}` : ""}`,
+        resort.website_url ? `Website: ${resort.website_url}` : "Website: not on file",
+        `Socials: ${[resort.x_url, resort.facebook_url, resort.instagram_url].filter(Boolean).join(", ") || "none on file"}`,
+        "",
+        `JSON ${doc.urls.api} · markdown ${doc.urls.markdown} · Atom ${doc.urls.powderFeed} · hub ${doc.urls.stateHub}`,
+      ];
+      return ok(lines.join("\n"), doc);
+    },
+  });
+
+  const PctEntrySchema = z.object({
+    rank: z.number().int(),
+    slug: z.string(),
+    name: z.string(),
+    canonicalUrl: z.string(),
+    state: z.string(),
+    pctOfNormal: z.number().describe("SWE as a percent of the station's 1991–2020 median for today's date in the water year."),
+    sweIn: z.number().describe("Snow water equivalent at the station, inches."),
+    station: StationSchema.nullable(),
+    measuredAt: z.string().describe("ISO instant of the report."),
+  });
+
+  const getPercentOfNormal = defineTool({
+    name: "get_percent_of_normal",
+    title: "Percent of normal",
+    description:
+      "SNOTEL-fed resorts ranked by snowpack relative to normal: snow water equivalent against the station's own 1991–2020 median for today's date, deepest first, optionally within one state. Only measured station readings qualify, inside the 10–300 % band and above 2 in of SWE; early-season noise is withheld, not ranked. Same data as https://www.peakcam.io/snow-report/percent-of-normal.",
+    inputSchema: z.object({
+      state: StateInput,
+      limit: z.number().int().min(1).max(MAX_PCT_ROWS).default(10).describe(`Rows to return, 1–${MAX_PCT_ROWS}.`),
+    }),
+    outputSchema: z.object({
+      asOf: z.string().nullable().describe("ISO instant of the newest report the ranking used."),
+      phase: z.enum(["pre-season", "early", "season"]).describe("`pre-season`/`early`: nothing rankable yet, see `sentence` for why."),
+      sentence: z.string().describe("The dated, quotable summary sentence."),
+      rule: z.string().describe("The publishable-value rule, in words."),
+      filters: z.object({ state: z.string().nullable() }),
+      stationFedCount: z.number().int().describe("Resorts whose latest report is a SNOTEL reading (the pool)."),
+      count: z.number().int(),
+      totalMatching: z.number().int(),
+      results: z.array(PctEntrySchema),
+      pageUrl: z.string(),
+      generatedAt: ISO_INSTANT,
+    }),
+    async handler({ state, limit }) {
+      const catalog = await data.catalog();
+      const pool = catalog.resorts.filter((r) => !state || sameCode(r.state, state));
+      const page = buildPctOfNormalPage(pool, catalog.now);
+      const bySlug = new Map(pool.map((r) => [r.slug, r]));
+      const results = page.ranked.slice(0, limit).map((e, i) => {
+        const resort = bySlug.get(e.slug)!;
+        const station = snowStation(serializeSnow(resort, serializeOptionsFor(catalog, resort)));
+        return {
+          rank: i + 1,
+          slug: e.slug,
+          name: e.name,
+          canonicalUrl: resortCanonicalUrl(e.slug),
+          state: resort.state,
+          pctOfNormal: e.pct,
+          sweIn: e.sweIn,
+          station,
+          measuredAt: new Date(e.updatedAt).toISOString(),
+        };
+      });
+      const lines = [
+        `Snowpack percent of normal${state ? ` in ${stateLabel(state)}` : ""} (${results.length}${page.ranked.length > results.length ? ` of ${page.ranked.length}` : ""} rankable; ${page.stationFedCount} SNOTEL-fed resorts in the pool):`,
+        "",
+        page.sentence.text,
+        "",
+        ...(results.length
+          ? results.map((r) => `${r.rank}. **${r.name}** (\`${r.slug}\`, ${r.state}) — ${r.pctOfNormal} % of normal, SWE ${formatInches(r.sweIn)}${formatStation(r.station) ? ` at ${formatStation(r.station)}` : ""}, ${formatInstant(r.measuredAt)} · ${r.canonicalUrl}`)
+          : ["Nothing to rank yet."]),
+        "",
+        PCT_OF_NORMAL_RULE,
+        `Page: ${SITE_URL}/snow-report/percent-of-normal`,
+      ];
+      return ok(lines.join("\n"), {
+        asOf: page.asOf,
+        phase: page.phase,
+        sentence: page.sentence.text,
+        rule: PCT_OF_NORMAL_RULE,
+        filters: { state: state ?? null },
+        stationFedCount: page.stationFedCount,
+        count: results.length,
+        totalMatching: page.ranked.length,
+        results,
+        pageUrl: `${SITE_URL}/snow-report/percent-of-normal`,
+        generatedAt: catalog.now.toISOString(),
+      });
+    },
+  });
+
+  const RegionSchema = z.object({
+    state: z.string().describe("The value to pass as `state` to other tools."),
+    label: z.string(),
+    country: z.string(),
+    resorts: z.number().int(),
+    reporting: z.number().int().describe("Resorts with a snow report."),
+    measured: z.number().int().describe("Resorts whose latest report is a SNOTEL station reading."),
+    cams: z.number().int().describe("Active cams."),
+    liveCams: z.number().int(),
+    hubUrl: z.string().describe("PeakCam's webcam hub page for the region."),
+  });
+
+  const listRegions = defineTool({
+    name: "list_regions",
+    title: "List regions",
+    description:
+      "Every state, province and country PeakCam covers, with resort, reporting, measured (SNOTEL) and cam counts and the hub page URL. Call it to learn the valid `state` values for find_powder, get_opening_dates and get_percent_of_normal, or to answer \"where does PeakCam have data\".",
+    inputSchema: z.object({}),
+    outputSchema: z.object({
+      totalResorts: z.number().int(),
+      countries: z.array(z.object({ country: z.string(), resorts: z.number().int() })),
+      regions: z.array(RegionSchema).describe("Most resorts first."),
+      generatedAt: ISO_INSTANT,
+    }),
+    async handler() {
+      const catalog = await data.catalog();
+      const groups = new Map<string, ResortWithData[]>();
+      for (const r of catalog.resorts) {
+        const list = groups.get(r.state) ?? [];
+        list.push(r);
+        groups.set(r.state, list);
+      }
+      const regions = [...groups.entries()]
+        .map(([state, rows]) => ({
+          state,
+          label: stateLabel(state),
+          country: rows[0].country,
+          resorts: rows.length,
+          reporting: rows.filter((r) => r.snow_report).length,
+          measured: rows.filter((r) => r.snow_report?.source === "snotel").length,
+          cams: rows.reduce((n, r) => n + r.cams.length, 0),
+          liveCams: rows.reduce((n, r) => n + r.cams.filter((c) => camLive(c) === true).length, 0),
+          hubUrl: `${SITE_URL}${stateHubPath(state)}`,
+        }))
+        .sort((a, b) => b.resorts - a.resorts || a.label.localeCompare(b.label, "en"));
+      const byCountry = new Map<string, number>();
+      for (const r of catalog.resorts) byCountry.set(r.country, (byCountry.get(r.country) ?? 0) + 1);
+      const countries = [...byCountry.entries()].map(([country, resorts]) => ({ country, resorts })).sort((a, b) => b.resorts - a.resorts);
+      const lines = [
+        `PeakCam covers ${catalog.resorts.length} resorts in ${regions.length} states, provinces and countries (${countries.map((c) => `${c.country} ${c.resorts}`).join(", ")}), as of ${formatInstant(catalog.now.toISOString())}:`,
+        "",
+        "| State | Resorts | Reporting | SNOTEL-measured | Cams live/total | Hub |",
+        "| --- | --- | --- | --- | --- | --- |",
+        ...regions.map((r) => `| ${r.label} (\`${r.state}\`, ${r.country}) | ${r.resorts} | ${r.reporting} | ${r.measured} | ${r.liveCams}/${r.cams} | ${r.hubUrl} |`),
+        "",
+        "Pass the code in backticks as `state` to find_powder, get_opening_dates or get_percent_of_normal.",
+      ];
+      return ok(lines.join("\n"), { totalResorts: catalog.resorts.length, countries, regions, generatedAt: catalog.now.toISOString() });
+    },
+  });
+
+  const AlertChannelSchema = z.object({
+    kind: z.enum(["email", "webhook", "atom", "ical", "resort_atom"]),
+    title: z.string(),
+    how: z.string().describe("What a person or agent does to use it."),
+    url: z.string().nullable().describe("Where to go, or a URL template."),
+    authentication: z.string(),
+  });
+
+  const getAlertOptions = defineTool({
+    name: "get_alert_options",
+    title: "Alert options",
+    description:
+      "How to be told when it snows, without this server writing anything: the powder-alert threshold and schedule, the e-mail, webhook (Standard Webhooks, signed), Atom and iCal channels, the per-resort public Atom feed, the webhook payload contract, and the manage page where a person registers a destination. Pass a slug to get that resort's feed URL.",
+    inputSchema: z.object({
+      slug: SlugInput.optional().describe("Optional: a resort slug, to fill in its public Atom feed URL."),
+    }),
+    outputSchema: z.object({
+      thresholdInches: z.number().describe("New snow in 24 h (measured) or storm total (forecast) that fires an alert."),
+      schedule: z.string(),
+      manageUrl: z.string().describe("Where a person subscribes and registers webhooks; e-mail verified, no password."),
+      channels: z.array(AlertChannelSchema),
+      resortFeed: z.object({ slug: z.string(), name: z.string(), atomUrl: z.string() }).nullable(),
+      webhook: z.object({
+        headers: z.array(z.string()),
+        signature: z.string(),
+        payloadExample: z.record(z.string(), z.unknown()),
+        retries: z.string(),
+        docsUrl: z.string(),
+      }),
+      writes: z.literal(false).describe("This tool never subscribes anyone; it only explains how."),
+      generatedAt: ISO_INSTANT,
+    }),
+    async handler({ slug }) {
+      const catalog = await data.catalog();
+      let resortFeed: { slug: string; name: string; atomUrl: string } | null = null;
+      if (slug) {
+        const hit = resolve(catalog, slug);
+        if (!hit.ok) return hit.result;
+        resortFeed = { slug: hit.resort.slug, name: hit.resort.name, atomUrl: `${resortCanonicalUrl(hit.resort.slug)}/powder.xml` };
+      }
+      const manageUrl = `${SITE_URL}/alerts/manage`;
+      const channels = [
+        { kind: "email" as const, title: "E-mail powder alerts", how: `Subscribe at ${SITE_URL}/alerts with an e-mail address and the resorts to follow; a verification link activates it.`, url: `${SITE_URL}/alerts`, authentication: "e-mail verification; a capability link manages the subscription" },
+        { kind: "webhook" as const, title: "Signed webhook", how: "On the manage page, add a destination URL. Each alert is POSTed as JSON and signed per Standard Webhooks; the secret is shown once.", url: manageUrl, authentication: "webhook-signature (HMAC-SHA256) on every delivery" },
+        { kind: "atom" as const, title: "Subscriber Atom feed", how: "The manage page shows a private Atom URL carrying this subscriber's alerts; paste it into any feed reader or poller.", url: `${SITE_URL}/alerts/feed/{manage_token}`, authentication: "capability token in the URL" },
+        { kind: "ical" as const, title: "Subscriber iCal feed", how: "The same URL with ?format=ics is a calendar of forecast storm windows for the followed resorts.", url: `${SITE_URL}/alerts/feed/{manage_token}?format=ics`, authentication: "capability token in the URL" },
+        { kind: "resort_atom" as const, title: "Public per-resort Atom feed", how: "No account: one entry when a resort's report crosses the threshold or a storm is logged. Poll it or wire it to a routine.", url: resortFeed?.atomUrl ?? `${SITE_URL}/resorts/{slug}/powder.xml`, authentication: "none" },
+      ];
+      const payloadExample = {
+        type: "powder.alert",
+        resort: { slug: "alta", name: "Alta Ski Area", url: `${SITE_URL}/resorts/alta` },
+        inches: 11,
+        kind: "measured",
+        measuredAt: "2026-12-01T12:30:00.000Z",
+        url: `${SITE_URL}/resorts/alta`,
+        threshold: 8,
+      };
+      const doc = {
+        thresholdInches: 8,
+        schedule: "Checked once a day at 13:00 UTC (06:00 Mountain) against the latest measured report and the Open-Meteo forecast.",
+        manageUrl,
+        channels,
+        resortFeed,
+        webhook: {
+          headers: ["webhook-id", "webhook-timestamp", "webhook-signature"],
+          signature: "v1,<base64(HMAC-SHA256(secret, \"<id>.<timestamp>.<raw body>\"))> — the secret is the base64 part after whsec_; reject timestamps more than 5 minutes off.",
+          payloadExample,
+          retries: "Three attempts per event (1 s, then 5 s), 5 s timeout each; a destination is disabled after ten consecutive failed runs.",
+          docsUrl: `${SITE_URL}/connect#agents`,
+        },
+        writes: false as const,
+        generatedAt: catalog.now.toISOString(),
+      };
+      const lines = [
+        "# Getting told when it snows (PeakCam powder alerts)",
+        "",
+        `Threshold ${doc.thresholdInches} in in 24 h (measured) or as a storm total (forecast); ${doc.schedule}`,
+        `Manage page (subscribe, add webhooks, copy feeds): ${manageUrl}`,
+        "",
+        ...channels.map((c) => `- **${c.title}** (${c.kind}) — ${c.how} URL: ${c.url} · auth: ${c.authentication}`),
+        "",
+        `Webhook deliveries carry ${doc.webhook.headers.join(", ")}; verify with any Standard Webhooks library. Payload example: \`${JSON.stringify(payloadExample)}\`.`,
+        "",
+        "This tool writes nothing: a person registers destinations on the manage page.",
+      ];
+      return ok(lines.join("\n"), doc);
+    },
+  });
+
+  const TimelineFrameSchema = z.object({
+    url: z.string().describe("Public image URL of the archived frame. Link it; do not describe it unseen."),
+    capturedAt: z.string().describe("ISO instant PeakCam captured it."),
+    snow24hAtCapture: z.number().nullable().describe("The resort's 24 h new-snow number when the frame was taken."),
+    keeper: z.boolean().describe(`True when captured during a storm (≥ ${KEEPER_MIN_SNOW_24H_IN} in in 24 h); kept a year instead of 30 days.`),
+  });
+
+  const getCamTimeline = defineTool({
+    name: "get_cam_timeline",
+    title: "Cam timeline",
+    description:
+      `Archived still frames for a resort's webcams (or one cam) over the last 1–${MAX_TIMELINE_HOURS} hours, as links with capture times, plus the newest storm frame on tape per cam. Only cams whose operator allows archiving appear; PeakCam captures every 6 hours. Use it for "what did it look like this morning" or "show me the last storm". Frames are never returned inline.`,
+    inputSchema: z.object({
+      slug: SlugInput,
+      camId: z.string().uuid().optional().describe("Optional: one cam's id from get_resort_cams; default is every archived cam at the resort."),
+      hours: z.number().int().min(1).max(MAX_TIMELINE_HOURS).default(24).describe(`Window, 1–${MAX_TIMELINE_HOURS} hours.`),
+    }),
+    outputSchema: z.object({
+      slug: z.string(),
+      name: z.string(),
+      canonicalUrl: z.string(),
+      hours: z.number().int(),
+      camCount: z.number().int().describe("Cams with at least one frame in the result."),
+      frameCount: z.number().int(),
+      newestCapturedAt: z.string().nullable(),
+      lastStorm: TimelineFrameSchema.extend({ camId: z.string(), camName: z.string() }).nullable().describe("Newest storm frame across the resort, any age."),
+      cams: z.array(
+        z.object({
+          camId: z.string(),
+          camName: z.string(),
+          pageUrl: z.string(),
+          frames: z.array(TimelineFrameSchema).describe(`Oldest first, at most ${MAX_TIMELINE_FRAMES_PER_CAM}, all inside the window.`),
+          lastStorm: TimelineFrameSchema.nullable(),
+        }),
+      ),
+      note: z.string(),
+      generatedAt: ISO_INSTANT,
+    }),
+    async handler({ slug, camId, hours }) {
+      const catalog = await data.catalog();
+      const hit = resolve(catalog, slug);
+      if (!hit.ok) return hit.result;
+      const resort = hit.resort;
+      const h = clampHours(hours);
+      if (camId && !resort.cams.some((c) => c.id === camId)) {
+        return err(`Cam ${camId} is not an active cam at ${resort.name}. get_resort_cams(\"${resort.slug}\") lists its cams and ids.`);
+      }
+      let frames: CamTimelineFrame[] | null;
+      try {
+        frames = await data.camStills(camId ? { camId } : { resortId: resort.id }, h);
+      } catch {
+        frames = null;
+      }
+      const canonicalUrl = resortCanonicalUrl(resort.slug);
+      const since = catalog.now.getTime() - h * 3_600_000;
+      const camOrder = resort.cams.map((c) => c.id);
+      const byCam = new Map<string, CamTimelineFrame[]>();
+      for (const f of frames ?? []) {
+        const list = byCam.get(f.camId) ?? [];
+        list.push(f);
+        byCam.set(f.camId, list);
+      }
+      const strip = (f: CamTimelineFrame) => ({ url: f.url, capturedAt: f.capturedAt, snow24hAtCapture: f.snow24hAtCapture, keeper: f.keeper });
+      const cams = [...byCam.entries()]
+        .sort((a, b) => camOrder.indexOf(a[0]) - camOrder.indexOf(b[0]))
+        .slice(0, MAX_TIMELINE_CAMS)
+        .map(([id, list]) => {
+          const cam = resort.cams.find((c) => c.id === id);
+          const newestFirst = [...list].sort((a, b) => Date.parse(b.capturedAt) - Date.parse(a.capturedAt));
+          const inWindow = newestFirst.filter((f) => Date.parse(f.capturedAt) >= since);
+          const keeper = newestFirst.find((f) => f.keeper) ?? null;
+          return {
+            camId: id,
+            camName: cam?.name ?? id,
+            pageUrl: `${canonicalUrl}#cam-${id}`,
+            frames: inWindow.slice(0, MAX_TIMELINE_FRAMES_PER_CAM).reverse().map(strip),
+            lastStorm: keeper ? strip(keeper) : null,
+          };
+        })
+        .filter((c) => c.frames.length || c.lastStorm);
+      const all = cams.flatMap((c) => c.frames.map((f) => f.capturedAt));
+      const newestCapturedAt = all.length ? all.sort().at(-1)! : null;
+      const storms = cams.filter((c) => c.lastStorm).map((c) => ({ ...c.lastStorm!, camId: c.camId, camName: c.camName }));
+      const lastStorm = storms.sort((a, b) => Date.parse(b.capturedAt) - Date.parse(a.capturedAt))[0] ?? null;
+      const frameCount = cams.reduce((n, c) => n + c.frames.length, 0);
+      const note = frames === null
+        ? "The frame archive was unavailable for this request; live cams are on the resort page."
+        : frameCount || lastStorm
+          ? "Frames are PeakCam captures of operator-permitted cams; rights stay with the operator. Link them, do not describe them unseen."
+          : "No archived frames for this window: the resort's cams may be player-only (no archiving permission) or the archive has not run yet.";
+      const lines = [
+        `# ${resort.name} cam timeline, last ${h} h (${frameCount} frames from ${cams.filter((c) => c.frames.length).length} cams) — ${canonicalUrl}`,
+        "",
+        ...(cams.length
+          ? cams.flatMap((c) => [
+              `## ${c.camName}`,
+              ...c.frames.map((f) => `- ${formatInstant(f.capturedAt)} — ${f.url}${f.keeper ? " (storm)" : ""}${f.snow24hAtCapture != null ? ` · 24 h ${formatInches(f.snow24hAtCapture)} at capture` : ""}`),
+              c.lastStorm ? `- last storm on tape: ${formatInstant(c.lastStorm.capturedAt)} — ${c.lastStorm.url}` : "- no storm frame on tape",
+              "",
+            ])
+          : [note, ""]),
+        note,
+      ];
+      return ok(lines.join("\n"), {
+        slug: resort.slug,
+        name: resort.name,
+        canonicalUrl,
+        hours: h,
+        camCount: cams.filter((c) => c.frames.length).length,
+        frameCount,
+        newestCapturedAt,
+        lastStorm,
+        cams,
+        note,
+        generatedAt: catalog.now.toISOString(),
+      });
+    },
+  });
+
+  // ── get_stations (station layer, migration 026) ───────────
   const ROLE_WORD = { summit: "Summit", mid: "Mid-mountain", base: "Base", approach: "Approach" } as const;
   const ageWord = (minutes: number) => (minutes < 60 ? `${minutes} min ago` : minutes < 2880 ? `${Math.round(minutes / 60)} h ago` : `${Math.round(minutes / 1440)} d ago`);
 
@@ -718,7 +1065,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
       if (!hit.ok) return hit.result;
       const resort = hit.resort;
       const options = serializeOptionsFor(catalog, resort);
-      const canonicalUrl = serializeResortLight(resort, options).canonicalUrl;
+      const canonicalUrl = resortCanonicalUrl(resort.slug);
       const rows = options.observationStations;
       const layer = rows ? serializeStations(rows, catalog.now) : { stations: [], measuredNow: [] };
       const used = [...new Set(layer.measuredNow.map((m) => m.source))];
@@ -751,7 +1098,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
     },
   });
 
-  return [
+  const baseTools = [
     searchResorts,
     getResortConditions,
     getResortCams,
@@ -760,8 +1107,39 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
     getForecast,
     getSnowHistory,
     getOpeningDates,
+    getResortProfile,
+    getPercentOfNormal,
+    listRegions,
+    getAlertOptions,
+    getCamTimeline,
     getStations,
   ] as unknown as ToolDefinition[];
+
+  const ask = defineTool({
+    name: "ask",
+    title: "Ask PeakCam",
+    description:
+      "One natural-language question in, one tool result out, deterministically: the router resolves the resort by name or nickname, picks an intent from the wording (snow, open/closed, forecast, cams, history, compare, where did it snow, percent of normal, profile, regions, alerts) and calls the matching tool. Returns the tool's data, the resort, citation URLs and a dated sentence to quote. Answers `answerable: false` with suggestions rather than guessing. No language model is involved.",
+    inputSchema: z.object({
+      question: z.string().trim().min(1).max(MAX_QUESTION_LENGTH).describe(`The question as the user asked it, up to ${MAX_QUESTION_LENGTH} characters, e.g. "is Alta open" or "where did it snow most in Colorado".`),
+    }),
+    outputSchema: AskAnswerSchema,
+    async handler({ question }) {
+      const answer = await answerQuestion({ tools: baseTools, data }, question, { via: "mcp", ipHash: null });
+      const lines = [
+        answer.sentence,
+        "",
+        answer.tool ? `Routed to ${answer.tool}(${JSON.stringify(answer.arguments)}) — intent ${answer.intent}.` : `Not answerable (${answer.intent}).`,
+        answer.citations.length ? `Cite: ${answer.citations.join(", ")}` : "",
+        answer.suggestions.length ? `Try: ${answer.suggestions.slice(0, 3).map((s) => `"${s}"`).join(" · ")}` : "",
+      ].filter((l, i, arr) => l !== "" || (i > 0 && arr[i - 1] !== ""));
+      return answer.answerable
+        ? ok(lines.join("\n"), answer as unknown as Record<string, unknown>)
+        : { content: [{ type: "text", text: lines.join("\n") }], structuredContent: answer as unknown as Record<string, unknown> };
+    },
+  });
+
+  return [...baseTools, ask as unknown as ToolDefinition];
 }
 
 export { camLine };

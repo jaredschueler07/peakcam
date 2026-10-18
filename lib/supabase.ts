@@ -659,6 +659,17 @@ async function fetchCamStillRows(filter: { camId?: string; resortId?: string }, 
 }
 
 /**
+ * Archived frames for one cam or one resort as public-URL frames, for the MCP
+ * `get_cam_timeline` tool and the ask router: every in-window frame plus the
+ * newest keeper per query, deduplicated, any order (the tool shapes them with
+ * lib/cam-timeline shapeTimeline). Null when the view is unavailable.
+ */
+export async function getCamStillFrames(filter: { camId?: string; resortId?: string }, hours = 24): Promise<CamTimelineFrame[] | null> {
+  const rows = await fetchCamStillRows(filter, clampHours(hours), new Date());
+  return rows ? rows.map((row) => toFrame(row, supabaseUrl)) : null;
+}
+
+/**
  * Timeline for one archive-allowed cam: up to four frames from the last
  * `hours` (clamped to 48) and the newest storm keeper. Null when nothing is
  * on tape, the cam is not archive-allowed, or the query failed. This is the

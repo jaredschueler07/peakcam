@@ -14,7 +14,9 @@ import {
   createPeakCamServer,
 } from "./server";
 import { MAX_CAMS, PEAKCAM_TOOL_NAMES, buildTools, diceSimilarity, editDistance, matchResorts, normalizeText, scoreResort } from "./tools";
-import type { McpDataSource, SnowHistoryRow } from "./types";
+import type { McpDataSource, SnowHistoryRow, UnmatchedQuestion } from "./types";
+import type { CamTimelineFrame } from "@/lib/cam-timeline";
+import { AskAnswerSchema } from "@/lib/public-api/schema";
 
 // ── Fixtures ─────────────────────────────────────────────────
 
@@ -188,7 +190,16 @@ const HISTORY: SnowHistoryRow[] = [
   { date: "2026-12-19", station_id: "842:CO:SNTL", snow_depth_in: 33, swe_in: 8.6, precip_accum_in: 9.8, temp_max_f: 23, temp_min_f: 6, qc_flag: "suspect" },
 ];
 
-const calls = { catalog: 0, forecast: 0, history: 0 };
+const BRECK_CAM_ID = RESORTS[0].cams[0].id;
+
+const FRAMES: CamTimelineFrame[] = [
+  { id: 1, camId: BRECK_CAM_ID, url: "https://x.supabase.co/storage/v1/object/public/cam-stills/archive/a/2026-12-20T06-00-00Z.jpg", capturedAt: "2026-12-20T06:00:00Z", snow24hAtCapture: 9, keeper: true },
+  { id: 2, camId: BRECK_CAM_ID, url: "https://x.supabase.co/storage/v1/object/public/cam-stills/archive/a/2026-12-20T12-00-00Z.jpg", capturedAt: "2026-12-20T12:00:00Z", snow24hAtCapture: 9, keeper: true },
+  { id: 3, camId: BRECK_CAM_ID, url: "https://x.supabase.co/storage/v1/object/public/cam-stills/archive/a/2026-12-18T12-00-00Z.jpg", capturedAt: "2026-12-18T12:00:00Z", snow24hAtCapture: 2, keeper: false },
+];
+
+const calls = { catalog: 0, forecast: 0, history: 0, stills: 0 };
+const logged: UnmatchedQuestion[] = [];
 
 function fixtureData(over: Partial<McpDataSource> = {}): McpDataSource {
   return {
@@ -203,6 +214,14 @@ function fixtureData(over: Partial<McpDataSource> = {}): McpDataSource {
     async snowHistory(resortId, days) {
       calls.history++;
       return resortId === "id-breckenridge" ? HISTORY.slice(0, days) : [];
+    },
+    async camStills(filter) {
+      calls.stills++;
+      if (filter.camId) return FRAMES.filter((f) => f.camId === filter.camId);
+      return filter.resortId === "id-breckenridge" ? FRAMES : [];
+    },
+    async logUnmatchedQuestion(entry) {
+      logged.push(entry);
     },
     ...over,
   };
@@ -257,13 +276,13 @@ test("initialize reports io.peakcam/snow, the package version and instructions",
   console.log(`negotiated protocol version ${version} (${client.getProtocolEra()} era)`);
 });
 
-test("tools/list returns the nine tools, each read-only with input and output schemas", async () => {
+test("tools/list returns the fifteen tools, each read-only with input and output schemas", async () => {
   const { tools } = await client.listTools();
   assert.deepEqual(
     tools.map((t) => t.name),
     [...PEAKCAM_TOOL_NAMES],
   );
-  assert.equal(tools.length, 9);
+  assert.equal(tools.length, 15);
   for (const tool of tools) {
     assert.deepEqual(tool.annotations, READ_ONLY_TOOL_ANNOTATIONS, `${tool.name} annotations`);
     assert.ok(tool.title, `${tool.name} has a title`);
@@ -668,6 +687,12 @@ test("every tool's structuredContent parses against its own outputSchema", async
     get_snow_history: { slug: "breckenridge", days: 2 },
     get_opening_dates: { state: "CO" },
     get_stations: { slug: "alta" },
+    get_resort_profile: { slug: "breckenridge" },
+    get_percent_of_normal: { state: "CO" },
+    list_regions: {},
+    get_alert_options: { slug: "alta" },
+    get_cam_timeline: { slug: "breckenridge", hours: 24 },
+    ask: { question: "how much snow at Alta" },
   };
   for (const tool of tools) {
     const args = tool.inputSchema.parse(samples[tool.name]);
@@ -677,4 +702,120 @@ test("every tool's structuredContent parses against its own outputSchema", async
     const body = JSON.stringify(result.structuredContent);
     assert.ok(body.length < 60_000, `${tool.name} payload stays small (${body.length} bytes)`);
   }
+});
+
+// ── P9 block 1 tools ─────────────────────────────────────────
+
+test("get_resort_profile returns identity, URLs, station and season without snow numbers", async () => {
+  const res = await call("get_resort_profile", { slug: "breckenridge" });
+  assert.notEqual(res.isError, true);
+  const doc = res.structuredContent as Record<string, Record<string, unknown>>;
+  assert.equal(doc.canonicalUrl, "https://www.peakcam.io/resorts/breckenridge");
+  assert.equal(doc.urls.markdown, "https://www.peakcam.io/resorts/breckenridge/index.md");
+  assert.equal(doc.urls.powderFeed, "https://www.peakcam.io/resorts/breckenridge/powder.xml");
+  assert.equal(doc.urls.stateHub, "https://www.peakcam.io/ski-cams/colorado");
+  assert.equal(doc.location.stateLabel, "Colorado");
+  assert.equal(doc.location.baseElevationFt, 9600);
+  assert.equal(doc.location.summitElevationFt, 12998);
+  assert.equal((doc.station as { id: string }).id, "842:CO:SNTL");
+  assert.equal(doc.season.status, "open");
+  assert.equal("snow" in doc, false);
+  assert.match(text(res), /Colorado, US/);
+});
+
+test("get_percent_of_normal ranks station-fed resorts and honours the state filter", async () => {
+  const all = (await call("get_percent_of_normal", {})).structuredContent as { results: Array<{ slug: string; pctOfNormal: number }>; phase: string; sentence: string };
+  assert.equal(all.phase, "season");
+  assert.deepEqual(all.results.map((r) => r.slug), ["alta", "breckenridge", "vail"], "portillo is a model estimate and big-sky has no report");
+  assert.equal(all.results[0].pctOfNormal, 118);
+  assert.match(all.sentence, /^As of /);
+  const co = (await call("get_percent_of_normal", { state: "co" })).structuredContent as { results: Array<{ slug: string }>; stationFedCount: number };
+  assert.deepEqual(co.results.map((r) => r.slug), ["breckenridge", "vail"]);
+  assert.equal(co.stationFedCount, 2);
+});
+
+test("list_regions counts resorts, measured reports and cams per state with hub URLs", async () => {
+  const res = await call("list_regions", {});
+  const doc = res.structuredContent as { totalResorts: number; regions: Array<Record<string, unknown>>; countries: Array<{ country: string; resorts: number }> };
+  assert.equal(doc.totalResorts, 5);
+  assert.equal(doc.regions[0].state, "CO");
+  assert.equal(doc.regions[0].resorts, 2);
+  assert.equal(doc.regions[0].measured, 2);
+  assert.equal(doc.regions[0].hubUrl, "https://www.peakcam.io/ski-cams/colorado");
+  assert.deepEqual(doc.countries.map((c) => c.country), ["US", "CL"]);
+  assert.match(text(res), /\| Colorado \(`CO`, US\) \| 2 \|/);
+});
+
+test("get_alert_options explains every channel, fills the resort feed, and writes nothing", async () => {
+  const res = await call("get_alert_options", { slug: "alta" });
+  const doc = res.structuredContent as { writes: boolean; thresholdInches: number; channels: Array<{ kind: string }>; resortFeed: { atomUrl: string } };
+  assert.equal(doc.writes, false);
+  assert.equal(doc.thresholdInches, 8);
+  assert.deepEqual(doc.channels.map((c) => c.kind), ["email", "webhook", "atom", "ical", "resort_atom"]);
+  assert.equal(doc.resortFeed.atomUrl, "https://www.peakcam.io/resorts/alta/powder.xml");
+  assert.match(text(res), /webhook-signature/);
+  const bad = await call("get_alert_options", { slug: "nowhere" });
+  assert.equal(bad.isError, true);
+});
+
+test("get_cam_timeline returns frames as links inside the window plus the last storm frame", async () => {
+  const res = await call("get_cam_timeline", { slug: "breckenridge", hours: 24 });
+  assert.notEqual(res.isError, true);
+  const doc = res.structuredContent as { frameCount: number; camCount: number; newestCapturedAt: string; lastStorm: { capturedAt: string } | null; cams: Array<{ camId: string; frames: Array<{ capturedAt: string }> }> };
+  assert.equal(doc.camCount, 1);
+  assert.equal(doc.frameCount, 2, "the 2026-12-18 frame is outside 24 h");
+  assert.deepEqual(doc.cams[0].frames.map((f) => f.capturedAt), ["2026-12-20T06:00:00Z", "2026-12-20T12:00:00Z"], "oldest first");
+  assert.equal(doc.newestCapturedAt, "2026-12-20T12:00:00Z");
+  assert.equal(doc.lastStorm?.capturedAt, "2026-12-20T12:00:00Z");
+  assert.match(text(res), /storage\/v1\/object\/public\/cam-stills/);
+
+  const none = await call("get_cam_timeline", { slug: "vail" });
+  const empty = none.structuredContent as { frameCount: number; note: string };
+  assert.equal(empty.frameCount, 0);
+  assert.match(empty.note, /No archived frames/);
+
+  const wrongCam = await call("get_cam_timeline", { slug: "vail", camId: "00000000-0000-4000-8000-000000000000" });
+  assert.equal(wrongCam.isError, true);
+
+  const down = await call("get_cam_timeline", { slug: "breckenridge" }).catch(() => null);
+  assert.ok(down);
+});
+
+test("get_cam_timeline degrades when the archive read fails", async () => {
+  const broken = buildTools(fixtureData({ camStills: async () => { throw new Error("view missing"); } }));
+  const tool = broken.find((t) => t.name === "get_cam_timeline")!;
+  const res = await tool.handler(tool.inputSchema.parse({ slug: "breckenridge" }));
+  assert.notEqual(res.isError, true);
+  assert.match((res.structuredContent as { note: string }).note, /unavailable/);
+});
+
+test("ask routes a question to a tool, quotes a dated sentence and cites the resort", async () => {
+  const res = await call("ask", { question: "How much snow did Breck get?" });
+  assert.notEqual(res.isError, true);
+  const answer = AskAnswerSchema.parse(res.structuredContent);
+  assert.equal(answer.answerable, true);
+  assert.equal(answer.intent, "conditions");
+  assert.equal(answer.tool, "get_resort_conditions");
+  assert.equal(answer.resort?.slug, "breckenridge");
+  assert.match(answer.sentence, /^As of .* MT Dec 20, the Breckenridge SNOTEL station/);
+  assert.match(answer.sentence, /9 in\. of new snow in 24 h/);
+  assert.deepEqual(answer.citations, ["https://www.peakcam.io/resorts/breckenridge"]);
+  assert.equal(answer.asOf, "2026-12-20T12:00:00.000Z");
+  assert.equal((answer.data as { slug: string }).slug, "breckenridge");
+  assert.match(text(res), /Routed to get_resort_conditions/);
+});
+
+test("ask declines unanswerable questions, offers suggestions and logs them without PII", async () => {
+  logged.length = 0;
+  const res = await call("ask", { question: "Book me a flight to Denver, my email is jo@example.com" });
+  const answer = AskAnswerSchema.parse(res.structuredContent);
+  assert.equal(answer.answerable, false);
+  assert.equal(answer.intent, "unknown");
+  assert.equal(answer.data, null);
+  assert.ok(answer.suggestions.length >= 5);
+  assert.equal(logged.length, 1);
+  assert.equal(logged[0].via, "mcp");
+  assert.equal(logged[0].ipHash, null);
+  assert.doesNotMatch(logged[0].question, /example\.com/);
+  assert.match(logged[0].question, /\[email\]/);
 });

@@ -11,6 +11,7 @@ import {
   CLAUDE_CODE_COMMAND,
   CLAUDE_CONNECTOR_LINK,
   CONNECT_LINKS,
+  CONNECT_TOOLS,
   CONNECT_URL,
   CURSOR_MCP_JSON,
   EXAMPLE_PROMPTS,
@@ -31,7 +32,7 @@ export const dynamic = "force-static";
 const TITLE = "Use PeakCam with your AI assistant";
 const DESCRIPTION =
   "Connect Claude, ChatGPT, Cursor, Grok, Perplexity or your own agent to PeakCam's MCP server for live snow reports, " +
-  "SNOTEL measurements, webcams and powder rankings across 150 ski resorts. No key, read-only, plus REST, OpenAPI, markdown and Atom alternatives.";
+  "SNOTEL measurements, webcams and powder rankings across 150 ski resorts. No key, read-only, plus an answer endpoint, REST, OpenAPI, markdown and Atom alternatives.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -41,6 +42,8 @@ export const metadata: Metadata = {
   openGraph: { title: TITLE, description: DESCRIPTION, url: CONNECT_URL, type: "website", siteName: "PeakCam" },
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
 };
+
+const COUNT_WORDS: Record<number, string> = { 8: "Eight", 10: "Ten", 12: "Twelve", 14: "Fourteen", 16: "Sixteen" };
 
 const linkClass = "font-bold text-ink underline decoration-alpen/60 decoration-2 underline-offset-[3px] hover:decoration-alpen";
 const chipClass =
@@ -127,7 +130,7 @@ export default function ConnectPage() {
         {/* 1. What you get */}
         <section aria-labelledby="tools" className="mt-14 scroll-mt-20">
           <SectionHeading id="tools" eyebrow="1 · What you get">
-            Eight tools, one resource
+            {`${COUNT_WORDS[CONNECT_TOOLS.length] ?? CONNECT_TOOLS.length} tools, one resource`}
           </SectionHeading>
           <p className="mt-4 max-w-3xl text-[15.5px] leading-relaxed text-ink">
             The server is <span className="font-mono text-[14px]">{MCP_NAME}</span>, speaking stateless Streamable HTTP with no
@@ -230,7 +233,7 @@ export default function ConnectPage() {
         {/* 3. Example prompts */}
         <section aria-labelledby="prompts" className="mt-14 scroll-mt-20">
           <SectionHeading id="prompts" eyebrow="3 · Try it">
-            Six prompts that work
+            {`${COUNT_WORDS[EXAMPLE_PROMPTS.length] ?? EXAMPLE_PROMPTS.length} prompts that work`}
           </SectionHeading>
           <ol className="mt-5 grid gap-3 sm:grid-cols-2">
             {EXAMPLE_PROMPTS.map((item, index) => (
@@ -311,13 +314,21 @@ export default function ConnectPage() {
             <UrlRow href={CONNECT_LINKS.apiResort.href} label="REST: one resort" note="Full document with provenance per field, season and cams." />
             <UrlRow href={CONNECT_LINKS.apiCams.href} label="REST: a resort's cams" note="Active cams with live health and still-image URLs." />
             <UrlRow href={CONNECT_LINKS.apiPowder.href} label="REST: powder ranking" note="Ranked new snow; source=snotel keeps measured resorts only. Also window, state, minInches, limit." />
+            <UrlRow href={CONNECT_LINKS.apiAsk.href} label="REST: ask a question" note="Deterministic: the resort and intent from the wording, one tool call, a dated sentence and citations. answerable: false instead of a guess. GET ?q= or POST {query}." />
+            <UrlRow href={CONNECT_LINKS.nlwebAsk.href} label="NLWeb: /ask" note="The same answer in the NLWeb list shape (query_id, results with schema_object), for clients that speak that protocol." />
+            <UrlRow href={CONNECT_LINKS.apiBatch.href} label="REST: batch" note="POST up to 10 GET paths as {requests:[{path}]} and get each route's status and body in order; one request against the rate limit." />
+            <UrlRow href={CONNECT_LINKS.apiSearchIndex.href} label="REST: search index" note="Slug, name, aliases, state, country and coordinates for every resort, cached a day, for matching names on your side." />
+            <UrlRow href={CONNECT_LINKS.apiStatus.href} label="REST: service status" note="Snow-report freshness and cam health against stated thresholds; 200 with status: degraded when a check fails." />
             <UrlRow href={CONNECT_LINKS.openapi.href} label="OpenAPI 3.1" note="Generated from the same schemas the MCP tools use." />
+            <UrlRow href={CONNECT_LINKS.schemas.href} label="JSON Schemas" note="One standalone draft 2020-12 document per shape: resort.json, cams.json, powder.json, status.json, ask.json and the parts they reference." />
             <UrlRow href={CONNECT_LINKS.apiCatalog.href} label="API catalog" note="RFC 9727 linkset for crawlers that know the convention." />
             <UrlRow href={CONNECT_LINKS.indexMd.href} label="Markdown: site index" note="Every resort in one document; each HTML page also advertises its alternate in a Link header." />
             <UrlRow href={CONNECT_LINKS.resortMd.href} label="Markdown: one resort" note="Byte-identical to the MCP resource peakcam://resorts/{slug}." />
             <UrlRow href={CONNECT_LINKS.powderAtom.href} label="Atom: powder feed" note="An entry when a report crosses 6 in. in 24 h or a storm is logged. Per-subscriber Atom and iCal live on the manage page." />
             <UrlRow href={CONNECT_LINKS.llms.href} label="llms.txt" note="Site map for answer engines with current snow numbers per resort." />
-            <UrlRow href={CONNECT_LINKS.serverCard.href} label="MCP server card" note="SEP-2127 card: name, version, endpoint, supported protocol revisions." />
+            <UrlRow href={CONNECT_LINKS.llmsFull.href} label="llms-full.txt" note="The long guide: every tool with an example call, every REST route with curl, attribution and the rate limit as it really behaves." />
+            <UrlRow href={CONNECT_LINKS.gptInstructions.href} label="Custom GPT instructions" note="Paste into a ChatGPT Custom GPT and import the OpenAPI document as its Action." />
+            <UrlRow href={CONNECT_LINKS.serverCard.href} label="MCP server card" note="SEP-2127 card: name, version, endpoint, supported protocol revisions. Also at /api/mcp/server-card." />
             <UrlRow href={CONNECT_LINKS.robots.href} label="robots.txt" note="Per-crawler rules plus a Content-Signal line (search, ai-input and ai-train allowed)." />
           </ul>
         </section>

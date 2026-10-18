@@ -14,7 +14,7 @@ import {
   PEAKCAM_MCP_TITLE,
   PEAKCAM_RESOURCE_TEMPLATE,
 } from "@/lib/mcp/server";
-import { PEAKCAM_TOOL_NAMES, type PeakCamToolName } from "@/lib/mcp/tools";
+import { PEAKCAM_TOOL_NAMES, type PeakCamToolName } from "@/lib/mcp/tool-names";
 
 /** MCP server identity, re-exported from the server module so the page cannot drift from it. */
 export const MCP_NAME: string = PEAKCAM_MCP_NAME;
@@ -53,7 +53,16 @@ export const CONNECT_LINKS = {
   apiResort: { href: "/api/v1/resorts/breckenridge", label: "REST: one resort" },
   apiCams: { href: "/api/v1/resorts/breckenridge/cams", label: "REST: a resort's cams" },
   apiPowder: { href: "/api/v1/powder?source=snotel", label: "REST: powder ranking" },
+  apiSearchIndex: { href: "/api/v1/resorts/search-index", label: "REST: search index" },
+  apiStatus: { href: "/api/v1/status", label: "REST: service status" },
+  apiAsk: { href: "/api/v1/ask?q=is+alta+open", label: "REST: ask a question" },
+  apiBatch: { href: "/api/v1/batch", label: "REST: batch (POST)" },
+  nlwebAsk: { href: "/ask?query=where+did+it+snow+most", label: "NLWeb: /ask" },
   openapi: { href: "/api/v1/openapi.json", label: "OpenAPI 3.1" },
+  schemas: { href: "/.well-known/schemas", label: "JSON Schemas" },
+  llmsFull: { href: "/llms-full.txt", label: "llms-full.txt" },
+  gptInstructions: { href: "/gpt-instructions.md", label: "Custom GPT instructions" },
+  serverCardAlias: { href: "/api/mcp/server-card", label: "MCP server card (SEP-2127 location)" },
   apiCatalog: { href: "/.well-known/api-catalog", label: "API catalog (RFC 9727)" },
   indexMd: { href: "/index.md", label: "Markdown: site index" },
   resortMd: { href: "/resorts/breckenridge/index.md", label: "Markdown: one resort" },
@@ -140,6 +149,30 @@ const TOOL_COPY: Record<PeakCamToolName, Omit<ConnectTool, "name">> = {
     title: "Nearby stations",
     summary: "What the instruments near a resort measured, by elevation band: station, network, elevation, age, depth, new snow, temperature and wind.",
   },
+  get_resort_profile: {
+    title: "Resort profile",
+    summary: "Where a resort is, its elevations, website, socials, station, season status and every PeakCam URL for it.",
+  },
+  get_percent_of_normal: {
+    title: "Percent of normal",
+    summary: "SNOTEL-fed resorts ranked by snowpack against the station's 1991 to 2020 median, deepest first, by state.",
+  },
+  list_regions: {
+    title: "List regions",
+    summary: "Every state, province and country covered, with resort, measured and cam counts and the valid state codes.",
+  },
+  get_alert_options: {
+    title: "Alert options",
+    summary: "How to be told when it snows: e-mail, signed webhook, Atom and iCal recipes and the manage page. Writes nothing.",
+  },
+  get_cam_timeline: {
+    title: "Cam timeline",
+    summary: "Archived webcam stills for a resort or one cam over the last 48 hours, as links with capture times, plus the last storm frame.",
+  },
+  ask: {
+    title: "Ask PeakCam",
+    summary: "A plain question routed to the right tool by name and keywords, with a dated sentence to quote. No model, no guessing.",
+  },
 };
 
 /** In the server's registration order. */
@@ -172,6 +205,10 @@ export const EXAMPLE_PROMPTS: readonly ExamplePrompt[] = [
   { prompt: "Show me Breckenridge's webcams.", tools: "get_resort_cams (links only)" },
   { prompt: "Compare Vail, Breckenridge and Keystone for a trip this weekend.", tools: "compare_resorts, then get_forecast for each" },
   { prompt: "When does Mammoth open this season? What about the rest of California?", tools: "get_opening_dates (CA)" },
+  { prompt: "Which Utah resorts are above normal snowpack right now?", tools: "get_percent_of_normal (UT)" },
+  { prompt: "What did Alta's cams look like over the last 24 hours?", tools: "get_cam_timeline (alta, 24 h; links only)" },
+  { prompt: "Tell me about Jackson Hole: where it is, how high, and where its snow numbers come from.", tools: "get_resort_profile" },
+  { prompt: "Is Breck open yet, and how do I get an alert when it dumps?", tools: "ask (\"is Breck open\"), get_alert_options" },
 ];
 
 // ── Client recipes ───────────────────────────────────────────
