@@ -40,7 +40,7 @@ export interface ConnectLink {
  * from the page; never write a bare "/path" string in connect JSX.
  */
 export const CONNECT_LINKS = {
-  mcp: { href: MCP_PATH, label: "MCP endpoint", pending: true },
+  mcp: { href: MCP_PATH, label: "MCP endpoint" },
   serverCard: { href: SERVER_CARD_PATH, label: "MCP server card" },
   apiResorts: { href: "/api/v1/resorts", label: "REST: resort list" },
   apiResort: { href: "/api/v1/resorts/breckenridge", label: "REST: one resort" },

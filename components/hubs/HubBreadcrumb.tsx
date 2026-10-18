@@ -19,7 +19,11 @@ export function HubBreadcrumb({ items }: { items: BreadcrumbItem[] }) {
           return (
             <li key={`${index}-${item.label}`} className="flex items-center gap-2">
               {item.href && !last ? (
-                <Link href={item.href} className="font-bold text-ink underline-offset-2 hover:underline">
+                <Link
+                  href={item.href}
+                  prefetch={false}
+                  className="font-bold text-ink underline-offset-2 hover:underline"
+                >
                   {item.label}
                 </Link>
               ) : (
