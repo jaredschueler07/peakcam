@@ -1,4 +1,4 @@
-import type { ResortWithData } from "@/lib/types";
+import type { ResortWithData, SnowReport } from "@/lib/types";
 import { isOffSeason } from "@/lib/map-utils";
 
 /**
@@ -197,14 +197,38 @@ export function buildResortSchemaDescription(resort: ResortWithData): string {
   return `${lead}${cams}`;
 }
 
+/** Percent-of-normal is published only inside this band (inclusive). */
+export const PCT_OF_NORMAL_MIN = 10;
+export const PCT_OF_NORMAL_MAX = 300;
+/** …and only once the station holds this much snow water equivalent, in inches. */
+export const PCT_OF_NORMAL_MIN_SWE_IN = 2;
+
 /**
  * Percent-of-normal compares SWE against the station's 1991–2020 median for
  * this day of the water year. Early and late season the median is near zero
- * and the ratio explodes (400% of nothing) — suppress it outside a sane band.
+ * and the ratio explodes (400% of nothing, or 900% on an October dusting) —
+ * so the number is publishable only from a station-fed report, inside the
+ * 10–300 band, and once at least 2 in. of SWE is on the ground. Returns the
+ * percent to show, or null to say nothing. Shared by the resort page copy,
+ * the freshness sentences (lib/quotable.ts) and the percent-of-normal
+ * leaderboard, so the rule lives in one place.
  */
+export function publishablePctOfNormal(
+  snow: Pick<SnowReport, "pct_of_normal" | "swe_in" | "source"> | null | undefined,
+  hasStation: boolean,
+): number | null {
+  if (!snow || !hasStation || snow.source !== "snotel") return null;
+  const pct = snow.pct_of_normal;
+  if (pct == null || !Number.isFinite(pct)) return null;
+  if (pct < PCT_OF_NORMAL_MIN || pct > PCT_OF_NORMAL_MAX) return null;
+  const swe = snow.swe_in == null ? null : Number(snow.swe_in);
+  if (swe == null || !Number.isFinite(swe) || swe < PCT_OF_NORMAL_MIN_SWE_IN) return null;
+  return pct;
+}
+
 function pctOfNormalSentence(resort: ResortWithData): string | null {
-  const pct = resort.snow_report?.pct_of_normal;
-  if (!hasStation(resort) || pct == null || pct < 10 || pct > 300) return null;
+  const pct = publishablePctOfNormal(resort.snow_report, hasStation(resort));
+  if (pct == null) return null;
   return `Snow water equivalent is ${pct}% of this station's 1991–2020 median for today's date.`;
 }
 
