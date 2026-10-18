@@ -4,4 +4,10 @@
 // /.well-known/mcp/server-card.json (same builder, same handlers), which stays
 // the address the execution plan, llms.txt and server.json advertise.
 // proxy.ts already excludes `api/mcp/` from the Supabase session refresh.
-export { GET, OPTIONS, dynamic } from "@/app/.well-known/mcp/server-card.json/route";
+//
+// Segment config must be a literal in this file (Next cannot parse a
+// re-exported `dynamic`), so it is restated here; keep it equal to the
+// .well-known route's.
+export const dynamic = "force-static";
+
+export { GET, OPTIONS } from "@/app/.well-known/mcp/server-card.json/route";
