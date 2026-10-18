@@ -5,13 +5,16 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { navLinks } from "@/components/layout/Header";
+import type { Quotable } from "@/lib/quotable";
 
 interface PeakHeroProps {
   /** Live resort count from the data layer — keeps the eyebrow honest as coverage grows. */
   resortCount?: number;
+  /** Dated, source-labelled freshness sentence from lib/quotable.ts; server-computed, rendered as plain text. */
+  freshness?: Pick<Quotable, "segments"> | null;
 }
 
-export function PeakHero({ resortCount }: PeakHeroProps) {
+export function PeakHero({ resortCount, freshness }: PeakHeroProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const countLabel =
     typeof resortCount === "number" && resortCount > 0
@@ -113,6 +116,30 @@ export function PeakHero({ resortCount }: PeakHeroProps) {
             <span className="text-ink">Peak</span>
             <span className="text-alpen italic font-bold">Cam</span>
           </div>
+
+          {/* Quotable freshness line: no state, no animation, in the server HTML
+              as plain text so crawlers and answer engines can lift it verbatim. */}
+          {freshness && freshness.segments.length > 0 && (
+            <p
+              className="mx-auto mb-5 max-w-2xl text-balance text-[14px] leading-snug text-bark-dk sm:text-[15px] md:text-base"
+              data-testid="home-freshness"
+            >
+              {freshness.segments.map((segment, index) =>
+                segment.href ? (
+                  <Link
+                    key={index}
+                    href={segment.href}
+                    prefetch={false}
+                    className="font-bold text-ink underline decoration-alpen/60 decoration-2 underline-offset-[3px] hover:decoration-alpen"
+                  >
+                    {segment.text}
+                  </Link>
+                ) : (
+                  <span key={index}>{segment.text}</span>
+                ),
+              )}
+            </p>
+          )}
 
           <motion.h1
             className="font-display italic font-bold text-xl md:text-4xl text-bark-dk mb-4 tracking-tight"

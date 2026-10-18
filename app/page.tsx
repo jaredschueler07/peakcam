@@ -1,7 +1,8 @@
 import { hasFreshSnowForecast } from "@/lib/snow-forecast";
 import { SITE_URL } from "@/lib/site";
 import { Suspense } from "react";
-import { getAllResorts } from "@/lib/supabase";
+import { getAllResorts, getResortOpenings } from "@/lib/supabase";
+import { homeSentence } from "@/lib/quotable";
 import { getRadarFrames } from "@/lib/weather-radar";
 import { BrowsePage } from "@/components/browse/BrowsePage";
 import { PeakHero } from "@/components/home/PeakHero";
@@ -56,10 +57,19 @@ export default async function Home() {
   // Next.js keeps serving the last good cached page instead of caching an
   // empty state at 200. Radar is best-effort so a RainViewer outage never
   // blocks the page (or the sidebar map's radar layer).
-  const [resorts, radarFrames] = await Promise.all([
+  const [resorts, radarFrames, openings] = await Promise.all([
     getAllResorts(),
     getRadarFrames().catch(() => []),
+    // Only the off-season sentence reads these; a missing table is already
+    // handled inside getResortOpenings (returns []), a failed query fails the
+    // revalidation like getAllResorts.
+    getResortOpenings(),
   ]);
+
+  // The quotable line under the wordmark: dated by the newest report, not by
+  // this render. `new Date()` is used only to decide which openings are still
+  // ahead, and ISR re-renders hourly so it tracks the calendar within a day.
+  const freshness = homeSentence(resorts, openings, new Date());
 
   // Build powder alerts for ticker — resorts with 8"+ fresh snow
   const powderAlerts = resorts
@@ -110,7 +120,7 @@ export default async function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(resortListJsonLd) }}
       />
-      <PeakHero resortCount={resorts.length} />
+      <PeakHero resortCount={resorts.length} freshness={{ segments: freshness.segments }} />
       <PowderTicker alerts={powderAlerts} />
       <BrowsePage resorts={resorts} radarFrames={radarFrames} />
       {snowCams.length > 0 && (
