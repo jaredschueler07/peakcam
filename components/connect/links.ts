@@ -8,12 +8,19 @@
 // ─────────────────────────────────────────────────────────────
 
 import { SITE_URL } from "@/lib/site";
+import {
+  PEAKCAM_MCP_ENDPOINT,
+  PEAKCAM_MCP_NAME,
+  PEAKCAM_MCP_TITLE,
+  PEAKCAM_RESOURCE_TEMPLATE,
+} from "@/lib/mcp/server";
+import { PEAKCAM_TOOL_NAMES, type PeakCamToolName } from "@/lib/mcp/tools";
 
-/** MCP server identity (execution plan §1 item 4; lib/mcp/server.ts on main). */
-export const MCP_NAME = "io.peakcam/snow";
-export const MCP_TITLE = "PeakCam Snow";
+/** MCP server identity, re-exported from the server module so the page cannot drift from it. */
+export const MCP_NAME: string = PEAKCAM_MCP_NAME;
+export const MCP_TITLE: string = PEAKCAM_MCP_TITLE;
 export const MCP_PATH = "/api/mcp";
-export const MCP_ENDPOINT = `${SITE_URL}${MCP_PATH}`;
+export const MCP_ENDPOINT: string = PEAKCAM_MCP_ENDPOINT;
 export const SERVER_CARD_PATH = "/.well-known/mcp/server-card.json";
 export const CONNECT_PATH = "/connect";
 export const CONNECT_URL = `${SITE_URL}${CONNECT_PATH}`;
@@ -28,9 +35,9 @@ export interface ConnectLink {
   href: string;
   label: string;
   /**
-   * The route ships on another branch that merges before this page goes
-   * live. tests/connect-links.test.ts tolerates a missing route only while
-   * this flag is set, and fails once the route exists so the flag is removed.
+   * For a route that ships on another branch: tests/connect-links.test.ts
+   * tolerates a missing route only while this flag is set, and fails once
+   * the route exists so the flag is removed. No link is pending today.
    */
   pending?: boolean;
 }
@@ -84,63 +91,64 @@ export const EXTERNAL_LINKS = {
 // ── Tools ────────────────────────────────────────────────────
 
 export interface ConnectTool {
-  name: string;
+  name: PeakCamToolName;
   title: string;
   /** One line, as rendered in the table and quoted in the server card. */
   summary: string;
 }
 
 /**
- * Names and titles match lib/mcp/tools.ts (branch feat/mcp-server); the
- * summaries are the page's shorter form of those tools' descriptions.
+ * Page copy per tool, keyed by the server's own name tuple so a renamed or
+ * added tool is a type error here. Titles mirror lib/mcp/tools.ts
+ * (tests/mcp-listings.test.ts checks them against buildTools()); summaries
+ * are the page's one-line form of the tool descriptions.
  */
-export const CONNECT_TOOLS: readonly ConnectTool[] = [
-  {
-    name: "search_resorts",
+const TOOL_COPY: Record<PeakCamToolName, Omit<ConnectTool, "name">> = {
+  search_resorts: {
     title: "Search resorts",
     summary: "Find a resort by name, fragment or region and get its slug with a one-line snow summary.",
   },
-  {
-    name: "get_resort_conditions",
+  get_resort_conditions: {
     title: "Resort conditions",
     summary: "The latest snow report for one resort, every number labelled with its source and time, plus the page URL to cite.",
   },
-  {
-    name: "get_resort_cams",
+  get_resort_cams: {
     title: "Resort webcams",
     summary: "The resort's webcams as links with live, down or unchecked health. Frames are never returned inline.",
   },
-  {
-    name: "find_powder",
+  find_powder: {
     title: "Find powder",
     summary: "Rank resorts by new snow in the last 24 or 48 hours, by state, with a measured-only option.",
   },
-  {
-    name: "compare_resorts",
+  compare_resorts: {
     title: "Compare resorts",
     summary: "Side-by-side snow, season status and cam counts for two to six resorts.",
   },
-  {
-    name: "get_forecast",
+  get_forecast: {
     title: "Resort forecast",
     summary: "Five-day National Weather Service forecast for US resorts; Canada and the Andes return available: false.",
   },
-  {
-    name: "get_snow_history",
+  get_snow_history: {
     title: "Snow history",
     summary: "Daily depth, snow water equivalent, precipitation and temperatures for the last 1 to 30 days at the resort's station.",
   },
-  {
-    name: "get_opening_dates",
+  get_opening_dates: {
     title: "Opening dates",
     summary: "Season opening and closing dates with open, closed or unknown status, soonest first.",
   },
-];
+};
 
-export const MCP_RESOURCE_TEMPLATE = "peakcam://resorts/{slug}";
+/** In the server's registration order. */
+export const CONNECT_TOOLS: readonly ConnectTool[] = PEAKCAM_TOOL_NAMES.map((name) => ({ name, ...TOOL_COPY[name] }));
 
-/** Protocol revisions the endpoint answers (docs/mcp.md on feat/mcp-server). */
-export const MCP_PROTOCOL_VERSIONS = ["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26"] as const;
+export const MCP_RESOURCE_TEMPLATE: string = PEAKCAM_RESOURCE_TEMPLATE;
+
+/**
+ * Protocol revisions the endpoint negotiates (docs/mcp.md "Negotiated
+ * versions": 2026-07-28 natively, the two 2025 revisions through the SDK's
+ * stateless fallback).
+ */
+export const MCP_PROTOCOL_VERSIONS = ["2026-07-28", "2025-11-25", "2025-06-18"] as const;
 
 // ── Example prompts ──────────────────────────────────────────
 

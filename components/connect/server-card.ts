@@ -15,8 +15,8 @@
 // Pure: no Next imports, so tests/mcp-listings.test.ts can assert on it.
 // ─────────────────────────────────────────────────────────────
 
-import pkg from "@/package.json";
 import { SITE_URL } from "@/lib/site";
+import { PEAKCAM_MCP_VERSION } from "@/lib/mcp/server";
 import { PUBLIC_API_LICENSE_URL } from "@/lib/public-api/headers";
 import {
   CONNECT_TOOLS,
@@ -36,7 +36,8 @@ export const SERVER_CARD_MEDIA_TYPE = "application/mcp-server-card+json";
 export const MCP_DESCRIPTION =
   "Live snow reports, SNOTEL measurements, webcams and powder rankings for 150 ski resorts.";
 
-export const MCP_VERSION: string = pkg.version;
+/** The version `initialize` reports (lib/mcp/server.ts reads it from package.json). */
+export const MCP_VERSION: string = PEAKCAM_MCP_VERSION;
 
 export interface ServerCard {
   $schema: typeof SERVER_CARD_SCHEMA;

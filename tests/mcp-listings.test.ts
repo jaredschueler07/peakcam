@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { buildServerCard, MCP_DESCRIPTION, SERVER_CARD_SCHEMA } from "@/components/connect/server-card";
-import { CONNECT_TOOLS, MCP_ENDPOINT, MCP_NAME } from "@/components/connect/links";
+import { CONNECT_TOOLS, MCP_ENDPOINT, MCP_NAME, MCP_PROTOCOL_VERSIONS } from "@/components/connect/links";
+import { buildTools, PEAKCAM_TOOL_NAMES } from "@/lib/mcp/tools";
+import { PEAKCAM_MCP_ENDPOINT, PEAKCAM_MCP_NAME, PEAKCAM_MCP_VERSION } from "@/lib/mcp/server";
+import type { McpDataSource } from "@/lib/mcp/types";
 
 // The two listing documents: the SEP-2127 server card (served at
 // /.well-known/mcp/server-card.json) and the MCP Registry manifest
@@ -74,19 +77,28 @@ test("server.json: parses, uses the dated registry schema, names io.peakcam/snow
   assert.ok(JSON.stringify(manifest._meta["io.modelcontextprotocol.registry/publisher-provided"]).length <= 4096);
 });
 
-test("the eight tool names are the ones the MCP server registers", () => {
+test("the page's identity constants are the server's own", () => {
+  assert.equal(MCP_NAME, PEAKCAM_MCP_NAME);
+  assert.equal(MCP_ENDPOINT, PEAKCAM_MCP_ENDPOINT);
+  assert.equal(buildServerCard().version, PEAKCAM_MCP_VERSION);
+  assert.deepEqual([...MCP_PROTOCOL_VERSIONS], ["2026-07-28", "2025-11-25", "2025-06-18"]);
+});
+
+test("the tool table lists exactly the server's tools, in order, with the server's titles", () => {
   assert.deepEqual(
     CONNECT_TOOLS.map((t) => t.name),
-    [
-      "search_resorts",
-      "get_resort_conditions",
-      "get_resort_cams",
-      "find_powder",
-      "compare_resorts",
-      "get_forecast",
-      "get_snow_history",
-      "get_opening_dates",
-    ],
+    [...PEAKCAM_TOOL_NAMES],
+  );
+  // buildTools only touches the data source inside handlers, so a stub that
+  // throws is enough to read the registered names and titles.
+  const never = async (): Promise<never> => {
+    throw new Error("not called");
+  };
+  const stub: McpDataSource = { catalog: never, forecast: never, snowHistory: never };
+  const registered = buildTools(stub).map((t) => ({ name: t.name, title: t.title }));
+  assert.deepEqual(
+    CONNECT_TOOLS.map((t) => ({ name: t.name, title: t.title })),
+    registered,
   );
   for (const tool of CONNECT_TOOLS) {
     assert.ok(tool.summary.length > 20 && tool.summary.length <= 140, `${tool.name} summary should be one line`);
