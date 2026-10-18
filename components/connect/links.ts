@@ -1,0 +1,190 @@
+// ─────────────────────────────────────────────────────────────
+// /connect — every URL, tool, prompt and client recipe the page renders,
+// kept as data so tests/connect-links.test.ts can check that each internal
+// href resolves to a route under app/ or a file under public/, and so the
+// footer, llms.txt and the server card quote the same strings.
+//
+// Pure: no React, no Next imports.
+// ─────────────────────────────────────────────────────────────
+
+import { SITE_URL } from "@/lib/site";
+
+/** MCP server identity (execution plan §1 item 4; lib/mcp/server.ts on main). */
+export const MCP_NAME = "io.peakcam/snow";
+export const MCP_TITLE = "PeakCam Snow";
+export const MCP_PATH = "/api/mcp";
+export const MCP_ENDPOINT = `${SITE_URL}${MCP_PATH}`;
+export const SERVER_CARD_PATH = "/.well-known/mcp/server-card.json";
+export const CONNECT_PATH = "/connect";
+export const CONNECT_URL = `${SITE_URL}${CONNECT_PATH}`;
+
+/** One-line prefilled "add custom connector" deep link for claude.ai. */
+export const CLAUDE_CONNECTOR_LINK =
+  "https://claude.ai/customize/connectors?modal=add-custom-connector" +
+  `&connectorName=PeakCam&connectorUrl=${encodeURIComponent(MCP_ENDPOINT)}`;
+
+export interface ConnectLink {
+  /** Site-relative path, may carry a fragment. */
+  href: string;
+  label: string;
+  /**
+   * The route ships on another branch that merges before this page goes
+   * live. tests/connect-links.test.ts tolerates a missing route only while
+   * this flag is set, and fails once the route exists so the flag is removed.
+   */
+  pending?: boolean;
+}
+
+/**
+ * Every internal href the page links to, by id. Add here, then reference
+ * from the page; never write a bare "/path" string in connect JSX.
+ */
+export const CONNECT_LINKS = {
+  mcp: { href: MCP_PATH, label: "MCP endpoint", pending: true },
+  serverCard: { href: SERVER_CARD_PATH, label: "MCP server card" },
+  apiResorts: { href: "/api/v1/resorts", label: "REST: resort list" },
+  apiResort: { href: "/api/v1/resorts/breckenridge", label: "REST: one resort" },
+  apiCams: { href: "/api/v1/resorts/breckenridge/cams", label: "REST: a resort's cams" },
+  apiPowder: { href: "/api/v1/powder?source=snotel", label: "REST: powder ranking" },
+  openapi: { href: "/api/v1/openapi.json", label: "OpenAPI 3.1" },
+  apiCatalog: { href: "/.well-known/api-catalog", label: "API catalog (RFC 9727)" },
+  indexMd: { href: "/index.md", label: "Markdown: site index" },
+  resortMd: { href: "/resorts/breckenridge/index.md", label: "Markdown: one resort" },
+  powderAtom: { href: "/resorts/breckenridge/powder.xml", label: "Atom: powder feed per resort" },
+  llms: { href: "/llms.txt", label: "llms.txt" },
+  robots: { href: "/robots.txt", label: "robots.txt (Content-Signal)" },
+  alerts: { href: "/alerts", label: "Powder alerts" },
+  alertsManage: { href: "/alerts/manage", label: "Manage alerts and webhooks" },
+  methodology: { href: "/methodology", label: "How we measure snow" },
+  snotel: { href: "/methodology#snotel", label: "SNOTEL and SCAN sensors" },
+  freshness: { href: "/methodology#freshness", label: "Freshness" },
+  about: { href: "/about", label: "About PeakCam" },
+  terms: { href: "/about#terms", label: "Terms of service" },
+  privacy: { href: "/about#privacy", label: "Privacy policy" },
+  snowReport: { href: "/snow-report", label: "Snow report" },
+  home: { href: "/", label: "Home" },
+} as const satisfies Record<string, ConnectLink>;
+
+export type ConnectLinkId = keyof typeof CONNECT_LINKS;
+
+export function absolute(id: ConnectLinkId): string {
+  return `${SITE_URL}${CONNECT_LINKS[id].href}`;
+}
+
+/** External documentation the page cites. Not route-checked. */
+export const EXTERNAL_LINKS = {
+  mcpSpec: "https://modelcontextprotocol.io",
+  standardWebhooks: "https://www.standardwebhooks.com",
+  nrcs: "https://www.nrcs.usda.gov/resources/data-and-reports/snow-and-water-interactive-map",
+  openMeteo: "https://open-meteo.com",
+  nws: "https://www.weather.gov",
+  repo: "https://github.com/jaredschueler07/peakcam",
+} as const;
+
+// ── Tools ────────────────────────────────────────────────────
+
+export interface ConnectTool {
+  name: string;
+  title: string;
+  /** One line, as rendered in the table and quoted in the server card. */
+  summary: string;
+}
+
+/**
+ * Names and titles match lib/mcp/tools.ts (branch feat/mcp-server); the
+ * summaries are the page's shorter form of those tools' descriptions.
+ */
+export const CONNECT_TOOLS: readonly ConnectTool[] = [
+  {
+    name: "search_resorts",
+    title: "Search resorts",
+    summary: "Find a resort by name, fragment or region and get its slug with a one-line snow summary.",
+  },
+  {
+    name: "get_resort_conditions",
+    title: "Resort conditions",
+    summary: "The latest snow report for one resort, every number labelled with its source and time, plus the page URL to cite.",
+  },
+  {
+    name: "get_resort_cams",
+    title: "Resort webcams",
+    summary: "The resort's webcams as links with live, down or unchecked health. Frames are never returned inline.",
+  },
+  {
+    name: "find_powder",
+    title: "Find powder",
+    summary: "Rank resorts by new snow in the last 24 or 48 hours, by state, with a measured-only option.",
+  },
+  {
+    name: "compare_resorts",
+    title: "Compare resorts",
+    summary: "Side-by-side snow, season status and cam counts for two to six resorts.",
+  },
+  {
+    name: "get_forecast",
+    title: "Resort forecast",
+    summary: "Five-day National Weather Service forecast for US resorts; Canada and the Andes return available: false.",
+  },
+  {
+    name: "get_snow_history",
+    title: "Snow history",
+    summary: "Daily depth, snow water equivalent, precipitation and temperatures for the last 1 to 30 days at the resort's station.",
+  },
+  {
+    name: "get_opening_dates",
+    title: "Opening dates",
+    summary: "Season opening and closing dates with open, closed or unknown status, soonest first.",
+  },
+];
+
+export const MCP_RESOURCE_TEMPLATE = "peakcam://resorts/{slug}";
+
+/** Protocol revisions the endpoint answers (docs/mcp.md on feat/mcp-server). */
+export const MCP_PROTOCOL_VERSIONS = ["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26"] as const;
+
+// ── Example prompts ──────────────────────────────────────────
+
+export interface ExamplePrompt {
+  prompt: string;
+  /** Which tools a well-behaved assistant reaches for. */
+  tools: string;
+}
+
+export const EXAMPLE_PROMPTS: readonly ExamplePrompt[] = [
+  { prompt: "Where did it snow most in the last 24 hours, measured only?", tools: "find_powder (24h, sourceOnly snotel)" },
+  { prompt: "Which Colorado resorts picked up more than 6 inches over the weekend?", tools: "find_powder (48h, CO, minInches 6)" },
+  {
+    prompt: "What are conditions like at Alta right now, and is the base deeper than last week?",
+    tools: "search_resorts, get_resort_conditions, get_snow_history (7 days)",
+  },
+  { prompt: "Show me Breckenridge's webcams.", tools: "get_resort_cams (links only)" },
+  { prompt: "Compare Vail, Breckenridge and Keystone for a trip this weekend.", tools: "compare_resorts, then get_forecast for each" },
+  { prompt: "When does Mammoth open this season? What about the rest of California?", tools: "get_opening_dates (CA)" },
+];
+
+// ── Client recipes ───────────────────────────────────────────
+
+export const CURSOR_MCP_JSON = JSON.stringify({ mcpServers: { peakcam: { url: MCP_ENDPOINT } } }, null, 2);
+
+export const CLAUDE_CODE_COMMAND = `claude mcp add --transport http peakcam ${MCP_ENDPOINT}`;
+
+/** The same recipe as docs/alerts-verification.md, trimmed to the one-liner. */
+export const HERMES_WEBHOOK_COMMAND = [
+  "hermes webhook subscribe --name peakcam-powder \\",
+  '  --secret "$PEAKCAM_WEBHOOK_SECRET" \\',
+  "  --on powder.alert \"notify 'Powder: {{resort.name}} {{inches}}\\\" ({{kind}}) {{url}}'\"",
+].join("\n");
+
+export const WEBHOOK_SAMPLE = JSON.stringify(
+  {
+    type: "powder.alert",
+    resort: { slug: "alta", name: "Alta Ski Area", url: `${SITE_URL}/resorts/alta` },
+    inches: 11,
+    kind: "measured",
+    measuredAt: "2026-12-01T12:30:00.000Z",
+    url: `${SITE_URL}/resorts/alta`,
+    threshold: 8,
+  },
+  null,
+  2,
+);

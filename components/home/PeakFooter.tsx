@@ -8,7 +8,7 @@ export function PeakFooter() {
   return (
     <footer className="relative bg-cream border-t-[1.5px] border-ink pt-7 pb-6 md:pt-14 md:pb-10 px-4 md:px-6">
       <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-10 mb-6 md:mb-10">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-6 md:gap-10 mb-6 md:mb-10">
           {/* Brand */}
           <div className="col-span-2">
             <div className="flex items-center gap-3 mb-4">
@@ -116,6 +116,38 @@ export function PeakFooter() {
                   Contact
                 </a>
               </li>
+            </ul>
+          </div>
+
+          {/* Developers — agent and API surfaces (execution plan Sprint 6).
+              Route handlers get plain anchors; only /connect is a page. */}
+          <div>
+            <h4 className="pc-eyebrow mb-4">Developers</h4>
+            <ul className="space-y-2.5">
+              <li>
+                <Link
+                  href="/connect"
+                  prefetch={false}
+                  className="text-ink/80 hover:text-alpen transition-colors duration-150 text-[14px] font-medium"
+                >
+                  Connect your AI assistant
+                </Link>
+              </li>
+              {[
+                { href: "/api/mcp", label: "MCP server" },
+                { href: "/api/v1/resorts", label: "REST API" },
+                { href: "/api/v1/openapi.json", label: "OpenAPI" },
+                { href: "/llms.txt", label: "llms.txt" },
+              ].map((item) => (
+                <li key={item.href}>
+                  <a
+                    href={item.href}
+                    className="text-ink/80 hover:text-alpen transition-colors duration-150 text-[14px] font-medium"
+                  >
+                    {item.label}
+                  </a>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
