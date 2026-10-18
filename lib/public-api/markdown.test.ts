@@ -32,14 +32,34 @@ const cam: CamPublic = {
   embedType: "image",
   pageUrl: "https://www.peakcam.io/resorts/vail",
   sourceUrl: "https://cams.example.com/summit.jpg",
+  kind: null,
+  credit: null,
+  sourceTermsUrl: null,
 };
+
+const EMPTY_PROFILE: ResortPublic["profile"] = {
+  runsTotal: null,
+  liftsTotal: null,
+  skiableAcres: null,
+  verticalFt: null,
+  annualSnowfallIn: null,
+  longestRunMi: null,
+  description: null,
+  descriptionSource: null,
+  trailMapUrl: null,
+  wikidataId: null,
+  aliases: [],
+  passes: [],
+};
+
 
 const resort: ResortPublic = {
   slug: "vail",
   name: "Vail Mountain",
   canonicalUrl: "https://www.peakcam.io/resorts/vail",
   apiUrl: "https://www.peakcam.io/api/v1/resorts/vail",
-  location: { state: "CO", region: "Colorado Rockies", country: "US", lat: 39.6, lon: -106.4, baseElevationFt: 8120 },
+  location: { state: "CO", region: "Colorado Rockies", country: "US", lat: 39.6, lon: -106.4, baseElevationFt: 8120, summitElevationFt: 11570 },
+  profile: EMPTY_PROFILE,
   snow: {
     baseDepth: m(42),
     newSnow24h: m(6),

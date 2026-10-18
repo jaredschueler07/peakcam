@@ -1,6 +1,7 @@
 import { getAllResorts } from "@/lib/supabase";
 import { SITE_URL } from "@/lib/site";
 import { HUB_BASE_PATH, hubPath, listHubs } from "@/lib/hubs";
+import { PEAKCAM_TOOL_NAMES } from "@/lib/mcp/tool-names";
 
 // llms.txt (https://llmstxt.org): a markdown map of the site written for LLM
 // crawlers and answer engines. Regenerated with the rest of the static site
@@ -68,12 +69,16 @@ often quote their upper mountain). Full details: ${SITE_URL}/methodology
 
 ## For agents
 
-- API base: ${SITE_URL}/api/v1 (JSON, anonymous, CORS open; resorts, resorts/{slug}, resorts/{slug}/cams, powder)
-- OpenAPI 3.1: ${SITE_URL}/api/v1/openapi.json
+- Full guide (every tool with an example call, every REST route with curl, rate limit, attribution): ${SITE_URL}/llms-full.txt
+- Answer endpoint (deterministic, no model; a resort and an intent from the wording, one tool call, a dated sentence, citations; answerable:false instead of a guess): ${SITE_URL}/api/v1/ask?q=is+alta+open — NLWeb shape: ${SITE_URL}/ask?query=
+- API base: ${SITE_URL}/api/v1 (JSON, anonymous, CORS open; resorts, resorts/search-index, resorts/{slug}, resorts/{slug}/cams, powder, status, ask; POST batch for up to 10 reads in one request)
+- OpenAPI 3.1: ${SITE_URL}/api/v1/openapi.json — JSON Schemas per shape: ${SITE_URL}/.well-known/schemas
 - API catalog (RFC 9727): ${SITE_URL}/.well-known/api-catalog
 - Markdown alternates: ${SITE_URL}/index.md and ${SITE_URL}/resorts/{slug}/index.md (also rel="alternate" in each HTML page's Link header)
 - Powder feed per resort (Atom): ${SITE_URL}/resorts/{slug}/powder.xml
-- MCP server io.peakcam/snow (Streamable HTTP, no auth, read-only; search_resorts, get_resort_conditions, get_resort_cams, find_powder, compare_resorts, get_forecast, get_snow_history, get_opening_dates): ${SITE_URL}/api/mcp — setup per client: ${SITE_URL}/connect — server card: ${SITE_URL}/.well-known/mcp/server-card.json
+- MCP server io.peakcam/snow (Streamable HTTP, no auth, read-only; ${PEAKCAM_TOOL_NAMES.join(", ")}): ${SITE_URL}/api/mcp — setup per client: ${SITE_URL}/connect — server card: ${SITE_URL}/.well-known/mcp/server-card.json
+- Custom GPT instructions (Actions from the OpenAPI document): ${SITE_URL}/gpt-instructions.md
+- Rate limit: 60 requests per minute per IP across /api/v1 and /api/mcp; the edge answers a plain-text 403 past it. Cache-Control is honest: poll no faster than every 15 minutes.
 - Attribution: cite the resort's PeakCam page URL; SNOTEL data is USDA NRCS, forecasts are NWS/Open-Meteo, cams belong to their operators. Terms: ${SITE_URL}/about#terms
 
 ## Key pages

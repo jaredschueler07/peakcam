@@ -417,9 +417,9 @@ test("publicJson / publicError / publicOptions / withPublicHeaders", async () =>
 test("the OpenAPI document references only schemas it defines", () => {
   const doc = buildOpenApiDocument() as { openapi: string; paths: Record<string, unknown>; components: { schemas: Record<string, Record<string, unknown>> } };
   assert.equal(doc.openapi, "3.1.0");
-  assert.deepEqual(Object.keys(doc.paths), ["/resorts", "/resorts/{slug}", "/resorts/{slug}/cams", "/powder"]);
+  assert.deepEqual(Object.keys(doc.paths), ["/resorts", "/resorts/{slug}", "/resorts/{slug}/cams", "/resorts/search-index", "/powder", "/status", "/ask", "/batch"]);
   const ids = new Set(Object.keys(doc.components.schemas));
-  for (const id of ["Resort", "ResortList", "CamList", "PowderList", "Measurement", "Station", "Season", "Cam", "Error"]) {
+  for (const id of ["Resort", "ResortList", "CamList", "PowderList", "Measurement", "Station", "Season", "Cam", "Error", "SearchIndex", "Status", "AskAnswer", "BatchRequest", "BatchResponse"]) {
     assert.ok(ids.has(id), `missing component ${id}`);
   }
   for (const schema of Object.values(doc.components.schemas)) {
@@ -433,4 +433,118 @@ test("the OpenAPI document references only schemas it defines", () => {
     assert.ok(r.startsWith('"$ref":"#/components/schemas/'), r);
     assert.ok(ids.has(target), `dangling $ref ${target}`);
   }
+});
+
+// ── Parity data model (migrations 025–028) ───────────────────
+
+test("profile is always present; null / empty until the row carries migration-025 values", () => {
+  const bare = serializeResort(resort(), { now: NOW });
+  assert.deepEqual(bare.profile, {
+    runsTotal: null,
+    liftsTotal: null,
+    skiableAcres: null,
+    verticalFt: null,
+    annualSnowfallIn: null,
+    longestRunMi: null,
+    description: null,
+    descriptionSource: null,
+    trailMapUrl: null,
+    wikidataId: null,
+    aliases: [],
+    passes: [],
+  });
+  assert.equal(bare.location.summitElevationFt, null);
+  ResortSchema.parse(bare);
+
+  const full = serializeResort(
+    resort({
+      runs_total: 195,
+      lifts_total: 31,
+      skiable_acres: 5317,
+      vertical_ft: 3450,
+      annual_snowfall_in: 354,
+      longest_run_mi: 4,
+      description: "Back Bowls and all.",
+      description_source: "editor",
+      trail_map_url: "https://www.vail.com/map.pdf",
+      wikidata_id: "Q1234",
+      aliases: ["Vail", "Vail Resort"],
+      passes: ["epic"],
+      elevation_base_ft: 8120,
+      elevation_summit_ft: 11570,
+    }),
+    { now: NOW },
+  );
+  assert.equal(full.profile.runsTotal, 195);
+  assert.equal(full.profile.skiableAcres, 5317);
+  assert.equal(full.profile.descriptionSource, "editor");
+  assert.deepEqual(full.profile.aliases, ["Vail", "Vail Resort"]);
+  assert.deepEqual(full.profile.passes, ["epic"]);
+  assert.equal(full.location.baseElevationFt, 8120);
+  assert.equal(full.location.summitElevationFt, 11570);
+  ResortSchema.parse(full);
+});
+
+test("profile drops a descriptionSource without a description and unknown passes", () => {
+  const doc = serializeResort(
+    resort({ description: null, description_source: "operator", passes: ["epic", "season" as never] }),
+    { now: NOW },
+  );
+  assert.equal(doc.profile.descriptionSource, null);
+  assert.deepEqual(doc.profile.passes, ["epic"]);
+});
+
+test("explicit elevation option (resort_metadata) wins over the resort row; the row fills the gaps", () => {
+  const row = resort({ elevation_base_ft: 8000, elevation_summit_ft: 11000 });
+  const explicit = serializeResort(row, { now: NOW, elevation: { baseFt: 8120 } });
+  assert.equal(explicit.location.baseElevationFt, 8120);
+  assert.equal(explicit.location.summitElevationFt, 11000);
+  const none = serializeResort(row, { now: NOW, elevation: null });
+  assert.equal(none.location.baseElevationFt, 8000);
+});
+
+test("cam kind, credit and sourceTermsUrl are null until classified and pass through when set", () => {
+  const plain = serializeCam(cam(), { slug: "vail" });
+  assert.equal(plain.kind, null);
+  assert.equal(plain.credit, null);
+  assert.equal(plain.sourceTermsUrl, null);
+  assert.ok(!("timelapses" in plain));
+  const tagged = serializeCam(
+    cam({ kind: "snow-stake", credit: "Courtesy Vail Resorts", source_terms_url: "https://www.vail.com/terms" }),
+    { slug: "vail" },
+  );
+  assert.equal(tagged.kind, "snow-stake");
+  assert.equal(tagged.credit, "Courtesy Vail Resorts");
+  assert.equal(tagged.sourceTermsUrl, "https://www.vail.com/terms");
+  CamListSchema.parse(serializeCams(resort({ cams: [cam({ kind: "approach" })] }), { now: NOW }));
+});
+
+test("the OpenAPI components carry the parity shapes and the resort document references them", () => {
+  const doc = buildOpenApiDocument("https://www.peakcam.io") as {
+    components: { schemas: Record<string, { properties?: Record<string, unknown>; required?: string[] }> };
+  };
+  const schemas = doc.components.schemas;
+  for (const id of [
+    "ResortProfile",
+    "ObservationStation",
+    "MeasuredNow",
+    "ForecastRun",
+    "ForecastDaily",
+    "ForecastScore",
+    "ScoreComponents",
+    "ResortScore",
+    "CamTimelapse",
+    "CamKind",
+  ]) {
+    assert.ok(schemas[id], `components.schemas.${id}`);
+  }
+  const resortProps = schemas.Resort.properties!;
+  assert.ok(resortProps.profile, "Resort.profile");
+  assert.ok(schemas.Resort.required!.includes("profile"), "profile is required (null fields, never omitted)");
+  for (const key of ["stations", "measuredNow", "forecast", "forecastScores", "score"]) {
+    assert.ok(resortProps[key], `Resort.${key}`);
+    assert.ok(!schemas.Resort.required!.includes(key), `${key} is optional until its block lands`);
+  }
+  assert.ok(schemas.Cam.required!.includes("kind"));
+  assert.ok(!schemas.Cam.required!.includes("timelapses"));
 });

@@ -2,7 +2,9 @@
 
 Read-only [Model Context Protocol](https://modelcontextprotocol.io) server that gives an AI
 assistant the same data as the site and `/api/v1`: the latest snow report per resort with its
-provenance, season status, webcams as links, NWS forecasts and SNOTEL daily history.
+provenance, season status, webcams as links and archived stills, NWS forecasts, SNOTEL daily
+history, percent-of-normal rankings, resort profiles, regions, alert recipes, and an `ask` tool
+that routes a plain question to the right one of them deterministically. Fourteen tools.
 
 | | |
 | --- | --- |
@@ -39,6 +41,12 @@ with the resort's canonical URL) and a `structuredContent` document that matches
 | `get_forecast` | `slug` | `{ available, provider: "nws", note, periods[] }` | Five-day NWS forecast for US resorts; `available: false` for Canada and the Andes, or when NWS does not answer. Snow inches are keyword heuristics, not QPF. |
 | `get_snow_history` | `slug`, `days?` 1–30 (14) | `{ source, station, rows[] }` | Daily depth, SWE, precipitation accumulation, temperatures and QC flag from `snowpack_daily`, newest first. |
 | `get_opening_dates` | `state?`, `limit?` 1–150 (50) | `{ asOf, totalMatching, resorts: { season }[] }` | Season open/closed/unknown with confirmed or projected dates, soonest first. |
+| `get_resort_profile` | `slug` | `{ urls, location (elevations), websiteUrl, camPageUrl, socials, station, dataSource, season, camCount, liveCamCount }` | Identity without the snow numbers: where, how high, which station, every PeakCam URL (page, JSON, markdown, Atom, state hub). P9 block 1. |
+| `get_percent_of_normal` | `state?`, `limit?` 1–50 (10) | `{ asOf, phase, sentence, rule, stationFedCount, totalMatching, results[] }` | SNOTEL-fed resorts ranked by SWE against the station's 1991–2020 median (`lib/percent-of-normal.ts`); the 10–300 % / 2 in rule withholds early-season noise. |
+| `list_regions` | none | `{ totalResorts, countries[], regions: { state, label, country, resorts, reporting, measured, cams, liveCams, hubUrl }[] }` | The valid `state` values for the other tools, with counts and hub pages. |
+| `get_alert_options` | `slug?` | `{ thresholdInches, schedule, manageUrl, channels[], resortFeed, webhook, writes: false }` | Explains e-mail, signed webhook, Atom, iCal and the public per-resort feed. Never writes; a person registers destinations on `/alerts/manage`. |
+| `get_cam_timeline` | `slug`, `camId?` (uuid), `hours?` 1–48 (24) | `{ camCount, frameCount, newestCapturedAt, lastStorm, cams: { camId, camName, frames[], lastStorm }[] , note }` | Archived stills from `cam_still_timeline` (migration 024) as links with capture times, 8 per cam, 12 cams; only archive-allowed cams. Degrades to `note` when the view is unavailable. S8 item 7. |
+| `ask` | `question` ≤ 300 chars | `AskAnswer` (`answerable`, `intent`, `tool`, `arguments`, `resort(s)`, `sentence`, `asOf`, `data`, `citations`, `suggestions`) | Deterministic router (`lib/ask/router.ts`): resort by name/slug/nickname with one typo of slack, intent by keywords, one tool call, a `lib/quotable.ts` sentence. `answerable: false` with suggestions instead of a guess; unmatched questions are logged to `agent_memory` (`entity = ask:unmatched`, salted IP hash only over HTTP, 30-day TTL). |
 
 Unknown slugs return `isError: true` with up to five close matches, for example:
 
@@ -85,6 +93,10 @@ resort's `canonicalUrl`.
 - "Show me Breckenridge's webcams." → `get_resort_cams("breckenridge")` (links; the assistant should not describe frames it has not seen)
 - "Compare Vail, Breckenridge and Keystone for a trip this weekend." → `compare_resorts(["vail","breckenridge","keystone"])`, `get_forecast` for each
 - "When does Mammoth open this season? What about the rest of California?" → `get_opening_dates(state="CA")`
+- "Which Utah resorts are above normal snowpack right now?" → `get_percent_of_normal(state="UT")`
+- "What did Alta's cams look like over the last 24 hours?" → `get_cam_timeline("alta", hours=24)` (links only)
+- "Tell me about Jackson Hole: where it is, how high, and where its snow numbers come from." → `get_resort_profile("jackson-hole")`
+- "Is Breck open yet, and how do I get an alert when it dumps?" → `ask("is Breck open")`, `get_alert_options("breckenridge")`
 
 ## Connecting
 
@@ -166,15 +178,37 @@ answer `405` by design.
   per `(resort, days)`, and NWS at one hour per grid point. A tool call is an in-memory
   serialisation on a warm instance.
 - **Limits.** `maxDuration = 60`. Payloads are capped: 12 cams, 30 history rows, 25 powder rows,
-  20 search rows, 6 compared resorts, 150 opening rows.
+  20 search rows, 6 compared resorts, 150 opening rows, 50 percent-of-normal rows, 8 frames × 12 cams
+  per timeline, 300-character questions.
 - **Proxy.** `proxy.ts` excludes `api/mcp` from the Supabase session refresh.
 - **CORS.** `*` with `POST, GET, DELETE, OPTIONS`, matching the public API's posture.
 - **Adding a tool.** Add a `defineTool` block in `lib/mcp/tools.ts`, append its name to
-  `PEAKCAM_TOOL_NAMES`, cover it in `lib/mcp/server.test.ts` (the schema round-trip test picks
-  it up automatically once a sample argument set is added), and list it in the table above.
-  Sprint 8's `get_cam_timeline(slug, camId, hours<=48)` is the next one.
-- **Tests.** `node --import tsx --test lib/mcp/server.test.ts lib/public-api/markdown.test.ts`
-  runs the server in memory with fixtures; no env, no network.
+  `PEAKCAM_TOOL_NAMES` in `lib/mcp/tool-names.ts`, give it an example in `lib/mcp/examples.ts`
+  (llms-full.txt and the tests read it), a `TOOL_COPY` entry in `components/connect/links.ts`
+  (the /connect table and server card derive from the name tuple; both are type errors until
+  you do), cover it in `lib/mcp/server.test.ts` (the schema round-trip test picks it up once a
+  sample argument set is added), and list it in the table above. If the ask router should
+  reach it, add an intent rule in `lib/ask/router.ts` and a sentence in `lib/ask/answer.ts`.
+- **Data source.** `McpDataSource` (`lib/mcp/types.ts`) has `catalog`, `forecast`,
+  `snowHistory`, `camStills` and the optional `logUnmatchedQuestion`; `lib/mcp/data.ts` is the
+  production implementation, the tests inject fixtures. The catalogue helpers the tools and
+  the router share (`findResort`, `matchResorts`, …) live in `lib/mcp/catalog.ts`.
+- **Tests.** `node --import tsx --test lib/mcp/server.test.ts lib/ask/router.test.ts lib/public-api/agent-surface.test.ts`
+  runs the server in memory with fixtures, the router against 20+ questions, and the
+  status/search-index/batch/llms-full builders; no env, no network.
+
+## Answer endpoint and REST additions (P9 block 1, 2026-10-18)
+
+The `ask` tool is also HTTP: `GET|POST /api/v1/ask` (`q`/`query`/`question`, JSON body on POST)
+returns the `AskAnswer` document, and `GET|POST /ask` wraps the same answer in the NLWeb list
+shape (`query_id`, `results[]` with `schema_object`, full answer under `peakcam`; `mode`, `prev`,
+`site`, `streaming` accepted and ignored). Alongside it: `POST /api/v1/batch` (≤ 10 GET paths
+dispatched in-process to the route handlers, results in order), `GET /api/v1/resorts/search-index`
+(slug, name, aliases from `lib/ask/aliases.ts`, state, country, lat/lon; 24 h cache) and
+`GET /api/v1/status` (report freshness and cam health with thresholds; 200 `degraded`, 503 only
+when the read fails). Discovery: `/llms-full.txt` (built from the tool definitions and
+`lib/mcp/examples.ts`), `/gpt-instructions.md`, `/.well-known/schemas` (+ `/{file}.json` per
+registered shape). All documented in `/api/v1/openapi.json`; smoke checks in `docs/runbook.md`.
 
 ## Discovery (Sprint 6)
 
