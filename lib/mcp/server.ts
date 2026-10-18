@@ -3,7 +3,10 @@
 //
 // `registerPeakCam(server, data)` registers the eight tools from tools.ts
 // (every one read-only, idempotent, closed-world) and the
-// `peakcam://resorts/{slug}` markdown resource on any McpServer. The route
+// `peakcam://resorts/{slug}` markdown resource on any McpServer. The
+// resource is byte-for-byte the Sprint 4 `/resorts/{slug}/index.md`
+// document (lib/public-api/markdown-page.ts); the tools' `content` uses the
+// compact renderer in lib/public-api/markdown.ts. The route
 // (app/api/mcp/route.ts) hands it mcp-handler's per-request server with the
 // production data source; the tests hand it an in-memory server with
 // fixtures. Nothing in here touches the network.
@@ -12,7 +15,7 @@
 import { McpServer, ResourceTemplate, type ServerOptions, type ToolAnnotations } from "@modelcontextprotocol/server";
 import pkg from "@/package.json";
 import { SITE_URL } from "@/lib/site";
-import { resortMarkdown } from "@/lib/public-api/markdown";
+import { resortMarkdown as resortPageMarkdown } from "@/lib/public-api/markdown-page";
 import { serializeResort } from "@/lib/public-api/serialize";
 import { buildTools, closeMatches, findResort, serializeOptionsFor } from "./tools";
 import type { McpDataSource } from "./types";
@@ -100,7 +103,7 @@ export function registerPeakCam(server: McpServer, data: McpDataSource): void {
     {
       title: "Resort snow report",
       description:
-        "Compact markdown snow report for one resort: latest measurements with source and station, season status, webcams as links, and the canonical PeakCam URL.",
+        "Markdown snow report for one resort, the same document as https://www.peakcam.io/resorts/{slug}/index.md: latest measurements with source and station, season status, webcams as links, and the canonical PeakCam URL.",
       mimeType: "text/markdown",
     },
     async (uri, variables) => {
@@ -112,7 +115,7 @@ export function registerPeakCam(server: McpServer, data: McpDataSource): void {
         throw new Error(`No active resort with slug "${slug}".${close.length ? ` Close matches: ${close.join(", ")}` : ""}`);
       }
       const doc = serializeResort(resort, serializeOptionsFor(catalog, resort));
-      return { contents: [{ uri: uri.href, mimeType: "text/markdown", text: resortMarkdown(doc) }] };
+      return { contents: [{ uri: uri.href, mimeType: "text/markdown", text: resortPageMarkdown(doc, { now: catalog.now }) }] };
     },
   );
 }

@@ -12,7 +12,7 @@ provenance, season status, webcams as links, NWS forecasts and SNOTEL daily hist
 | Server name / title | `io.peakcam/snow` / "PeakCam Snow" |
 | Version | `package.json` version (reported in `initialize`) |
 | Protocol revisions | 2026-07-28 served natively; 2025-11-25, 2025-06-18 and 2025-03-26 clients are served through the SDK's stateless fallback. See *Negotiated versions* below. |
-| Code | `app/api/mcp/route.ts` (handler), `lib/mcp/server.ts` (identity + registration), `lib/mcp/tools.ts` (tools), `lib/mcp/data.ts` (production data source), `lib/public-api/markdown.ts` (markdown renderer) |
+| Code | `app/api/mcp/route.ts` (handler), `lib/mcp/server.ts` (identity + registration), `lib/mcp/tools.ts` (tools), `lib/mcp/data.ts` (production data source), `lib/public-api/markdown.ts` (compact tool markdown), `lib/public-api/markdown-page.ts` (resource markdown, shared with `/resorts/{slug}/index.md`) |
 | Libraries | `mcp-handler@2.3.0`, `@modelcontextprotocol/server@2.3.1` (runtime), `@modelcontextprotocol/client@2.3.1` (tests only) |
 
 A plain browser `GET https://www.peakcam.io/api/mcp` (no `text/event-stream` in `Accept`)
@@ -59,11 +59,16 @@ them:
 
 ## Resource
 
-`peakcam://resorts/{slug}` (`text/markdown`): the compact resort report built by
-`resortMarkdown()` in `lib/public-api/markdown.ts` from the same `serializeResort()` output the
-JSON API uses. `resources/list` enumerates every active resort; `resources/templates/list`
-returns the template; the `slug` variable supports completion. The Sprint 4 `/resorts/{slug}/index.md`
-route should render through the same function so the two never disagree.
+`peakcam://resorts/{slug}` (`text/markdown`): byte-for-byte the document served at
+`https://www.peakcam.io/resorts/{slug}/index.md`, rendered by `resortMarkdown()` in
+`lib/public-api/markdown-page.ts` (Sprint 4) from the same `serializeResort()` output the JSON
+API uses. `resources/list` enumerates every active resort; `resources/templates/list` returns
+the template; the `slug` variable supports completion.
+
+Two markdown renderers exist on purpose: `markdown-page.ts` is the long-form page document;
+`lib/public-api/markdown.ts` is the compact, source-labelled form the tools put in their
+`content` blocks (a tool result should not carry a whole page). Both read the serializer's
+output, so numbers and source labels agree.
 
 ## Server instructions
 

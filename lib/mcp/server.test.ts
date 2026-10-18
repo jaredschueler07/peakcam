@@ -567,9 +567,17 @@ test("the peakcam://resorts/{slug} resource lists every resort and reads as mark
   const content = read.contents[0] as { uri: string; mimeType?: string; text?: string };
   assert.equal(content.uri, "peakcam://resorts/breckenridge");
   assert.equal(content.mimeType, "text/markdown");
-  assert.match(content.text ?? "", /^# Breckenridge snow report/);
-  assert.match(content.text ?? "", /## Cams \(1, 1 live\)/);
-  assert.match(content.text ?? "", /- \*\*Cam cam-\d+\*\* \(11,000 ft\) · live as of 2026-12-20 11:00 UTC · image · still: https:\/\/cams\.example\.com\//);
+  // The resource is the Sprint 4 /resorts/{slug}/index.md document, so a
+  // client that already fetched the page alternate sees the same text.
+  const { resortMarkdown: pageMarkdown } = await import("@/lib/public-api/markdown-page");
+  const { serializeResort } = await import("@/lib/public-api/serialize");
+  const { serializeOptionsFor } = await import("./tools");
+  const cat = catalog();
+  const expected = pageMarkdown(serializeResort(RESORTS[0], serializeOptionsFor(cat, RESORTS[0])), { now: cat.now });
+  assert.equal(content.text, expected);
+  assert.match(content.text ?? "", /^# Breckenridge, .*: snow report and webcams/);
+  assert.match(content.text ?? "", /## Webcams \(1\)/);
+  assert.match(content.text ?? "", /- Page: https:\/\/www\.peakcam\.io\/resorts\/breckenridge/);
   assert.match(content.text ?? "", /Data: PeakCam \(https:\/\/www\.peakcam\.io\)/);
 
   await assert.rejects(client.readResource({ uri: "peakcam://resorts/breckenrige" }), /No active resort with slug "breckenrige".*peakcam:\/\/resorts\/breckenridge/);

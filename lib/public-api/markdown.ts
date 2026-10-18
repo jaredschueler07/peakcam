@@ -2,11 +2,12 @@
 // Public API — markdown rendering of the serializer shapes.
 //
 // Pure functions over the wire types in schema.ts: no Next.js, no Supabase,
-// no clock (every date is read from the document). The MCP server (Sprint 5)
-// renders tool text and the `peakcam://resorts/{slug}` resource through
-// these; the Sprint 4 `/resorts/{slug}/index.md` alternate should call
-// `resortMarkdown()` with the same `serializeResort()` output so the two
-// surfaces never disagree on a number or a label.
+// no clock (every date is read from the document). This is the compact form
+// the MCP tools (lib/mcp/tools.ts) put in their `content` blocks: a short,
+// dated, source-labelled report that fits a tool result. The long-form page
+// documents served at /resorts/{slug}/index.md and /index.md (and the MCP
+// `peakcam://resorts/{slug}` resource) live in markdown-page.ts; both read
+// the same `serializeResort()` output, so the numbers and labels agree.
 // ─────────────────────────────────────────────────────────────
 
 import type {
