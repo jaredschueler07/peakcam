@@ -44,6 +44,10 @@ import {
   SNOW_KEYWORDS,
 } from "../lib/weather.js";
 
+// IndexNow ping for the pages whose report changed in this run (end of main,
+// only when INDEXNOW_ENABLED=1). Pure module: importing it reads no env.
+import { pingIndexNow } from "./indexnow-ping.js";
+
 // ─── Load .env.local manually ────────────────────────────────────────────
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -98,6 +102,7 @@ function sleep(ms: number): Promise<void> {
 
 interface SnotelResort {
   id: string;
+  slug: string;
   name: string;
   state: string;
   snotel_station_id: string;
@@ -129,7 +134,7 @@ interface ParsedDay {
 // ─── Step 1: Fetch resorts with snotel_station_id ─────────────────────────
 
 async function fetchResorts(): Promise<SnotelResort[]> {
-  const url = `${SUPABASE_URL}/rest/v1/resorts?select=id,name,state,snotel_station_id,lat,lng,resort_metadata(elevation_base_ft)&is_active=eq.true&snotel_station_id=not.is.null`;
+  const url = `${SUPABASE_URL}/rest/v1/resorts?select=id,slug,name,state,snotel_station_id,lat,lng,resort_metadata(elevation_base_ft)&is_active=eq.true&snotel_station_id=not.is.null`;
   const resp = await fetch(url, { headers: supaHeaders });
   if (!resp.ok) throw new Error(`Supabase resorts fetch failed: ${resp.status}`);
   return resp.json();
@@ -491,6 +496,9 @@ async function main(): Promise<void> {
   let success = 0;
   let failed = 0;
   let noData = 0;
+  // Slugs that got a new snow_reports row this run: the pages worth asking
+  // search engines to re-crawl now rather than on their next scheduled visit.
+  const changedSlugs: string[] = [];
 
   for (const resort of resorts) {
     try {
@@ -591,6 +599,7 @@ async function main(): Promise<void> {
 
       // 4k. Update resorts.cond_rating
       await updateResortRating(resort.id, conditions.condRating);
+      changedSlugs.push(resort.slug);
 
       // Log per-resort status
       const pctStr =
@@ -619,6 +628,21 @@ async function main(): Promise<void> {
   console.log(
     `\n[snotel-sync] Done. ${success} synced, ${noData} no data, ${failed} failed (of ${resorts.length} total)`,
   );
+
+  // IndexNow (scripts/indexnow-ping.ts): opt-in per machine via the env flag
+  // so a dev-box run against production data never pings for it. A failed
+  // ping is logged by pingIndexNow and must not fail the sync: the reports
+  // are already written. Enable on the Mini by adding INDEXNOW_ENABLED=1 to
+  // its .env.local (docs/runbook.md, "Discovery surface").
+  if (process.env.INDEXNOW_ENABLED === "1") {
+    try {
+      await pingIndexNow(changedSlugs);
+    } catch (err) {
+      console.error("[indexnow] ping failed:", err instanceof Error ? err.message : err);
+    }
+  } else if (changedSlugs.length > 0) {
+    console.log(`[indexnow] disabled (set INDEXNOW_ENABLED=1 to submit ${changedSlugs.length} changed pages)`);
+  }
 }
 
 main().catch((err) => {
