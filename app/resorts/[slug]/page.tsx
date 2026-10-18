@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getResortBySlug, getAllResortSlugs, getAllResorts, getLiveConditions, getUserConditions, getResortElevationFt } from "@/lib/supabase";
+import { getResortBySlug, getAllResortSlugs, getAllResorts, getLiveConditions, getUserConditions, getResortElevationFt, getResortOpenings } from "@/lib/supabase";
+import { resortSentence } from "@/lib/quotable";
+import type { BreadcrumbItem } from "@/components/hubs/HubBreadcrumb";
 import { ResortAboutSection } from "@/components/resort/ResortAboutSection";
 import type { NearbyResortsData } from "@/components/resort/NearbyResorts";
 import { nearbyResorts, summarizeNearby } from "@/lib/geo";
@@ -116,7 +118,7 @@ export default async function ResortPage({
   const isUS = resort.country === "US";
   const elevationFt = isUS ? null : await getResortElevationFt(resort.id);
 
-  const [weather, hourlyRaw, liveConditions, userConditions, allResorts] = await Promise.all([
+  const [weather, hourlyRaw, liveConditions, userConditions, allResorts, openings] = await Promise.all([
     isUS
       ? getWeatherForecast(resort.lat, resort.lng)
       : getOpenMeteoForecast(resort.lat, resort.lng, elevationFt),
@@ -126,7 +128,19 @@ export default async function ResortPage({
     getLiveConditions(resort.id),
     getUserConditions(resort.id),
     getAllResorts(),
+    // The freshness sentence names the opening date only for a resort with no
+    // report yet, so the openings table is read only in that case.
+    resort.snow_report ? Promise.resolve([]) : getResortOpenings(),
   ]);
+
+  // First sentence under the H1 (lib/quotable.ts): dated by the report's own
+  // updated_at, labelled by its source. Station name/elevation are not in the
+  // database yet, so the SNOTEL wording names the resort's station without
+  // the parenthetical. `new Date()` only decides whether an opening date is
+  // still ahead; same hourly ISR cadence as generateMetadata above.
+  const freshness = resortSentence(resort, new Date(), {
+    opening: openings.find((row) => row.resort_id === resort.id) ?? null,
+  });
 
   const forecastPeriods = hourlyRaw ? bucketIntoPeriods(hourlyRaw) : null;
 
@@ -270,14 +284,22 @@ export default async function ResortPage({
   // the crawl path — the old `/#browse` fragment was the homepage again. A
   // resort with no state on file (none today) falls back to the hub index.
   const crumbHub = stateHubLink ?? { label: "Ski cams", href: HUB_BASE_PATH };
+  // One trail feeds both the visible breadcrumb (HubBreadcrumb inside
+  // ResortDetailPage) and the JSON-LD below, so the two can never disagree.
+  const breadcrumb: BreadcrumbItem[] = [
+    { label: "Home", href: "/" },
+    { label: crumbHub.label, href: crumbHub.href },
+    { label: resort.name, href: `/resorts/${resort.slug}` },
+  ];
   const breadcrumbLd = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
-    itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: BASE_URL },
-      { "@type": "ListItem", position: 2, name: crumbHub.label, item: `${BASE_URL}${crumbHub.href}` },
-      { "@type": "ListItem", position: 3, name: resort.name, item: pageUrl },
-    ],
+    itemListElement: breadcrumb.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.label,
+      item: item.href === "/" ? BASE_URL : `${BASE_URL}${item.href}`,
+    })),
   };
 
   // SkiResort is a Place, which schema.org gives no dateModified — so freshness
@@ -310,7 +332,7 @@ export default async function ResortPage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageLd) }}
         />
       )}
-      <ResortDetailPage resort={resort} weather={weather} forecastPeriods={forecastPeriods} hourlyData={hourlyRaw} liveConditions={liveConditions} userConditions={userConditions} nearby={nearby} />
+      <ResortDetailPage resort={resort} weather={weather} forecastPeriods={forecastPeriods} hourlyData={hourlyRaw} liveConditions={liveConditions} userConditions={userConditions} nearby={nearby} freshness={{ segments: freshness.segments }} breadcrumb={breadcrumb} />
       <ResortAboutSection resort={resort} />
     </main>
   );

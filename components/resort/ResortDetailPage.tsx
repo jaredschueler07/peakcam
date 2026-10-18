@@ -31,6 +31,8 @@ import { useHydrated } from "@/lib/use-hydrated";
 import { formatLocalDateTime, formatUtcDate } from "@/lib/format-date";
 import { ResortAlertCapture } from "@/components/alerts/ResortAlertCapture";
 import { NearbyResorts, type NearbyResortsData } from "@/components/resort/NearbyResorts";
+import { HubBreadcrumb, type BreadcrumbItem } from "@/components/hubs/HubBreadcrumb";
+import type { Quotable } from "@/lib/quotable";
 
 interface Props {
   resort: ResortWithData;
@@ -41,6 +43,10 @@ interface Props {
   userConditions?: UserCondition[];
   /** Server-computed neighbours + hub links (app/resorts/[slug]/page.tsx); omitted → no block. */
   nearby?: NearbyResortsData | null;
+  /** Dated, source-labelled first sentence under the H1 (lib/quotable.ts); omitted → none. */
+  freshness?: Pick<Quotable, "segments"> | null;
+  /** Home / {State hub} / {Resort}; the page emits the matching BreadcrumbList JSON-LD. Omitted → the plain "All Resorts" link. */
+  breadcrumb?: BreadcrumbItem[] | null;
 }
 
 // ─── "Updated …" stamp ───────────────────────────────────────────────────────
@@ -387,7 +393,7 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData, liveConditions, userConditions = [], nearby = null }: Props) {
+export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData, liveConditions, userConditions = [], nearby = null, freshness = null, breadcrumb = null }: Props) {
   const activeCams = resort.cams.filter((c) => c.is_active);
   const embeddableCams = activeCams.filter((c) => c.embed_type !== "link");
   const snow = resort.snow_report;
@@ -444,15 +450,21 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
       {/* ── Hero ──────────────────────────────────────────────── */}
       <div className="bg-gradient-to-b from-surface2 to-bg border-b border-border px-4 py-6 md:px-8 md:py-8">
         <div className="max-w-5xl mx-auto">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 text-text-muted hover:text-cyan text-sm py-2 px-1 pointer-coarse:min-h-11 transition-colors mb-4"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            All Resorts
-          </Link>
+          {breadcrumb && breadcrumb.length > 0 ? (
+            <div className="mb-4 py-2">
+              <HubBreadcrumb items={breadcrumb} />
+            </div>
+          ) : (
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 text-text-muted hover:text-cyan text-sm py-2 px-1 pointer-coarse:min-h-11 transition-colors mb-4"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              All Resorts
+            </Link>
+          )}
 
           {hasCurrentSnowForecast(hourlyData, forecastTime ?? NaN) && (
             <div className="flex items-center gap-2 px-3 py-1.5 mb-4 bg-cyan/10 border border-cyan/30 rounded-lg w-fit">
@@ -471,6 +483,24 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
                   {resort.name}
                 </h1>
               </div>
+              {freshness && freshness.segments.length > 0 && (
+                <p className="mt-2 max-w-2xl text-[15px] leading-snug text-bark-dk" data-testid="resort-freshness">
+                  {freshness.segments.map((segment, index) =>
+                    segment.href ? (
+                      <Link
+                        key={index}
+                        href={segment.href}
+                        prefetch={false}
+                        className="font-bold text-ink underline decoration-alpen/60 decoration-2 underline-offset-[3px] hover:decoration-alpen"
+                      >
+                        {segment.text}
+                      </Link>
+                    ) : (
+                      <span key={index}>{segment.text}</span>
+                    ),
+                  )}
+                </p>
+              )}
               <p className="text-text-muted text-sm mt-1.5">
                 {resort.region} · {resort.state}
               </p>
