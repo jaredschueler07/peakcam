@@ -294,3 +294,68 @@ curl -sI https://www.peakcam.io/api/v1/resorts/breckenridge | grep -iE '^(x-attr
 curl -s https://www.peakcam.io/api/v1/powder?source=snotel | jq '.results[:3] | map({slug, in24: .newSnow24h.value})'
 curl -s https://www.peakcam.io/api/v1/openapi.json | npx --yes @redocly/cli lint --format=summary -
 ```
+
+## Discovery surface (markdown alternates, Link headers, robots, llms.txt, IndexNow)
+
+Added 2026-10-18 (branch `feat/discovery-surface`, execution plan Sprint 4). All
+of it is read-only and rides on the same cached catalogue as `/api/v1`.
+
+| Surface | Where | Cache |
+| --- | --- | --- |
+| `GET /resorts/{slug}/index.md` | `app/resorts/[slug]/index.md/route.ts` → `lib/public-api/markdown-page.ts` `resortMarkdown()` | ISR 900 s + public API `Cache-Control` |
+| `GET /index.md` | `app/index.md/route.ts` → `indexMarkdown()` | ISR 900 s |
+| `Link` header on `/` and `/resorts/{slug}` | `next.config.ts` `headers()` (`discoveryLinkHeader`) | static config |
+| `GET /robots.txt` | `app/robots.txt/route.ts` → `lib/robots.ts` (replaced `app/robots.ts`) | 24 h |
+| `GET /llms.txt` | `app/llms.txt/route.ts`, "For agents" block | ISR 3600 s |
+| IndexNow key | `public/<key>.txt`, key constant in `scripts/indexnow-ping.ts` | static |
+
+The markdown alternates answer `Content-Type: text/markdown; charset=utf-8`,
+`X-Robots-Tag: noindex` (the HTML page is what should rank), a `Link` with
+`rel="canonical"` plus the author/license relations, and the CORS/attribution
+set from `lib/public-api/headers.ts`. They are not in the sitemap. The page
+`Link` header uses relative URLs on purpose so a preview advertises its own
+alternates: `</sitemap.xml>; rel="sitemap", </resorts/{slug}/index.md>;
+rel="alternate"; type="text/markdown", </.well-known/api-catalog>;
+rel="api-catalog", </api/v1/openapi.json>; rel="service-desc"; ...`.
+
+`robots.txt` is byte-identical to the old metadata-route output plus one line
+in the `User-Agent: *` group, `Content-Signal: search=yes, ai-input=yes,
+ai-train=yes` (Content Signals Policy, Cloudflare syntax). Changing the policy
+is `CONTENT_SIGNAL` in `lib/robots.ts`; the per-bot allow rules are unchanged
+and still the place to block a single crawler.
+
+Smoke check after a deploy:
+
+```bash
+curl -sI https://www.peakcam.io/resorts/breckenridge | grep -i '^link'
+curl -sI https://www.peakcam.io/resorts/breckenridge/index.md | grep -iE '^(content-type|x-robots-tag|link|x-vercel-cache)'
+curl -s https://www.peakcam.io/robots.txt | grep -n Content-Signal      # line 2
+curl -s https://www.peakcam.io/llms.txt | sed -n '/## For agents/,/## Key pages/p'
+```
+
+**IndexNow — code shipped, not yet enabled on the Mini.** `scripts/snotel-sync.ts`
+collects the slugs that got a new `snow_reports` row and, only when
+`INDEXNOW_ENABLED=1`, POSTs their page URLs to `https://api.indexnow.org/indexnow`
+in batches of at most 10,000 (`scripts/indexnow-ping.ts`; payload and batching
+are unit-tested, no network in tests). The key file must be reachable at
+`https://www.peakcam.io/<key>.txt` first, which happens when this branch
+reaches production. A failed ping is logged and never fails the sync.
+
+To enable on the Mac mini (follow-up, not part of the deploy):
+
+1. `ssh mini`, then as `maestro_admin` in `/Users/maestro_admin/peakcam/peakcam`:
+   `git pull` so `scripts/indexnow-ping.ts` exists, then append
+   `INDEXNOW_ENABLED=1` to that checkout's `.env.local` (the sync loads it;
+   no plist edit needed, the launchd job `com.peakcam.snotel-sync` keeps its
+   21,600 s interval). To gate per job instead, add the key under
+   `EnvironmentVariables` in `~/Library/LaunchAgents/com.peakcam.snotel-sync.plist`
+   and `launchctl unload`/`load` it.
+2. Verify with a manual run: `npx tsx scripts/snotel-sync.ts 2>&1 | grep indexnow`
+   should print `[indexnow] N URLs submitted (HTTP 200)` (202 on the first
+   submissions while the key is being verified; 403 means the key file is not
+   live yet, 422 means a URL was off-host).
+3. One-off submissions: `npx tsx scripts/indexnow-ping.ts breckenridge vail`.
+   Bing Webmaster Tools > IndexNow shows what was received.
+
+`scripts/model-sync.ts` (Open-Meteo resorts) does not ping yet; add the same
+three lines there when the SNOTEL path has run clean for a week.
