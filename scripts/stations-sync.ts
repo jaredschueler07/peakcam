@@ -214,10 +214,17 @@ async function collectCandidates(resort: ResortRow): Promise<Candidate[]> {
 
   // SNOTEL: the resort's own station, exactly as snotel-sync reads it.
   if (resort.snotel_station_id) {
-    try {
-      add(await fetchSnotelObservation(normalizeTriplet(resort.snotel_station_id, resort.state)));
-    } catch (err) {
-      console.warn(`  [snotel] ${resort.slug}: ${err instanceof Error ? err.message : err}`);
+    const triplet = normalizeTriplet(resort.snotel_station_id, resort.state);
+    // AWDB answers 500 now and then (seen 2026-10-18 on /stations); one retry
+    // keeps the resort's base-depth truth in the set instead of dropping it for an hour.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        add(await fetchSnotelObservation(triplet));
+        break;
+      } catch (err) {
+        console.warn(`  [snotel] ${resort.slug}${attempt ? "" : " (retrying)"}: ${err instanceof Error ? err.message : err}`);
+        if (!attempt) await sleep(2000);
+      }
     }
   }
 
