@@ -161,6 +161,18 @@ const securityHeaders = [
   },
 ];
 
+// The `Link` header value shared by `/` and `/resorts/:slug` below:
+// sitemap, the page's markdown alternate, the RFC 9727 API catalog and the
+// OpenAPI description. Header values must be Latin-1; this is plain ASCII.
+function discoveryLinkHeader(markdownPath: string): string {
+  return [
+    '</sitemap.xml>; rel="sitemap"',
+    `<${markdownPath}>; rel="alternate"; type="text/markdown"`,
+    '</.well-known/api-catalog>; rel="api-catalog"',
+    '</api/v1/openapi.json>; rel="service-desc"; type="application/vnd.oai.openapi+json"',
+  ].join(", ");
+}
+
 const nextConfig: NextConfig = {
   // No `x-powered-by: Next.js` on every response; it is framework
   // fingerprinting with no benefit to the site.
@@ -215,6 +227,21 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*",
         headers: securityHeaders,
+      },
+      // Discovery links for agents and crawlers (execution plan Sprint 4):
+      // RFC 8288 `Link` on the two page shapes an assistant lands on. Relative
+      // URLs on purpose, so a preview deployment advertises its own alternates
+      // rather than production's. `:slug` is substituted into the value by
+      // Next's header compiler (path params are allowed in header values).
+      // The `.md` routes carry their own `Link` (canonical + author/license),
+      // so they are matched by neither entry: `:slug` is a single segment.
+      {
+        source: "/",
+        headers: [{ key: "Link", value: discoveryLinkHeader("/index.md") }],
+      },
+      {
+        source: "/resorts/:slug",
+        headers: [{ key: "Link", value: discoveryLinkHeader("/resorts/:slug/index.md") }],
       },
     ];
   },
