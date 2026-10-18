@@ -3,18 +3,20 @@
 import { useEffect, useRef, useState } from "react";
 import Script from "next/script";
 import { usePathname } from "next/navigation";
-import { META_PIXEL_ID, META_PIXEL_SNIPPET, fireMetaPixelEvent, flushMetaPixelEvents } from "@/lib/meta-pixel";
+import { buildMetaPixelSnippet, fireMetaPixelEvent, flushMetaPixelEvents, metaPixelId } from "@/lib/meta-pixel";
 
 /**
  * Loads the Meta Pixel base snippet once and fires PageView on initial mount
  * and on every client-side route change (the snippet alone only fires on full
- * page loads). Mounted once in the root layout; renders nothing visible. The
- * <noscript> image covers visitors with JavaScript disabled.
+ * page loads). Mounted once from app/client-providers.tsx, and only when
+ * NEXT_PUBLIC_META_PIXEL_ID is set; renders nothing visible. The <noscript>
+ * image covers visitors with JavaScript disabled.
  */
 export function MetaPixel() {
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
   const lastPathname = useRef<string | null>(null);
+  const id = metaPixelId();
 
   useEffect(() => {
     // afterInteractive can execute after this component's first effect. Wait
@@ -25,6 +27,8 @@ export function MetaPixel() {
     fireMetaPixelEvent("PageView");
   }, [pathname, ready]);
 
+  if (!id) return null;
+
   return (
     <>
       <Script
@@ -34,7 +38,7 @@ export function MetaPixel() {
           flushMetaPixelEvents();
           setReady(true);
         }}
-        dangerouslySetInnerHTML={{ __html: META_PIXEL_SNIPPET }}
+        dangerouslySetInnerHTML={{ __html: buildMetaPixelSnippet(id) }}
       />
       <noscript>
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -43,7 +47,7 @@ export function MetaPixel() {
           width="1"
           style={{ display: "none" }}
           alt=""
-          src={`https://www.facebook.com/tr?id=${META_PIXEL_ID}&ev=PageView&noscript=1`}
+          src={`https://www.facebook.com/tr?id=${id}&ev=PageView&noscript=1`}
         />
       </noscript>
     </>

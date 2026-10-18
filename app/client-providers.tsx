@@ -24,8 +24,13 @@ const RedditPixel = dynamic(
   () => import("@/lib/reddit-pixel").then((mod) => mod.RedditPixel),
   { ssr: false }
 );
+const MetaPixel = dynamic(
+  () => import("@/components/analytics/MetaPixel").then((mod) => mod.MetaPixel),
+  { ssr: false }
+);
 const GOOGLE_ADS_ENABLED = Boolean(process.env.NEXT_PUBLIC_GOOGLE_ADS_ID);
 const REDDIT_PIXEL_ENABLED = Boolean(process.env.NEXT_PUBLIC_REDDIT_PIXEL_ID);
+const META_PIXEL_ENABLED = Boolean(process.env.NEXT_PUBLIC_META_PIXEL_ID);
 
 export function ClientProviders({ children, release = "local" }: { children: React.ReactNode; release?: string }) {
   return (
@@ -36,6 +41,7 @@ export function ClientProviders({ children, release = "local" }: { children: Rea
       </Suspense>
       {GOOGLE_ADS_ENABLED && <GoogleTag />}
       {REDDIT_PIXEL_ENABLED && <RedditPixel />}
+      {META_PIXEL_ENABLED && <MetaPixel />}
     </PostHogProvider></BugReportProvider>
   );
 }
