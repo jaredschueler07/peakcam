@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
 import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition, PowderProbability, PowderProbabilityForecast, PowderProbabilityWindow } from "./types";
 import type { ResortOpening } from "./openings";
+import type { StationNormalsSummary } from "./resort-faq";
 import { withResolvedCamNames } from "./cam-name";
 import { clampHours, pickResortTimeline, shapeTimeline, toFrame, MAX_TIMELINE_HOURS, type CamStillRow, type CamTimeline, type CamTimelineFrame } from "./cam-timeline";
 
@@ -534,8 +535,7 @@ export async function getResortSitemapEntries(): Promise<ResortSitemapEntry[]> {
   }));
 }
 
-/** Fetch all resort slugs — used for generateStaticParams. */
-export async function getAllResortSlugs(): Promise<string[]> {
+async function fetchAllResortSlugs(): Promise<string[]> {
   const { data, error } = await supabase
     .from("resorts")
     .select("slug")
@@ -543,6 +543,16 @@ export async function getAllResortSlugs(): Promise<string[]> {
 
   if (error) throw error;
   return data?.map((r) => r.slug) ?? [];
+}
+
+// Single-flight: the resort page family (overview, snow-report, webcams) runs
+// three generateStaticParams concurrently while `next build` collects page
+// data, and they must all see the same slug list — one query, three callers.
+const fetchAllResortSlugsSingleFlight = singleFlight(fetchAllResortSlugs);
+
+/** Fetch all resort slugs — used for generateStaticParams. */
+export function getAllResortSlugs(): Promise<string[]> {
+  return fetchAllResortSlugsSingleFlight();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -630,4 +640,92 @@ export async function getLatestArchivedStill(resortId: string): Promise<CamTimel
     return null;
   }
   return data ? toFrame(data as CamStillRow, supabaseUrl) : null;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Resort subpages (parity plan P2): history, normals, every cam's timeline
+// ─────────────────────────────────────────────────────────────
+
+/** One `snowpack_daily` row as the snow-report subpage reads it (migration 005). */
+export interface SnowpackHistoryRow {
+  date: string;
+  station_id: string;
+  snow_depth_in: number | null;
+  swe_in: number | null;
+  precip_accum_in: number | null;
+  temp_max_f: number | null;
+  temp_min_f: number | null;
+  qc_flag: string;
+}
+
+const SNOWPACK_HISTORY_COLUMNS = "date,station_id,snow_depth_in,swe_in,precip_accum_in,temp_max_f,temp_min_f,qc_flag";
+
+/**
+ * The most recent `days` rows of `snowpack_daily` for a resort, newest first
+ * (the same columns the MCP get_snow_history tool reads). Fails soft to []:
+ * the history table is one section of the snow-report subpage, whose core
+ * numbers come from getResortBySlug, and a missing table must not fail the
+ * ISR revalidation.
+ */
+export async function getSnowpackHistory(resortId: string, days = 7): Promise<SnowpackHistoryRow[]> {
+  const { data, error } = await supabase
+    .from("snowpack_daily")
+    .select(SNOWPACK_HISTORY_COLUMNS)
+    .eq("resort_id", resortId)
+    .order("date", { ascending: false })
+    .limit(Math.max(1, Math.min(days, 60)));
+  if (error) {
+    if (!MISSING_TABLE_CODES.has(error.code)) console.warn("[PeakCam] Could not fetch snowpack history:", error.message);
+    return [];
+  }
+  return (data ?? []) as unknown as SnowpackHistoryRow[];
+}
+
+/**
+ * The peak of a station's 1991–2020 median snow depth across the water year
+ * (`snotel_normals`, migration 005): the "typical season" figure the FAQ
+ * quotes. Null for a resort without a station, a station the normals seed
+ * does not cover, or a failed query (the FAQ then drops the question).
+ */
+export async function getStationNormalsSummary(stationId: string | null | undefined): Promise<StationNormalsSummary | null> {
+  if (!stationId) return null;
+  const { data, error } = await supabase
+    .from("snotel_normals")
+    .select("day_of_water_year, median_depth_in, median_swe_in")
+    .eq("station_id", stationId)
+    .not("median_depth_in", "is", null)
+    .order("median_depth_in", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    if (!MISSING_TABLE_CODES.has(error.code)) console.warn("[PeakCam] Could not fetch station normals:", error.message);
+    return null;
+  }
+  if (!data || data.median_depth_in == null) return null;
+  const peak = Number(data.median_depth_in);
+  if (!Number.isFinite(peak) || peak <= 0) return null;
+  return {
+    peakMedianDepthIn: peak,
+    peakDayOfWaterYear: Number(data.day_of_water_year),
+    peakMedianSweIn: data.median_swe_in == null ? null : Number(data.median_swe_in),
+  };
+}
+
+/**
+ * A timeline per archive-allowed cam for the webcams subpage: one query for
+ * the resort, shaped per cam, in `camOrder`. Cams with nothing on tape are
+ * absent from the map. Null when the view is missing or the query failed.
+ */
+export async function getResortCamTimelines(resortId: string, camOrder: readonly string[], hours = 24): Promise<Map<string, CamTimeline> | null> {
+  const h = clampHours(hours);
+  const now = new Date();
+  const rows = await fetchCamStillRows({ resortId }, h, now);
+  if (!rows) return null;
+  const ids = new Set(rows.map((r) => r.cam_id));
+  const out = new Map<string, CamTimeline>();
+  for (const camId of [...camOrder.filter((id) => ids.has(id)), ...[...ids].filter((id) => !camOrder.includes(id))]) {
+    const t = shapeTimeline(rows, { camId, hours: h, now, supabaseUrl });
+    if (t) out.set(camId, t);
+  }
+  return out;
 }
