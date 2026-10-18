@@ -59,8 +59,8 @@ test("links are site-relative, with no origin, trailing slash or double slash", 
 });
 
 test("a pending link stops being pending once its route lands on this branch", () => {
-  // The MCP route ships on feat/mcp-server. While it is absent the link is
-  // allowed to be pending; once app/api/mcp/route.ts exists, drop the flag so
+  // For a route that ships on another branch: while it is absent the link is
+  // allowed to be pending; once the route file exists, drop the flag so
   // the first test guards it like every other link.
   for (const [id, link] of entries) {
     if (!("pending" in link && link.pending)) continue;

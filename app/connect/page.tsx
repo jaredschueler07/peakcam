@@ -131,8 +131,9 @@ export default function ConnectPage() {
           </SectionHeading>
           <p className="mt-4 max-w-3xl text-[15.5px] leading-relaxed text-ink">
             The server is <span className="font-mono text-[14px]">{MCP_NAME}</span>, speaking stateless Streamable HTTP with no
-            authentication. Every tool is annotated read-only and returns a short, dated markdown answer plus a structured
-            document that matches the{" "}
+            authentication and no legacy SSE endpoint; it negotiates protocol revisions 2026-07-28, 2025-11-25 and
+            2025-06-18, and a plain browser GET on the URL returns a small JSON description of itself. Every tool is
+            annotated read-only and returns a short, dated markdown answer plus a structured document that matches the{" "}
             <a href={CONNECT_LINKS.openapi.href} className={linkClass}>
               public API
             </a>{" "}
