@@ -39,6 +39,7 @@ with the resort's canonical URL) and a `structuredContent` document that matches
 | `get_forecast` | `slug` | `{ available, provider: "nws", note, periods[] }` | Five-day NWS forecast for US resorts; `available: false` for Canada and the Andes, or when NWS does not answer. Snow inches are keyword heuristics, not QPF. |
 | `get_snow_history` | `slug`, `days?` 1–30 (14) | `{ source, station, rows[] }` | Daily depth, SWE, precipitation accumulation, temperatures and QC flag from `snowpack_daily`, newest first. |
 | `get_opening_dates` | `state?`, `limit?` 1–150 (50) | `{ asOf, totalMatching, resorts: { season }[] }` | Season open/closed/unknown with confirmed or projected dates, soonest first. |
+| `get_stations` | `slug` | `{ available, count, stations: ObservationStation[], measuredNow: MeasuredNow[], sources[] }` | Up to three stations within 25 km by elevation band (summit / mid / base) with network, elevation, distance, reading time and age, depth, new snow, SWE, temperature, wind. `available: false` until the station layer is populated. Markdown is a table plus the attribution lines. |
 
 Unknown slugs return `isError: true` with up to five close matches, for example:
 
@@ -56,6 +57,13 @@ them:
 | `snotel` | SNOTEL-measured (USDA NRCS) | Read from the NRCS station nearest the resort, quality-controlled, refreshed every 6 h. Valid at the station's elevation (in `station.elevationFt`), not the summit. |
 | `open_meteo` | model estimate (Open-Meteo) | Weather-model estimate for resorts without a station (most of Canada and the Andes). |
 | `pipeline` / `manual` / `resort` | PeakCam multi-source blend / hand-entered / resort-reported | Rare today. |
+
+`get_stations` names observation networks rather than report sources (`measuredNow[].source`):
+`snotel` (USDA NRCS, daily, depth + SWE), `ghcn` (NOAA NCEI GHCN-Daily cooperative observers,
+daily, depth + new snow), `nws` (NOAA NWS hourly surface observations: METAR and mesonet,
+temperature + wind), `bc_asws` (BC River Forecast Centre automated snow stations, hourly),
+`eccc` (Environment and Climate Change Canada, hourly). Each row carries the attribution line
+its terms ask for; `docs/stations.md` has the endpoints and licences.
 
 ## Resource
 

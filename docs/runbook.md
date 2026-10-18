@@ -45,6 +45,7 @@ Then spot-check `/`, a `/resorts/<slug>`, `/snow-report`, `/about`.
 | `com.peakcam.cam-health-check` | Probe every cam, bump `consecutive_failures`, auto-disable dead ones | daily 06:00 | running (scheduled) |
 | `com.peakcam.cam-stills` | Capture one frame per click-to-play cam → bucket `cam-stills`, `cams.still_url`; archive a frame for every `archive_allowed` cam → `cam_stills` + `archive/` prefix, prune by retention (`scripts/cam-capture-stills.ts`, policy `docs/cams/still-archive-policy.md`) | every 6 h (21,600 s, since 2026-10-18; was 2 h) | running on the mini (scheduled) — deploy note below |
 | `com.peakcam.model-sync` | Weather-model sync (`scripts/model-sync.ts`) | every 6 h | running (scheduled) |
+| `com.peakcam.stations-sync` | Station layer (`scripts/stations-sync.ts`): up to three stations per resort by elevation band from SNOTEL, GHCN-Daily, NWS obs, BC ASWS, ECCC → `stations`, `resort_stations`, `station_observations` (migration 026). Reads only public APIs; never touches `snow_reports`. `docs/stations.md` | hourly (3,600 s) | **plist in repo, not yet loaded on the mini** — recipe below |
 | `com.peakcam.pipeline` | Multi-source blender | daily 06:00 | **prepared but Disabled=true** — awaits migration 010 |
 
 All of the above run from the ops checkout `/Users/maestro_admin/peakcam/peakcam` on the
@@ -70,6 +71,39 @@ launchctl kickstart -k gui/$(id -u)/com.peakcam.cam-stills   # first run now; ex
 After the first run `select count(*) from cam_stills` should grow by roughly the number
 of archive-allowed active cams (249 on 2026-10-18) per run. The Studio runs only
 `com.peakcam.cam-check` and has no peakcam clone (checked 2026-10-18).
+
+**Loading `com.peakcam.stations-sync` for the first time (parity block P3):** on the
+Mac mini as `maestro_admin`, pull `main`, prove the fetchers against public APIs with a
+dry run, then load the plist and kick it once. The job needs `SUPABASE_SERVICE_ROLE_KEY`
+in the checkout's `.env.local` (already there for `snotel-sync`); the optional road-cam
+keys (`UDOT_API_KEY`, `WSDOT_ACCESS_CODE`, `COTRIP_API_KEY`) are read only by
+`approach-cams-sync`.
+
+```bash
+ssh mini
+cd /Users/maestro_admin/peakcam/peakcam && git pull && npm ci
+npx tsx scripts/stations-sync.ts --dry-run --resort alta        # expect a summit NWS row and the Atwater SNOTEL row
+cp com.peakcam.stations-sync.plist ~/Library/LaunchAgents/
+launchctl bootout gui/$(id -u)/com.peakcam.stations-sync 2>/dev/null
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.peakcam.stations-sync.plist
+launchctl kickstart -k gui/$(id -u)/com.peakcam.stations-sync   # first full sync now, ~10 min for 148 resorts
+tail -f scripts/stations-sync.log                                # ends with "N/148 resorts with ≥1 station, M with ≥2 sources"
+npx tsx scripts/approach-cams-sync.ts --dry-run                  # 19 resorts / 71 cams from Caltrans + DriveBC on 2026-10-18
+npx tsx scripts/approach-cams-sync.ts                            # writes kind=approach cams rows once the DriveBC terms call is made
+```
+
+Verify in production after the first run:
+
+```bash
+curl -s https://www.peakcam.io/api/v1/resorts/alta | jq '.measuredNow[] | {role, source, sourceId, elevationFt, ageMinutes, snowDepthIn, tempF, windMph}'
+curl -s https://www.peakcam.io/resorts/alta/index.md | grep -A6 "What the instruments say"
+npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_stations --tool-arg slug=alta
+```
+
+and in SQL: `select source, count(*) from stations group by 1;`
+`select count(distinct resort_id) from resort_stations;`
+`select max(observed_at) from station_observations;`. The API and the page cache the
+station index for 15 minutes, so allow that long after the first sync.
 
 ## Launchd Services (Studio)
 
@@ -334,10 +368,10 @@ are optional until their block lands.
 | Table / columns | Migration | Written by | Read by |
 | --- | --- | --- | --- |
 | `resorts.runs_total, lifts_total, skiable_acres, vertical_ft, annual_snowfall_in, longest_run_mi, description, description_source, trail_map_url, wikidata_id, aliases[], passes[], elevation_base_ft, elevation_summit_ft` | 025 | `scripts/import-resorts-standalone.mjs` (optional CSV columns), later the P2 enrichment job | `/api/v1` `profile` + `location`, resort pages (P2) |
-| `cams.kind, credit, source_terms_url` | 025 | importer (optional `cams.csv` columns), P8 cam audit | `/api/v1` cams |
+| `cams.kind, credit, source_terms_url` | 025 | importer (optional `cams.csv` columns), `scripts/approach-cams-sync.ts` (kind=approach), P8 cam audit | `/api/v1` cams |
 | `cam_timelapses` (`"window"` is quoted in SQL: reserved word) | 025 | P8 timelapse job (mini, ffmpeg, Storage bucket pending the user's budget call) | cam pages, `Cam.timelapses` |
-| `stations`, `resort_stations` | 026 | P3 station-discovery job | `Resort.stations` |
-| `station_observations` (PK `(station_id, observed_at)` is the read index) | 026 | P3 per-source fetchers (NWS, METAR, GHCN, ECCC, BC ASWS, road cams) | `Resort.measuredNow` |
+| `stations`, `resort_stations` | 026 | `scripts/stations-sync.ts` (hourly, `com.peakcam.stations-sync`) | `Resort.stations`, resort page "What the instruments say", MCP `get_stations` |
+| `station_observations` (PK `(station_id, observed_at)` is the read index) | 026 | `scripts/stations-sync.ts` via `lib/stations/` (SNOTEL, GHCN, NWS, BC ASWS, ECCC) | `Resort.measuredNow` |
 | `forecast_runs`, `forecast_daily` | 027 | P4 forecast-sync job | `Resort.forecast` |
 | `forecast_scores` | 027 | P4 verification job (rewrites per resort/model/window) | `Resort.forecastScores` |
 | `resort_scores` | 028 | P7 scoring job | `Resort.score`, leaderboards |
