@@ -79,6 +79,7 @@ often quote their upper mountain). Full details: ${SITE_URL}/methodology
 ## Key pages
 
 - [Snow Report](${SITE_URL}/snow-report): every resort's base depth, fresh snow, and conditions in one sortable table — the fastest answer to "where is the snow right now"
+- [Snowpack percent of normal](${SITE_URL}/snow-report/percent-of-normal): SNOTEL-fed resorts ranked by snow water equivalent against the station's 1991–2020 median, dated to the reading; listed only above 2 in. of SWE and inside the 10–300% band
 - [Resort Map](${SITE_URL}/map): interactive map of all resorts with live snow data and weather radar
 - [Compare](${SITE_URL}/compare): side-by-side conditions for any set of resorts
 - [About](${SITE_URL}/about): what PeakCam is and where the data comes from

@@ -87,6 +87,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     { url: SITE_URL, lastModified: dataModified, changeFrequency: "hourly", priority: 1.0 },
     { url: `${SITE_URL}/snow-report`, lastModified: dataModified, changeFrequency: "hourly", priority: 0.9 },
+    // Percent-of-normal leaderboard: ranks the SNOTEL-fed resorts, so it
+    // changes with the newest report like the other aggregate pages.
+    { url: `${SITE_URL}/snow-report/percent-of-normal`, lastModified: dataModified, changeFrequency: "hourly", priority: 0.7 },
     { url: `${SITE_URL}/map`, lastModified: dataModified, changeFrequency: "hourly", priority: 0.8 },
     { url: `${SITE_URL}/compare`, lastModified: buildTime, changeFrequency: "weekly", priority: 0.6 },
     // Powder-alert sign-up landing page: the only dedicated conversion page,
