@@ -242,3 +242,70 @@ test("indexMarkdown honours baseUrl for site links (previews)", () => {
   assert.ok(md.includes("- API base: https://preview.example/api/v1"));
   assert.ok(md.includes("https://preview.example/ski-cams/colorado"));
 });
+
+// ── Subpage alternates (parity plan P2) ──────────────────────
+
+import { snowReportMarkdown, webcamsMarkdown } from "./markdown-page";
+
+test("resortMarkdown labels a stored description with its source and links the subpages", () => {
+  const md = resortMarkdown(resort(), { now: new Date(AT), description: { text: "Alta-style powder.", source: "operator" } });
+  assert.match(md, /^Description \(operator\): Alta-style powder\.$/m);
+  assert.match(md, /^- Snow report: https:\/\/www\.peakcam\.io\/resorts\/breckenridge\/snow-report \(markdown: https:\/\/www\.peakcam\.io\/resorts\/breckenridge\/snow-report\/index\.md\)$/m);
+  assert.match(md, /^- Webcams: https:\/\/www\.peakcam\.io\/resorts\/breckenridge\/webcams \(markdown: .*\/webcams\/index\.md\)$/m);
+  assert.doesNotMatch(resortMarkdown(resort(), { now: new Date(AT) }), /Description \(/);
+});
+
+test("snowReportMarkdown: today's table, dated history, forecast with its caveat, report count, station link", () => {
+  const md = snowReportMarkdown(resort(), {
+    now: new Date(AT),
+    history: [
+      { date: "2026-12-20", station_id: "531:CO:SNTL", snow_depth_in: 42, swe_in: 9.5, precip_accum_in: 12.1, temp_max_f: 28, temp_min_f: 10, qc_flag: "valid" },
+      { date: "2026-12-19", station_id: "531:CO:SNTL", snow_depth_in: 36, swe_in: 8.9, precip_accum_in: 11.4, temp_max_f: null, temp_min_f: 4, qc_flag: "suspect" },
+    ],
+    forecast: [
+      { dow: "Today", condition: "heavy-snow", high: 24, low: 12, snowInches: 6, shortForecast: "Heavy Snow", windSpeed: 10, windDirection: "W", windGust: null, precipProbability: 90, feelsLike: 14 },
+    ],
+    userReportCount48h: 2,
+  });
+  assert.match(md, /^# Breckenridge snow report: measured conditions$/m);
+  assert.match(md, /^Canonical: https:\/\/www\.peakcam\.io\/resorts\/breckenridge\/snow-report$/m);
+  assert.match(md, /^\| Base depth \| 42 in \| SNOTEL, Hoosier Pass, 11,400 ft \| 2026-12-20T12:00:00\.000Z \|$/m);
+  assert.match(md, /^\| 2026-12-19 \| 36 in \| 8\.9 in \| 11\.4 in \| n\/a \/ 4°F \| suspect \|$/m);
+  assert.match(md, /Rows are daily readings from NRCS station 531:CO:SNTL/);
+  assert.match(md, /^\| Today \| Heavy Snow \| 24°F \/ 12°F \| 6 in \| 90% \|$/m);
+  assert.match(md, /keyword estimates from the forecast text/);
+  assert.match(md, /^2 user-submitted conditions reports in the last 48 hours/m);
+  assert.match(md, /methodology#snotel \(station 531:CO:SNTL, Hoosier Pass\)/);
+  // No history, no forecast, no report: honest lines, no table.
+  const empty = snowReportMarkdown(resort({ snow: null }), { now: new Date(AT), history: [], forecast: null, userReportCount48h: 0 });
+  assert.match(empty, /No snow report yet this season\./);
+  assert.match(empty, /No daily station history stored for this resort yet\./);
+  assert.match(empty, /Forecast unavailable at render time\./);
+  assert.match(empty, /No user-submitted conditions reports in the last 48 hours\./);
+});
+
+test("webcamsMarkdown: counts by health, one line per cam, frames on tape only where they exist", () => {
+  const md = webcamsMarkdown(resort(), {
+    now: new Date(AT),
+    timelines: {
+      "cam-1": {
+        camId: "cam-1",
+        hours: 24,
+        frames: [{ id: 1, camId: "cam-1", url: "https://x.supabase.co/storage/v1/object/public/cam-stills/archive/cam-1/a.jpg", capturedAt: "2026-12-20T06:00:00.000Z", snow24hAtCapture: 6, keeper: true }],
+        lastStorm: { id: 1, camId: "cam-1", url: "https://x.supabase.co/storage/v1/object/public/cam-stills/archive/cam-1/a.jpg", capturedAt: "2026-12-20T06:00:00.000Z", snow24hAtCapture: 6, keeper: true },
+      },
+    },
+  });
+  assert.match(md, /^# Breckenridge webcams: 3 live cams$/m);
+  assert.match(md, /^3 webcams at Breckenridge: 1 live, 1 offline, 1 not yet checked as of the last health check at 4:00 AM MT on Dec 20, 2026\.$/m);
+  assert.match(md, /^- Summit \(11,000 ft\): live, provider still, capture time unknown; watch at https:\/\/www\.peakcam\.io\/resorts\/breckenridge$/m);
+  assert.match(md, /^  - Last 24 h on tape \(1 frame\):$/m);
+  assert.match(md, /^    - 2026-12-20T06:00:00\.000Z, 6 in new in 24 h at capture: https:\/\/x\.supabase\.co/m);
+  assert.match(md, /^  - Last storm on tape: 2026-12-20T06:00:00\.000Z \(6 in in 24 h\)/m);
+  assert.match(md, /^Canonical: https:\/\/www\.peakcam\.io\/resorts\/breckenridge\/webcams$/m);
+  // Only cam-1 has frames; the others get just their line.
+  assert.equal((md.match(/Last 24 h on tape/g) ?? []).length, 1);
+  const none = webcamsMarkdown(resort({ cams: [] }), { now: new Date(AT), timelines: {} });
+  assert.match(none, /^# Breckenridge webcams: 0 live cams$/m);
+  assert.match(none, /PeakCam lists no active webcams for Breckenridge\./);
+});

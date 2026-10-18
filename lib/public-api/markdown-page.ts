@@ -14,6 +14,11 @@
 
 import { SITE_URL } from "@/lib/site";
 import { HUB_BASE_PATH, stateHubPath, stateLabel } from "@/lib/hubs";
+import type { WeatherPeriod } from "@/lib/types";
+import type { CamTimeline } from "@/lib/cam-timeline";
+import type { SnowHistoryRow } from "@/lib/mcp/types";
+import { DESCRIPTION_SOURCE_LABELS, type ResortDescription } from "@/lib/resort-profile";
+import { RESORT_SUBPAGES, resortTabMarkdownPath, resortTabPath } from "@/lib/resort-pages";
 import { publicApiHeaders } from "./headers";
 import type {
   CamPublic,
@@ -32,6 +37,8 @@ export interface MarkdownPageOptions {
   now?: Date;
   /** Origin for site links (API, hubs, feeds). Defaults to the production www host. */
   baseUrl?: string;
+  /** The stored `resorts.description` with its provenance, when the row has one (P2 plumbing). */
+  description?: ResortDescription | null;
 }
 
 /**
@@ -212,6 +219,10 @@ export function resortMarkdown(resort: ResortPublic, opts: MarkdownPageOptions =
     "",
   ];
 
+  if (opts.description) {
+    lines.push(`Description (${DESCRIPTION_SOURCE_LABELS[opts.description.source]}): ${opts.description.text}`, "");
+  }
+
   if (snow) {
     lines.push(snowTable(snow), "");
     const extras: string[] = [];
@@ -239,9 +250,170 @@ export function resortMarkdown(resort: ResortPublic, opts: MarkdownPageOptions =
   lines.push(`- Cams API: ${resort.apiUrl}/cams`);
   lines.push(`- Powder feed (Atom): ${resort.canonicalUrl}/powder.xml`);
   if (resort.websiteUrl) lines.push(`- Resort website: ${resort.websiteUrl}`);
+  lines.push(...subpageLinks(resort, opts.baseUrl));
   lines.push("");
 
   lines.push(attributionBlock(resort.canonicalUrl, resort.attribution, resort.license), "");
+  return lines.join("\n");
+}
+
+/** "- Snow report: …/snow-report (markdown: …/snow-report/index.md)" for every subpage in the family. */
+function subpageLinks(resort: Pick<ResortPublic, "slug">, baseUrl: string = SITE_URL): string[] {
+  return RESORT_SUBPAGES.map(
+    (tab) => `- ${tab.label}: ${baseUrl}${resortTabPath(resort.slug, tab.key)} (markdown: ${baseUrl}${resortTabMarkdownPath(resort.slug, tab.key)})`,
+  );
+}
+
+// ── /resorts/{slug}/snow-report/index.md ─────────────────────
+
+export interface SnowReportMarkdownExtras extends MarkdownPageOptions {
+  /** `snowpack_daily` rows, newest first (the 7-day history table). */
+  history: readonly SnowHistoryRow[];
+  /** NWS (US) or Open-Meteo daily periods, or null when the service did not answer. */
+  forecast: readonly WeatherPeriod[] | null;
+  /** Unflagged on-mountain user reports in the last 48 hours. */
+  userReportCount48h: number;
+}
+
+function degrees(value: number | null | undefined): string {
+  return value == null || !Number.isFinite(value) ? "n/a" : `${Math.round(value)}°F`;
+}
+
+function historyTable(rows: readonly SnowHistoryRow[]): string[] {
+  if (!rows.length) return ["No daily station history stored for this resort yet."];
+  const out = ["| Date | Snow depth | SWE | Precip (accum.) | High / low | QC |", "| --- | --- | --- | --- | --- | --- |"];
+  for (const r of rows) {
+    out.push(
+      `| ${r.date} | ${inches(r.snow_depth_in)} | ${inches(r.swe_in)} | ${inches(r.precip_accum_in)} | ${degrees(r.temp_max_f)} / ${degrees(r.temp_min_f)} | ${r.qc_flag} |`,
+    );
+  }
+  const station = rows[0].station_id;
+  out.push(
+    "",
+    station === "open-meteo"
+      ? "Rows are weather-model estimates (Open-Meteo), one per day, written by PeakCam's model sync."
+      : `Rows are daily readings from NRCS station ${station}, quality-controlled (range and spike checks; \`suspect\` rows are kept but flagged).`,
+  );
+  return out;
+}
+
+function forecastTable(periods: readonly WeatherPeriod[] | null, country: string): string[] {
+  if (!periods || !periods.length) return ["Forecast unavailable at render time."];
+  const out = ["| Day | Forecast | High / low | Est. snow | Precip chance |", "| --- | --- | --- | --- | --- |"];
+  for (const p of periods) {
+    const chance = p.precipProbability == null ? "n/a" : `${Math.round(p.precipProbability)}%`;
+    out.push(`| ${p.dow} | ${p.shortForecast} | ${degrees(p.high)} / ${degrees(p.low)} | ${inches(p.snowInches)} | ${chance} |`);
+  }
+  out.push(
+    "",
+    country === "US"
+      ? "Source: National Weather Service point forecast. Snow amounts are keyword estimates from the forecast text, not a quantitative precipitation forecast."
+      : "Source: Open-Meteo model forecast for the resort's coordinates. Snow amounts are model estimates.",
+  );
+  return out;
+}
+
+export function snowReportMarkdown(resort: ResortPublic, extras: SnowReportMarkdownExtras): string {
+  const base = extras.baseUrl ?? SITE_URL;
+  const canonical = `${base}${resortTabPath(resort.slug, "snow-report")}`;
+  const snow = resort.snow;
+  const lines: string[] = [
+    `# ${resort.name} snow report: measured conditions`,
+    "",
+    resortSummarySentence(resort, extras),
+    "",
+  ];
+  if (snow) {
+    lines.push("## Today's numbers", "", snowTable(snow), "");
+    const extrasLine: string[] = [];
+    if (snow.trend7d.value) extrasLine.push(`7-day trend: ${snow.trend7d.value}`);
+    if (snow.outlook) extrasLine.push(`outlook: ${snow.outlook.replace("_", " ")}`);
+    if (extrasLine.length) lines.push(`${extrasLine.join("; ")}.`, "");
+  } else {
+    lines.push("## Today's numbers", "", "No snow report yet this season.", "");
+  }
+  lines.push(seasonLine(resort.season), "");
+  lines.push(`## Last ${extras.history.length || 7} days`, "", ...historyTable(extras.history), "");
+  lines.push("## Forecast", "", ...forecastTable(extras.forecast, resort.location.country), "");
+  const n = extras.userReportCount48h;
+  lines.push(
+    "## On-mountain reports",
+    "",
+    n === 0
+      ? "No user-submitted conditions reports in the last 48 hours."
+      : `${n} user-submitted conditions report${n === 1 ? "" : "s"} in the last 48 hours; read them on the resort page.`,
+    "",
+  );
+  const station = snow?.baseDepth.station ?? snow?.newSnow24h.station;
+  lines.push("## Links", "");
+  lines.push(`- Resort page: ${resort.canonicalUrl}`);
+  lines.push(...subpageLinks(resort, base));
+  lines.push(`- API: ${resort.apiUrl}`);
+  lines.push(`- Powder feed (Atom): ${resort.canonicalUrl}/powder.xml`);
+  lines.push(`- How the station is read: ${base}/methodology#snotel${station ? ` (station ${station.id}${station.name ? `, ${station.name}` : ""})` : ""}`);
+  lines.push("");
+  lines.push(attributionBlock(canonical, resort.attribution, resort.license), "");
+  return lines.join("\n");
+}
+
+// ── /resorts/{slug}/webcams/index.md ─────────────────────────
+
+export interface WebcamsMarkdownExtras extends MarkdownPageOptions {
+  /** camId → still-archive timeline (only cams with frames on tape). */
+  timelines: Readonly<Record<string, CamTimeline>>;
+}
+
+function timelineLines(timeline: CamTimeline | undefined): string[] {
+  if (!timeline) return [];
+  const out: string[] = [];
+  if (timeline.frames.length) {
+    out.push(`  - Last ${timeline.hours} h on tape (${timeline.frames.length} frame${timeline.frames.length === 1 ? "" : "s"}):`);
+    for (const f of timeline.frames) {
+      const snow = f.snow24hAtCapture == null ? "" : `, ${inches(f.snow24hAtCapture)} new in 24 h at capture`;
+      out.push(`    - ${f.capturedAt}${snow}: ${f.url}`);
+    }
+  }
+  if (timeline.lastStorm) {
+    const s = timeline.lastStorm;
+    out.push(`  - Last storm on tape: ${s.capturedAt}${s.snow24hAtCapture == null ? "" : ` (${inches(s.snow24hAtCapture)} in 24 h)`}: ${s.url}`);
+  }
+  return out;
+}
+
+export function webcamsMarkdown(resort: ResortPublic, extras: WebcamsMarkdownExtras): string {
+  const base = extras.baseUrl ?? SITE_URL;
+  const canonical = `${base}${resortTabPath(resort.slug, "webcams")}`;
+  const cams = resort.cams;
+  const live = cams.filter((c) => c.live === true).length;
+  const offline = cams.filter((c) => c.live === false).length;
+  const unchecked = cams.length - live - offline;
+  const checks = cams.map((c) => c.lastCheckedAt).filter((v): v is string => Boolean(v)).sort();
+  const latestCheck = checks.length ? checks[checks.length - 1] : null;
+  const lines: string[] = [`# ${resort.name} webcams: ${cams.length} live cam${cams.length === 1 ? "" : "s"}`, ""];
+  if (cams.length === 0) {
+    lines.push(`PeakCam lists no active webcams for ${resort.name}.`, "");
+  } else {
+    const when = latestCheck ? ` as of the last health check at ${formatMountainTime(latestCheck)}` : "";
+    lines.push(
+      `${cams.length} webcam${cams.length === 1 ? "" : "s"} at ${resort.name}: ${live} live, ${offline} offline, ${unchecked} not yet checked${when}.`,
+      "",
+    );
+    for (const cam of cams) {
+      lines.push(camLine(cam), ...timelineLines(extras.timelines[cam.id]));
+    }
+    lines.push(
+      "",
+      "`live` is the last health check, not proof of a live broadcast. Frames on tape are PeakCam's own 6-hourly captures of cams whose operators allow archiving; provider snapshots are served as published and their age is unknown.",
+      "",
+    );
+  }
+  lines.push("## Links", "");
+  lines.push(`- Resort page: ${resort.canonicalUrl}`);
+  lines.push(...subpageLinks(resort, base));
+  lines.push(`- Cams API: ${resort.apiUrl}/cams`);
+  if (resort.websiteUrl) lines.push(`- Resort website: ${resort.websiteUrl}`);
+  lines.push("");
+  lines.push(attributionBlock(canonical, resort.attribution, resort.license), "");
   return lines.join("\n");
 }
 
