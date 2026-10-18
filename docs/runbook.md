@@ -272,6 +272,14 @@ cached catalogue (`getAllResorts()`, 1 h) plus `resort_openings` and
 | `GET /api/v1/powder?window=24h\|48h&state=&minInches=&source=&limit=` | Ranked new snow; `source=snotel` = measured only | ISR 900 s per URL |
 | `GET /api/v1/openapi.json` | OpenAPI 3.1, generated from the zod registry in `lib/public-api/schema.ts` | static, 1 h / 24 h CDN |
 | `GET /.well-known/api-catalog` | RFC 9727 linkset pointing at the OpenAPI document | static, 1 h / 24 h CDN |
+| `GET /api/v1/resorts/search-index` | Slug, name, aliases (`lib/ask/aliases.ts`), state, country, lat/lon, page URL per resort (P9) | 1 h / 24 h CDN |
+| `GET /api/v1/status` | Report freshness (≤ 12 h) and cam health (≥ 90 % live) with thresholds; 200 `degraded`, 503 only when the read throws (P9) | 5 min CDN |
+| `GET\|POST /api/v1/ask` | Deterministic answer endpoint (`lib/ask/*`): `?q=` or `{"query"}`; `AskAnswer` with `answerable`, `sentence`, `data`, `citations`; 400 only for a missing/oversized question (P9) | 900 s; `no-store` when unanswerable |
+| `GET\|POST /ask` | NLWeb-shaped wrapper over the same router (`query_id`, `results[]`, `peakcam`); excluded from `proxy.ts` like `/api/v1` (P9) | same |
+| `POST /api/v1/batch` | ≤ 10 GET paths (`{"requests":[{"path"}]}` or a string array) dispatched in-process to the route handlers, results in order; 400 names a disallowed path (P9) | `no-store` |
+| `GET /.well-known/schemas` + `/{file}.json` | Standalone JSON Schemas (draft 2020-12) per registered shape, `lib/public-api/json-schemas.ts` | static, 1 h / 24 h CDN |
+| `GET /llms-full.txt` | Long agent guide built from the tool definitions and `lib/mcp/examples.ts` (`lib/public-api/llms-full.ts`) | static, 1 h / 24 h CDN |
+| `GET /gpt-instructions.md` | Custom GPT instructions (`lib/public-api/gpt-instructions.ts`) | static, 1 h / 24 h CDN |
 
 All routes answer `OPTIONS` with 204. Unknown slugs 404 with `Cache-Control:
 no-store`; all other responses carry `public, s-maxage=900,
@@ -316,7 +324,25 @@ Smoke check after a deploy:
 curl -sI https://www.peakcam.io/api/v1/resorts/breckenridge | grep -iE '^(x-attribution|link|cache-control|access-control|x-vercel-cache)'
 curl -s https://www.peakcam.io/api/v1/powder?source=snotel | jq '.results[:3] | map({slug, in24: .newSnow24h.value})'
 curl -s https://www.peakcam.io/api/v1/openapi.json | npx --yes @redocly/cli lint --format=summary -
+# P9 block 1
+curl -s 'https://www.peakcam.io/api/v1/ask?q=is+alta+open' | jq '{answerable, intent, tool, sentence, citations}'
+curl -s https://www.peakcam.io/api/v1/ask -H 'content-type: application/json' -d '{"query":"where did it snow most in Colorado, measured only"}' | jq '{intent, arguments, sentence}'
+curl -s 'https://www.peakcam.io/ask?query=compare+vail+and+keystone' | jq '{query_id, n: (.results|length), first: .results[0].description}'
+curl -s https://www.peakcam.io/api/v1/batch -H 'content-type: application/json' -d '{"requests":[{"path":"/api/v1/resorts/alta"},{"path":"/api/v1/resorts/vail/cams"},{"path":"/api/v1/powder?state=UT&limit=3"},{"path":"/api/v1/nope"}]}' | jq '{status: .status, error}'   # 400 disallowed_path
+curl -s https://www.peakcam.io/api/v1/batch -H 'content-type: application/json' -d '{"requests":[{"path":"/api/v1/resorts/alta"},{"path":"/api/v1/status"}]}' | jq '.results[] | {path, status}'
+curl -s https://www.peakcam.io/api/v1/resorts/search-index | jq '{count, breck: (.resorts[] | select(.slug=="breckenridge") | .aliases)}'
+curl -s https://www.peakcam.io/api/v1/status | jq '{status, age: .checks.snowReports.ageHours, live: .checks.cams.liveRatio, issues}'
+curl -s https://www.peakcam.io/.well-known/schemas | jq '.count'
+curl -s https://www.peakcam.io/.well-known/schemas/resort.json | jq '."$id"'
+curl -s https://www.peakcam.io/llms-full.txt | grep -c '^### '          # 14 tools + 10 REST routes = 24
+curl -sI https://www.peakcam.io/gpt-instructions.md | grep -i '^content-type'
 ```
+
+Unmatched `/ask` questions land in `agent_memory` (`entity = 'ask:unmatched'`, `source_agent`
+`ask-api` or `ask-mcp`, `source_thread` = salted day-scoped IP hash or null, `expires_at` 30
+days). Review with
+`select fact, source_agent, created_at from agent_memory where entity = 'ask:unmatched' order by created_at desc limit 50;`
+and turn recurring misses into alias or intent rules in `lib/ask/aliases.ts` / `lib/ask/router.ts`.
 
 ## Discovery surface (markdown alternates, Link headers, robots, llms.txt, IndexNow)
 
@@ -396,7 +422,8 @@ static; nothing here reads the database.
 | `GET /api/mcp/server-card` | `app/api/mcp/server-card/route.ts`, re-exports the `.well-known` handlers (SEP-2127 reserved location `<streamable-http-url>/server-card`) | same, byte-identical |
 | `server.json` (repo root) | MCP Registry manifest, read by `mcp-publisher publish` from the repo root; not served | n/a |
 | Footer "Developers" column | `components/home/PeakFooter.tsx`: `/connect`, `/api/mcp`, `/api/v1/resorts`, `/api/v1/openapi.json`, `/llms.txt` | static |
-| `llms.txt` "For agents" MCP line | `app/llms.txt/route.ts` | ISR 3600 s |
+| `llms.txt` "For agents" MCP line | `app/llms.txt/route.ts` (tool list from `PEAKCAM_TOOL_NAMES`) | ISR 3600 s |
+| `GET /llms-full.txt` | `app/llms-full.txt/route.ts` → `lib/public-api/llms-full.ts` | static per deploy, 24 h CDN |
 
 The server card follows the SEP-2127 **v1** shape (schema
 `https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json`):
@@ -408,7 +435,16 @@ documentation) is under `_meta["io.peakcam/connect"]`. The SEP's reserved
 location is `<streamable-http-url>/server-card`, i.e. `/api/mcp/server-card`,
 served since 2026-10-18 by re-exporting the same handlers, so the two documents
 cannot drift. An `/.well-known/ai-catalog.json` pointing at the card is the
-discovery entry the extension expects and is not shipped yet.
+discovery entry the extension expects and is not shipped yet (the parity plan
+drops it: no consumer reads it).
+
+MCP tool verification after a deploy (expect 14 names, `ask` last):
+
+```bash
+npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/list | jq -r '.tools[].name'
+npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name ask --tool-arg question="is Breck open"
+npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_cam_timeline --tool-arg slug=breckenridge --tool-arg hours=24
+```
 
 Guard rails: `tests/connect-links.test.ts` walks every internal href in
 `CONNECT_LINKS` and fails if it does not match a `page.tsx`/`route.ts` under
