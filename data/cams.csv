@@ -273,7 +273,8 @@ wintergreen,Classic,3515,image,https://ftp.resortcams.com/wintergreen/skyline.jp
 wintergreen,Lookout,3515,image,https://ftp.resortcams.com/wintergreen/slopeside.jpg,,true
 wisp,Base,3080,image,https://ftp.resortcams.com/wisp/image.jpg,,true
 wisp,Mountain Park,3080,image,https://ftp.resortcams.com/wisp-resort-mountain-park/image.jpg,,true
-snowshoe,Webcams,4848,link,https://snowshoemtn.com/media-room/web-cams,,trueski-santa-fe,Quad Top,10350,iframe,https://player.brownrice.com/snapshot/quadtop,,true
+snowshoe,Webcams,4848,link,https://snowshoemtn.com/media-room/web-cams,,true
+ski-santa-fe,Quad Top,10350,iframe,https://player.brownrice.com/snapshot/quadtop,,true
 ski-santa-fe,Base,10350,iframe,https://player.brownrice.com/snapshot/santafe,,true
 ski-santa-fe,Chair 5,10350,iframe,https://player.brownrice.com/snapshot/santafechair5,,true
 taos,Base,9207,iframe,https://live2.brownrice.com/embed/tsv,,true
