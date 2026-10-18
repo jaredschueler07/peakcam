@@ -1,6 +1,7 @@
 # Cam still archive policy
 
-> Status: in force from 2026-10-18 (migration 024, Sprint 8 of the 2026-10-18 execution plan).
+> Status: in force from 2026-10-18 (migration 024, Sprint 8 of the 2026-10-18 execution plan);
+> cadence and retention tiers revised the same day by parity block P8 (15-min captures, 48 h / 6 h / 30 d).
 > Owner: PeakCam ops. Takedown contact: see "Takedown and opt-out" below.
 > Code: `scripts/cam-capture-stills.ts` (writes), `lib/cam-timeline.ts` (rules),
 > `lib/supabase.ts` `getCamTimeline()` (reads), `supabase/migrations/024_cam_still_history.sql`.
@@ -61,8 +62,13 @@ or flip rows by hand after checking the provider against the table above.
 ## 3. What a frame is
 
 - One JPEG per cam per run, at most 1280 px wide, quality 4, about 40 KB.
-- Captured every 6 h (`com.peakcam.cam-stills.plist`, `StartInterval` 21,600 s),
-  aligned with the SNOTEL sync so the 24 h number stamped on the frame is fresh.
+- Captured every 15 min (`com.peakcam.cam-stills.plist`, `StartInterval` 900 s,
+  `CAPTURE_INTERVAL_S` in `lib/cam-timeline.ts`). The 24 h number stamped on the
+  frame is whatever `latest_snow_reports` holds at capture; the SNOTEL sync
+  refreshes it every 6 h. Cams that only need a "latest frame" (not
+  `archive_allowed`) are still captured once per 6 h: the job skips them while
+  `cams.still_captured_at` is fresher than that, so the heavy HLS grabs keep their
+  old rhythm (`--force-latest` overrides).
 - Stored in the public bucket `cam-stills` under `archive/<cam_id>/<iso>.jpg`,
   immutable path, one-year cache headers. The existing "latest frame" objects under
   `<cam_id>/` are untouched and keep their own 7-day retention.
@@ -74,28 +80,48 @@ or flip rows by hand after checking the provider against the table above.
 
 ## 4. Retention
 
-| Frame | Kept | Why |
-| --- | --- | --- |
-| Non-keeper | 30 days rolling | Enough for "last 24 h" and "same time last week" without an open-ended archive. |
-| Keeper (`snow_24h_at_capture >= 6` in.) | 365 days | The "last storm on tape" frame. One season's worth of storm days per cam. |
+Three tiers, judged per cam by the age of the frame at prune time:
 
-The capture job prunes at the end of every run: storage object first, then the row.
-A frame whose object delete fails keeps its row and is retried next run, so storage
-is never orphaned. Rules and thresholds live in `lib/cam-timeline.ts`
-(`ARCHIVE_RETENTION_DAYS`, `KEEPER_RETENTION_DAYS`, `KEEPER_MIN_SNOW_24H_IN`).
+| Age of frame | Kept | Why |
+| --- | --- | --- |
+| 0 to 48 h | Every frame (96 a day at 15 min) | "Last 24 h on tape" at full density; the source for the P8 block-2 timelapses. |
+| 48 h to 30 days | One frame per 6 h bucket per cam: the earliest keeper in the bucket if there is one, otherwise the earliest frame | "Same time last week" and the month's storm days without an open-ended archive. |
+| Over 30 days | Keepers (`snow_24h_at_capture >= 6` in.) only, to 365 days | The "last storm on tape" frame. One season's worth of storm days per cam. |
+
+Buckets are 6 h slots aligned to the UTC epoch, so a bucket is the same slot on
+every run. The selection is pure and idempotent (`selectPrune()` in
+`lib/cam-timeline.ts`, unit-tested in `lib/cam-timeline.test.ts`): the survivor of
+a bucket is always its oldest keeper-preferred frame, which is also the first frame
+of that bucket to age past 48 h, so a second pass over the survivors deletes
+nothing. Thresholds: `FULL_RETENTION_HOURS`, `THIN_BUCKET_HOURS`,
+`ARCHIVE_RETENTION_DAYS`, `KEEPER_RETENTION_DAYS`, `KEEPER_MIN_SNOW_24H_IN`.
+
+The capture job prunes at the end of every run (`pruneArchive()` in
+`scripts/cam-capture-stills.ts`): storage object first, then the row. A frame whose
+object delete fails keeps its row and is retried next run, so storage is never
+orphaned. Each run reads two bounded candidate sets: rows past their expiry cutoff
+(at most 1,000 per run; the rest follow next run) and the thinning band behind the
+48 h edge, `PRUNE_LOOKBACK_DAYS` (7) deep, snapped to whole buckets
+(`pruneWindow()`). After downtime longer than a week run
+`npx tsx scripts/cam-capture-stills.ts --prune-only --prune-lookback-days 30` once
+for a full pass; `--dry-run` reports what would go.
 
 ### Storage estimate
 
 | | |
 | --- | --- |
-| Archive-allowed active cams | 249 today, planned for about 405 |
-| Frames per cam per day | 4 |
-| Bytes per frame | about 40 KB |
-| Per day at 405 cams | about 65 MB |
-| Rolling 30 days | about 2 GB |
-| Keepers | about 40 KB × storm-day frames; a 30-storm-day season across 405 cams adds about 2 GB at most |
+| Archive-allowed active cams | 249 today; about 405 once the P8 cam additions are flagged |
+| Frames per cam per day (first 48 h) | 96 |
+| Bytes per frame | about 30 to 40 KB |
+| Written per day at 250 cams | about 700 MB to 1 GB (the plan's 96 × 30 KB × 250 estimate) |
+| Held in the 48 h tier at 250 cams | about 1.4 to 2 GB |
+| Held in the 6 h tier (28 days × 4 frames × 250 cams) | about 1 GB |
+| Keepers | about 40 KB × 4 per storm day per cam; a 30-storm-day season across 405 cams adds about 2 GB at most |
+| Steady state at 405 cams | about 6 GB, well inside the Pro plan's 100 GB |
 
-Current production use before the archive (2026-10-18): 1,170 objects, 106 MB.
+Per-run work is bounded by the cam count: one capture, one upload and one row per
+archive-allowed cam, plus the prune queries above. Production use before the
+archive (2026-10-18): 1,170 objects, 106 MB.
 
 ## 5. Where it shows
 

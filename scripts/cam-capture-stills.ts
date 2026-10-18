@@ -14,10 +14,11 @@
  *    snapshot endpoints and image feeds, see docs/cams/still-archive-policy.md —
  *    store the same frame a second time under archive/<camId>/<iso>.jpg and
  *    insert a cam_stills row carrying the resort's latest 24 h number. A frame
- *    taken while that number is >= 6 in. is a storm `keeper`. Non-keepers are
- *    pruned after 30 days, keepers after a year (object and row). The site
- *    reads the archive through the cam_still_timeline view
- *    (lib/supabase.ts getCamTimeline); the rules live in lib/cam-timeline.ts.
+ *    taken while that number is >= 6 in. is a storm `keeper`. Retention has
+ *    three tiers (lib/cam-timeline.ts selectPrune): every frame for 48 h, then
+ *    one frame per 6 h bucket (keeper preferred) to 30 days, keepers to a year;
+ *    the rest is deleted, object first, then row. The site reads the archive
+ *    through the cam_still_timeline view (lib/supabase.ts getCamTimeline).
  *
  * Rules:
  *   - Provider stills are never replaced on the card: cams.still_url is only
@@ -29,11 +30,18 @@
  *     stream URLs stay in the log.
  *   - Latest-frame objects older than RETENTION_DAYS are deleted per cam so
  *     the <camId>/ prefix stays bounded; the archive/ prefix is pruned by row.
+ *   - Cadence: the job runs every 15 min (900 s) for the archive. A cam that
+ *     only needs a latest frame (no archive_allowed) is still captured once per
+ *     LATEST_INTERVAL_MS, so the heavy HLS grabs keep their 6 h rhythm.
+ *   - Work per run is bounded by the cam count: one capture and one upload
+ *     per cam, one prune query set (expired rows, limit 1000, plus the
+ *     thinning band behind the 48 h edge, PRUNE_LOOKBACK_DAYS deep).
  *
- * Usage: npx tsx scripts/cam-capture-stills.ts [--dry-run] [--only <slug|cam-id>] [--concurrency 4] [--no-archive]
+ * Usage: npx tsx scripts/cam-capture-stills.ts [--dry-run] [--only <slug|cam-id>] [--concurrency 4]
+ *        [--no-archive] [--force-latest] [--prune-lookback-days N] [--prune-only]
  * Needs: ffmpeg + ffprobe on PATH, .env.local with NEXT_PUBLIC_SUPABASE_URL and
  * SUPABASE_SERVICE_ROLE_KEY. Scheduled via com.peakcam.cam-stills.plist every
- * 6 h (21,600 s), aligned with the SNOTEL sync so the 24 h number is fresh.
+ * 15 min (StartInterval 900, see docs/cams/still-archive-policy.md).
  */
 import fs from "node:fs";
 import os from "node:os";
@@ -43,7 +51,7 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import type { Cam } from "../lib/types.js";
 import { providerStill } from "../lib/cam-preview.js";
-import { archivePath, isKeeper, pruneCutoffs } from "../lib/cam-timeline.js";
+import { ARCHIVE_RETENTION_DAYS, PRUNE_LOOKBACK_DAYS, archivePath, isKeeper, pruneWindow, selectPrune, type PruneRow } from "../lib/cam-timeline.js";
 
 const exec = promisify(execFile);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -69,7 +77,15 @@ const DRY = args.includes("--dry-run");
 const ONLY = args.includes("--only") ? args[args.indexOf("--only") + 1] : null;
 const CONCURRENCY = Number(args.includes("--concurrency") ? args[args.indexOf("--concurrency") + 1] : 4) || 4;
 const NO_ARCHIVE = args.includes("--no-archive");
+/** Capture latest-only cams even when their still is fresher than LATEST_INTERVAL_MS. */
+const FORCE_LATEST = args.includes("--force-latest");
+/** Skip captures; only run the archive prune (catch-up after downtime). */
+const PRUNE_ONLY = args.includes("--prune-only");
+/** Days behind the 48 h edge to re-thin; `--prune-lookback-days 30` is a full pass. */
+const PRUNE_LOOKBACK_DAYS_ARG = Number(args.includes("--prune-lookback-days") ? args[args.indexOf("--prune-lookback-days") + 1] : PRUNE_LOOKBACK_DAYS) || PRUNE_LOOKBACK_DAYS;
 const BUCKET = "cam-stills";
+/** Latest-only cams (no archive) are re-captured at most this often; 5 min slack under 6 h so a 900 s schedule hits every 6 h run. */
+const LATEST_INTERVAL_MS = 6 * 3_600_000 - 5 * 60_000;
 /** Latest-frame objects (<camId>/ prefix) kept per cam. The archive/ prefix has its own retention in lib/cam-timeline.ts. */
 const RETENTION_DAYS = 7;
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
@@ -209,40 +225,63 @@ async function insertArchiveRow(row: ArchiveRow) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/cam_stills`, { method: "POST", headers: { ...sb, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(row) });
   if (!res.ok) throw new Error(`cam_stills POST ${res.status}: ${(await res.text()).slice(0, 200)}`);
 }
+/** One PostgREST page of cam_stills rows for `filter`; `offset` for paging. */
+async function fetchPruneRows(filter: string, offset = 0, limit = 1000): Promise<PruneRow[]> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/cam_stills?select=id,cam_id,captured_at,keeper,path&${filter}&order=captured_at.asc,id.asc&limit=${limit}&offset=${offset}`, { headers: sb });
+  if (!res.ok) throw new Error(`cam_stills GET ${res.status}: ${(await res.text()).slice(0, 120)}`);
+  return (await res.json()) as PruneRow[];
+}
 /**
- * Retention: non-keepers older than 30 days, keepers older than a year
- * (lib/cam-timeline.ts). Objects first, then rows; a failed object delete
- * leaves the rows for the next run rather than orphaning storage.
+ * Retention pass (lib/cam-timeline.ts selectPrune): every frame for 48 h,
+ * one per 6 h bucket to 30 days, keepers to a year. Two candidate sets are
+ * read: rows past their expiry cutoff (bounded at 1000 per run; the rest
+ * follow next run) and the thinning band behind the 48 h edge,
+ * `lookbackDays` deep, whole 6 h buckets only (pruneWindow). Objects first,
+ * then rows; a failed object delete leaves the rows for the next run rather
+ * than orphaning storage. Idempotent: a second pass finds nothing.
  */
-async function pruneArchive() {
-  const cut = pruneCutoffs(new Date());
-  const filter = `or=(and(keeper.eq.false,captured_at.lt.${cut.plain}),and(keeper.eq.true,captured_at.lt.${cut.keeper}))`;
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/cam_stills?select=id,path&${filter}&order=captured_at.asc&limit=1000`, { headers: sb });
-  if (!res.ok) { console.log(`  ! prune: cam_stills GET ${res.status}`); return 0; }
-  const rows = (await res.json()) as { id: number; path: string }[];
-  if (!rows.length) return 0;
+export async function pruneArchive(now = new Date(), lookbackDays = PRUNE_LOOKBACK_DAYS_ARG, dry = DRY): Promise<{ candidates: number; selected: number; removed: number }> {
+  const w = pruneWindow(now, lookbackDays);
+  const seen = new Map<number, PruneRow & { path: string }>();
+  const add = (rows: PruneRow[]) => { for (const r of rows) seen.set(r.id, r as PruneRow & { path: string }); };
+  try {
+    add(await fetchPruneRows(`or=(and(keeper.eq.false,captured_at.lt.${w.plain}),and(keeper.eq.true,captured_at.lt.${w.keeper}))`));
+    // Thinning band: paged, capped so one run can never read the whole table.
+    for (let page = 0, offset = 0; page < 40; page++, offset += 1000) {
+      const rows = await fetchPruneRows(`captured_at=gte.${w.thinFrom}&captured_at=lt.${w.thinTo}`, offset);
+      add(rows);
+      if (rows.length < 1000) break;
+    }
+  } catch (e) { console.log(`  ! prune: ${(e as Error).message}`); return { candidates: seen.size, selected: 0, removed: 0 }; }
+  const candidates = [...seen.values()];
+  const doomed = selectPrune(candidates, now);
+  if (!doomed.length || dry) return { candidates: candidates.length, selected: doomed.length, removed: 0 };
   let removed = 0;
-  for (let i = 0; i < rows.length; i += 100) {
-    const batch = rows.slice(i, i + 100);
+  for (let i = 0; i < doomed.length; i += 100) {
+    const batch = doomed.slice(i, i + 100);
     const del = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}`, { method: "DELETE", headers: { ...sb, "Content-Type": "application/json" }, body: JSON.stringify({ prefixes: batch.map(r => r.path) }) });
     if (!del.ok) { console.log(`  ! prune: object DELETE ${del.status}: ${(await del.text()).slice(0, 120)}`); continue; }
     const rowDel = await fetch(`${SUPABASE_URL}/rest/v1/cam_stills?id=in.(${batch.map(r => r.id).join(",")})`, { method: "DELETE", headers: { ...sb, Prefer: "return=minimal" } });
     if (!rowDel.ok) { console.log(`  ! prune: cam_stills DELETE ${rowDel.status}`); continue; }
     removed += batch.length;
   }
-  return removed;
+  return { candidates: candidates.length, selected: doomed.length, removed };
 }
 
 // ─── main ────────────────────────────────────────────────────────────────
+const lookbackLabel = () => PRUNE_LOOKBACK_DAYS_ARG >= ARCHIVE_RETENTION_DAYS ? "full pass" : `${PRUNE_LOOKBACK_DAYS_ARG} d lookback`;
 async function main() {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/cams?select=*,resorts(slug)&is_active=eq.true&auto_disabled=eq.false&embed_type=neq.link&order=resort_id,name`, { headers: sb });
   if (!res.ok) throw new Error(`cams GET ${res.status}`);
   // Two target sets, one pass: cams that need a latest frame (no provider
   // still) and cams whose history we may keep (archive_allowed). A cam can be
   // both; it is captured once and stored twice.
-  const wantsLatest = (c: CamRow) => providerStill(c) === null;
   const wantsArchive = (c: CamRow) => !NO_ARCHIVE && c.archive_allowed === true;
-  const cams = ((await res.json()) as CamRow[]).filter(c => wantsLatest(c) || wantsArchive(c)).filter(c => !ONLY || c.id === ONLY || c.resorts?.slug === ONLY);
+  // Latest-only cams keep a 6 h rhythm under the 15 min schedule: skip them
+  // while their still is fresh. Archive cams are captured every run.
+  const latestFresh = (c: CamRow) => !FORCE_LATEST && !wantsArchive(c) && !!c.still_captured_at && Date.now() - Date.parse(c.still_captured_at) < LATEST_INTERVAL_MS;
+  const wantsLatest = (c: CamRow) => providerStill(c) === null && !latestFresh(c);
+  const cams = PRUNE_ONLY ? [] : ((await res.json()) as CamRow[]).filter(c => wantsLatest(c) || wantsArchive(c)).filter(c => !ONLY || c.id === ONLY || c.resorts?.slug === ONLY);
   const nLatest = cams.filter(wantsLatest).length, nArchive = cams.filter(wantsArchive).length;
   console.log(`[cam-stills] ${new Date().toISOString()} ${cams.length} cams: ${nLatest} need a latest frame, ${nArchive} archive-allowed${DRY ? " (dry run)" : ""}`);
   const snow24h = nArchive ? await latestSnow24h() : new Map<string, number | null>();
@@ -290,8 +329,9 @@ async function main() {
   }
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
   fs.rmSync(tmp, { recursive: true, force: true });
-  const pruned = DRY || NO_ARCHIVE ? 0 : await pruneArchive();
-  console.log(`[cam-stills] done: ${summary.stored} latest stored, ${summary.archived} archived (${summary.keepers} keepers), ${summary.blank} blank, ${summary.failed} failed, ${pruned} archive frames pruned`);
+  const prune = NO_ARCHIVE || ONLY ? { candidates: 0, selected: 0, removed: 0 } : await pruneArchive();
+  const pruneNote = DRY ? `${prune.selected} of ${prune.candidates} candidate frames would be pruned` : `${prune.removed} archive frames pruned (${prune.selected} selected of ${prune.candidates} candidates, ${lookbackLabel()})`;
+  console.log(`[cam-stills] done: ${summary.stored} latest stored, ${summary.archived} archived (${summary.keepers} keepers), ${summary.blank} blank, ${summary.failed} failed, ${pruneNote}`);
 }
 
 const invokedDirectly = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);

@@ -8,7 +8,8 @@
  *   archive  — a frame stored at archive/<camId>/<stamp>.jpg in bucket
  *              cam-stills with a cam_stills row. Only for archive_allowed cams.
  *   keeper   — an archived frame captured while the resort's latest 24 h
- *              number was >= KEEPER_MIN_SNOW_24H_IN. Kept a year, not 30 days.
+ *              number was >= KEEPER_MIN_SNOW_24H_IN. Kept a year, not 30 days,
+ *              and preferred when a 6 h bucket is thinned to one frame.
  *   timeline — the shaped read model: up to STRIP_FRAMES recent frames in a
  *              window, plus the newest keeper ("last storm on tape").
  */
@@ -18,16 +19,26 @@ export const STORAGE_BUCKET = "cam-stills";
 export const ARCHIVE_PREFIX = "archive";
 /** 24 h new snow (inches) at capture that makes a frame a storm keeper. */
 export const KEEPER_MIN_SNOW_24H_IN = 6;
+/** Capture cadence of com.peakcam.cam-stills (plist StartInterval), seconds. */
+export const CAPTURE_INTERVAL_S = 900;
+/** Every frame is kept this long ("last 24 h on tape" at full 15-min density). */
+export const FULL_RETENTION_HOURS = 48;
+/** Past FULL_RETENTION_HOURS one frame per this many hours survives, per cam. */
+export const THIN_BUCKET_HOURS = 6;
 /** Non-keepers are pruned after this many days (object + row). */
 export const ARCHIVE_RETENTION_DAYS = 30;
 /** Keepers are pruned after this many days. */
 export const KEEPER_RETENTION_DAYS = 365;
+/** How far behind the 48 h edge the capture job re-thins on an ordinary run (days). */
+export const PRUNE_LOOKBACK_DAYS = 7;
 /** Frames shown in the resort page's "Last 24 h" strip. */
 export const STRIP_FRAMES = 4;
 /** Longest window getCamTimeline / the MCP tool will serve. */
 export const MAX_TIMELINE_HOURS = 48;
 
 const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
+const BUCKET_MS = THIN_BUCKET_HOURS * HOUR_MS;
 
 /** One row of cam_stills / cam_still_timeline as the site reads it. */
 export interface CamStillRow {
@@ -85,23 +96,64 @@ export function publicStillUrl(supabaseUrl: string, path: string): string {
   return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/${STORAGE_BUCKET}/${path}`;
 }
 
-/**
- * Rows the prune pass should delete at `now`: non-keepers older than
- * ARCHIVE_RETENTION_DAYS, keepers older than KEEPER_RETENTION_DAYS.
- */
-export function selectPrune<T extends Pick<CamStillRow, "captured_at" | "keeper">>(rows: readonly T[], now: Date): T[] {
-  const plainCutoff = now.getTime() - ARCHIVE_RETENTION_DAYS * DAY_MS;
-  const keeperCutoff = now.getTime() - KEEPER_RETENTION_DAYS * DAY_MS;
-  return rows.filter((row) => {
-    const t = Date.parse(row.captured_at);
-    if (Number.isNaN(t)) return false;
-    return row.keeper ? t < keeperCutoff : t < plainCutoff;
-  });
+/** Row shape the prune selection needs; `id` only breaks ties between equal timestamps. */
+export type PruneRow = Pick<CamStillRow, "id" | "cam_id" | "captured_at" | "keeper">;
+
+/** 6 h bucket index of an instant (UTC-epoch aligned), shared by selectPrune and pruneWindow. */
+export function thinBucket(t: number): number {
+  return Math.floor(t / BUCKET_MS);
 }
 
-/** `captured_at` lower bound for the prune query (the older of the two cutoffs). */
-export function pruneCutoffs(now: Date): { plain: string; keeper: string } {
+/**
+ * Rows the prune pass should delete at `now`. Three tiers, per cam:
+ *
+ *   age <= 48 h            keep every frame (15-min density)
+ *   48 h < age <= 30 d     keep one frame per 6 h bucket: the earliest keeper
+ *                          in the bucket if there is one, else the earliest frame
+ *   age > 30 d             keepers survive to 365 d, everything else goes
+ *
+ * Pure and idempotent: given the survivors of one pass it returns nothing,
+ * because the bucket representative is always the oldest (keeper-preferred)
+ * frame and that frame is the first to have aged into the band. The caller
+ * decides which rows to feed in (see pruneWindow); buckets are only judged
+ * against the rows present, so hand it whole buckets.
+ */
+export function selectPrune<T extends PruneRow>(rows: readonly T[], now: Date): T[] {
+  const fullCutoff = now.getTime() - FULL_RETENTION_HOURS * HOUR_MS;
+  const plainCutoff = now.getTime() - ARCHIVE_RETENTION_DAYS * DAY_MS;
+  const keeperCutoff = now.getTime() - KEEPER_RETENTION_DAYS * DAY_MS;
+  const parsed = rows
+    .map((row) => ({ row, t: Date.parse(row.captured_at) }))
+    .filter((x) => !Number.isNaN(x.t))
+    .sort((a, b) => a.t - b.t || a.row.id - b.row.id);
+  const doomed: T[] = [];
+  const survivor = new Map<string, { row: T; keeper: boolean }>();
+  for (const { row, t } of parsed) {
+    if (row.keeper ? t < keeperCutoff : t < plainCutoff) { doomed.push(row); continue; }
+    if (t >= fullCutoff) continue;
+    const key = `${row.cam_id}|${thinBucket(t)}`;
+    const cur = survivor.get(key);
+    if (!cur) { survivor.set(key, { row, keeper: row.keeper }); continue; }
+    if (row.keeper && !cur.keeper) { doomed.push(cur.row); survivor.set(key, { row, keeper: true }); continue; }
+    doomed.push(row);
+  }
+  return doomed;
+}
+
+/**
+ * Query bounds for one prune pass. `thinFrom`/`thinTo` bracket the band the
+ * job re-thins each run: everything that aged past 48 h in the last
+ * `lookbackDays` days, with the lower edge snapped down to a 6 h bucket
+ * boundary so a bucket is never half inside the band. `plain`/`keeper` are
+ * the expiry cutoffs. A full pass is `lookbackDays = ARCHIVE_RETENTION_DAYS`.
+ */
+export function pruneWindow(now: Date, lookbackDays = PRUNE_LOOKBACK_DAYS): { thinFrom: string; thinTo: string; plain: string; keeper: string } {
+  const thinTo = now.getTime() - FULL_RETENTION_HOURS * HOUR_MS;
+  const lookback = Math.min(Math.max(lookbackDays, 0), ARCHIVE_RETENTION_DAYS) * DAY_MS;
+  const thinFrom = thinBucket(thinTo - lookback) * BUCKET_MS;
   return {
+    thinFrom: new Date(thinFrom).toISOString(),
+    thinTo: new Date(thinTo).toISOString(),
     plain: new Date(now.getTime() - ARCHIVE_RETENTION_DAYS * DAY_MS).toISOString(),
     keeper: new Date(now.getTime() - KEEPER_RETENTION_DAYS * DAY_MS).toISOString(),
   };

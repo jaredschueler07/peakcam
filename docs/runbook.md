@@ -43,7 +43,7 @@ Then spot-check `/`, a `/resorts/<slug>`, `/snow-report`, `/about`.
 | `com.peakcam.agents` | 9-agent Slack bot loop | always-on | **running** |
 | `com.peakcam.snotel-sync` | SNOTEL data sync → `snow_reports` | daily 07:00 | running (scheduled) |
 | `com.peakcam.cam-health-check` | Probe every cam, bump `consecutive_failures`, auto-disable dead ones | daily 06:00 | running (scheduled) |
-| `com.peakcam.cam-stills` | Capture one frame per click-to-play cam → bucket `cam-stills`, `cams.still_url`; archive a frame for every `archive_allowed` cam → `cam_stills` + `archive/` prefix, prune by retention (`scripts/cam-capture-stills.ts`, policy `docs/cams/still-archive-policy.md`) | every 6 h (21,600 s, since 2026-10-18; was 2 h) | running on the mini (scheduled) — deploy note below |
+| `com.peakcam.cam-stills` | Capture one frame per click-to-play cam → bucket `cam-stills`, `cams.still_url` (latest-only cams at most every 6 h); archive a frame for every `archive_allowed` cam → `cam_stills` + `archive/` prefix; prune: all frames 48 h, one per 6 h to 30 d, keepers to 365 d (`scripts/cam-capture-stills.ts`, policy `docs/cams/still-archive-policy.md`) | every 15 min (900 s, P8 block 1; was 21,600 s earlier on 2026-10-18, 7,200 s before that) | running on the mini (scheduled) — deploy note below |
 | `com.peakcam.model-sync` | Weather-model sync (`scripts/model-sync.ts`) | every 6 h | running (scheduled) |
 | `com.peakcam.stations-sync` | Station layer (`scripts/stations-sync.ts`): up to three stations per resort by elevation band from SNOTEL, GHCN-Daily, NWS obs, BC ASWS, ECCC → `stations`, `resort_stations`, `station_observations` (migration 026). Reads only public APIs; never touches `snow_reports`. `docs/stations.md` | hourly (3,600 s) | **plist in repo, not yet loaded on the mini** — recipe below |
 | `com.peakcam.pipeline` | Multi-source blender | daily 06:00 | **prepared but Disabled=true** — awaits migration 010 |
@@ -55,10 +55,10 @@ directory; `com.peakcam.snotel-sync` (21600), `model-sync`, `cam-health-check` a
 `agents` share the path. The clone was on `main` at `5583736` with one dirty file, so it
 is behind `origin/main` until the next pull.
 
-**Deploying a change to `com.peakcam.cam-stills` (e.g. the Sprint 8 archive, 2026-10-18):**
-on the Mac mini as `maestro_admin`, pull `main` in `/Users/maestro_admin/peakcam/peakcam`
-and reload the plist (the repo plist already points at that path; the interval moves
-from 7,200 s to 21,600 s):
+**Deploying a change to `com.peakcam.cam-stills` (e.g. the P8 15-min cadence, 2026-10-18):**
+on the Mac mini as `maestro_admin` (`ssh mini`), pull `main` in
+`/Users/maestro_admin/peakcam/peakcam` and reload the plist (the repo plist already
+points at that path; the interval is now 900 s):
 
 ```bash
 cd /Users/maestro_admin/peakcam/peakcam && git pull
@@ -66,7 +66,13 @@ cp com.peakcam.cam-stills.plist ~/Library/LaunchAgents/
 launchctl bootout gui/$(id -u)/com.peakcam.cam-stills 2>/dev/null
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.peakcam.cam-stills.plist
 launchctl kickstart -k gui/$(id -u)/com.peakcam.cam-stills   # first run now; expect "archived N" in the log
+tail -3 scripts/cam-capture-stills.log                         # "... archive frames pruned (N selected of M candidates, 7 d lookback)"
 ```
+
+After a cadence change or any gap longer than a week, run one full retention pass by
+hand so the band the job re-thins each run (7 days behind the 48 h edge) is not left
+with unthinned history: `npx tsx scripts/cam-capture-stills.ts --prune-only --prune-lookback-days 30`
+(add `--dry-run` first to see the count).
 
 After the first run `select count(*) from cam_stills` should grow by roughly the number
 of archive-allowed active cams (249 on 2026-10-18) per run. The Studio runs only

@@ -6,9 +6,11 @@ import {
   clampHours,
   isKeeper,
   pickResortTimeline,
+  pruneWindow,
   publicStillUrl,
   selectPrune,
   shapeTimeline,
+  thinBucket,
   type CamStillRow,
 } from "./cam-timeline";
 
@@ -56,7 +58,7 @@ test("public URL points at the public bucket path", () => {
 
 // ─── prune selection ────────────────────────────────────────────────────
 
-test("prune: non-keepers after 30 days, keepers after a year, nothing else", () => {
+test("prune: non-keepers after 30 days, keepers after a year, bad dates ignored", () => {
   const rows = [
     row("c", daysAgo(29)),
     row("c", daysAgo(31)),
@@ -65,7 +67,73 @@ test("prune: non-keepers after 30 days, keepers after a year, nothing else", () 
     row("c", "not a date"),
   ];
   const doomed = selectPrune(rows, NOW);
-  assert.deepEqual(doomed.map((r) => r.captured_at), [daysAgo(31), daysAgo(366)]);
+  assert.deepEqual(doomed.map((r) => r.captured_at).sort(), [daysAgo(31), daysAgo(366)].sort());
+});
+
+test("prune: every frame inside 48 h survives at 15-min density", () => {
+  const rows = Array.from({ length: 48 * 4 }, (_, i) => row("c", hoursAgo(i / 4)));
+  assert.deepEqual(selectPrune(rows, NOW), []);
+});
+
+test("prune: past 48 h one frame per 6 h bucket survives, the earliest", () => {
+  // Four frames in one 6 h bucket, all ~3 days old. Bucket edges are
+  // epoch-aligned, so pick times inside one bucket explicitly.
+  const base = Math.floor((NOW.getTime() - 3 * 86_400_000) / 21_600_000) * 21_600_000;
+  const at = (m: number) => new Date(base + m * 60_000).toISOString();
+  const rows = [row("c", at(45)), row("c", at(15)), row("c", at(300)), row("c", at(120))];
+  const doomed = selectPrune(rows, NOW);
+  assert.deepEqual(doomed.map((r) => r.captured_at).sort(), [at(45), at(120), at(300)].sort());
+  // Adjacent bucket keeps its own representative.
+  const next = row("c", new Date(base + 21_600_000 + 60_000).toISOString());
+  assert.deepEqual(selectPrune([...rows, next], NOW).length, 3);
+});
+
+test("prune: a keeper wins its bucket even when it is not the earliest frame", () => {
+  const base = Math.floor((NOW.getTime() - 5 * 86_400_000) / 21_600_000) * 21_600_000;
+  const at = (m: number) => new Date(base + m * 60_000).toISOString();
+  const plainFirst = row("c", at(10));
+  const keeper = row("c", at(200), { keeper: true, snow_24h_at_capture: 8 });
+  const plainLast = row("c", at(330));
+  const doomed = selectPrune([plainFirst, keeper, plainLast], NOW);
+  assert.deepEqual(doomed.map((r) => r.id).sort(), [plainFirst.id, plainLast.id].sort());
+  // Two keepers in a bucket: the earliest keeper stays.
+  const keeper2 = row("c", at(250), { keeper: true, snow_24h_at_capture: 8 });
+  assert.deepEqual(selectPrune([keeper, keeper2], NOW).map((r) => r.id), [keeper2.id]);
+});
+
+test("prune: buckets are per cam", () => {
+  const base = Math.floor((NOW.getTime() - 4 * 86_400_000) / 21_600_000) * 21_600_000;
+  const at = (m: number) => new Date(base + m * 60_000).toISOString();
+  const rows = [row("a", at(5)), row("a", at(65)), row("b", at(5)), row("b", at(65))];
+  const doomed = selectPrune(rows, NOW);
+  assert.deepEqual(doomed.map((r) => `${r.cam_id}@${r.captured_at}`).sort(), [`a@${at(65)}`, `b@${at(65)}`]);
+});
+
+test("prune: idempotent, a second pass over the survivors deletes nothing", () => {
+  const rows: CamStillRow[] = [];
+  for (let h = 0; h < 29 * 24; h += 0.25) rows.push(row("c", hoursAgo(h), h > 100 && h < 106 ? { keeper: true, snow_24h_at_capture: 7 } : {}));
+  rows.push(row("c", daysAgo(40)));
+  const first = selectPrune(rows, NOW);
+  const gone = new Set(first.map((r) => r.id));
+  const survivors = rows.filter((r) => !gone.has(r.id));
+  assert.deepEqual(selectPrune(survivors, NOW), []);
+  // Bound: 48 h of 15-min frames plus at most one per 6 h for the rest of 30 days.
+  assert.ok(survivors.length <= 48 * 4 + 1 + Math.ceil((29 * 24 - 48) / 6) + 1, `survivors ${survivors.length}`);
+  assert.ok(survivors.filter((r) => r.keeper).length >= 1);
+  assert.ok(!survivors.some((r) => r.captured_at === daysAgo(40)));
+});
+
+test("prune window: band ends at the 48 h edge and starts on a 6 h bucket boundary", () => {
+  const w = pruneWindow(NOW, 7);
+  assert.equal(w.thinTo, hoursAgo(48));
+  assert.equal(Date.parse(w.thinFrom) % 21_600_000, 0);
+  assert.ok(Date.parse(w.thinFrom) <= Date.parse(hoursAgo(48 + 7 * 24)));
+  assert.ok(Date.parse(w.thinFrom) > Date.parse(hoursAgo(48 + 7 * 24 + 6)));
+  assert.equal(w.plain, daysAgo(30));
+  assert.equal(w.keeper, daysAgo(365));
+  // lookback is clamped to the 30-day archive.
+  assert.equal(pruneWindow(NOW, 90).thinFrom, pruneWindow(NOW, 30).thinFrom);
+  assert.equal(thinBucket(21_600_000 * 5 + 1), 5);
 });
 
 // ─── archive-rights default ─────────────────────────────────────────────
