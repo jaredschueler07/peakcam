@@ -42,6 +42,9 @@ export const config = {
     // `drop-in` is excluded because the game's static assets (a ~100KB HTML file
     // and the three.js bundle) otherwise get a full Supabase getUser() round-trip
     // ahead of the filesystem check on every single game load.
-    "/((?!_next/static|_next/image|favicon.ico|drop-in/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // `api/v1/` and `api/mcp` are the anonymous public API and MCP endpoint:
+    // they never read a session, and the getUser() round-trip would otherwise
+    // sit in front of every cached JSON response (and every agent tool call).
+    "/((?!_next/static|_next/image|favicon.ico|drop-in/|api/v1/|api/mcp(?:/|$)|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

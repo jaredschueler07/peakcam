@@ -1,0 +1,434 @@
+{
+  "1034:NM:SNTL": {
+    "name": "Sierra Blanca",
+    "elevationFt": 10250,
+    "lat": 33.40682,
+    "lng": -105.79467
+  },
+  "1041:CO:SNTL": {
+    "name": "Beaver Ck Village",
+    "elevationFt": 8530,
+    "lat": 39.59871,
+    "lng": -106.51113
+  },
+  "1067:CA:SNTL": {
+    "name": "Carson Pass",
+    "elevationFt": 8360,
+    "lat": 38.6927,
+    "lng": -120.0022
+  },
+  "1154:UT:SNTL": {
+    "name": "Brian Head",
+    "elevationFt": 10040,
+    "lat": 37.67994,
+    "lng": -112.85674
+  },
+  "1168:NM:SNTL": {
+    "name": "Taos Powderhorn",
+    "elevationFt": 11020,
+    "lat": 36.58195,
+    "lng": -105.45617
+  },
+  "1170:NM:SNTL": {
+    "name": "Palo",
+    "elevationFt": 9330,
+    "lat": 36.40869,
+    "lng": -105.33038
+  },
+  "1186:CO:SNTL": {
+    "name": "Fool Creek",
+    "elevationFt": 11130,
+    "lat": 39.86866,
+    "lng": -105.86765
+  },
+  "1187:CO:SNTL": {
+    "name": "High Lonesome",
+    "elevationFt": 10630,
+    "lat": 40.0359,
+    "lng": -105.75472
+  },
+  "1242:NV:SNTL": {
+    "name": "Little Valley",
+    "elevationFt": 6500,
+    "lat": 39.25259,
+    "lng": -119.8771
+  },
+  "1300:UT:SNTL": {
+    "name": "Powder Mountain",
+    "elevationFt": 8490,
+    "lat": 41.37428,
+    "lng": -111.76673
+  },
+  "1308:UT:SNTL": {
+    "name": "Atwater",
+    "elevationFt": 8750,
+    "lat": 40.59124,
+    "lng": -111.63775
+  },
+  "1344:CO:SNTL": {
+    "name": "Alta Lakes",
+    "elevationFt": 11290,
+    "lat": 37.88929,
+    "lng": -107.84484
+  },
+  "2041:VT:SCAN": {
+    "name": "Mount Mansfield",
+    "elevationFt": 2310,
+    "lat": 44.53512,
+    "lng": -72.83462
+  },
+  "2042:VT:SCAN": {
+    "name": "Lye Brook",
+    "elevationFt": 2440,
+    "lat": 43.05723,
+    "lng": -73.03892
+  },
+  "2069:NH:SCAN": {
+    "name": "Hubbard Brook",
+    "elevationFt": 1480,
+    "lat": 43.94852,
+    "lng": -71.72662
+  },
+  "2088:VA:SCAN": {
+    "name": "Shenandoah",
+    "elevationFt": 1760,
+    "lat": 37.93299,
+    "lng": -79.21513
+  },
+  "2191:CA:SCAN": {
+    "name": "Doe Ridge",
+    "elevationFt": 7340,
+    "lat": 37.63423,
+    "lng": -118.82643
+  },
+  "338:ID:SNTL": {
+    "name": "Big Creek Summit",
+    "elevationFt": 6550,
+    "lat": 44.62621,
+    "lng": -115.79561
+  },
+  "341:OR:SNTL": {
+    "name": "Big Red Mountain",
+    "elevationFt": 6060,
+    "lat": 42.05257,
+    "lng": -122.85487
+  },
+  "345:CO:SNTL": {
+    "name": "Bison Lake",
+    "elevationFt": 10950,
+    "lat": 39.76458,
+    "lng": -107.35628
+  },
+  "356:CA:SNTL": {
+    "name": "Blue Lakes",
+    "elevationFt": 8060,
+    "lat": 38.60801,
+    "lng": -119.92455
+  },
+  "366:UT:SNTL": {
+    "name": "Brighton",
+    "elevationFt": 8790,
+    "lat": 40.59936,
+    "lng": -111.58167
+  },
+  "376:WA:SNTL": {
+    "name": "Bunchgrass Mdw",
+    "elevationFt": 5020,
+    "lat": 48.68688,
+    "lng": -117.17633
+  },
+  "380:CO:SNTL": {
+    "name": "Butte",
+    "elevationFt": 10190,
+    "lat": 38.89435,
+    "lng": -106.95327
+  },
+  "387:CO:SNTL": {
+    "name": "Cascade #2",
+    "elevationFt": 8990,
+    "lat": 37.65751,
+    "lng": -107.80287
+  },
+  "388:OR:SNTL": {
+    "name": "Cascade Summit",
+    "elevationFt": 5100,
+    "lat": 43.59042,
+    "lng": -122.0601
+  },
+  "407:MT:SNTL": {
+    "name": "Cole Creek",
+    "elevationFt": 7910,
+    "lat": 45.19405,
+    "lng": -109.34548
+  },
+  "415:CO:SNTL": {
+    "name": "Copper Mountain",
+    "elevationFt": 10500,
+    "lat": 39.48917,
+    "lng": -106.17154
+  },
+  "428:CA:SNTL": {
+    "name": "Css Lab",
+    "elevationFt": 6890,
+    "lat": 39.32565,
+    "lng": -120.36807
+  },
+  "457:CO:SNTL": {
+    "name": "Dry Lake",
+    "elevationFt": 8240,
+    "lat": 40.5337,
+    "lng": -106.7814
+  },
+  "463:CA:SNTL": {
+    "name": "Echo Peak",
+    "elevationFt": 7650,
+    "lat": 38.849,
+    "lng": -120.0795
+  },
+  "469:MT:SNTL": {
+    "name": "Emery Creek",
+    "elevationFt": 4340,
+    "lat": 48.43412,
+    "lng": -113.93725
+  },
+  "485:CO:SNTL": {
+    "name": "Fremont Pass",
+    "elevationFt": 11310,
+    "lat": 39.38014,
+    "lng": -106.19784
+  },
+  "505:CO:SNTL": {
+    "name": "Grizzly Peak",
+    "elevationFt": 11110,
+    "lat": 39.64646,
+    "lng": -105.8694
+  },
+  "518:CA:SNTL": {
+    "name": "Heavenly Valley",
+    "elevationFt": 8540,
+    "lat": 38.92431,
+    "lng": -119.91641
+  },
+  "526:OR:SNTL": {
+    "name": "Hogg Pass",
+    "elevationFt": 4800,
+    "lat": 44.42042,
+    "lng": -121.85655
+  },
+  "541:CA:SNTL": {
+    "name": "Independence Lake",
+    "elevationFt": 8340,
+    "lat": 39.42752,
+    "lng": -120.31342
+  },
+  "564:CO:SNTL": {
+    "name": "Lake Eldora",
+    "elevationFt": 9700,
+    "lat": 39.93659,
+    "lng": -105.59031
+  },
+  "574:CA:SNTL": {
+    "name": "Leavitt Lake",
+    "elevationFt": 9600,
+    "lat": 38.27594,
+    "lng": -119.61281
+  },
+  "590:MT:SNTL": {
+    "name": "Lone Mountain",
+    "elevationFt": 8820,
+    "lat": 45.27412,
+    "lng": -111.42692
+  },
+  "594:ID:SNTL": {
+    "name": "Lookout",
+    "elevationFt": 5180,
+    "lat": 47.45749,
+    "lng": -115.70457
+  },
+  "602:CO:SNTL": {
+    "name": "Loveland Basin",
+    "elevationFt": 11410,
+    "lat": 39.67428,
+    "lng": -105.90264
+  },
+  "622:CO:SNTL": {
+    "name": "Mesa Lakes",
+    "elevationFt": 10160,
+    "lat": 39.05738,
+    "lng": -108.05756
+  },
+  "642:WA:SNTL": {
+    "name": "Morse Lake",
+    "elevationFt": 5400,
+    "lat": 46.90585,
+    "lng": -121.4827
+  },
+  "651:OR:SNTL": {
+    "name": "Mt Hood Test Site",
+    "elevationFt": 5380,
+    "lat": 45.32097,
+    "lng": -121.7158
+  },
+  "652:NV:SNTL": {
+    "name": "Mt Rose Ski Area",
+    "elevationFt": 8810,
+    "lat": 39.31573,
+    "lng": -119.89473
+  },
+  "669:CO:SNTL": {
+    "name": "North Lost Trail",
+    "elevationFt": 9190,
+    "lat": 39.07818,
+    "lng": -107.14388
+  },
+  "672:WA:SNTL": {
+    "name": "Olallie Meadows",
+    "elevationFt": 4010,
+    "lat": 47.37406,
+    "lng": -121.44213
+  },
+  "689:WY:SNTL": {
+    "name": "Phillips Bench",
+    "elevationFt": 8170,
+    "lat": 43.51687,
+    "lng": -110.91258
+  },
+  "701:CO:SNTL": {
+    "name": "Porphyry Creek",
+    "elevationFt": 10790,
+    "lat": 38.48864,
+    "lng": -106.33967
+  },
+  "715:NM:SNTL": {
+    "name": "Red River Pass #2",
+    "elevationFt": 9840,
+    "lat": 36.69935,
+    "lng": -105.34145
+  },
+  "738:ID:SNTL": {
+    "name": "Schweitzer Basin",
+    "elevationFt": 6090,
+    "lat": 48.37428,
+    "lng": -116.63917
+  },
+  "766:UT:SNTL": {
+    "name": "Snowbird",
+    "elevationFt": 9170,
+    "lat": 40.56914,
+    "lng": -111.65852
+  },
+  "782:ID:SNTL": {
+    "name": "Puhi Flat",
+    "elevationFt": 6240,
+    "lat": 44.77091,
+    "lng": -116.24805
+  },
+  "784:CA:SNTL": {
+    "name": "Palisades Tahoe",
+    "elevationFt": 8010,
+    "lat": 39.18986,
+    "lng": -120.26576
+  },
+  "791:WA:SNTL": {
+    "name": "Stevens Pass",
+    "elevationFt": 3940,
+    "lat": 47.74607,
+    "lng": -121.09288
+  },
+  "814:UT:SNTL": {
+    "name": "Thaynes Canyon",
+    "elevationFt": 9260,
+    "lat": 40.6235,
+    "lng": -111.53322
+  },
+  "815:OR:SNTL": {
+    "name": "Three Creeks Meadow",
+    "elevationFt": 5680,
+    "lat": 44.14425,
+    "lng": -121.64095
+  },
+  "820:UT:SNTL": {
+    "name": "Timpanogos Divide",
+    "elevationFt": 8180,
+    "lat": 40.42817,
+    "lng": -111.61633
+  },
+  "824:WA:SNTL": {
+    "name": "Touchet",
+    "elevationFt": 5520,
+    "lat": 46.11868,
+    "lng": -117.8505
+  },
+  "834:CA:SNTL": {
+    "name": "Truckee #2",
+    "elevationFt": 6500,
+    "lat": 39.30087,
+    "lng": -120.18407
+  },
+  "841:WA:SNTL": {
+    "name": "Upper Wheeler",
+    "elevationFt": 4330,
+    "lat": 47.28734,
+    "lng": -120.37015
+  },
+  "842:CO:SNTL": {
+    "name": "Vail Mountain",
+    "elevationFt": 10290,
+    "lat": 39.61765,
+    "lng": -106.38019
+  },
+  "848:CA:SNTL": {
+    "name": "Ward Creek #3",
+    "elevationFt": 6750,
+    "lat": 39.13545,
+    "lng": -120.21865
+  },
+  "863:WA:SNTL": {
+    "name": "White Pass E.S.",
+    "elevationFt": 4440,
+    "lat": 46.64142,
+    "lng": -121.38153
+  },
+  "874:CO:SNTL": {
+    "name": "Wolf Creek Summit",
+    "elevationFt": 10930,
+    "lat": 37.47903,
+    "lng": -106.80234
+  },
+  "895:ID:SNTL": {
+    "name": "Chocolate Gulch",
+    "elevationFt": 6310,
+    "lat": 43.7685,
+    "lng": -114.41812
+  },
+  "909:WA:SNTL": {
+    "name": "Wells Creek",
+    "elevationFt": 4040,
+    "lat": 48.8661,
+    "lng": -121.78976
+  },
+  "922:NM:SNTL": {
+    "name": "Santa Fe",
+    "elevationFt": 11480,
+    "lat": 35.77154,
+    "lng": -105.78487
+  },
+  "927:AZ:SNTL": {
+    "name": "Snowslide Canyon",
+    "elevationFt": 9720,
+    "lat": 35.34179,
+    "lng": -111.65084
+  },
+  "929:MT:SNTL": {
+    "name": "Sacajawea",
+    "elevationFt": 6610,
+    "lat": 45.87395,
+    "lng": -110.92783
+  },
+  "978:ID:SNTL": {
+    "name": "Bogus Basin",
+    "elevationFt": 6370,
+    "lat": 43.76377,
+    "lng": -116.09685
+  }
+}

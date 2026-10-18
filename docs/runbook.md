@@ -232,3 +232,65 @@ Drop In was gated out of production on 2026-09-17 so the core cam/snow product g
 - **Re-enable:** set `NEXT_PUBLIC_DROP_IN_ENABLED=true` in the Vercel environment (it is inlined at build time, so redeploy).
 - **Snapshot of the game before parking:** branch `archive/drop-in-2026-09-17`, tag `drop-in-archive-2026-09-17`. The unmerged v3 engine lives on `feat/drop-in-v3-skisim`.
 - **Game e2e specs** skip themselves unless the flag is set.
+
+## Public API (`/api/v1`)
+
+Read-only, anonymous JSON for agents and developers, added 2026-10-18 (branch
+`feat/public-api-mcp`, execution plan Sprint 3). Everything reads through the
+cached catalogue (`getAllResorts()`, 1 h) plus `resort_openings` and
+`resort_metadata` elevations; nothing here writes.
+
+| Route | What | Cache |
+| --- | --- | --- |
+| `GET /api/v1/resorts` | Light list: every active resort, headline numbers, rating, season status, cam counts | ISR 900 s |
+| `GET /api/v1/resorts/{slug}` | Full document: location, snow report per field with provenance, season, cams | ISR 900 s |
+| `GET /api/v1/resorts/{slug}/cams` | Active cams: `live` health, still URL, `capturedAt` (PeakCam captures only) | ISR 900 s |
+| `GET /api/v1/powder?window=24h\|48h&state=&minInches=&source=&limit=` | Ranked new snow; `source=snotel` = measured only | ISR 900 s per URL |
+| `GET /api/v1/openapi.json` | OpenAPI 3.1, generated from the zod registry in `lib/public-api/schema.ts` | static, 1 h / 24 h CDN |
+| `GET /.well-known/api-catalog` | RFC 9727 linkset pointing at the OpenAPI document | static, 1 h / 24 h CDN |
+
+All routes answer `OPTIONS` with 204. Unknown slugs 404 with `Cache-Control:
+no-store`; all other responses carry `public, s-maxage=900,
+stale-while-revalidate=3600`, so a bad deploy clears from the CDN within 15
+minutes and a Supabase outage keeps serving the last good document (the read
+path throws rather than returning an empty catalogue).
+
+Headers on every response (`lib/public-api/headers.ts`):
+`Access-Control-Allow-Origin: *`, `Access-Control-Expose-Headers: Link,
+X-Attribution`, `X-Attribution: PeakCam (https://www.peakcam.io) - SNOTEL data:
+USDA NRCS; forecasts: NWS/Open-Meteo; cams: their operators`, `Link:
+<https://www.peakcam.io>; rel="author", <https://www.peakcam.io/about#terms>;
+rel="license"`, `Vary: Accept`. The licence link points at the Terms section of
+`/about` because there is no standalone `/terms` page; move it when one exists.
+
+Code: `lib/public-api/{schema,serialize,headers,openapi,data}.ts`, routes under
+`app/api/v1/` and `app/.well-known/api-catalog/`. `proxy.ts` excludes
+`api/v1/` and `api/mcp` from the Supabase session refresh. Station names and
+elevations come from `lib/public-api/stations.json`, trimmed from
+`data/snotel_stations.json` to the triplets the catalogue references;
+regenerate it when a resort gets a new station.
+
+**Rate limit — not enforced yet.** The plan calls for a Vercel WAF custom rule
+(60 requests / 60 s per IP on `/api/v1/` and `/api/mcp`, action
+`rate_limit` → 429). On 2026-10-18 every firewall endpoint for project
+`prj_kW5KDfMw3cWyOKSEJSFeZ9q7Q85W` (team `team_9gcibwoI6xSIs4ixHDAN8SYA`)
+returned `404 not_found: Seawall Config not found` — `GET
+/v1/security/firewall/config/active`, `PUT /v1/security/firewall/config` with
+the rule, and `PATCH … {action: firewallEnabled}` all alike. That is the
+response for a project whose WAF has never been provisioned, and custom rules /
+rate limiting are a Pro-plan feature, so this needs a human in the dashboard:
+<https://vercel.com/jaredschuelerspotify-3622s-projects/peakcam/firewall> →
+Configure → Add rule: name `Public API rate limit`, condition `Request Path`
+*starts with* `/api/v1/` OR *starts with* `/api/mcp`, action **Rate Limit**,
+60 requests per 60 s, keyed by IP, then **Deny**. The OpenAPI document already
+advertises the 60/min limit and a 429 response. Until the rule exists the only
+protection is the 15-minute CDN cache, which absorbs read bursts on hot URLs
+but not a scan of distinct query strings on `/api/v1/powder`.
+
+Smoke check after a deploy:
+
+```bash
+curl -sI https://www.peakcam.io/api/v1/resorts/breckenridge | grep -iE '^(x-attribution|link|cache-control|access-control|x-vercel-cache)'
+curl -s https://www.peakcam.io/api/v1/powder?source=snotel | jq '.results[:3] | map({slug, in24: .newSnow24h.value})'
+curl -s https://www.peakcam.io/api/v1/openapi.json | npx --yes @redocly/cli lint --format=summary -
+```
