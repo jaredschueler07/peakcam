@@ -357,7 +357,8 @@ curl -s https://www.peakcam.io/robots.txt | grep -n Content-Signal      # line 2
 curl -s https://www.peakcam.io/llms.txt | sed -n '/## For agents/,/## Key pages/p'
 ```
 
-**IndexNow — code shipped, not yet enabled on the Mini.** `scripts/snotel-sync.ts`
+**IndexNow — enabled on the Mini since 2026-10-18** (`INDEXNOW_ENABLED=1` in the ops
+checkout's `.env.local`; the first manual run submitted 89 URLs, HTTP 202). `scripts/snotel-sync.ts`
 collects the slugs that got a new `snow_reports` row and, only when
 `INDEXNOW_ENABLED=1`, POSTs their page URLs to `https://api.indexnow.org/indexnow`
 in batches of at most 10,000 (`scripts/indexnow-ping.ts`; payload and batching
@@ -365,7 +366,7 @@ are unit-tested, no network in tests). The key file must be reachable at
 `https://www.peakcam.io/<key>.txt` first, which happens when this branch
 reaches production. A failed ping is logged and never fails the sync.
 
-To enable on the Mac mini (follow-up, not part of the deploy):
+How it was enabled on the Mac mini (repeat only if the checkout or `.env.local` is rebuilt):
 
 1. `ssh mini`, then as `maestro_admin` in `/Users/maestro_admin/peakcam/peakcam`:
    `git pull` so `scripts/indexnow-ping.ts` exists, then append
@@ -393,6 +394,7 @@ static; nothing here reads the database.
 | --- | --- | --- |
 | `GET /connect` | `app/connect/page.tsx`, data in `components/connect/links.ts` (links, tools, prompts, client recipes) | static per deploy |
 | `GET /.well-known/mcp/server-card.json` | `app/.well-known/mcp/server-card.json/route.ts` → `components/connect/server-card.ts` | 1 day, ETag, CORS `*` |
+| `GET /api/mcp/server-card` | `app/api/mcp/server-card/route.ts`, re-exports the `.well-known` handlers (SEP-2127 reserved location `<streamable-http-url>/server-card`) | same, byte-identical |
 | `server.json` (repo root) | MCP Registry manifest, read by `mcp-publisher publish` from the repo root; not served | n/a |
 | Footer "Developers" column | `components/home/PeakFooter.tsx`: `/connect`, `/api/mcp`, `/api/v1/resorts`, `/api/v1/openapi.json`, `/llms.txt` | static |
 | `llms.txt` "For agents" MCP line | `app/llms.txt/route.ts` | ISR 3600 s |
@@ -404,9 +406,9 @@ The server card follows the SEP-2127 **v1** shape (schema
 The card does not list tools or auth at the top level by design (runtime
 listing owns that); the human summary (tools, no-auth, licence, contact,
 documentation) is under `_meta["io.peakcam/connect"]`. The SEP's reserved
-location is `<streamable-http-url>/server-card`, i.e. `/api/mcp/server-card`:
-when the MCP route adds that alias it must return the same `buildServerCard()`
-document. An `/.well-known/ai-catalog.json` pointing at the card is the
+location is `<streamable-http-url>/server-card`, i.e. `/api/mcp/server-card`,
+served since 2026-10-18 by re-exporting the same handlers, so the two documents
+cannot drift. An `/.well-known/ai-catalog.json` pointing at the card is the
 discovery entry the extension expects and is not shipped yet.
 
 Guard rails: `tests/connect-links.test.ts` walks every internal href in
@@ -428,11 +430,25 @@ curl -s https://www.peakcam.io/llms.txt | grep -n 'MCP server'
 curl -s https://www.peakcam.io/sitemap.xml | grep -c '/connect<'
 ```
 
-**Submissions (not automated, run only once `/api/mcp` is live on production):**
-MCP Registry via `mcp-publisher` with DNS (`peakcam.io. IN TXT "v=MCPv1; k=ed25519; p=…"`
-at the apex) or HTTP (`/.well-known/mcp-registry-auth`) namespace proof for
-`io.peakcam`, then `mcp-publisher publish` from the repo root; Claude
-Connectors Directory through <https://claude.ai/directory/manage> → Submit new
+**Submissions.** MCP Registry: **published 2026-10-18** as `io.peakcam/snow`
+0.1.0 (`curl "https://registry.modelcontextprotocol.io/v0.1/servers?search=io.peakcam/snow"`).
+Namespace proof is the apex TXT `peakcam.io. IN TXT "v=MCPv1; k=ed25519; p=…"`
+in Vercel DNS (record `rec_82e1d6ea8c9f5198f4beef15`); the matching Ed25519
+private key lives on the Mac Studio at `~/.config/peakcam-mcp-registry-key.pem`
+(user `totcho_admin`, not in the repo, not backed up anywhere else). To
+re-publish after bumping `version` in both `package.json` and `server.json`, on
+the Studio from the repo root:
+
+```bash
+OPENSSL=/opt/homebrew/opt/openssl@3/bin/openssl
+PRIVATE_KEY="$($OPENSSL pkey -in ~/.config/peakcam-mcp-registry-key.pem -noout -text | grep -A3 'priv:' | tail -n +2 | tr -d ' :\n')"
+mcp-publisher login dns --domain peakcam.io --private-key "$PRIVATE_KEY"
+mcp-publisher validate && mcp-publisher publish
+```
+
+(`brew install mcp-publisher`; a lost key means a new key, a replaced TXT record
+and a fresh login, nothing else.) Claude
+Connectors Directory (not yet submitted, needs the owner's claude.ai login) through <https://claude.ai/directory/manage> → Submit new
 → MCP connector (listing fields: name, one-liner ≤ 200, description ≤ 2,000,
 categories, documentation `/connect`, privacy `/about#privacy`, support
 `hello@peakcam.io`, icon, no authentication). The PR that shipped this page
