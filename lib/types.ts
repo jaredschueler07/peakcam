@@ -26,7 +26,29 @@ export interface Resort {
   instagram_url: string | null;
   is_active: boolean;
   created_at: string;
+  // Profile columns (parity plan P0, migration 025). Optional everywhere: the
+  // site renders without them until the migration and scripts/import-profiles.ts
+  // have run, and every consumer drops a sentence rather than printing null.
+  runs_total?: number | null;
+  lifts_total?: number | null;
+  skiable_acres?: number | null;
+  vertical_ft?: number | null;
+  annual_snowfall_in?: number | null;
+  longest_run_mi?: number | null;
+  description?: string | null;
+  description_source?: ResortDescriptionSource | null;
+  trail_map_url?: string | null;
+  wikidata_id?: string | null;
+  aliases?: string[] | null;
+  passes?: SeasonPass[] | null;
+  elevation_base_ft?: number | null;
+  elevation_summit_ft?: number | null;
 }
+
+/** Who wrote `resorts.description`: the operator's own text, an editor, or a generated paragraph. */
+export type ResortDescriptionSource = "operator" | "editor" | "generated";
+/** The multi-resort passes `resorts.passes` can name. */
+export type SeasonPass = "ikon" | "epic" | "mountain-collective" | "indy" | "power";
 
 // ── Cams ─────────────────────────────────────────────────────
 export interface Cam {
