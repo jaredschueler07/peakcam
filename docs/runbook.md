@@ -294,22 +294,21 @@ elevations come from `lib/public-api/stations.json`, trimmed from
 `data/snotel_stations.json` to the triplets the catalogue references;
 regenerate it when a resort gets a new station.
 
-**Rate limit — not enforced yet.** The plan calls for a Vercel WAF custom rule
-(60 requests / 60 s per IP on `/api/v1/` and `/api/mcp`, action
-`rate_limit` → 429). On 2026-10-18 every firewall endpoint for project
-`prj_kW5KDfMw3cWyOKSEJSFeZ9q7Q85W` (team `team_9gcibwoI6xSIs4ixHDAN8SYA`)
-returned `404 not_found: Seawall Config not found` — `GET
-/v1/security/firewall/config/active`, `PUT /v1/security/firewall/config` with
-the rule, and `PATCH … {action: firewallEnabled}` all alike. That is the
-response for a project whose WAF has never been provisioned, and custom rules /
-rate limiting are a Pro-plan feature, so this needs a human in the dashboard:
-<https://vercel.com/jaredschuelerspotify-3622s-projects/peakcam/firewall> →
-Configure → Add rule: name `Public API rate limit`, condition `Request Path`
-*starts with* `/api/v1/` OR *starts with* `/api/mcp`, action **Rate Limit**,
-60 requests per 60 s, keyed by IP, then **Deny**. The OpenAPI document already
-advertises the 60/min limit and a 429 response. Until the rule exists the only
-protection is the 15-minute CDN cache, which absorbs read bursts on hot URLs
-but not a scan of distinct query strings on `/api/v1/powder`.
+**Rate limit — enforced since 2026-10-18** by a Vercel WAF custom rule added in
+the dashboard (`Public API rate limit`: Request Path starts with `/api/v1/` or
+`/api/mcp`, 60 requests per 60 s per IP, exceed action Deny). The firewall API
+still answers `404 Seawall Config not found` for this project, so the rule is
+only visible and editable at
+<https://vercel.com/jaredschuelerspotify-3622s-projects/peakcam/firewall>.
+Observed behaviour: the 61st distinct request inside a minute gets **403**
+`Forbidden` (text/plain, `x-vercel-mitigated: deny`, no `Retry-After`), not
+429; the edge counts every request to the matched paths, cache hits included,
+and the window resets about a minute later. The OpenAPI document describes
+this 403. Burst check:
+
+```bash
+for i in $(seq 1 70); do curl -s -o /dev/null -w '%{http_code}\n' "https://www.peakcam.io/api/v1/powder?minInches=$i"; done | sort | uniq -c   # 60×200, 10×403
+```
 
 Smoke check after a deploy:
 

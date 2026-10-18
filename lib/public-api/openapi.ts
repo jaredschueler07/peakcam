@@ -64,9 +64,13 @@ const ERROR_404 = {
   content: { "application/json": { schema: ref("Error") } },
 };
 
-const ERROR_429 = {
-  description: "Rate limit exceeded: 60 requests per minute per IP. Back off and retry after the window.",
-  content: { "application/json": { schema: ref("Error") } },
+// The limit is a Vercel WAF rule in front of the app (60 requests per 60 s
+// per IP on /api/v1/ and /api/mcp, action Deny), so the blocked response is the
+// edge's plain-text 403 with `x-vercel-mitigated: deny`, not a JSON 429.
+const ERROR_403 = {
+  description:
+    "Rate limit exceeded: 60 requests per minute per IP across /api/v1 and /api/mcp. The edge answers a plain-text `Forbidden` with `x-vercel-mitigated: deny` and no Retry-After; the window resets within a minute.",
+  content: { "text/plain": { schema: { type: "string", example: "Forbidden" } } },
 };
 
 const ERROR_400 = {
@@ -121,7 +125,7 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
           tags: ["resorts"],
           summary: "List every active resort with headline snow numbers",
           description: "Alphabetical. One row per resort with base depth and new snow, the report source, rating, season status and cam counts. Fetch `/resorts/{slug}` for provenance per field, the season detail and the cam list.",
-          responses: { "200": jsonResponse("The resort list.", "ResortList"), "429": ERROR_429 },
+          responses: { "200": jsonResponse("The resort list.", "ResortList"), "403": ERROR_403 },
         },
       },
       "/resorts/{slug}": {
@@ -133,7 +137,7 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
           responses: {
             "200": jsonResponse("The resort document.", "Resort"),
             "404": ERROR_404,
-            "429": ERROR_429,
+            "403": ERROR_403,
           },
         },
       },
@@ -147,7 +151,7 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
           responses: {
             "200": jsonResponse("The cam list.", "CamList"),
             "404": ERROR_404,
-            "429": ERROR_429,
+            "403": ERROR_403,
           },
         },
       },
@@ -167,7 +171,7 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
           responses: {
             "200": jsonResponse("The ranking.", "PowderList"),
             "400": ERROR_400,
-            "429": ERROR_429,
+            "403": ERROR_403,
           },
         },
       },
