@@ -383,3 +383,57 @@ To enable on the Mac mini (follow-up, not part of the deploy):
 
 `scripts/model-sync.ts` (Open-Meteo resorts) does not ping yet; add the same
 three lines there when the SNOTEL path has run clean for a week.
+
+## Connect page and MCP listings (`/connect`, server card, `server.json`)
+
+Added 2026-10-18 (branch `feat/connect-page`, execution plan Sprint 6). All
+static; nothing here reads the database.
+
+| Surface | Where | Cache |
+| --- | --- | --- |
+| `GET /connect` | `app/connect/page.tsx`, data in `components/connect/links.ts` (links, tools, prompts, client recipes) | static per deploy |
+| `GET /.well-known/mcp/server-card.json` | `app/.well-known/mcp/server-card.json/route.ts` → `components/connect/server-card.ts` | 1 day, ETag, CORS `*` |
+| `server.json` (repo root) | MCP Registry manifest, read by `mcp-publisher publish` from the repo root; not served | n/a |
+| Footer "Developers" column | `components/home/PeakFooter.tsx`: `/connect`, `/api/mcp`, `/api/v1/resorts`, `/api/v1/openapi.json`, `/llms.txt` | static |
+| `llms.txt` "For agents" MCP line | `app/llms.txt/route.ts` | ISR 3600 s |
+
+The server card follows the SEP-2127 **v1** shape (schema
+`https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json`):
+`name`, `version` (package.json), `description` (≤ 100 chars), `title`,
+`websiteUrl`, `repository`, `remotes[{type, url, supportedProtocolVersions}]`.
+The card does not list tools or auth at the top level by design (runtime
+listing owns that); the human summary (tools, no-auth, licence, contact,
+documentation) is under `_meta["io.peakcam/connect"]`. The SEP's reserved
+location is `<streamable-http-url>/server-card`, i.e. `/api/mcp/server-card`:
+when the MCP route adds that alias it must return the same `buildServerCard()`
+document. An `/.well-known/ai-catalog.json` pointing at the card is the
+discovery entry the extension expects and is not shipped yet.
+
+Guard rails: `tests/connect-links.test.ts` walks every internal href in
+`CONNECT_LINKS` and fails if it does not match a `page.tsx`/`route.ts` under
+`app/` (dynamic `[segment]`s match anything) or a file under `public/`; a link
+may be `pending: true` only while its route is absent, and the test fails the
+other way once the route exists. `tests/mcp-listings.test.ts` checks both
+documents parse, agree on name/version/endpoint, and that `server.json` keeps
+the one `_meta` key the registry preserves. Bump `server.json` `version` when
+`package.json` moves (the test enforces equality).
+
+Smoke check after a deploy:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://www.peakcam.io/connect
+curl -sI https://www.peakcam.io/.well-known/mcp/server-card.json | grep -iE '^(content-type|cache-control|etag|access-control-allow-origin)'
+curl -s https://www.peakcam.io/.well-known/mcp/server-card.json | jq '{name, version, remotes}'
+curl -s https://www.peakcam.io/llms.txt | grep -n 'MCP server'
+curl -s https://www.peakcam.io/sitemap.xml | grep -c '/connect<'
+```
+
+**Submissions (not automated, run only once `/api/mcp` is live on production):**
+MCP Registry via `mcp-publisher` with DNS (`peakcam.io. IN TXT "v=MCPv1; k=ed25519; p=…"`
+at the apex) or HTTP (`/.well-known/mcp-registry-auth`) namespace proof for
+`io.peakcam`, then `mcp-publisher publish` from the repo root; Claude
+Connectors Directory through <https://claude.ai/directory/manage> → Submit new
+→ MCP connector (listing fields: name, one-liner ≤ 200, description ≤ 2,000,
+categories, documentation `/connect`, privacy `/about#privacy`, support
+`hello@peakcam.io`, icon, no authentication). The PR that shipped this page
+carries the exact commands and payload text.
