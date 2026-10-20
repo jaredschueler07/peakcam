@@ -1,0 +1,130 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "id": "WHSE_WATER_MANAGEMENT.SSL_SNOW_ASWS_STNS_SP.72",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -117.7012139,
+     50.4341722
+    ]
+   },
+   "geometry_name": "SHAPE",
+   "properties": {
+    "SNOW_ASWS_STN_ID": 72,
+    "LOCATION_ID": "2B08P",
+    "LOCATION_NAME": "St. Leon Creek",
+    "ELEVATION": 1800,
+    "STATUS": "Active",
+    "LATITUDE": 50.434172,
+    "LONGITUDE": -117.701214,
+    "OPERATOR": "BC Hydro",
+    "CAMERA_URL": null,
+    "OBJECTID": 108870,
+    "SE_ANNO_CAD_DATA": null
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "WHSE_WATER_MANAGEMENT.SSL_SNOW_ASWS_STNS_SP.105",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -123.102889,
+     50.137056
+    ]
+   },
+   "geometry_name": "SHAPE",
+   "properties": {
+    "SNOW_ASWS_STN_ID": 105,
+    "LOCATION_ID": "3A20P",
+    "LOCATION_NAME": "Callaghan Creek",
+    "ELEVATION": 1017,
+    "STATUS": "Active",
+    "LATITUDE": 50.137056,
+    "LONGITUDE": -123.102889,
+    "OPERATOR": "BC Hydro",
+    "CAMERA_URL": null,
+    "OBJECTID": 108903,
+    "SE_ANNO_CAD_DATA": null
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "WHSE_WATER_MANAGEMENT.SSL_SNOW_ASWS_STNS_SP.108",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -123.4361,
+     50.1543
+    ]
+   },
+   "geometry_name": "SHAPE",
+   "properties": {
+    "SNOW_ASWS_STN_ID": 108,
+    "LOCATION_ID": "3A25P",
+    "LOCATION_NAME": "Squamish River Upper",
+    "ELEVATION": 1360,
+    "STATUS": "Active",
+    "LATITUDE": 50.1543,
+    "LONGITUDE": -123.4361,
+    "OPERATOR": "BC ENV",
+    "CAMERA_URL": null,
+    "OBJECTID": 108906,
+    "SE_ANNO_CAD_DATA": null
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "WHSE_WATER_MANAGEMENT.SSL_SNOW_ASWS_STNS_SP.1",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -118.5475,
+     52.90622
+    ]
+   },
+   "geometry_name": "SHAPE",
+   "properties": {
+    "SNOW_ASWS_STN_ID": 1,
+    "LOCATION_ID": "1A01P",
+    "LOCATION_NAME": "Yellowhead Lake",
+    "ELEVATION": 1860,
+    "STATUS": "Active",
+    "LATITUDE": 52.90622,
+    "LONGITUDE": -118.5475,
+    "OPERATOR": "BC ENV",
+    "CAMERA_URL": null,
+    "OBJECTID": 107935,
+    "SE_ANNO_CAD_DATA": null
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "WHSE_WATER_MANAGEMENT.SSL_SNOW_ASWS_STNS_SP.15",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -122.7888194,
+     50.7751889
+    ]
+   },
+   "geometry_name": "SHAPE",
+   "properties": {
+    "SNOW_ASWS_STN_ID": 15,
+    "LOCATION_ID": "1C14P",
+    "LOCATION_NAME": "Bralorne",
+    "ELEVATION": 1382,
+    "STATUS": "Active",
+    "LATITUDE": 50.775189,
+    "LONGITUDE": -122.788819,
+    "OPERATOR": "BC Hydro",
+    "CAMERA_URL": null,
+    "OBJECTID": 108813,
+    "SE_ANNO_CAD_DATA": null
+   }
+  }
+ ]
+}

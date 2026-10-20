@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // MCP server `io.peakcam/snow` — identity, instructions, registration.
 //
-// `registerPeakCam(server, data)` registers the eight tools from tools.ts
+// `registerPeakCam(server, data)` registers every tool from tools.ts
 // (every one read-only, idempotent, closed-world) and the
 // `peakcam://resorts/{slug}` markdown resource on any McpServer. The
 // resource is byte-for-byte the Sprint 4 `/resorts/{slug}/index.md`

@@ -125,6 +125,19 @@ export interface StationObservation {
   source_payload: Record<string, unknown> | null;
 }
 
+/**
+ * One `resort_stations` row joined to its station and the station's newest
+ * observation (lib/supabase.ts getResortStationsIndex). What the API, the
+ * resort page and the MCP `get_stations` tool read.
+ */
+export interface ResortStationJoined {
+  role: StationRole;
+  distance_km: number | null;
+  rank: number;
+  station: StationRow;
+  latest: StationObservation | null;
+}
+
 // ── Forecasts (migration 027, P4 writes these) ───────────────
 export type ForecastPoint = "summit" | "base";
 

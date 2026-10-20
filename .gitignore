@@ -87,3 +87,6 @@ REPORT-*.md
 # WeatherNext harness: project-local Python environment (recreate with uv sync)
 scripts/weathernext/.venv/
 scripts/weathernext/**/__pycache__/
+
+# Station layer: GHCND inventory files downloaded by scripts/stations-sync.ts (11 MB, refreshed weekly)
+data/cache/

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getResortBySlug, getAllResortSlugs, getAllResorts, getLiveConditions, getUserConditions, getResortElevationIndex, getResortOpenings, getResortCamTimeline, getStationNormalsSummary } from "@/lib/supabase";
+import { getResortBySlug, getAllResortSlugs, getAllResorts, getLiveConditions, getUserConditions, getResortElevationIndex, getResortOpenings, getResortCamTimeline, getStationNormalsSummary, getResortStationsIndex } from "@/lib/supabase";
+import { serializeStations } from "@/lib/public-api/serialize";
 import { resortSentence } from "@/lib/quotable";
 import { stationFor } from "@/lib/stations";
 import { ResortAboutSection } from "@/components/resort/ResortAboutSection";
@@ -141,7 +142,7 @@ export default async function ResortPage({
     ...resort.cams.filter((cam) => cam.is_active && !cam.auto_disabled && cam.embed_type === "link"),
   ].map((cam) => cam.id);
 
-  const [weather, hourlyRaw, liveConditions, userConditions, allResorts, openings, camTimeline, normals] = await Promise.all([
+  const [weather, hourlyRaw, liveConditions, userConditions, allResorts, openings, camTimeline, normals, stationIndex] = await Promise.all([
     isUS
       ? getWeatherForecast(resort.lat, resort.lng)
       : getOpenMeteoForecast(resort.lat, resort.lng, elevationFt),
@@ -157,8 +158,15 @@ export default async function ResortPage({
     getResortCamTimeline(resort.id, camOrder, 24),
     // 30-year normals peak for the "typical season" FAQ entry; null without a station.
     getStationNormalsSummary(resort.snotel_station_id),
+    getResortStationsIndex(),
   ]);
   const opening = openings.find((row) => row.resort_id === resort.id) ?? null;
+
+  // "What the instruments say": the station layer's rows for this resort
+  // (migration 026), serialised exactly as /api/v1/resorts/{slug}.measuredNow
+  // so the page and the API never disagree. Age is measured from the same
+  // `new Date()` the freshness sentence uses, once per ISR render.
+  const measuredNow = stationIndex[resort.id]?.length ? serializeStations(stationIndex[resort.id], new Date()).measuredNow : [];
 
   // First sentence under the H1 (lib/quotable.ts): dated by the report's own
   // updated_at, labelled by its source. The SNOTEL wording names the station
@@ -409,6 +417,7 @@ export default async function ResortPage({
         freshness={{ segments: freshness.segments }}
         breadcrumb={breadcrumb}
         camTimeline={camTimeline}
+        measuredNow={measuredNow}
         subnav={
           <>
             <ResortTabs slug={resort.slug} active="overview" />

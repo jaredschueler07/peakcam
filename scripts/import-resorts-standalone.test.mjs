@@ -3,6 +3,8 @@ import assert from "node:assert";
 import {
   CAM_KINDS,
   RESORT_PASSES,
+  camIdentity,
+  partitionCamRecords,
   hasElevationData,
   parseList,
   parsePasses,
@@ -210,4 +212,52 @@ test("toCamRecord: kind/credit/source_terms_url are sent only when their header 
   assert.strictEqual(bad.kind, null);
   assert.strictEqual(warnings.length, 1);
   assert.deepStrictEqual(CAM_KINDS, ["summit", "mid", "base", "snow-stake", "village", "approach"]);
+});
+
+// ── Cam identity / skip logic (prod constraint cams_unique_per_resort) ──
+
+const cam = (over = {}) => ({ resort_id: "r1", name: "Snow Stake", embed_url: null, youtube_id: "abc12345678", ...over });
+
+test("camIdentity coalesces null embed_url and youtube_id to empty strings like the prod constraint", () => {
+  assert.strictEqual(camIdentity(cam()), "r1|Snow Stake||abc12345678");
+  assert.strictEqual(camIdentity(cam({ embed_url: "https://x/y", youtube_id: null })), "r1|Snow Stake|https://x/y|");
+  assert.strictEqual(camIdentity(cam({ embed_url: undefined, youtube_id: undefined })), "r1|Snow Stake||");
+  assert.strictEqual(camIdentity(cam()), camIdentity({ ...cam(), elevation: "9000", kind: "snow-stake" }));
+});
+
+test("partitionCamRecords skips rows already present under the four-column identity and logs each", () => {
+  const existing = [
+    cam(),                                                  // YouTube-only row, null embed_url (the Ontario Snowstake case)
+    cam({ name: "Base", embed_url: "https://player/base", youtube_id: null }),
+  ];
+  const records = [
+    cam({ elevation: "9000", kind: "snow-stake" }),         // same identity, extra columns: skipped
+    cam({ name: "Base", embed_url: "https://player/base", youtube_id: null, credit: "Op" }), // skipped
+    cam({ name: "Base", embed_url: "https://player/base", youtube_id: "zzz99999999" }),      // same (resort, url, name) but new youtube_id: upsert (merges on 012's index)
+    cam({ name: "Summit", embed_url: "https://player/summit", youtube_id: null }),          // new
+    cam({ resort_id: "r2" }),                                                                // same name/ids, other resort: new
+  ];
+  const logged = [];
+  const { toUpsert, skipped } = partitionCamRecords(records, existing, (m) => logged.push(m));
+  assert.deepStrictEqual(skipped.map((r) => r.name), ["Snow Stake", "Base"]);
+  assert.deepStrictEqual(toUpsert.map((r) => [r.resort_id, r.name]), [["r1", "Base"], ["r1", "Summit"], ["r2", "Snow Stake"]]);
+  assert.strictEqual(logged.length, 2);
+  assert.match(logged[0], /already present, skipped: Snow Stake \(abc12345678\)/);
+  assert.match(logged[1], /already present, skipped: Base \(https:\/\/player\/base\)/);
+});
+
+test("partitionCamRecords is idempotent: a second run over the first run's output skips everything", () => {
+  const records = [cam(), cam({ name: "Summit", embed_url: "https://player/summit", youtube_id: null })];
+  const first = partitionCamRecords(records, [], () => {});
+  assert.strictEqual(first.toUpsert.length, 2);
+  const second = partitionCamRecords(records, first.toUpsert, () => {});
+  assert.strictEqual(second.toUpsert.length, 0);
+  assert.strictEqual(second.skipped.length, 2);
+});
+
+test("partitionCamRecords with no existing rows upserts everything in order", () => {
+  const records = [cam({ name: "A" }), cam({ name: "B" })];
+  const { toUpsert, skipped } = partitionCamRecords(records, [], () => {});
+  assert.deepStrictEqual(toUpsert, records);
+  assert.deepStrictEqual(skipped, []);
 });
