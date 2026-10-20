@@ -1,6 +1,7 @@
 import { findResort, isValidSlug, loadPublicApiCatalog, optionsFor } from "@/lib/public-api/data";
 import { markdownPageHeaders, resortMarkdown } from "@/lib/public-api/markdown-page";
 import { serializeResort } from "@/lib/public-api/serialize";
+import { profileDescription } from "@/lib/resort-profile";
 
 // GET /resorts/{slug}/index.md — the resort page as markdown for agents and
 // answer engines (rel="alternate" from the HTML page's Link header). Only GET
@@ -23,5 +24,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
   const resort = findResort(catalog, slug);
   if (!resort) return notFound(slug);
   const doc = serializeResort(resort, optionsFor(catalog, resort));
-  return new Response(resortMarkdown(doc, { now: catalog.now }), { headers: markdownPageHeaders(doc.canonicalUrl) });
+  // The stored description (P2 plumbing) travels with its provenance label.
+  return new Response(resortMarkdown(doc, { now: catalog.now, description: profileDescription(resort) }), {
+    headers: markdownPageHeaders(doc.canonicalUrl),
+  });
 }

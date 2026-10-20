@@ -3,6 +3,7 @@ import { getResortOpenings, getResortSitemapEntries } from "@/lib/supabase";
 import { SITE_URL } from "@/lib/site";
 import { isDropInEnabled } from "@/lib/drop-in";
 import { HUB_BASE_PATH, hubPath, listHubs } from "@/lib/hubs";
+import { RESORT_SUBPAGES, resortTabPath } from "@/lib/resort-pages";
 
 // Match the data pages' ISR window: the sitemap's lastModified values come
 // from snow_reports, which the sync jobs append every 6h (and, for
@@ -27,16 +28,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const buildTime = process.env.NEXT_PUBLIC_BUILD_TIME
     ? new Date(process.env.NEXT_PUBLIC_BUILD_TIME)
     : new Date();
-  const resortEntries: MetadataRoute.Sitemap = entries.map((e) => ({
-    url: `${SITE_URL}/resorts/${e.slug}`,
+  const resortEntries: MetadataRoute.Sitemap = entries.flatMap((e) => {
     // Real freshness beats a blanket "now": the page's data-bearing content
     // changes when its snow report does, and crawlers downrank sitemaps whose
     // lastModified is always the crawl date. Resorts with no report yet fall
     // back to build time.
-    lastModified: e.lastReportAt ? new Date(e.lastReportAt) : buildTime,
-    changeFrequency: "hourly",
-    priority: 0.8,
-  }));
+    const lastModified = e.lastReportAt ? new Date(e.lastReportAt) : buildTime;
+    return [
+      { url: `${SITE_URL}${resortTabPath(e.slug, "overview")}`, lastModified, changeFrequency: "hourly" as const, priority: 0.8 },
+      // The page family (lib/resort-pages.ts): snow report and webcams per
+      // resort, same data clock as the overview, one step down in priority.
+      ...RESORT_SUBPAGES.map((tab) => ({
+        url: `${SITE_URL}${resortTabPath(e.slug, tab.key)}`,
+        lastModified,
+        changeFrequency: "hourly" as const,
+        priority: 0.6,
+      })),
+    ];
+  });
 
   // The aggregate pages (/, /snow-report, /map) change exactly when the newest
   // snow report lands, so their lastModified is the max report timestamp —

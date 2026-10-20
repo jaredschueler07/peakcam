@@ -22,7 +22,7 @@ export interface ResortFaqItem {
   answer: string;
 }
 
-const COUNTRY_NAMES: Record<string, string> = {
+export const COUNTRY_NAMES: Record<string, string> = {
   US: "the United States",
   CA: "Canada",
   CL: "Chile",
@@ -53,7 +53,7 @@ function asSentence(text: string): string {
 }
 
 /** Full state/province name, or the country for Andes rows that store it in `state`. */
-function stateLabel(resort: ResortWithData): string {
+export function stateLabel(resort: Pick<ResortWithData, "state" | "country">): string {
   const countryName = COUNTRY_NAMES[resort.country] ?? resort.country;
   if (resort.state === countryName || resort.state === resort.country) return countryName;
   return STATE_NAMES[resort.state] ?? resort.state;
@@ -90,7 +90,8 @@ function regionPhrase(region: string): string {
   return REGION_NEEDS_THE.test(region) ? `the ${region}` : region;
 }
 
-function locationSentence(resort: ResortWithData): string {
+/** "{Name} is a ski resort in the Wasatch Range, Utah." — shared with the identity FAQ (lib/resort-faq.ts). */
+export function locationSentence(resort: Pick<ResortWithData, "name" | "state" | "country" | "region">): string {
   const countryName = COUNTRY_NAMES[resort.country] ?? resort.country;
   // Andes rows store the country name in `state`; saying it twice reads as a
   // mail-merge bug ("Central Andes, Chile, Chile").

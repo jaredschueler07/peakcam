@@ -1,14 +1,19 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getResortBySlug, getAllResortSlugs, getAllResorts, getLiveConditions, getUserConditions, getResortElevationFt, getResortOpenings, getResortCamTimeline, getResortStationsIndex } from "@/lib/supabase";
+import { getResortBySlug, getAllResortSlugs, getAllResorts, getLiveConditions, getUserConditions, getResortElevationIndex, getResortOpenings, getResortCamTimeline, getStationNormalsSummary, getResortStationsIndex } from "@/lib/supabase";
 import { serializeStations } from "@/lib/public-api/serialize";
 import { resortSentence } from "@/lib/quotable";
 import { stationFor } from "@/lib/stations";
-import type { BreadcrumbItem } from "@/components/hubs/HubBreadcrumb";
 import { ResortAboutSection } from "@/components/resort/ResortAboutSection";
+import { ResortTabs } from "@/components/resort/ResortTabs";
+import { ResortDescription } from "@/components/resort/ResortDescription";
+import { buildResortFaqPage, faqPageLd } from "@/lib/resort-faq";
+import { profileAdditionalProperties, profileDescription, profileSameAs, resolveElevation } from "@/lib/resort-profile";
+import { breadcrumbListLd, resortBreadcrumb, resortTabUrl } from "@/lib/resort-pages";
+import { SEASON_LABEL, toPacificDay } from "@/lib/openings";
 import type { NearbyResortsData } from "@/components/resort/NearbyResorts";
 import { nearbyResorts, summarizeNearby } from "@/lib/geo";
-import { HUB_BASE_PATH, groupByRegion, hubPath, stateHub, stateHubPath } from "@/lib/hubs";
+import { groupByRegion, hubPath, stateHub, stateHubPath } from "@/lib/hubs";
 import { isOffSeason } from "@/lib/map-utils";
 import { getWeatherForecast, getHourlyForecast, bucketIntoPeriods, applyBlendToPeriods, type SnowByDateInches } from "@/lib/weather";
 import { getOpenMeteoForecast, getOpenMeteoHourly } from "@/lib/open-meteo";
@@ -121,7 +126,16 @@ export default async function ResortPage({
   // page keeps serving, rather than caching a resort page with no neighbours
   // at 200 for an hour.
   const isUS = resort.country === "US";
-  const elevationFt = isUS ? null : await getResortElevationFt(resort.id);
+  // Base/summit: the P0 profile columns when the importer has filled them,
+  // else the resort_metadata row (one cached query for the whole catalogue).
+  const elevationIndex = await getResortElevationIndex();
+  const metadataRow = elevationIndex[resort.id];
+  const elevation = resolveElevation(resort, metadataRow ? { baseFt: metadataRow.base_ft, summitFt: metadataRow.summit_ft } : null);
+  const elevationFt = isUS
+    ? null
+    : elevation.baseFt != null && elevation.summitFt != null
+      ? Math.round((elevation.baseFt + elevation.summitFt) / 2)
+      : elevation.baseFt;
 
   // Still-archive strip (migration 024): the page's lead cam first — the same
   // "first embeddable active cam" rule ResortDetailPage uses — so the strip
@@ -150,7 +164,7 @@ export default async function ResortPage({
     ? Object.fromEntries(forecastStrip.daily.map((d) => [d.date, d.snowfallIn]))
     : null;
 
-  const [weatherRaw, hourlyRaw, liveConditions, userConditions, allResorts, openings, camTimeline, stationIndex] = await Promise.all([
+  const [weatherRaw, hourlyRaw, liveConditions, userConditions, allResorts, openings, camTimeline, normals, stationIndex] = await Promise.all([
     isUS
       ? getWeatherForecast(resort.lat, resort.lng, blendByDate)
       : getOpenMeteoForecast(resort.lat, resort.lng, elevationFt),
@@ -160,12 +174,15 @@ export default async function ResortPage({
     getLiveConditions(resort.id),
     getUserConditions(resort.id),
     getAllResorts(),
-    // The freshness sentence names the opening date only for a resort with no
-    // report yet, so the openings table is read only in that case.
-    resort.snow_report ? Promise.resolve([]) : getResortOpenings(),
+    // The opening row feeds the Event node and the "when does it open" FAQ
+    // entry as well as the no-report freshness sentence, so it is always read.
+    getResortOpenings(),
     getResortCamTimeline(resort.id, camOrder, 24),
+    // 30-year normals peak for the "typical season" FAQ entry; null without a station.
+    getStationNormalsSummary(resort.snotel_station_id),
     getResortStationsIndex(),
   ]);
+  const opening = openings.find((row) => row.resort_id === resort.id) ?? null;
 
   // "What the instruments say": the station layer's rows for this resort
   // (migration 026), serialised exactly as /api/v1/resorts/{slug}.measuredNow
@@ -180,10 +197,16 @@ export default async function ResortPage({
   // alternate use — and drops the parenthetical for a triplet the table does
   // not know. `new Date()` only decides whether an opening date is still
   // ahead; same hourly ISR cadence as generateMetadata above.
-  const freshness = resortSentence(resort, new Date(), {
-    station: stationFor(resort),
-    opening: openings.find((row) => row.resort_id === resort.id) ?? null,
-  });
+  const station = stationFor(resort);
+  const now = new Date();
+  const freshness = resortSentence(resort, now, { station, opening });
+
+  // Identity + operational FAQ (lib/resort-faq.ts): the same list renders
+  // visibly in ResortAboutSection and as the FAQPage node below, so the
+  // structured data never claims a question the page does not show.
+  const faq = buildResortFaqPage(resort, now, { elevation, opening, normals, station });
+  const faqLd = faqPageLd(faq);
+  const description = profileDescription(resort);
 
   // The NWS path applied the blend inside getWeatherForecast; the Open-Meteo
   // single-model path carries dates too, so the same per-date override works.
@@ -210,7 +233,7 @@ export default async function ResortPage({
   };
 
   const snow = resort.snow_report;
-  const pageUrl = `${BASE_URL}/resorts/${resort.slug}`;
+  const pageUrl = resortTabUrl(resort.slug, "overview");
   const ogImage = `${BASE_URL}/resorts/${resort.slug}/opengraph-image`;
   // `conditions` is "tags||narrative"; only the narrative half is prose.
   const narrative = conditionsNarrative(snow?.conditions);
@@ -294,19 +317,21 @@ export default async function ResortPage({
     ];
   });
 
-  // Collect social / official links for sameAs
-  const sameAs: string[] = [];
-  if (resort.website_url) sameAs.push(resort.website_url);
-  if (resort.x_url) sameAs.push(resort.x_url);
-  if (resort.facebook_url) sameAs.push(resort.facebook_url);
-  if (resort.instagram_url) sameAs.push(resort.instagram_url);
+  // sameAs: the operator's site, socials and the Wikidata item when the
+  // profile has one. additionalProperty: vertical, annual snowfall, longest
+  // run, skiable terrain, passes — each only when the row carries the value.
+  const sameAs = profileSameAs(resort);
+  const additionalProperty = profileAdditionalProperties(resort, elevation);
 
   const skiResortLd = {
     "@context": "https://schema.org",
     "@type": ["SkiResort", "TouristAttraction"],
     "@id": pageUrl,
     name: resort.name,
-    description: buildResortSchemaDescription(resort),
+    // The stored description when the profile has one (its provenance is
+    // labelled on the page and in the markdown alternate); else the
+    // data-derived sentence.
+    description: description?.text ?? buildResortSchemaDescription(resort),
     url: pageUrl,
     // OG card first (the share image), then one still per cam, so image
     // search has the mountain views and not only the generated poster.
@@ -325,44 +350,62 @@ export default async function ResortPage({
     isAccessibleForFree: false,
     ...(sameAs.length ? { sameAs } : {}),
     ...(amenityFeature.length ? { amenityFeature } : {}),
+    ...(additionalProperty.length ? { additionalProperty } : {}),
     ...(videos.length ? { video: videos } : {}),
+    ...(resort.trail_map_url ? { hasMap: resort.trail_map_url } : {}),
   };
 
-  // Item 2 is the state hub ("Colorado" → /ski-cams/colorado), a real page in
-  // the crawl path — the old `/#browse` fragment was the homepage again. A
-  // resort with no state on file (none today) falls back to the hub index.
-  const crumbHub = stateHubLink ?? { label: "Ski cams", href: HUB_BASE_PATH };
-  // One trail feeds both the visible breadcrumb (HubBreadcrumb inside
-  // ResortDetailPage) and the JSON-LD below, so the two can never disagree.
-  const breadcrumb: BreadcrumbItem[] = [
-    { label: "Home", href: "/" },
-    { label: crumbHub.label, href: crumbHub.href },
-    { label: resort.name, href: `/resorts/${resort.slug}` },
-  ];
-  const breadcrumbLd = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: breadcrumb.map((item, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      name: item.label,
-      item: item.href === "/" ? BASE_URL : `${BASE_URL}${item.href}`,
-    })),
-  };
+  // Home › {State hub} › {Resort} (lib/resort-pages.ts): one trail feeds the
+  // visible HubBreadcrumb inside ResortDetailPage and the JSON-LD, so the two
+  // can never disagree. The subpages append their own leaf to the same trail.
+  const breadcrumb = resortBreadcrumb(resort, "overview");
+  const breadcrumbLd = breadcrumbListLd(breadcrumb);
 
   // SkiResort is a Place, which schema.org gives no dateModified — so freshness
   // rides on a WebPage node instead: dateModified is the latest snow report's
   // updated_at, the moment this page's data-bearing content last changed.
-  const webPageLd = snow
-    ? {
-        "@context": "https://schema.org",
-        "@type": "WebPage",
-        url: pageUrl,
-        name: `${resort.name} Snow Report & Webcams`,
-        dateModified: snow.updated_at,
-        mainEntity: { "@id": pageUrl },
-      }
-    : null;
+  // `speakable` points at the freshness sentence (#resort-freshness in
+  // ResortDetailPage), the one dated line written to be read aloud verbatim.
+  const webPageLd = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    url: pageUrl,
+    name: `${resort.name} Snow Report & Webcams`,
+    ...(snow ? { dateModified: snow.updated_at } : {}),
+    mainEntity: { "@id": pageUrl },
+    speakable: { "@type": "SpeakableSpecification", cssSelector: ["#resort-freshness"] },
+    ...(description ? { creditText: `Description source: ${description.source}` } : {}),
+  };
+
+  // Event: "{Resort} 2026–27 season opening" from resort_openings — only while
+  // the opening is ahead of today (US Pacific day, the same clock
+  // /opening-dates reads), because a past opening is not an upcoming event.
+  // A projection is still EventScheduled but says so in its description; a
+  // Southern-hemisphere row with only a closing date gets no Event.
+  const openingDate = opening?.confirmed_open ?? opening?.projected_open ?? null;
+  const eventLd =
+    opening && openingDate && openingDate >= toPacificDay(now)
+      ? {
+          "@context": "https://schema.org",
+          "@type": "Event",
+          name: `${resort.name} ${opening.season.replace(/^(\d{4})-(\d{2})$/, "$1–$2") || SEASON_LABEL} season opening`,
+          description: opening.confirmed_open
+            ? `Opening day of the ${opening.season} ski season at ${resort.name}, as announced by the resort.`
+            : `Projected opening day of the ${opening.season} ski season at ${resort.name}. A projection until the resort confirms it.`,
+          startDate: openingDate,
+          eventStatus: "https://schema.org/EventScheduled",
+          eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+          location: {
+            "@type": "Place",
+            "@id": pageUrl,
+            name: resort.name,
+            address: { "@type": "PostalAddress", addressRegion: resort.state, addressCountry: resort.country },
+            geo: { "@type": "GeoCoordinates", latitude: resort.lat, longitude: resort.lng },
+          },
+          ...(resort.website_url ? { organizer: { "@type": "Organization", name: resort.name, url: resort.website_url } } : {}),
+          url: `${BASE_URL}/opening-dates`,
+        }
+      : null;
 
   return (
     <main id="main-content">
@@ -374,14 +417,43 @@ export default async function ResortPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
       />
-      {webPageLd && (
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageLd) }}
+      />
+      {eventLd && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageLd) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(eventLd) }}
         />
       )}
-      <ResortDetailPage resort={resort} weather={weather} forecastPeriods={forecastPeriods} forecastStrip={forecastStrip} hourlyData={hourlyRaw} liveConditions={liveConditions} userConditions={userConditions} nearby={nearby} freshness={{ segments: freshness.segments }} breadcrumb={breadcrumb} camTimeline={camTimeline} measuredNow={measuredNow} />
-      <ResortAboutSection resort={resort} />
+      {faqLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }}
+        />
+      )}
+      <ResortDetailPage
+        resort={resort}
+        weather={weather}
+        forecastPeriods={forecastPeriods}
+        forecastStrip={forecastStrip}
+        hourlyData={hourlyRaw}
+        liveConditions={liveConditions}
+        userConditions={userConditions}
+        nearby={nearby}
+        freshness={{ segments: freshness.segments }}
+        breadcrumb={breadcrumb}
+        camTimeline={camTimeline}
+        measuredNow={measuredNow}
+        subnav={
+          <>
+            <ResortTabs slug={resort.slug} active="overview" />
+            <ResortDescription description={description} />
+          </>
+        }
+      />
+      <ResortAboutSection resort={resort} faq={faq} />
     </main>
   );
 }
