@@ -14,6 +14,8 @@ import { AuthModal } from "@/components/auth/AuthModal";
 import type { ResortWithData } from "@/lib/types";
 import type { RadarFrame } from "@/lib/weather-radar";
 import { isOffSeason } from "@/lib/map-utils";
+import type { ScoreLightPublic } from "@/lib/public-api/schema";
+import type { Quotable } from "@/lib/quotable";
 // Curated popularity ranking — order matters, top of list = top of grid. Based
 // on brand recognition / skier visits; SA heroes featured for Andes season.
 // Shared with the 404 page, so it can't live in this "use client" module.
@@ -36,6 +38,13 @@ interface Props {
   resorts: ResortWithData[];
   /** RainViewer radar frames for the sidebar map's radar loop (best-effort). */
   radarFrames?: RadarFrame[];
+  /** P7: today's Snow Score per resort id and the dated leaders sentence; the "Best right now" strip ranks on it when present. */
+  featured?: FeaturedScores | null;
+}
+
+export interface FeaturedScores {
+  scores: Record<string, ScoreLightPublic>;
+  sentence: Pick<Quotable, "segments">;
 }
 
 type StateFilter = string;
@@ -227,13 +236,20 @@ function AlertSignupBanner({ resorts }: { resorts: ResortWithData[] }) {
 
 // ── TODAY'S TOP CONDITIONS — editorial strip ─────────────────────────────────
 
-function FeaturedRow({ resorts }: { resorts: ResortWithData[] }) {
+function FeaturedRow({ resorts, scores }: { resorts: ResortWithData[]; scores?: FeaturedScores | null }) {
+  const byScore = Boolean(scores && Object.keys(scores.scores).length);
   const featured = useMemo(() => {
     const now = new Date();
-    const sorted = resorts
-      // In-season only: a stale "great" on a summer-closed resort shouldn't
-      // headline "Today's Top" (matches the map's off-season treatment).
-      .filter((r) => r.snow_report && r.cond_rating && !isOffSeason(r.lat, now))
+    // In-season only: a stale "great" on a summer-closed resort shouldn't
+    // headline "Today's Top" (matches the map's off-season treatment).
+    const inSeason = resorts.filter((r) => r.snow_report && r.cond_rating && !isOffSeason(r.lat, now));
+    if (byScore) {
+      // P7: rank on today's Snow Score; a resort without a score sorts last.
+      const score = (r: ResortWithData) => scores?.scores[r.id]?.score ?? -1;
+      const sorted = [...inSeason].sort((a, b) => score(b) - score(a) || (b.snow_report?.new_snow_24h ?? 0) - (a.snow_report?.new_snow_24h ?? 0)).slice(0, 4);
+      return sorted.some((r) => (scores?.scores[r.id]?.rating ?? "poor") !== "poor") ? sorted : [];
+    }
+    const sorted = inSeason
       .sort((a, b) => {
         const condDiff = (CONDITION_ORDER[a.cond_rating] ?? 99) - (CONDITION_ORDER[b.cond_rating] ?? 99);
         if (condDiff !== 0) return condDiff;
@@ -242,7 +258,7 @@ function FeaturedRow({ resorts }: { resorts: ResortWithData[] }) {
       .slice(0, 4);
     const hasGoodOrBetter = sorted.some(r => r.cond_rating === "great" || r.cond_rating === "good");
     return hasGoodOrBetter ? sorted : [];
-  }, [resorts]);
+  }, [resorts, scores, byScore]);
 
   if (featured.length === 0) return null;
 
@@ -262,11 +278,31 @@ function FeaturedRow({ resorts }: { resorts: ResortWithData[] }) {
       <h2 className="font-display font-black text-4xl md:text-5xl text-ink mb-1 leading-[0.95] tracking-[-0.02em]">
         Best <em className="text-alpen not-italic font-bold italic">right now</em>.
       </h2>
-      <p className="text-bark text-sm mb-5">Ranked by condition rating and recent snowfall.</p>
+      {byScore && scores ? (
+        <p className="text-bark text-sm mb-5" data-testid="featured-score-sentence">
+          {scores.sentence.segments.map((segment, index) =>
+            segment.href ? (
+              <Link key={index} href={segment.href} prefetch={false} className="font-bold text-ink underline decoration-alpen/60 decoration-2 underline-offset-[3px] hover:decoration-alpen">
+                {segment.text}
+              </Link>
+            ) : (
+              <span key={index}>{segment.text}</span>
+            ),
+          )}{" "}
+          <Link href="/methodology#score" className="underline underline-offset-2 hover:text-ink">
+            How the score works
+          </Link>
+          .
+        </p>
+      ) : (
+        <p className="text-bark text-sm mb-5">Ranked by condition rating and recent snowfall.</p>
+      )}
       <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 scrollbar-hide">
         {featured.map((resort) => {
           const snow = resort.snow_report;
-          const chip = chipClass[resort.cond_rating] ?? "bg-cream-50 text-ink border-bark";
+          const score = scores?.scores[resort.id] ?? null;
+          const rating = byScore && score ? score.rating : resort.cond_rating;
+          const chip = chipClass[rating] ?? "bg-cream-50 text-ink border-bark";
           return (
             <Link
               key={resort.id}
@@ -286,8 +322,9 @@ function FeaturedRow({ resorts }: { resorts: ResortWithData[] }) {
                     </h3>
                     <p className="text-bark text-xs mt-1">{resort.region}</p>
                   </div>
-                  <span className={`inline-flex items-center rounded-full border-[1.5px] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] shrink-0 ${chip}`}>
-                    {resort.cond_rating.toUpperCase()}
+                  <span className={`inline-flex items-center gap-1.5 rounded-full border-[1.5px] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] shrink-0 ${chip}`} title={byScore && score ? `PeakCam Snow Score ${score.score} of 100, ${score.rating}, as of ${score.date}` : undefined}>
+                    {byScore && score ? <span className="font-display text-[15px] leading-none tabular-nums">{score.score}</span> : null}
+                    {rating.toUpperCase()}
                   </span>
                 </div>
 
@@ -396,7 +433,7 @@ function SouthernSeasonBanner({
 
 // ── Main BrowsePage ──────────────────────────────────────────────────────────
 
-export function BrowsePage({ resorts, radarFrames = [] }: Props) {
+export function BrowsePage({ resorts, radarFrames = [], featured = null }: Props) {
   const [search, setSearch] = useState("");
 
   // Header search on inner pages routes here as /?q=… (the resort list only
@@ -749,7 +786,7 @@ export function BrowsePage({ resorts, radarFrames = [] }: Props) {
             setShowStates(false);
           }}
         />
-        <FeaturedRow resorts={resorts} />
+        <FeaturedRow resorts={resorts} scores={featured} />
         <PowderAlert resorts={resorts} />
 
         <div className="hidden md:block"><AlertSignupBanner resorts={resorts} /></div>

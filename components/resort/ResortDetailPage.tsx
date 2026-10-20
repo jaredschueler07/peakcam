@@ -40,6 +40,8 @@ import type { MeasuredNowPublic } from "@/lib/public-api/schema";
 import { StatusChip } from "@/components/resort/StatusChip";
 import { FreshnessLabels } from "@/components/resort/FreshnessLabels";
 import type { ResortConditionsView } from "@/lib/public-api/conditions";
+import { ScoreCard } from "@/components/resort/ScoreCard";
+import type { ResortScoreHistoryPublic } from "@/lib/public-api/schema";
 
 interface Props {
   resort: ResortWithData;
@@ -66,6 +68,8 @@ interface Props {
   measuredNow?: MeasuredNowPublic[] | null;
   /** The P6 conditions contract (lib/public-api/conditions.ts resortConditionsView): status chip in the hero, freshness labels under the snow strip. Omitted → neither. */
   conditions?: ResortConditionsView | null;
+  /** The P7 Snow Score document (lib/public-api/score.ts buildScoreDocument): ring, components and sparkline above the snow strip. Omitted or unavailable → no card. */
+  score?: ResortScoreHistoryPublic | null;
 }
 
 // ─── "Updated …" stamp ───────────────────────────────────────────────────────
@@ -198,7 +202,7 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStrip = null, hourlyData, liveConditions, userConditions = [], nearby = null, freshness = null, breadcrumb = null, camTimeline = null, timelapse = null, subnav = null, measuredNow = null, conditions = null }: Props) {
+export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStrip = null, hourlyData, liveConditions, userConditions = [], nearby = null, freshness = null, breadcrumb = null, camTimeline = null, timelapse = null, subnav = null, measuredNow = null, conditions = null, score = null }: Props) {
   const activeCams = resort.cams.filter((c) => c.is_active);
   const embeddableCams = activeCams.filter((c) => c.embed_type !== "link");
   const snow = resort.snow_report;
@@ -439,6 +443,12 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
         <nav aria-label="Resort sections" className="flex flex-wrap gap-2">
           {[['cameras', 'Cameras'], ['conditions-report', 'Conditions'], ['forecast', 'Forecast']].map(([id, label]) => <a key={id} href={`#${id}`} className="inline-flex min-h-11 items-center rounded-full border border-ink bg-cream-50 px-4 text-sm font-bold">{label}</a>)}
         </nav>
+        {/* P7: the Snow Score card, when the scorer has a row for this resort. */}
+        {score && score.available && (
+          <section id="snow-score" className="scroll-mt-20" aria-label="Snow Score">
+            <ScoreCard doc={score} resortName={resort.name} />
+          </section>
+        )}
         {/* Snow conditions strip */}
         {snow ? (
           <section id="conditions-report" className="scroll-mt-20">

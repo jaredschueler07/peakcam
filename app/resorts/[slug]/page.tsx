@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import type { OperatorStatusRow } from "@/lib/types";
 import { notFound } from "next/navigation";
-import { getResortBySlug, getAllResortSlugs, getAllResorts, getLiveConditions, getUserConditions, getResortElevationIndex, getResortOpenings, getResortCamTimeline, getStationNormalsSummary, getResortStationsIndex, getLatestOperatorStatusIndex, getResortTimelapses } from "@/lib/supabase";
+import { getResortBySlug, getAllResortSlugs, getAllResorts, getLiveConditions, getUserConditions, getResortElevationIndex, getResortOpenings, getResortCamTimeline, getStationNormalsSummary, getResortStationsIndex, getLatestOperatorStatusIndex, getResortTimelapses, getLatestScoresIndex, getResortScoreHistory } from "@/lib/supabase";
+import { buildScoreDocument } from "@/lib/public-api/score";
+import { SCORE_HISTORY_DAYS } from "@/lib/score";
 import { resortConditionsView } from "@/lib/public-api/conditions";
 import { pickResortTimelapse } from "@/lib/cam-timelapse";
 import { serializeStations } from "@/lib/public-api/serialize";
@@ -167,7 +169,7 @@ export default async function ResortPage({
     ? Object.fromEntries(forecastStrip.daily.map((d) => [d.date, d.snowfallIn]))
     : null;
 
-  const [weatherRaw, hourlyRaw, liveConditions, userConditions, allResorts, openings, camTimeline, normals, stationIndex, operatorIndex, timelapses] = await Promise.all([
+  const [weatherRaw, hourlyRaw, liveConditions, userConditions, allResorts, openings, camTimeline, normals, stationIndex, operatorIndex, timelapses, scoreIndex, scoreHistory] = await Promise.all([
     isUS
       ? getWeatherForecast(resort.lat, resort.lng, blendByDate)
       : getOpenMeteoForecast(resort.lat, resort.lng, elevationFt),
@@ -188,9 +190,14 @@ export default async function ResortPage({
     getLatestOperatorStatusIndex().catch((): Record<string, OperatorStatusRow> => ({})),
     // Rendered clips (P8): the overview shows the newest 24 h clip as one tile.
     getResortTimelapses(resort.id, camOrder),
+    // Snow Score (P7, migration 028): today's row from the catalogue index and the 30-day history; both fail soft to "no card".
+    getLatestScoresIndex().catch(() => null),
+    getResortScoreHistory(resort.id, SCORE_HISTORY_DAYS).catch(() => null),
   ]);
   const timelapse = pickResortTimelapse(timelapses ?? []).current;
   const opening = openings.find((row) => row.resort_id === resort.id) ?? null;
+  // The same document /api/v1/resorts/{slug}/score-components serves, built once per ISR render.
+  const score = buildScoreDocument(resort, { today: scoreIndex?.[resort.id] ?? null, history: scoreHistory }, { now: new Date() });
 
   // "What the instruments say": the station layer's rows for this resort
   // (migration 026), serialised exactly as /api/v1/resorts/{slug}.measuredNow
@@ -467,6 +474,7 @@ export default async function ResortPage({
         timelapse={timelapse}
         measuredNow={measuredNow}
         conditions={conditions}
+        score={score}
         subnav={
           <>
             <ResortTabs slug={resort.slug} active="overview" />
