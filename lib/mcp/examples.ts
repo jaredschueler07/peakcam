@@ -34,6 +34,7 @@ export const TOOL_EXAMPLES: Record<PeakCamToolName, ToolExample> = {
   get_season_stats: { prompt: "How much snow has Breckenridge had this season, and is that normal?", args: { slug: "breckenridge" } },
   get_monthly_climatology: { prompt: "Which month is snowiest at Alta?", args: { slug: "alta" } },
   get_leaderboard: { prompt: "Which Colorado resorts have had the most powder days this season?", args: { kind: "season-powder-days", state: "CO", limit: 10 } },
+  get_timelapses: { prompt: "Show me a timelapse of the last 24 hours at Alta, and the last storm on tape.", args: { slug: "alta" } },
 };
 
 /** `--tool-arg k=v` pairs for the MCP Inspector CLI (arrays and objects as JSON). */
