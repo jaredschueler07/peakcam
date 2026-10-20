@@ -708,25 +708,28 @@ export async function getSnowpackHistory(resortId: string, days = 7): Promise<Sn
  */
 export async function getStationNormalsSummary(stationId: string | null | undefined): Promise<StationNormalsSummary | null> {
   if (!stationId) return null;
+  // Live-DB drift: migration 005 names these columns median_depth_in /
+  // median_swe_in, but the table in prod (what scripts/seed-snotel-normals.ts
+  // writes and scripts/snotel-sync.ts reads) has median_depth / median_swe.
   const { data, error } = await supabase
     .from("snotel_normals")
-    .select("day_of_water_year, median_depth_in, median_swe_in")
+    .select("day_of_water_year, median_depth, median_swe")
     .eq("station_id", stationId)
-    .not("median_depth_in", "is", null)
-    .order("median_depth_in", { ascending: false })
+    .not("median_depth", "is", null)
+    .order("median_depth", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) {
     if (!MISSING_TABLE_CODES.has(error.code)) console.warn("[PeakCam] Could not fetch station normals:", error.message);
     return null;
   }
-  if (!data || data.median_depth_in == null) return null;
-  const peak = Number(data.median_depth_in);
+  if (!data || data.median_depth == null) return null;
+  const peak = Number(data.median_depth);
   if (!Number.isFinite(peak) || peak <= 0) return null;
   return {
     peakMedianDepthIn: peak,
     peakDayOfWaterYear: Number(data.day_of_water_year),
-    peakMedianSweIn: data.median_swe_in == null ? null : Number(data.median_swe_in),
+    peakMedianSweIn: data.median_swe == null ? null : Number(data.median_swe),
   };
 }
 
