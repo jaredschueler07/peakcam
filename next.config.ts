@@ -191,7 +191,10 @@ const nextConfig: NextConfig = {
     "/api/drop-in/*": ["./public/game/terrain/*.height.u16.br", "./public/game/terrain/*.meta.json", "./public/game/terrain/*.trails.json", "./public/game/terrain/*.network.json"],
   },
   images: {
-    domains: [],
+    // Google account avatars on /account (P11). lib/auth-profile.ts drops any
+    // avatar outside this host pattern before it reaches next/image, which
+    // would otherwise throw at render time for an unknown host.
+    remotePatterns: [{ protocol: "https", hostname: "*.googleusercontent.com" }],
   },
   experimental: {
     // Max attempts per page during the static export (default 1). The build
