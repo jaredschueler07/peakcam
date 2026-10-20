@@ -377,7 +377,7 @@ async function draft(client: Anthropic, row: ResortRow, sourceText: string, sour
   });
   if (response.stop_reason === "refusal") return null;
   const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .filter((b: Anthropic.ContentBlock): b is Anthropic.TextBlock => b.type === "text")
     .map((b: Anthropic.TextBlock) => b.text)
     .join("")
     .trim();
