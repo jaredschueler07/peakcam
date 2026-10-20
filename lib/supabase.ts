@@ -5,6 +5,7 @@ import type { ResortOpening } from "./openings";
 import type { StationNormalsSummary } from "./resort-faq";
 import { withResolvedCamNames } from "./cam-name";
 import { clampHours, pickResortTimeline, shapeTimeline, toFrame, MAX_TIMELINE_HOURS, type CamStillRow, type CamTimeline, type CamTimelineFrame } from "./cam-timeline";
+import { shapeTimelapses, type CamTimelapseRow, type CamTimelapses } from "./cam-timelapse";
 import { assembleStoredRuns, latestRunsPerModel, type ForecastDailyRow, type ForecastRunRow, type ForecastScoreRow, type StoredForecast } from "./forecast/store";
 import type { CumulativeNormalRow, DailyRow, MonthlyNormalRow, NormalWindow } from "./snow-history";
 import type { SeasonAggregateRow } from "./leaderboards";
@@ -732,6 +733,8 @@ export interface ResortSitemapEntry {
   /** Raw `resorts.state` ("CO", "BC", "Chile") — groups the entry into its /ski-cams hub. */
   state: string;
   region: string;
+  /** "US" | "CA" | "CL" | "AR" — picks the resort's sitemap child file. */
+  country: string;
   /** updated_at of the latest snow report, null when a resort has none. */
   lastReportAt: string | null;
 }
@@ -744,7 +747,7 @@ export interface ResortSitemapEntry {
  */
 export async function getResortSitemapEntries(): Promise<ResortSitemapEntry[]> {
   const [resortsRes, reportsRes] = await Promise.all([
-    supabase.from("resorts").select("id, slug, name, state, region").eq("is_active", true),
+    supabase.from("resorts").select("id, slug, name, state, region, country").eq("is_active", true),
     supabase.from("latest_snow_reports").select("resort_id, updated_at"),
   ]);
   if (resortsRes.error) throw resortsRes.error;
@@ -758,6 +761,7 @@ export async function getResortSitemapEntries(): Promise<ResortSitemapEntry[]> {
     name: r.name,
     state: r.state,
     region: r.region,
+    country: r.country,
     lastReportAt: lastByResort.get(r.id) ?? null,
   }));
 }
@@ -969,6 +973,37 @@ export async function getResortCamTimelines(resortId: string, camOrder: readonly
     if (t) out.set(camId, t);
   }
   return out;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Cam timelapse clips (migrations 025 + 031)
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Rendered clips for every archive-allowed cam of a resort from the public
+ * `cam_timelapse_current` view (migration 031; joins through
+ * cams.archive_allowed like the still timeline), shaped per cam in
+ * `camOrder`: the current 24 h clip and the newest storm clips. Cams with
+ * no clip are absent. Fails soft (null) when the view is missing — the
+ * strip is decoration on a page whose core data comes from
+ * getResortBySlug — so an unapplied migration never fails the ISR render.
+ */
+export async function getResortTimelapses(resortId: string, camOrder: readonly string[] = []): Promise<CamTimelapses[] | null> {
+  const { data, error } = await supabase
+    .from("cam_timelapse_current")
+    .select("id,cam_id,resort_id,window,url,poster_url,frames,starts_at,ends_at,bytes,rendered_at,storm_date")
+    .eq("resort_id", resortId)
+    .order("rendered_at", { ascending: false })
+    .limit(400);
+  if (error) {
+    if (MISSING_TABLE_CODES.has(error.code)) {
+      console.warn("[PeakCam] cam_timelapse_current missing — apply migration 031; timelapses unavailable");
+    } else {
+      console.warn("[PeakCam] Could not fetch cam timelapses:", error.message);
+    }
+    return null;
+  }
+  return shapeTimelapses((data ?? []) as CamTimelapseRow[], camOrder);
 }
 
 // ── Season history (P5, migration 030) ───────────────────────

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import type { OperatorStatusRow } from "@/lib/types";
 import { notFound } from "next/navigation";
-import { getResortBySlug, getAllResortSlugs, getAllResorts, getLiveConditions, getUserConditions, getResortElevationIndex, getResortOpenings, getResortCamTimeline, getStationNormalsSummary, getResortStationsIndex, getLatestOperatorStatusIndex } from "@/lib/supabase";
+import { getResortBySlug, getAllResortSlugs, getAllResorts, getLiveConditions, getUserConditions, getResortElevationIndex, getResortOpenings, getResortCamTimeline, getStationNormalsSummary, getResortStationsIndex, getLatestOperatorStatusIndex, getResortTimelapses } from "@/lib/supabase";
 import { resortConditionsView } from "@/lib/public-api/conditions";
+import { pickResortTimelapse } from "@/lib/cam-timelapse";
 import { serializeStations } from "@/lib/public-api/serialize";
 import { resortSentence } from "@/lib/quotable";
 import { stationFor } from "@/lib/stations";
@@ -166,7 +167,7 @@ export default async function ResortPage({
     ? Object.fromEntries(forecastStrip.daily.map((d) => [d.date, d.snowfallIn]))
     : null;
 
-  const [weatherRaw, hourlyRaw, liveConditions, userConditions, allResorts, openings, camTimeline, normals, stationIndex, operatorIndex] = await Promise.all([
+  const [weatherRaw, hourlyRaw, liveConditions, userConditions, allResorts, openings, camTimeline, normals, stationIndex, operatorIndex, timelapses] = await Promise.all([
     isUS
       ? getWeatherForecast(resort.lat, resort.lng, blendByDate)
       : getOpenMeteoForecast(resort.lat, resort.lng, elevationFt),
@@ -185,7 +186,10 @@ export default async function ResortPage({
     getResortStationsIndex(),
     // Newest operator report (migration 032, P6); an empty index before the job has run.
     getLatestOperatorStatusIndex().catch((): Record<string, OperatorStatusRow> => ({})),
+    // Rendered clips (P8): the overview shows the newest 24 h clip as one tile.
+    getResortTimelapses(resort.id, camOrder),
   ]);
+  const timelapse = pickResortTimelapse(timelapses ?? []).current;
   const opening = openings.find((row) => row.resort_id === resort.id) ?? null;
 
   // "What the instruments say": the station layer's rows for this resort
@@ -460,6 +464,7 @@ export default async function ResortPage({
         freshness={{ segments: freshness.segments }}
         breadcrumb={breadcrumb}
         camTimeline={camTimeline}
+        timelapse={timelapse}
         measuredNow={measuredNow}
         conditions={conditions}
         subnav={

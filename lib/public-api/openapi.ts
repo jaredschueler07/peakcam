@@ -160,7 +160,7 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
           operationId: "getResortCams",
           tags: ["cams"],
           summary: "The resort's webcams",
-          description: "Active cams with health (`live`), a still URL where the operator publishes one or PeakCam captured one, and `capturedAt` only for PeakCam captures. Frames are linked, never proxied; rights stay with the operator.",
+          description: "Active cams with health (`live`), a still URL where the operator publishes one or PeakCam captured one, `capturedAt` only for PeakCam captures, and `timelapses` (the cam's rendered clips, present once the clip table is served). Frames and clips are linked, never proxied; rights stay with the operator.",
           parameters: [SLUG_PARAM],
           responses: {
             "200": jsonResponse("The cam list.", "CamList"),
@@ -179,6 +179,21 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
           parameters: [SLUG_PARAM],
           responses: {
             "200": jsonResponse("The conditions envelope.", "ResortConditions"),
+            "404": ERROR_404,
+            "403": ERROR_403,
+          },
+        },
+      },
+      "/resorts/{slug}/timelapses": {
+        get: {
+          operationId: "getResortTimelapses",
+          tags: ["cams"],
+          summary: "Rendered timelapse clips per cam: the rolling 24 h MP4 and storm reels",
+          description:
+            "For every cam whose operator allows archiving: the rolling 24 h clip (H.264, 7 fps, 720p max, at most 3 MB, replaced every 6 h from the still archive) with its poster JPEG and frame bounds, plus storm reels (rendered while the resort's measured 24 h new snow is at or past 8 in, from the first frame after the last dry day, capped at 72 h; one per storm day, kept a year). Links only, never inline media. `available: false` means the clip table is not served by this deployment yet; an empty `cams` list with `available: true` means nothing is rendered for this resort. Backs the Last 24 hours strip on https://www.peakcam.io/resorts/{slug}/webcams.",
+          parameters: [SLUG_PARAM],
+          responses: {
+            "200": jsonResponse("The clip list.", "TimelapseList"),
             "404": ERROR_404,
             "403": ERROR_403,
           },
@@ -349,7 +364,7 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
           tags: ["batch"],
           summary: `Run up to ${BATCH_MAX_REQUESTS} GET requests in one call`,
           description:
-            `Accepts up to ${BATCH_MAX_REQUESTS} GET paths under /api/v1 (with query strings) and answers them in order, each with the status and body that path would have returned on its own. The paths run in-process against the same handlers, so a batch is one function invocation and one request against the edge rate limit. Read-only by construction: only /resorts, /resorts/search-index, /resorts/{slug}, /resorts/{slug}/cams, /resorts/{slug}/conditions, /resorts/{slug}/forecast, /resorts/{slug}/forecast-accuracy, /resorts/{slug}/history, /resorts/{slug}/season-stats, /resorts/{slug}/monthly, /leaderboards/{kind}, /powder, /status and /ask (GET) dispatch; any other path fails the whole batch with a 400 naming it. The response is never cached.`,
+            `Accepts up to ${BATCH_MAX_REQUESTS} GET paths under /api/v1 (with query strings) and answers them in order, each with the status and body that path would have returned on its own. The paths run in-process against the same handlers, so a batch is one function invocation and one request against the edge rate limit. Read-only by construction: only /resorts, /resorts/search-index, /resorts/{slug}, /resorts/{slug}/cams, /resorts/{slug}/conditions, /resorts/{slug}/timelapses, /resorts/{slug}/forecast, /resorts/{slug}/forecast-accuracy, /resorts/{slug}/history, /resorts/{slug}/season-stats, /resorts/{slug}/monthly, /leaderboards/{kind}, /powder, /status and /ask (GET) dispatch; any other path fails the whole batch with a 400 naming it. The response is never cached.`,
           requestBody: {
             required: true,
             content: {

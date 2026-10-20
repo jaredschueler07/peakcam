@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAllResortSlugs, getResortBySlug, getResortCamTimelines } from "@/lib/supabase";
+import { getAllResortSlugs, getResortBySlug, getResortCamTimelines, getResortTimelapses } from "@/lib/supabase";
+import { clipDurationSeconds, pickResortTimelapse } from "@/lib/cam-timelapse";
 import { camLive } from "@/lib/public-api/serialize";
 import { formatMountainTime } from "@/lib/quotable";
 import { stateLabel } from "@/lib/resort-copy";
@@ -12,6 +13,7 @@ import { PeakFooter } from "@/components/home/PeakFooter";
 import { HubBreadcrumb } from "@/components/hubs/HubBreadcrumb";
 import { ResortTabs } from "@/components/resort/ResortTabs";
 import { WebcamGrid } from "@/components/resort/WebcamGrid";
+import { TimelapseStrip } from "@/components/resort/TimelapseClips";
 
 // Same ISR window and static-params contract as the overview
 // (app/resorts/[slug]/page.tsx).
@@ -53,7 +55,9 @@ export default async function ResortWebcamsPage({ params }: { params: Promise<{ 
   if (!resort) return notFound();
 
   const cams = activeCams(resort.cams);
-  const timelines = (await getResortCamTimelines(resort.id, cams.map((c) => c.id), 24)) ?? new Map();
+  const camIds = cams.map((c) => c.id);
+  const [timelinesRaw, timelapses] = await Promise.all([getResortCamTimelines(resort.id, camIds, 24), getResortTimelapses(resort.id, camIds)]);
+  const timelines = timelinesRaw ?? new Map();
   const pageUrl = resortTabUrl(resort.slug, "webcams");
   const breadcrumb = resortBreadcrumb(resort, "webcams");
   const title = webcamsTitle(resort.name, cams.length);
@@ -76,7 +80,33 @@ export default async function ResortWebcamsPage({ params }: { params: Promise<{ 
       if (!Number.isNaN(ms) && ms > newestMs) newestMs = ms;
     }
   }
+  for (const t of timelapses ?? []) {
+    for (const c of [...(t.current ? [t.current] : []), ...t.storms]) {
+      const ms = Date.parse(c.renderedAt);
+      if (!Number.isNaN(ms) && ms > newestMs) newestMs = ms;
+    }
+  }
   const dateModified = newestMs > 0 ? new Date(newestMs).toISOString() : null;
+  // VideoObject per clip (P8): the 24 h clip and the newest storm reel, so
+  // the clips are discoverable without a player.
+  const picked = pickResortTimelapse(timelapses ?? []);
+  const videoLd = [picked.current, picked.storm].filter((c): c is NonNullable<typeof c> => Boolean(c)).map((clip) => {
+    const cam = cams.find((c) => c.id === clip.camId);
+    const secs = clipDurationSeconds(clip.frames);
+    return {
+      "@context": "https://schema.org",
+      "@type": "VideoObject",
+      name: `${resort.name}${cam ? ` ${cam.name}` : ""} ${clip.stormDate ? `storm timelapse, ${clip.stormDate}` : "24-hour timelapse"}`,
+      description: clip.stormDate
+        ? `PeakCam timelapse of the ${clip.stormDate} storm at ${resort.name}, rendered from archived webcam frames.`
+        : `PeakCam timelapse of the last 24 hours at ${resort.name}, rendered from archived webcam frames.`,
+      contentUrl: clip.url,
+      ...(clip.posterUrl ? { thumbnailUrl: clip.posterUrl } : {}),
+      uploadDate: clip.renderedAt,
+      ...(secs != null ? { duration: `PT${Math.max(1, Math.round(secs))}S` } : {}),
+      isPartOf: { "@id": pageUrl },
+    };
+  });
   const webPageLd = {
     "@context": "https://schema.org",
     "@type": "WebPage",
@@ -96,6 +126,9 @@ export default async function ResortWebcamsPage({ params }: { params: Promise<{ 
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbListLd(breadcrumb)) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageLd) }} />
+      {videoLd.map((ld, i) => (
+        <script key={i} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
+      ))}
       <Header showSearch={false} />
       <div className="border-b border-bark/30 bg-cream px-4 py-6 md:px-8 md:py-8">
         <div className="mx-auto max-w-5xl">
@@ -131,6 +164,9 @@ export default async function ResortWebcamsPage({ params }: { params: Promise<{ 
             )}
           </section>
         ) : (
+          <>
+          {/* Timelapse clips (P8 block 2): renders nothing until the renderer has stored a clip for this resort. */}
+          <TimelapseStrip timelapses={timelapses} cams={cams} />
           <section aria-labelledby="cams-heading">
             <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
               <h2 id="cams-heading" className="font-display text-2xl font-black tracking-[-0.01em] text-ink">
@@ -150,6 +186,7 @@ export default async function ResortWebcamsPage({ params }: { params: Promise<{ 
               timelines={Object.fromEntries(timelines)}
             />
           </section>
+          </>
         )}
 
         <section aria-labelledby="about-cams-heading" className="max-w-3xl">
@@ -158,9 +195,10 @@ export default async function ResortWebcamsPage({ params }: { params: Promise<{ 
           </h2>
           <p className="mt-3 text-[15.5px] leading-relaxed text-ink">
             Every feed belongs to its operator and plays only when you tap it. &ldquo;Live&rdquo; is the result of PeakCam&rsquo;s last
-            health check, not proof of a live broadcast. Frames on tape are PeakCam&rsquo;s own captures, every six hours, of cams
+            health check, not proof of a live broadcast. Frames on tape are PeakCam&rsquo;s own captures, every 15 minutes, of cams
             whose operators allow archiving; a frame taken while the resort&rsquo;s 24-hour number was 6&Prime; or more is kept as the
-            &ldquo;last storm on tape&rdquo;.{" "}
+            &ldquo;last storm on tape&rdquo;. Timelapse clips are rendered from those frames every six hours (the last 24 hours, and a
+            storm reel once the resort&rsquo;s measured 24-hour snowfall reaches 8&Prime;); rights stay with the operator.{" "}
             <Link href="/methodology#freshness" className="font-bold text-ink underline-offset-2 hover:underline">
               How freshness is measured
             </Link>

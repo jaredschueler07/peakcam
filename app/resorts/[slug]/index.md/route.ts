@@ -1,4 +1,4 @@
-import { findResort, isValidSlug, loadPublicApiCatalog, loadResortForecast, optionsFor } from "@/lib/public-api/data";
+import { findResort, isValidSlug, loadPublicApiCatalog, loadResortForecast, loadResortTimelapses, optionsFor } from "@/lib/public-api/data";
 import { markdownPageHeaders, resortMarkdown } from "@/lib/public-api/markdown-page";
 import { resortConditionsView } from "@/lib/public-api/conditions";
 import { serializeResort } from "@/lib/public-api/serialize";
@@ -26,11 +26,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
   if (!resort) return notFound(slug);
   const options = optionsFor(catalog, resort);
   const doc = serializeResort(resort, options);
-  // P6: the same contract /api/v1/resorts/{slug}/conditions serves, as a section.
-  const stored = await loadResortForecast(resort.id).catch(() => ({ runs: [] }));
+  // P6: the same contract /api/v1/resorts/{slug}/conditions serves, as a section; P8 clips are listed under each cam.
+  const [stored, timelapses] = await Promise.all([loadResortForecast(resort.id).catch(() => ({ runs: [] })), loadResortTimelapses(resort.id)]);
   const conditions = resortConditionsView(resort, { ...options, forecast: stored });
   // The stored description (P2 plumbing) travels with its provenance label.
-  return new Response(resortMarkdown(doc, { now: catalog.now, description: profileDescription(resort), conditions }), {
+  return new Response(resortMarkdown(doc, { now: catalog.now, description: profileDescription(resort), timelapses, conditions }), {
     headers: markdownPageHeaders(doc.canonicalUrl),
   });
 }

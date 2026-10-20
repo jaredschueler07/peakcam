@@ -4,6 +4,7 @@ import type { Cam, ResortWithData, SnowReport } from "@/lib/types";
 import type { ResortOpening } from "@/lib/openings";
 import {
   CamListSchema,
+  TimelapseListSchema,
   PowderListSchema,
   ResortListSchema,
   ResortSchema,
@@ -18,6 +19,7 @@ import {
   serializeCams,
   serializeResort,
   serializeResortLight,
+  serializeTimelapses,
   serializeResortList,
   serializeSeason,
   toIsoInstant,
@@ -417,7 +419,7 @@ test("publicJson / publicError / publicOptions / withPublicHeaders", async () =>
 test("the OpenAPI document references only schemas it defines", () => {
   const doc = buildOpenApiDocument() as { openapi: string; paths: Record<string, unknown>; components: { schemas: Record<string, Record<string, unknown>> } };
   assert.equal(doc.openapi, "3.1.0");
-  assert.deepEqual(Object.keys(doc.paths), ["/resorts", "/resorts/{slug}", "/resorts/{slug}/cams", "/resorts/{slug}/conditions", "/resorts/{slug}/forecast", "/resorts/{slug}/forecast-accuracy", "/resorts/search-index", "/powder", "/status", "/ask", "/resorts/{slug}/history", "/resorts/{slug}/season-stats", "/resorts/{slug}/monthly", "/leaderboards/{kind}", "/batch"]);
+  assert.deepEqual(Object.keys(doc.paths), ["/resorts", "/resorts/{slug}", "/resorts/{slug}/cams", "/resorts/{slug}/conditions", "/resorts/{slug}/timelapses", "/resorts/{slug}/forecast", "/resorts/{slug}/forecast-accuracy", "/resorts/search-index", "/powder", "/status", "/ask", "/resorts/{slug}/history", "/resorts/{slug}/season-stats", "/resorts/{slug}/monthly", "/leaderboards/{kind}", "/batch"]);
   const ids = new Set(Object.keys(doc.components.schemas));
   for (const id of ["Resort", "ResortList", "CamList", "PowderList", "Measurement", "Station", "Season", "Cam", "Error", "SearchIndex", "Status", "AskAnswer", "BatchRequest", "BatchResponse", "Forecast", "ForecastAccuracy", "ForecastSummary", "ForecastScore", "ResortConditions", "ConditionsContract", "ResortStatus"]) {
     assert.ok(ids.has(id), `missing component ${id}`);
@@ -605,4 +607,52 @@ test("serializeResort: stations/measuredNow appear only when the caller passes o
   assert.deepEqual(withEmpty.stations, []);
   assert.deepEqual(withEmpty.measuredNow, []);
   ResortSchema.parse(withEmpty);
+});
+
+// ── P8 block 2: timelapse clips ───────────────────────────────
+
+test("cams carry `timelapses` only when the caller loaded them; /timelapses lists clips per cam with the newest storm reel", () => {
+  const a = cam({ name: "Summit" });
+  const b = cam({ name: "Base" });
+  const r = resort({ cams: [a, b] });
+  const clip = (id: string, window: "24h" | "storm", stormDate: string | null, renderedAt = "2026-12-20T06:00:00Z") => ({
+    id, window, url: `https://x.supabase.co/storage/v1/object/public/cam-timelapses/vail/${id}.mp4?v=1`, posterUrl: `https://x.supabase.co/storage/v1/object/public/cam-timelapses/vail/${id}.jpg?v=1`,
+    frames: 96, startsAt: "2026-12-19T06:00:00Z", endsAt: "2026-12-20T05:45:00Z", bytes: 900_000, renderedAt, stormDate,
+  });
+  const timelapses = [
+    { camId: a.id, current: clip("a-24h", "24h", null), storms: [clip("a-s2", "storm", "2026-12-18"), clip("a-s1", "storm", "2026-12-10")] },
+    { camId: b.id, current: null, storms: [clip("b-s3", "storm", "2026-12-19", "2026-12-19T18:00:00Z")] },
+  ];
+
+  const plain = serializeCams(r, { now: NOW });
+  assert.equal("timelapses" in plain.cams[0], false, "key absent when nothing was loaded");
+  const withNull = serializeCams(r, { now: NOW, timelapses: null });
+  assert.equal("timelapses" in withNull.cams[0], false, "view unavailable reads like not loaded");
+  const loaded = serializeCams(r, { now: NOW, timelapses });
+  CamListSchema.parse(loaded);
+  assert.deepEqual(loaded.cams[0].timelapses!.map((c) => c.id), ["a-24h", "a-s2", "a-s1"], "24 h clip first, then storms");
+  assert.deepEqual(loaded.cams[1].timelapses!.map((c) => c.id), ["b-s3"]);
+  const empty = serializeCams(resort({ cams: [cam()] }), { now: NOW, timelapses: [] });
+  assert.deepEqual(empty.cams[0].timelapses, [], "loaded but no clip: empty list, not absent");
+
+  const doc = serializeTimelapses(r, { now: NOW, timelapses });
+  TimelapseListSchema.parse(doc);
+  assert.equal(doc.available, true);
+  assert.equal(doc.clipCount, 4);
+  assert.deepEqual(doc.cams.map((c) => c.camId), [a.id, b.id]);
+  assert.equal(doc.cams[0].camName, "Summit");
+  assert.match(doc.cams[0].pageUrl, new RegExp(`/resorts/${r.slug}/webcams#cam-${a.id}$`));
+  assert.equal(doc.lastStorm?.id, "b-s3", "newest storm date across cams");
+  assert.equal(doc.lastStorm?.camName, "Base");
+  assert.equal(doc.newestRenderedAt, "2026-12-20T06:00:00.000Z");
+  assert.match(doc.note, /Link them/);
+
+  const off = serializeTimelapses(r, { now: NOW, timelapses: null });
+  TimelapseListSchema.parse(off);
+  assert.equal(off.available, false);
+  assert.equal(off.clipCount, 0);
+  assert.match(off.note, /not served/);
+  const none = serializeTimelapses(r, { now: NOW, timelapses: [] });
+  assert.equal(none.available, true);
+  assert.match(none.note, /No clips yet/);
 });

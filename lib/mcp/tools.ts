@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// MCP server — the nineteen read-only tools, as pure builders.
+// MCP server — the read-only tools (PEAKCAM_TOOL_NAMES is the count), as pure builders.
 //
 // `buildTools(data)` returns tool definitions over an injected McpDataSource
 // so lib/mcp/server.test.ts can run every tool against fixtures with no
@@ -17,6 +17,8 @@ import type { PublicApiCatalog } from "@/lib/public-api/data";
 import { SITE_URL } from "@/lib/site";
 import { stateHubPath, stateLabel } from "@/lib/hubs";
 import { KEEPER_MIN_SNOW_24H_IN, MAX_TIMELINE_HOURS, clampHours, type CamTimelineFrame } from "@/lib/cam-timeline";
+import { clipDurationSeconds, type CamTimelapses } from "@/lib/cam-timelapse";
+import { resortTabUrl } from "@/lib/resort-pages";
 import { PCT_OF_NORMAL_RULE, buildPctOfNormalPage } from "@/lib/percent-of-normal";
 import { answerQuestion } from "@/lib/ask/answer";
 import { MAX_QUESTION_LENGTH } from "@/lib/ask/router";
@@ -24,6 +26,7 @@ import { MAX_QUESTION_LENGTH } from "@/lib/ask/router";
 import {
   AskAnswerSchema,
   CamListSchema,
+  TimelapseListSchema,
   ForecastBlendDaySchema,
   ForecastCreditSchema,
   ForecastScoreSchema,
@@ -47,6 +50,7 @@ import {
   resortApiUrl,
   resortCanonicalUrl,
   serializeCams,
+  serializeTimelapses,
   serializeResort,
   serializeResortLight,
   serializeSeason,
@@ -1407,7 +1411,52 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
   // so the name tuple's order is the registration order.
   const historyTools = buildHistoryTools(data) as unknown as ToolDefinition[];
 
-  return [...baseTools, ask as unknown as ToolDefinition, ...historyTools];
+  // ── get_timelapses (P8 block 2, migrations 025 + 031) ─────
+  const getTimelapses = defineTool({
+    name: "get_timelapses",
+    title: "Timelapses",
+    description:
+      "Rendered timelapse clips for a resort's webcams (or one cam), as links: the rolling 24-hour MP4 per cam (H.264, 7 fps, 720p max, at most 3 MB, re-rendered every 6 hours from PeakCam's still archive) with its poster JPEG and frame bounds, plus storm reels (rendered while the resort's measured 24 h new snow is 8 in or more, from the first frame after the last dry day, capped at 72 h; one per storm day, kept a year). Only cams whose operator allows archiving have clips. Use it for \"show me the last 24 hours\" or \"show me the last storm\" questions; get_cam_timeline returns the individual frames. Media is never returned inline.",
+    inputSchema: z.object({
+      slug: SlugInput,
+      camId: z.string().uuid().optional().describe("Optional: one cam's id from get_resort_cams; default is every cam with a clip."),
+    }),
+    outputSchema: TimelapseListSchema,
+    async handler({ slug, camId }) {
+      const catalog = await data.catalog();
+      const hit = resolve(catalog, slug);
+      if (!hit.ok) return hit.result;
+      const resort = hit.resort;
+      if (camId && !resort.cams.some((c) => c.id === camId)) {
+        return err(`Cam ${camId} is not an active cam at ${resort.name}. get_resort_cams(\"${resort.slug}\") lists its cams and ids.`);
+      }
+      let clips: CamTimelapses[] | null = null;
+      if (data.timelapses) {
+        try {
+          clips = await data.timelapses(resort.id);
+        } catch {
+          clips = null;
+        }
+      }
+      const filtered = clips && camId ? clips.filter((c) => c.camId === camId) : clips;
+      const doc = serializeTimelapses(resort, { ...serializeOptionsFor(catalog, resort), timelapses: filtered });
+      const when = (iso: string | null) => (iso ? formatInstant(iso) : "unknown time");
+      const lines = [`# ${resort.name} timelapses (${doc.clipCount} clip${doc.clipCount === 1 ? "" : "s"} from ${doc.cams.length} cam${doc.cams.length === 1 ? "" : "s"}) — ${doc.webcamsUrl}`, ""];
+      for (const cam of doc.cams) {
+        lines.push(`## ${cam.camName}`);
+        if (cam.current) {
+          const d = clipDurationSeconds(cam.current.frames);
+          lines.push(`- Last 24 h: ${cam.current.url} (${cam.current.frames ?? "?"} frames${d != null ? `, ${d} s` : ""}, ${when(cam.current.startsAt)} to ${when(cam.current.endsAt)}, rendered ${formatInstant(cam.current.renderedAt)})${cam.current.posterUrl ? ` · poster ${cam.current.posterUrl}` : ""}`);
+        }
+        for (const s of cam.storms) lines.push(`- Storm reel ${s.stormDate ?? ""}: ${s.url} (${s.frames ?? "?"} frames, ${when(s.startsAt)} to ${when(s.endsAt)})${s.posterUrl ? ` · poster ${s.posterUrl}` : ""}`);
+        lines.push("");
+      }
+      lines.push(doc.note);
+      return ok(lines.join("\n"), doc as unknown as Record<string, unknown>);
+    },
+  });
+
+  return [...baseTools, ask as unknown as ToolDefinition, ...historyTools, getTimelapses as unknown as ToolDefinition];
 }
 
 export { camLine };

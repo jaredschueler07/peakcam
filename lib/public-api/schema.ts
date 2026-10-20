@@ -122,13 +122,17 @@ export const CamKindSchema = z
 export const CamTimelapseSchema = z
   .object({
     id: z.string(),
-    window: z.string().describe("Which clip: `24h` (rolling day), `storm` (one storm, see `stormDate`), or another label."),
-    url: z.string().describe("Public MP4 URL."),
-    frames: z.number().int().nullable(),
+    window: z.string().describe("Which clip: `24h` (rolling day, replaced every render), `storm` (one storm, see `stormDate`), or another label."),
+    url: z.string().describe("Public MP4 URL (H.264, 7 fps, 720p max, at most 3 MB). Link it; never inline it."),
+    posterUrl: z.string().nullable().describe("Public JPEG of the clip's last frame, the <video> poster. Null for clips rendered before the poster existed."),
+    frames: z.number().int().nullable().describe("Archived frames in the clip; at 7 fps the duration is frames / 7 seconds."),
+    startsAt: z.string().nullable().describe("Capture time of the first frame (ISO-8601)."),
+    endsAt: z.string().nullable().describe("Capture time of the last frame (ISO-8601)."),
+    bytes: z.number().int().nullable().describe("Size of the MP4."),
     renderedAt: z.string().describe("ISO-8601 instant the clip was rendered."),
     stormDate: z.string().nullable().describe("YYYY-MM-DD of the storm a `storm` clip covers."),
   })
-  .register(publicApiRegistry, { id: "CamTimelapse", description: "A rendered timelapse clip for a cam." });
+  .register(publicApiRegistry, { id: "CamTimelapse", description: "A rendered timelapse clip for a cam, made only of PeakCam's own archived frames of operator-permitted cams." });
 
 export const ResortPassSchema = z.enum(["ikon", "epic", "mountain-collective", "indy", "power"]);
 export const DescriptionSourceSchema = z.enum(["operator", "generated", "editor"]);
@@ -480,6 +484,36 @@ export const CamListSchema = z
   })
   .register(publicApiRegistry, { id: "CamList" });
 
+export const CamTimelapsesSchema = z
+  .object({
+    camId: z.string(),
+    camName: z.string(),
+    pageUrl: z.string().describe("The cam's anchor on the resort's webcams page."),
+    kind: CamKindSchema.nullable(),
+    credit: z.string().nullable().describe("Attribution line for the frames; null means credit the resort."),
+    current: CamTimelapseSchema.nullable().describe("The rolling 24 h clip; null when none is rendered yet."),
+    storms: z.array(CamTimelapseSchema).describe("Storm reels, newest first, at most three."),
+  })
+  .register(publicApiRegistry, { id: "CamTimelapses", description: "Every rendered clip for one cam." });
+
+export const TimelapseListSchema = z
+  .object({
+    slug: z.string(),
+    name: z.string(),
+    canonicalUrl: z.string(),
+    webcamsUrl: z.string().describe("The resort's webcams page, where the clips play."),
+    available: z.boolean().describe("False when the clip table is not served by this deployment yet."),
+    clipCount: z.number().int(),
+    newestRenderedAt: z.string().nullable(),
+    lastStorm: CamTimelapseSchema.extend({ camId: z.string(), camName: z.string() }).nullable().describe("The newest storm reel across the resort's cams."),
+    cams: z.array(CamTimelapsesSchema).describe("Only cams with at least one clip, in the resort's cam order."),
+    note: z.string(),
+    attribution: z.string(),
+    license: z.string(),
+    updatedAt: z.string().nullable(),
+  })
+  .register(publicApiRegistry, { id: "TimelapseList", description: "Rendered timelapse clips (24 h rolling and storm reels) per cam of one resort, as links." });
+
 export const PowderWindowSchema = z.enum(["24h", "48h"]);
 
 export const PowderEntrySchema = z
@@ -648,6 +682,8 @@ export type SeasonStatus = z.infer<typeof SeasonStatusSchema>;
 export type CamPublic = z.infer<typeof CamSchema>;
 export type CamKind = z.infer<typeof CamKindSchema>;
 export type CamTimelapsePublic = z.infer<typeof CamTimelapseSchema>;
+export type CamTimelapsesPublic = z.infer<typeof CamTimelapsesSchema>;
+export type TimelapseListPublic = z.infer<typeof TimelapseListSchema>;
 export type ResortProfilePublic = z.infer<typeof ResortProfileSchema>;
 export type ResortPass = z.infer<typeof ResortPassSchema>;
 export type ObservationStationPublic = z.infer<typeof ObservationStationSchema>;

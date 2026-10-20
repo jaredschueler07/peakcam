@@ -4,7 +4,7 @@ Read-only [Model Context Protocol](https://modelcontextprotocol.io) server that 
 assistant the same data as the site and `/api/v1`: the latest snow report per resort with its
 provenance, season status, webcams as links and archived stills, NWS forecasts, SNOTEL daily
 history, percent-of-normal rankings, resort profiles, regions, alert recipes, and an `ask` tool
-that routes a plain question to the right one of them deterministically. Nineteen tools.
+that routes a plain question to the right one of them deterministically. Twenty tools.
 
 | | |
 | --- | --- |
@@ -52,6 +52,7 @@ with the resort's canonical URL) and a `structuredContent` document that matches
 | `get_monthly_climatology` | `slug` | `MonthlyClimatology` | Average snowfall, snow days, depth and biggest storm per month at the station, 30-winter and recent-decade; `available: false` without a station normal. P5. |
 | `get_leaderboard` | `kind` (`best-powder-this-week` \| `season-powder-days` \| `deepest-base` \| `season-snowfall`), `state?`, `sourceOnly?` `snotel`, `limit?` 1–50 (10) | `Leaderboard` | The four season boards over `season_stats()` (migration 030); deepest-base needs only the catalogue. `unavailable: true` when the function is missing. P5. |
 | `get_stations` | `slug` | `{ available, count, stations: ObservationStation[], measuredNow: MeasuredNow[], sources[] }` | Up to three stations within 25 km by elevation band (summit / mid / base) with network, elevation, distance, reading time and age, depth, new snow, SWE, temperature, wind. `available: false` until the station layer is populated. Markdown is a table plus the attribution lines. |
+| `get_timelapses` | `slug`, `camId?` (uuid) | `TimelapseList` (`available`, `clipCount`, `lastStorm`, `cams: { camId, camName, pageUrl, current: CamTimelapse \| null, storms: CamTimelapse[] }[]`, `note`) | Rendered clips from `cam_timelapse_current` (migrations 025 + 031) as links: the rolling 24 h MP4 per cam (7 fps, 720p max, ≤ 3 MB, poster JPEG, frame bounds) and storm reels (one per storm day, kept a year). Only archive-allowed cams. `available: false` when the view is not served; never inline media. P8 block 2. |
 
 Unknown slugs return `isError: true` with up to five close matches, for example:
 
@@ -107,6 +108,7 @@ resort's `canonicalUrl`.
 - "When does Mammoth open this season? What about the rest of California?" → `get_opening_dates(state="CA")`
 - "Which Utah resorts are above normal snowpack right now?" → `get_percent_of_normal(state="UT")`
 - "What did Alta's cams look like over the last 24 hours?" → `get_cam_timeline("alta", hours=24)` (links only)
+- "Show me a timelapse of the last 24 hours at Alta, and the last storm on tape." → `get_timelapses("alta")` (links only)
 - "Tell me about Jackson Hole: where it is, how high, and where its snow numbers come from." → `get_resort_profile("jackson-hole")`
 - "Is Breck open yet, and how do I get an alert when it dumps?" → `ask("is Breck open")`, `get_alert_options("breckenridge")`
 
@@ -202,7 +204,8 @@ answer `405` by design.
   sample argument set is added), and list it in the table above. If the ask router should
   reach it, add an intent rule in `lib/ask/router.ts` and a sentence in `lib/ask/answer.ts`.
 - **Data source.** `McpDataSource` (`lib/mcp/types.ts`) has `catalog`, `forecast`,
-  `snowHistory`, `camStills` and the optional `logUnmatchedQuestion`; `lib/mcp/data.ts` is the
+  `snowHistory`, `camStills` and the optional `logUnmatchedQuestion`, `resortHistory`,
+  `seasonAggregates` (P5) and `timelapses` (P8); `lib/mcp/data.ts` is the
   production implementation, the tests inject fixtures. The catalogue helpers the tools and
   the router share (`findResort`, `matchResorts`, …) live in `lib/mcp/catalog.ts`.
 - **Tests.** `node --import tsx --test lib/mcp/server.test.ts lib/ask/router.test.ts lib/public-api/agent-surface.test.ts`

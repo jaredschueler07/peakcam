@@ -26,6 +26,8 @@ export const PEAKCAM_TOOL_NAMES = [
   "get_season_stats",
   "get_monthly_climatology",
   "get_leaderboard",
+  // P8 timelapses
+  "get_timelapses",
 ] as const;
 
 export type PeakCamToolName = (typeof PEAKCAM_TOOL_NAMES)[number];

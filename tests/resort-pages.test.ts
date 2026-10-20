@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { RESORT_SUBPAGES, RESORT_TABS, breadcrumbListLd, resortBreadcrumb, resortTabMarkdownPath, resortTabPath, snowReportTitle, webcamsTitle } from "@/lib/resort-pages";
+import { RESORT_SUBPAGES, RESORT_TABS, breadcrumbListLd, resortBreadcrumb, resortTabMarkdownPath, resortTabPath, snowForecastTitle, snowReportTitle, webcamsTitle } from "@/lib/resort-pages";
 
 // Every tab in the resort page family must resolve to a page under app/ and
 // carry a markdown alternate route — pure filesystem, no server.
@@ -31,14 +31,17 @@ test("every resort tab has a page and a markdown alternate route", () => {
     assert.ok(routeFile(path, "page.tsx"), `${path} needs a page.tsx`);
     assert.ok(routeFile(resortTabMarkdownPath("alta", tab.key), "route.ts"), `${path}/index.md needs a route.ts`);
   }
-  assert.deepEqual(RESORT_SUBPAGES.map((t) => t.key), ["snow-report", "webcams", "history"]);
+  assert.deepEqual(RESORT_SUBPAGES.map((t) => t.key), ["snow-report", "snow-forecast", "webcams", "history"]);
+  assert.deepEqual(RESORT_TABS.map((t) => t.label), ["Overview", "Snow report", "Forecast", "Webcams", "History"]);
 });
 
 test("paths and titles are templated from the registry", () => {
   assert.equal(resortTabPath("alta", "overview"), "/resorts/alta");
   assert.equal(resortTabPath("alta", "snow-report"), "/resorts/alta/snow-report");
   assert.equal(resortTabMarkdownPath("alta", "webcams"), "/resorts/alta/webcams/index.md");
+  assert.equal(resortTabPath("alta", "snow-forecast"), "/resorts/alta/snow-forecast");
   assert.equal(snowReportTitle("Alta Ski Area"), "Alta Ski Area Snow Report — Measured Conditions | PeakCam");
+  assert.equal(snowForecastTitle("Alta Ski Area"), "Alta Ski Area Snow Forecast — 14-Day Multi-Model Blend | PeakCam");
   assert.equal(webcamsTitle("Alta Ski Area", 4), "Alta Ski Area Webcams — 4 Live Cams | PeakCam");
   assert.equal(webcamsTitle("Alta Ski Area", 1), "Alta Ski Area Webcams — 1 Live Cam | PeakCam");
 });

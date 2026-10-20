@@ -184,6 +184,10 @@ const TOOL_COPY: Record<PeakCamToolName, Omit<ConnectTool, "name">> = {
     title: "Cam timeline",
     summary: "Archived webcam stills for a resort or one cam over the last 48 hours, as links with capture times, plus the last storm frame.",
   },
+  get_timelapses: {
+    title: "Timelapses",
+    summary: "Rendered clips per cam as links: the rolling 24-hour MP4 with its poster, and storm reels for the resort's last storms. Never inline media.",
+  },
   ask: {
     title: "Ask PeakCam",
     summary: "A plain question routed to the right tool by name and keywords, with a dated sentence to quote. No model, no guessing.",
@@ -240,6 +244,7 @@ export const EXAMPLE_PROMPTS: readonly ExamplePrompt[] = [
   { prompt: "Is Breck open yet, and how do I get an alert when it dumps?", tools: "ask (\"is Breck open\"), get_alert_options" },
   { prompt: "How is this season going at Breckenridge compared with normal and with last year?", tools: "get_season_stats, get_snow_history (season)" },
   { prompt: "Which resorts have had the most powder days this season?", tools: "get_leaderboard (season-powder-days)" },
+  { prompt: "Show me a timelapse of the last 24 hours at Alta, and the last storm on tape.", tools: "get_timelapses (alta; links only)" },
 ];
 
 // ── Client recipes ───────────────────────────────────────────
