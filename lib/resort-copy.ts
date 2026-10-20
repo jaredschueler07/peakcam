@@ -37,6 +37,7 @@ const STATE_NAMES: Record<string, string> = {
   OR: "Oregon", PA: "Pennsylvania", UT: "Utah", VA: "Virginia", VT: "Vermont",
   WA: "Washington", WI: "Wisconsin", WV: "West Virginia", WY: "Wyoming",
   BC: "British Columbia", AB: "Alberta", ON: "Ontario", QC: "Quebec",
+  NB: "New Brunswick", NS: "Nova Scotia", NL: "Newfoundland and Labrador",
 };
 
 const inches = (n: number) => `${n} ${n === 1 ? "inch" : "inches"}`;

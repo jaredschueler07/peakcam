@@ -74,6 +74,20 @@ const NO_CAM_NO_STATION_ALLOWED: Record<string, string> = {
   "welch-village": "P3: GHCN US1MNGH0021 3 km, NWS KRGK 20 km; no public cam on the operator site",
   "wild-mountain": "P3: GHCN US1MNCG0043 4 km, NWS KOEO 20 km; cams held on framing terms",
   "wilmot-mountain": "P3: GHCN US1WIKN0037 5 km, NWS KBUU 23 km; no public cam on the operator site",
+  // P1 batch 3 (2026-10-20): Canada has no NRCS stations at all, so every Canadian row relies on the P3
+  // layer (GHCN-Daily, BC ASWS, ECCC SWOB); the nearest within 25 km on import day are recorded here.
+  "baldy-mountain": "P3: GHCN CAN01125852 20 km, ECCC BC_TRAN_33093 17 km; both operator cams unembeddable (ipcamlive free tier), re-check at opening",
+  "cypress-mountain": "P3: GHCN CAN01108824 5 km, BC ASWS 3A09P 14 km, ECCC 1108824 5 km; four cams held on Boyne framing terms",
+  "manning-park": "P3: BC ASWS 2G03P 11 km, ECCC BC_TRAN_15392 7 km; both operator cams offline until opening",
+  "powder-king": "P3: BC ASWS 4A02P 2 km; the operator's YouTube stream ended 2025-04, re-check at opening",
+  "sommet-morin-heights": "P3: GHCN CA1QC000022 11 km; the Sommets group publishes no cam for this hill",
+  "sommet-olympia": "P3: GHCN CA1QC000061 6 km; the Sommets group publishes no cam for this hill",
+  "crabbe-mountain": "P3: GHCN CA1NB000081 20 km; the only cam (nbcams.ca relay) is stale off-season, re-check at opening",
+  "marble-mountain": "P3: GHCN CA1NL000095 3 km, ECCC 8401298 6 km; the Brownrice stream is scheduled offline until opening",
+  "bigrock-mountain": "P3: GHCN US1MEAR0028 17 km, NWS KPQI 25 km; no public cam on the operator site",
+  penitentes: "Andes: no public cam, no station network; model snow report",
+  antuco: "Andes: no public cam, no station network; model snow report",
+  "las-araucarias": "Andes: no public cam, no station network; model snow report",
 };
 
 const slugs = new Set(resorts.map((r) => r.slug));

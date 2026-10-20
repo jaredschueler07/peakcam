@@ -34,6 +34,7 @@ import type { ConditionRating } from "./types";
 const CSV_STATE_VALUES = [
   "CA", "CO", "VT", "Chile", "UT", "Argentina", "WA", "NH", "OR", "ID", "NM", "NY", "MT",
   "BC", "MI", "MA", "ME", "MN", "NV", "PA", "WY", "AZ", "MD", "VA", "WI", "WV", "SD", "AK", "OH", "MO", "IN", "NJ", "NC",
+  "AB", "ON", "QC", "NB", "NS", "NL",
 ];
 
 const CSV_REGION_VALUES = [
@@ -168,9 +169,10 @@ test("every state value in data/resorts.csv has a full-name label and the right 
     if (value === "Chile" || value === "Argentina") {
       assert.equal(hub.kind, "country");
       assert.equal(hub.label, value);
-    } else if (value === "BC") {
-      assert.equal(hub.kind, "province");
-      assert.equal(hub.label, "British Columbia");
+    } else if (["BC", "AB", "ON", "QC", "NB", "NS", "NL"].includes(value)) {
+      assert.equal(hub.kind, "province", value);
+      assert.equal(hub.label, STATE_NAMES[value], value);
+      assert.ok(hub.label.length > 2, value);
     } else {
       assert.equal(hub.kind, "state", value);
       assert.notEqual(hub.label, value, `no full name for ${value}`);
