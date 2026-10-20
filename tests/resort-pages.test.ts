@@ -31,7 +31,7 @@ test("every resort tab has a page and a markdown alternate route", () => {
     assert.ok(routeFile(path, "page.tsx"), `${path} needs a page.tsx`);
     assert.ok(routeFile(resortTabMarkdownPath("alta", tab.key), "route.ts"), `${path}/index.md needs a route.ts`);
   }
-  assert.deepEqual(RESORT_SUBPAGES.map((t) => t.key), ["snow-report", "webcams"]);
+  assert.deepEqual(RESORT_SUBPAGES.map((t) => t.key), ["snow-report", "webcams", "history"]);
 });
 
 test("paths and titles are templated from the registry", () => {

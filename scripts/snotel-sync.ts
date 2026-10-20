@@ -237,6 +237,7 @@ async function upsertSnowpackDaily(
   stationId: string,
   date: string,
   validated: ReturnType<typeof validateReading>,
+  newSnowIn: number | null,
 ): Promise<void> {
   const body = {
     resort_id: resortId,
@@ -249,6 +250,10 @@ async function upsertSnowpackDaily(
     temp_max_f: validated.tempMaxF,
     temp_min_f: validated.tempMinF,
     qc_flag: validated.qcFlag,
+    // Daily new snow (migration 030): the same positive depth delta the
+    // report's new_snow_24h carries, so the season history and the report
+    // agree. Null when yesterday is not in the AWDB window.
+    new_snow_in: newSnowIn,
   };
 
   const resp = await fetch(`${SUPABASE_URL}/rest/v1/snowpack_daily`, {
@@ -536,16 +541,18 @@ async function main(): Promise<void> {
       };
       const validated = validateReading(raw, previousDay);
 
-      // 4d. Upsert to snowpack_daily
+      // 4d. Compute new snow deltas
+      const deltas = computeDeltas(days);
+      const hasYesterday = days.length >= 2 && days[days.length - 2].snowDepthIn != null && latest.snowDepthIn != null;
+
+      // 4e. Upsert to snowpack_daily
       await upsertSnowpackDaily(
         resort.id,
         resort.snotel_station_id,
         latest.date,
         validated,
+        hasYesterday ? deltas.newSnow24h : null,
       );
-
-      // 4e. Compute new snow deltas
-      const deltas = computeDeltas(days);
 
       // 4f. Lookup normals for today's day-of-water-year
       const dowy = dayOfWaterYear(new Date());

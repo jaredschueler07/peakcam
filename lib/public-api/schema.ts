@@ -679,3 +679,264 @@ export type BatchRequestPublic = z.infer<typeof BatchRequestSchema>;
 export type BatchResponsePublic = z.infer<typeof BatchResponseSchema>;
 export type AskAnswerPublic = z.infer<typeof AskAnswerSchema>;
 export type AskResortRef = z.infer<typeof AskResortRefSchema>;
+
+// ── P5: season history, season stats, monthly climatology, leaderboards ──
+//
+// Shapes for /api/v1/resorts/{slug}/history, /season-stats, /monthly and
+// /api/v1/leaderboards/{kind}, computed by lib/snow-history.ts,
+// lib/season-stats.ts and lib/leaderboards.ts from `snowpack_daily` and
+// the normals tables (migration 030). Daily new snow is the positive
+// day-over-day change in station depth: a measured floor on what fell.
+
+export const SeasonRefSchema = z
+  .object({
+    key: z.number().int().describe("Water year for the Northern hemisphere (Oct 2026 → 2027); calendar year for the Southern."),
+    label: z.string().describe("`2026-27` (North) or `2026` (South)."),
+    startDate: z.string().describe("YYYY-MM-DD the season starts: Oct 1 (North) or Apr 1 (South)."),
+  })
+  .register(publicApiRegistry, { id: "SeasonRef", description: "Which season a number belongs to." });
+
+export const HistorySourceSchema = z
+  .enum(["snotel", "open_meteo"])
+  .describe("`snotel`: daily NRCS station readings, quality-controlled. `open_meteo`: weather-model daily values for resorts without a station.");
+
+export const SeasonCurvePointSchema = z
+  .object({
+    dayOfSeason: z.number().int().describe("1 = the season's first day."),
+    date: z.string().describe("YYYY-MM-DD."),
+    cumulativeIn: z.number().describe("Measured new snow since the season start, inches; days with no reading add nothing."),
+    snowDepthIn: z.number().nullable().describe("Depth at the station that day; null when not measured."),
+  })
+  .register(publicApiRegistry, { id: "SeasonCurvePoint" });
+
+export const NormalBandPointSchema = z
+  .object({
+    dayOfSeason: z.number().int(),
+    meanIn: z.number().describe("Mean cumulative new snow by this day over the 30 most recent complete winters."),
+    p25In: z.number(),
+    p75In: z.number(),
+    recentMeanIn: z.number().nullable().describe("The same mean over the 10 most recent complete winters."),
+  })
+  .register(publicApiRegistry, { id: "NormalBandPoint" });
+
+export const SeasonCurveSchema = z
+  .object({
+    points: z.array(SeasonCurvePointSchema).describe("One per day from the season start through `asOf`."),
+    band: z.array(NormalBandPointSchema).describe("Days 1–273 (through June 30); empty for resorts without a station normal."),
+    normalYears: z.number().int().nullable().describe("Winters behind the 30-winter band."),
+    recentYears: z.number().int().nullable(),
+  })
+  .register(publicApiRegistry, { id: "SeasonCurve" });
+
+export const EnsoPhaseSchema = z.enum(["el-nino", "la-nina", "neutral"]);
+
+export const EnsoSeasonSchema = z
+  .object({
+    phase: EnsoPhaseSchema,
+    oni: z.number().describe("NOAA Oceanic Niño Index, DJF anomaly in °C."),
+    label: z.string(),
+  })
+  .register(publicApiRegistry, { id: "EnsoSeason", description: "The winter's ENSO phase from NOAA's ONI table (DJF ≥ 0.5 El Niño, ≤ −0.5 La Niña)." });
+
+export const StormSchema = z
+  .object({
+    totalIn: z.number(),
+    start: z.string().describe("YYYY-MM-DD."),
+    end: z.string(),
+    days: z.number().int().describe("Consecutive days with at least 1 in of new snow."),
+  })
+  .register(publicApiRegistry, { id: "Storm" });
+
+export const DeepestBaseSchema = z
+  .object({ depthIn: z.number(), date: z.string().describe("YYYY-MM-DD the depth was first reached.") })
+  .register(publicApiRegistry, { id: "DeepestBase" });
+
+export const PastSeasonSchema = z
+  .object({
+    season: SeasonRefSchema,
+    totalIn: z.number().describe("Measured new snow over the season (through June 30 in the North)."),
+    snowDays: z.number().int().describe("Days with at least 1 in."),
+    powderDays: z.number().int().describe("Days at or above `powderDayThresholdIn`."),
+    daysMeasured: z.number().int(),
+    maxStorm: StormSchema.nullable(),
+    deepestBase: DeepestBaseSchema.nullable(),
+    weeklyCumulativeIn: z.array(z.number()).describe("Cumulative new snow at the end of each 7-day week from the season start; 52 entries."),
+    percentOfNormal: z.number().nullable().describe("Season total as a percent of the 30-winter mean season; null without a normal."),
+    enso: EnsoSeasonSchema.nullable(),
+  })
+  .register(publicApiRegistry, { id: "PastSeason" });
+
+export const ResortHistorySchema = z
+  .object({
+    slug: z.string(),
+    name: z.string(),
+    canonicalUrl: z.string().describe("The resort's PeakCam page."),
+    pageUrl: z.string().describe("The history page this document backs."),
+    apiUrl: z.string(),
+    source: HistorySourceSchema.nullable(),
+    station: StationSchema.nullable(),
+    hemisphere: HemisphereSchema,
+    season: SeasonRefSchema.describe("The season in progress."),
+    asOf: z.string().nullable().describe("YYYY-MM-DD of the newest daily reading this season; null before the first."),
+    powderDayThresholdIn: z.number(),
+    curve: SeasonCurveSchema,
+    pastSeasons: z.array(PastSeasonSchema).describe("Up to ten seasons before the current one, newest first; seasons with no rows are omitted."),
+    attribution: z.string(),
+    license: z.string(),
+    generatedAt: z.string(),
+  })
+  .register(publicApiRegistry, { id: "ResortHistory", description: "The current season's cumulative snowfall curve against the station's normal band, plus ten past seasons." });
+
+export const PercentOfNormalToDateSchema = z
+  .object({
+    thirtyYear: z.number().nullable().describe("Season-to-date snowfall as a percent of the 30-winter mean by this day; null without a normal."),
+    recentDecade: z.number().nullable().describe("The same against the 10 most recent winters."),
+    normalToDateIn: z.number().nullable(),
+    recentNormalToDateIn: z.number().nullable(),
+    normalYears: z.number().int().nullable(),
+    recentYears: z.number().int().nullable(),
+    baselineNote: z.string().nullable().describe("Set when the two baselines differ by more than 10 %; quote it with the percent."),
+  })
+  .register(publicApiRegistry, { id: "PercentOfNormalToDate" });
+
+export const LastYearComparisonSchema = z
+  .object({
+    season: SeasonRefSchema,
+    seasonToDateIn: z.number().describe("Cumulative snowfall by the same day of season last year."),
+    baseOnSameDayIn: z.number().nullable(),
+    powderDays: z.number().int(),
+    diffIn: z.number().describe("This season minus last season, inches."),
+    pctOfLastYear: z.number().nullable(),
+  })
+  .register(publicApiRegistry, { id: "LastYearComparison" });
+
+export const SeasonTrendSchema = z
+  .object({
+    last7In: z.number(),
+    prior7In: z.number(),
+    direction: z.enum(["rising", "falling", "steady"]),
+  })
+  .register(publicApiRegistry, { id: "SeasonTrend" });
+
+export const SeasonStatsSchema = z
+  .object({
+    slug: z.string(),
+    name: z.string(),
+    canonicalUrl: z.string(),
+    pageUrl: z.string(),
+    apiUrl: z.string(),
+    source: HistorySourceSchema.nullable(),
+    station: StationSchema.nullable(),
+    hemisphere: HemisphereSchema,
+    season: SeasonRefSchema,
+    dayOfSeason: z.number().int(),
+    asOf: z.string().nullable().describe("YYYY-MM-DD of the newest daily reading this season."),
+    seasonToDateIn: z.number(),
+    daysMeasured: z.number().int(),
+    snowDays: z.number().int(),
+    powderDays: z.number().int(),
+    powderDayThresholdIn: z.number(),
+    currentBaseIn: z.number().nullable(),
+    deepestBase: DeepestBaseSchema.nullable(),
+    percentOfNormal: PercentOfNormalToDateSchema,
+    lastYear: LastYearComparisonSchema.nullable(),
+    trend: SeasonTrendSchema,
+    sentence: z.string().describe("A dated sentence that can be quoted verbatim."),
+    attribution: z.string(),
+    license: z.string(),
+    generatedAt: z.string(),
+  })
+  .register(publicApiRegistry, { id: "SeasonStats", description: "Season-to-date snowfall, powder days, base and percent of normal on two baselines, with the same day last year." });
+
+export const MonthWindowStatsSchema = z
+  .object({
+    avgSnowfallIn: z.number().nullable(),
+    avgSnowDays: z.number().nullable(),
+    avgDepthIn: z.number().nullable(),
+    maxStormIn: z.number().nullable(),
+    maxStormStart: z.string().nullable(),
+    maxStormEnd: z.string().nullable(),
+    yearsTracked: z.number().int(),
+  })
+  .register(publicApiRegistry, { id: "MonthWindowStats" });
+
+export const MonthClimatologySchema = z
+  .object({
+    month: z.number().int().min(1).max(12),
+    label: z.string(),
+    thirtyYear: MonthWindowStatsSchema.describe("The 30 most recent complete winters."),
+    recentDecade: MonthWindowStatsSchema.describe("The 10 most recent complete winters."),
+    recentVsThirtyPct: z.number().nullable().describe("Recent-decade average snowfall as a percent of the 30-winter average."),
+    baselineNote: z.string().nullable(),
+  })
+  .register(publicApiRegistry, { id: "MonthClimatology" });
+
+export const MonthlyClimatologySchema = z
+  .object({
+    slug: z.string(),
+    name: z.string(),
+    canonicalUrl: z.string(),
+    pageUrl: z.string(),
+    apiUrl: z.string(),
+    station: StationSchema.nullable(),
+    available: z.boolean().describe("False for resorts without a station normal; `months` is then empty."),
+    note: z.string(),
+    months: z.array(MonthClimatologySchema).describe("In season order (October first in the North)."),
+    attribution: z.string(),
+    license: z.string(),
+    generatedAt: z.string(),
+  })
+  .register(publicApiRegistry, { id: "MonthlyClimatology", description: "Average snowfall, snow days, depth and biggest storm per month at the resort's station, on 30-winter and recent-decade baselines." });
+
+export const LeaderboardKindSchema = z
+  .enum(["best-powder-this-week", "season-powder-days", "deepest-base", "season-snowfall"])
+  .register(publicApiRegistry, { id: "LeaderboardKind" });
+
+export const LeaderboardEntrySchema = z
+  .object({
+    rank: z.number().int(),
+    slug: z.string(),
+    name: z.string(),
+    canonicalUrl: z.string(),
+    state: z.string(),
+    country: z.string(),
+    value: z.number().describe("The ranked number."),
+    unit: z.enum(["in", "days"]),
+    source: MeasurementSourceSchema,
+    station: StationSchema.nullable(),
+    measuredAt: z.string().nullable().describe("ISO instant the value is dated to."),
+    detail: z.object({ label: z.string(), value: z.string() }).nullable().describe("A second number for context (base, season total, powder days)."),
+  })
+  .register(publicApiRegistry, { id: "LeaderboardEntry" });
+
+export const LeaderboardSchema = z
+  .object({
+    kind: LeaderboardKindSchema,
+    title: z.string(),
+    description: z.string(),
+    rule: z.string().describe("The ranking rule in words."),
+    season: SeasonRefSchema.describe("The Northern-hemisphere season the season-bound boards count from."),
+    weekStart: z.string().describe("YYYY-MM-DD the 7-day window starts (best-powder-this-week)."),
+    filters: z.object({ state: z.string().nullable(), source: MeasurementSourceSchema.nullable() }),
+    count: z.number().int(),
+    totalMatching: z.number().int(),
+    pool: z.number().int().describe("Resorts considered after the filters."),
+    asOf: z.string().nullable(),
+    sentence: z.string().describe("The dated, quotable summary sentence."),
+    unavailable: z.boolean().describe("True when the season aggregates could not be read; `results` is then empty."),
+    results: z.array(LeaderboardEntrySchema),
+    pageUrl: z.string(),
+    attribution: z.string(),
+    license: z.string(),
+    generatedAt: z.string(),
+  })
+  .register(publicApiRegistry, { id: "Leaderboard", description: "One of the four season leaderboards, ranked and dated." });
+
+export type SeasonRefPublic = z.infer<typeof SeasonRefSchema>;
+export type ResortHistoryPublic = z.infer<typeof ResortHistorySchema>;
+export type PastSeasonPublic = z.infer<typeof PastSeasonSchema>;
+export type SeasonStatsPublic = z.infer<typeof SeasonStatsSchema>;
+export type MonthClimatologyPublic = z.infer<typeof MonthClimatologySchema>;
+export type MonthlyClimatologyPublic = z.infer<typeof MonthlyClimatologySchema>;
+export type LeaderboardPublic = z.infer<typeof LeaderboardSchema>;
+export type LeaderboardEntryPublic = z.infer<typeof LeaderboardEntrySchema>;

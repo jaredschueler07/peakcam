@@ -3,6 +3,7 @@ import { getResortOpenings, getResortSitemapEntries } from "@/lib/supabase";
 import { SITE_URL } from "@/lib/site";
 import { isDropInEnabled } from "@/lib/drop-in";
 import { HUB_BASE_PATH, hubPath, listHubs } from "@/lib/hubs";
+import { LEADERBOARD_KINDS, leaderboardPath } from "@/lib/leaderboards";
 import { RESORT_SUBPAGES, resortTabPath } from "@/lib/resort-pages";
 
 // Match the data pages' ISR window: the sitemap's lastModified values come
@@ -36,8 +37,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const lastModified = e.lastReportAt ? new Date(e.lastReportAt) : buildTime;
     return [
       { url: `${SITE_URL}${resortTabPath(e.slug, "overview")}`, lastModified, changeFrequency: "hourly" as const, priority: 0.8 },
-      // The page family (lib/resort-pages.ts): snow report and webcams per
-      // resort, same data clock as the overview, one step down in priority.
+      // The page family (lib/resort-pages.ts): snow report, webcams and
+      // history per resort, same data clock as the overview, one step down
+      // in priority.
       ...RESORT_SUBPAGES.map((tab) => ({
         url: `${SITE_URL}${resortTabPath(e.slug, tab.key)}`,
         lastModified,
@@ -99,6 +101,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Percent-of-normal leaderboard: ranks the SNOTEL-fed resorts, so it
     // changes with the newest report like the other aggregate pages.
     { url: `${SITE_URL}/snow-report/percent-of-normal`, lastModified: dataModified, changeFrequency: "hourly", priority: 0.7 },
+    // P5 leaderboards: season snowfall, powder days, deepest base and the
+    // 7-day board all move with the newest report / daily row.
+    ...LEADERBOARD_KINDS.map((kind) => ({ url: `${SITE_URL}${leaderboardPath(kind)}`, lastModified: dataModified, changeFrequency: "daily" as const, priority: 0.7 })),
     { url: `${SITE_URL}/map`, lastModified: dataModified, changeFrequency: "hourly", priority: 0.8 },
     { url: `${SITE_URL}/compare`, lastModified: buildTime, changeFrequency: "weekly", priority: 0.6 },
     // Powder-alert sign-up landing page: the only dedicated conversion page,

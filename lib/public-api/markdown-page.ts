@@ -30,6 +30,7 @@ import type {
   ResortPublic,
   SeasonPublic,
 } from "./schema";
+import type { MonthlyClimatologyPublic, ResortHistoryPublic, SeasonStatsPublic } from "./schema";
 
 export const MARKDOWN_CONTENT_TYPE = "text/markdown; charset=utf-8";
 
@@ -509,5 +510,92 @@ export function indexMarkdown(list: ResortListPublic, opts: MarkdownPageOptions 
   lines.push("");
 
   lines.push(attributionBlock(`${base}/`, list.attribution, list.license), "");
+  return lines.join("\n");
+}
+
+// ── P5: /resorts/{slug}/history/index.md ─────────────────────
+
+
+function inchesMd(value: number | null | undefined): string {
+  if (value == null) return "–";
+  const r = Math.round(value * 10) / 10;
+  return `${Number.isInteger(r) ? r : r.toFixed(1)} in`;
+}
+
+/**
+ * The history page as one markdown document: the dated season sentence,
+ * the season-to-date numbers on both baselines, the current curve at
+ * month ends against the band, the past-seasons table and the monthly
+ * climatology. Every number is the API's; nothing is recomputed here.
+ */
+export function historyMarkdown(history: ResortHistoryPublic, stats: SeasonStatsPublic, monthly: MonthlyClimatologyPublic): string {
+  const p = stats.percentOfNormal;
+  const station = history.station ? `${history.station.name ?? history.station.id}${history.station.elevationFt ? `, ${Math.round(history.station.elevationFt).toLocaleString("en-US")} ft` : ""}` : null;
+  const sourceLine =
+    history.source === "snotel"
+      ? `Source: NRCS SNOTEL station ${station ?? history.station?.id} (measured, quality-controlled by PeakCam, synced every 6 h). Daily new snow = positive change in station depth, a floor on what fell.`
+      : history.source === "open_meteo"
+        ? "Source: Open-Meteo weather-model daily estimates (no SNOTEL station near this resort); no station normal band."
+        : "No daily record yet.";
+  const bandAt = (day: number) => history.curve.band.find((b) => b.dayOfSeason === day);
+  const monthEnds = history.curve.points.filter((pt, i, arr) => i === arr.length - 1 || pt.date.slice(8) === "01");
+  const lines: string[] = [
+    `# ${history.name} snow history, season ${history.season.label}`,
+    "",
+    `Canonical page: ${history.pageUrl}  ·  Resort: ${history.canonicalUrl}  ·  JSON: ${history.apiUrl}`,
+    "",
+    stats.sentence,
+    "",
+    sourceLine,
+    "",
+    "## This season to date",
+    "",
+    `- Snow since ${history.season.startDate}: ${inchesMd(stats.seasonToDateIn)} (${stats.daysMeasured} days measured, ${stats.snowDays} snow days, ${stats.powderDays} powder days at ≥ ${stats.powderDayThresholdIn} in)`,
+    `- Base now: ${inchesMd(stats.currentBaseIn)}${stats.deepestBase ? `; deepest ${inchesMd(stats.deepestBase.depthIn)} on ${stats.deepestBase.date}` : ""}`,
+    p.thirtyYear != null
+      ? `- Percent of normal to date: ${p.thirtyYear}% of the ${p.normalYears ?? 30}-winter mean (${inchesMd(p.normalToDateIn)})${p.recentDecade != null ? `; ${p.recentDecade}% of the last ${p.recentYears ?? 10} winters (${inchesMd(p.recentNormalToDateIn)})` : ""}`
+      : "- Percent of normal: not available (no station normal)",
+    ...(p.baselineNote ? [`- ${p.baselineNote}`] : []),
+    stats.lastYear
+      ? `- Same day last season (${stats.lastYear.season.label}): ${inchesMd(stats.lastYear.seasonToDateIn)}, ${stats.lastYear.powderDays} powder days${stats.lastYear.baseOnSameDayIn != null ? `, base ${inchesMd(stats.lastYear.baseOnSameDayIn)}` : ""}; this season ${stats.lastYear.diffIn >= 0 ? "+" : ""}${stats.lastYear.diffIn} in`
+      : "- No rows for last season",
+    `- Trend: ${stats.trend.direction} (last 7 days ${inchesMd(stats.trend.last7In)}, the 7 before ${inchesMd(stats.trend.prior7In)})`,
+    "",
+    "## Season curve vs normal",
+    "",
+  ];
+  if (monthEnds.length) {
+    lines.push("| Date | Day | Measured so far | 30-winter mean | p25–p75 | Last 10 winters |", "| --- | --- | --- | --- | --- | --- |");
+    for (const pt of monthEnds) {
+      const b = bandAt(pt.dayOfSeason);
+      lines.push(`| ${pt.date} | ${pt.dayOfSeason} | ${inchesMd(pt.cumulativeIn)} | ${b ? inchesMd(b.meanIn) : "–"} | ${b ? `${inchesMd(b.p25In)} – ${inchesMd(b.p75In)}` : "–"} | ${b?.recentMeanIn != null ? inchesMd(b.recentMeanIn) : "–"} |`);
+    }
+    lines.push("", `Full daily curve (${history.curve.points.length} points) and the band for days 1–273: ${history.apiUrl}`);
+  } else {
+    lines.push("No daily readings yet this season.");
+  }
+  lines.push("", `## Past seasons (${history.pastSeasons.length})`, "");
+  if (history.pastSeasons.length) {
+    lines.push("| Season | Snowfall | % of normal | Snow days | Powder days | Biggest storm | Deepest base | ENSO |", "| --- | --- | --- | --- | --- | --- | --- | --- |");
+    for (const s of history.pastSeasons) {
+      lines.push(
+        `| ${s.season.label} | ${inchesMd(s.totalIn)} | ${s.percentOfNormal != null ? `${s.percentOfNormal}%` : "–"} | ${s.snowDays} | ${s.powderDays} | ${s.maxStorm ? `${inchesMd(s.maxStorm.totalIn)} (${s.maxStorm.start}${s.maxStorm.days > 1 ? ` to ${s.maxStorm.end}` : ""})` : "–"} | ${s.deepestBase ? `${inchesMd(s.deepestBase.depthIn)} (${s.deepestBase.date})` : "–"} | ${s.enso ? `${s.enso.label} (ONI ${s.enso.oni > 0 ? "+" : ""}${s.enso.oni})` : "–"} |`,
+      );
+    }
+    lines.push("", "Weekly cumulative totals per season are in the JSON (`pastSeasons[].weeklyCumulativeIn`).");
+  } else {
+    lines.push("No past seasons on file yet.");
+  }
+  lines.push("", "## Monthly climatology", "");
+  if (monthly.available) {
+    lines.push("| Month | Avg snowfall (30 winters) | Last 10 winters | Snow days | Avg depth | Biggest storm | Winters |", "| --- | --- | --- | --- | --- | --- | --- |");
+    for (const m of monthly.months.filter((x) => x.thirtyYear.yearsTracked > 0 || x.recentDecade.yearsTracked > 0)) {
+      lines.push(
+        `| ${m.label} | ${inchesMd(m.thirtyYear.avgSnowfallIn)} | ${inchesMd(m.recentDecade.avgSnowfallIn)}${m.recentVsThirtyPct != null ? ` (${m.recentVsThirtyPct}%)` : ""} | ${m.thirtyYear.avgSnowDays ?? "–"} | ${inchesMd(m.thirtyYear.avgDepthIn)} | ${m.thirtyYear.maxStormIn != null ? `${inchesMd(m.thirtyYear.maxStormIn)} (${m.thirtyYear.maxStormStart})` : "–"} | ${m.thirtyYear.yearsTracked} |`,
+      );
+    }
+    for (const m of monthly.months.filter((x) => x.baselineNote)) lines.push(`- ${m.label}: ${m.baselineNote}`);
+  }
+  lines.push(monthly.note, "", `Methodology: ${SITE_URL}/methodology#history  ·  Attribution: PeakCam (https://www.peakcam.io), SNOTEL data: USDA NRCS  ·  Terms: ${SITE_URL}/about#terms`, "");
   return lines.join("\n");
 }

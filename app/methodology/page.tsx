@@ -109,6 +109,35 @@ export default function MethodologyPage() {
           suppresses it rather than print &ldquo;400% of nothing.&rdquo;
         </p>
 
+        <H2 id="history">History and normals</H2>
+        <p className="mb-4">
+          Each resort&apos;s history page (<code>/resorts/&#123;slug&#125;/history</code>) is built from
+          PeakCam&apos;s own daily station record: ten water years of SNOTEL depth, SWE and
+          temperature pulled once from the NRCS archive and run through the same quality control
+          as the live sync, then one row a day from the sync onward. Daily new snow is the
+          positive change in snow depth from the previous day. Settling, wind and melt make that
+          a floor on what fell, never a ceiling, so a season total here reads lower than a
+          resort&apos;s own snowfall figure and is labelled &ldquo;measured&rdquo; rather than
+          &ldquo;snowfall.&rdquo; A snow day is one inch or more; a powder day is eight inches or
+          more in a day, the same threshold as the powder alerts.
+        </p>
+        <p className="mb-4">
+          The normal band on the season curve is the station&apos;s own: the mean and the middle
+          half (25th to 75th percentile) of cumulative new snow by day of the water year over the
+          thirty most recent complete winters with a usable record (at least 200 depth readings
+          between October and June; fewer than twenty-five qualifying winters is noted). A second
+          line uses only the ten most recent winters. Season-to-date percent of normal is quoted
+          against both, and when the two baselines differ by more than ten percent the page says
+          so instead of choosing one. This is a different number from the resort page&apos;s
+          &ldquo;% of normal,&rdquo; which compares snow water equivalent with the 1991&ndash;2020
+          median. Monthly climatology (average snowfall, snow days, depth and the biggest run of
+          consecutive snow days per month) uses the same two windows. The ENSO column on the
+          past-seasons table is NOAA&apos;s Oceanic Ni&ntilde;o Index for December&ndash;February,
+          El Ni&ntilde;o at +0.5&nbsp;&deg;C and above, La Ni&ntilde;a at &minus;0.5 and below.
+          Resorts without a station show the season curve from weather-model daily values and no
+          band. Normals are refreshed each October once the previous water year is complete.
+        </p>
+
         <H2 id="conditions">Ratings, trends, and outlook</H2>
         <p className="mb-4">
           The condition rating is a fixed function of the measured data, not editorial

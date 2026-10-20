@@ -8,7 +8,7 @@
 
 import { SITE_URL } from "./site";
 
-export type ResortTabKey = "overview" | "snow-report" | "webcams";
+export type ResortTabKey = "overview" | "snow-report" | "webcams" | "history";
 
 export interface ResortTab {
   key: ResortTabKey;
@@ -18,11 +18,12 @@ export interface ResortTab {
   segment: string;
 }
 
-/** Overview first; Forecast and History join in P2 block 2 once P4/P5 land. */
+/** Overview first; History is P5 (season curve, past seasons, monthly climatology); Forecast joins with P4. */
 export const RESORT_TABS: readonly ResortTab[] = [
   { key: "overview", label: "Overview", segment: "" },
   { key: "snow-report", label: "Snow report", segment: "snow-report" },
   { key: "webcams", label: "Webcams", segment: "webcams" },
+  { key: "history", label: "History", segment: "history" },
 ];
 
 /** The subpages (everything but the overview), for the sitemap and markdown link lists. */

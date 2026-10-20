@@ -7,7 +7,21 @@
 export const BATCH_MAX_REQUESTS = 10;
 export const BATCH_MAX_PATH_LENGTH = 300;
 
-export type BatchRouteId = "resorts" | "searchIndex" | "resort" | "cams" | "forecast" | "forecastAccuracy" | "powder" | "status" | "ask";
+export type BatchRouteId =
+  | "resorts"
+  | "searchIndex"
+  | "resort"
+  | "cams"
+  | "forecast"
+  | "forecastAccuracy"
+  | "powder"
+  | "status"
+  | "ask"
+  // P5 history
+  | "history"
+  | "seasonStats"
+  | "monthly"
+  | "leaderboard";
 
 export interface BatchPath {
   path: string;
@@ -26,6 +40,11 @@ const ROUTE_PATTERNS: Array<{ route: BatchRouteId; re: RegExp }> = [
   { route: "powder", re: /^\/api\/v1\/powder$/ },
   { route: "status", re: /^\/api\/v1\/status$/ },
   { route: "ask", re: /^\/api\/v1\/ask$/ },
+  // P5 history (the leaderboard kind is captured in the slug slot)
+  { route: "history", re: /^\/api\/v1\/resorts\/([a-z0-9][a-z0-9-]{0,99})\/history$/ },
+  { route: "seasonStats", re: /^\/api\/v1\/resorts\/([a-z0-9][a-z0-9-]{0,99})\/season-stats$/ },
+  { route: "monthly", re: /^\/api\/v1\/resorts\/([a-z0-9][a-z0-9-]{0,99})\/monthly$/ },
+  { route: "leaderboard", re: /^\/api\/v1\/leaderboards\/([a-z-]{1,40})$/ },
 ];
 
 export function matchBatchPath(path: string): BatchPath | null {
@@ -62,7 +81,7 @@ export function parseBatchBody(body: unknown): BatchParse {
       return {
         ok: false,
         error: "disallowed_path",
-        detail: `${path} is not a batchable GET route. Allowed: /api/v1/resorts, /api/v1/resorts/search-index, /api/v1/resorts/{slug}, /api/v1/resorts/{slug}/cams, /api/v1/resorts/{slug}/forecast, /api/v1/resorts/{slug}/forecast-accuracy, /api/v1/powder, /api/v1/status, /api/v1/ask (with query strings).`,
+        detail: `${path} is not a batchable GET route. Allowed: /api/v1/resorts, /api/v1/resorts/search-index, /api/v1/resorts/{slug}, /api/v1/resorts/{slug}/cams, /api/v1/resorts/{slug}/forecast, /api/v1/resorts/{slug}/forecast-accuracy, /api/v1/resorts/{slug}/history, /api/v1/resorts/{slug}/season-stats, /api/v1/resorts/{slug}/monthly, /api/v1/leaderboards/{kind}, /api/v1/powder, /api/v1/status, /api/v1/ask (with query strings).`,
       };
     }
     paths.push(matched);

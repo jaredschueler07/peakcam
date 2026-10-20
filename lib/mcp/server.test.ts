@@ -15,6 +15,9 @@ import {
 } from "./server";
 import { MAX_CAMS, PEAKCAM_TOOL_NAMES, buildTools, diceSimilarity, editDistance, matchResorts, normalizeText, scoreResort } from "./tools";
 import type { McpDataSource, SnowHistoryRow, UnmatchedQuestion } from "./types";
+import type { ResortHistoryData } from "@/lib/public-api/data";
+import type { SeasonAggregateRow } from "@/lib/leaderboards";
+import { addDays, deriveNewSnow, type CumulativeNormalRow, type DailyRow, type MonthlyNormalRow } from "@/lib/snow-history";
 import type { CamTimelineFrame } from "@/lib/cam-timeline";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -224,6 +227,34 @@ const ACCURACY: AccuracyInput = {
   ],
 };
 
+
+// P5: ten past winters plus 80 days of the 2026-27 season at Breckenridge, with a normal band.
+const HISTORY_DATA: ResortHistoryData = (() => {
+  const rows: DailyRow[] = [];
+  for (let wy = 2017; wy <= 2027; wy++) {
+    let depth = 0;
+    const days = wy === 2027 ? 80 : 273;
+    for (let d = 1; d <= days; d++) {
+      depth += d % 3 === 0 ? 2 : 0;
+      if (d === 60) depth += 12;
+      rows.push({ date: addDays(`${wy - 1}-10-01`, d - 1), snowDepthIn: depth, sweIn: depth / 4, newSnowIn: null, qcFlag: "valid" });
+    }
+  }
+  const normals: CumulativeNormalRow[] = Array.from({ length: 273 }, (_, i) => ({ dayOfWaterYear: i + 1, meanIn: (i + 1) * 0.7, p25In: (i + 1) * 0.5, p75In: (i + 1) * 0.9, years: 30, recentMeanIn: (i + 1) * 0.6, recentYears: 10 }));
+  const monthly: MonthlyNormalRow[] = [10, 11, 12, 1, 2, 3].flatMap((month) => [
+    { month, window: "30yr" as const, avgSnowfallIn: 25, avgSnowDays: 8, avgDepthIn: 40, maxStormIn: 20, maxStormStart: "2019-12-25", maxStormEnd: "2019-12-26", yearsTracked: 30 },
+    { month, window: "10yr" as const, avgSnowfallIn: month === 1 ? 18 : 26, avgSnowDays: 7, avgDepthIn: 38, maxStormIn: 16, maxStormStart: "2024-01-05", maxStormEnd: "2024-01-05", yearsTracked: 10 },
+  ]);
+  return { rows: deriveNewSnow(rows), normals, monthly };
+})();
+
+const AGGREGATES: SeasonAggregateRow[] = [
+  { resortId: "id-breckenridge", stationId: "842:CO:SNTL", seasonTotalIn: 64, snowDays: 26, powderDays: 1, daysMeasured: 80, deepestBaseIn: 64, deepestBaseDate: "2026-12-19", weekTotalIn: 4, lastDate: "2026-12-19", latestDepthIn: 64 },
+  { resortId: "id-vail", stationId: "842:CO:SNTL", seasonTotalIn: 50, snowDays: 20, powderDays: 0, daysMeasured: 80, deepestBaseIn: 50, deepestBaseDate: "2026-12-19", weekTotalIn: 9, lastDate: "2026-12-20", latestDepthIn: 50 },
+  { resortId: "id-alta", stationId: "766:UT:SNTL", seasonTotalIn: 120, snowDays: 30, powderDays: 5, daysMeasured: 80, deepestBaseIn: 80, deepestBaseDate: "2026-12-20", weekTotalIn: 20, lastDate: "2026-12-20", latestDepthIn: 80 },
+];
+
+
 const calls = { catalog: 0, forecast: 0, history: 0, stills: 0, runs: 0 };
 const logged: UnmatchedQuestion[] = [];
 
@@ -256,6 +287,13 @@ function fixtureData(over: Partial<McpDataSource> = {}): McpDataSource {
     },
     async logUnmatchedQuestion(entry) {
       logged.push(entry);
+    },
+    async resortHistory(resort) {
+      calls.history++;
+      return resort.id === "id-breckenridge" ? HISTORY_DATA : { rows: [], normals: [], monthly: [] };
+    },
+    async seasonAggregates() {
+      return AGGREGATES;
     },
     ...over,
   };
@@ -310,13 +348,13 @@ test("initialize reports io.peakcam/snow, the package version and instructions",
   console.log(`negotiated protocol version ${version} (${client.getProtocolEra()} era)`);
 });
 
-test("tools/list returns the sixteen tools, each read-only with input and output schemas", async () => {
+test("tools/list returns every tool in the name tuple, each read-only with input and output schemas", async () => {
   const { tools } = await client.listTools();
   assert.deepEqual(
     tools.map((t) => t.name),
     [...PEAKCAM_TOOL_NAMES],
   );
-  assert.equal(tools.length, 16);
+  assert.equal(tools.length, PEAKCAM_TOOL_NAMES.length);
   for (const tool of tools) {
     assert.deepEqual(tool.annotations, READ_ONLY_TOOL_ANNOTATIONS, `${tool.name} annotations`);
     assert.ok(tool.title, `${tool.name} has a title`);
@@ -794,6 +832,9 @@ test("every tool's structuredContent parses against its own outputSchema", async
     get_alert_options: { slug: "alta" },
     get_cam_timeline: { slug: "breckenridge", hours: 24 },
     ask: { question: "how much snow at Alta" },
+    get_season_stats: { slug: "breckenridge" },
+    get_monthly_climatology: { slug: "breckenridge" },
+    get_leaderboard: { kind: "season-snowfall", state: "CO" },
   };
   for (const tool of tools) {
     const args = tool.inputSchema.parse(samples[tool.name]);
@@ -919,4 +960,87 @@ test("ask declines unanswerable questions, offers suggestions and logs them with
   assert.equal(logged[0].ipHash, null);
   assert.doesNotMatch(logged[0].question, /example\.com/);
   assert.match(logged[0].question, /\[email\]/);
+});
+
+// ── P5 history tools ─────────────────────────────────────────
+
+test("get_season_stats: season-to-date numbers on both baselines, last year, and a dated sentence", async () => {
+  const res = await call("get_season_stats", { slug: "breckenridge" });
+  assert.notEqual(res.isError, true);
+  const doc = res.structuredContent as Record<string, unknown> & { percentOfNormal: Record<string, unknown>; lastYear: Record<string, unknown> | null };
+  assert.equal(doc.available, true);
+  assert.equal((doc.season as { label: string }).label, "2026-27");
+  assert.equal(doc.asOf, "2026-12-19");
+  assert.equal(doc.powderDays, 1);
+  assert.equal(doc.powderDayThresholdIn, 8);
+  assert.ok(Math.abs((doc.percentOfNormal.normalToDateIn as number) - 56.7) < 1e-9, "day 81 (Dec 20 Mountain) × 0.7");
+  assert.ok(typeof doc.percentOfNormal.thirtyYear === "number");
+  assert.match(doc.percentOfNormal.baselineNote as string, /14% below/);
+  assert.ok(doc.lastYear && (doc.lastYear.seasonToDateIn as number) > 0);
+  assert.match(text(res), /^# Breckenridge season 2026-27 to date — https:\/\/www\.peakcam\.io\/resorts\/breckenridge\/history/);
+  assert.match(text(res), /Through Dec 19, the Breckenridge SNOTEL station \(Vail Mountain\) has measured/);
+  assert.match(text(res), /Same day last season \(2025-26\)/);
+});
+
+test("get_season_stats for a resort with no rows answers zeros, not an error; a pre-P5 source answers available: false", async () => {
+  const res = await call("get_season_stats", { slug: "alta" });
+  assert.notEqual(res.isError, true);
+  const doc = res.structuredContent as Record<string, unknown>;
+  assert.equal(doc.seasonToDateIn, 0);
+  assert.equal(doc.asOf, null);
+  assert.match(text(res), /No daily measurements yet this season for Alta/);
+
+  const { client: old, server: oldServer } = await connect(fixtureData({ resortHistory: undefined, seasonAggregates: undefined }));
+  const legacy = await old.callTool({ name: "get_season_stats", arguments: { slug: "breckenridge" } });
+  assert.notEqual(legacy.isError, true);
+  assert.equal((legacy.structuredContent as Record<string, unknown>).available, false);
+  const board = await old.callTool({ name: "get_leaderboard", arguments: { kind: "season-snowfall" } });
+  assert.equal((board.structuredContent as Record<string, unknown>).unavailable, true);
+  await old.close();
+  await oldServer.close();
+});
+
+test("get_monthly_climatology: months in season order, both baselines, the January note", async () => {
+  const res = await call("get_monthly_climatology", { slug: "breckenridge" });
+  assert.notEqual(res.isError, true);
+  const doc = res.structuredContent as { available: boolean; months: Array<{ month: number; label: string; recentVsThirtyPct: number | null; baselineNote: string | null }> };
+  assert.equal(doc.available, true);
+  assert.deepEqual(doc.months.slice(0, 4).map((m) => m.month), [10, 11, 12, 1]);
+  const jan = doc.months.find((m) => m.month === 1)!;
+  assert.equal(jan.recentVsThirtyPct, 72);
+  assert.match(jan.baselineNote ?? "", /28% below/);
+  assert.match(text(res), /\| Jan \| 25 in \| 18 in \(72%\) \|/);
+  const none = await call("get_monthly_climatology", { slug: "ski-portillo" });
+  assert.equal((none.structuredContent as { available: boolean }).available, false);
+});
+
+test("get_leaderboard ranks from the aggregates, filters by state, and deepest-base needs none", async () => {
+  const res = await call("get_leaderboard", { kind: "season-snowfall", limit: 5 });
+  assert.notEqual(res.isError, true);
+  const doc = res.structuredContent as { results: Array<{ slug: string; value: number; station: { name: string | null } | null }>; sentence: string; unavailable: boolean };
+  assert.deepEqual(doc.results.map((r) => [r.slug, r.value]), [["alta", 120], ["breckenridge", 64], ["vail", 50]]);
+  assert.equal(doc.results[0].station?.name, "Snowbird", "the 766:UT:SNTL name from the bundled index");
+  assert.match(doc.sentence, /the most snow since Oct 1 is 120 in\. at Alta \(SNOTEL\), then 64 in\. at Breckenridge \(SNOTEL\)\./);
+  const co = await call("get_leaderboard", { kind: "season-powder-days", state: "co" });
+  assert.deepEqual((co.structuredContent as { results: Array<{ slug: string }> }).results.map((r) => r.slug), ["breckenridge", "vail"]);
+  const base = await call("get_leaderboard", { kind: "deepest-base", sourceOnly: "snotel" });
+  const baseDoc = base.structuredContent as { results: Array<{ slug: string; value: number; source: string }> };
+  assert.deepEqual(baseDoc.results.map((r) => r.slug), ["alta", "vail", "breckenridge"]);
+  assert.ok(baseDoc.results.every((r) => r.source === "snotel"));
+});
+
+test("get_snow_history with season returns every daily row of that season, oldest first, with new snow", async () => {
+  const res = await call("get_snow_history", { slug: "breckenridge", season: "2024-25" });
+  assert.notEqual(res.isError, true);
+  const doc = res.structuredContent as { season: string | null; count: number; rows: Array<{ date: string; newSnowIn?: number | null }> };
+  assert.equal(doc.season, "2024-25");
+  assert.equal(doc.count, 273);
+  assert.equal(doc.rows[0].date, "2024-10-01");
+  assert.equal(doc.rows[59].newSnowIn, 14, "the day-60 storm plus the every-third-day inch");
+  assert.match(text(res), /season 2024-25 daily history \(273 rows from 2024-10-01/);
+  const current = await call("get_snow_history", { slug: "breckenridge", season: "current" });
+  assert.equal((current.structuredContent as { season: string }).season, "2026-27");
+  assert.equal((current.structuredContent as { count: number }).count, 80);
+  const plain = await call("get_snow_history", { slug: "breckenridge", days: 2 });
+  assert.equal((plain.structuredContent as { season: string | null }).season, null);
 });

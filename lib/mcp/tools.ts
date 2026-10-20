@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// MCP server — the sixteen read-only tools, as pure builders.
+// MCP server — the nineteen read-only tools, as pure builders.
 //
 // `buildTools(data)` returns tool definitions over an injected McpDataSource
 // so lib/mcp/server.test.ts can run every tool against fixtures with no
@@ -71,6 +71,8 @@ import { runsForPoint, type StoredForecast } from "@/lib/forecast/store";
 import { cmToInches } from "@/lib/open-meteo";
 import type { McpDataSource } from "./types";
 import { PEAKCAM_TOOL_NAMES, type PeakCamToolName } from "./tool-names";
+import { buildHistoryTools, readHistory } from "./tools-history";
+import { hemisphereOf, seasonOf, type SeasonRef } from "@/lib/snow-history";
 import {
   closeMatches,
   diceSimilarity,
@@ -632,10 +634,16 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
   const getSnowHistory = defineTool({
     name: "get_snow_history",
     title: "Snow history",
-    description: `Daily snow depth, snow water equivalent, precipitation accumulation and temperatures for the last 1–${MAX_HISTORY_DAYS} days at the resort's station (SNOTEL where there is one, Open-Meteo model otherwise), newest first. Use it for \"how has the base changed this week\" questions.`,
+    description: `Daily snow depth, snow water equivalent, precipitation accumulation and temperatures for the last 1–${MAX_HISTORY_DAYS} days at the resort's station (SNOTEL where there is one, Open-Meteo model otherwise), newest first. Use it for \"how has the base changed this week\" questions. Pass \`season\` (\`2024-25\`, or \`current\`) for a whole season's daily depth and new-snow rows instead of the last N days; get_season_stats summarises a season.`,
     inputSchema: z.object({
       slug: SlugInput,
-      days: z.number().int().min(1).max(MAX_HISTORY_DAYS).default(14).describe(`Days back, 1–${MAX_HISTORY_DAYS}.`),
+      days: z.number().int().min(1).max(MAX_HISTORY_DAYS).default(14).describe(`Days back, 1–${MAX_HISTORY_DAYS}. Ignored when \`season\` is set.`),
+      season: z
+        .string()
+        .trim()
+        .regex(/^(current|\d{4}(-\d{2})?)$/)
+        .optional()
+        .describe("A season label (`2024-25` for the Northern water year, `2026` for an Andes resort) or `current`: returns every daily row of that season, oldest first, with daily new snow."),
     }),
     outputSchema: z.object({
       slug: z.string(),
@@ -644,62 +652,94 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
       source: MeasurementSourceSchema.nullable(),
       station: StationSchema.nullable(),
       days: z.number().int(),
+      season: z.string().nullable().describe("The season label when `season` was asked for; null for a last-N-days read."),
       count: z.number().int(),
-      rows: z.array(HistoryRowSchema),
+      rows: z.array(HistoryRowSchema.extend({ newSnowIn: z.number().nullable().optional().describe("Daily new snow (positive depth change), season reads only.") })),
       generatedAt: ISO_INSTANT,
     }),
-    async handler({ slug, days }) {
+    async handler({ slug, days, season }) {
       const catalog = await data.catalog();
       const hit = resolve(catalog, slug);
       if (!hit.ok) return hit.result;
       const resort = hit.resort;
       const options = serializeOptionsFor(catalog, resort);
-      const raw = await data.snowHistory(resort.id, days);
-      const rows = raw
-        .slice(0, days)
-        .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
-        .map((r) => ({
-          date: r.date,
-          snowDepthIn: r.snow_depth_in,
-          sweIn: r.swe_in,
-          precipAccumIn: r.precip_accum_in,
-          tempMaxF: r.temp_max_f,
-          tempMinF: r.temp_min_f,
-          qcFlag: r.qc_flag,
-        }));
+      let seasonRef: SeasonRef | null = null;
+      let rows: Array<{ date: string; snowDepthIn: number | null; sweIn: number | null; precipAccumIn: number | null; tempMaxF: number | null; tempMinF: number | null; qcFlag: string; newSnowIn?: number | null }>;
+      let raw: Awaited<ReturnType<typeof data.snowHistory>> = [];
+      if (season) {
+        const hemisphere = hemisphereOf(resort.lat);
+        const today = catalog.now.toISOString().slice(0, 10);
+        seasonRef = season === "current" ? seasonOf(today, hemisphere) : seasonOf(hemisphere === "south" ? `${season.slice(0, 4)}-06-01` : `${season.slice(0, 4)}-12-01`, hemisphere);
+        const history = await readHistory(data, resort);
+        if (!history) return err("Season history is not available right now (the daily archive could not be read). Try days instead of season.");
+        const start = seasonRef.startDate;
+        const nextStart = `${Number(start.slice(0, 4)) + 1}${start.slice(4)}`;
+        rows = history.rows
+          .filter((r) => r.date >= start && r.date < nextStart)
+          .map((r) => ({ date: r.date, snowDepthIn: r.snowDepthIn, sweIn: r.sweIn, precipAccumIn: null, tempMaxF: null, tempMinF: null, qcFlag: r.qcFlag, newSnowIn: r.newSnowIn }));
+      } else {
+        raw = await data.snowHistory(resort.id, days);
+        rows = raw
+          .slice(0, days)
+          .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+          .map((r) => ({
+            date: r.date,
+            snowDepthIn: r.snow_depth_in,
+            sweIn: r.swe_in,
+            precipAccumIn: r.precip_accum_in,
+            tempMaxF: r.temp_max_f,
+            tempMinF: r.temp_min_f,
+            qcFlag: r.qc_flag,
+          }));
+      }
       const source: MeasurementSource | null = raw[0]
         ? raw[0].station_id === "open-meteo"
           ? "open_meteo"
           : "snotel"
         : resort.snotel_station_id
           ? "snotel"
-          : null;
+          : rows.length
+            ? "open_meteo"
+            : null;
       const station = source === "snotel" ? snowStation(serializeSnow(resort, options)) : null;
       const canonicalUrl = serializeResortLight(resort, options).canonicalUrl;
-      const newest = rows[0];
-      const oldest = rows[rows.length - 1];
+      const newest = seasonRef ? rows[rows.length - 1] : rows[0];
+      const oldest = seasonRef ? rows[0] : rows[rows.length - 1];
       const change =
         newest && oldest && newest !== oldest && newest.snowDepthIn != null && oldest.snowDepthIn != null
           ? ` Depth ${oldest.date} → ${newest.date}: ${formatInches(oldest.snowDepthIn)} → ${formatInches(newest.snowDepthIn)} (${newest.snowDepthIn - oldest.snowDepthIn >= 0 ? "+" : ""}${newest.snowDepthIn - oldest.snowDepthIn} in).`
           : "";
       const stationText = formatStation(station);
+      const seasonTotal = seasonRef ? rows.reduce((s, r) => s + (r.newSnowIn ?? 0), 0) : 0;
       const lines = [
-        `# ${resort.name} snow history, last ${days} days (${rows.length} rows, ${sourceLabel(source)}${stationText ? `, station ${stationText}` : ""}) — ${canonicalUrl}`,
+        seasonRef
+          ? `# ${resort.name} season ${seasonRef.label} daily history (${rows.length} rows from ${seasonRef.startDate}, ${sourceLabel(source)}${stationText ? `, station ${stationText}` : ""}) — ${canonicalUrl}/history`
+          : `# ${resort.name} snow history, last ${days} days (${rows.length} rows, ${sourceLabel(source)}${stationText ? `, station ${stationText}` : ""}) — ${canonicalUrl}`,
         "",
         ...(rows.length
-          ? [
-              "| Date | Depth | SWE | Precip accum | Max / Min °F | QC |",
-              "| --- | --- | --- | --- | --- | --- |",
-              ...rows.map(
-                (r) =>
-                  `| ${r.date} | ${formatInches(r.snowDepthIn)} | ${formatInches(r.sweIn)} | ${formatInches(r.precipAccumIn)} | ${r.tempMaxF ?? "–"} / ${r.tempMinF ?? "–"} | ${r.qcFlag} |`,
-              ),
-              "",
-              `Newest first.${change}`,
-            ]
-          : ["No daily rows on file for this resort yet."]),
+          ? seasonRef
+            ? [
+                `Measured snowfall over the season: ${formatInches(Math.round(seasonTotal * 10) / 10)} (sum of daily depth increases). Oldest first; the table is capped at 60 rows, the structured result carries all ${rows.length}.`,
+                "",
+                "| Date | Depth | New snow | SWE | QC |",
+                "| --- | --- | --- | --- | --- |",
+                ...rows.slice(0, 60).map((r) => `| ${r.date} | ${formatInches(r.snowDepthIn)} | ${formatInches(r.newSnowIn ?? null)} | ${formatInches(r.sweIn)} | ${r.qcFlag} |`),
+                "",
+                `Season summary: get_season_stats("${resort.slug}"). Page: ${canonicalUrl}/history`,
+              ]
+            : [
+                "| Date | Depth | SWE | Precip accum | Max / Min °F | QC |",
+                "| --- | --- | --- | --- | --- | --- |",
+                ...rows.map(
+                  (r) =>
+                    `| ${r.date} | ${formatInches(r.snowDepthIn)} | ${formatInches(r.sweIn)} | ${formatInches(r.precipAccumIn)} | ${r.tempMaxF ?? "–"} / ${r.tempMinF ?? "–"} | ${r.qcFlag} |`,
+                ),
+                "",
+                `Newest first.${change}`,
+              ]
+          : [seasonRef ? `No daily rows on file for season ${seasonRef.label}.` : "No daily rows on file for this resort yet."]),
       ];
-      return ok(lines.join("\n"), { slug: resort.slug, name: resort.name, canonicalUrl, source, station, days, count: rows.length, rows, generatedAt: catalog.now.toISOString() });
+      return ok(lines.join("\n"), { slug: resort.slug, name: resort.name, canonicalUrl, source, station, days: seasonRef ? rows.length : days, season: seasonRef?.label ?? null, count: rows.length, rows, generatedAt: catalog.now.toISOString() });
     },
   });
 
@@ -1325,7 +1365,11 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
     },
   });
 
-  return [...baseTools, ask as unknown as ToolDefinition];
+  // P5: season stats, monthly climatology and the leaderboards, after `ask`
+  // so the name tuple's order is the registration order.
+  const historyTools = buildHistoryTools(data) as unknown as ToolDefinition[];
+
+  return [...baseTools, ask as unknown as ToolDefinition, ...historyTools];
 }
 
 export { camLine };

@@ -13,6 +13,8 @@ import type { AccuracyInput } from "@/lib/public-api/forecast";
 import type { StoredForecast } from "@/lib/forecast/store";
 import type { SnowByDateInches } from "@/lib/weather";
 import type { CamTimelineFrame } from "@/lib/cam-timeline";
+import type { ResortHistoryData } from "@/lib/public-api/data";
+import type { SeasonAggregateRow } from "@/lib/leaderboards";
 
 /** One `snowpack_daily` row (migration 005), the columns the history tool reads. */
 export interface SnowHistoryRow {
@@ -44,7 +46,7 @@ export interface UnmatchedQuestion {
   via: "api" | "mcp";
 }
 
-export interface McpDataSource {
+export interface McpDataSource extends McpHistorySource {
   /** The cached catalogue read shared with /api/v1 (resorts, openings, elevations, now). */
   catalog(): Promise<PublicApiCatalog>;
   /**
@@ -71,4 +73,19 @@ export interface McpDataSource {
    * fire-and-forget: a failure must never surface to the caller.
    */
   logUnmatchedQuestion?(entry: UnmatchedQuestion): Promise<void>;
+}
+
+// ── P5: season history ───────────────────────────────────────
+
+
+/**
+ * History reads, optional on the interface so fixture data sources written
+ * before P5 still type-check: a tool answers "history unavailable" when the
+ * method is absent. lib/mcp/data.ts implements both.
+ */
+export interface McpHistorySource {
+  /** Daily rows (ten seasons plus the current one) and the station's normals for a resort. */
+  resortHistory?(resort: Pick<ResortWithData, "id" | "snotel_station_id">): Promise<ResortHistoryData>;
+  /** `season_stats(powder_in, season_start, week_start)` rows; null when the function is missing. */
+  seasonAggregates?(seasonStart: string, weekStart: string): Promise<SeasonAggregateRow[] | null>;
 }
