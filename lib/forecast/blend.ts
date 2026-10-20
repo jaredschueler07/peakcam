@@ -12,7 +12,13 @@
 // Units stay the provider's (cm, °C, km/h, %); conversion happens at the edge.
 // ─────────────────────────────────────────────────────────────
 
-import type { ModelDay, ModelRun } from "./open-meteo-models";
+import type { ModelDay } from "./open-meteo-models";
+
+/** What the blend needs from a run: a model id and its days. Fresh `ModelRun`s and stored runs both fit. */
+export interface BlendInput {
+  model: string;
+  daily: readonly ModelDay[];
+}
 
 export interface BlendDay {
   date: string;
@@ -112,7 +118,7 @@ function findPeak(days: readonly BlendDay[]): BlendPeak | null {
  * dates in order; a day a model does not reach simply has one fewer
  * contributor. Up to `maxDays` days are returned.
  */
-export function blendRuns(runs: readonly ModelRun[], maxDays = 14): Blend {
+export function blendRuns(runs: readonly BlendInput[], maxDays = 14): Blend {
   const byDate = new Map<string, Array<{ model: string; day: ModelDay }>>();
   for (const run of runs) {
     for (const day of run.daily) {
