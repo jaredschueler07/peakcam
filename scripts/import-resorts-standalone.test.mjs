@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { groupByKeys, test } from "node:test";
 import assert from "node:assert";
 import {
   CAM_KINDS,
@@ -260,4 +260,16 @@ test("partitionCamRecords with no existing rows upserts everything in order", ()
   const { toUpsert, skipped } = partitionCamRecords(records, [], () => {});
   assert.deepStrictEqual(toUpsert, records);
   assert.deepStrictEqual(skipped, []);
+});
+
+
+test("groupByKeys splits a batch into same-key groups so PostgREST bulk upserts never see mixed shapes", () => {
+  const a = { slug: "a", name: "A", runs_total: 10 };
+  const b = { slug: "b", name: "B" };
+  const c = { name: "C", slug: "c", runs_total: 3 };
+  const groups = groupByKeys([a, b, c]);
+  assert.strictEqual(groups.length, 2);
+  assert.deepStrictEqual(groups[0], [a, c]);
+  assert.deepStrictEqual(groups[1], [b]);
+  assert.deepStrictEqual(groupByKeys([]), []);
 });
