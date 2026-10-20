@@ -175,6 +175,29 @@ export interface ForecastScoreRow {
   computed_at: string;
 }
 
+// ── Operator status (migration 031, P6: scripts/operator-sync.ts writes these) ──
+/** One `latest_operator_status` row: the newest operator report per resort. */
+export interface OperatorStatusRow {
+  resort_id: string;
+  id: string;
+  source: string;               // "liftie"
+  source_id: string;
+  observed_at: string;          // the provider's timestamp for the lift status
+  fetched_at: string;
+  lifts_open: number | null;
+  lifts_hold: number | null;
+  lifts_scheduled: number | null;
+  lifts_closed: number | null;
+  lifts_total: number | null;
+  trails_open: number | null;
+  trails_total: number | null;
+  base_depth_in: number | null;
+  surface: string | null;
+  opening_date: string | null;  // YYYY-MM-DD
+  source_url: string | null;
+  verified: boolean;
+}
+
 // ── Scores (migration 028, P7 writes these) ──────────────────
 export interface ResortScoreRow {
   resort_id: string;

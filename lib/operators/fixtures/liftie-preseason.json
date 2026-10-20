@@ -1,0 +1,17 @@
+{
+  "id": "breck",
+  "name": "Breckenridge",
+  "href": "https://www.breckenridge.com/the-mountain/mountain-conditions/terrain-and-lift-status.aspx",
+  "ll": [-106.0667, 39.4817],
+  "timestamp": { "lifts": 1797789600000 },
+  "lifts": {
+    "status": {
+      "Colorado SuperChair": "scheduled",
+      "Rip's Ride": "scheduled",
+      "Independence SuperChair": "closed",
+      "Peak 8 SuperConnect": "closed"
+    },
+    "stats": { "open": 0, "hold": 0, "scheduled": 2, "closed": 2, "percentage": { "open": 0, "hold": 0, "scheduled": 50, "closed": 50 } }
+  },
+  "opening": "2026-11-13"
+}

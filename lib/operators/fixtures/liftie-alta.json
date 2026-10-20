@@ -1,0 +1,30 @@
+{
+  "id": "alta",
+  "name": "Alta",
+  "href": "https://www.alta.com/lift-terrain-status",
+  "ll": [-111.63726, 40.583828],
+  "timestamp": { "lifts": 1797789600000, "weather": 1766250000000 },
+  "lifts": {
+    "status": {
+      "Collins": "open",
+      "Wildcat": "open",
+      "Sugarloaf": "open",
+      "Supreme": "open",
+      "Sunnyside": "open",
+      "Albion": "open",
+      "Transfer Tow": "open",
+      "Cecret": "hold",
+      "Snowpine Rope Tow": "closed",
+      "Alf's Rope Tow": "closed",
+      "Sugarloaf Tow": "closed"
+    },
+    "stats": {
+      "open": 7,
+      "hold": 1,
+      "scheduled": 0,
+      "closed": 3,
+      "percentage": { "open": 63.6, "hold": 9, "scheduled": 0, "closed": 27.2 }
+    }
+  },
+  "weather": { "icon": "snow", "text": "Snow", "temperature": { "max": 22, "min": 9 } }
+}

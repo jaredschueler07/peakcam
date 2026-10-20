@@ -22,6 +22,7 @@
     "model-sync": "tsx scripts/model-sync.ts",
     "stations-sync": "tsx scripts/stations-sync.ts",
     "approach-cams-sync": "tsx scripts/approach-cams-sync.ts",
+    "operator-sync": "tsx scripts/operator-sync.ts",
     "pipeline-sync": "tsx scripts/pipeline-sync.ts",
     "seed-normals": "tsx scripts/seed-snotel-normals.ts",
     "snotel-backfill": "tsx scripts/snotel-backfill.ts",
