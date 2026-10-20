@@ -31,6 +31,9 @@ import { NearbyResorts, type NearbyResortsData } from "@/components/resort/Nearb
 import { HubBreadcrumb, type BreadcrumbItem } from "@/components/hubs/HubBreadcrumb";
 import type { Quotable } from "@/lib/quotable";
 import { CamTimelineStrip } from "@/components/resort/CamTimelineStrip";
+import { TimelapseTile } from "@/components/resort/TimelapseClips";
+import type { CamTimelapseClip } from "@/lib/cam-timelapse";
+import { resortTabPath } from "@/lib/resort-pages";
 import type { CamTimeline } from "@/lib/cam-timeline";
 import { MeasuredNow } from "@/components/resort/MeasuredNow";
 import type { MeasuredNowPublic } from "@/lib/public-api/schema";
@@ -52,6 +55,8 @@ interface Props {
   breadcrumb?: BreadcrumbItem[] | null;
   /** Server-fetched still archive for one cam (getResortCamTimeline); null/omitted → no strip. */
   camTimeline?: CamTimeline | null;
+  /** The resort's newest 24 h timelapse clip (getResortTimelapses + pickResortTimelapse); null until the renderer has one. */
+  timelapse?: (CamTimelapseClip & { camId: string }) | null;
   /** Tab row for the page family (ResortTabs) and the labelled description block, rendered between the hero and the content. */
   subnav?: React.ReactNode;
   /** Station layer rows (lib/public-api/serialize.ts serializeStations); empty/omitted → no "What the instruments say" block. */
@@ -188,7 +193,7 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStrip = null, hourlyData, liveConditions, userConditions = [], nearby = null, freshness = null, breadcrumb = null, camTimeline = null, subnav = null, measuredNow = null }: Props) {
+export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStrip = null, hourlyData, liveConditions, userConditions = [], nearby = null, freshness = null, breadcrumb = null, camTimeline = null, timelapse = null, subnav = null, measuredNow = null }: Props) {
   const activeCams = resort.cams.filter((c) => c.is_active);
   const embeddableCams = activeCams.filter((c) => c.embed_type !== "link");
   const snow = resort.snow_report;
@@ -596,6 +601,12 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
                   storm keeper for one archive-allowed cam. Renders nothing
                   until the capture job has stored frames for this resort. */}
               <CamTimelineStrip timeline={camTimeline} cams={activeCams} />
+              {/* Timelapse clip (P8 block 2): the newest 24 h MP4 at the resort, poster until pressed. */}
+              <TimelapseTile
+                clip={timelapse}
+                cams={activeCams}
+                webcamsHref={resortTabPath(resort.slug, "webcams")}
+              />
               {/* A single-cam resort has nothing left for the grid on phones. */}
               {activeCams.length === 1 && (
                 <p className="text-text-muted text-sm lg:hidden">
