@@ -21,7 +21,13 @@ import type { ResortElevation, SerializeOptions } from "@/lib/public-api/seriali
 export function serializeOptionsFor(catalog: PublicApiCatalog, resort: ResortWithData): SerializeOptions {
   const row = catalog.elevations[resort.id];
   const elevation: ResortElevation | null = row ? { baseFt: row.base_ft, summitFt: row.summit_ft } : null;
-  return { now: catalog.now, opening: catalog.openings.get(resort.id) ?? null, elevation };
+  return {
+    now: catalog.now,
+    opening: catalog.openings.get(resort.id) ?? null,
+    elevation,
+    // Station layer (migration 026): an index without a row for this resort is an empty list, no index at all is "not served".
+    observationStations: catalog.stations ? (catalog.stations[resort.id] ?? []) : null,
+  };
 }
 
 /** Lowercase ASCII words: strips accents and punctuation (`Mt. Bachelor` → `mt bachelor`). */

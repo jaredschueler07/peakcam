@@ -1,0 +1,2033 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "id": "https://api.weather.gov/stations/A4547",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.71341,
+     40.44194
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/A4547",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1702.9176
+    },
+    "stationIdentifier": "A4547",
+    "name": "Cave Camp - Timpanogos Cave",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC049",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/ABGUT",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.56131,
+     40.71048
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/ABGUT",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2152.1928
+    },
+    "stationIdentifier": "ABGUT",
+    "name": "Airbag - Utah Olympic Park",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC043",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/AGD",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.638,
+     40.5905
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/AGD",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2681.9352
+    },
+    "stationIdentifier": "AGD",
+    "name": "ALTA - GUARD HOUSE",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/ALT",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.631,
+     40.571
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/ALT",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 3183.0264
+    },
+    "stationIdentifier": "ALT",
+    "name": "ALTA - TOP OF COLLINS",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/AMB",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.6374,
+     40.5677
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/AMB",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 3372.9168
+    },
+    "stationIdentifier": "AMB",
+    "name": "ALTA - MT BALDY",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/AS230",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.82683,
+     40.7305
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/AS230",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1403.500368
+    },
+    "stationIdentifier": "AS230",
+    "name": "K7PB Salt Lake City",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/AT481",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.8945,
+     40.408
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/AT481",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1378.32084
+    },
+    "stationIdentifier": "AT481",
+    "name": "N1VL Lehi",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ106",
+    "county": "https://api.weather.gov/zones/county/UTC049",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/AT693",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.92367,
+     40.52583
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/AT693",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1339.909944
+    },
+    "stationIdentifier": "AT693",
+    "name": "KC7VZS Herriman",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/AT921",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.85483,
+     40.65317
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/AT921",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1325.200296
+    },
+    "stationIdentifier": "AT921",
+    "name": "W7CBM Salt Lake City",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/ATB",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.637,
+     40.589
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/ATB",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2609.088
+    },
+    "stationIdentifier": "ATB",
+    "name": "ALTA - BASE",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/ATH20",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.63778,
+     40.59148
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/ATH20",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2667.6096
+    },
+    "stationIdentifier": "ATH20",
+    "name": "Atwater Study Plot",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/ATRU1",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.64,
+     40.59
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/ATRU1",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2667.9144
+    },
+    "stationIdentifier": "ATRU1",
+    "name": "ATWATER",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/AV997",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.84533,
+     40.47583
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/AV997",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 6201.0036
+    },
+    "stationIdentifier": "AV997",
+    "name": "NW5W-12 Suncrest",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC049",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/AW070",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.96917,
+     40.51017
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/AW070",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1392.936
+    },
+    "stationIdentifier": "AW070",
+    "name": "K7LDN-13 RIVERTON",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/AW249",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.4015,
+     40.524
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/AW249",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1773.000264
+    },
+    "stationIdentifier": "AW249",
+    "name": "KK7NDB HEBER CITY",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ108",
+    "county": "https://api.weather.gov/zones/county/UTC051",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/AX355",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.80233,
+     40.4025
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/AX355",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1453.999632
+    },
+    "stationIdentifier": "AX355",
+    "name": "WX5LOK AMERICAN FORK",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ106",
+    "county": "https://api.weather.gov/zones/county/UTC049",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/AX675",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.885,
+     40.65267
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/AX675",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1317.001176
+    },
+    "stationIdentifier": "AX675",
+    "name": "KM7GAN-13 MURRAY",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/BRC",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.57732,
+     40.58721
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/BRC",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2919.0696
+    },
+    "stationIdentifier": "BRC",
+    "name": "BRIGHTON CREST",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/BRIU1",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.58167,
+     40.59936
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/BRIU1",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2671.572
+    },
+    "stationIdentifier": "BRIU1",
+    "name": "BRIGHTON",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/BRW",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.5616,
+     40.5923
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/BRW",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 3220.212
+    },
+    "stationIdentifier": "BRW",
+    "name": "BRIGHTON GREAT WESTERN",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/C4143",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.8279,
+     40.46365
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/C4143",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 325.959216
+    },
+    "stationIdentifier": "C4143",
+    "name": "CW4143 Alpine 3W",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC049",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/C8826",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.7885,
+     40.69267
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/C8826",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1555.0896
+    },
+    "stationIdentifier": "C8826",
+    "name": "CW8826 Salt Lake City",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/C9635",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.5485,
+     40.35533
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/C9635",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2094.8904
+    },
+    "stationIdentifier": "C9635",
+    "name": "CW9635 Salt Lake City",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC051",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/CLN",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.6383,
+     40.5763
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/CLN",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2944.9776
+    },
+    "stationIdentifier": "CLN",
+    "name": "ALTA - COLLINS",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/COOPAMFU1",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.77088,
+     40.46437
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/COOPAMFU1",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1554.48
+    },
+    "stationIdentifier": "COOPAMFU1",
+    "name": "ALPINE",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ106",
+    "county": "https://api.weather.gov/zones/county/UTC049",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/COOPATAU1",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.63703,
+     40.59058
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/COOPATAU1",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2654.808
+    },
+    "stationIdentifier": "COOPATAU1",
+    "name": "ALTA",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/COOPHOLU1",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.7836,
+     40.6189
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/COOPHOLU1",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1519.7328
+    },
+    "stationIdentifier": "COOPHOLU1",
+    "name": "COTTONWOOD WEIR",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/COOPPCFU1",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.5054,
+     40.6557
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/COOPPCFU1",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2103.12
+    },
+    "stationIdentifier": "COOPPCFU1",
+    "name": "PARK CITY",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ108",
+    "county": "https://api.weather.gov/zones/county/UTC043",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/COOPPCWU1",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.53674,
+     40.70384
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/COOPPCWU1",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1976.628
+    },
+    "stationIdentifier": "COOPPCWU1",
+    "name": "SNYDERVILLE",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ108",
+    "county": "https://api.weather.gov/zones/county/UTC043",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/COOPPKCU1",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.5842,
+     40.6008
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/COOPPKCU1",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2663.952
+    },
+    "stationIdentifier": "COOPPKCU1",
+    "name": "SILVER LAKE BRIGHTON",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/COOPPLTU1",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.5289,
+     40.4044
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/COOPPLTU1",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1606.296
+    },
+    "stationIdentifier": "COOPPLTU1",
+    "name": "DEER CREEK DAM",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ108",
+    "county": "https://api.weather.gov/zones/county/UTC051",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/COOPSALU1",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.72323,
+     40.74853
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/COOPSALU1",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1652.016
+    },
+    "stationIdentifier": "COOPSALU1",
+    "name": "MOUNTAIN DELL DAM",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ110",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/COOPWANU1",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.4077,
+     40.7908
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/COOPWANU1",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1810.512
+    },
+    "stationIdentifier": "COOPWANU1",
+    "name": "WANSHIP DAM",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ108",
+    "county": "https://api.weather.gov/zones/county/UTC043",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/D0231",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.81133,
+     40.66583
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/D0231",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1395.441456
+    },
+    "stationIdentifier": "D0231",
+    "name": "DW0231 Holladay",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/D4988",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.97933,
+     40.64667
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/D4988",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1399.019808
+    },
+    "stationIdentifier": "D4988",
+    "name": "DW4988 Taylorsville",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/D5026",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.838,
+     40.65917
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/D5026",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1332.491112
+    },
+    "stationIdentifier": "D5026",
+    "name": "DW5026 Holladay",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/D5508",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.9845,
+     40.646
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/D5508",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1405.298688
+    },
+    "stationIdentifier": "D5508",
+    "name": "DW5508 Kearns",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/D6120",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.80333,
+     40.552
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/D6120",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1570.600872
+    },
+    "stationIdentifier": "D6120",
+    "name": "DW6120 Sandy",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/D6376",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.79433,
+     40.45267
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/D6376",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1521.000768
+    },
+    "stationIdentifier": "D6376",
+    "name": "DW6376 Alpine",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ106",
+    "county": "https://api.weather.gov/zones/county/UTC049",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/D6494",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.8435,
+     40.43067
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/D6494",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1464.280536
+    },
+    "stationIdentifier": "D6494",
+    "name": "DW6494 Lehi",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ106",
+    "county": "https://api.weather.gov/zones/county/UTC049",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/D9435",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.87933,
+     40.48217
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/D9435",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1542.129504
+    },
+    "stationIdentifier": "D9435",
+    "name": "DW9435 Draper",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/DCC",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.520649,
+     40.40147
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/DCC",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2034.54
+    },
+    "stationIdentifier": "DCC",
+    "name": "Deer Creek Dam",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC051",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/DVB",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.4809,
+     40.6236
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/DVB",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2560.32
+    },
+    "stationIdentifier": "DVB",
+    "name": "DV - BALD EAGLE",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC051",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/DVE",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.479465,
+     40.634029
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/DVE",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2235.0984
+    },
+    "stationIdentifier": "DVE",
+    "name": "DV - BURNS",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC043",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/DVO",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.497424,
+     40.609141
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/DVO",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2773.68
+    },
+    "stationIdentifier": "DVO",
+    "name": "DV - Ontario",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC043",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/DVP",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.4927,
+     40.59296
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/DVP",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2702.9664
+    },
+    "stationIdentifier": "DVP",
+    "name": "DV - Park Peak",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC051",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/E3770",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.96167,
+     40.57167
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/E3770",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1389.098568
+    },
+    "stationIdentifier": "E3770",
+    "name": "EW3770 South Jordan",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/E4956",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.73867,
+     40.786
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/E4956",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1832.131464
+    },
+    "stationIdentifier": "E4956",
+    "name": "EW4956 Salt Lake City",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ110",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/E6393",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.81706,
+     40.72223
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/E6393",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1480.319112
+    },
+    "stationIdentifier": "E6393",
+    "name": "EW6393 Salt Lake City",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/E7354",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.81617,
+     40.63267
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/E7354",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1407.148824
+    },
+    "stationIdentifier": "E7354",
+    "name": "EW7354 Cottonwood Heights         UT US",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/E7419",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.98338,
+     40.57623
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/E7419",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1407.121392
+    },
+    "stationIdentifier": "E7419",
+    "name": "EW7419 SOUTH JORDAN",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/E7701",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.87533,
+     40.542
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/E7701",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1373.401368
+    },
+    "stationIdentifier": "E7701",
+    "name": "EW7701 Draper",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/E8775",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.74117,
+     40.396
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/E8775",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 4970.00784
+    },
+    "stationIdentifier": "E8775",
+    "name": "EW8775 Cedar Hills",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ106",
+    "county": "https://api.weather.gov/zones/county/UTC049",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/E9449",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.799,
+     40.673
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/E9449",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1527.941064
+    },
+    "stationIdentifier": "E9449",
+    "name": "EW9449 Millcreek",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/E9651",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.859,
+     40.5555
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/E9651",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1413.909288
+    },
+    "stationIdentifier": "E9651",
+    "name": "EW9651 Sandy",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/ELBUT",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.68773,
+     40.57579
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/ELBUT",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2316.48
+    },
+    "stationIdentifier": "ELBUT",
+    "name": "UDOT LCC Elberts",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/EMPUT",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.5272,
+     40.6119
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/EMPUT",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2916.936
+    },
+    "stationIdentifier": "EMPUT",
+    "name": "DV - EMPIRE PK",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC043",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/F0287",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.84867,
+     40.64067
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/F0287",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1342.01916
+    },
+    "stationIdentifier": "F0287",
+    "name": "FW0287 Murray",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/F1790",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.96117,
+     40.51217
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/F1790",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1380.039912
+    },
+    "stationIdentifier": "F1790",
+    "name": "FW1790 RIVERTON",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/F2865",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.56883,
+     40.74217
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/F2865",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1957.541424
+    },
+    "stationIdentifier": "F2865",
+    "name": "FW2865 Park City",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ108",
+    "county": "https://api.weather.gov/zones/county/UTC043",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/F3671",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.84367,
+     40.49933
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/F3671",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1491.429072
+    },
+    "stationIdentifier": "F3671",
+    "name": "FW3671 Draper",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/F3937",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.85133,
+     40.77133
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/F3937",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1419.3012
+    },
+    "stationIdentifier": "F3937",
+    "name": "FW3937 Salt Lake City",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/F5717",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.72379,
+     40.81241
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/F5717",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2011.68
+    },
+    "stationIdentifier": "F5717",
+    "name": "FW5717 Salt Lake City",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ110",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/F5778",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.99367,
+     40.58417
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/F5778",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1429.07004
+    },
+    "stationIdentifier": "F5778",
+    "name": "FW5778 West Jordan",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/F5941",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.9645,
+     40.57033
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/F5941",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1394.121672
+    },
+    "stationIdentifier": "F5941",
+    "name": "FW5941 South Jordan",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/F6938",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.76017,
+     40.4495
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/F6938",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1550.8224
+    },
+    "stationIdentifier": "F6938",
+    "name": "FW6938 Alpine",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ106",
+    "county": "https://api.weather.gov/zones/county/UTC049",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/F8379",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.48476,
+     40.74306
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/F8379",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2002.536
+    },
+    "stationIdentifier": "F8379",
+    "name": "FW8379 Park City",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ108",
+    "county": "https://api.weather.gov/zones/county/UTC043",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/F8688",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.88617,
+     40.39967
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/F8688",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1369.64928
+    },
+    "stationIdentifier": "F8688",
+    "name": "FW8688 Lehi",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ106",
+    "county": "https://api.weather.gov/zones/county/UTC049",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/FG001",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.76292,
+     40.45744
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/FG001",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1531.0104
+    },
+    "stationIdentifier": "FG001",
+    "name": "Alpine",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ106",
+    "county": "https://api.weather.gov/zones/county/UTC049",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/FG013",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.71455,
+     40.34734
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/FG013",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1437.132
+    },
+    "stationIdentifier": "FG013",
+    "name": "Lindon",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ106",
+    "county": "https://api.weather.gov/zones/county/UTC049",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/FPS",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.90483,
+     40.45689
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/FPS",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1585.5696
+    },
+    "stationIdentifier": "FPS",
+    "name": "Flight Park South",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ106",
+    "county": "https://api.weather.gov/zones/county/UTC049",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/G3835",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.8365,
+     40.4
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/G3835",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1406.350248
+    },
+    "stationIdentifier": "G3835",
+    "name": "GW3835 LEHI",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ106",
+    "county": "https://api.weather.gov/zones/county/UTC049",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/G4028",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.5085,
+     40.8165
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/G4028",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2408.5296
+    },
+    "stationIdentifier": "G4028",
+    "name": "GW4028 COALVILLE",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ110",
+    "county": "https://api.weather.gov/zones/county/UTC043",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/G4949",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.83683,
+     40.697
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/G4949",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1381.000032
+    },
+    "stationIdentifier": "G4949",
+    "name": "GW4949 SALT LAKE CITY",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/G5189",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.9785,
+     40.62533
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/G5189",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1381.000032
+    },
+    "stationIdentifier": "G5189",
+    "name": "GW5189 WEST JORDAN",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/G5229",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.72767,
+     40.33317
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/G5229",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1408.99896
+    },
+    "stationIdentifier": "G5229",
+    "name": "GW5229 LINDON",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ106",
+    "county": "https://api.weather.gov/zones/county/UTC049",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/G5423",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.5485,
+     40.70533
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/G5423",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 2003.7552
+    },
+    "stationIdentifier": "G5423",
+    "name": "GW5423 PARK CITY",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ108",
+    "county": "https://api.weather.gov/zones/county/UTC043",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/G6314",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.42117,
+     40.61733
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/G6314",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1885.998768
+    },
+    "stationIdentifier": "G6314",
+    "name": "GW6314 HEBER",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ108",
+    "county": "https://api.weather.gov/zones/county/UTC051",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/HBRU1",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.50417,
+     40.54528
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/HBRU1",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1831.848
+    },
+    "stationIdentifier": "HBRU1",
+    "name": "SNAKE CREEK POWER HOUSE NEAR HEBER 5WNW",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ108",
+    "county": "https://api.weather.gov/zones/county/UTC051",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/HDP",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.64522,
+     40.56106
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/HDP",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 3352.8
+    },
+    "stationIdentifier": "HDP",
+    "name": "Hidden Peak",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ111",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ479"
+   }
+  },
+  {
+   "id": "https://api.weather.gov/stations/HOL",
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -111.8259,
+     40.6756
+    ]
+   },
+   "properties": {
+    "@id": "https://api.weather.gov/stations/HOL",
+    "@type": "wx:ObservationStation",
+    "elevation": {
+     "unitCode": "wmoUnit:m",
+     "value": 1402.08
+    },
+    "stationIdentifier": "HOL",
+    "name": "North Holladay",
+    "timeZone": "America/Denver",
+    "forecast": "https://api.weather.gov/zones/forecast/UTZ105",
+    "county": "https://api.weather.gov/zones/county/UTC035",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/UTZ478"
+   }
+  }
+ ],
+ "pagination": {
+  "next": "https://api.weather.gov/stations?state%5B0%5D=UT&limit=500&cursor=eyJzIjo1MDB9"
+ }
+}

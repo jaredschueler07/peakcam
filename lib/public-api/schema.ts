@@ -179,17 +179,37 @@ export const ObservationStationSchema = z
     description: "A station (of any network) that serves this resort. Distinct from `Station`, which is the NRCS sensor behind a Measurement.",
   });
 
+export const StationSourceSchema = z
+  .enum(["snotel", "ghcn", "nws", "bc_asws", "eccc"])
+  .register(publicApiRegistry, {
+    id: "StationSource",
+    description:
+      "Observation network. `snotel`: USDA NRCS SNOTEL/SCAN, daily, depth + SWE. `ghcn`: NOAA NCEI GHCN-Daily cooperative observers, daily, depth + new snow. `nws`: NOAA NWS hourly surface observations (METAR and mesonet), temperature + wind. `bc_asws`: BC River Forecast Centre automated snow stations, hourly. `eccc`: Environment and Climate Change Canada hourly observations.",
+  });
+
 export const MeasuredNowSchema = z
   .object({
-    stationId: z.string(),
-    observedAt: z.string().describe("ISO-8601 instant of the observation."),
+    stationId: z.string().describe("PeakCam station id; joins `stations[]`."),
+    role: StationRoleSchema.describe("summit / mid / base by the station's elevation against the resort's vertical."),
+    source: StationSourceSchema,
+    sourceId: z.string().describe("The provider's own station id, e.g. `AMB`, `1308:UT:SNTL`, `USC00420072`."),
+    name: z.string().nullable(),
+    elevationFt: z.number().nullable().describe("Station elevation. Every value below describes this elevation."),
+    distanceKm: z.number().nullable().describe("Great-circle distance from the resort's coordinates."),
+    observedAt: z.string().describe("ISO-8601 instant of the observation; a daily value is stamped at the end of its UTC day."),
+    ageMinutes: z.number().int().describe("Minutes between `observedAt` and `generatedAt`. Daily sources read 1,440 or more; hourly sources under 120 when live."),
     snowDepthIn: z.number().nullable(),
     sweIn: z.number().nullable(),
-    newSnowIn: z.number().nullable().describe("New snow since the previous observation, inches."),
+    newSnowIn: z.number().nullable().describe("New snow over the provider's own period (24 h for daily sources), inches. Null for hourly sources, which do not measure it."),
     tempF: z.number().nullable(),
     windMph: z.number().nullable(),
+    attribution: z.string().describe("The credit line the provider's terms ask for."),
   })
-  .register(publicApiRegistry, { id: "MeasuredNow", description: "The latest observation from one station." });
+  .register(publicApiRegistry, {
+    id: "MeasuredNow",
+    description:
+      "The latest observation from one of the resort's stations, with its role and provenance. There is no freezing-level field: the networks PeakCam reads do not publish one.",
+  });
 
 export const ForecastPointSchema = z.enum(["summit", "base"]);
 
@@ -528,6 +548,7 @@ export type ResortProfilePublic = z.infer<typeof ResortProfileSchema>;
 export type ResortPass = z.infer<typeof ResortPassSchema>;
 export type ObservationStationPublic = z.infer<typeof ObservationStationSchema>;
 export type MeasuredNowPublic = z.infer<typeof MeasuredNowSchema>;
+export type StationSourcePublic = z.infer<typeof StationSourceSchema>;
 export type ForecastDailyPublic = z.infer<typeof ForecastDailySchema>;
 export type ForecastRunPublic = z.infer<typeof ForecastRunSchema>;
 export type ForecastScorePublic = z.infer<typeof ForecastScoreSchema>;

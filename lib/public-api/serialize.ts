@@ -8,7 +8,7 @@
 // whatever they fetched, and the tests build fixtures by hand.
 // ─────────────────────────────────────────────────────────────
 
-import type { Cam, Resort, ResortWithData, SnowReport } from "@/lib/types";
+import type { Cam, Resort, ResortStationJoined, ResortWithData, SnowReport } from "@/lib/types";
 import { SITE_URL } from "@/lib/site";
 import { cameraPreview } from "@/lib/cam-preview";
 import { camDisplayName } from "@/lib/cam-name";
@@ -20,6 +20,9 @@ import type {
   CamPublic,
   Measurement,
   MeasurementSource,
+  MeasuredNowPublic,
+  ObservationStationPublic,
+  StationSourcePublic,
   PowderEntryPublic,
   PowderListPublic,
   PowderWindow,
@@ -34,6 +37,7 @@ import type {
   TrendMeasurement,
 } from "./schema";
 import { STATION_INDEX, type StationMeta } from "../stations";
+import { STATION_SOURCES } from "../stations/index";
 
 // ── Options ──────────────────────────────────────────────────
 
@@ -53,6 +57,13 @@ export interface SerializeOptions {
   baseUrl?: string;
   /** Station metadata override; defaults to the bundled NRCS index. */
   stations?: Record<string, StationMeta>;
+  /**
+   * The resort's station-layer rows (migration 026, `getResortStationsIndex`).
+   * Omitted → `stations` / `measuredNow` are left off the document, which is
+   * how a database without the station layer reads; an empty array → the
+   * layer is live and this resort has no station within 25 km.
+   */
+  observationStations?: ResortStationJoined[] | null;
 }
 
 export type { StationMeta };
@@ -329,12 +340,73 @@ export function serializeCams(resort: ResortWithData, options: SerializeOptions 
   };
 }
 
+// ── Stations (migration 026) ─────────────────────────────────
+
+const KNOWN_STATION_SOURCES = new Set<StationSourcePublic>(["snotel", "ghcn", "nws", "bc_asws", "eccc"]);
+
+export interface StationsPublic {
+  stations: ObservationStationPublic[];
+  measuredNow: MeasuredNowPublic[];
+}
+
+/**
+ * The station layer for one resort: every linked station, and the newest
+ * observation for each station that has one. Rows whose `source` is not one
+ * the API documents (a future network) are listed under `stations` but carry
+ * no `measuredNow` entry, so the enum stays truthful.
+ */
+export function serializeStations(rows: readonly ResortStationJoined[], now: Date): StationsPublic {
+  const sorted = [...rows].sort((a, b) => a.rank - b.rank);
+  const stations: ObservationStationPublic[] = sorted.map((r) => ({
+    id: r.station.id,
+    source: r.station.source,
+    sourceId: r.station.source_id,
+    name: r.station.name,
+    kind: r.station.kind,
+    role: r.role,
+    lat: r.station.lat,
+    lon: r.station.lng,
+    elevationFt: r.station.elevation_ft,
+    distanceKm: r.distance_km,
+    rank: r.rank,
+  }));
+  const measuredNow: MeasuredNowPublic[] = [];
+  for (const r of sorted) {
+    const latest = r.latest;
+    const source = r.station.source as StationSourcePublic;
+    if (!latest || !KNOWN_STATION_SOURCES.has(source)) continue;
+    const observedAt = toIsoInstant(latest.observed_at);
+    if (!observedAt) continue;
+    measuredNow.push({
+      stationId: r.station.id,
+      role: r.role,
+      source,
+      sourceId: r.station.source_id,
+      name: r.station.name,
+      elevationFt: r.station.elevation_ft,
+      distanceKm: r.distance_km,
+      observedAt,
+      ageMinutes: Math.max(0, Math.round((now.getTime() - Date.parse(observedAt)) / 60_000)),
+      snowDepthIn: finite(latest.snow_depth_in),
+      sweIn: finite(latest.swe_in),
+      newSnowIn: finite(latest.new_snow_in),
+      tempF: finite(latest.temp_f),
+      windMph: finite(latest.wind_mph),
+      attribution: STATION_SOURCES[source].attribution,
+    });
+  }
+  return { stations, measuredNow };
+}
+
+const finite = (v: number | null | undefined): number | null => (v == null || !Number.isFinite(v) ? null : v);
+
 // ── Resort ───────────────────────────────────────────────────
 
 export function serializeResort(resort: ResortWithData, options: SerializeOptions = {}): ResortPublic {
   const snow = serializeSnow(resort, options);
   const cams = activeCams(resort).map((cam) => serializeCam(cam, resort, options));
   const elevation = resolveElevation(resort, options);
+  const stationLayer = options.observationStations ? serializeStations(options.observationStations, options.now ?? new Date()) : null;
   return {
     slug: resort.slug,
     name: resort.name,
@@ -353,6 +425,7 @@ export function serializeResort(resort: ResortWithData, options: SerializeOption
     snow,
     season: serializeSeason(resort, options),
     cams,
+    ...(stationLayer ?? {}),
     websiteUrl: resort.website_url ?? null,
     attribution: PUBLIC_API_ATTRIBUTION,
     license: PUBLIC_API_LICENSE_URL,

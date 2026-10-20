@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// MCP server — the seventeen read-only tools, as pure builders.
+// MCP server — the eighteen read-only tools, as pure builders.
 //
 // `buildTools(data)` returns tool definitions over an injected McpDataSource
 // so lib/mcp/server.test.ts can run every tool against fixtures with no
@@ -24,7 +24,9 @@ import { MAX_QUESTION_LENGTH } from "@/lib/ask/router";
 import {
   AskAnswerSchema,
   CamListSchema,
+  MeasuredNowSchema,
   MeasurementSourceSchema,
+  ObservationStationSchema,
   PowderListSchema,
   PowderWindowSchema,
   ResortLightSchema,
@@ -43,7 +45,9 @@ import {
   serializeResortLight,
   serializeSeason,
   serializeSnow,
+  serializeStations,
 } from "@/lib/public-api/serialize";
+import { STATION_SOURCES } from "@/lib/stations/index";
 import {
   camLine,
   camsSection,
@@ -1074,6 +1078,66 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
     },
   });
 
+  // ── get_stations (station layer, migration 026) ───────────
+  const ROLE_WORD = { summit: "Summit", mid: "Mid-mountain", base: "Base", approach: "Approach" } as const;
+  const ageWord = (minutes: number) => (minutes < 60 ? `${minutes} min ago` : minutes < 2880 ? `${Math.round(minutes / 60)} h ago` : `${Math.round(minutes / 1440)} d ago`);
+
+  const getStations = defineTool({
+    name: "get_stations",
+    title: "Nearby stations",
+    description:
+      "What the instruments near one resort measured, by elevation band (summit / mid / base): up to three stations within 25 km with the network named (SNOTEL, GHCN-Daily, NWS, BC ASWS, ECCC), elevation, distance, the time of the reading and its age, snow depth, new snow, SWE, temperature and wind. Daily networks carry depth; hourly ones carry temperature and wind. Use it for \"what is it like at the top right now\" and \"how old is that number\" questions; the snow report itself comes from get_resort_conditions.",
+    inputSchema: z.object({ slug: SlugInput }),
+    outputSchema: z.object({
+      slug: z.string(),
+      name: z.string(),
+      canonicalUrl: z.string(),
+      available: z.boolean().describe("False when the station layer is not populated for this deployment yet."),
+      count: z.number().int(),
+      stations: z.array(ObservationStationSchema),
+      measuredNow: z.array(MeasuredNowSchema),
+      sources: z.array(z.object({ source: z.string(), label: z.string(), attribution: z.string(), termsUrl: z.string() })),
+      generatedAt: ISO_INSTANT,
+    }),
+    async handler({ slug }) {
+      const catalog = await data.catalog();
+      const hit = resolve(catalog, slug);
+      if (!hit.ok) return hit.result;
+      const resort = hit.resort;
+      const options = serializeOptionsFor(catalog, resort);
+      const canonicalUrl = resortCanonicalUrl(resort.slug);
+      const rows = options.observationStations;
+      const layer = rows ? serializeStations(rows, catalog.now) : { stations: [], measuredNow: [] };
+      const used = [...new Set(layer.measuredNow.map((m) => m.source))];
+      const sources = used.map((source) => ({ source, label: STATION_SOURCES[source].label, attribution: STATION_SOURCES[source].attribution, termsUrl: STATION_SOURCES[source].termsUrl }));
+      const lines = [`# ${resort.name}: nearby stations, as of ${formatInstant(catalog.now.toISOString())} — ${canonicalUrl}`, ""];
+      if (!rows) {
+        lines.push("The station layer is not populated for this deployment yet; get_resort_conditions carries the SNOTEL or model report.");
+      } else if (!layer.measuredNow.length) {
+        lines.push(`No observation station within 25 km of ${resort.name} is on file. get_resort_conditions carries the resort's snow report.`);
+      } else {
+        lines.push("| Band | Station | Network | Elev | Dist | Depth | New | SWE | Temp | Wind | Read |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
+        for (const m of layer.measuredNow) {
+          lines.push(
+            `| ${ROLE_WORD[m.role]} | ${m.name ?? m.sourceId} (\`${m.sourceId}\`) | ${STATION_SOURCES[m.source].label} | ${m.elevationFt != null ? `${m.elevationFt.toLocaleString("en-US")} ft` : "–"} | ${m.distanceKm != null ? `${m.distanceKm.toFixed(1)} km` : "–"} | ${formatInches(m.snowDepthIn)} | ${formatInches(m.newSnowIn)} | ${formatInches(m.sweIn)} | ${m.tempF != null ? `${m.tempF} °F` : "–"} | ${m.windMph != null ? `${m.windMph} mph` : "–"} | ${formatInstant(m.observedAt)} (${ageWord(m.ageMinutes)}) |`,
+          );
+        }
+        lines.push("", "Each row is one sensor at its own elevation, not a mountain average. Daily networks are stamped at the end of their day; an hourly row older than a few hours means the sensor has gone quiet.", "", `Attribution: ${sources.map((s) => s.attribution).join("; ")}.`);
+      }
+      return ok(lines.join("\n"), {
+        slug: resort.slug,
+        name: resort.name,
+        canonicalUrl,
+        available: rows != null,
+        count: layer.stations.length,
+        stations: layer.stations,
+        measuredNow: layer.measuredNow,
+        sources,
+        generatedAt: catalog.now.toISOString(),
+      });
+    },
+  });
+
   const baseTools = [
     searchResorts,
     getResortConditions,
@@ -1088,6 +1152,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
     listRegions,
     getAlertOptions,
     getCamTimeline,
+    getStations,
   ] as unknown as ToolDefinition[];
 
   const ask = defineTool({

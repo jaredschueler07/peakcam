@@ -1,0 +1,96 @@
+{
+ "@context": [
+  "https://geojson.org/geojson-ld/geojson-context.jsonld",
+  {
+   "@version": "1.1",
+   "wx": "https://api.weather.gov/ontology#",
+   "s": "https://schema.org/",
+   "geo": "http://www.opengis.net/ont/geosparql#",
+   "unit": "http://codes.wmo.int/common/unit/",
+   "@vocab": "https://api.weather.gov/ontology#",
+   "geometry": {
+    "@id": "s:GeoCoordinates",
+    "@type": "geo:wktLiteral"
+   },
+   "city": "s:addressLocality",
+   "state": "s:addressRegion",
+   "distance": {
+    "@id": "s:Distance",
+    "@type": "s:QuantitativeValue"
+   },
+   "bearing": {
+    "@type": "s:QuantitativeValue"
+   },
+   "value": {
+    "@id": "s:value"
+   },
+   "unitCode": {
+    "@id": "s:unitCode",
+    "@type": "@id"
+   },
+   "forecastOffice": {
+    "@type": "@id"
+   },
+   "forecastGridData": {
+    "@type": "@id"
+   },
+   "publicZone": {
+    "@type": "@id"
+   },
+   "county": {
+    "@type": "@id"
+   }
+  }
+ ],
+ "id": "https://api.weather.gov/stations/UT224/observations/2026-10-18T22:30:00+00:00",
+ "type": "Feature",
+ "geometry": {
+  "type": "Point",
+  "coordinates": [
+   -111.52,
+   40.68
+  ]
+ },
+ "properties": {
+  "@id": "https://api.weather.gov/stations/UT224/observations/2026-10-18T22:30:00+00:00",
+  "@type": "wx:ObservationStation",
+  "elevation": {
+   "unitCode": "wmoUnit:m",
+   "value": 2041.2
+  },
+  "station": "https://api.weather.gov/stations/UT224",
+  "timestamp": "2026-10-18T22:30:00+00:00",
+  "rawMessage": "",
+  "textDescription": "",
+  "temperature": {
+   "unitCode": "wmoUnit:degC",
+   "value": 17.95,
+   "qualityControl": "V"
+  },
+  "dewpoint": {
+   "unitCode": "wmoUnit:degC",
+   "value": -2.42,
+   "qualityControl": "V"
+  },
+  "windDirection": {
+   "unitCode": "wmoUnit:degree_(angle)",
+   "value": 337,
+   "qualityControl": "V"
+  },
+  "windSpeed": {
+   "unitCode": "wmoUnit:km_h-1",
+   "value": 4.86,
+   "qualityControl": "V"
+  },
+  "windGust": {
+   "unitCode": "wmoUnit:km_h-1",
+   "value": 17.28,
+   "qualityControl": "S"
+  },
+  "relativeHumidity": {
+   "unitCode": "wmoUnit:percent",
+   "value": 24.921281352463,
+   "qualityControl": "V"
+  }
+ }
+}

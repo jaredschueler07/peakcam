@@ -118,6 +118,26 @@ async function supabaseUpsert(table, records, onConflict) {
   return res.json();
 }
 
+/**
+ * Every cam row already in the table, in the shape camIdentity() reads.
+ * Paged: PostgREST caps a response at 1,000 rows and the table is past 600.
+ */
+async function fetchExistingCams() {
+  const out = [];
+  for (let offset = 0; ; offset += 1000) {
+    const url = `${SUPABASE_URL}/rest/v1/cams?select=resort_id,name,embed_url,youtube_id&order=id&limit=1000&offset=${offset}`;
+    const res = await fetch(url, { headers: { "apikey": SERVICE_KEY, "Authorization": `Bearer ${SERVICE_KEY}` } });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Supabase cams select failed (${res.status}): ${err}`);
+    }
+    const page = await res.json();
+    out.push(...page);
+    if (page.length < 1000) break;
+  }
+  return out;
+}
+
 /** slug → id for every resort already in the table (cams-only runs). */
 async function fetchSlugToId() {
   const url = `${SUPABASE_URL}/rest/v1/resorts?select=id,slug`;
@@ -279,6 +299,41 @@ export function toCamRecord(resortId, row, warn = console.warn) {
   return record;
 }
 
+/**
+ * The identity production enforces on `cams` through the hand-applied
+ * constraint `cams_unique_per_resort`:
+ *   (resort_id, name, COALESCE(embed_url, ''), COALESCE(youtube_id, ''))
+ * It exists in no migration file (CLAUDE.md, "Known live-DB drift"). The
+ * upsert targets migration 012's cams_resort_embed_url_idx on
+ * (resort_id, embed_url, name) instead, where a NULL embed_url never
+ * conflicts, so a YouTube-only row that already exists would go to INSERT
+ * and die on 23505. Rows matching this identity are skipped up front.
+ */
+export function camIdentity(cam) {
+  return `${cam.resort_id}|${cam.name}|${cam.embed_url ?? ""}|${cam.youtube_id ?? ""}`;
+}
+
+/**
+ * Split the CSV-derived cam records into the ones to upsert and the ones
+ * already present under camIdentity(). Pure; `existing` is whatever
+ * fetchExistingCams() returned (or a fixture). Order is preserved. Every
+ * skip is reported through `log` so a run shows what it left alone.
+ */
+export function partitionCamRecords(records, existing, log = console.log) {
+  const present = new Set(existing.map(camIdentity));
+  const toUpsert = [];
+  const skipped = [];
+  for (const record of records) {
+    if (present.has(camIdentity(record))) {
+      skipped.push(record);
+      log(`  · already present, skipped: ${record.name} (${record.embed_url ?? record.youtube_id ?? "no url"})`);
+    } else {
+      toUpsert.push(record);
+    }
+  }
+  return { toUpsert, skipped };
+}
+
 function dedupeBy(arr, key) {
   const seen = new Set();
   return arr.filter((item) => {
@@ -379,19 +434,32 @@ async function importCams(slugToId) {
     return;
   }
 
+  // Rows already in the table under production's four-column identity
+  // (cams_unique_per_resort, see camIdentity) are skipped, so the run is
+  // idempotent whichever unique index the upsert's on_conflict hits. Rows
+  // that exist only under (resort_id, embed_url, name) still merge below;
+  // genuinely new rows insert.
+  const existing = await fetchExistingCams();
+  const { toUpsert, skipped: present } = partitionCamRecords(records, existing);
+  console.log(`  ${existing.length} cams already in the table; ${present.length} CSV rows already present, ${toUpsert.length} to upsert`);
+  if (toUpsert.length === 0) {
+    console.log("✅  Cams done. Nothing to upsert.");
+    return;
+  }
+
   // Migration 012 added a unique index on (resort_id, embed_url, name) — real
   // upsert now, instead of the old ignore-duplicates insert (which was a
   // no-op without a unique constraint and duplicated cams on re-run).
   const BATCH = 100;
   let total = 0;
-  for (let i = 0; i < records.length; i += BATCH) {
-    const batch = records.slice(i, i + BATCH);
+  for (let i = 0; i < toUpsert.length; i += BATCH) {
+    const batch = toUpsert.slice(i, i + BATCH);
     const data = await supabaseUpsert("cams", batch, "resort_id,embed_url,name");
     total += data.length;
     process.stdout.write(`  ✓ Batch ${Math.floor(i / BATCH) + 1}: ${data.length} cams upserted\n`);
   }
 
-  console.log(`✅  Cams done. ${total} upserted.`);
+  console.log(`✅  Cams done. ${total} upserted, ${present.length} already present.`);
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────

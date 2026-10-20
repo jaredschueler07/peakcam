@@ -152,6 +152,10 @@ const TOOL_COPY: Record<PeakCamToolName, Omit<ConnectTool, "name">> = {
     title: "Opening dates",
     summary: "Season opening and closing dates with open, closed or unknown status, soonest first.",
   },
+  get_stations: {
+    title: "Nearby stations",
+    summary: "What the instruments near a resort measured, by elevation band: station, network, elevation, age, depth, new snow, temperature and wind.",
+  },
   get_resort_profile: {
     title: "Resort profile",
     summary: "Where a resort is, its elevations, website, socials, station, season status and every PeakCam URL for it.",

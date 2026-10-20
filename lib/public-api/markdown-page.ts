@@ -15,6 +15,7 @@
 import { SITE_URL } from "@/lib/site";
 import { HUB_BASE_PATH, stateHubPath, stateLabel } from "@/lib/hubs";
 import { publicApiHeaders } from "./headers";
+import { STATION_SOURCES } from "@/lib/stations/index";
 import type {
   CamPublic,
   Measurement,
@@ -222,6 +223,18 @@ export function resortMarkdown(resort: ResortPublic, opts: MarkdownPageOptions =
   }
 
   lines.push(seasonLine(resort.season), "");
+
+  if (resort.measuredNow && resort.measuredNow.length > 0) {
+    lines.push("## What the instruments say", "");
+    lines.push("| Band | Station | Network | Elevation | Depth | New snow | Temp | Wind | Read |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- |");
+    const band = { summit: "Summit", mid: "Mid-mountain", base: "Base", approach: "Approach" } as const;
+    for (const m of resort.measuredNow) {
+      lines.push(
+        `| ${band[m.role]} | ${m.name ?? m.sourceId} | ${STATION_SOURCES[m.source].label} | ${feet(m.elevationFt) ?? "–"} | ${inches(m.snowDepthIn)} | ${inches(m.newSnowIn)} | ${m.tempF != null ? `${m.tempF} °F` : "–"} | ${m.windMph != null ? `${m.windMph} mph` : "–"} | ${formatMountainTime(m.observedAt)} |`,
+      );
+    }
+    lines.push("", "One sensor per row at its own elevation. Daily networks (SNOTEL, GHCN-Daily) read once a day; hourly networks (NWS, ECCC, BC ASWS) carry temperature and wind, not depth.", "");
+  }
 
   lines.push(`## Webcams (${resort.cams.length})`, "");
   if (resort.cams.length === 0) {

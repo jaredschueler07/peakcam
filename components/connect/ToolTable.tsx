@@ -1,6 +1,6 @@
 import { CONNECT_TOOLS, MCP_RESOURCE_TEMPLATE } from "./links";
 
-// Server component: the eight MCP tools plus the markdown resource, one line
+// Server component: every MCP tool (PEAKCAM_TOOL_NAMES) plus the markdown resource, one line
 // each. Stacks to two rows per tool under 640 px so it reads at 375 px.
 export function ToolTable() {
   return (
