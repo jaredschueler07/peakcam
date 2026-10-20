@@ -81,7 +81,7 @@ Route handlers under `app/api/` (28 `route.ts` files as of 2026-10-18), each wit
 Known live-DB drift from the repo migrations (verify against prod before trusting a migration file):
 - `user_conditions.snow_quality`: the 004 file still checks `icy/slush`, but prod's CHECK is already `powder/packed/crud/ice/spring` (changed by hand; matches code and UI). Migration 019 records the prod definition idempotently.
 - `user_conditions` timestamp column: 004 says `submitted_at`; prod has `created_at`. Code used `submitted_at` for months (PostgREST 400 → "No recent reports", zero user reports in the sync blend, rate limit failing open). Reconciled in code — every consumer now reads `created_at` — and documented by migration 019 (renames only if `submitted_at` still exists; no-op on prod).
-- `latest_snow_reports` view was created as `SELECT *` in 001; columns added to `snow_reports` by 005/007 required manual view recreation in prod — no migration records it.
+- `latest_snow_reports` exposes `resorts.id AS resort_id` (migration 029) so a per-resort filter pushes down to one index probe; keep that when recreating it. It was created as `SELECT *` in 001; columns added to `snow_reports` by 005/007 required manual view recreation in prod — no migration records it.
 - `cams` now has unique indexes (`cams_unique_per_resort` on resort_id+name+embed_url+youtube_id, and `cams_resort_embed_url_idx`) applied by hand in prod, so the importer's `ignore-duplicates` works; migrations in the repo contain no CREATE INDEX at all — every prod index exists only in the live DB.
 - `latest_snow_reports` is hit ~12k times/day by the anon role, which has a 3s `statement_timeout`; the view must stay index-friendly (see migration 018).
 
