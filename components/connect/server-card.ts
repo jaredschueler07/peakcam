@@ -27,6 +27,9 @@ import {
   MCP_PROTOCOL_VERSIONS,
   MCP_RESOURCE_TEMPLATE,
   MCP_TITLE,
+  STDIO_COMMAND,
+  STDIO_PACKAGE_NAME,
+  STDIO_PACKAGE_VERSION,
 } from "./links";
 
 export const SERVER_CARD_SCHEMA = "https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json";
@@ -77,6 +80,17 @@ export function buildServerCard(): ServerCard {
         capabilities: { tools: {}, resources: {} },
         tools: CONNECT_TOOLS.map((t) => ({ name: t.name, title: t.title, description: t.summary })),
         resourceTemplates: [MCP_RESOURCE_TEMPLATE],
+        // The stdio bridge for clients that cannot speak Streamable HTTP
+        // (server.json carries the same entry in the registry's `packages` shape).
+        packages: [
+          {
+            registryType: "npm",
+            identifier: STDIO_PACKAGE_NAME,
+            version: STDIO_PACKAGE_VERSION,
+            transport: "stdio",
+            command: STDIO_COMMAND,
+          },
+        ],
         contact: "mailto:hello@peakcam.io",
         license: PUBLIC_API_LICENSE_URL,
         attribution:

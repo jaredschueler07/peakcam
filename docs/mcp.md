@@ -147,15 +147,31 @@ with the connector enabled.
 }
 ```
 
-### Any stdio-only client
+### Claude Desktop and any stdio-only client
+
+The npm bridge `peakcam-mcp` (`packages/peakcam-mcp`, P9 part 2) forwards a stdio client's
+JSON-RPC to the endpoint and back; no key, no state, Node ≥ 20. Claude Desktop reads the same
+object from `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or
+`%APPDATA%\Claude\claude_desktop_config.json` (Windows).
 
 ```json
 {
   "mcpServers": {
-    "peakcam": { "command": "npx", "args": ["-y", "mcp-remote", "https://www.peakcam.io/api/mcp"] }
+    "peakcam": { "command": "npx", "args": ["-y", "peakcam-mcp"] }
   }
 }
 ```
+
+`claude mcp add peakcam -- npx -y peakcam-mcp` is the Claude Code form; `--url` or
+`PEAKCAM_MCP_URL` points the bridge at a preview deployment. The generic
+`npx -y mcp-remote https://www.peakcam.io/api/mcp` works too. Until the package is published
+to npm (owner item in `docs/runbook.md`), run it from a checkout:
+`node packages/peakcam-mcp/bin/peakcam-mcp.mjs`.
+
+### ChatGPT Custom GPT (Actions, no MCP)
+
+Create → Configure → Actions → Import from URL `https://www.peakcam.io/api/v1/openapi.json`,
+authentication none; paste `https://www.peakcam.io/gpt-instructions.md` into Instructions.
 
 ### MCP Inspector (smoke test)
 
@@ -201,7 +217,9 @@ answer `405` by design.
   (llms-full.txt and the tests read it), a `TOOL_COPY` entry in `components/connect/links.ts`
   (the /connect table and server card derive from the name tuple; both are type errors until
   you do), cover it in `lib/mcp/server.test.ts` (the schema round-trip test picks it up once a
-  sample argument set is added), and list it in the table above. If the ask router should
+  sample argument set is added), list it in the table above, add the name to `server.json`'s
+  `_meta` tool list and to `packages/peakcam-mcp/README.md` (`tests/mcp-listings.test.ts` checks
+  both), then re-publish `server.json` to the registry. If the ask router should
   reach it, add an intent rule in `lib/ask/router.ts` and a sentence in `lib/ask/answer.ts`.
 - **Data source.** `McpDataSource` (`lib/mcp/types.ts`) has `catalog`, `forecast`,
   `snowHistory`, `camStills` and the optional `logUnmatchedQuestion`, `resortHistory`,
@@ -301,12 +319,20 @@ Liftie (liftie.info) sits behind a Cloudflare managed challenge for non-browser 
 clears, `liftsOpen` carries `source: "none"` and the status falls back to the opening row.
 `docs/runbook.md` "Operator status" has the job and the follow-up list of operator feeds.
 
-## Discovery (Sprint 6)
+## Discovery (Sprint 6, extended in P9 part 2)
 
 Shipped 2026-10-18: `/.well-known/mcp/server-card.json` (also at the SEP-2127 reserved
 `/api/mcp/server-card`), `server.json` for the MCP Registry (published as `io.peakcam/snow`
 0.1.0, re-publish steps in `docs/runbook.md`), the MCP line in `llms.txt`, the `/connect` page
-and the footer link. Everything they need is exported
+and the footer link. Added 2026-10-20 (P9 part 2): `server.json` lists the npm stdio package
+(`packages[0]`: `peakcam-mcp`, `npx`, stdio) and every tool name under the publisher-provided
+`_meta`; the server card carries the same package under `_meta["io.peakcam/connect"].packages`;
+`/connect` has the stdio and Custom GPT cards; `llms-full.txt` names the bridge and carries the
+API deprecation policy (12 months notice, `Deprecation` and `Sunset` headers; the full text is in
+`/api/v1/openapi.json` `info.description` and `docs/runbook.md` "Public API"). The same policy
+applies to tool names: a renamed tool keeps its old name registered, marked deprecated in its
+description, for 12 months. The registry copy of `server.json` is behind until the owner
+publishes the npm package and re-runs `mcp-publisher publish` (checklist in the runbook). Everything they need is exported
 from `lib/mcp/server.ts` (`PEAKCAM_MCP_NAME`, `PEAKCAM_MCP_TITLE`, `PEAKCAM_MCP_VERSION`,
 `PEAKCAM_MCP_ENDPOINT`, `PEAKCAM_MCP_INSTRUCTIONS`) and `lib/mcp/tools.ts`
 (`PEAKCAM_TOOL_NAMES`, `buildTools()` for titles and descriptions).

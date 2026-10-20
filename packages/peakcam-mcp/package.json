@@ -1,0 +1,40 @@
+{
+  "name": "peakcam-mcp",
+  "version": "0.1.0",
+  "mcpName": "io.peakcam/snow",
+  "description": "stdio bridge to the PeakCam Snow MCP server (io.peakcam/snow): live snow reports, SNOTEL measurements, forecasts, webcams and season history for ski resorts across the Americas. Read-only, no key.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "peakcam-mcp": "bin/peakcam-mcp.mjs"
+  },
+  "files": [
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ski",
+    "snow",
+    "snotel",
+    "webcams",
+    "peakcam"
+  ],
+  "homepage": "https://www.peakcam.io/connect",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jaredschueler07/peakcam.git",
+    "directory": "packages/peakcam-mcp"
+  },
+  "bugs": {
+    "email": "hello@peakcam.io"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1"
+  }
+}

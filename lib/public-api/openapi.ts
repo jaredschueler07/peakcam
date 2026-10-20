@@ -52,7 +52,38 @@ const SHARED_HEADERS = {
     description: `public, s-maxage=${PUBLIC_API_REVALIDATE_SECONDS}, stale-while-revalidate=3600 — data refreshes on a 15-minute ISR window; the sync jobs write new reports every 6 hours.`,
     schema: { type: "string" },
   },
+  // Absent while an operation is current. Present only once an operation or
+  // field is scheduled for removal, per the policy in info.description.
+  Deprecation: {
+    description:
+      "RFC 9745. Present only on a deprecated operation: the moment the deprecation was announced, as an RFC 9651 Date (`@` + Unix seconds, e.g. `@1767225600`). Absent on every current operation.",
+    schema: { type: "string", pattern: "^@[0-9]+$" },
+    required: false,
+  },
+  Sunset: {
+    description:
+      "RFC 8594. Present only on a deprecated operation: the HTTP-date after which it may stop answering, at least 12 months after `Deprecation`. A `Link: <...>; rel=\"sunset\"` points at the changelog entry that names the replacement.",
+    schema: { type: "string" },
+    required: false,
+  },
 };
+
+/** The versioning and deprecation commitment, printed in info.description and carried as `x-deprecation-policy`. */
+export const DEPRECATION_POLICY = {
+  noticeMonths: 12,
+  announcedAt: ["/llms-full.txt", "/connect", "/api/v1/openapi.json"],
+  headers: ["Deprecation", "Sunset", "Link rel=sunset"],
+  rfcs: ["RFC 9745 (Deprecation)", "RFC 8594 (Sunset)"],
+} as const;
+
+export function deprecationPolicyText(baseUrl: string): string {
+  return [
+    `Versioning and deprecation: the base path carries the major version (/api/v1); within it, PeakCam only adds fields, enum values and operations, never renames or removes them without notice. `,
+    `A removal is announced at least ${DEPRECATION_POLICY.noticeMonths} months ahead: the affected operation starts answering with a \`Deprecation\` header (RFC 9745, the announcement date) and a \`Sunset\` header (RFC 8594, the earliest removal date) plus \`Link: <changelog>; rel="sunset"\`, its summary in this document gains "Deprecated:" with the replacement, and the same notice appears in ${baseUrl}/llms-full.txt and on ${baseUrl}/connect. `,
+    `Current operations carry neither header. A new major version is published at its own base path (/api/v2) and the previous one keeps answering for the full notice period after the new one is announced. `,
+    `The MCP server (${baseUrl}/api/mcp) follows the same rule for tool names and argument shapes: a renamed tool keeps its old name registered, marked deprecated in its description, for ${DEPRECATION_POLICY.noticeMonths} months.`,
+  ].join("");
+}
 
 function jsonResponse(description: string, schemaId: string) {
   return {
@@ -108,6 +139,8 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
         `Agents: \`GET /ask?q=\` answers a question deterministically (one tool call, a dated sentence, citations; never a guess); \`POST /batch\` runs up to ${BATCH_MAX_REQUESTS} reads in one request; \`GET /resorts/search-index\` is the name-to-slug table. The same data is an MCP server at ${baseUrl}/api/mcp (setup: ${baseUrl}/connect). An NLWeb-shaped form of the answer endpoint is at ${baseUrl}/ask (outside this server's base path).`,
         "",
         `Methodology: ${baseUrl}/methodology. Short and long agent guides: ${baseUrl}/llms.txt, ${baseUrl}/llms-full.txt. Standalone JSON Schemas for every shape below: ${baseUrl}${SCHEMAS_PATH}.`,
+        "",
+        deprecationPolicyText(baseUrl),
       ].join("\n"),
       contact: { name: "PeakCam", url: baseUrl },
       license: { name: "PeakCam Terms of Service", url: PUBLIC_API_LICENSE_URL },
@@ -115,6 +148,8 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
       "x-mcp-endpoint": `${baseUrl}/api/mcp`,
       "x-nlweb-endpoint": `${baseUrl}/ask`,
       "x-json-schemas": `${baseUrl}${SCHEMAS_PATH}`,
+      "x-deprecation-policy": DEPRECATION_POLICY,
+      "x-stdio-package": "npx -y peakcam-mcp",
     },
     externalDocs: { description: "How the numbers are measured", url: `${baseUrl}/methodology` },
     servers: [{ url: `${baseUrl}/api/v1`, description: "Production" }],

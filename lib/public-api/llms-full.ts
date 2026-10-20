@@ -17,6 +17,7 @@ import { TOOL_EXAMPLES, inspectorArgs } from "@/lib/mcp/examples";
 import type { McpDataSource } from "@/lib/mcp/types";
 import { PUBLIC_API_ATTRIBUTION, PUBLIC_API_LICENSE_URL, PUBLIC_API_REVALIDATE_SECONDS } from "./headers";
 import { SCHEMAS_PATH } from "./json-schemas";
+import { deprecationPolicyText } from "./openapi";
 
 /** docs/runbook.md "Public API": the live limit and what exceeding it looks like. */
 export const RATE_LIMIT_TEXT =
@@ -143,10 +144,16 @@ export function buildLlmsFull(baseUrl: string = SITE_URL): string {
     `- JSON responses carry \`Cache-Control: public, s-maxage=${PUBLIC_API_REVALIDATE_SECONDS}, stale-while-revalidate=3600\`; the sync jobs write new reports every 6 hours, so polling faster than every 15 minutes buys nothing. The search index and the schema files are cached a day; /api/v1/status five minutes.`,
     "- CORS is open (`Access-Control-Allow-Origin: *`); `Link` carries `rel=\"author\"` and `rel=\"license\"`.",
     "",
+    "## Versioning and deprecation",
+    "",
+    `- ${deprecationPolicyText(baseUrl)}`,
+    "- Check for the `Deprecation` and `Sunset` headers on the operations you call; while neither is present the operation is current. The OpenAPI document carries the same commitment as `info.x-deprecation-policy`.",
+    "",
     "## MCP server",
     "",
     `- Name \`${PEAKCAM_MCP_NAME}\`, endpoint \`${PEAKCAM_MCP_ENDPOINT}\`, stateless Streamable HTTP, no auth, no SSE mount. Protocol 2026-07-28 natively; 2025-11-25 and 2025-06-18 through the SDK fallback.`,
-    `- Server card: ${baseUrl}/.well-known/mcp/server-card.json (also ${baseUrl}/api/mcp/server-card). Client recipes (Claude, ChatGPT, Cursor, Claude Code, stdio bridges): ${baseUrl}/connect#clients.`,
+    `- Server card: ${baseUrl}/.well-known/mcp/server-card.json (also ${baseUrl}/api/mcp/server-card). Client recipes (Claude, ChatGPT, Cursor, Claude Code, Claude Desktop, Custom GPT): ${baseUrl}/connect#clients.`,
+    "- stdio-only clients: `npx -y peakcam-mcp` (npm package `peakcam-mcp`, a stateless bridge to the endpoint; `--url` or `PEAKCAM_MCP_URL` for a preview deployment). Listed in server.json and the server card beside the HTTP remote.",
     "- Workflow: `search_resorts` (or `ask`) turns a name into a slug; the `get_*` tools take the slug; `find_powder`, `get_opening_dates`, `get_percent_of_normal` and `get_leaderboard` take an optional `state` whose valid values `list_regions` returns. Season questions: `get_season_stats` (summary), `get_snow_history` with `season` (daily rows), `get_monthly_climatology` (what a month usually brings).",
     "- Every tool is annotated read-only and idempotent, validates its input, and returns a dated markdown `content` block plus `structuredContent` matching its `outputSchema` (the same shapes as the REST API).",
     "- Resource: `peakcam://resorts/{slug}` (text/markdown), the same document as `/resorts/{slug}/index.md`.",
