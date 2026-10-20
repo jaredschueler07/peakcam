@@ -330,11 +330,11 @@ export function storms(rows: readonly DailyRow[]): Storm[] {
   return out.sort((a, b) => b.totalIn - a.totalIn || (a.start < b.start ? -1 : 1));
 }
 
-/** Deepest depth in a set of rows and the first day it was reached. */
+/** Deepest depth in a set of rows and the first day it was reached; null when nothing above zero was measured. */
 export function deepestBase(rows: readonly DailyRow[]): { depthIn: number; date: string } | null {
   let best: { depthIn: number; date: string } | null = null;
   for (const r of normalizeRows(rows)) {
-    if (r.snowDepthIn == null) continue;
+    if (r.snowDepthIn == null || r.snowDepthIn <= 0) continue;
     if (!best || r.snowDepthIn > best.depthIn) best = { depthIn: r.snowDepthIn, date: r.date };
   }
   return best;

@@ -14,7 +14,7 @@ import type { ResortStationJoined, ResortWithData } from "@/lib/types";
 import type { ResortOpening } from "@/lib/openings";
 import type { ResortElevation, SerializeOptions } from "./serialize";
 import { getSeasonAggregates, getSnowpackDailySince, getStationCumulativeNormals, getStationMonthlyNormals } from "@/lib/supabase";
-import type { CumulativeNormalRow, DailyRow, MonthlyNormalRow } from "@/lib/snow-history";
+import { deriveNewSnow, normalizeRows, type CumulativeNormalRow, type DailyRow, type MonthlyNormalRow } from "@/lib/snow-history";
 import type { SeasonAggregateRow } from "@/lib/leaderboards";
 import { PAST_SEASONS, POWDER_DAY_IN } from "@/lib/season-stats";
 
@@ -97,7 +97,10 @@ async function fetchResortHistory(resortId: string, stationId: string | null, si
     stationId ? getStationCumulativeNormals(stationId) : Promise.resolve([]),
     stationId ? getStationMonthlyNormals(stationId) : Promise.resolve([]),
   ]);
-  return { rows, normals, monthly };
+  // Rows written before migration 030 (and model-sync rows, which never carry
+  // new_snow_in) get their daily new snow derived from the depth deltas on
+  // read, the same rule the backfill stores; stored values are kept as is.
+  return { rows: deriveNewSnow(normalizeRows(rows)), normals, monthly };
 }
 
 // Keyed by (resortId, stationId, since); the daily rows grow by one a day, so
