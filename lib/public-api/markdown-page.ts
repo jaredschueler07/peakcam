@@ -16,6 +16,7 @@ import { SITE_URL } from "@/lib/site";
 import { HUB_BASE_PATH, stateHubPath, stateLabel } from "@/lib/hubs";
 import type { WeatherPeriod } from "@/lib/types";
 import type { CamTimeline } from "@/lib/cam-timeline";
+import { clipDurationSeconds, type CamTimelapseClip, type CamTimelapses } from "@/lib/cam-timelapse";
 import type { SnowHistoryRow } from "@/lib/mcp/types";
 import { DESCRIPTION_SOURCE_LABELS, type ResortDescription } from "@/lib/resort-profile";
 import { RESORT_SUBPAGES, resortTabMarkdownPath, resortTabPath } from "@/lib/resort-pages";
@@ -41,6 +42,26 @@ export interface MarkdownPageOptions {
   baseUrl?: string;
   /** The stored `resorts.description` with its provenance, when the row has one (P2 plumbing). */
   description?: ResortDescription | null;
+  /** Rendered timelapse clips per cam (`getResortTimelapses`), when the caller fetched them; null when the clip view is unavailable. */
+  timelapses?: CamTimelapses[] | null;
+}
+
+/** "24 h clip, 96 frames (13.7 s), 2026-12-19T12:00Z to 2026-12-20T12:00Z: <url> (poster: <url>)" */
+function clipLine(label: string, clip: CamTimelapseClip): string {
+  const secs = clipDurationSeconds(clip.frames);
+  const span = clip.startsAt && clip.endsAt ? `, ${clip.startsAt} to ${clip.endsAt}` : "";
+  const poster = clip.posterUrl ? ` (poster: ${clip.posterUrl})` : "";
+  return `${label}${clip.frames != null ? `, ${clip.frames} frames${secs != null ? ` (${secs} s)` : ""}` : ""}${span}: ${clip.url}${poster}`;
+}
+
+/** Clip lines for one cam, indented under its cam line; empty when the cam has no clip. */
+function timelapseLines(cams: readonly CamTimelapses[] | null | undefined, camId: string): string[] {
+  const own = cams?.find((t) => t.camId === camId);
+  if (!own) return [];
+  const out: string[] = [];
+  if (own.current) out.push(`  - ${clipLine("Last 24 h timelapse (MP4)", own.current)}`);
+  for (const s of own.storms) out.push(`  - ${clipLine(`Storm reel ${s.stormDate ?? ""} (MP4)`, s)}`);
+  return out;
 }
 
 /**
@@ -251,9 +272,10 @@ export function resortMarkdown(resort: ResortPublic, opts: MarkdownPageOptions =
   if (resort.cams.length === 0) {
     lines.push("No active webcams.", "");
   } else {
-    lines.push(...resort.cams.map(camLine), "");
+    lines.push(...resort.cams.flatMap((cam) => [camLine(cam), ...timelapseLines(opts.timelapses, cam.id)]), "");
     lines.push(
-      "`live` is the last health check, not proof of a live broadcast. A capture time is given only for frames PeakCam captured itself; provider snapshots are served as published and their age is unknown.",
+      "`live` is the last health check, not proof of a live broadcast. A capture time is given only for frames PeakCam captured itself; provider snapshots are served as published and their age is unknown." +
+        (opts.timelapses?.some((t) => t.current || t.storms.length) ? " Timelapse clips are PeakCam renders of its own archived frames of operator-permitted cams (7 fps, 720p max); the 24 h clip is replaced every render, storm reels are kept a year." : ""),
       "",
     );
   }
@@ -262,6 +284,7 @@ export function resortMarkdown(resort: ResortPublic, opts: MarkdownPageOptions =
   lines.push(`- Page: ${resort.canonicalUrl}`);
   lines.push(`- API: ${resort.apiUrl}`);
   lines.push(`- Cams API: ${resort.apiUrl}/cams`);
+  lines.push(`- Timelapses API: ${resort.apiUrl}/timelapses`);
   lines.push(`- Powder feed (Atom): ${resort.canonicalUrl}/powder.xml`);
   if (resort.websiteUrl) lines.push(`- Resort website: ${resort.websiteUrl}`);
   lines.push(...subpageLinks(resort, opts.baseUrl));
@@ -413,11 +436,12 @@ export function webcamsMarkdown(resort: ResortPublic, extras: WebcamsMarkdownExt
       "",
     );
     for (const cam of cams) {
-      lines.push(camLine(cam), ...timelineLines(extras.timelines[cam.id]));
+      lines.push(camLine(cam), ...timelapseLines(extras.timelapses, cam.id), ...timelineLines(extras.timelines[cam.id]));
     }
     lines.push(
       "",
-      "`live` is the last health check, not proof of a live broadcast. Frames on tape are PeakCam's own 6-hourly captures of cams whose operators allow archiving; provider snapshots are served as published and their age is unknown.",
+      "`live` is the last health check, not proof of a live broadcast. Frames on tape are PeakCam's own captures (every 15 minutes) of cams whose operators allow archiving; provider snapshots are served as published and their age is unknown." +
+        (extras.timelapses?.some((t) => t.current || t.storms.length) ? " Timelapse clips are rendered from those frames (H.264, 7 fps, 720p max, at most 3 MB); the 24 h clip is replaced every render, storm reels are kept a year." : ""),
       "",
     );
   }
@@ -425,6 +449,7 @@ export function webcamsMarkdown(resort: ResortPublic, extras: WebcamsMarkdownExt
   lines.push(`- Resort page: ${resort.canonicalUrl}`);
   lines.push(...subpageLinks(resort, base));
   lines.push(`- Cams API: ${resort.apiUrl}/cams`);
+  lines.push(`- Timelapses API: ${resort.apiUrl}/timelapses`);
   if (resort.websiteUrl) lines.push(`- Resort website: ${resort.websiteUrl}`);
   lines.push("");
   lines.push(attributionBlock(canonical, resort.attribution, resort.license), "");

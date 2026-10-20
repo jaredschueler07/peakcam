@@ -9,7 +9,8 @@
 // ─────────────────────────────────────────────────────────────
 
 import { unstable_cache } from "next/cache";
-import { getAllResorts, getForecastRuns, getForecastScores, getResortElevationIndex, getResortOpenings, getResortStationsIndex, getSnowDepthHistory } from "@/lib/supabase";
+import { getAllResorts, getForecastRuns, getForecastScores, getResortElevationIndex, getResortOpenings, getResortStationsIndex, getResortTimelapses, getSnowDepthHistory } from "@/lib/supabase";
+import type { CamTimelapses } from "@/lib/cam-timelapse";
 import type { ResortStationJoined, ResortWithData } from "@/lib/types";
 import type { ResortOpening } from "@/lib/openings";
 import type { ForecastScoreRow, StoredForecast } from "@/lib/forecast/store";
@@ -38,6 +39,19 @@ const getSnowDepthHistoryCached = unstable_cache((resortId: string, days: number
   revalidate: PUBLIC_API_REVALIDATE_SECONDS,
   tags: ["peakcam-resort-catalog"],
 });
+
+// ── Timelapse clips (migrations 025 + 031) ───────────────────
+// The renderer writes every 6 h, so a 15-minute window per resort loses
+// nothing; same tag as the catalogue so a manual purge clears both.
+const getResortTimelapsesCached = unstable_cache((resortId: string) => getResortTimelapses(resortId), ["peakcam:public-api:timelapses:v1"], {
+  revalidate: PUBLIC_API_REVALIDATE_SECONDS,
+  tags: ["peakcam-resort-catalog"],
+});
+
+/** Rendered clips per cam of a resort; null when the clip view is unavailable (migration 031 not applied). */
+export function loadResortTimelapses(resortId: string): Promise<CamTimelapses[] | null> {
+  return getResortTimelapsesCached(resortId);
+}
 
 /** The newest run per point and model for a resort; `{ runs: [] }` when none is current. Never throws past a missing table. */
 export function loadResortForecast(resortId: string): Promise<StoredForecast> {

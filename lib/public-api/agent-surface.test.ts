@@ -109,10 +109,10 @@ test("search index: alphabetical, with aliases, coordinates and canonical URLs",
 // ── batch ────────────────────────────────────────────────────
 
 test("batch: parses both body shapes, caps at ten, and refuses anything that is not a known GET route", () => {
-  const ok = parseBatchBody({ requests: [{ path: "/api/v1/resorts/alta" }, { path: "/api/v1/powder?state=CO&limit=3" }, { path: "/api/v1/resorts/vail/cams" }] });
+  const ok = parseBatchBody({ requests: [{ path: "/api/v1/resorts/alta" }, { path: "/api/v1/powder?state=CO&limit=3" }, { path: "/api/v1/resorts/vail/cams" }, { path: "/api/v1/resorts/vail/timelapses" }] });
   assert.ok(ok.ok);
   if (ok.ok) {
-    assert.deepEqual(ok.paths.map((p) => p.route), ["resort", "powder", "cams"]);
+    assert.deepEqual(ok.paths.map((p) => p.route), ["resort", "powder", "cams", "timelapses"]);
     assert.equal(ok.paths[0].slug, "alta");
     assert.equal(ok.paths[2].slug, "vail");
   }

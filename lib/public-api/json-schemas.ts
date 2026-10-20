@@ -16,6 +16,7 @@ export const SCHEMAS_PATH = "/.well-known/schemas";
 const FILE_STEMS: Record<string, string> = {
   Resort: "resort",
   CamList: "cams",
+  TimelapseList: "timelapses",
   PowderList: "powder",
   ResortList: "resort-list",
   SearchIndex: "search-index",

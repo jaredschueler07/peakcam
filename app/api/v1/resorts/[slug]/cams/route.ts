@@ -1,8 +1,9 @@
-import { findResort, loadPublicApiCatalog, optionsFor } from "@/lib/public-api/data";
+import { findResort, loadPublicApiCatalog, loadResortTimelapses, optionsFor } from "@/lib/public-api/data";
 import { publicError, publicJson, publicOptions } from "@/lib/public-api/headers";
 import { serializeCams } from "@/lib/public-api/serialize";
 
-// GET /api/v1/resorts/{slug}/cams — the resort's active cams with health and stills.
+// GET /api/v1/resorts/{slug}/cams — the resort's active cams with health,
+// stills and (P8 block 2) their rendered timelapse clips as links.
 // Caching: exporting OPTIONS (CORS preflight) makes Next treat the handler as
 // non-static (`hasNonStaticMethods` in next/dist/server/route-modules/app-route),
 // so a `revalidate` segment export would be inert here. The 15-minute policy is
@@ -15,7 +16,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
   const catalog = await loadPublicApiCatalog();
   const resort = findResort(catalog, slug);
   if (!resort) return publicError(404, "resort_not_found", `No active resort with slug "${slug}". List them at /api/v1/resorts.`);
-  return publicJson(serializeCams(resort, optionsFor(catalog, resort)));
+  // Null (view missing) leaves the `timelapses` key off every cam; an empty array puts an empty list on each.
+  const timelapses = await loadResortTimelapses(resort.id);
+  return publicJson(serializeCams(resort, { ...optionsFor(catalog, resort), timelapses }));
 }
 
 export function OPTIONS(): Response {
