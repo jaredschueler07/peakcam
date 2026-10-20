@@ -127,6 +127,8 @@ test("status: a fresh operator feed with lifts open is OPEN; with lifts only sch
   const open = deriveStatus({ ...base, opening: opening({ confirmed_open: "2026-11-20" }), operator: operator() });
   assert.equal(open.status, "OPEN");
   assert.equal(open.source, "operator");
+  assert.equal(open.basis, "feed");
+  assert.equal(open.observedAt, hoursAgo(1));
   assert.match(open.reasons[0], /7 of 11 lifts open/);
   const scheduled = deriveStatus({ ...base, opening: null, operator: operator({ liftsOpen: 0, liftsScheduled: 9, liftsClosed: 2 }) });
   assert.equal(scheduled.status, "OPEN");
@@ -153,7 +155,10 @@ test("status: a stale operator feed is ignored and the opening row decides; a fe
 });
 
 test("status from the opening row alone: confirmed past → OPEN, confirmed ahead → PRE_SEASON, projected ahead → PRE_SEASON (profile), projected past → UNKNOWN, closing past → OFF_SEASON, nothing → UNKNOWN", () => {
-  assert.equal(deriveStatus({ ...base, opening: opening({ confirmed_open: "2026-11-20" }), operator: null }).status, "OPEN");
+  const byDate = deriveStatus({ ...base, opening: opening({ confirmed_open: "2026-11-20" }), operator: null });
+  assert.equal(byDate.status, "OPEN");
+  assert.equal(byDate.basis, "date");
+  assert.equal(byDate.observedAt, null, "a date-derived status is a fact about today, not an observation");
   assert.equal(deriveStatus({ ...base, opening: opening({ confirmed_open: "2026-12-20" }), operator: null }).status, "OPEN");
   const pre = deriveStatus({ ...base, opening: opening({ confirmed_open: "2026-12-21" }), operator: null });
   assert.equal(pre.status, "PRE_SEASON");
@@ -310,6 +315,9 @@ test("buildConditions: a model-estimated Andes resort after its closing date is 
   );
   assert.equal(c.status.value, "OFF_SEASON");
   assert.equal(c.status.source, "operator");
+  assert.equal(c.status.observedAt, null);
+  assert.deepEqual(c.status.freshness, { tier: "recent", ageHours: null });
+  assert.equal(c.status.confidence, 0.7);
   assert.equal(c.recommendableToday, false);
   assert.equal(c.baseDepthIn.source, "model");
   assert.equal(c.baseDepthIn.freshness.tier, "estimated");

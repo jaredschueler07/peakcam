@@ -200,8 +200,16 @@ export interface StatusInput {
 
 export interface StatusResult {
   status: ResortStatus;
-  /** What the status rests on: `operator` (lift feed), `operator` (confirmed date), `profile` (projection), `derived` (calendar), `none`. */
+  /** What the status rests on: `operator` (lift feed or confirmed date), `profile` (projection), `none`. */
   source: FieldSource;
+  /**
+   * `feed`: a fresh operator feed decided it (observedAt is the feed's time).
+   * `date`: an opening or closing date against the resort's calendar day
+   * decided it; that is a fact about today, not an observation, so
+   * observedAt is null and the field reads `recent` with no age.
+   * `none`: nothing usable.
+   */
+  basis: "feed" | "date" | "none";
   observedAt: string | null;
   reasons: string[];
 }
@@ -240,17 +248,17 @@ export function deriveStatus(input: StatusInput): StatusResult {
     if (fresh.tier === "live" || fresh.tier === "recent") {
       if (open > 0) {
         reasons.push(`operator feed${age}: ${open} of ${total || "?"} lifts open`);
-        return { status: "OPEN", source: "operator", observedAt: toIso(operator.observedAt), reasons };
+        return { status: "OPEN", source: "operator", basis: "feed", observedAt: toIso(operator.observedAt), reasons };
       }
       if (scheduled > 0) {
         reasons.push(`operator feed${age}: no lift spinning yet, ${scheduled} scheduled to open today`);
-        return { status: "OPEN", source: "operator", observedAt: toIso(operator.observedAt), reasons };
+        return { status: "OPEN", source: "operator", basis: "feed", observedAt: toIso(operator.observedAt), reasons };
       }
       if (total > 0) {
         reasons.push(`operator feed${age}: 0 of ${total} lifts open, none scheduled`);
         if (seasonOn) {
           reasons.push(`inside the ${seasonWord} per the confirmed opening date${opening?.confirmed_open ? ` ${opening.confirmed_open}` : ""}`);
-          return { status: "CLOSED_TODAY", source: "operator", observedAt: toIso(operator.observedAt), reasons };
+          return { status: "CLOSED_TODAY", source: "operator", basis: "feed", observedAt: toIso(operator.observedAt), reasons };
         }
         // Not known to be in season: the feed agrees with the calendar below.
       } else {
@@ -263,9 +271,8 @@ export function deriveStatus(input: StatusInput): StatusResult {
 
   if (!opening) {
     reasons.push("no opening date on file");
-    return { status: "UNKNOWN", source: "none", observedAt: null, reasons };
+    return { status: "UNKNOWN", source: "none", basis: "none", observedAt: null, reasons };
   }
-  const observedAt = toIso(opening.updated_at);
   switch (openingState) {
     case "open":
       reasons.push(
@@ -273,25 +280,25 @@ export function deriveStatus(input: StatusInput): StatusResult {
           ? `confirmed opening date ${opening.confirmed_open} has passed${opening.closing_date ? `, closing ${opening.closing_date}` : ""}`
           : `inside the ${seasonWord} per the published closing date ${opening.closing_date}`,
       );
-      return { status: "OPEN", source: "operator", observedAt, reasons };
+      return { status: "OPEN", source: "operator", basis: "date", observedAt: null, reasons };
     case "confirmed":
       reasons.push(`confirmed opening date ${opening.confirmed_open} is ahead of ${localDate}`);
-      return { status: "PRE_SEASON", source: "operator", observedAt, reasons };
+      return { status: "PRE_SEASON", source: "operator", basis: "date", observedAt: null, reasons };
     case "projected": {
       const date = opening.projected_open!;
       if (date >= localDate) {
         reasons.push(`projected opening date ${date} (third-party estimate) is ahead of ${localDate}`);
-        return { status: "PRE_SEASON", source: "profile", observedAt, reasons };
+        return { status: "PRE_SEASON", source: "profile", basis: "date", observedAt: null, reasons };
       }
       reasons.push(`projected opening date ${date} has passed without confirmation from the resort`);
-      return { status: "UNKNOWN", source: "none", observedAt, reasons };
+      return { status: "UNKNOWN", source: "none", basis: "none", observedAt: null, reasons };
     }
     case "closed":
       reasons.push(`closing date ${opening.closing_date} has passed`);
-      return { status: "OFF_SEASON", source: "operator", observedAt, reasons };
+      return { status: "OFF_SEASON", source: "operator", basis: "date", observedAt: null, reasons };
     default:
       reasons.push("no sourced opening or closing date for this season");
-      return { status: "UNKNOWN", source: "none", observedAt, reasons };
+      return { status: "UNKNOWN", source: "none", basis: "none", observedAt: null, reasons };
   }
 }
 
@@ -499,9 +506,12 @@ export function buildConditions(input: ConditionsInput): ConditionsContract {
 
   const statusResult = deriveStatus({ opening, hemisphere: input.hemisphere, localDate: input.localDate, operator, now });
   const status: Field<ResortStatus> =
-    statusResult.status === "UNKNOWN"
-      ? { ...noneField<ResortStatus>(), value: "UNKNOWN", source: "none" }
-      : field<ResortStatus>(statusResult.status, statusResult.source, statusResult.observedAt, now);
+    statusResult.basis === "feed"
+      ? field<ResortStatus>(statusResult.status, statusResult.source, statusResult.observedAt, now)
+      : statusResult.basis === "date"
+        ? // A date against today's calendar is a current fact with no observation time, like a profile value.
+          { value: statusResult.status, source: statusResult.source, observedAt: null, confidence: round2(BASE_CONFIDENCE[statusResult.source]), freshness: { tier: "recent", ageHours: null } }
+        : { ...noneField<ResortStatus>(), value: "UNKNOWN", source: "none" };
 
   const openingAt = opening?.updated_at ?? null;
   const seasonOpening: Field<string> = opening?.confirmed_open

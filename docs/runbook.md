@@ -48,6 +48,7 @@ Then spot-check `/`, a `/resorts/<slug>`, `/snow-report`, `/about`.
 | `com.peakcam.forecast-sync` | Multi-model forecast runs → `forecast_runs` + `forecast_daily` (`scripts/forecast-sync.ts`: one Open-Meteo `models=` call per point, summit and base, nine models for US resorts, seven elsewhere; idempotent per issue hour; retention pass on the first run after 00:00 UTC) | every 6 h (21,600 s, `RunAtLoad`) | **to deploy** (P4, 2026-10-20) — recipe below |
 | `com.peakcam.forecast-score` | Forecast verification → `forecast_scores` (`scripts/forecast-score.ts`: day-1/3/7 MAE, bias ratio, rank per model + `blend`, graded against SNOTEL depth deltas over 90 days) | daily 07:30 local (after snotel-sync) | **to deploy** (P4, 2026-10-20) |
 | `com.peakcam.stations-sync` | Station layer (`scripts/stations-sync.ts`): up to three stations per resort by elevation band from SNOTEL, GHCN-Daily, NWS obs, BC ASWS, ECCC → `stations`, `resort_stations`, `station_observations` (migration 026). Reads only public APIs; never touches `snow_reports`. `docs/stations.md` | hourly (3,600 s) | **plist in repo, not yet loaded on the mini** — recipe below |
+| `com.peakcam.operator-sync` | Operator lift status via Liftie → `operator_status` (`scripts/operator-sync.ts`, migration 031): lifts open / hold / scheduled / closed per resort for the 88 resorts in `data/operator-sources.json`; read by the conditions contract (`/api/v1/resorts/{slug}/conditions`, the status chip). Exits 2 when every fetch is refused by Liftie's Cloudflare challenge | 06:00 and 11:00 local (`StartCalendarInterval` ×2) | **plist in repo (P6, 2026-10-20), blocked upstream** — see "Operator status" below |
 | `com.peakcam.pipeline` | Multi-source blender | daily 06:00 | **prepared but Disabled=true** — awaits migration 010 |
 
 All of the above run from the ops checkout `/Users/maestro_admin/peakcam/peakcam` on the
@@ -336,6 +337,7 @@ cached catalogue (`getAllResorts()`, 1 h) plus `resort_openings` and
 | `GET /api/v1/resorts` | Light list: every active resort, headline numbers, rating, season status, cam counts | ISR 900 s |
 | `GET /api/v1/resorts/{slug}` | Full document: location, snow report per field with provenance, season, cams | ISR 900 s |
 | `GET /api/v1/resorts/{slug}/cams` | Active cams: `live` health, still URL, `capturedAt` (PeakCam captures only) | ISR 900 s |
+| `GET /api/v1/resorts/{slug}/conditions` | P6 conditions contract v2: versioned envelope (`schemaVersion` 1.0.0, `schemaUrl` → `/.well-known/schemas/resort-conditions-v1.json`), `data` with every field as `{value, source, observedAt, confidence, freshness: {tier, ageHours}}`, derived `status` (OPEN / CLOSED_TODAY / PRE_SEASON / OFF_SEASON / UNKNOWN, never defaulting to open), `recommendableToday` + `reasons`, `depthDisagreement`, `measuredNow`, a quotable `sentence`; `lib/public-api/conditions.ts` over `lib/conditions-contract.ts` | 900 s |
 | `GET /api/v1/resorts/{slug}/forecast?point=summit\|base` | Blended 14-day forecast (median across models, 25th/75th band, `modelCount` per day, summary) + every model run in provider units; `credits` and `X-Attribution` carry the Open-Meteo CC BY 4.0 line (P4) | 900 s |
 | `GET /api/v1/resorts/{slug}/forecast-accuracy` | Per-model 90-day verification: day-1/3/7 MAE (cm), bias ratio, samples, rank, `truthBasis`, `measuredDays` (P4) | 900 s |
 | `GET /api/v1/powder?window=24h\|48h&state=&minInches=&source=&limit=` | Ranked new snow; `source=snotel` = measured only | ISR 900 s per URL |
@@ -418,6 +420,14 @@ npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --metho
 curl -s 'https://www.peakcam.io/api/v1/ask?q=forecast+for+alta' | jq '{tool, sentence}'
 curl -s https://www.peakcam.io/resorts/alta | grep -o '14-day snow outlook[^<]*' | head -1   # the strip renders once a run is stored
 curl -sI https://www.peakcam.io/gpt-instructions.md | grep -i '^content-type'
+# P6 conditions contract
+curl -s https://www.peakcam.io/api/v1/resorts/alta/conditions | jq '{status: .data.status, lifts: [.data.liftsOpen.value, .data.liftsTotal.value], base: .data.baseDepthIn, verdict: .data.recommendableToday, reasons: .data.reasons, tiers: .meta.freshness, sentence}'
+curl -s https://www.peakcam.io/api/v1/resorts/ski-portillo/conditions | jq '{status: .data.status.value, tz: .meta.timeZone, day: .meta.localDate, sources: .meta.sources}'   # OFF_SEASON after the closing date, America/Santiago
+curl -s https://www.peakcam.io/.well-known/schemas/resort-conditions-v1.json | jq '."$id", .title'
+curl -s 'https://www.peakcam.io/api/v1/ask?q=is+alta+open+today' | jq '{tool, sentence, status: .data.data.status.value}'
+curl -s https://www.peakcam.io/resorts/alta/index.md | sed -n '/## Status and freshness/,/## What the instruments say/p' | head -20
+curl -s https://www.peakcam.io/resorts/alta | grep -o 'data-testid="resort-status" data-status="[A-Z_]*"'
+npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_resort_conditions --tool-arg slug=alta | head -20
 ```
 
 Unmatched `/ask` questions land in `agent_memory` (`entity = 'ask:unmatched'`, `source_agent`
@@ -449,6 +459,7 @@ are optional until their block lands.
 | `forecast_runs`, `forecast_daily` | 027 | `scripts/forecast-sync.ts` (`com.peakcam.forecast-sync`, every 6 h; live since P4, 2026-10-20) | `Resort.forecast` summary, `/resorts/{slug}/forecast`, `get_forecast`, the resort page strip |
 | `forecast_scores` | 027 | `scripts/forecast-score.ts` (`com.peakcam.forecast-score`, daily 07:30; rewrites per resort/model/window, `blend` row included) | `Resort.forecastScores`, `/resorts/{slug}/forecast-accuracy`, `compare_models` |
 | `resort_scores` | 028 | P7 scoring job | `Resort.score`, leaderboards |
+| `operator_status` + view `latest_operator_status` | 031 (P6, 2026-10-20) | `scripts/operator-sync.ts` (`com.peakcam.operator-sync`, 06:00 and 11:00) via `lib/operators/liftie.ts`; one row per fetch, idempotent on `(resort_id, source, observed_at)`; public read, no write policies | `/api/v1/resorts/{slug}/conditions` (`data.liftsOpen` …), the resort page status chip, `get_resort_conditions`, the markdown "Status and freshness" section |
 
 Elevations: `resorts.elevation_base_ft/summit_ft` are the canonical home from
 025 on (backfilled from `resort_metadata` for 145 resorts); `getResortElevationIndex()`
@@ -514,6 +525,51 @@ written since 2026-03-21, past seasons are empty, the band is absent, and the tw
 boards say "unavailable" until migration 030 exists. Normals: a station with fewer than 25
 qualifying winters is logged by the seed (`NOTE fewer than 25 qualifying winters`); the band
 still renders with whatever it has and `curve.normalYears` says how many.
+
+## Operator status (P6, migration 031)
+
+Branch `feat/p6-conditions`, parity plan block P6. The conditions contract
+(`lib/conditions-contract.ts`, served by `/api/v1/resorts/{slug}/conditions`, inside
+`get_resort_conditions`, on the resort page as the status chip and freshness labels, and in
+the markdown alternates as "Status and freshness") joins the snow report, the opening row,
+the station layer, the stored forecast blend and the newest operator report. Only the last
+of those is new: `operator_status` (one row per fetch) and `latest_operator_status`.
+
+| Job | What | When | Notes |
+| --- | --- | --- | --- |
+| `com.peakcam.operator-sync` (`npm run operator-sync`) | For each of the 88 resorts mapped in `data/operator-sources.json`, GET `https://liftie.info/api/resort/<id>` (Liftie, BSD-3, parses the operator's own lift-status page) → lifts open / hold / scheduled / closed, the provider's timestamp, the operator page URL, a published opening date | 06:00 and 11:00 local | `--dry-run --resort alta` needs no service key. Exit 2 when every fetch was challenged. ~90 requests, 400 ms apart, ≈ 40 s |
+
+**Blocked upstream (2026-10-20).** liftie.info answers every non-browser request from the
+Air and from the mini with HTTP 403, `cf-mitigated: challenge` and a Cloudflare "Just a
+moment" page; the Liftie API is not open to scripts from these hosts today. The fetcher
+names that case `blocked`, the sync logs it and exits 2, and the contract falls back: `data.liftsOpen`
+carries `source: "none"` and `data.status` rests on the opening row (OPEN only after a
+resort-confirmed date). PeakCam does not scrape operator HTML itself. Options, in order:
+ask the Liftie maintainer (github.com/pirxpilot/liftie) for an allow-listed user agent or
+run a self-hosted Liftie (it is open source and runs with `node app` against the same resort
+parsers); otherwise the follow-up list of operator feeds with public JSON and terms that
+permit reuse: Vail Resorts (`*.com/api/…` lift status behind the EpicMix app, terms
+unclear), Alterra (per-resort), Powdr, Boyne, Arapahoe Basin's own JSON, Alta's
+`window.Alta` script block (the page Liftie parses), Perisher-style verified portals.
+Each needs a terms read before a fetcher is written; record `verified=true` only for an
+operator's own API.
+
+Deploy on the Mini (`ssh mini`, user `maestro_admin`; `zsh -l -c` because npm is not on the
+non-login PATH):
+
+```bash
+# 1. apply supabase/migrations/031_operator_status.sql by hand (SQL Editor / MCP apply_migration; not during a Vercel build), then:
+ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && git pull && npm ci --no-audit --no-fund"'
+ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && npx tsx scripts/operator-sync.ts --dry-run --resort alta | tail -4"'   # "OK Alta …" once Liftie answers; "FAIL … blocked 403" while the challenge stands
+ssh mini 'cd /Users/maestro_admin/peakcam/peakcam && cp com.peakcam.operator-sync.plist ~/Library/LaunchAgents/ && launchctl bootout gui/$(id -u)/com.peakcam.operator-sync 2>/dev/null; launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.peakcam.operator-sync.plist && launchctl list | grep com.peakcam.operator-sync'
+ssh mini 'launchctl kickstart -k gui/$(id -u)/com.peakcam.operator-sync && sleep 60 && tail -5 /Users/maestro_admin/peakcam/peakcam/scripts/operator-sync.log'
+```
+
+Verify in the database: `select source, count(*), max(observed_at) from operator_status group by 1;`
+`select count(*) from latest_operator_status where lifts_total is not null;`. Then on the
+site (allow the 15-minute cache): the P6 lines under "Public API" above. Without rows the
+contract still validates for every resort; `/api/v1/resorts/alta/conditions` shows
+`data.liftsOpen.source = "none"` and the status from the opening row.
 
 ## Discovery surface (markdown alternates, Link headers, robots, llms.txt, IndexNow)
 

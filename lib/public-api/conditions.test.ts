@@ -177,7 +177,8 @@ test("Portillo: model-estimated fields, the resort's own day in Santiago, and th
   assert.equal(doc.data.percentOfNormal.source, "none");
   assert.equal(doc.data.snowQuality.source, "none");
   assert.deepEqual(doc.meta.sources, ["operator", "model", "profile"]);
-  assert.match(doc.sentence, /Ski Portillo is closed for the season: closed Oct 5; base 20 in\. \(model estimate, 5 h old\), 3 in\. of new snow in 24 h \(model estimate\)\./);
+  assert.match(doc.sentence, /^As of Dec 20, Ski Portillo is closed for the season: closed Oct 5; base 20 in\. \(model estimate, 5 h old\), 3 in\. of new snow in 24 h \(model estimate\)\.$/);
+  assert.equal(doc.meta.freshness.status, "recent");
 });
 
 test("Big Sky with nothing on file is UNKNOWN everywhere and still validates", () => {
@@ -206,7 +207,10 @@ test("operatorReportFromRow normalises numeric strings and nulls; buildResortCon
 
 test("pre-season and closed-today sentences name the date or the lift count", () => {
   const vail = envelopeFor(VAIL);
-  assert.equal(vail.sentence, "As of 6:00 p.m. MT Sep 30, Vail Mountain has not opened for the season: confirmed opening Dec 26; base 42 in. (SNOTEL, 5 h old), 6 in. of new snow in 24 h (SNOTEL).");
+  // Dated by the resort's own day, not by the opening row's update time.
+  assert.equal(vail.sentence, "As of Dec 20, Vail Mountain has not opened for the season: confirmed opening Dec 26; base 42 in. (SNOTEL, 5 h old), 6 in. of new snow in 24 h (SNOTEL).");
+  assert.equal(vail.data.status.observedAt, null);
+  assert.equal(vail.data.status.freshness.tier, "recent");
   const closed = serializeConditions(LOVELAND, { now: NOW, opening: OPENINGS["id-loveland"], operator: operatorRow("id-loveland", { lifts_open: 0, lifts_scheduled: 0, lifts_hold: 0, lifts_closed: 9, lifts_total: 9 }), observationStations: [] });
   assert.equal(closed.data.status.value, "CLOSED_TODAY");
   assert.match(closed.sentence, /Loveland Ski Area is closed today: 0 of 9 lifts open \(operator feed, 1 h old\)/);
