@@ -29,6 +29,7 @@
     "seed-openings": "node scripts/seed-resort-openings.mjs",
     "cam-health": "node scripts/cam-health-check.mjs",
     "cam-stills": "tsx scripts/cam-capture-stills.ts",
+    "cam-timelapse": "tsx scripts/cam-timelapse.ts",
     "forecast-sync": "tsx scripts/forecast-sync.ts",
     "forecast-score": "tsx scripts/forecast-score.ts",
     "powder-alerts": "node scripts/powder-alert-check.mjs",

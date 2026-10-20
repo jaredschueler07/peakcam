@@ -13,6 +13,7 @@ import type { AccuracyInput } from "@/lib/public-api/forecast";
 import type { StoredForecast } from "@/lib/forecast/store";
 import type { SnowByDateInches } from "@/lib/weather";
 import type { CamTimelineFrame } from "@/lib/cam-timeline";
+import type { CamTimelapses } from "@/lib/cam-timelapse";
 import type { ResortHistoryData } from "@/lib/public-api/data";
 import type { SeasonAggregateRow } from "@/lib/leaderboards";
 
@@ -73,6 +74,13 @@ export interface McpDataSource extends McpHistorySource {
    * fire-and-forget: a failure must never surface to the caller.
    */
   logUnmatchedQuestion?(entry: UnmatchedQuestion): Promise<void>;
+  /**
+   * Rendered timelapse clips per cam of a resort (`cam_timelapse_current`,
+   * migration 031), shaped by lib/cam-timelapse shapeTimelapses. Null when
+   * the view is unavailable; absent on data sources written before P8 (the
+   * tool then answers `available: false`).
+   */
+  timelapses?(resortId: string): Promise<CamTimelapses[] | null>;
 }
 
 // ── P5: season history ───────────────────────────────────────

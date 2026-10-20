@@ -196,7 +196,7 @@ test("resortMarkdown carries the table, season, cams with capture provenance, li
   assert.ok(md.includes("- Peak 8 Base: offline (last health check failed), captured 2026-12-20T11:30:00.000Z; watch at"));
   assert.ok(md.includes("- Village: unchecked, no still image; watch at"));
 
-  assert.ok(md.includes("- Page: https://www.peakcam.io/resorts/breckenridge\n- API: https://www.peakcam.io/api/v1/resorts/breckenridge\n- Cams API: https://www.peakcam.io/api/v1/resorts/breckenridge/cams\n- Powder feed (Atom): https://www.peakcam.io/resorts/breckenridge/powder.xml\n- Resort website: https://www.breckenridge.com"));
+  assert.ok(md.includes("- Page: https://www.peakcam.io/resorts/breckenridge\n- API: https://www.peakcam.io/api/v1/resorts/breckenridge\n- Cams API: https://www.peakcam.io/api/v1/resorts/breckenridge/cams\n- Timelapses API: https://www.peakcam.io/api/v1/resorts/breckenridge/timelapses\n- Powder feed (Atom): https://www.peakcam.io/resorts/breckenridge/powder.xml\n- Resort website: https://www.breckenridge.com"));
   assert.ok(md.includes("Canonical: https://www.peakcam.io/resorts/breckenridge"));
   assert.ok(md.includes(`Data: ${PUBLIC_API_ATTRIBUTION}. Cite the canonical URL`));
   assert.ok(md.endsWith(`License: ${PUBLIC_API_LICENSE_URL}\n`));

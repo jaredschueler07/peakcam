@@ -19,6 +19,7 @@ import type { ResortHistoryData } from "@/lib/public-api/data";
 import type { SeasonAggregateRow } from "@/lib/leaderboards";
 import { addDays, deriveNewSnow, type CumulativeNormalRow, type DailyRow, type MonthlyNormalRow } from "@/lib/snow-history";
 import type { CamTimelineFrame } from "@/lib/cam-timeline";
+import type { CamTimelapses } from "@/lib/cam-timelapse";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ALL_MODELS, parseModelRuns, type OpenMeteoMultiModelResponse } from "@/lib/forecast/open-meteo-models";
@@ -206,6 +207,15 @@ const FRAMES: CamTimelineFrame[] = [
   { id: 3, camId: BRECK_CAM_ID, url: "https://x.supabase.co/storage/v1/object/public/cam-stills/archive/a/2026-12-18T12-00-00Z.jpg", capturedAt: "2026-12-18T12:00:00Z", snow24hAtCapture: 2, keeper: false },
 ];
 
+// Rendered clips for the Breckenridge cam only (P8): one 24 h clip and one storm reel.
+const CLIPS: CamTimelapses[] = [
+  {
+    camId: BRECK_CAM_ID,
+    current: { id: "clip-24h", window: "24h", url: "https://x.supabase.co/storage/v1/object/public/cam-timelapses/breckenridge/a/24h.mp4?v=1", posterUrl: "https://x.supabase.co/storage/v1/object/public/cam-timelapses/breckenridge/a/24h.jpg?v=1", frames: 96, startsAt: "2026-12-19T12:00:00Z", endsAt: "2026-12-20T11:45:00Z", bytes: 900_000, renderedAt: "2026-12-20T12:00:00Z", stormDate: null },
+    storms: [{ id: "clip-storm", window: "storm", url: "https://x.supabase.co/storage/v1/object/public/cam-timelapses/breckenridge/a/storm-2026-12-20.mp4?v=1", posterUrl: null, frames: 160, startsAt: "2026-12-19T00:00:00Z", endsAt: "2026-12-20T11:45:00Z", bytes: 2_000_000, renderedAt: "2026-12-20T12:00:00Z", stormDate: "2026-12-20" }],
+  },
+];
+
 // Stored multi-model runs for Vail only, from the recorded Alta response
 // (dates 2026-10-18..31; the fixture catalogue's "now" is 2026-12-20, which
 // the blend does not care about — it blends whatever is stored).
@@ -294,6 +304,9 @@ function fixtureData(over: Partial<McpDataSource> = {}): McpDataSource {
     },
     async seasonAggregates() {
       return AGGREGATES;
+    },
+    async timelapses(resortId) {
+      return resortId === "id-breckenridge" ? CLIPS : [];
     },
     ...over,
   };
@@ -835,6 +848,7 @@ test("every tool's structuredContent parses against its own outputSchema", async
     get_season_stats: { slug: "breckenridge" },
     get_monthly_climatology: { slug: "breckenridge" },
     get_leaderboard: { kind: "season-snowfall", state: "CO" },
+    get_timelapses: { slug: "breckenridge" },
   };
   for (const tool of tools) {
     const args = tool.inputSchema.parse(samples[tool.name]);
@@ -898,6 +912,39 @@ test("get_alert_options explains every channel, fills the resort feed, and write
   assert.match(text(res), /webhook-signature/);
   const bad = await call("get_alert_options", { slug: "nowhere" });
   assert.equal(bad.isError, true);
+});
+
+test("get_timelapses returns the 24 h clip and storm reels as links, empty for a resort without clips, unavailable without a reader", async () => {
+  const res = await call("get_timelapses", { slug: "breckenridge" });
+  assert.notEqual(res.isError, true);
+  const doc = res.structuredContent as { available: boolean; clipCount: number; lastStorm: { stormDate: string; camId: string } | null; cams: Array<{ camId: string; current: { url: string; posterUrl: string } | null; storms: Array<{ stormDate: string }> }>; webcamsUrl: string };
+  assert.equal(doc.available, true);
+  assert.equal(doc.clipCount, 2);
+  assert.equal(doc.cams[0].camId, BRECK_CAM_ID);
+  assert.match(doc.cams[0].current!.url, /cam-timelapses\/breckenridge\/a\/24h\.mp4/);
+  assert.match(doc.cams[0].current!.posterUrl, /24h\.jpg/);
+  assert.equal(doc.lastStorm?.stormDate, "2026-12-20");
+  assert.equal(doc.lastStorm?.camId, BRECK_CAM_ID);
+  assert.match(doc.webcamsUrl, /\/resorts\/breckenridge\/webcams$/);
+  assert.match(text(res), /Last 24 h: https:\/\/x\.supabase\.co.*24h\.mp4/);
+  assert.match(text(res), /Storm reel 2026-12-20/);
+  assert.doesNotMatch(text(res), /data:video/, "links only, never inline media");
+
+  const none = await call("get_timelapses", { slug: "vail" });
+  const empty = none.structuredContent as { available: boolean; clipCount: number; note: string };
+  assert.equal(empty.available, true);
+  assert.equal(empty.clipCount, 0);
+  assert.match(empty.note, /No clips yet/);
+
+  const wrongCam = await call("get_timelapses", { slug: "breckenridge", camId: "00000000-0000-4000-8000-000000000000" });
+  assert.equal(wrongCam.isError, true);
+
+  const bare = fixtureData();
+  delete (bare as { timelapses?: unknown }).timelapses;
+  const tool = buildTools(bare).find((t) => t.name === "get_timelapses")!;
+  const off = (await tool.handler({ slug: "breckenridge" })).structuredContent as { available: boolean; note: string };
+  assert.equal(off.available, false);
+  assert.match(off.note, /not served/);
 });
 
 test("get_cam_timeline returns frames as links inside the window plus the last storm frame", async () => {

@@ -15,9 +15,14 @@ import { camDisplayName } from "@/lib/cam-name";
 import { conditionsNarrative } from "@/lib/resort-copy";
 import { openingStatus, toPacificDay, type ResortOpening } from "@/lib/openings";
 import { PUBLIC_API_ATTRIBUTION, PUBLIC_API_LICENSE_URL } from "./headers";
+import { resortTabUrl } from "@/lib/resort-pages";
+import type { CamTimelapses } from "@/lib/cam-timelapse";
 import type {
   CamListPublic,
   CamPublic,
+  CamTimelapsePublic,
+  CamTimelapsesPublic,
+  TimelapseListPublic,
   Measurement,
   MeasurementSource,
   MeasuredNowPublic,
@@ -64,6 +69,13 @@ export interface SerializeOptions {
    * layer is live and this resort has no station within 25 km.
    */
   observationStations?: ResortStationJoined[] | null;
+  /**
+   * Rendered timelapse clips per cam (migrations 025 + 031,
+   * `getResortTimelapses`). Omitted → cam objects carry no `timelapses`
+   * key (the P0 contract makes it optional); an array, even empty → every
+   * cam carries one, empty for cams without a clip.
+   */
+  timelapses?: CamTimelapses[] | null;
 }
 
 export type { StationMeta };
@@ -279,6 +291,64 @@ export function serializeCam(cam: Cam, resort: Pick<ResortWithData, "slug">, opt
     kind: cam.kind ?? null,
     credit: cam.credit ?? null,
     sourceTermsUrl: cam.source_terms_url ?? null,
+    // Rendered clips (P8 block 2): only when the caller loaded them.
+    ...(options.timelapses ? { timelapses: clipsForCam(options.timelapses, cam.id) } : {}),
+  };
+}
+
+/** The flat clip list for one cam: the current 24 h clip first, then the storm reels. */
+function clipsForCam(all: readonly CamTimelapses[], camId: string): CamTimelapsePublic[] {
+  const own = all.find((t) => t.camId === camId);
+  if (!own) return [];
+  return [...(own.current ? [own.current] : []), ...own.storms];
+}
+
+/**
+ * /api/v1/resorts/{slug}/timelapses: every clip per cam, links only. The
+ * per-cam entries follow the resort's cam order and skip cams without a
+ * clip; `available` is false when the caller could not read the clip table
+ * (migration 031 not applied), which is different from "no clips yet".
+ */
+export function serializeTimelapses(resort: ResortWithData, options: SerializeOptions = {}): TimelapseListPublic {
+  const cams = activeCams(resort);
+  const all = options.timelapses ?? null;
+  const webcamsUrl = resortTabUrl(resort.slug, "webcams", options.baseUrl);
+  const entries: CamTimelapsesPublic[] = [];
+  for (const cam of cams) {
+    const own = all?.find((t) => t.camId === cam.id);
+    if (!own || (!own.current && !own.storms.length)) continue;
+    entries.push({
+      camId: cam.id,
+      camName: camDisplayName(cam),
+      pageUrl: `${webcamsUrl}#cam-${cam.id}`,
+      kind: cam.kind ?? null,
+      credit: cam.credit ?? null,
+      current: own.current,
+      storms: own.storms,
+    });
+  }
+  const clips = entries.flatMap((e) => [...(e.current ? [e.current] : []), ...e.storms]);
+  const storms = entries.flatMap((e) => e.storms.map((s) => ({ ...s, camId: e.camId, camName: e.camName })));
+  const lastStorm = storms.sort((a, b) => (b.stormDate ?? "").localeCompare(a.stormDate ?? "") || Date.parse(b.renderedAt) - Date.parse(a.renderedAt))[0] ?? null;
+  const note = !all
+    ? "Timelapse clips are not served by this deployment yet."
+    : clips.length
+      ? "Clips are PeakCam renders of its own archived frames of operator-permitted cams (7 fps, 720p max, at most 3 MB); rights stay with the operator. The 24 h clip is replaced every render; storm reels are kept a year. Link them, do not describe them unseen."
+      : "No clips yet: the resort's cams may be player-only (no archiving permission) or the archive has fewer than a dozen frames in the last 24 hours.";
+  return {
+    slug: resort.slug,
+    name: resort.name,
+    canonicalUrl: resortCanonicalUrl(resort.slug, options.baseUrl),
+    webcamsUrl,
+    available: all != null,
+    clipCount: clips.length,
+    newestRenderedAt: latestInstant(clips.map((c) => c.renderedAt)),
+    lastStorm,
+    cams: entries,
+    note,
+    attribution: PUBLIC_API_ATTRIBUTION,
+    license: PUBLIC_API_LICENSE_URL,
+    updatedAt: latestInstant(clips.map((c) => c.renderedAt)),
   };
 }
 

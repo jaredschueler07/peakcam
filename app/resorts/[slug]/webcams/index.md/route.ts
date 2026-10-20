@@ -1,4 +1,4 @@
-import { findResort, isValidSlug, loadPublicApiCatalog, optionsFor } from "@/lib/public-api/data";
+import { findResort, isValidSlug, loadPublicApiCatalog, loadResortTimelapses, optionsFor } from "@/lib/public-api/data";
 import { markdownPageHeaders, webcamsMarkdown } from "@/lib/public-api/markdown-page";
 import { serializeResort } from "@/lib/public-api/serialize";
 import { getResortCamTimelines } from "@/lib/supabase";
@@ -23,8 +23,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
   const resort = findResort(catalog, slug);
   if (!resort) return notFound(slug);
   const camOrder = resort.cams.filter((c) => c.is_active).map((c) => c.id);
-  const timelines = (await getResortCamTimelines(resort.id, camOrder, 24)) ?? new Map();
+  const [timelines, timelapses] = await Promise.all([getResortCamTimelines(resort.id, camOrder, 24), loadResortTimelapses(resort.id)]);
   const doc = serializeResort(resort, optionsFor(catalog, resort));
-  const body = webcamsMarkdown(doc, { now: catalog.now, timelines: Object.fromEntries(timelines) });
+  const body = webcamsMarkdown(doc, { now: catalog.now, timelines: Object.fromEntries(timelines ?? new Map()), timelapses });
   return new Response(body, { headers: markdownPageHeaders(resortTabUrl(resort.slug, "webcams")) });
 }
