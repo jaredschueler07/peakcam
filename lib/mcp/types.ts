@@ -9,6 +9,9 @@
 
 import type { ResortWithData, WeatherPeriod } from "@/lib/types";
 import type { PublicApiCatalog } from "@/lib/public-api/data";
+import type { AccuracyInput } from "@/lib/public-api/forecast";
+import type { StoredForecast } from "@/lib/forecast/store";
+import type { SnowByDateInches } from "@/lib/weather";
 import type { CamTimelineFrame } from "@/lib/cam-timeline";
 import type { ResortHistoryData } from "@/lib/public-api/data";
 import type { SeasonAggregateRow } from "@/lib/leaderboards";
@@ -46,8 +49,16 @@ export interface UnmatchedQuestion {
 export interface McpDataSource extends McpHistorySource {
   /** The cached catalogue read shared with /api/v1 (resorts, openings, elevations, now). */
   catalog(): Promise<PublicApiCatalog>;
-  /** NWS 5-day forecast for a resort; null when NWS does not answer or does not cover the point. */
-  forecast(resort: Pick<ResortWithData, "lat" | "lng" | "country">): Promise<WeatherPeriod[] | null>;
+  /**
+   * NWS 5-day narrative for a resort; null when NWS does not answer or does
+   * not cover the point. `blendByDate` (inches per YYYY-MM-DD from the stored
+   * blend) replaces the keyword snow amounts when given.
+   */
+  forecast(resort: Pick<ResortWithData, "lat" | "lng" | "country">, blendByDate?: SnowByDateInches | null): Promise<WeatherPeriod[] | null>;
+  /** The newest stored run per point and model (migration 027); `{ runs: [] }` when none is current. */
+  forecastRuns(resortId: string): Promise<StoredForecast>;
+  /** Score rows, measured days and truth basis for the accuracy document. */
+  forecastAccuracy(resort: Pick<ResortWithData, "id" | "snotel_station_id" | "elevation_summit_ft" | "elevation_base_ft">): Promise<AccuracyInput>;
   /** The most recent `days` rows of `snowpack_daily` for a resort, newest first. */
   snowHistory(resortId: string, days: number): Promise<SnowHistoryRow[]>;
   /**

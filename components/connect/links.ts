@@ -52,6 +52,8 @@ export const CONNECT_LINKS = {
   apiResorts: { href: "/api/v1/resorts", label: "REST: resort list" },
   apiResort: { href: "/api/v1/resorts/breckenridge", label: "REST: one resort" },
   apiCams: { href: "/api/v1/resorts/breckenridge/cams", label: "REST: a resort's cams" },
+  apiForecast: { href: "/api/v1/resorts/breckenridge/forecast", label: "REST: blended 14-day forecast" },
+  apiForecastAccuracy: { href: "/api/v1/resorts/breckenridge/forecast-accuracy", label: "REST: forecast accuracy by model" },
   apiPowder: { href: "/api/v1/powder?source=snotel", label: "REST: powder ranking" },
   apiSearchIndex: { href: "/api/v1/resorts/search-index", label: "REST: search index" },
   apiStatus: { href: "/api/v1/status", label: "REST: service status" },
@@ -142,7 +144,11 @@ const TOOL_COPY: Record<PeakCamToolName, Omit<ConnectTool, "name">> = {
   },
   get_forecast: {
     title: "Resort forecast",
-    summary: "Five-day National Weather Service forecast for US resorts; Canada and the Andes return available: false.",
+    summary: "Fourteen-day blended snow forecast: median of up to nine weather models per day, with the 25th–75th band and model count.",
+  },
+  compare_models: {
+    title: "Compare forecast models",
+    summary: "How each model has verified at a resort over 90 days against measured snow (MAE, bias, rank), and its 7-day outlook now.",
   },
   get_snow_history: {
     title: "Snow history",
@@ -223,6 +229,7 @@ export const EXAMPLE_PROMPTS: readonly ExamplePrompt[] = [
   },
   { prompt: "Show me Breckenridge's webcams.", tools: "get_resort_cams (links only)" },
   { prompt: "Compare Vail, Breckenridge and Keystone for a trip this weekend.", tools: "compare_resorts, then get_forecast for each" },
+  { prompt: "Which forecast model has been most accurate at Alta, and how much do they disagree this week?", tools: "compare_models (alta)" },
   { prompt: "When does Mammoth open this season? What about the rest of California?", tools: "get_opening_dates (CA)" },
   { prompt: "Which Utah resorts are above normal snowpack right now?", tools: "get_percent_of_normal (UT)" },
   { prompt: "What did Alta's cams look like over the last 24 hours?", tools: "get_cam_timeline (alta, 24 h; links only)" },

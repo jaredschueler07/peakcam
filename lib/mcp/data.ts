@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { unstable_cache } from "next/cache";
-import { loadPublicApiCatalog, loadResortHistory, loadSeasonAggregates } from "@/lib/public-api/data";
+import { loadPublicApiCatalog, loadResortAccuracy, loadResortForecast, loadResortHistory, loadSeasonAggregates } from "@/lib/public-api/data";
 import { PUBLIC_API_REVALIDATE_SECONDS } from "@/lib/public-api/headers";
 import { getCamStillFrames, supabase } from "@/lib/supabase";
 import { getWeatherForecast } from "@/lib/weather";
@@ -69,7 +69,10 @@ export const productionDataSource: McpDataSource = {
   catalog: loadPublicApiCatalog,
   // getWeatherForecast() fetches with `next: { revalidate: 3600 }`, so the
   // Data Cache holds each grid point's forecast for an hour.
-  forecast: (resort) => getWeatherForecast(resort.lat, resort.lng),
+  forecast: (resort, blendByDate) => getWeatherForecast(resort.lat, resort.lng, blendByDate),
+  // Both read through the public API's 15-minute caches (lib/public-api/data.ts).
+  forecastRuns: (resortId) => loadResortForecast(resortId),
+  forecastAccuracy: (resort) => loadResortAccuracy(resort),
   snowHistory: (resortId, days) => getSnowHistoryCached(resortId, days),
   camStills: (filter, hours) => getCamStillFramesCached(filter.camId ?? null, filter.resortId ?? null, hours),
   logUnmatchedQuestion,

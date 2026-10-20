@@ -27,7 +27,7 @@ export const RATE_LIMIT_TEXT =
 const never = async (): Promise<never> => {
   throw new Error("llms-full.txt never calls a tool");
 };
-const STUB: McpDataSource = { catalog: never, forecast: never, snowHistory: never, camStills: never };
+const STUB: McpDataSource = { catalog: never, forecast: never, forecastRuns: never, forecastAccuracy: never, snowHistory: never, camStills: never };
 
 interface ParamDoc {
   name: string;
@@ -96,6 +96,8 @@ function restDocs(baseUrl: string): RestDoc[] {
     { method: "GET", path: "/api/v1/resorts/search-index", summary: "Slug, name, aliases, state, country, lat/lon and page URL per resort, for client-side name matching. Cached a day.", example: `curl -s ${api}/resorts/search-index | jq '.resorts[] | select(.aliases | length > 0) | {slug, aliases}' | head -40`, schema: "search-index" },
     { method: "GET", path: "/api/v1/resorts/{slug}", summary: "One resort: location, latest snow report with per-field source and time, season, cams.", example: `curl -s ${api}/resorts/alta | jq '{name, snow: .snow.newSnow24h, season: .season.status}'`, schema: "resort" },
     { method: "GET", path: "/api/v1/resorts/{slug}/cams", summary: "The resort's cams with health and still URLs. Links only.", example: `curl -s ${api}/resorts/breckenridge/cams | jq '.cams[] | {name, live, stillUrl}'`, schema: "cams" },
+    { method: "GET", path: "/api/v1/resorts/{slug}/forecast?point=summit|base", summary: "Blended 14-day snow forecast: per-day median across up to nine weather models with the 25th/75th band and model count, a summary (next 48 h, 7/14-day totals, peak), and every model run in provider units. Weather data by Open-Meteo.com (CC BY 4.0).", example: `curl -s ${api}/resorts/alta/forecast | jq '{models: .summary.modelCount, next7: .summary.total7dIn, days: [.daily[] | {date, in: .snowfallIn, lo: .snowfallLoIn, hi: .snowfallHiIn, n: .modelCount}]}'`, schema: "forecast" },
+    { method: "GET", path: "/api/v1/resorts/{slug}/forecast-accuracy", summary: "Per-model verification over 90 days against measured snow: day-1/3/7 MAE (cm), bias ratio, samples, rank, with truthBasis and measuredDays. Empty models until the scorer has measured days.", example: `curl -s ${api}/resorts/alta/forecast-accuracy | jq '{truthBasis, measuredDays, best: .bestModel, models: [.models[] | {model, rank, day1Mae, biasRatio}]}'`, schema: "forecast-accuracy" },
     { method: "GET", path: "/api/v1/powder?window=24h|48h&state=&minInches=&source=snotel&limit=", summary: "Resorts ranked by new snow; `source=snotel` keeps measured reports only.", example: `curl -s '${api}/powder?window=24h&state=CO&source=snotel&limit=5' | jq '.results[] | {rank, name, in24: .newSnow24h.value}'`, schema: "powder" },
     { method: "GET", path: "/api/v1/status", summary: "Service status from the data: snow-report freshness and cam health, with thresholds. 200 even when degraded; read `status`.", example: `curl -s ${api}/status | jq '{status, age: .checks.snowReports.ageHours, cams: .checks.cams.liveRatio}'`, schema: "status" },
     { method: "GET", path: "/api/v1/resorts/{slug}/history", summary: "The season's cumulative measured snowfall curve by day against the station's 30-winter normal band (mean, p25, p75, recent-decade mean), plus ten past seasons with totals, powder days, biggest storm, deepest base, weekly cumulative totals and ENSO phase.", example: `curl -s ${api}/resorts/breckenridge/history | jq '{season: .season.label, asOf, days: (.curve.points|length), past: [.pastSeasons[] | {s: .season.label, totalIn, powderDays}]}'`, schema: "resort-history" },
@@ -120,7 +122,7 @@ export function buildLlmsFull(baseUrl: string = SITE_URL): string {
     "## What the data is",
     "",
     "- Every snow number carries a `source` and a `measuredAt`. `snotel` means measured at a USDA NRCS SNOTEL/SCAN station near the resort, quality-controlled by PeakCam and synced every 6 hours; the station sits at one elevation (`station.elevationFt`), not the summit. `open_meteo` means a weather-model estimate for resorts with no station (most of Canada, the East and the Andes). Say which it is when you quote a number.",
-    "- Forecasts are the US National Weather Service for US resorts (5 days; snow amounts in them are keyword heuristics from the forecast wording, not quantitative). Canadian and Andes resorts return `available: false`.",
+    "- Forecasts are PeakCam's blend of up to nine weather models (ECMWF IFS, GFS, GEM, ICON, JMA, Météo-France, UKMO; NBM and HRRR for US points) fetched from Open-Meteo every 6 hours at the summit and base: per day the median snowfall, a 25th–75th percentile band, and `modelCount` (fewer models reach the far days — say so when you quote day 10). US resorts also get the National Weather Service narrative with its snow amounts replaced by the blend. Each model and the blend is graded against measured SNOTEL snow over 90 days (`compare_models`, `/forecast-accuracy`); quote `truthBasis` and `measuredDays` with any accuracy claim. Credit: Weather data by Open-Meteo.com (CC BY 4.0).",
     "- Webcams are returned as links (PeakCam page, operator stream, still URL with its capture time). Never describe a frame you have not fetched. Archived stills exist only for cams whose operator allows it.",
     "- Season status comes from `resort_openings`: `open` once a resort-confirmed date has passed, `closed` before it, `unknown` when PeakCam has only a projection or no date. Never report a resort as open without a confirmed source.",
     "- Percent of normal is SWE against the station's 1991–2020 median for the day of the water year, published only inside 10–300 % and above 2 in of SWE.",
@@ -179,7 +181,7 @@ export function buildLlmsFull(baseUrl: string = SITE_URL): string {
     "",
     "## What PeakCam does not have (do not invent)",
     "",
-    "- Lift and trail open counts, terrain statistics, pass affiliations, multi-model forecasts and forecast verification are not in this API yet. Say so rather than estimating.",
+    "- Lift and trail open counts, terrain statistics and pass affiliations are not in this API yet. Say so rather than estimating.",
     "- Season history is PeakCam's own daily station record (ten seasons, from the backfill) and daily new snow is the positive change in station depth, a measured floor: do not present a season total as the resort's marketing snowfall figure. Resorts without a station have model-estimated daily values and no normal band or monthly climatology.",
     "- Resorts outside the catalogue: `search_resorts` or `/api/v1/resorts/search-index` is the authority on what is tracked.",
     "",

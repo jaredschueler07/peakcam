@@ -20,6 +20,8 @@ const FILE_STEMS: Record<string, string> = {
   ResortList: "resort-list",
   SearchIndex: "search-index",
   Status: "status",
+  Forecast: "forecast",
+  ForecastAccuracy: "forecast-accuracy",
   AskAnswer: "ask",
   BatchRequest: "batch-request",
   BatchResponse: "batch",

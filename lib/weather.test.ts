@@ -230,3 +230,16 @@ test("forecastToCondition agrees with estimateSnow on wintry mix", () => {
   assert.strictEqual(forecastToCondition("Blizzard"), "blizzard");
   assert.strictEqual(forecastToCondition("Sunny"), "clear");
 });
+
+// ── applyBlendToPeriods (P4) ─────────────────────────────────
+
+test("applyBlendToPeriods rescales a day's periods to the blended total, in proportion to the keyword weights", async () => {
+  const { applyBlendToPeriods } = await import("./weather");
+  const period = (date: string, p: "morning" | "afternoon" | "evening", snowInches: number) => ({
+    day: "Mon", date, period: p, condition: "light-snow", highTemp: 20, lowTemp: 10, feelsLike: 5, windSpeed: 10, windGust: 15, windDirection: "W", snowInches, precipProbability: 60, shortForecast: "Snow",
+  });
+  const periods = [period("2026-12-01", "morning", 3), period("2026-12-01", "afternoon", 1), period("2026-12-02", "morning", 0), period("2026-12-02", "evening", 0), period("2026-12-03", "morning", 2)];
+  const out = applyBlendToPeriods(periods, { "2026-12-01": 8, "2026-12-02": 5 });
+  assert.deepEqual(out.map((p) => p.snowInches), [6, 2, 2.5, 2.5, 2], "proportional on day 1, even split on a day the wording named no snow, untouched when the blend has no date");
+  assert.deepEqual(applyBlendToPeriods(periods, null).map((p) => p.snowInches), [3, 1, 0, 0, 2]);
+});

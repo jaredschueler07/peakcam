@@ -124,6 +124,7 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
     tags: [
       { name: "resorts", description: "Catalogue and per-resort conditions." },
       { name: "cams", description: "Webcams and stills." },
+      { name: "forecast", description: "Blended multi-model snow forecast and its verification." },
       { name: "powder", description: "Ranked new-snow queries." },
       { name: "ask", description: "The deterministic answer endpoint." },
       { name: "batch", description: "Several reads in one request." },
@@ -163,6 +164,37 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
           parameters: [SLUG_PARAM],
           responses: {
             "200": jsonResponse("The cam list.", "CamList"),
+            "404": ERROR_404,
+            "403": ERROR_403,
+          },
+        },
+      },
+      "/resorts/{slug}/forecast": {
+        get: {
+          operationId: "getResortForecast",
+          tags: ["forecast"],
+          summary: "Blended 14-day snow forecast with every model run",
+          description:
+            "Per day, the median snowfall across the models that reach that day (ECMWF IFS, GFS, GEM, ICON, JMA, Météo-France, UKMO; NBM and HRRR added for US points), with the 25th/75th percentile across models as `snowfallLoIn`/`snowfallHiIn` and `modelCount` per day. `summary` carries next 48 h, 7- and 14-day totals and the peak day; `byModel` is the newest run per model in the provider's units (cm, °C, km/h). Runs are stored every 6 hours from Open-Meteo at the resort's summit and base elevations. `available: false` with empty arrays when no run is current. Weather data by Open-Meteo.com (CC BY 4.0): carry the `credits` line with any reuse.",
+          parameters: [SLUG_PARAM, { name: "point", in: "query", description: "Which elevation's blend to return. Falls back to the other point with a `note` when the asked one has no runs.", schema: { type: "string", enum: ["summit", "base"], default: "summit" } }],
+          responses: {
+            "200": jsonResponse("The forecast document.", "Forecast"),
+            "400": ERROR_400,
+            "404": ERROR_404,
+            "403": ERROR_403,
+          },
+        },
+      },
+      "/resorts/{slug}/forecast-accuracy": {
+        get: {
+          operationId: "getResortForecastAccuracy",
+          tags: ["forecast"],
+          summary: "How each model has verified at this resort over 90 days",
+          description:
+            "One row per model plus `blend`, ranked by day-1 mean absolute error (cm), with day-3 and day-7 MAE, a bias ratio (total forecast over total measured; above 1 over-forecasts) and `samples` (measured days graded). `truthBasis` says what the forecasts were graded against — `snotel` means NRCS station depth change clipped at zero, measured, not modelled — and `measuredDays` how many days of the window had a measurement. Empty `models` until the scorer has measured days for the resort.",
+          parameters: [SLUG_PARAM],
+          responses: {
+            "200": jsonResponse("The accuracy document.", "ForecastAccuracy"),
             "404": ERROR_404,
             "403": ERROR_403,
           },
@@ -302,7 +334,7 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
           tags: ["batch"],
           summary: `Run up to ${BATCH_MAX_REQUESTS} GET requests in one call`,
           description:
-            `Accepts up to ${BATCH_MAX_REQUESTS} GET paths under /api/v1 (with query strings) and answers them in order, each with the status and body that path would have returned on its own. The paths run in-process against the same handlers, so a batch is one function invocation and one request against the edge rate limit. Read-only by construction: only /resorts, /resorts/search-index, /resorts/{slug}, /resorts/{slug}/cams, /resorts/{slug}/history, /resorts/{slug}/season-stats, /resorts/{slug}/monthly, /leaderboards/{kind}, /powder, /status and /ask (GET) dispatch; any other path fails the whole batch with a 400 naming it. The response is never cached.`,
+            `Accepts up to ${BATCH_MAX_REQUESTS} GET paths under /api/v1 (with query strings) and answers them in order, each with the status and body that path would have returned on its own. The paths run in-process against the same handlers, so a batch is one function invocation and one request against the edge rate limit. Read-only by construction: only /resorts, /resorts/search-index, /resorts/{slug}, /resorts/{slug}/cams, /resorts/{slug}/forecast, /resorts/{slug}/forecast-accuracy, /resorts/{slug}/history, /resorts/{slug}/season-stats, /resorts/{slug}/monthly, /leaderboards/{kind}, /powder, /status and /ask (GET) dispatch; any other path fails the whole batch with a 400 naming it. The response is never cached.`,
           requestBody: {
             required: true,
             content: {

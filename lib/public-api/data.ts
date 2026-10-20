@@ -9,10 +9,65 @@
 // ─────────────────────────────────────────────────────────────
 
 import { unstable_cache } from "next/cache";
-import { getAllResorts, getResortElevationIndex, getResortOpenings, getResortStationsIndex } from "@/lib/supabase";
+import { getAllResorts, getForecastRuns, getForecastScores, getResortElevationIndex, getResortOpenings, getResortStationsIndex, getSnowDepthHistory } from "@/lib/supabase";
 import type { ResortStationJoined, ResortWithData } from "@/lib/types";
 import type { ResortOpening } from "@/lib/openings";
+import type { ForecastScoreRow, StoredForecast } from "@/lib/forecast/store";
+import { SCORE_PERIOD_DAYS, measuredFromDepth, scoredPointFor } from "@/lib/forecast/score";
+import { STATION_INDEX } from "@/lib/stations";
 import type { ResortElevation, SerializeOptions } from "./serialize";
+import { PUBLIC_API_REVALIDATE_SECONDS } from "./headers";
+import { truthBasisFor, type AccuracyInput } from "./forecast";
+
+// ── Stored forecasts (migration 027) ─────────────────────────
+// Keyed by resort id automatically; one cold read per resort per 15-minute
+// window, same tag as the catalogue so a manual purge clears both. The sync
+// job writes every 6 h, so the window loses nothing.
+
+const getForecastRunsCached = unstable_cache((resortId: string) => getForecastRuns(resortId), ["peakcam:public-api:forecast-runs:v1"], {
+  revalidate: PUBLIC_API_REVALIDATE_SECONDS,
+  tags: ["peakcam-resort-catalog"],
+});
+
+const getForecastScoresCached = unstable_cache((resortId: string) => getForecastScores(resortId), ["peakcam:public-api:forecast-scores:v1"], {
+  revalidate: PUBLIC_API_REVALIDATE_SECONDS,
+  tags: ["peakcam-resort-catalog"],
+});
+
+const getSnowDepthHistoryCached = unstable_cache((resortId: string, days: number) => getSnowDepthHistory(resortId, days), ["peakcam:public-api:depth-history:v1"], {
+  revalidate: PUBLIC_API_REVALIDATE_SECONDS,
+  tags: ["peakcam-resort-catalog"],
+});
+
+/** The newest run per point and model for a resort; `{ runs: [] }` when none is current. Never throws past a missing table. */
+export function loadResortForecast(resortId: string): Promise<StoredForecast> {
+  return getForecastRunsCached(resortId);
+}
+
+export function loadResortForecastScores(resortId: string): Promise<ForecastScoreRow[]> {
+  return getForecastScoresCached(resortId);
+}
+
+/**
+ * Everything the accuracy document needs: the score rows, how many days of
+ * the window had a measured value, and what the measurement was. Measured
+ * days are counted from the same depth-delta rule the scorer uses, so the
+ * number on the page is the number the scores were built on.
+ */
+export async function loadResortAccuracy(
+  resort: Pick<ResortWithData, "id" | "snotel_station_id" | "elevation_summit_ft" | "elevation_base_ft">,
+): Promise<AccuracyInput> {
+  const [scores, depth] = await Promise.all([getForecastScoresCached(resort.id), resort.snotel_station_id ? getSnowDepthHistoryCached(resort.id, SCORE_PERIOD_DAYS) : Promise.resolve([])]);
+  const measuredDays = measuredFromDepth(depth).size;
+  const meta = resort.snotel_station_id ? STATION_INDEX[resort.snotel_station_id] : undefined;
+  return {
+    scores,
+    measuredDays,
+    truthBasis: truthBasisFor(resort, measuredDays),
+    station: resort.snotel_station_id ? { id: resort.snotel_station_id, name: meta?.name ?? null, elevationFt: meta?.elevationFt ?? null } : null,
+    scoredPoint: scores.length ? scoredPointFor(resort, meta?.elevationFt ?? null) : null,
+  };
+}
 import { getSeasonAggregates, getSnowpackDailySince, getStationCumulativeNormals, getStationMonthlyNormals } from "@/lib/supabase";
 import { deriveNewSnow, normalizeRows, type CumulativeNormalRow, type DailyRow, type MonthlyNormalRow } from "@/lib/snow-history";
 import type { SeasonAggregateRow } from "@/lib/leaderboards";

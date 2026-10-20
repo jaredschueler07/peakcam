@@ -21,6 +21,7 @@ export const TOOL_EXAMPLES: Record<PeakCamToolName, ToolExample> = {
   find_powder: { prompt: "Where did it snow most in Colorado, measured only?", args: { window: "24h", state: "CO", sourceOnly: "snotel", limit: 5 } },
   compare_resorts: { prompt: "Compare Vail, Breckenridge and Keystone.", args: { slugs: ["vail", "breckenridge", "keystone"] } },
   get_forecast: { prompt: "What's the forecast for Jackson Hole?", args: { slug: "jackson-hole" } },
+  compare_models: { prompt: "Which forecast model has been most accurate at Alta, and what does each say for the week?", args: { slug: "alta" } },
   get_snow_history: { prompt: "How has Alta's base changed this week?", args: { slug: "alta", days: 7 } },
   get_opening_dates: { prompt: "When do California resorts open?", args: { state: "CA", limit: 20 } },
   get_resort_profile: { prompt: "Where is Mammoth and how high is it?", args: { slug: "mammoth" } },
