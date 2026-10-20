@@ -89,6 +89,12 @@
     "lat": 39.25259,
     "lng": -119.8771
   },
+  "1259:WA:SNTL": {
+    "name": "Muckamuck",
+    "elevationFt": 4470,
+    "lat": 48.58526,
+    "lng": -119.86624
+  },
   "1299:ID:SNTL": {
     "name": "Pebble Creek",
     "elevationFt": 6520,
@@ -125,6 +131,12 @@
     "lat": 43.05723,
     "lng": -73.03892
   },
+  "2043:NH:SCAN": {
+    "name": "Mascoma River",
+    "elevationFt": 1400,
+    "lat": 43.7756,
+    "lng": -72.02593
+  },
   "2069:NH:SCAN": {
     "name": "Hubbard Brook",
     "elevationFt": 1480,
@@ -142,6 +154,12 @@
     "elevationFt": 7340,
     "lat": 37.63423,
     "lng": -118.82643
+  },
+  "2227:MO:SCAN": {
+    "name": "Shaw Nature Reserve",
+    "elevationFt": 580,
+    "lat": 38.47902,
+    "lng": -90.80641
   },
   "310:AZ:SNTL": {
     "name": "Baldy",
@@ -413,6 +431,12 @@
     "lat": 44.16188,
     "lng": -107.12622
   },
+  "707:WA:SNTL": {
+    "name": "Quartz Peak",
+    "elevationFt": 4710,
+    "lat": 47.87927,
+    "lng": -117.08938
+  },
   "708:NM:SNTL": {
     "name": "Quemazon",
     "elevationFt": 9500,
@@ -538,6 +562,12 @@
     "elevationFt": 4440,
     "lat": 46.64142,
     "lng": -121.38153
+  },
+  "873:OR:SNTL": {
+    "name": "Wolf Creek",
+    "elevationFt": 5730,
+    "lat": 45.06704,
+    "lng": -118.15185
   },
   "874:CO:SNTL": {
     "name": "Wolf Creek Summit",
