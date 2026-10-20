@@ -6,6 +6,8 @@ import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { safeNext } from "@/lib/safe-redirect";
 import { track, EVENTS } from "@/lib/analytics-events";
 import { authErrorMessage } from "@/lib/auth-errors";
+import { OAUTH_PROVIDER, googleSignInOptions, isOAuthProviderEnabled } from "@/lib/auth-oauth";
+import { GoogleSignInButton } from "./GoogleSignInButton";
 
 export type AuthMode = "signin" | "signup" | "link" | "reset" | "confirm";
 type Mode = AuthMode;
@@ -42,6 +44,7 @@ export function AuthForm({
   const [sent, setSent] = useState(false);
   const [token, setToken] = useState("");
   const [resendIn, setResendIn] = useState(0);
+  const [googleBusy, setGoogleBusy] = useState(false);
   const submitting = useRef(false);
   useEffect(() => {
     if (!resendIn) return;
@@ -95,6 +98,34 @@ export function AuthForm({
       setError(authErrorMessage(caught));
     } finally { submitting.current = false; setLoading(false); }
   }
+  /**
+   * Google sign-in (P11). The browser client builds the /auth/v1/authorize
+   * URL and navigates there without a request first, and with the provider
+   * switched off that URL is a raw JSON 400 page — so the public settings
+   * document is checked before leaving. The PKCE verifier cookie is written by
+   * @supabase/ssr; /auth/callback exchanges the code and honours `next`.
+   * Email flows are untouched; the method is only tagged on Google's events.
+   */
+  async function signInWithGoogle() {
+    if (submitting.current) return;
+    submitting.current = true;
+    setGoogleBusy(true); setLoading(true); setError(null);
+    try {
+      if (mode === "signup") track(EVENTS.AUTH_SIGNUP_STARTED, { method: "google" });
+      const enabled = await isOAuthProviderEnabled(OAUTH_PROVIDER, {
+        supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
+        apiKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
+      });
+      if (enabled === false) throw { code: "google_not_enabled" };
+      if (mode === "signup") track(EVENTS.AUTH_SIGNUP_SUBMITTED, { method: "google", session_issued: false });
+      const { error } = await createSupabaseBrowserClient().auth.signInWithOAuth(googleSignInOptions(window.location.origin, next));
+      if (error) throw error;
+      // The browser is navigating to Google now; the state reset below only
+      // matters if it comes back through bfcache.
+    } catch (caught) {
+      setError(authErrorMessage(caught));
+    } finally { submitting.current = false; setGoogleBusy(false); setLoading(false); }
+  }
   async function verifyCode(event: React.FormEvent) {
     event.preventDefault();
     if (submitting.current || !/^\d{6,10}$/.test(token)) return;
@@ -124,6 +155,7 @@ export function AuthForm({
       {(["signin", "signup"] as const).map(value => <button key={value} type="button" disabled={loading} aria-pressed={mode === value} onClick={() => changeMode(value)} className={`min-h-11 rounded-full border border-ink px-3 text-sm font-bold ${mode === value ? "bg-ink text-cream-50" : "bg-cream-50 text-ink"}`}>{value === "signin" ? "Sign in" : "Sign up"}</button>)}
     </div>}
     {(mode === "reset" || mode === "link" || mode === "confirm") && <p className="mb-4 text-sm text-bark">{mode === "reset" ? "We’ll send a link to choose a new password." : mode === "confirm" ? "Request another confirmation for your existing signup." : `Sign in to your existing account with an email ${EMAIL_CODE_ENABLED ? "code" : "link"}.`}</p>}
+    {needsPassword && <GoogleSignInButton onClick={signInWithGoogle} disabled={loading} busy={googleBusy} />}
     <form onSubmit={submit} className="space-y-4">
       <label htmlFor={`${id}-email`} className="block text-sm font-bold">Email address<input id={`${id}-email`} type="email" autoComplete="email" required value={email} disabled={loading} onChange={event => setEmail(event.target.value)} className={inputClass} /></label>
       {needsPassword && <div><label htmlFor={`${id}-password`} className="block text-sm font-bold">Password<input id={`${id}-password`} aria-describedby={mode === "signup" ? `${id}-password-hint` : undefined} type="password" autoComplete={mode === "signin" ? "current-password" : "new-password"} required minLength={mode === "signup" ? 8 : undefined} value={password} disabled={loading} onChange={event => setPassword(event.target.value)} className={inputClass} /></label>{mode === "signup" && <p id={`${id}-password-hint`} className="mt-1 text-xs text-bark">Use at least 8 characters.</p>}</div>}

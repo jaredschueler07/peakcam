@@ -3,13 +3,14 @@
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { track, EVENTS } from "@/lib/analytics-events";
-import { WELCOME_PARAM, WELCOME_SIGNUP } from "@/lib/auth-signup-welcome";
+import { WELCOME_METHOD_GOOGLE, WELCOME_METHOD_PARAM, WELCOME_PARAM, WELCOME_SIGNUP } from "@/lib/auth-signup-welcome";
 
 /**
  * Consumes the `?welcome=signup` marker that /auth/callback appends when a
- * brand-new account confirms its email, fires AUTH_SIGNUP_COMPLETED exactly
- * once, and strips the marker from the URL so a reload or share cannot
- * re-fire it. Must render under a Suspense boundary (useSearchParams).
+ * brand-new account confirms its email (or is created by Google sign-in),
+ * fires AUTH_SIGNUP_COMPLETED exactly once, and strips the marker from the
+ * URL so a reload or share cannot re-fire it. Must render under a Suspense
+ * boundary (useSearchParams).
  */
 export function SignupWelcomeTracker() {
   const router = useRouter();
@@ -23,10 +24,12 @@ export function SignupWelcomeTracker() {
     if (searchParams.get(WELCOME_PARAM) !== WELCOME_SIGNUP) return;
     fired.current = true;
 
-    track(EVENTS.AUTH_SIGNUP_COMPLETED, { confirmation: "email" });
+    const viaGoogle = searchParams.get(WELCOME_METHOD_PARAM) === WELCOME_METHOD_GOOGLE;
+    track(EVENTS.AUTH_SIGNUP_COMPLETED, viaGoogle ? { confirmation: "oauth", method: "google" } : { confirmation: "email" });
 
     const rest = new URLSearchParams(searchParams.toString());
     rest.delete(WELCOME_PARAM);
+    rest.delete(WELCOME_METHOD_PARAM);
     const query = rest.toString();
     const destination = query ? `${pathname}?${query}` : pathname;
     router.replace(`${destination}${window.location.hash}`, { scroll: false });

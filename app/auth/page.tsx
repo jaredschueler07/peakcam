@@ -6,12 +6,17 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { track, EVENTS } from "@/lib/analytics-events";
+import { authErrorMessage } from "@/lib/auth-errors";
 
 const ACCOUNT_PERKS = ["Favorites synced across devices", "My Peak dashboard", "Post full condition reports"];
 
 function SignIn() {
   const params = useSearchParams();
-  const failed = params?.get("error") === "auth_failed";
+  const errorKind = params?.get("error");
+  const failed = errorKind === "auth_failed";
+  // Google sign-in came back through /auth/callback with an OAuth error;
+  // `reason` is Supabase's error code, mapped to copy in lib/auth-errors.ts.
+  const oauthFailed = errorKind === "oauth_failed";
   const reason = params?.get("reason") ?? "unknown";
   useEffect(() => {
     // /auth/callback redirects here when the code exchange fails and tags the
@@ -19,8 +24,12 @@ function SignIn() {
     // confirmed accounts that never reach the ?welcome=signup landing —
     // visible next to AUTH_SIGNUP_COMPLETED instead of silently missing.
     if (failed) track(EVENTS.AUTH_CALLBACK_FAILED, { reason });
-  }, [failed, reason]);
-  return <AuthForm redirectTo={params?.get("next") ?? "/"} initialMode={params?.get("mode") === "signup" ? "signup" : "signin"} initialError={failed ? "That sign-in link expired or couldn’t be opened in this browser. Please request a new link." : null} />;
+    else if (oauthFailed) track(EVENTS.AUTH_CALLBACK_FAILED, { reason, method: "google" });
+  }, [failed, oauthFailed, reason]);
+  const initialError = failed
+    ? "That sign-in link expired or couldn’t be opened in this browser. Please request a new link."
+    : oauthFailed ? authErrorMessage({ code: reason }) : null;
+  return <AuthForm redirectTo={params?.get("next") ?? "/"} initialMode={params?.get("mode") === "signup" ? "signup" : "signin"} initialError={initialError} />;
 }
 export default function AuthPage() {
   return <main id="main-content" className="mx-auto min-h-dvh w-full max-w-md px-4 py-8">
