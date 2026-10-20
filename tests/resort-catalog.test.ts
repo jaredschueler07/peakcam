@@ -24,16 +24,56 @@ const profiles = readCsv("resort-profiles.csv");
 const openings = readCsv("resort-openings.csv");
 
 /**
- * Resorts that ship with neither a cam row nor a SNOTEL station. Each one
+ * Resorts that ship with neither a cam row nor a SNOTEL/SCAN triplet. Each one
  * needs a reason here so the gap is a decision, never an accident: the Andes
  * rows have no public cam and no open station network (Open-Meteo covers the
- * snow report); any new entry should name the follow-up that removes it.
+ * snow report); the Eastern and Midwest rows name the P3 station that measures
+ * for them and why no cam is stored; any new entry should name the follow-up
+ * that removes it.
  */
 const NO_CAM_NO_STATION_ALLOWED: Record<string, string> = {
   lagunillas: "Andes: no public cam, no station network; model snow report",
   "cerro-mirador": "Andes: no public cam, no station network; model snow report",
   "batea-mahuida": "Andes: no public cam, no station network; model snow report",
   "cerro-perito-moreno": "Andes: no public cam, no station network; model snow report",
+  // P1 batch 2 (2026-10-20): east of the Rockies the AWDB rule rarely matches, so the P3
+  // station layer (GHCN-Daily snow stations, NWS observations) is the measured source.
+  // The nearest ones within 25 km are recorded here from the import-day check.
+  "afton-alps": "P3: GHCN US1MNWG0047 5 km, NWS K21D 17 km; no public cam on the operator site",
+  "alpine-valley": "P3: GHCN US1WIWW0037 10 km, NWS K57C 8 km; no public cam on the operator site",
+  "berkshire-east": "P3: GHCN USC00192175 5 km; no public cam on the operator site",
+  "big-boulder": "P3: GHCN US1PACB0033 4 km, NWS KMPO 21 km; no public cam on the operator site",
+  "big-powderhorn": "P3: GHCN US1MIGG0008 4 km, NWS KIWD 4 km; Twitch players need a host-bound parent parameter",
+  "black-mountain-nh": "P3: GHCN US1NHCR0015 6 km; no public cam on the operator site",
+  "black-mountain-of-maine": "P3: GHCN USC00171901 18 km; no public cam on the operator site",
+  "boston-mills": "P3: GHCN US1OHSM0044 7 km; no public cam on the operator site",
+  "devils-head": "P3: GHCN US1WISK0026 6 km, NWS KDLL 17 km; no public cam on the operator site",
+  "elk-mountain": "P3: GHCN USC00367029 9 km; no public cam on the operator site",
+  "jack-frost": "P3: GHCN US1PACB0033 4 km, NWS KMPO 23 km; no public cam on the operator site",
+  "labrador-mountain": "P3: GHCN US1NYOG0087 9 km, NWS KN03 22 km; no public cam on the operator site",
+  "laurel-mountain": "P3: GHCN USC00364839 2 km, NWS KLBE 24 km; no public cam on the operator site",
+  "lost-valley": "P3: GHCN US1MEAN0041 3 km, NWS KLEW 9 km; no public cam on the operator site",
+  "mad-river-mountain": "P3: GHCN US1OHLG0015 9 km, NWS KEDJ 13 km; no public cam on the operator site",
+  "montage-mountain": "P3: GHCN USW00014777 5 km, NWS KAVP 6 km; no public cam on the operator site",
+  "mount-bohemia": "P3: GHCN US1MIKW0001 9 km, NWS KP59 14 km; no public cam on the operator site",
+  "mountain-creek": "P3: GHCN US1NJSS0066 3 km, NWS KFWN 10 km; no public cam on the operator site",
+  "mt-abram": "P3: GHCN US1MEOX0014 8 km; no public cam on the operator site",
+  "mt-brighton": "P3: GHCN US1MILV0024 6 km, NWS KOZW 18 km; no public cam on the operator site",
+  "otsego-resort": "P3: GHCN USW00004854 3 km, NWS KGLR 3 km; no public cam on the operator site",
+  "paoli-peaks": "P3: GHCN US1INOR0034 6 km; no public cam on the operator site",
+  "pine-mountain": "P3: GHCN US1MIDC0006 1 km, NWS KIMT 3 km; no public cam on the operator site",
+  "plattekill": "P3: GHCN US1NYDL0025 9 km; no public cam on the operator site",
+  "pleasant-mountain": "P3: GHCN USC00176484 18 km, NWS KIZG 13 km; cams held on Boyne framing terms",
+  "quechee": "P3: GHCN US1VTWR0032 2 km, NWS KLEB 12 km; no public cam on the operator site",
+  "ski-brule": "P3: GHCN USC00207812 7 km; no public cam on the operator site",
+  "snowriver": "P3: GHCN US1MIGG0011 10 km, NWS KIWD 13 km; no public cam on the operator site",
+  "song-mountain": "P3: GHCN US1NYOG0087 5 km, NWS KN03 21 km; no public cam on the operator site",
+  "swain": "P3: GHCN US1NYLV0001 10 km, NWS KDSV 15 km; no public cam on the operator site",
+  "the-highlands": "P3: GHCN US1MIEM0005 5 km, NWS KMGN 5 km; cams held on Boyne framing terms",
+  "trollhaugen": "P3: GHCN US1WIPK0054 6 km, NWS KOEO 7 km; no public cam on the operator site",
+  "welch-village": "P3: GHCN US1MNGH0021 3 km, NWS KRGK 20 km; no public cam on the operator site",
+  "wild-mountain": "P3: GHCN US1MNCG0043 4 km, NWS KOEO 20 km; cams held on framing terms",
+  "wilmot-mountain": "P3: GHCN US1WIKN0037 5 km, NWS KBUU 23 km; no public cam on the operator site",
 };
 
 const slugs = new Set(resorts.map((r) => r.slug));
