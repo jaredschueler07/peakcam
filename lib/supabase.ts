@@ -27,7 +27,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 /**
  * Per-attempt fetch timeout. 8 s at runtime keeps a stuck connection from
  * holding an ISR revalidation (see withFetchTimeout). During `next build`
- * the 148+ prerenders share PostgREST's 10-connection pool with the Mac
+ * the 268+ prerenders share PostgREST's 10-connection pool with the Mac
  * mini's jobs (stills every 15 min, hourly stations sync, the daily cam
  * health check's 640 PATCHes); a burst from those queued build reads past
  * 8 s on 2026-10-20 01:51 UTC with an otherwise idle database. A build has

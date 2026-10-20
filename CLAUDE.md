@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PeakCam is a live mountain webcam and snow report aggregator, in production at https://www.peakcam.io (Vercel, auto-deploy on push to main). Stack: Next.js 16 (App Router), React 19, Supabase (Postgres + Auth), Tailwind CSS 4, MapLibre GL (react-map-gl), Resend, PostHog. Production holds 148 active resorts and 640 cam rows (603 active, 354 archive-allowed) as of 2026-10-20, seeded from `data/*.csv` by the standalone importer; parity block P1 batch 1 (#109, merged 2026-10-20) adds 36 western resorts to the CSVs and is live once the import runs on the Mini and the next deploy prerenders them.
+PeakCam is a live mountain webcam and snow report aggregator, in production at https://www.peakcam.io (Vercel, auto-deploy on push to main). Stack: Next.js 16 (App Router), React 19, Supabase (Postgres + Auth), Tailwind CSS 4, MapLibre GL (react-map-gl), Resend, PostHog. Production holds 268 active resorts and 802 cam rows (765 active) as of 2026-10-20 15:20 UTC, after P1 coverage batches 1 and 2 (Canada and the Andes follow), seeded from `data/*.csv` by the standalone importer; parity block P1 batch 1 (#109, merged 2026-10-20) adds 36 western resorts to the CSVs and is live once the import runs on the Mini and the next deploy prerenders them.
 
 ## Commands
 
