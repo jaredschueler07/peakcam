@@ -41,7 +41,12 @@ export interface PublicApiHeaderOptions {
   cacheControl?: string;
   /** `Access-Control-Allow-Methods` for routes that accept more than GET (the batch and ask POSTs). */
   allowMethods?: string;
+  /** Override `X-Attribution` (the forecast routes append the Open-Meteo credit). */
+  attribution?: string;
 }
+
+/** `X-Attribution` on the forecast routes: the shared line plus the CC BY 4.0 credit Open-Meteo requires. */
+export const PUBLIC_API_FORECAST_ATTRIBUTION = `${PUBLIC_API_ATTRIBUTION}; Weather data by Open-Meteo.com (CC BY 4.0)`;
 
 /** The full header set as a plain object, for `new Response(body, { headers })`. */
 export function publicApiHeaders(options: PublicApiHeaderOptions = {}): Record<string, string> {
@@ -55,7 +60,7 @@ export function publicApiHeaders(options: PublicApiHeaderOptions = {}): Record<s
     "Access-Control-Allow-Headers": "Accept, Content-Type",
     "Access-Control-Expose-Headers": "Link, X-Attribution",
     "Access-Control-Max-Age": "86400",
-    "X-Attribution": PUBLIC_API_ATTRIBUTION,
+    "X-Attribution": options.attribution ?? PUBLIC_API_ATTRIBUTION,
     Link: link,
   };
 }

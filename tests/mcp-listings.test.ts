@@ -94,7 +94,7 @@ test("the tool table lists exactly the server's tools, in order, with the server
   const never = async (): Promise<never> => {
     throw new Error("not called");
   };
-  const stub: McpDataSource = { catalog: never, forecast: never, snowHistory: never, camStills: never };
+  const stub: McpDataSource = { catalog: never, forecast: never, forecastRuns: never, forecastAccuracy: never, snowHistory: never, camStills: never };
   const registered = buildTools(stub).map((t) => ({ name: t.name, title: t.title }));
   assert.deepEqual(
     CONNECT_TOOLS.map((t) => ({ name: t.name, title: t.title })),

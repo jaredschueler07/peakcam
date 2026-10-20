@@ -1,6 +1,7 @@
-import { findResort, loadPublicApiCatalog, optionsFor } from "@/lib/public-api/data";
+import { findResort, loadPublicApiCatalog, loadResortForecast, loadResortForecastScores, optionsFor } from "@/lib/public-api/data";
 import { publicError, publicJson, publicOptions } from "@/lib/public-api/headers";
 import { serializeResort } from "@/lib/public-api/serialize";
+import { rankScores, serializeForecastSummary } from "@/lib/public-api/forecast";
 
 // GET /api/v1/resorts/{slug} — the full resort document.
 // Caching: exporting OPTIONS (CORS preflight) makes Next treat the handler as
@@ -15,7 +16,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
   const catalog = await loadPublicApiCatalog();
   const resort = findResort(catalog, slug);
   if (!resort) return publicError(404, "resort_not_found", `No active resort with slug "${slug}". List them at /api/v1/resorts.`);
-  return publicJson(serializeResort(resort, optionsFor(catalog, resort)));
+  // The stored blend summary and the ranked scores ride on the single-resort
+  // document only (two cached reads per resort); the full daily blend and
+  // every model run live at /forecast and /forecast-accuracy.
+  const [stored, scores] = await Promise.all([loadResortForecast(resort.id), loadResortForecastScores(resort.id)]);
+  const doc = serializeResort(resort, optionsFor(catalog, resort));
+  return publicJson({ ...doc, forecast: serializeForecastSummary(stored), forecastScores: rankScores(scores) });
 }
 
 export function OPTIONS(): Response {

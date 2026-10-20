@@ -153,10 +153,26 @@ function powderSentence(doc: PowderListPublic, plan: AskPlan): { text: string; a
   return { text: `${stamp}the most new snow in the last ${window}${where} is ${listOf(lead)}.`, asOf };
 }
 
-function forecastSentence(doc: { name: string; available: boolean; note: string | null; generatedAt: string; periods: Array<{ dow: string; shortForecast: string; highF: number; snowInchesEstimate: number }> }): string {
-  if (!doc.available) return `No forecast for ${doc.name}: ${doc.note ?? "the National Weather Service did not answer."}`;
+function forecastSentence(doc: {
+  name: string;
+  available: boolean;
+  provider: "blend" | "nws" | "none";
+  note: string | null;
+  generatedAt: string;
+  issuedAt: string | null;
+  summary: { total7dIn: number; total14dIn: number; modelCount: number; models: string[]; peak: { date: string; in: number } | null } | null;
+  periods: Array<{ dow: string; shortForecast: string; highF: number; snowInches: number }>;
+}): string {
+  if (!doc.available) return `No forecast for ${doc.name}: ${doc.note ?? "no model run is stored yet."}`;
   const days = doc.periods.slice(0, 3).map((p) => `${p.dow} ${p.shortForecast.toLowerCase()}, high ${p.highF} °F`);
-  const total = doc.periods.reduce((s, p) => s + (p.snowInchesEstimate || 0), 0);
+  const narrative = days.length ? ` NWS: ${days.join("; ")}.` : "";
+  if (doc.provider === "blend" && doc.summary) {
+    const s = doc.summary;
+    const peak = s.peak && s.peak.in > 0 ? `, peaking at ${inches(s.peak.in)} on ${s.peak.date}` : "";
+    const amount = s.total14dIn > 0 ? `${inches(s.total7dIn)} of snow in the next 7 days and ${inches(s.total14dIn)} over 14${peak}` : "no snow in the next 14 days";
+    return `PeakCam blend of ${s.models.length} weather models for ${doc.name}, issued ${formatMountainTime(doc.issuedAt ?? doc.generatedAt)}: ${amount} (median across models; ${s.modelCount} models agree on day one; Open-Meteo data, CC BY 4.0).${narrative}`;
+  }
+  const total = doc.periods.reduce((s, p) => s + (p.snowInches || 0), 0);
   const est = total > 0 ? ` The forecast wording suggests about ${inches(total)} of snow over ${doc.periods.length} days (keyword estimate, not a measured amount).` : ` No snow is named in the ${doc.periods.length}-day wording.`;
   return `NWS forecast for ${doc.name}, fetched ${formatMountainTime(doc.generatedAt)}: ${days.join("; ")}.${est}`;
 }

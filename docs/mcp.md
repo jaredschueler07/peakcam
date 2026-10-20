@@ -4,7 +4,7 @@ Read-only [Model Context Protocol](https://modelcontextprotocol.io) server that 
 assistant the same data as the site and `/api/v1`: the latest snow report per resort with its
 provenance, season status, webcams as links and archived stills, NWS forecasts, SNOTEL daily
 history, percent-of-normal rankings, resort profiles, regions, alert recipes, and an `ask` tool
-that routes a plain question to the right one of them deterministically. Fifteen tools.
+that routes a plain question to the right one of them deterministically. Sixteen tools.
 
 | | |
 | --- | --- |
@@ -38,7 +38,8 @@ with the resort's canonical URL) and a `structuredContent` document that matches
 | `get_resort_cams` | `slug` | `CamList` (cams capped at 12) | Links only: PeakCam page, operator source, still-image URL, health (`live`/`down`/`unchecked`). |
 | `find_powder` | `window?` `24h`\|`48h` (24h), `state?`, `minInches?`, `sourceOnly?` `snotel`, `limit?` 1–25 (10) | `PowderList` | Ranked by new snow; `sourceOnly=snotel` answers "measured only". Resorts with no report are left out. |
 | `compare_resorts` | `slugs[]` 2–6 | `{ count, resorts: (Resort without cams + camCount/liveCamCount)[] }` | Markdown table side by side. Any unknown slug is an error with suggestions. |
-| `get_forecast` | `slug` | `{ available, provider: "nws", note, periods[] }` | Five-day NWS forecast for US resorts; `available: false` for Canada and the Andes, or when NWS does not answer. Snow inches are keyword heuristics, not QPF. |
+| `get_forecast` | `slug`, `point?` `summit`\|`base` (summit) | `{ provider: "blend"\|"nws"\|"none", available, note, point, issuedAt, modelCount, models[], summary, days: ForecastBlendDay[] (≤ 14), periods[] (NWS narrative, US only), credits[] }` | The stored multi-model blend (P4): per day the median snowfall across the models that reach it, `snowfallLoIn`/`snowfallHiIn` as the 25th/75th percentile, `modelCount`. US resorts also get the NWS narrative with its snow amounts replaced by the blend (`snowSource`). `provider: "nws"` with keyword amounts only when no run is stored yet; `available: false` when neither exists. Credit: Weather data by Open-Meteo.com (CC BY 4.0). |
+| `compare_models` | `slug` | `{ periodDays: 90, truthBasis: "snotel"\|"ghcn"\|"none", measuredDays, station, scoredPoint, bestModel, scores: ForecastScore[], outlook: { model, label, total7dIn, horizonDays, issuedAt }[], blendTotal7dIn, note, credits[] }` | Per-model verification at the resort (day-1/3/7 MAE in cm, bias ratio, samples, rank; the `blend` row graded by the same rule) from `forecast_scores`, plus what each stored run says for the next 7 days. Scores are empty, with `note`, until the scorer has measured days. P4. |
 | `get_snow_history` | `slug`, `days?` 1–30 (14) | `{ source, station, rows[] }` | Daily depth, SWE, precipitation accumulation, temperatures and QC flag from `snowpack_daily`, newest first. |
 | `get_opening_dates` | `state?`, `limit?` 1–150 (50) | `{ asOf, totalMatching, resorts: { season }[] }` | Season open/closed/unknown with confirmed or projected dates, soonest first. |
 | `get_resort_profile` | `slug` | `{ urls, location (elevations), websiteUrl, camPageUrl, socials, station, dataSource, season, camCount, liveCamCount }` | Identity without the snow numbers: where, how high, which station, every PeakCam URL (page, JSON, markdown, Atom, state hub). P9 block 1. |
@@ -217,6 +218,21 @@ dispatched in-process to the route handlers, results in order), `GET /api/v1/res
 when the read fails). Discovery: `/llms-full.txt` (built from the tool definitions and
 `lib/mcp/examples.ts`), `/gpt-instructions.md`, `/.well-known/schemas` (+ `/{file}.json` per
 registered shape). All documented in `/api/v1/openapi.json`; smoke checks in `docs/runbook.md`.
+
+## Multi-model forecast and verification (P4, 2026-10-20)
+
+`get_forecast` reads the runs `scripts/forecast-sync.ts` stores every 6 h (migration 027) and
+blends them on the way out (`lib/forecast/blend.ts`): per day the median snowfall across the
+models that reach that day, the 25th/75th percentile as the band, `modelCount` per day, totals
+and the peak window. `compare_models` reads `forecast_scores` (written daily by
+`scripts/forecast-score.ts`, graded against SNOTEL depth deltas clipped at zero over 90 days,
+`lib/forecast/score.ts`) and the same runs for a per-model 7-day outlook. Both go through the
+`McpDataSource` (`forecastRuns`, `forecastAccuracy`) so the tests run on fixtures; the
+production source reads through the public API's 15-minute caches. The REST twins are
+`/api/v1/resorts/{slug}/forecast` and `/forecast-accuracy`; the shapes are `Forecast`,
+`ForecastBlendDay`, `ForecastSummary`, `ForecastAccuracy` and `ForecastScore` in
+`lib/public-api/schema.ts`. Every surface that serves blend numbers carries "Weather data by
+Open-Meteo.com" (CC BY 4.0) in `credits` and, on REST, `X-Attribution`.
 
 ## Discovery (Sprint 6)
 

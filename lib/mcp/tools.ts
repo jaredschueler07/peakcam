@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// MCP server — the fifteen read-only tools, as pure builders.
+// MCP server — the sixteen read-only tools, as pure builders.
 //
 // `buildTools(data)` returns tool definitions over an injected McpDataSource
 // so lib/mcp/server.test.ts can run every tool against fixtures with no
@@ -24,6 +24,11 @@ import { MAX_QUESTION_LENGTH } from "@/lib/ask/router";
 import {
   AskAnswerSchema,
   CamListSchema,
+  ForecastBlendDaySchema,
+  ForecastCreditSchema,
+  ForecastScoreSchema,
+  ForecastSummarySchema,
+  ForecastTruthBasisSchema,
   MeasuredNowSchema,
   MeasurementSourceSchema,
   ObservationStationSchema,
@@ -60,6 +65,10 @@ import {
   snowStation,
   sourceLabel,
 } from "@/lib/public-api/markdown";
+import { FORECAST_CREDITS, blendForPoint, serializeBlendDays, serializeForecastAccuracy, serializeSummary, type AccuracyInput } from "@/lib/public-api/forecast";
+import { OPEN_METEO_ATTRIBUTION, OPEN_METEO_LICENSE, modelLabel } from "@/lib/forecast/open-meteo-models";
+import { runsForPoint, type StoredForecast } from "@/lib/forecast/store";
+import { cmToInches } from "@/lib/open-meteo";
 import type { McpDataSource } from "./types";
 import { PEAKCAM_TOOL_NAMES, type PeakCamToolName } from "./tool-names";
 import {
@@ -351,36 +360,183 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
     },
   });
 
-  const ForecastPeriodSchema = z.object({
-    dow: z.string().describe("`Today`, then three-letter weekday."),
-    date: z.string().nullable().describe("YYYY-MM-DD when NWS supplies it."),
-    shortForecast: z.string().describe("NWS short forecast text, e.g. `Snow Likely`."),
-    condition: z.string().describe("PeakCam condition key derived from the text."),
+  const NarrativePeriodSchema = z.object({
+    dow: z.string(),
+    date: z.string().nullable(),
+    shortForecast: z.string(),
+    condition: z.string(),
     highF: z.number(),
     lowF: z.number().nullable(),
-    snowInchesEstimate: z
-      .number()
-      .describe("Keyword heuristic from the forecast text (blizzard/heavy snow 8, snow 3, flurries 1, else 0). Not a quantitative forecast; say so when quoting it."),
-    precipProbability: z.number().nullable().describe("Percent."),
+    snowInches: z.number().describe("From the blend when one is stored for that date, else the keyword estimate (see snowSource)."),
+    snowSource: z.enum(["blend", "nws_keyword", "open_meteo"]),
+    precipProbability: z.number().nullable(),
     windMph: z.number().nullable(),
     windDirection: z.string().nullable(),
-    feelsLikeF: z.number().nullable().describe("Wind-chill adjusted high."),
+    feelsLikeF: z.number().nullable(),
   });
 
   const getForecast = defineTool({
     name: "get_forecast",
     title: "Resort forecast",
     description:
-      "Five-day National Weather Service forecast for a US resort (daily high/low, text forecast, precipitation chance, wind) with a rough snow estimate derived from the forecast wording. NWS covers US resorts only; Canadian and Andes resorts return available=false.",
+      "Fourteen-day blended snow forecast for a resort: per day the median snowfall across the weather models that reach that day (ECMWF IFS, GFS, GEM, ICON, JMA, Météo-France, UKMO; NBM and HRRR added for US points), the 25th/75th percentile band as snowfallLoIn/snowfallHiIn, and modelCount so you can weigh a far-out two-model day against a near-term nine-model one. `summary` has next 48 h, 7- and 14-day totals and the peak day. US resorts also get the National Weather Service text narrative (`periods`), with its snow amounts replaced by the blend. Weather data by Open-Meteo.com (CC BY 4.0): quote the credit. `available: false` when no model run is stored yet.",
+    inputSchema: z.object({
+      slug: SlugInput,
+      point: z.enum(["summit", "base"]).default("summit").describe("Which elevation's blend. Falls back to the other point with a note when the asked one has no runs."),
+    }),
+    outputSchema: z.object({
+      slug: z.string(),
+      name: z.string(),
+      canonicalUrl: z.string(),
+      forecastUrl: z.string().describe("The REST document with every model run."),
+      provider: z.enum(["blend", "nws", "none"]).describe("`blend`: stored multi-model blend; `nws`: NWS narrative only, snow amounts are keyword estimates; `none`: nothing available."),
+      available: z.boolean(),
+      note: z.string().nullable(),
+      point: z.enum(["summit", "base"]).nullable(),
+      issuedAt: z.string().nullable().describe("Newest model issue instant among the runs blended."),
+      modelCount: z.number().int().describe("Models contributing to the first day."),
+      models: z.array(z.string()),
+      summary: ForecastSummarySchema.nullable(),
+      days: z.array(ForecastBlendDaySchema).describe("Up to 14 blended days."),
+      periods: z.array(NarrativePeriodSchema).describe("NWS daily narrative for US resorts (up to 5 days); empty elsewhere or when NWS does not answer."),
+      credits: z.array(ForecastCreditSchema),
+      generatedAt: ISO_INSTANT,
+    }),
+    async handler({ slug, point }) {
+      const catalog = await data.catalog();
+      const hit = resolve(catalog, slug);
+      if (!hit.ok) return hit.result;
+      const resort = hit.resort;
+      const canonicalUrl = resortCanonicalUrl(resort.slug);
+      const base = {
+        slug: resort.slug,
+        name: resort.name,
+        canonicalUrl,
+        forecastUrl: `${resortApiUrl(resort.slug)}/forecast`,
+        credits: FORECAST_CREDITS,
+        generatedAt: catalog.now.toISOString(),
+      };
+
+      let stored: StoredForecast | null = null;
+      try {
+        stored = await data.forecastRuns(resort.id);
+      } catch {
+        stored = null;
+      }
+      const blended = blendForPoint(stored, point);
+      const days = blended ? serializeBlendDays(blended.blend) : [];
+      const summary = blended ? serializeSummary(blended.blend, blended.point, blended.issuedAt) : null;
+      const blendByDate = Object.fromEntries(days.map((d) => [d.date, d.snowfallIn]));
+
+      let periods: WeatherPeriod[] | null = null;
+      if (resort.country === "US") {
+        try {
+          periods = await data.forecast(resort, blended ? blendByDate : null);
+        } catch {
+          periods = null;
+        }
+      }
+      const narrative = (periods ?? []).map((p) => ({
+        dow: p.dow,
+        date: p.date ?? null,
+        shortForecast: p.shortForecast,
+        condition: p.condition,
+        highF: p.high,
+        lowF: p.low,
+        snowInches: p.snowInches,
+        snowSource: p.snowSource ?? "nws_keyword",
+        precipProbability: p.precipProbability,
+        windMph: p.windSpeed,
+        windDirection: p.windDirection,
+        feelsLikeF: p.feelsLike,
+      }));
+
+      if (!blended && narrative.length === 0) {
+        const note =
+          resort.country === "US"
+            ? "No stored model run for this resort yet and the National Weather Service did not answer; try again in a few minutes."
+            : "No stored model run for this resort yet; the forecast job writes one every 6 hours.";
+        return ok(`No forecast for ${resort.name}: ${note} Conditions and cams: ${canonicalUrl}`, {
+          ...base, provider: "none", available: false, note, point: null, issuedAt: null, modelCount: 0, models: [], summary: null, days: [], periods: [],
+        });
+      }
+
+      const provider = blended ? "blend" : "nws";
+      const note = !blended
+        ? "No stored model run yet: snow amounts in `periods` are keyword estimates from the NWS wording, not quantitative."
+        : blended.point !== point
+          ? `No ${point} point for this resort; showing ${blended.point}.`
+          : null;
+      const lines: string[] = [`# ${resort.name} forecast — ${canonicalUrl}`, ""];
+      if (blended && summary) {
+        lines.push(
+          `**${summary.total7dIn} in next 7 days, ${summary.total14dIn} in over 14** (${blended.point}, blend of ${summary.models.length} models issued ${formatInstant(summary.issuedAt)}${summary.peak ? `; peak ${summary.peak.in} in on ${summary.peak.date}` : ""}).`,
+          "",
+          "| Date | Snow (in) | Band (25–75 %) | Models | High / Low °F | Weather |",
+          "| --- | --- | --- | --- | --- | --- |",
+          ...days.map((d) => `| ${d.date} | ${d.snowfallIn} | ${d.snowfallLoIn}–${d.snowfallHiIn} | ${d.modelCount} | ${d.tempMaxF ?? "–"} / ${d.tempMinF ?? "–"} | ${d.condition} |`),
+          "",
+        );
+      }
+      if (narrative.length) {
+        lines.push(
+          `NWS narrative${blended ? " (snow amounts from the blend)" : " (snow amounts are keyword estimates)"}:`,
+          "",
+          ...narrative.map((p) => `- ${p.dow}${p.date ? ` ${p.date}` : ""}: ${p.shortForecast}, high ${p.highF}${p.lowF != null ? ` / low ${p.lowF}` : ""} °F${p.snowInches ? `, ~${p.snowInches} in` : ""}`),
+          "",
+        );
+      }
+      lines.push(`${OPEN_METEO_ATTRIBUTION} (${OPEN_METEO_LICENSE}). Every model run: ${base.forecastUrl}`);
+      return ok(lines.join("\n"), {
+        ...base,
+        provider,
+        available: true,
+        note,
+        point: blended?.point ?? null,
+        issuedAt: blended?.issuedAt ?? null,
+        modelCount: blended?.blend.modelCount ?? 0,
+        models: blended?.blend.models ?? [],
+        summary,
+        days,
+        periods: narrative,
+      });
+    },
+  });
+
+  const compareModels = defineTool({
+    name: "compare_models",
+    title: "Compare forecast models",
+    description:
+      "How each weather model has verified at a resort over the trailing 90 days, graded against measured snow (SNOTEL depth change, clipped at zero), and what each model says for the next 7 days right now. Per model: rank, mean absolute error at day 1/3/7 (cm), bias ratio (total forecast over total measured; above 1 over-forecasts), samples, plus the current 7-day total and horizon. `truthBasis` and `measuredDays` say what the grading rested on; a resort with no measured series has no scores. The PeakCam blend is graded by the same rule and appears as `blend`.",
     inputSchema: z.object({ slug: SlugInput }),
     outputSchema: z.object({
       slug: z.string(),
       name: z.string(),
       canonicalUrl: z.string(),
-      provider: z.literal("nws"),
-      available: z.boolean(),
+      accuracyUrl: z.string(),
+      periodDays: z.number().int(),
+      truthBasis: ForecastTruthBasisSchema,
+      measuredDays: z.number().int(),
+      station: StationSchema.nullable(),
+      scoredPoint: z.enum(["summit", "base"]).nullable(),
+      bestModel: z.string().nullable(),
+      scores: z.array(ForecastScoreSchema).describe("Ranked; empty until the scorer has measured days."),
+      outlook: z
+        .array(
+          z.object({
+            model: z.string(),
+            label: z.string(),
+            point: z.enum(["summit", "base"]),
+            issuedAt: z.string(),
+            horizonDays: z.number().int(),
+            total7dIn: z.number(),
+            total7dCm: z.number(),
+          }),
+        )
+        .describe("The newest stored run per model: what each says for the next 7 days."),
+      blendTotal7dIn: z.number().nullable(),
       note: z.string().nullable(),
-      periods: z.array(ForecastPeriodSchema),
+      credits: z.array(ForecastCreditSchema),
       generatedAt: ISO_INSTANT,
     }),
     async handler({ slug }) {
@@ -388,49 +544,78 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
       const hit = resolve(catalog, slug);
       if (!hit.ok) return hit.result;
       const resort = hit.resort;
-      const base = {
+      const canonicalUrl = resortCanonicalUrl(resort.slug);
+      let accuracy: AccuracyInput = { scores: [], measuredDays: 0, truthBasis: "none" };
+      try {
+        accuracy = await data.forecastAccuracy(resort);
+      } catch {
+        /* no scores: the document says so */
+      }
+      let stored: StoredForecast | null = null;
+      try {
+        stored = await data.forecastRuns(resort.id);
+      } catch {
+        stored = null;
+      }
+      const doc = serializeForecastAccuracy(resort, accuracy, { now: catalog.now });
+      const picked = runsForPoint(stored, "summit");
+      const outlook = picked.runs
+        .map((run) => {
+          const cm = Math.round(run.daily.slice(0, 7).reduce((s, d) => s + (d.snowfallCm ?? 0), 0) * 10) / 10;
+          return { model: run.model, label: modelLabel(run.model), point: run.point, issuedAt: run.issuedAt, horizonDays: run.horizonDays, total7dIn: Math.round(cmToInches(cm) * 10) / 10, total7dCm: cm };
+        })
+        .sort((a, b) => b.total7dIn - a.total7dIn);
+      const blended = blendForPoint(stored, "summit");
+      const blendTotal7dIn = blended ? Math.round(cmToInches(blended.blend.total7dCm) * 10) / 10 : null;
+      const note =
+        doc.models.length === 0
+          ? accuracy.truthBasis === "none"
+            ? "No measured snow series at this resort, so no model is graded here; the outlook still shows what each model says."
+            : `Scores arrive once the daily scorer has measured days to grade (${accuracy.measuredDays} so far).`
+          : null;
+      const lines = [
+        `# ${resort.name}: forecast models — ${canonicalUrl}`,
+        "",
+        doc.models.length
+          ? `Graded against ${doc.truthBasis === "snotel" ? "SNOTEL-measured 24 h snow" : doc.truthBasis === "ghcn" ? "station-measured new snow" : "no measured series"} on ${doc.measuredDays} days of the last ${doc.periodDays}${doc.station?.name ? ` (${doc.station.name})` : ""}; best: ${doc.bestModel}.`
+          : note ?? "",
+        "",
+        ...(doc.models.length
+          ? [
+              "| Rank | Model | Day-1 MAE cm | Day-3 | Day-7 | Bias | Days |",
+              "| --- | --- | --- | --- | --- | --- | --- |",
+              ...doc.models.map((m) => `| ${m.rank} | ${modelLabel(m.model)} | ${m.day1Mae ?? "–"} | ${m.day3Mae ?? "–"} | ${m.day7Mae ?? "–"} | ${m.biasRatio ?? "–"} | ${m.samples ?? "–"} |`),
+              "",
+            ]
+          : []),
+        ...(outlook.length
+          ? [
+              `Next 7 days by model (${picked.point}${blendTotal7dIn != null ? `; blend ${blendTotal7dIn} in` : ""}):`,
+              "",
+              ...outlook.map((o) => `- ${o.label}: ${o.total7dIn} in (${o.horizonDays}-day horizon, issued ${formatInstant(o.issuedAt)})`),
+              "",
+            ]
+          : ["No stored model run yet.", ""]),
+        `${OPEN_METEO_ATTRIBUTION} (${OPEN_METEO_LICENSE}). Detail: ${resortApiUrl(resort.slug)}/forecast-accuracy`,
+      ];
+      return ok(lines.join("\n"), {
         slug: resort.slug,
         name: resort.name,
-        canonicalUrl: serializeResortLight(resort, serializeOptionsFor(catalog, resort)).canonicalUrl,
-        provider: "nws" as const,
+        canonicalUrl,
+        accuracyUrl: `${resortApiUrl(resort.slug)}/forecast-accuracy`,
+        periodDays: doc.periodDays,
+        truthBasis: doc.truthBasis,
+        measuredDays: doc.measuredDays,
+        station: doc.station,
+        scoredPoint: doc.scoredPoint,
+        bestModel: doc.bestModel,
+        scores: doc.models,
+        outlook,
+        blendTotal7dIn,
+        note,
+        credits: FORECAST_CREDITS,
         generatedAt: catalog.now.toISOString(),
-      };
-      const unavailable = (note: string) =>
-        ok(`No forecast for ${resort.name}: ${note} Conditions and cams: ${base.canonicalUrl}`, { ...base, available: false, note, periods: [] });
-      if (resort.country !== "US") return unavailable("the National Weather Service covers US resorts only, and PeakCam has no forecast feed for other countries yet.");
-      let periods: WeatherPeriod[] | null;
-      try {
-        periods = await data.forecast(resort);
-      } catch {
-        periods = null;
-      }
-      if (!periods?.length) return unavailable("the National Weather Service did not answer for this point; try again in a few minutes.");
-      const out = periods.map((p) => ({
-        dow: p.dow,
-        date: p.date ?? null,
-        shortForecast: p.shortForecast,
-        condition: p.condition,
-        highF: p.high,
-        lowF: p.low,
-        snowInchesEstimate: p.snowInches,
-        precipProbability: p.precipProbability,
-        windMph: p.windSpeed,
-        windDirection: p.windDirection,
-        feelsLikeF: p.feelsLike,
-      }));
-      const lines = [
-        `# ${resort.name} forecast (NWS, fetched ${formatInstant(base.generatedAt)}) — ${base.canonicalUrl}`,
-        "",
-        "| Day | Forecast | High / Low °F | Precip % | Wind | Snow est. |",
-        "| --- | --- | --- | --- | --- | --- |",
-        ...out.map(
-          (p) =>
-            `| ${p.dow}${p.date ? ` ${p.date}` : ""} | ${p.shortForecast} | ${p.highF} / ${p.lowF ?? "–"} | ${p.precipProbability ?? "–"} | ${p.windMph != null ? `${p.windMph} mph${p.windDirection ? ` ${p.windDirection}` : ""}` : "–"} | ${p.snowInchesEstimate ? `~${p.snowInchesEstimate} in` : "–"} |`,
-        ),
-        "",
-        "Snow estimates are keyword heuristics from the NWS wording, not quantitative precipitation forecasts. Source: api.weather.gov.",
-      ];
-      return ok(lines.join("\n"), { ...base, available: true, note: null, periods: out });
+      });
     },
   });
 
@@ -1113,6 +1298,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
     getAlertOptions,
     getCamTimeline,
     getStations,
+    compareModels,
   ] as unknown as ToolDefinition[];
 
   const ask = defineTool({

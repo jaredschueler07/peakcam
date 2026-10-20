@@ -248,8 +248,111 @@ export const ForecastScoreSchema = z
     samples: z.number().int().nullable(),
     biasRatio: z.number().nullable().describe("Sum(forecast) / sum(observed); above 1 means the model over-forecasts snow."),
     computedAt: z.string(),
+    rank: z.number().int().nullable().describe("1 = lowest day-1 MAE among the models scored at this resort (the blend is ranked too). Null before the first scoring run."),
   })
   .register(publicApiRegistry, { id: "ForecastScore", description: "How a model has verified at this resort." });
+
+export const ForecastCreditSchema = z
+  .object({
+    name: z.string(),
+    text: z.string().describe("The attribution line to carry with any reuse, e.g. `Weather data by Open-Meteo.com`."),
+    license: z.string().describe("Licence of the source data, e.g. `CC BY 4.0`."),
+    url: z.string(),
+  })
+  .register(publicApiRegistry, { id: "ForecastCredit", description: "A data source that must be credited when forecast values are reused." });
+
+export const ForecastBlendDaySchema = z
+  .object({
+    date: z.string().describe("YYYY-MM-DD, local to the resort."),
+    snowfallIn: z.number().describe("Median across the models that reach this day, inches."),
+    snowfallLoIn: z.number().describe("25th percentile across models, inches. Equals the median when one model reaches the day."),
+    snowfallHiIn: z.number().describe("75th percentile across models, inches."),
+    snowfallCm: z.number(),
+    snowfallLoCm: z.number(),
+    snowfallHiCm: z.number(),
+    tempMaxF: z.number().nullable(),
+    tempMinF: z.number().nullable(),
+    precipProb: z.number().nullable().describe("0–100, median of the models that publish one."),
+    windGustMph: z.number().nullable(),
+    weatherCode: z.number().int().nullable().describe("Modal WMO code across models; ties go to the more severe code."),
+    condition: z.string().describe("PeakCam icon slug for the weather code (`heavy-snow`, `clear`, ...)."),
+    modelCount: z.number().int().describe("Models contributing to this day. Falls with lead time as shorter-range models drop out."),
+    models: z.array(z.string()).describe("Model ids contributing to this day."),
+  })
+  .register(publicApiRegistry, { id: "ForecastBlendDay", description: "One day of PeakCam's blended forecast with the cross-model spread." });
+
+export const ForecastPeakSchema = z
+  .object({
+    date: z.string().describe("The day with the most blended snowfall."),
+    in: z.number(),
+    cm: z.number(),
+    windowDays: z.number().int().describe("Consecutive days around the peak with at least 1 cm (the storm window)."),
+  })
+  .register(publicApiRegistry, { id: "ForecastPeak" });
+
+export const ForecastSummarySchema = z
+  .object({
+    point: ForecastPointSchema.describe("The elevation the summary is for: summit when the resort has a summit point, else base."),
+    issuedAt: z.string().describe("Newest model issue instant among the runs blended."),
+    modelCount: z.number().int().describe("Models contributing to the first day."),
+    models: z.array(z.string()).describe("Every model id that contributed to any day."),
+    next48hIn: z.number(),
+    next48hCm: z.number(),
+    total7dIn: z.number(),
+    total7dCm: z.number(),
+    total14dIn: z.number(),
+    total14dCm: z.number(),
+    peak: ForecastPeakSchema.nullable().describe("Null when no day has any blended snow."),
+  })
+  .register(publicApiRegistry, { id: "ForecastSummary", description: "Headline numbers from the blended 14-day forecast." });
+
+export const ForecastSchema = z
+  .object({
+    slug: z.string(),
+    name: z.string(),
+    canonicalUrl: z.string(),
+    available: z.boolean().describe("False when no stored run is current for this resort; `daily` and `byModel` are then empty."),
+    note: z.string().nullable(),
+    point: ForecastPointSchema,
+    points: z.array(ForecastPointSchema).describe("Points with current runs; pass `?point=` to pick one."),
+    summary: ForecastSummarySchema.nullable(),
+    daily: z.array(ForecastBlendDaySchema).describe("Up to 14 blended days."),
+    byModel: z.array(ForecastRunSchema).describe("The newest run per model for the chosen point, in the provider's units (cm, °C, km/h)."),
+    method: z.string().describe("How the blend is built, in one sentence."),
+    credits: z.array(ForecastCreditSchema),
+    attribution: z.string(),
+    license: z.string(),
+    generatedAt: z.string(),
+  })
+  .register(publicApiRegistry, { id: "Forecast", description: "The blended 14-day snow forecast for a resort with every contributing model run." });
+
+export const ForecastTruthBasisSchema = z
+  .enum(["snotel", "ghcn", "none"])
+  .register(publicApiRegistry, {
+    id: "ForecastTruthBasis",
+    description: "What the forecasts were graded against: `snotel` (NRCS station depth deltas, clipped at zero), `ghcn` (a station's own daily new-snow series), or `none` (no measured series; no scores).",
+  });
+
+export const ForecastAccuracySchema = z
+  .object({
+    slug: z.string(),
+    name: z.string(),
+    canonicalUrl: z.string(),
+    periodDays: z.number().int().describe("Trailing window the scores cover."),
+    truthBasis: ForecastTruthBasisSchema,
+    station: StationSchema.nullable().describe("The station behind the measured series, when it is an NRCS one."),
+    measuredDays: z.number().int().describe("Days inside the window with a usable measured value. Scores need measured days; a resort with none has no scores."),
+    scoredPoint: ForecastPointSchema.nullable().describe("The forecast point the measured series was graded against (the one nearest the station's elevation)."),
+    models: z.array(ForecastScoreSchema).describe("One row per model plus `blend`, ranked. Empty until the scorer has run with measured days."),
+    bestModel: z.string().nullable().describe("Model id with rank 1."),
+    computedAt: z.string().nullable(),
+    method: z.string(),
+    credits: z.array(ForecastCreditSchema),
+    attribution: z.string(),
+    license: z.string(),
+    generatedAt: z.string(),
+  })
+  .register(publicApiRegistry, { id: "ForecastAccuracy", description: "How each forecast model, and the blend, has verified at this resort against measured snow." });
 
 export const ScoreComponentsSchema = z
   .record(z.string(), z.number().nullable())
@@ -320,8 +423,8 @@ export const ResortSchema = z
     cams: z.array(CamSchema),
     stations: z.array(ObservationStationSchema).optional().describe("Observation stations serving the resort, once the station layer is live."),
     measuredNow: z.array(MeasuredNowSchema).optional().describe("Latest observation per station, once the station layer is live."),
-    forecast: z.array(ForecastRunSchema).optional().describe("Latest run per model and point, once stored forecasts are live."),
-    forecastScores: z.array(ForecastScoreSchema).optional().describe("Per-model verification at this resort, once computed."),
+    forecast: ForecastSummarySchema.nullable().optional().describe("Headline numbers from the blended 14-day forecast (summit point when one exists). Null when no run is current; absent on list and compare rows. The full daily blend and every model run are at `/resorts/{slug}/forecast`."),
+    forecastScores: z.array(ForecastScoreSchema).optional().describe("Per-model verification at this resort over 90 days, ranked; empty until the scorer has measured days. Detail at `/resorts/{slug}/forecast-accuracy`."),
     score: ResortScoreSchema.nullable().optional().describe("Today's 0–100 score, once the scorer is live."),
     websiteUrl: z.string().nullable(),
     attribution: z.string(),
@@ -552,6 +655,12 @@ export type StationSourcePublic = z.infer<typeof StationSourceSchema>;
 export type ForecastDailyPublic = z.infer<typeof ForecastDailySchema>;
 export type ForecastRunPublic = z.infer<typeof ForecastRunSchema>;
 export type ForecastScorePublic = z.infer<typeof ForecastScoreSchema>;
+export type ForecastCreditPublic = z.infer<typeof ForecastCreditSchema>;
+export type ForecastBlendDayPublic = z.infer<typeof ForecastBlendDaySchema>;
+export type ForecastSummaryPublic = z.infer<typeof ForecastSummarySchema>;
+export type ForecastPublic = z.infer<typeof ForecastSchema>;
+export type ForecastTruthBasis = z.infer<typeof ForecastTruthBasisSchema>;
+export type ForecastAccuracyPublic = z.infer<typeof ForecastAccuracySchema>;
 export type ScoreComponents = z.infer<typeof ScoreComponentsSchema>;
 export type ResortScorePublic = z.infer<typeof ResortScoreSchema>;
 export type LocationPublic = z.infer<typeof LocationSchema>;

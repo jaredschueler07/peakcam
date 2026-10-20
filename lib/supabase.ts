@@ -5,6 +5,7 @@ import type { ResortOpening } from "./openings";
 import type { StationNormalsSummary } from "./resort-faq";
 import { withResolvedCamNames } from "./cam-name";
 import { clampHours, pickResortTimeline, shapeTimeline, toFrame, MAX_TIMELINE_HOURS, type CamStillRow, type CamTimeline, type CamTimelineFrame } from "./cam-timeline";
+import { assembleStoredRuns, latestRunsPerModel, type ForecastDailyRow, type ForecastRunRow, type ForecastScoreRow, type StoredForecast } from "./forecast/store";
 
 // ─────────────────────────────────────────────────────────────
 // Client
@@ -619,6 +620,76 @@ export async function getResortElevationFt(resortId: string): Promise<number | n
   if (!row) return null;
   if (row.base_ft != null && row.summit_ft != null) return Math.round((row.base_ft + row.summit_ft) / 2);
   return row.base_ft ?? null;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Stored forecasts (migration 027; written by scripts/forecast-sync.ts)
+// ─────────────────────────────────────────────────────────────
+
+/** Runs issued inside this window count as "current"; the sync runs every 6 h, so 36 h tolerates a missed run or two. */
+export const FORECAST_RUN_MAX_AGE_HOURS = 36;
+
+/**
+ * The newest run per (point, model) for a resort with its daily rows, as the
+ * serializer and the MCP tools consume them. `runs` is empty (not an error)
+ * when the tables are missing or no job has written yet.
+ */
+export async function getForecastRuns(resortId: string, maxAgeHours = FORECAST_RUN_MAX_AGE_HOURS): Promise<StoredForecast> {
+  const since = new Date(Date.now() - maxAgeHours * 3_600_000).toISOString();
+  const { data: runRows, error: runError } = await supabase
+    .from("forecast_runs")
+    .select("id, resort_id, point, model, issued_at, horizon_days")
+    .eq("resort_id", resortId)
+    .gte("issued_at", since)
+    .order("issued_at", { ascending: false })
+    .limit(200);
+  if (runError) {
+    if (MISSING_TABLE_CODES.has(runError.code)) return { runs: [] };
+    throw runError;
+  }
+  const latest = latestRunsPerModel((runRows ?? []) as ForecastRunRow[]);
+  if (!latest.length) return { runs: [] };
+  const { data: dailyRows, error: dailyError } = await supabase
+    .from("forecast_daily")
+    .select("run_id, date, snowfall_cm, snowfall_lo, snowfall_hi, temp_max, temp_min, precip_prob, wind_gust, weather_code")
+    .in("run_id", latest.map((r) => r.id))
+    .order("date");
+  if (dailyError) throw dailyError;
+  return { runs: assembleStoredRuns(latest, (dailyRows ?? []) as ForecastDailyRow[]) };
+}
+
+/** Every verification row for a resort (one per model and window). Empty when none computed yet. */
+export async function getForecastScores(resortId: string): Promise<ForecastScoreRow[]> {
+  const { data, error } = await supabase
+    .from("forecast_scores")
+    .select("resort_id, model, period_days, day1_mae, day3_mae, day7_mae, samples, bias_ratio, computed_at")
+    .eq("resort_id", resortId);
+  if (error) {
+    if (MISSING_TABLE_CODES.has(error.code)) return [];
+    throw error;
+  }
+  return (data ?? []) as ForecastScoreRow[];
+}
+
+export interface SnowDepthHistoryRow {
+  date: string;
+  station_id: string;
+  snow_depth_in: number | null;
+  qc_flag: string;
+}
+
+/** `snowpack_daily` depth rows for the trailing `days`, newest first — the accuracy surface counts the measured days from these. */
+export async function getSnowDepthHistory(resortId: string, days: number): Promise<SnowDepthHistoryRow[]> {
+  const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from("snowpack_daily")
+    .select("date, station_id, snow_depth_in, qc_flag")
+    .eq("resort_id", resortId)
+    .gte("date", since)
+    .order("date", { ascending: false })
+    .limit(days + 1);
+  if (error) throw error;
+  return (data ?? []) as SnowDepthHistoryRow[];
 }
 
 // ─────────────────────────────────────────────────────────────

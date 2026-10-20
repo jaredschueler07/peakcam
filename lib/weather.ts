@@ -74,6 +74,8 @@ function parseWindSpeed(windStr: string): number {
 
 interface NWSPeriod {
   name: string;
+  /** ISO with the point's own offset, e.g. "2026-11-02T06:00:00-07:00". */
+  startTime?: string;
   temperature: number;
   temperatureUnit: string;
   shortForecast: string;
@@ -110,12 +112,22 @@ export async function resolveGridPoint(lat: number, lng: number) {
 }
 
 /**
+ * Daily snowfall in inches keyed by YYYY-MM-DD (resort-local), from the stored
+ * multi-model blend (lib/forecast/blend.ts via lib/public-api/forecast.ts).
+ * When a caller passes one, the NWS periods take their snow amounts from it
+ * and keep the NWS wording for the narrative; without one the keyword
+ * heuristic stands in and the period says so in `snowSource`.
+ */
+export type SnowByDateInches = Record<string, number>;
+
+/**
  * Fetch 5-day forecast for a given lat/lng from the NWS API.
  * Returns null if NWS is unreachable — always handle gracefully.
  */
 export async function getWeatherForecast(
   lat: number,
-  lng: number
+  lng: number,
+  blendByDate?: SnowByDateInches | null,
 ): Promise<WeatherPeriod[] | null> {
   try {
     const grid = await resolveGridPoint(lat, lng);
@@ -141,15 +153,20 @@ export async function getWeatherForecast(
         const low = next && !next.isDaytime ? next.temperature : null;
         const ws = p.windSpeed ? parseWindSpeed(p.windSpeed) : null;
         const high = p.temperature;
+        const date = p.startTime ? parseLocalParts(p.startTime)?.dateKey : undefined;
+        const blended = date != null ? blendByDate?.[date] : undefined;
+        const keyword = Math.max(
+          estimateSnow(p.shortForecast),
+          low != null ? estimateSnow(next?.shortForecast ?? "") : 0
+        );
         days.push({
+          date,
           dow: days.length === 0 ? "Today" : p.name.substring(0, 3),
           condition: forecastToCondition(p.shortForecast),
           high,
           low,
-          snowInches: Math.max(
-            estimateSnow(p.shortForecast),
-            low != null ? estimateSnow(next?.shortForecast ?? "") : 0
-          ),
+          snowInches: blended != null ? blended : keyword,
+          snowSource: blended != null ? "blend" : "nws_keyword",
           shortForecast: p.shortForecast,
           windSpeed: ws,
           windDirection: p.windDirection ?? null,
@@ -272,7 +289,7 @@ export function parseLocalParts(iso: string): LocalParts | null {
 
 /** Bucket hourly data into morning/afternoon/evening periods per resort-local day. */
 export function bucketIntoPeriods(hourly: HourlyWeather[]): ForecastPeriod[] {
-  type Bucket = { period: "morning" | "afternoon" | "evening"; day: string; items: HourlyWeather[] };
+  type Bucket = { period: "morning" | "afternoon" | "evening"; day: string; date: string; items: HourlyWeather[] };
   const buckets = new Map<string, Bucket>();
 
   for (const h of hourly) {
@@ -289,7 +306,7 @@ export function bucketIntoPeriods(hourly: HourlyWeather[]): ForecastPeriod[] {
 
     const key = `${dateKey}-${period}`;
     if (!buckets.has(key)) {
-      buckets.set(key, { period, day: dow, items: [] });
+      buckets.set(key, { period, day: dow, date: dateKey, items: [] });
     }
     buckets.get(key)!.items.push(h);
   }
@@ -297,7 +314,7 @@ export function bucketIntoPeriods(hourly: HourlyWeather[]): ForecastPeriod[] {
   const results: ForecastPeriod[] = [];
 
   for (const bucket of buckets.values()) {
-    const { items, day, period } = bucket;
+    const { items, day, date, period } = bucket;
     if (items.length === 0) continue;
 
     // Dominant condition: most frequent
@@ -333,6 +350,7 @@ export function bucketIntoPeriods(hourly: HourlyWeather[]): ForecastPeriod[] {
 
     results.push({
       day,
+      date,
       period,
       condition: dominantCondition,
       highTemp: Math.max(...items.map((it) => it.temperature)),
@@ -351,4 +369,32 @@ export function bucketIntoPeriods(hourly: HourlyWeather[]): ForecastPeriod[] {
   }
 
   return results;
+}
+
+/**
+ * Re-scale each day's period snow totals so they add up to the blended daily
+ * amount: in proportion to the keyword weights the hourly wording gave, or
+ * evenly across the day's periods when the wording named no snow. Days the
+ * blend does not cover keep their keyword values. Pure; the resort page
+ * calls it after bucketIntoPeriods.
+ */
+export function applyBlendToPeriods(periods: ForecastPeriod[], blendByDate: SnowByDateInches | null | undefined): ForecastPeriod[] {
+  if (!blendByDate) return periods;
+  const byDate = new Map<string, ForecastPeriod[]>();
+  for (const p of periods) {
+    if (!p.date) continue;
+    if (!byDate.has(p.date)) byDate.set(p.date, []);
+    byDate.get(p.date)!.push(p);
+  }
+  const scaled = new Map<ForecastPeriod, number>();
+  for (const [date, group] of byDate) {
+    const target = blendByDate[date];
+    if (target == null || !Number.isFinite(target)) continue;
+    const keywordTotal = group.reduce((s, p) => s + p.snowInches, 0);
+    for (const p of group) {
+      const share = keywordTotal > 0 ? p.snowInches / keywordTotal : 1 / group.length;
+      scaled.set(p, Math.round(target * share * 10) / 10);
+    }
+  }
+  return periods.map((p) => (scaled.has(p) ? { ...p, snowInches: scaled.get(p)! } : p));
 }

@@ -20,6 +20,7 @@ export const PEAKCAM_TOOL_NAMES = [
   "get_alert_options",
   "get_cam_timeline",
   "get_stations",
+  "compare_models",
   "ask",
 ] as const;
 
