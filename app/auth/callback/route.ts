@@ -1,15 +1,18 @@
 // ─────────────────────────────────────────────────────────────
-// Supabase Auth — email link callback
+// Supabase Auth — email link and OAuth callback
 // Establishes a session from either a `token_hash` + `type` pair (the links
 // our own email templates point straight at this route) or a PKCE `code`
-// (links Supabase's /auth/v1/verify redirects to), then redirects back.
+// (links Supabase's /auth/v1/verify redirects to, and the Google sign-in
+// round trip), then redirects back. A Google attempt that failed arrives as
+// `?error=…&error_code=…&error_description=…` and is sent to /auth with a
+// readable reason.
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { safeNext } from "@/lib/safe-redirect";
-import { WELCOME_PARAM, WELCOME_SIGNUP, isFreshSignup } from "@/lib/auth-signup-welcome";
+import { WELCOME_METHOD_GOOGLE, WELCOME_METHOD_PARAM, WELCOME_PARAM, WELCOME_SIGNUP, isFreshSignup } from "@/lib/auth-signup-welcome";
 
 /**
  * Why the callback failed, for the `auth_callback_failed` event fired on
@@ -31,6 +34,22 @@ const TOKEN_HASH_TYPES: readonly EmailOtpType[] = ["signup", "recovery", "invite
 
 function isEmailOtpType(value: string | null): value is EmailOtpType {
   return value !== null && (TOKEN_HASH_TYPES as readonly string[]).includes(value);
+}
+
+/**
+ * Supabase reports an OAuth failure by redirecting here with `error` (an
+ * OAuth 2 error string such as access_denied / server_error) and usually a
+ * more specific `error_code` from its own catalogue (provider_disabled,
+ * email_exists, flow_state_expired …). The code is the better key for a
+ * message, the generic string the fallback. Both are user-controlled query
+ * input, so the result is reduced to a short identifier and only ever used as
+ * a lookup key in lib/auth-errors.ts — `error_description` is never echoed.
+ */
+function oauthFailureReason(searchParams: URLSearchParams): string | null {
+  const error = searchParams.get("error");
+  if (!error) return null;
+  const candidate = searchParams.get("error_code") || error;
+  return /^[a-z0-9_]{1,64}$/i.test(candidate) ? candidate.toLowerCase() : "unknown";
 }
 
 function hasCodeVerifierCookie(request: NextRequest): boolean {
@@ -71,6 +90,19 @@ export async function GET(request: NextRequest) {
   let failure: CallbackFailure = "missing_code";
   let signedIn = false;
   let confirmedAt: string | null | undefined;
+  let provider: string | undefined;
+
+  const oauthFailure = oauthFailureReason(searchParams);
+  if (oauthFailure) {
+    // Google round trip came back without a code: cancelled at the account
+    // chooser, provider switched off, identity conflict, expired flow state.
+    // Keep `next` so a retry from /auth still lands where the visitor meant to.
+    const fallback = new URL("/auth", origin);
+    fallback.searchParams.set("error", "oauth_failed");
+    fallback.searchParams.set("reason", oauthFailure);
+    if (next !== "/") fallback.searchParams.set("next", next);
+    return NextResponse.redirect(fallback);
+  }
 
   if (tokenHash && isEmailOtpType(type)) {
     // Token-hash link from supabase/email-templates/{confirmation,recovery}.html.
@@ -86,13 +118,17 @@ export async function GET(request: NextRequest) {
       failure = "verify_failed";
     }
   } else if (code) {
-    // PKCE link: `{{ .ConfirmationURL }}` templates (invite, email change) and
-    // any confirmation/recovery email sent before the templates switched.
+    // PKCE link: `{{ .ConfirmationURL }}` templates (invite, email change),
+    // any confirmation/recovery email sent before the templates switched, and
+    // the Google sign-in round trip (AuthForm → Supabase → Google → Supabase →
+    // here). The verifier cookie was written by the browser that clicked.
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
       signedIn = true;
       confirmedAt = data.user?.email_confirmed_at ?? data.user?.confirmed_at;
+      const appProvider = data.user?.app_metadata?.provider;
+      provider = typeof appProvider === "string" ? appProvider : undefined;
     } else {
       failure = hasCodeVerifierCookie(request) ? "exchange_failed" : "missing_code_verifier";
     }
@@ -113,6 +149,10 @@ export async function GET(request: NextRequest) {
     // redirect target.
     if (isFreshSignup(confirmedAt)) {
       target.searchParams.set(WELCOME_PARAM, WELCOME_SIGNUP);
+      // A brand-new Google account is confirmed at creation, seconds before
+      // this redirect, so it passes the same freshness test; tag the method
+      // so AUTH_SIGNUP_COMPLETED can be split by sign-up path.
+      if (provider === WELCOME_METHOD_GOOGLE) target.searchParams.set(WELCOME_METHOD_PARAM, WELCOME_METHOD_GOOGLE);
     }
     return NextResponse.redirect(target);
   }

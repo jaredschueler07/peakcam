@@ -8,6 +8,14 @@
 
 export const WELCOME_PARAM = "welcome";
 export const WELCOME_SIGNUP = "signup";
+/**
+ * Companion to WELCOME_PARAM: how the fresh account was created. Absent for
+ * the email flows (the historical rows carry no method); "google" when the
+ * callback exchanged a Google OAuth code. Read by SignupWelcomeTracker and
+ * stripped from the URL with the marker.
+ */
+export const WELCOME_METHOD_PARAM = "welcome_method";
+export const WELCOME_METHOD_GOOGLE = "google";
 
 /**
  * Keyed on the *confirmation* timestamp, not account creation. Supabase stamps
@@ -16,7 +24,10 @@ export const WELCOME_SIGNUP = "signup";
  * matter how long the user took to open the email — whereas `created_at` is
  * stamped at form submit and would exclude everyone who read their inbox more
  * than a few minutes later. For a returning magic-link or password-reset user
- * the confirmation is days old, so those flows stay excluded.
+ * the confirmation is days old, so those flows stay excluded. A brand-new
+ * Google account is confirmed at creation, seconds before the same redirect,
+ * so it falls inside the window too; an existing email account that just
+ * linked Google keeps its old confirmation and stays out.
  *
  * The window only has to absorb the verify → callback redirect plus clock
  * skew between Supabase and Vercel; two minutes is generous for that.

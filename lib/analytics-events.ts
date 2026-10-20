@@ -53,6 +53,17 @@ export const EVENTS = {
 export type EventName = (typeof EVENTS)[keyof typeof EVENTS];
 
 /**
+ * How an account event was initiated. The email flows predate the property
+ * and still omit it, so "no method" reads as email in PostHog; Google
+ * sign-in (P11) passes "google" on every auth_* event it fires.
+ */
+export const AUTH_METHODS = ["email", "google"] as const;
+export type AuthMethod = (typeof AUTH_METHODS)[number];
+
+/** Properties accepted by track(): free-form, except `method` is constrained. */
+export type EventProperties = Record<string, unknown> & { method?: AuthMethod };
+
+/**
  * PostHogProvider is mounted through `dynamic(..., { ssr: false })`, which makes
  * it and the page subtree commit together — and React flushes child effects
  * before parent ones. So any event captured from a mount effect on a cold page
@@ -64,7 +75,7 @@ export type EventName = (typeof EVENTS)[keyof typeof EVENTS];
  * (no key configured, blocked script), give up after a few seconds rather than
  * holding the events forever.
  */
-const pending: Array<[EventName, Record<string, unknown> | undefined]> = [];
+const pending: Array<[EventName, EventProperties | undefined]> = [];
 let draining = false;
 
 function isLoaded() {
@@ -146,7 +157,7 @@ const META_EVENT_MAP: Partial<Record<EventName, string>> = {
   [EVENTS.AUTH_SIGNUP_COMPLETED]: "CompleteRegistration",
 };
 
-export function track(event: EventName, properties?: Record<string, unknown>) {
+export function track(event: EventName, properties?: EventProperties) {
   if (typeof window === "undefined") return;
   const metaEvent = META_EVENT_MAP[event];
   if (metaEvent) fireMetaPixelEvent(metaEvent);
