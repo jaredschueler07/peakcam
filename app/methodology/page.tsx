@@ -203,6 +203,62 @@ export default function MethodologyPage() {
           one elevation, an operator picks its deepest stake.
         </p>
 
+        <H2 id="score">The Snow Score</H2>
+        <p className="mb-4">
+          The PeakCam Snow Score is one number from 0 to 100 per resort per day, scored once a day
+          by a fixed formula. It is algorithmic: no editor touches it, and every score row and API
+          document says so (<code className="font-mono text-[13px]">scoredBy: &quot;algorithmic&quot;</code>).
+          Five components add up to it, and each one carries the points it earned, its maximum, a
+          one-line basis you can quote and the source it rests on, so &ldquo;why 72&rdquo; is always
+          answerable on the resort page, in the API (
+          <code className="font-mono text-[13px]">/api/v1/resorts/&#123;slug&#125;/score-components</code>) and in the{" "}
+          <code className="font-mono text-[13px]">get_score</code> MCP tool.
+        </p>
+        <ul className="mb-4 list-disc space-y-2 pl-6">
+          <li>
+            <strong>Depth vs normal, 30 points.</strong> The station&apos;s snow water equivalent against its
+            own 1991&ndash;2020 median for today&apos;s date: 70% of normal (the rating&apos;s &ldquo;fair&rdquo;
+            line) is half marks, 100% (its &ldquo;good&rdquo; line) is 24, 125% and above is full. A resort
+            without a station normal is scored on base depth instead, 20 and 24 inches anchoring the
+            scale, and can earn at most 27 of 30 because nothing says whether that base is normal.
+          </li>
+          <li>
+            <strong>New snow over 7 days, 25 points.</strong> Daily new snow from the station record (the
+            positive change in depth, a floor on what fell) summed over the last week; 6 inches is 10
+            points, 12 inches is 17, 24 inches is full. Resorts on the weather model use the model&apos;s
+            daily values, labelled as such.
+          </li>
+          <li>
+            <strong>Forecast over 7 days, 20 points.</strong> The blended forecast&apos;s next-seven-day total
+            (the median across the models, from the run stored that day): 6 inches is half, 20 inches is
+            full. No stored run, no points.
+          </li>
+          <li>
+            <strong>Snow quality, 15 points.</strong> Three factors multiplied: days since the last snow day
+            (one inch or more: within a day is 1.0, falling to 0.3 after a month), the highest daily high
+            over the last three days (freezing or below is 1.0, 50&nbsp;&deg;F is 0.6, 60&nbsp;&deg;F is
+            0.4; the station&apos;s own thermometer, else the blend&apos;s first-day high), and the engine&apos;s
+            surface tags (&ldquo;rain at base&rdquo; halves it, &ldquo;icy&rdquo; is 0.6, &ldquo;spring
+            skiing&rdquo; 0.75; a &ldquo;powder day&rdquo; keeps the freshness factor at 0.9 or better).
+          </li>
+          <li>
+            <strong>Operating status, 10 points.</strong> The derived status from the section above: open
+            is full, pre-season and closed today are half, off season and unknown are none. A closed
+            resort with a deep base can still score in the forties; the status component and its basis
+            say why it is not higher.
+          </li>
+        </ul>
+        <p className="mb-4">
+          The score&apos;s four-tier label uses the same words as the conditions rating, cut at fixed
+          points: <strong>great</strong> at 75 and above, <strong>good</strong> at 55, <strong>fair</strong> at 35,
+          otherwise <strong>poor</strong>. The two can disagree on a given day, on purpose: the rating
+          reads today&apos;s measurements alone, the score also counts the week behind, the week ahead and
+          whether the lifts turn. The anchors above are the rating&apos;s own thresholds, so the two agree
+          on what counts as a lot of snow. Each day&apos;s score is kept, so a resort page shows the last
+          thirty days as a sparkline and the API returns the history; a formula change bumps the
+          version and re-scores the window from the stored rows rather than mixing formulas.
+        </p>
+
         <H2 id="user-reports">On-mountain reports</H2>
         <p className="mb-4">
           Skiers standing on the snow see what a pillow cannot: wind effect, crust, how the

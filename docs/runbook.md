@@ -48,6 +48,7 @@ Then spot-check `/`, a `/resorts/<slug>`, `/snow-report`, `/about`.
 | `com.peakcam.model-sync` | Weather-model sync (`scripts/model-sync.ts`) | every 6 h | running (scheduled) |
 | `com.peakcam.forecast-sync` | Multi-model forecast runs → `forecast_runs` + `forecast_daily` (`scripts/forecast-sync.ts`: one Open-Meteo `models=` call per point, summit and base, nine models for US resorts, seven elsewhere; idempotent per issue hour; retention pass on the first run after 00:00 UTC) | every 6 h (21,600 s, `RunAtLoad`) | **to deploy** (P4, 2026-10-20) — recipe below |
 | `com.peakcam.forecast-score` | Forecast verification → `forecast_scores` (`scripts/forecast-score.ts`: day-1/3/7 MAE, bias ratio, rank per model + `blend`, graded against SNOTEL depth deltas over 90 days) | daily 07:30 local (after snotel-sync) | **to deploy** (P4, 2026-10-20) |
+| `com.peakcam.score-sync` | Snow Score → `resort_scores` (`scripts/score-sync.ts`, migration 028): one 0–100 row per resort per day with five components (`lib/score.ts`), from the day's `snow_reports` row, `snowpack_daily`, the stored forecast runs and the P6 status; idempotent on `(resort_id, date)`; `--backfill 30` fills the sparkline from stored rows | 07:45 and 19:45 local (`StartCalendarInterval` ×2, `RunAtLoad`) | **to deploy** (P7, 2026-10-20) — see "Snow Score" below |
 | `com.peakcam.stations-sync` | Station layer (`scripts/stations-sync.ts`): up to three stations per resort by elevation band from SNOTEL, GHCN-Daily, NWS obs, BC ASWS, ECCC → `stations`, `resort_stations`, `station_observations` (migration 026). Reads only public APIs; never touches `snow_reports`. `docs/stations.md` | hourly (3,600 s) | **plist in repo, not yet loaded on the mini** — recipe below |
 | `com.peakcam.operator-sync` | Operator lift status via Liftie → `operator_status` (`scripts/operator-sync.ts`, migration 032): lifts open / hold / scheduled / closed per resort for the 88 resorts in `data/operator-sources.json`; read by the conditions contract (`/api/v1/resorts/{slug}/conditions`, the status chip). Exits 2 when every fetch is refused by Liftie's Cloudflare challenge | 06:00 and 11:00 local (`StartCalendarInterval` ×2) | **plist in repo (P6, 2026-10-20), blocked upstream** — see "Operator status" below |
 | `com.peakcam.pipeline` | Multi-source blender | daily 06:00 | **prepared but Disabled=true** — awaits migration 010 |
@@ -457,7 +458,7 @@ curl -s https://www.peakcam.io/api/v1/resorts/search-index | jq '{count, breck: 
 curl -s https://www.peakcam.io/api/v1/status | jq '{status, age: .checks.snowReports.ageHours, live: .checks.cams.liveRatio, issues}'
 curl -s https://www.peakcam.io/.well-known/schemas | jq '.count'
 curl -s https://www.peakcam.io/.well-known/schemas/resort.json | jq '."$id"'
-curl -s https://www.peakcam.io/llms-full.txt | grep -c '^### '          # 16 tools + 12 REST routes = 28
+curl -s https://www.peakcam.io/llms-full.txt | grep -c '^### '          # 21 tools + 20 REST routes = 41 (P7: get_score, score-components, snow-report)
 # P4 forecast (available:false with empty arrays until com.peakcam.forecast-sync has run on the mini)
 curl -sI https://www.peakcam.io/api/v1/resorts/alta/forecast | grep -i '^x-attribution'   # ends "Weather data by Open-Meteo.com (CC BY 4.0)"
 curl -s https://www.peakcam.io/api/v1/resorts/alta/forecast | jq '{available, point, points, models: .summary.modelCount, next7: .summary.total7dIn, peak: .summary.peak, days: (.daily|length), byModel: [.byModel[] | {model, horizonDays, issuedAt}]}'
@@ -508,7 +509,7 @@ are optional until their block lands.
 | `station_observations` (PK `(station_id, observed_at)` is the read index) | 026 | `scripts/stations-sync.ts` via `lib/stations/` (SNOTEL, GHCN, NWS, BC ASWS, ECCC) | `Resort.measuredNow` |
 | `forecast_runs`, `forecast_daily` | 027 | `scripts/forecast-sync.ts` (`com.peakcam.forecast-sync`, every 6 h; live since P4, 2026-10-20) | `Resort.forecast` summary, `/resorts/{slug}/forecast`, `get_forecast`, the resort page strip |
 | `forecast_scores` | 027 | `scripts/forecast-score.ts` (`com.peakcam.forecast-score`, daily 07:30; rewrites per resort/model/window, `blend` row included) | `Resort.forecastScores`, `/resorts/{slug}/forecast-accuracy`, `compare_models` |
-| `resort_scores` | 028 | P7 scoring job | `Resort.score`, leaderboards |
+| `resort_scores` | 028 | `scripts/score-sync.ts` (`com.peakcam.score-sync`, 07:45 and 19:45; P7, 2026-10-20), `scored_by = 'algorithmic'`, `components` jsonb keyed by `lib/score.ts SCORE_COMPONENT_IDS` | `Resort.score` (and `ScoreLight` on list / powder / compare rows), `/resorts/{slug}/score-components`, `/snow-report?sort=score`, MCP `get_score`, the resort page `#snow-score` card, the homepage strip, the markdown alternate |
 | `operator_status` + view `latest_operator_status` | 032 (P6, 2026-10-20) | `scripts/operator-sync.ts` (`com.peakcam.operator-sync`, 06:00 and 11:00) via `lib/operators/liftie.ts`; one row per fetch, idempotent on `(resort_id, source, observed_at)`; public read, no write policies | `/api/v1/resorts/{slug}/conditions` (`data.liftsOpen` …), the resort page status chip, `get_resort_conditions`, the markdown "Status and freshness" section |
 
 Elevations: `resorts.elevation_base_ft/summit_ft` are the canonical home from
@@ -575,6 +576,53 @@ written since 2026-03-21, past seasons are empty, the band is absent, and the tw
 boards say "unavailable" until migration 030 exists. Normals: a station with fewer than 25
 qualifying winters is logged by the seed (`NOTE fewer than 25 qualifying winters`); the band
 still renders with whatever it has and `curve.normalYears` says how many.
+
+## Snow Score (P7, migration 028)
+
+Added 2026-10-20 (branch `feat/p7-score`, parity plan block P7). The table has existed in
+prod since P0; the job fills it. `lib/score.ts` is the formula (documented at
+`/methodology#score`), `scripts/score-sync.ts` the job, `lib/public-api/score.ts` the
+documents. The read path (`getLatestScoresIndex()`) treats the newest row at most 3 days old as
+"today", so a missed run shows yesterday's score dated as such, never nothing; everything fails
+soft to `available: false` / `score: null` while the table is empty.
+
+| Job | What it does | Schedule | Notes |
+| --- | --- | --- | --- |
+| `com.peakcam.score-sync` (`npm run score-sync`) | Per resort: the newest `snow_reports` row of the day (publishable % of normal, 24/48 h, tags), `snowpack_daily` back 14 days (7-day new-snow sum, days since a ≥ 1 in day, 3-day high), the summit (else base) forecast runs issued that day blended with `lib/forecast/blend.ts` (7-day total, model count, first-day high for model resorts), `deriveStatus` over `resort_openings` + `latest_operator_status` (today only; past days rest on the dates) → `computeScore` → upsert `resort_scores` | 07:45 and 19:45 local | ~4 PostgREST reads per resort, 150 ms apart, ≈ 2 min for 148 resorts. `--dry-run` reads with the anon key and writes nothing; `--resort slug`; `--backfill N` scores the N days ending today (one set of reads per resort, N rows). Exit 1 only when every resort failed. |
+
+Deploy on the mini (user `maestro_admin`, checkout `/Users/maestro_admin/peakcam/peakcam`),
+after the merge has reached `main` and `git pull` there:
+
+```bash
+ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && git pull --ff-only && npm ci --no-audit --no-fund 2>&1 | tail -1"'
+ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && npx tsx scripts/score-sync.ts --dry-run --resort alta | tail -3"'      # "OK Alta Ski Area — <date> score N (rating): depth …"
+ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && npx tsx scripts/score-sync.ts --backfill 30 | tail -5"'                # first real rows: 148 resorts × 30 days, so the sparkline is not empty on day one (≈ 3–4 min)
+ssh mini 'cd /Users/maestro_admin/peakcam/peakcam && cp com.peakcam.score-sync.plist ~/Library/LaunchAgents/ && launchctl bootout gui/$(id -u)/com.peakcam.score-sync 2>/dev/null; launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.peakcam.score-sync.plist && launchctl list | grep com.peakcam.score-sync'
+ssh mini 'tail -3 /Users/maestro_admin/peakcam/peakcam/scripts/score-sync.log'   # RunAtLoad wrote today's row again; ends "[score-sync] Done. 148 scored (148 rows), 0 failed (of 148)."
+```
+
+Verify in production (the catalogue cache is 15 min, so allow that after the first write):
+
+```bash
+curl -s https://www.peakcam.io/api/v1/resorts/alta/score-components | jq '{available, score: .today.score, rating: .today.rating, date: .today.date, scoredBy: .today.scoredBy, tagline: .today.tagline, parts: [.today.components | to_entries[] | {k: .key, pts: .value.points, max: .value.max, src: .value.source}], history: (.history | length)}'
+curl -s 'https://www.peakcam.io/api/v1/snow-report?sort=score' | jq '{sentence, scoredAsOf, top: [.resorts[:5][] | {slug, score: .score.score, rating: .score.rating}]}'
+curl -s 'https://www.peakcam.io/api/v1/resorts?sort=score' | jq '.resorts[:3] | map({slug, score})'
+curl -s https://www.peakcam.io/api/v1/resorts/alta | jq '.score | {date, score, rating, scoredBy}'
+curl -s https://www.peakcam.io/api/v1/powder?limit=3 | jq '.results[] | {slug, score}'
+curl -s https://www.peakcam.io/.well-known/schemas/score-components.json | jq '."$id", .title'
+curl -s https://www.peakcam.io/api/v1/batch -H 'content-type: application/json' -d '{"requests":[{"path":"/api/v1/resorts/alta/score-components"},{"path":"/api/v1/snow-report?sort=score&state=UT"}]}' | jq '.results[] | {path, status}'
+curl -s https://www.peakcam.io/resorts/alta | grep -o 'data-testid="score-card" data-score="[0-9a-z]*" data-rating="[a-z]*"'
+curl -s https://www.peakcam.io/resorts/alta/index.md | grep '^Snow Score:'
+curl -s https://www.peakcam.io/ | grep -o 'data-testid="featured-score-sentence"'
+npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/list | grep -c '"name"'   # 21
+npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_score --tool-arg slug=alta | head -20
+npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name compare_resorts --tool-arg 'slugs=["alta","snowbird"]' | grep '| Score |'
+```
+
+Re-scoring after a formula change: bump `SCORE_VERSION` in `lib/score.ts`, merge, then
+`npx tsx scripts/score-sync.ts --backfill 30` on the mini rewrites the window (the upsert
+replaces each `(resort_id, date)` row). Rows older than the window keep the old formula; the
+API's `version` says which formula is live, not which one scored an old row.
 
 ## Operator status (P6, migration 032)
 
