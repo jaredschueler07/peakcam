@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { buildServerCard, MCP_DESCRIPTION, SERVER_CARD_SCHEMA } from "@/components/connect/server-card";
-import { CONNECT_TOOLS, MCP_ENDPOINT, MCP_NAME, MCP_PROTOCOL_VERSIONS } from "@/components/connect/links";
+import { CONNECT_TOOLS, MCP_ENDPOINT, MCP_NAME, MCP_PROTOCOL_VERSIONS, STDIO_COMMAND, STDIO_MCP_JSON, STDIO_PACKAGE_NAME, STDIO_PACKAGE_VERSION } from "@/components/connect/links";
 import { buildTools, PEAKCAM_TOOL_NAMES } from "@/lib/mcp/tools";
 import { PEAKCAM_MCP_ENDPOINT, PEAKCAM_MCP_NAME, PEAKCAM_MCP_VERSION } from "@/lib/mcp/server";
 import type { McpDataSource } from "@/lib/mcp/types";
@@ -15,6 +15,14 @@ import type { McpDataSource } from "@/lib/mcp/types";
 
 const ROOT = resolve(__dirname, "..");
 const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { version: string };
+const stdioPkg = JSON.parse(readFileSync(join(ROOT, "packages/peakcam-mcp/package.json"), "utf8")) as {
+  name: string;
+  version: string;
+  mcpName: string;
+  bin: Record<string, string>;
+  files: string[];
+  dependencies: Record<string, string>;
+};
 
 // Schema constraints, from the v1 server-card schema and the registry's
 // 2025-12-11 server.schema.json: reverse-DNS name with exactly one slash,
@@ -57,6 +65,27 @@ test("server card: the top level carries no tool list (runtime listing owns it);
     CONNECT_TOOLS.map((t) => t.name),
   );
   assert.equal(summary.license, "https://www.peakcam.io/about#terms");
+  // The stdio bridge sits beside the HTTP remote, as advisory vendor data.
+  assert.deepEqual(summary.packages, [
+    { registryType: "npm", identifier: STDIO_PACKAGE_NAME, version: STDIO_PACKAGE_VERSION, transport: "stdio", command: STDIO_COMMAND },
+  ]);
+});
+
+test("the npm stdio bridge: manifest, bin, registry ownership field and the recipes agree", () => {
+  assert.equal(stdioPkg.name, "peakcam-mcp");
+  assert.equal(STDIO_PACKAGE_NAME, stdioPkg.name);
+  assert.equal(STDIO_PACKAGE_VERSION, stdioPkg.version);
+  // The MCP Registry verifies npm ownership by reading `mcpName` from the published package.json.
+  assert.equal(stdioPkg.mcpName, MCP_NAME);
+  assert.deepEqual(stdioPkg.bin, { "peakcam-mcp": "bin/peakcam-mcp.mjs" });
+  const bin = readFileSync(join(ROOT, "packages/peakcam-mcp", stdioPkg.bin["peakcam-mcp"]), "utf8");
+  assert.ok(bin.startsWith("#!/usr/bin/env node\n"));
+  assert.ok(bin.includes(`"${MCP_ENDPOINT}"`), "the bridge defaults to the production endpoint");
+  assert.ok(bin.includes("StdioServerTransport") && bin.includes("StreamableHTTPClientTransport"));
+  assert.ok(stdioPkg.files.includes("bin/") && stdioPkg.files.includes("README.md") && stdioPkg.files.includes("LICENSE"));
+  assert.ok(Object.keys(stdioPkg.dependencies).includes("@modelcontextprotocol/sdk"));
+  assert.equal(STDIO_COMMAND, "npx -y peakcam-mcp");
+  assert.deepEqual(JSON.parse(STDIO_MCP_JSON), { mcpServers: { peakcam: { command: "npx", args: ["-y", "peakcam-mcp"] } } });
 });
 
 test("server.json: parses, uses the dated registry schema, names io.peakcam/snow and the endpoint", () => {
@@ -68,13 +97,23 @@ test("server.json: parses, uses the dated registry schema, names io.peakcam/snow
   assert.equal(manifest.version, pkg.version, "bump server.json when package.json's version moves");
   assert.equal(manifest.description, MCP_DESCRIPTION);
   assert.ok(manifest.description.length <= 100, `registry caps description at 100 chars (${manifest.description.length})`);
-  assert.equal(manifest.packages, undefined, "remote-only: no packages array");
   assert.deepEqual(manifest.remotes, [{ type: "streamable-http", url: MCP_ENDPOINT }]);
+  // One npm package (the stdio bridge), in the registry's package shape; its
+  // version is the bridge's own, not the site's. The registry validates the
+  // entry against the published npm package (`mcpName`), so publish to npm
+  // before re-running `mcp-publisher publish`.
+  assert.deepEqual(manifest.packages, [
+    { registryType: "npm", registryBaseUrl: "https://registry.npmjs.org", identifier: stdioPkg.name, version: stdioPkg.version, runtimeHint: "npx", transport: { type: "stdio" } },
+  ]);
   assert.equal(manifest.repository.url, "https://github.com/jaredschueler07/peakcam");
   assert.equal(manifest.repository.source, "github");
   // Only this _meta key survives publishing; anything else is dropped.
   assert.deepEqual(Object.keys(manifest._meta), ["io.modelcontextprotocol.registry/publisher-provided"]);
-  assert.ok(JSON.stringify(manifest._meta["io.modelcontextprotocol.registry/publisher-provided"]).length <= 4096);
+  const provided = manifest._meta["io.modelcontextprotocol.registry/publisher-provided"];
+  assert.ok(JSON.stringify(provided).length <= 4096);
+  // Every tool the server registers, in order, so the registry listing names them without a tools/list call.
+  assert.deepEqual(provided.tools, [...PEAKCAM_TOOL_NAMES]);
+  assert.equal(provided.stdio, STDIO_COMMAND);
 });
 
 test("the page's identity constants are the server's own", () => {

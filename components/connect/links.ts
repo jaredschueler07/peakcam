@@ -15,6 +15,7 @@ import {
   PEAKCAM_RESOURCE_TEMPLATE,
 } from "@/lib/mcp/server";
 import { PEAKCAM_TOOL_NAMES, type PeakCamToolName } from "@/lib/mcp/tool-names";
+import stdioPackage from "@/packages/peakcam-mcp/package.json";
 
 /** MCP server identity, re-exported from the server module so the page cannot drift from it. */
 export const MCP_NAME: string = PEAKCAM_MCP_NAME;
@@ -252,6 +253,31 @@ export const EXAMPLE_PROMPTS: readonly ExamplePrompt[] = [
 export const CURSOR_MCP_JSON = JSON.stringify({ mcpServers: { peakcam: { url: MCP_ENDPOINT } } }, null, 2);
 
 export const CLAUDE_CODE_COMMAND = `claude mcp add --transport http peakcam ${MCP_ENDPOINT}`;
+
+/**
+ * The npm stdio bridge (packages/peakcam-mcp, published as `peakcam-mcp`):
+ * `npx -y peakcam-mcp` forwards a stdio client's JSON-RPC to the endpoint
+ * and back. Name and version come from the package's own manifest so
+ * server.json, the server card and this page cannot drift from it.
+ */
+export const STDIO_PACKAGE_NAME: string = stdioPackage.name;
+export const STDIO_PACKAGE_VERSION: string = stdioPackage.version;
+export const STDIO_COMMAND = `npx -y ${STDIO_PACKAGE_NAME}`;
+export const STDIO_MCP_JSON = JSON.stringify(
+  { mcpServers: { peakcam: { command: "npx", args: ["-y", STDIO_PACKAGE_NAME] } } },
+  null,
+  2,
+);
+
+/** Claude Desktop reads the same object from its own config file. */
+export const CLAUDE_DESKTOP_CONFIG_PATHS = {
+  macOS: "~/Library/Application Support/Claude/claude_desktop_config.json",
+  windows: "%APPDATA%\\Claude\\claude_desktop_config.json",
+} as const;
+
+/** Custom GPT (Actions-only path): import the OpenAPI document, paste the instructions file. */
+export const GPT_ACTION_IMPORT_URL = `${SITE_URL}/api/v1/openapi.json`;
+export const GPT_INSTRUCTIONS_URL = `${SITE_URL}/gpt-instructions.md`;
 
 /** The same recipe as docs/alerts-verification.md, trimmed to the one-liner. */
 export const HERMES_WEBHOOK_COMMAND = [
