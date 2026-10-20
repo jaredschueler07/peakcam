@@ -10,6 +10,7 @@
     "commercialization:test": "node --test dashboard/commercialization/server.test.mjs",
     "commercialization:test:browser": "node dashboard/commercialization/browser.test.mjs",
     "lint": "eslint",
+    "generate-descriptions": "tsx scripts/generate-descriptions.ts",
     "test": "node --import tsx --test 'lib/**/*.test.ts' 'scripts/**/*.test.ts' 'scripts/**/*.test.mjs' 'tests/**/*.test.ts'",
     "bake-terrain": "tsx scripts/bake-resort.ts",
     "bake-far-field": "tsx scripts/bake-far-field.ts",
