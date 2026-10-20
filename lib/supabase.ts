@@ -19,7 +19,18 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-const SUPABASE_FETCH_TIMEOUT_MS = 8_000;
+/**
+ * Per-attempt fetch timeout. 8 s at runtime keeps a stuck connection from
+ * holding an ISR revalidation (see withFetchTimeout). During `next build`
+ * the 148+ prerenders share PostgREST's 10-connection pool with the Mac
+ * mini's jobs (stills every 15 min, hourly stations sync, the daily cam
+ * health check's 640 PATCHes); a burst from those queued build reads past
+ * 8 s on 2026-10-20 01:51 UTC with an otherwise idle database. A build has
+ * no user waiting, so it tolerates a long wait better than a failed deploy.
+ */
+const IS_NEXT_BUILD =
+  process.env.NEXT_PHASE === "phase-production-build" || process.env.npm_lifecycle_event === "build";
+const SUPABASE_FETCH_TIMEOUT_MS = IS_NEXT_BUILD ? 25_000 : 8_000;
 const RESORT_CATALOG_REVALIDATE_SECONDS = 60 * 60;
 // Stations refresh hourly on the mini; a 15-minute cache keeps "age" honest without a query per request.
 const PUBLIC_API_STATIONS_REVALIDATE_SECONDS = 15 * 60;
