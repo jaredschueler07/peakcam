@@ -33,7 +33,7 @@ import type { ConditionRating } from "./types";
 
 const CSV_STATE_VALUES = [
   "CA", "CO", "VT", "Chile", "UT", "Argentina", "WA", "NH", "OR", "ID", "NM", "NY", "MT",
-  "BC", "MI", "MA", "ME", "MN", "NV", "PA", "WY", "AZ", "MD", "VA", "WI", "WV", "SD", "AK",
+  "BC", "MI", "MA", "ME", "MN", "NV", "PA", "WY", "AZ", "MD", "VA", "WI", "WV", "SD", "AK", "OH", "MO", "IN", "NJ", "NC",
 ];
 
 const CSV_REGION_VALUES = [
