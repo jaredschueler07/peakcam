@@ -1,7 +1,7 @@
 # PeakCam Runbook
 
-> Last updated: 2026-04-17
-> Status: pre-V0-launch baseline. Human-gated tasks (QA smoke, PostHog dashboard, alerts inbox E2E) will add to this doc as they complete.
+> Last updated: 2026-10-20 (parity plan P10: the job table below was rewritten from the plists loaded on the Mac mini that day).
+> Status: in production. Human-gated tasks (listing submissions, npm publish, keys on the mini) are under "Connect page and MCP listings" and "Where to look".
 
 ## Environments
 
@@ -38,26 +38,55 @@ Then spot-check `/`, a `/resorts/<slug>`, `/snow-report`, `/about`.
 
 ## Launchd Services (Mac Mini)
 
-| Label | Purpose | Schedule | Status |
-|---|---|---|---|
-| `com.peakcam.agents` | 9-agent Slack bot loop | always-on | **running** |
-| `com.peakcam.snotel-sync` | SNOTEL data sync → `snow_reports` | daily 07:00 | running (scheduled) |
-| `com.peakcam.cam-health-check` | Probe every cam, bump `consecutive_failures`, auto-disable dead ones | daily 06:00 | running (scheduled) |
-| `com.peakcam.cam-stills` | Capture one frame per click-to-play cam → bucket `cam-stills`, `cams.still_url` (latest-only cams at most every 6 h); archive a frame for every `archive_allowed` cam → `cam_stills` + `archive/` prefix; prune: all frames 48 h, one per 6 h to 30 d, keepers to 365 d (`scripts/cam-capture-stills.ts`, policy `docs/cams/still-archive-policy.md`) | every 15 min (900 s, P8 block 1; was 21,600 s earlier on 2026-10-18, 7,200 s before that) | running on the mini (scheduled) — deploy note below |
-| `com.peakcam.cam-timelapse` | Render timelapse clips from the still archive (`scripts/cam-timelapse.ts`): a 24 h MP4 + poster per `archive_allowed` cam (H.264, 7 fps, 720p max, ≤ 3 MB, replaced each run) and storm reels while the resort's measured 24 h snow is ≥ 8 in (one per storm day, kept 365 d) → bucket `cam-timelapses`, table `cam_timelapses`; needs ffmpeg and migration 031 | every 6 h (21,600 s, `RunAtLoad`) | **to deploy** (P8 block 2, 2026-10-20) — recipe below |
-| `com.peakcam.model-sync` | Weather-model sync (`scripts/model-sync.ts`) | every 6 h | running (scheduled) |
-| `com.peakcam.forecast-sync` | Multi-model forecast runs → `forecast_runs` + `forecast_daily` (`scripts/forecast-sync.ts`: one Open-Meteo `models=` call per point, summit and base, nine models for US resorts, seven elsewhere; idempotent per issue hour; retention pass on the first run after 00:00 UTC) | every 6 h (21,600 s, `RunAtLoad`) | **to deploy** (P4, 2026-10-20) — recipe below |
-| `com.peakcam.forecast-score` | Forecast verification → `forecast_scores` (`scripts/forecast-score.ts`: day-1/3/7 MAE, bias ratio, rank per model + `blend`, graded against SNOTEL depth deltas over 90 days) | daily 07:30 local (after snotel-sync) | **to deploy** (P4, 2026-10-20) |
-| `com.peakcam.stations-sync` | Station layer (`scripts/stations-sync.ts`): up to three stations per resort by elevation band from SNOTEL, GHCN-Daily, NWS obs, BC ASWS, ECCC → `stations`, `resort_stations`, `station_observations` (migration 026). Reads only public APIs; never touches `snow_reports`. `docs/stations.md` | hourly (3,600 s) | **plist in repo, not yet loaded on the mini** — recipe below |
-| `com.peakcam.operator-sync` | Operator lift status via Liftie → `operator_status` (`scripts/operator-sync.ts`, migration 032): lifts open / hold / scheduled / closed per resort for the 88 resorts in `data/operator-sources.json`; read by the conditions contract (`/api/v1/resorts/{slug}/conditions`, the status chip). Exits 2 when every fetch is refused by Liftie's Cloudflare challenge | 06:00 and 11:00 local (`StartCalendarInterval` ×2) | **plist in repo (P6, 2026-10-20), blocked upstream** — see "Operator status" below |
-| `com.peakcam.pipeline` | Multi-source blender | daily 06:00 | **prepared but Disabled=true** — awaits migration 010 |
+Ground truth is `~/Library/LaunchAgents/com.peakcam.*.plist` on the mini, read over ssh on
+2026-10-20 (`ssh mini 'launchctl list | grep peakcam'`); every row below was loaded and
+matched the plist in the repo root. All jobs run as `maestro_admin` from the ops checkout
+`/Users/maestro_admin/peakcam/peakcam` (on `main` at `9af28b4` that morning), write via the
+service-role key in that checkout's `.env.local`, and log to the path in the last column
+(stdout and stderr to the same file). Times are the mini's local time (America/Denver).
 
-All of the above run from the ops checkout `/Users/maestro_admin/peakcam/peakcam` on the
-Mac mini (hostname `Maestros-Mini`, user `maestro_admin`). Verified 2026-10-18 over ssh:
-`com.peakcam.cam-stills` is loaded there with `StartInterval` 7200 and that working
-directory; `com.peakcam.snotel-sync` (21600), `model-sync`, `cam-health-check` and
-`agents` share the path. The clone was on `main` at `5583736` with one dirty file, so it
-is behind `origin/main` until the next pull.
+| Label | Script (`ProgramArguments`) | Schedule | Writes | Log |
+|---|---|---|---|---|
+| `com.peakcam.agents` | `node agents/loop.mjs` | always-on (`KeepAlive`, `RunAtLoad`) | `agent_memory`, Slack | `agents/loop.log` |
+| `com.peakcam.snotel-sync` | `npx tsx scripts/snotel-sync.ts` | every 6 h (`StartInterval` 21,600) | `snowpack_daily`, `snow_reports` (source `snotel`), `resorts.cond_rating`; IndexNow ping when `INDEXNOW_ENABLED=1` | `scripts/snotel-sync.log` |
+| `com.peakcam.model-sync` | `npx tsx scripts/model-sync.ts` | every 6 h (21,600) | `snow_reports` (source `open_meteo`) for the resorts without a station, `cond_rating` | `scripts/model-sync.log` |
+| `com.peakcam.stations-sync` | `npx tsx scripts/stations-sync.ts` | hourly (3,600) | `stations`, `resort_stations`, `station_observations` (migration 026); never `snow_reports` | `scripts/stations-sync.log` |
+| `com.peakcam.forecast-sync` | `npx tsx scripts/forecast-sync.ts` | every 6 h (21,600, `RunAtLoad`) | `forecast_runs`, `forecast_daily` (027); ~240 Open-Meteo calls a run; retention pass after 00:00 UTC | `scripts/forecast-sync.log` |
+| `com.peakcam.forecast-score` | `npx tsx scripts/forecast-score.ts` | daily 07:30 (`StartCalendarInterval`) | `forecast_scores` (027), graded against SNOTEL depth deltas over 90 days | `scripts/forecast-score.log` |
+| `com.peakcam.operator-sync` | `npx tsx scripts/operator-sync.ts` | 06:00 and 11:00 (`StartCalendarInterval` ×2) | `operator_status` (032) via Liftie; writes nothing while Liftie's Cloudflare challenge stands (exit 2, see "Operator status") | `scripts/operator-sync.log` |
+| `com.peakcam.cam-stills` | `npx tsx scripts/cam-capture-stills.ts` | every 15 min (900, `RunAtLoad`) | bucket `cam-stills`, `cams.still_url`, `cam_stills` (archive_allowed cams; 48 h / 6-h buckets to 30 d / keepers a year) | `scripts/cam-capture-stills.log` |
+| `com.peakcam.cam-timelapse` | `npx tsx scripts/cam-timelapse.ts` | every 6 h (21,600, `RunAtLoad`) | bucket `cam-timelapses`, `cam_timelapses` (031): the 24 h MP4 + poster per archive-allowed cam, storm reels | `scripts/cam-timelapse.log` |
+| `com.peakcam.cam-health-check` | `node scripts/cam-health-check.mjs` | daily 06:00 (`StartCalendarInterval`) | `cams.last_checked_at`, `consecutive_failures`, auto-disables dead cams | `scripts/cam-health-check.log` |
+| `com.peakcam.pipeline` | — | not loaded: the file is `com.peakcam.pipeline.plist.disabled` | nothing (multi-source blender, dormant) | `logs/pipeline.log` (empty) |
+
+Not on launchd: `npm run snotel-backfill` and `npm run seed-normals` (run once; "Season history"),
+`npx tsx scripts/import-resorts-standalone.mjs` and `scripts/import-profiles.ts` (per coverage batch),
+`npm run generate-descriptions` (per batch, needs `ANTHROPIC_API_KEY`), `scripts/approach-cams-sync.ts`
+(by hand, pending the DriveBC terms call). Vercel runs one cron, `/api/alerts/trigger` daily
+13:00 UTC (`vercel.json`, Bearer `CRON_SECRET`). The Mac Studio runs only `com.peakcam.cam-check`
+(next section) and has no checkout.
+
+**Reload recipe, any job.** The plist in the repo root is the source; copy it over the installed one,
+bootout, bootstrap, then kickstart if the job should run now (`RunAtLoad` jobs start on bootstrap
+by themselves). npm is not on the non-login PATH, so wrap npm/npx in `zsh -l -c`:
+
+```bash
+JOB=stations-sync   # any label suffix from the table
+ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && git pull && npm ci --no-audit --no-fund"'
+ssh mini "cd /Users/maestro_admin/peakcam/peakcam && cp com.peakcam.$JOB.plist ~/Library/LaunchAgents/ && launchctl bootout gui/\$(id -u)/com.peakcam.$JOB 2>/dev/null; launchctl bootstrap gui/\$(id -u) ~/Library/LaunchAgents/com.peakcam.$JOB.plist && launchctl list | grep com.peakcam.$JOB"
+ssh mini "launchctl kickstart -k gui/\$(id -u)/com.peakcam.$JOB"          # run now (optional)
+ssh mini "tail -5 /Users/maestro_admin/peakcam/peakcam/scripts/$JOB.log"
+```
+
+`launchctl list | grep peakcam` prints `PID  last-exit  label`; a `-` PID is a scheduled job
+between runs, a non-zero exit is the script's own (operator-sync exits 2 while Liftie is
+blocked). A pull alone is enough for a script change (each run starts a fresh process); a plist
+change needs the reload. The dependency order when restarting everything: `snotel-sync` and
+`model-sync` first (they feed `snow_reports`), then `stations-sync`, `forecast-sync` (and the
+scorer the next morning), `cam-stills` before `cam-timelapse`.
+
+First-time deploy notes for the individual jobs follow; they are kept because each carries
+its dry-run and verification commands.
 
 **Deploying a change to `com.peakcam.cam-stills` (e.g. the P8 15-min cadence, 2026-10-18):**
 on the Mac mini as `maestro_admin` (`ssh mini`), pull `main` in
@@ -184,8 +213,7 @@ changes: `StartInterval` in the plist for the sync; `THIN_AFTER_DAYS` / `DELETE_
 
 **Recover:**
 ```bash
-launchctl stop com.peakcam.agents
-launchctl start com.peakcam.agents
+launchctl kickstart -k gui/$(id -u)/com.peakcam.agents
 tail -f ~/peakcam/peakcam/agents/loop.log
 ```
 
@@ -198,7 +226,7 @@ Common causes: Slack auth token expired (rotate in bot's App config), Supabase c
 **Recover:**
 ```bash
 cd ~/peakcam/peakcam
-node scripts/snotel-sync.mjs 2>&1 | tee /tmp/snotel.log
+npx tsx scripts/snotel-sync.ts 2>&1 | tee /tmp/snotel.log     # or: launchctl kickstart -k gui/$(id -u)/com.peakcam.snotel-sync
 ```
 
 Known transient: NRCS SNOTEL server returns HTML error pages during outages. Current `fetchers/snotel.ts` parses these as date columns and errors with PostgREST 22007. Non-fatal — next day's sync recovers. Upstream fix filed to V0.5.
@@ -258,9 +286,16 @@ See `docs/alerts-verification.md` for the E2E run log.
 | Supabase query logs | Supabase dashboard → Logs |
 | Analytics | PostHog dashboard (https://us.posthog.com/project/350200/dashboard/1486208) |
 | Resend deliveries | Resend dashboard → Logs |
-| Launchd jobs | `launchctl list \| grep com.peakcam` |
+| Launchd jobs | `launchctl list \| grep com.peakcam` (table above) |
+| Model sync (mini) | `~/peakcam/peakcam/scripts/model-sync.log` |
+| Station layer (mini) | `~/peakcam/peakcam/scripts/stations-sync.log`; `select max(observed_at) from station_observations` |
+| Forecast runs and scores (mini) | `~/peakcam/peakcam/scripts/forecast-sync.log`, `forecast-score.log`; `select max(issued_at) from forecast_runs` |
+| Operator status (mini) | `~/peakcam/peakcam/scripts/operator-sync.log` (`blocked` lines while Liftie challenges) |
 | Still capture + archive (mini) | `~/peakcam/peakcam/scripts/cam-capture-stills.log`; `select count(*), max(captured_at) from cam_stills` |
+| Timelapse renders (mini) | `~/peakcam/peakcam/scripts/cam-timelapse.log`; `select "window", count(*), max(rendered_at) from cam_timelapses group by 1` |
 | Cam health check (mini) | `~/peakcam/peakcam/scripts/cam-health-check.log` |
+| Public API health | `curl -s https://www.peakcam.io/api/v1/status \| jq '{status, issues}'` |
+| IndexNow receipts | Bing Webmaster Tools → IndexNow; `grep indexnow ~/peakcam/peakcam/scripts/snotel-sync.log \| tail` |
 | Camera-preview check (Studio) | `~/Library/Application Support/peakcam-cam-check/latest.md`, `~/Library/Logs/peakcam-cam-check.log` |
 
 ## Analytics Events Reference
@@ -359,12 +394,10 @@ cd ~/peakcam/peakcam && node scripts/pipeline-inspect.mjs
 cd ~/peakcam/peakcam && CRON_SECRET=<val> node scripts/powder-alert-check.mjs
 
 # Agent loop restart
-launchctl stop com.peakcam.agents && launchctl start com.peakcam.agents
+launchctl kickstart -k gui/$(id -u)/com.peakcam.agents
 
-# Tail all launchd-managed logs
-tail -f ~/peakcam/peakcam/agents/loop.log \
-       ~/peakcam/peakcam/scripts/snotel-sync.log \
-       ~/peakcam/peakcam/logs/pipeline.log
+# Tail every launchd-managed log on the mini
+tail -f ~/peakcam/peakcam/agents/loop.log ~/peakcam/peakcam/scripts/{snotel-sync,model-sync,stations-sync,forecast-sync,forecast-score,operator-sync,cam-capture-stills,cam-timelapse,cam-health-check}.log
 ```
 
 ## Drop In (arcade game) — parked
@@ -404,7 +437,9 @@ cached catalogue (`getAllResorts()`, 1 h) plus `resort_openings` and
 | `GET /llms-full.txt` | Long agent guide built from the tool definitions and `lib/mcp/examples.ts` (`lib/public-api/llms-full.ts`) | static, 1 h / 24 h CDN |
 | `GET /gpt-instructions.md` | Custom GPT instructions (`lib/public-api/gpt-instructions.ts`) | static, 1 h / 24 h CDN |
 
-All routes answer `OPTIONS` with 204. Unknown slugs 404 with `Cache-Control:
+All routes answer `OPTIONS` with 204. The same data is the MCP server at `/api/mcp`
+(docs/mcp.md), also reachable from stdio-only clients through the npm bridge
+`npx -y peakcam-mcp` (`packages/peakcam-mcp`). Unknown slugs 404 with `Cache-Control:
 no-store`; all other responses carry `public, s-maxage=900,
 stale-while-revalidate=3600`, so a bad deploy clears from the CDN within 15
 minutes and a Supabase outage keeps serving the last good document (the read
@@ -417,6 +452,23 @@ USDA NRCS; forecasts: NWS/Open-Meteo; cams: their operators`, `Link:
 <https://www.peakcam.io>; rel="author", <https://www.peakcam.io/about#terms>;
 rel="license"`, `Vary: Accept`. The licence link points at the Terms section of
 `/about` because there is no standalone `/terms` page; move it when one exists.
+
+**Versioning and deprecation policy** (P9, 2026-10-20; the text is `deprecationPolicyText()` in
+`lib/public-api/openapi.ts`, printed in `info.description`, carried as `info.x-deprecation-policy`
+and repeated in `llms-full.txt`). The base path carries the major version (`/api/v1`); inside it
+PeakCam only adds fields, enum values and operations. Removing or renaming anything is announced
+at least **12 months** ahead: the affected operation starts answering with `Deprecation:
+@<unix-seconds>` (RFC 9745, the announcement date) and `Sunset: <HTTP-date>` (RFC 8594, the
+earliest removal date, ≥ 12 months after the announcement) plus `Link: <changelog>; rel="sunset"`;
+its OpenAPI summary gains "Deprecated:" with the replacement; the same notice goes on `/connect`
+and in `llms-full.txt`. Current operations carry neither header (the shared header set documents
+both as optional for that reason). A new major version is published at its own base path
+(`/api/v2`) and the previous one keeps answering for the full notice period after the new one is
+announced. The MCP server follows the same rule for tool names and argument shapes: a renamed
+tool keeps its old name registered, marked deprecated in its description, for 12 months. How to
+execute a deprecation: add the two headers in `lib/public-api/headers.ts` behind a per-route
+option, set the summary, write the changelog entry the `Link` points at, and record the sunset
+date here.
 
 Code: `lib/public-api/{schema,serialize,headers,openapi,data}.ts`, routes under
 `app/api/v1/` and `app/.well-known/api-catalog/`. `proxy.ts` excludes
@@ -457,7 +509,8 @@ curl -s https://www.peakcam.io/api/v1/resorts/search-index | jq '{count, breck: 
 curl -s https://www.peakcam.io/api/v1/status | jq '{status, age: .checks.snowReports.ageHours, live: .checks.cams.liveRatio, issues}'
 curl -s https://www.peakcam.io/.well-known/schemas | jq '.count'
 curl -s https://www.peakcam.io/.well-known/schemas/resort.json | jq '."$id"'
-curl -s https://www.peakcam.io/llms-full.txt | grep -c '^### '          # 16 tools + 12 REST routes = 28
+curl -s https://www.peakcam.io/llms-full.txt | grep -c '^### '          # 20 tools + 18 REST routes = 38 (P7 adds get_score)
+curl -s https://www.peakcam.io/api/v1/openapi.json | jq '.info["x-deprecation-policy"], (.info.description | test("12 months"))'
 # P4 forecast (available:false with empty arrays until com.peakcam.forecast-sync has run on the mini)
 curl -sI https://www.peakcam.io/api/v1/resorts/alta/forecast | grep -i '^x-attribution'   # ends "Weather data by Open-Meteo.com (CC BY 4.0)"
 curl -s https://www.peakcam.io/api/v1/resorts/alta/forecast | jq '{available, point, points, models: .summary.modelCount, next7: .summary.total7dIn, peak: .summary.peak, days: (.daily|length), byModel: [.byModel[] | {model, horizonDays, issuedAt}]}'
@@ -660,13 +713,18 @@ curl -s https://www.peakcam.io/llms.txt | sed -n '/## For agents/,/## Key pages/
 ```
 
 **IndexNow — enabled on the Mini since 2026-10-18** (`INDEXNOW_ENABLED=1` in the ops
-checkout's `.env.local`; the first manual run submitted 89 URLs, HTTP 202). `scripts/snotel-sync.ts`
-collects the slugs that got a new `snow_reports` row and, only when
-`INDEXNOW_ENABLED=1`, POSTs their page URLs to `https://api.indexnow.org/indexnow`
-in batches of at most 10,000 (`scripts/indexnow-ping.ts`; payload and batching
-are unit-tested, no network in tests). The key file must be reachable at
-`https://www.peakcam.io/<key>.txt` first, which happens when this branch
-reaches production. A failed ping is logged and never fails the sync.
+checkout's `.env.local`, re-verified present on 2026-10-20 with `grep -c '^INDEXNOW_ENABLED=1' .env.local`
+over ssh; the first manual run submitted 89 URLs, HTTP 202). `scripts/snotel-sync.ts`
+collects the resorts (slug and state) that got a new `snow_reports` row and, only when
+`INDEXNOW_ENABLED=1`, POSTs to `https://api.indexnow.org/indexnow` in batches of at most 10,000
+(`scripts/indexnow-ping.ts`; payload and batching are unit-tested, no network in tests).
+Since P10 (2026-10-20) each changed resort submits its whole page family (overview, snow report,
+forecast, webcams, history), the state's `/ski-cams/{hub}` and `/snow-report/{hub}` pages, and
+the aggregate pages whose ranking moves with any report (`/`, `/snow-report`,
+`/snow-report/percent-of-normal`, the four leaderboards), de-duplicated: 89 changed resorts ≈ 500
+URLs a run. Markdown alternates are `noindex` and never submitted. The key file is live at
+`https://www.peakcam.io/<key>.txt`. A failed ping is logged and never fails the sync. If the
+mini's `.env.local` is ever rebuilt, the flag must be added again (user item; nothing else gates it).
 
 How it was enabled on the Mac mini (repeat only if the checkout or `.env.local` is rebuilt):
 
@@ -681,8 +739,9 @@ How it was enabled on the Mac mini (repeat only if the checkout or `.env.local` 
    should print `[indexnow] N URLs submitted (HTTP 200)` (202 on the first
    submissions while the key is being verified; 403 means the key file is not
    live yet, 422 means a URL was off-host).
-3. One-off submissions: `npx tsx scripts/indexnow-ping.ts breckenridge vail`.
-   Bing Webmaster Tools > IndexNow shows what was received.
+3. One-off submissions: `npx tsx scripts/indexnow-ping.ts breckenridge:CO vail:CO` (the
+   `:STATE` suffix lets the script add the hub pages; without it only the page family and
+   the aggregates go). Bing Webmaster Tools > IndexNow shows what was received.
 
 `scripts/model-sync.ts` (Open-Meteo resorts) does not ping yet; add the same
 three lines there when the SNOTEL path has run clean for a week.
@@ -697,7 +756,8 @@ static; nothing here reads the database.
 | `GET /connect` | `app/connect/page.tsx`, data in `components/connect/links.ts` (links, tools, prompts, client recipes) | static per deploy |
 | `GET /.well-known/mcp/server-card.json` | `app/.well-known/mcp/server-card.json/route.ts` → `components/connect/server-card.ts` | 1 day, ETag, CORS `*` |
 | `GET /api/mcp/server-card` | `app/api/mcp/server-card/route.ts`, re-exports the `.well-known` handlers (SEP-2127 reserved location `<streamable-http-url>/server-card`) | same, byte-identical |
-| `server.json` (repo root) | MCP Registry manifest, read by `mcp-publisher publish` from the repo root; not served | n/a |
+| `server.json` (repo root) | MCP Registry manifest, read by `mcp-publisher publish` from the repo root; not served. Lists the HTTP remote, the npm stdio package and every tool name | n/a |
+| `packages/peakcam-mcp/` | The npm stdio bridge `peakcam-mcp` (`npx -y peakcam-mcp` → `/api/mcp`); `bin/peakcam-mcp.mjs`, README, MIT LICENSE; `mcpName` = `io.peakcam/snow` for the registry's ownership check. Not published yet (user item below) | n/a |
 | Footer "Developers" column | `components/home/PeakFooter.tsx`: `/connect`, `/api/mcp`, `/api/v1/resorts`, `/api/v1/openapi.json`, `/llms.txt` | static |
 | `llms.txt` "For agents" MCP line | `app/llms.txt/route.ts` (tool list from `PEAKCAM_TOOL_NAMES`) | ISR 3600 s |
 | `GET /llms-full.txt` | `app/llms-full.txt/route.ts` → `lib/public-api/llms-full.ts` | static per deploy, 24 h CDN |
@@ -715,12 +775,15 @@ cannot drift. An `/.well-known/ai-catalog.json` pointing at the card is the
 discovery entry the extension expects and is not shipped yet (the parity plan
 drops it: no consumer reads it).
 
-MCP tool verification after a deploy (expect 14 names, `ask` last):
+MCP tool verification after a deploy (expect 20 names in `PEAKCAM_TOOL_NAMES` order, `get_timelapses`
+last; 21 once P7's `get_score` lands):
 
 ```bash
 npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/list | jq -r '.tools[].name'
 npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name ask --tool-arg question="is Breck open"
 npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_cam_timeline --tool-arg slug=breckenridge --tool-arg hours=24
+# the stdio bridge, end to end against production (exits when stdin closes):
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}' | node packages/peakcam-mcp/bin/peakcam-mcp.mjs | jq '.result.serverInfo'
 ```
 
 Guard rails: `tests/connect-links.test.ts` walks every internal href in
@@ -728,9 +791,11 @@ Guard rails: `tests/connect-links.test.ts` walks every internal href in
 `app/` (dynamic `[segment]`s match anything) or a file under `public/`; a link
 may be `pending: true` only while its route is absent, and the test fails the
 other way once the route exists. `tests/mcp-listings.test.ts` checks both
-documents parse, agree on name/version/endpoint, and that `server.json` keeps
-the one `_meta` key the registry preserves. Bump `server.json` `version` when
-`package.json` moves (the test enforces equality).
+documents parse, agree on name/version/endpoint, list every tool in `PEAKCAM_TOOL_NAMES`,
+carry the npm package entry with the bridge's own version and `mcpName`, and that `server.json`
+keeps the one `_meta` key the registry preserves. Bump `server.json` `version` when
+`package.json` moves and `packages[0].version` when `packages/peakcam-mcp/package.json` moves
+(the test enforces both).
 
 Smoke check after a deploy:
 
@@ -742,26 +807,52 @@ curl -s https://www.peakcam.io/llms.txt | grep -n 'MCP server'
 curl -s https://www.peakcam.io/sitemap.xml | grep -c '/connect<'
 ```
 
-**Submissions.** MCP Registry: **published 2026-10-18** as `io.peakcam/snow`
-0.1.0 (`curl "https://registry.modelcontextprotocol.io/v0.1/servers?search=io.peakcam/snow"`).
-Namespace proof is the apex TXT `peakcam.io. IN TXT "v=MCPv1; k=ed25519; p=…"`
-in Vercel DNS (record `rec_82e1d6ea8c9f5198f4beef15`); the matching Ed25519
-private key lives on the Mac Studio at `~/.config/peakcam-mcp-registry-key.pem`
-(user `totcho_admin`, not in the repo, not backed up anywhere else). To
-re-publish after bumping `version` in both `package.json` and `server.json`, on
-the Studio from the repo root:
+**Submissions: what is done and what the owner still has to do.** Every item below needs an
+account only the owner holds; the repo side is complete. Do them in this order, because the
+registry re-publish validates the npm package.
 
-```bash
-OPENSSL=/opt/homebrew/opt/openssl@3/bin/openssl
-PRIVATE_KEY="$($OPENSSL pkey -in ~/.config/peakcam-mcp-registry-key.pem -noout -text | grep -A3 'priv:' | tail -n +2 | tr -d ' :\n')"
-mcp-publisher login dns --domain peakcam.io --private-key "$PRIVATE_KEY"
-mcp-publisher validate && mcp-publisher publish
-```
-
-(`brew install mcp-publisher`; a lost key means a new key, a replaced TXT record
-and a fresh login, nothing else.) Claude
-Connectors Directory (not yet submitted, needs the owner's claude.ai login) through <https://claude.ai/directory/manage> → Submit new
-→ MCP connector (listing fields: name, one-liner ≤ 200, description ≤ 2,000,
-categories, documentation `/connect`, privacy `/about#privacy`, support
-`hello@peakcam.io`, icon, no authentication). The PR that shipped this page
-carries the exact commands and payload text.
+1. **npm: publish `peakcam-mcp`** (not published; the name is free as of 2026-10-20).
+   ```bash
+   cd packages/peakcam-mcp && npm pack --dry-run        # 3 files, ~2.5 kB
+   npm login                                           # the owner's npm account
+   npm publish --access public
+   npx -y peakcam-mcp --help                           # from any other directory
+   ```
+   The registry reads `mcpName` (`io.peakcam/snow`) from the published package.json to prove
+   ownership. Bumping later: `version` in `packages/peakcam-mcp/package.json` and
+   `server.json` `packages[0].version` together, then `npm publish`, then step 2.
+2. **MCP Registry: re-publish `server.json`** (first published 2026-10-18 as `io.peakcam/snow`
+   0.1.0, remote only; this run added the `packages` entry and the tool list, so the registry
+   copy is behind until this is run). Namespace proof is the apex TXT
+   `peakcam.io. IN TXT "v=MCPv1; k=ed25519; p=…"` in Vercel DNS (record
+   `rec_82e1d6ea8c9f5198f4beef15`), already in place; the matching Ed25519 private key lives on
+   the Mac Studio at `~/.config/peakcam-mcp-registry-key.pem` (user `totcho_admin`, not in the
+   repo, not backed up anywhere else). On the Studio from the repo root on `main`:
+   ```bash
+   brew install mcp-publisher                           # once
+   OPENSSL=/opt/homebrew/opt/openssl@3/bin/openssl
+   PRIVATE_KEY="$($OPENSSL pkey -in ~/.config/peakcam-mcp-registry-key.pem -noout -text | grep -A3 'priv:' | tail -n +2 | tr -d ' :\n')"
+   mcp-publisher login dns --domain peakcam.io --private-key "$PRIVATE_KEY"
+   mcp-publisher validate && mcp-publisher publish
+   curl "https://registry.modelcontextprotocol.io/v0.1/servers?search=io.peakcam/snow" | jq '.servers[0] | {version, remotes, packages}'
+   ```
+   A lost key means a new key (`$OPENSSL genpkey -algorithm Ed25519 -out …`), a replaced TXT
+   record (`vercel dns add peakcam.io @ TXT "v=MCPv1; k=ed25519; p=<base64 of the last 32 DER bytes>"`)
+   and a fresh login, nothing else. If `publish` rejects the package entry, step 1 has not
+   propagated yet; wait a few minutes.
+3. **Claude Connectors Directory** (submitted by the owner 2026-10-18, awaiting the automated
+   scan; escalation mcp-review@anthropic.com). <https://claude.ai/directory/manage> → the
+   listing. Nothing to resubmit; if the reviewer asks for the tool list, it is 20 tools now
+   (the submission text named eight). Connection URL `https://www.peakcam.io/api/mcp`, docs
+   `/connect`, privacy `/about#privacy`, support `hello@peakcam.io`, icon `app/icon.png`, no
+   authentication, read-only. Test text: "No account needed. Add the URL as a custom connector
+   and run the prompts on https://www.peakcam.io/connect#prompts."
+4. **Smithery** (optional, not done): <https://smithery.ai/new> → remote server, URL
+   `https://www.peakcam.io/api/mcp`, no auth, the one-liner from `server.json` `description`,
+   docs `/connect`. Smithery also reads `server.json`; point it at the repo.
+5. **ChatGPT**: a Custom GPT is a 10-minute owner task with the recipe on `/connect#custom-gpt`
+   (import `/api/v1/openapi.json` as the Action, paste `/gpt-instructions.md`); an Apps SDK
+   submission (the directory listing) needs the OpenAI developer account and their review and
+   is not started.
+6. **Verify after each**: `/connect` renders the stdio card; `curl -s https://www.peakcam.io/.well-known/mcp/server-card.json | jq '._meta["io.peakcam/connect"].packages'`
+   shows the npm entry; the registry search above shows `packages[0].identifier == "peakcam-mcp"`.

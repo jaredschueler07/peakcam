@@ -86,6 +86,11 @@ test("the npm stdio bridge: manifest, bin, registry ownership field and the reci
   assert.ok(Object.keys(stdioPkg.dependencies).includes("@modelcontextprotocol/sdk"));
   assert.equal(STDIO_COMMAND, "npx -y peakcam-mcp");
   assert.deepEqual(JSON.parse(STDIO_MCP_JSON), { mcpServers: { peakcam: { command: "npx", args: ["-y", "peakcam-mcp"] } } });
+  // The README's tool list is prose, so keep it honest by hand: every registered name, no stale one.
+  const readme = readFileSync(join(ROOT, "packages/peakcam-mcp/README.md"), "utf8");
+  for (const name of PEAKCAM_TOOL_NAMES) assert.ok(readme.includes(`\`${name}\``), `README names ${name}`);
+  const listed = [...readme.matchAll(/`([a-z_]+)`/g)].map((m) => m[1]).filter((n) => /^(get|find|compare|search|list|ask)/.test(n));
+  assert.deepEqual([...new Set(listed)].sort(), [...PEAKCAM_TOOL_NAMES].sort());
 });
 
 test("server.json: parses, uses the dated registry schema, names io.peakcam/snow and the endpoint", () => {
