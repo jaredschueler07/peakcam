@@ -1,14 +1,20 @@
 import type { Metadata } from "next";
+import type { OperatorStatusRow } from "@/lib/types";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   getAllResortSlugs,
+  getLatestOperatorStatusIndex,
   getResortBySlug,
   getResortElevationFt,
   getResortOpenings,
+  getResortStationsIndex,
   getSnowpackHistory,
   getUserConditions,
 } from "@/lib/supabase";
+import { resortConditionsView } from "@/lib/public-api/conditions";
+import { StatusChip } from "@/components/resort/StatusChip";
+import { FreshnessLabels } from "@/components/resort/FreshnessLabels";
 import { getWeatherForecast } from "@/lib/weather";
 import { getOpenMeteoForecast } from "@/lib/open-meteo";
 import { formatMountainTime, resortSentence, sourceLabel } from "@/lib/quotable";
@@ -83,19 +89,22 @@ export default async function ResortSnowReportPage({ params }: { params: Promise
 
   const isUS = resort.country === "US";
   const elevationFt = isUS ? null : await getResortElevationFt(resort.id);
-  const [history, forecast, userConditions, openings] = await Promise.all([
+  const [history, forecast, userConditions, openings, stationIndex, operatorIndex] = await Promise.all([
     getSnowpackHistory(resort.id, 7),
     isUS ? getWeatherForecast(resort.lat, resort.lng) : getOpenMeteoForecast(resort.lat, resort.lng, elevationFt),
     getUserConditions(resort.id),
-    resort.snow_report ? Promise.resolve([]) : getResortOpenings(),
+    // The opening row feeds the status chip (P6) as well as the no-report sentence.
+    getResortOpenings(),
+    getResortStationsIndex(),
+    getLatestOperatorStatusIndex().catch((): Record<string, OperatorStatusRow> => ({})),
   ]);
 
   const station = stationFor(resort);
   const now = new Date();
-  const freshness = resortSentence(resort, now, {
-    station,
-    opening: openings.find((row) => row.resort_id === resort.id) ?? null,
-  });
+  const opening = openings.find((row) => row.resort_id === resort.id) ?? null;
+  const freshness = resortSentence(resort, now, { station, opening });
+  // P6: the same contract the overview chip and /api/v1/resorts/{slug}/conditions use.
+  const conditions = resortConditionsView(resort, { now, opening, observationStations: stationIndex[resort.id] ?? [], operator: operatorIndex[resort.id] ?? null });
   const snow = resort.snow_report;
   const pageUrl = resortTabUrl(resort.slug, "snow-report");
   const breadcrumb = resortBreadcrumb(resort, "snow-report");
@@ -142,6 +151,12 @@ export default async function ResortSnowReportPage({ params }: { params: Promise
             {resort.name} snow report
           </h1>
           <FreshnessSentence segments={freshness.segments} />
+          {conditions.contract.status.value && (
+            <p className="mt-3 flex flex-wrap items-center gap-3">
+              <StatusChip status={conditions.contract.status.value} sentence={conditions.sentence} source={conditions.contract.status.source} />
+              <span className="text-sm text-bark-dk">{conditions.sentence}</span>
+            </p>
+          )}
           <p className="mt-1.5 text-sm text-bark">
             {resort.region} · {stateLabel(resort)}
           </p>
@@ -183,6 +198,7 @@ export default async function ResortSnowReportPage({ params }: { params: Promise
                   </tbody>
                 </table>
               </div>
+              <FreshnessLabels contract={conditions.contract} />
             </>
           ) : (
             <p className="mt-3 text-[15.5px] text-ink">No snow report yet this season. The first station reading or model run appears here within six hours of the sync picking it up.</p>

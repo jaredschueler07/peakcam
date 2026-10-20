@@ -18,6 +18,7 @@
 
 import { z } from "zod";
 import { ASK_INTENTS } from "@/lib/ask/intents";
+import { CONDITIONS_SCHEMA_VERSION, CONDITION_FIELD_NAMES, FIELD_SOURCES, FRESHNESS_TIERS, RESORT_STATUSES } from "@/lib/conditions-contract";
 
 export const PUBLIC_API_VERSION = "1.1.0";
 
@@ -967,6 +968,126 @@ export const LeaderboardSchema = z
     generatedAt: z.string(),
   })
   .register(publicApiRegistry, { id: "Leaderboard", description: "One of the four season leaderboards, ranked and dated." });
+
+// ── P6: conditions contract v2 ───────────────────────────────
+//
+// /api/v1/resorts/{slug}/conditions and the MCP get_resort_conditions
+// envelope. Every field is a Field: value, source, observedAt, confidence
+// and a freshness tier with the age in hours (lib/conditions-contract.ts
+// holds the rules and the thresholds). The status is derived and never
+// defaults to open.
+
+export const ConditionSourceSchema = z.enum(FIELD_SOURCES).register(publicApiRegistry, {
+  id: "ConditionSource",
+  description:
+    "Where a conditions field came from. `snotel`: the resort's NRCS station as written to the snow report. `station:<network>`: a reading from the station layer (`nws`, `ghcn`, `bc_asws`, `eccc`, `snotel`). `operator`: the resort's own published report (lift status via Liftie, a confirmed opening date). `model`: a weather-model estimate (Open-Meteo). `profile`: a static catalogue fact (lift and run totals, a projected opening date). `derived`: computed by PeakCam from other fields. `none`: nothing on file.",
+});
+
+export const FreshnessTierSchema = z.enum(FRESHNESS_TIERS).register(publicApiRegistry, {
+  id: "FreshnessTier",
+  description:
+    "`live`: ≤ 3 h old from a source that publishes at least hourly (operator feed, NWS / ECCC / BC ASWS observations). `recent`: ≤ 30 h old otherwise, including a daily station reading inside its cadence and a static profile fact. `estimated`: a model value ≤ 30 h old. `stale`: older than 30 h, any source. `unknown`: no value, source or observation time.",
+});
+
+export const ResortStatusSchema = z.enum(RESORT_STATUSES).register(publicApiRegistry, {
+  id: "ResortStatus",
+  description:
+    "Operating status, derived. `OPEN`: a fresh operator feed shows lifts open or scheduled, or a resort-confirmed opening date has passed with no closing date behind it. `CLOSED_TODAY`: inside the season but the operator feed shows every lift closed or on hold. `PRE_SEASON`: a confirmed or projected opening date is still ahead. `OFF_SEASON`: the closing date has passed. `UNKNOWN`: nothing usable on file; the calendar alone never opens a resort.",
+});
+
+export const ConditionFreshnessSchema = z
+  .object({
+    tier: FreshnessTierSchema,
+    ageHours: z.number().nullable().describe("Hours between the observation and `generatedAt`, one decimal; null for static facts and empty fields."),
+  })
+  .register(publicApiRegistry, { id: "ConditionFreshness" });
+
+function conditionField<T extends z.ZodTypeAny>(value: T, id: string, description: string) {
+  return z
+    .object({
+      value: value.nullable().describe("Null when PeakCam has nothing for this field."),
+      source: ConditionSourceSchema,
+      observedAt: z.string().nullable().describe("ISO-8601 instant the value was observed or published; null for static facts and empty fields."),
+      confidence: z.number().min(0).max(1).describe("0–1: SNOTEL 0.9, other stations 0.8, operator 0.7, profile 0.6, derived 0.6, model 0.5; halved when stale, 0 when unknown."),
+      freshness: ConditionFreshnessSchema,
+    })
+    .register(publicApiRegistry, { id, description });
+}
+
+export const ConditionNumberFieldSchema = conditionField(z.number(), "ConditionNumberField", "A numeric conditions field with its provenance and freshness.");
+export const ConditionTextFieldSchema = conditionField(z.string(), "ConditionTextField", "A text conditions field (a date or a surface label) with its provenance and freshness.");
+export const ConditionStatusFieldSchema = conditionField(ResortStatusSchema, "ConditionStatusField", "The derived operating status with the source it rests on.");
+export const SnowQualitySchema = z.enum(["powder", "packed", "spring", "ice"]);
+export const ConditionSnowQualityFieldSchema = conditionField(SnowQualitySchema, "ConditionSnowQualityField", "Snow quality derived from the conditions engine's tags.");
+
+export const DepthDisagreementSchema = z
+  .object({
+    measuredIn: z.number(),
+    operatorIn: z.number(),
+    differencePct: z.number().describe("|measured − operator| as a percent of the larger value; present only above 30 %."),
+    preferred: z.literal("measured"),
+    note: z.string(),
+  })
+  .register(publicApiRegistry, { id: "DepthDisagreement", description: "The station and the operator disagree about the base depth by more than 30 %. Quote the measured value." });
+
+export const ConditionsContractSchema = z
+  .object({
+    status: ConditionStatusFieldSchema,
+    recommendableToday: z.boolean().describe("True only when the status is OPEN on a usable source, a current base depth is on file and the rating is not poor."),
+    reasons: z.array(z.string()).describe("Why the status and the verdict came out as they did, in order; quote them."),
+    depthDisagreement: DepthDisagreementSchema.nullable(),
+    seasonOpening: ConditionTextFieldSchema.describe("YYYY-MM-DD. Source `operator` for a resort-confirmed date, `profile` for a third-party projection."),
+    seasonClosing: ConditionTextFieldSchema.describe("YYYY-MM-DD, mainly Southern-hemisphere rows."),
+    baseDepthIn: ConditionNumberFieldSchema.describe("Measured (or model) base depth from the snow report, inches. Prefer this over `operatorBaseDepthIn`."),
+    operatorBaseDepthIn: ConditionNumberFieldSchema.describe("The operator's own base figure, when a feed carries one."),
+    newSnow24hIn: ConditionNumberFieldSchema,
+    newSnow48hIn: ConditionNumberFieldSchema,
+    sweIn: ConditionNumberFieldSchema.describe("Snow water equivalent, inches."),
+    liftsOpen: ConditionNumberFieldSchema.describe("Lifts open per the operator feed."),
+    liftsTotal: ConditionNumberFieldSchema.describe("From the operator feed when it lists lifts, else the profile total."),
+    runsOpen: ConditionNumberFieldSchema,
+    runsTotal: ConditionNumberFieldSchema,
+    surface: ConditionTextFieldSchema.describe("Operator-reported surface, when a feed carries one."),
+    snowQuality: ConditionSnowQualityFieldSchema,
+    tempF: ConditionNumberFieldSchema.describe("The highest station with a temperature (summit first)."),
+    windMph: ConditionNumberFieldSchema,
+    forecastNext48hCm: ConditionNumberFieldSchema.describe("Blended forecast snowfall over the next 48 h, cm (P4 blend, summit point)."),
+    percentOfNormal: ConditionNumberFieldSchema.describe("SWE against the station's 1991–2020 median, inside the publishable band."),
+  })
+  .register(publicApiRegistry, { id: "ConditionsContract", description: "Every conditions field with value, source, observation time, confidence and freshness, plus the derived status and verdict." });
+
+export const ConditionFieldNameSchema = z.enum(CONDITION_FIELD_NAMES);
+
+export const ResortConditionsSchema = z
+  .object({
+    schemaVersion: z.literal(CONDITIONS_SCHEMA_VERSION).describe("Contract version; the schema file name carries the major."),
+    schemaUrl: z.string().describe("The JSON Schema this document validates against."),
+    slug: z.string(),
+    name: z.string(),
+    canonicalUrl: z.string().describe("The resort's PeakCam page. Cite this."),
+    apiUrl: z.string().describe("The full resort document."),
+    sentence: z.string().describe("A dated, source-labelled status sentence that can be quoted verbatim."),
+    meta: z.object({
+      generatedAt: z.string(),
+      resolvedAt: z.string().describe("ISO instant the status was evaluated at (ages are measured from it)."),
+      timeZone: z.string().describe("IANA zone the resort's calendar day runs on."),
+      localDate: z.string().describe("YYYY-MM-DD at the resort when the status was resolved."),
+      newestObservationAt: z.string().nullable().describe("The newest `observedAt` across the populated fields."),
+      freshness: z.record(ConditionFieldNameSchema, FreshnessTierSchema).describe("Freshness tier per field."),
+      sources: z.array(ConditionSourceSchema).describe("Distinct sources used, best first."),
+    }),
+    data: ConditionsContractSchema,
+    measuredNow: z.array(MeasuredNowSchema).describe("The station layer's latest reading per station (P3), the same rows as `/resorts/{slug}.measuredNow`."),
+    attribution: z.string(),
+    license: z.string(),
+  })
+  .register(publicApiRegistry, { id: "ResortConditions", description: "Conditions contract v2 for one resort: a versioned envelope around per-field provenance, freshness and a derived status." });
+
+export type ConditionSourcePublic = z.infer<typeof ConditionSourceSchema>;
+export type FreshnessTierPublic = z.infer<typeof FreshnessTierSchema>;
+export type ResortStatusPublic = z.infer<typeof ResortStatusSchema>;
+export type ConditionsContractPublic = z.infer<typeof ConditionsContractSchema>;
+export type ResortConditionsPublic = z.infer<typeof ResortConditionsSchema>;
 
 export type SeasonRefPublic = z.infer<typeof SeasonRefSchema>;
 export type ResortHistoryPublic = z.infer<typeof ResortHistorySchema>;

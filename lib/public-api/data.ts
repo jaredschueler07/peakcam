@@ -9,9 +9,9 @@
 // ─────────────────────────────────────────────────────────────
 
 import { unstable_cache } from "next/cache";
-import { getAllResorts, getForecastRuns, getForecastScores, getResortElevationIndex, getResortOpenings, getResortStationsIndex, getResortTimelapses, getSnowDepthHistory } from "@/lib/supabase";
+import { getAllResorts, getForecastRuns, getForecastScores, getLatestOperatorStatusIndex, getResortElevationIndex, getResortOpenings, getResortStationsIndex, getResortTimelapses, getSnowDepthHistory } from "@/lib/supabase";
 import type { CamTimelapses } from "@/lib/cam-timelapse";
-import type { ResortStationJoined, ResortWithData } from "@/lib/types";
+import type { OperatorStatusRow, ResortStationJoined, ResortWithData } from "@/lib/types";
 import type { ResortOpening } from "@/lib/openings";
 import type { ForecastScoreRow, StoredForecast } from "@/lib/forecast/store";
 import { SCORE_PERIOD_DAYS, measuredFromDepth, scoredPointFor } from "@/lib/forecast/score";
@@ -93,6 +93,8 @@ export interface PublicApiCatalog {
   elevations: Record<string, { base_ft: number | null; summit_ft: number | null }>;
   /** Station layer (migration 026) by resort id; `null` when the tables are not there yet. */
   stations: Record<string, ResortStationJoined[]> | null;
+  /** Newest operator report (migration 032) by resort id; optional so fixture catalogues written before P6 still type-check. */
+  operatorStatus?: Record<string, OperatorStatusRow> | null;
   now: Date;
 }
 
@@ -105,17 +107,19 @@ const getOpeningsCached = unstable_cache(getResortOpenings, ["peakcam:public-api
 });
 
 export async function loadPublicApiCatalog(): Promise<PublicApiCatalog> {
-  const [resorts, openingRows, elevations, stations] = await Promise.all([
+  const [resorts, openingRows, elevations, stations, operatorStatus] = await Promise.all([
     getAllResorts(),
     getOpeningsCached(),
     getResortElevationIndex(),
     getResortStationsIndex(),
+    getLatestOperatorStatusIndex(),
   ]);
   return {
     resorts,
     openings: new Map(openingRows.map((row) => [row.resort_id, row])),
     elevations,
     stations,
+    operatorStatus,
     now: new Date(),
   };
 }
@@ -131,6 +135,7 @@ export function optionsFor(catalog: PublicApiCatalog, resort: ResortWithData): S
     elevation,
     // An index that exists but has no row for this resort means "no station within 25 km": an empty list, not an absent block.
     observationStations: catalog.stations ? (catalog.stations[resort.id] ?? []) : null,
+    operator: catalog.operatorStatus?.[resort.id] ?? null,
   };
 }
 

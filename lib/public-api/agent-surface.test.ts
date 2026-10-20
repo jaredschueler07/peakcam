@@ -109,10 +109,11 @@ test("search index: alphabetical, with aliases, coordinates and canonical URLs",
 // ── batch ────────────────────────────────────────────────────
 
 test("batch: parses both body shapes, caps at ten, and refuses anything that is not a known GET route", () => {
-  const ok = parseBatchBody({ requests: [{ path: "/api/v1/resorts/alta" }, { path: "/api/v1/powder?state=CO&limit=3" }, { path: "/api/v1/resorts/vail/cams" }, { path: "/api/v1/resorts/vail/timelapses" }] });
+  const ok = parseBatchBody({ requests: [{ path: "/api/v1/resorts/alta" }, { path: "/api/v1/powder?state=CO&limit=3" }, { path: "/api/v1/resorts/vail/cams" }, { path: "/api/v1/resorts/vail/timelapses" }, { path: "/api/v1/resorts/alta/conditions" }] });
   assert.ok(ok.ok);
   if (ok.ok) {
-    assert.deepEqual(ok.paths.map((p) => p.route), ["resort", "powder", "cams", "timelapses"]);
+    assert.deepEqual(ok.paths.map((p) => p.route), ["resort", "powder", "cams", "timelapses", "conditions"]);
+    assert.equal(ok.paths[4].slug, "alta");
     assert.equal(ok.paths[0].slug, "alta");
     assert.equal(ok.paths[2].slug, "vail");
   }
@@ -138,7 +139,7 @@ test("well-known schemas: every $ref points at a file the directory serves, with
   const files = buildJsonSchemas();
   const index = buildSchemaIndex();
   assert.equal(index.count, Object.keys(files).length);
-  for (const stem of ["resort", "cams", "powder", "status", "search-index", "ask", "batch", "resort-list", "measurement", "cam"]) {
+  for (const stem of ["resort", "cams", "powder", "status", "search-index", "ask", "batch", "resort-list", "measurement", "cam", "resort-conditions-v1", "conditions-contract", "condition-number-field"]) {
     assert.ok(stem in files, `missing ${stem}.json`);
   }
   assert.equal(schemaFileStem("CamList"), "cams");
@@ -173,7 +174,7 @@ test("llms-full.txt documents every tool with an example that parses, every REST
     const example = TOOL_EXAMPLES[tool.name];
     assert.doesNotThrow(() => tool.inputSchema.parse(example.args), `${tool.name} example parses against its inputSchema`);
   }
-  for (const route of ["GET /api/v1/resorts", "GET /api/v1/resorts/search-index", "GET /api/v1/resorts/{slug}", "GET /api/v1/resorts/{slug}/cams", "GET /api/v1/powder", "GET /api/v1/status", "GET /api/v1/ask", "POST /api/v1/ask", "POST /api/v1/batch", "GET /ask"]) {
+  for (const route of ["GET /api/v1/resorts", "GET /api/v1/resorts/search-index", "GET /api/v1/resorts/{slug}", "GET /api/v1/resorts/{slug}/cams", "GET /api/v1/resorts/{slug}/conditions", "GET /api/v1/powder", "GET /api/v1/status", "GET /api/v1/ask", "POST /api/v1/ask", "POST /api/v1/batch", "GET /ask"]) {
     assert.ok(text.includes(`### ${route}`), `${route} is documented`);
   }
   assert.ok(text.includes("PeakCam (https://www.peakcam.io) - SNOTEL data: USDA NRCS"));
@@ -194,5 +195,6 @@ test("gpt-instructions.md names the OpenAPI Action, the ask-first workflow, the 
   assert.match(text, /snotel/);
   assert.match(text, /open_meteo/);
   assert.ok(text.includes(RATE_LIMIT_TEXT));
-  assert.match(text, /does not have lift or trail open counts/);
+  assert.match(text, /does not have trail open counts/);
+  assert.match(text, /getResortConditions/);
 });

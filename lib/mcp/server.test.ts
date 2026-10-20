@@ -1,10 +1,10 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
-import type { Cam, ResortStationJoined, ResortWithData, SnowReport, WeatherPeriod } from "@/lib/types";
+import type { Cam, OperatorStatusRow, ResortStationJoined, ResortWithData, SnowReport, WeatherPeriod } from "@/lib/types";
 import type { ResortOpening } from "@/lib/openings";
 import type { PublicApiCatalog } from "@/lib/public-api/data";
-import { CamListSchema, PowderListSchema, ResortSchema } from "@/lib/public-api/schema";
+import { CamListSchema, PowderListSchema, ResortConditionsSchema, ResortSchema } from "@/lib/public-api/schema";
 import pkg from "@/package.json";
 import {
   PEAKCAM_MCP_INSTRUCTIONS,
@@ -149,12 +149,22 @@ const OPENINGS: ResortOpening[] = [
   opening("id-ski-portillo", { season: "2026", closing_date: "2026-10-05" }),
 ];
 
+// P6: Alta has a fresh Liftie row; the others have no operator feed.
+const OPERATORS: Record<string, OperatorStatusRow> = {
+  "id-alta": {
+    resort_id: "id-alta", id: "os-alta", source: "liftie", source_id: "alta", observed_at: "2026-12-20T17:00:00Z", fetched_at: "2026-12-20T17:05:00Z",
+    lifts_open: 7, lifts_hold: 1, lifts_scheduled: 0, lifts_closed: 3, lifts_total: 11, trails_open: null, trails_total: null, base_depth_in: null, surface: null, opening_date: null,
+    source_url: "https://www.alta.com/lift-terrain-status", verified: false,
+  },
+};
+
 function catalog(): PublicApiCatalog {
   return {
     resorts: RESORTS,
     openings: new Map(OPENINGS.map((o) => [o.resort_id, o])),
     elevations: { "id-breckenridge": { base_ft: 9600, summit_ft: 12998 } },
     stations: STATIONS,
+    operatorStatus: OPERATORS,
     now: NOW,
   };
 }
@@ -517,6 +527,58 @@ test("get_resort_conditions returns the full resort document and a sourced markd
   assert.doesNotMatch(md, /- \*\*Cam /, "conditions tool summarises cams instead of listing them");
 });
 
+test("get_resort_conditions carries the P6 envelope: Alta is OPEN on the operator feed with sourced, tiered fields; Breckenridge on its confirmed date; Alta's projection alone never opens it", async () => {
+  const alta = await call("get_resort_conditions", { slug: "alta" });
+  const doc = alta.structuredContent as { data: Record<string, { value: unknown; source: string; freshness: { tier: string } }>; meta: { freshness: Record<string, string>; sources: string[] }; sentence: string; schemaUrl: string; measuredNow: unknown[] };
+  assert.equal(doc.schemaUrl, "https://www.peakcam.io/.well-known/schemas/resort-conditions-v1.json");
+  assert.equal(doc.data.status.value, "OPEN");
+  assert.equal(doc.data.status.source, "operator");
+  assert.equal(doc.data.liftsOpen.value, 7);
+  assert.equal(doc.data.liftsOpen.freshness.tier, "live");
+  assert.equal(doc.data.baseDepthIn.value, 60);
+  assert.equal(doc.data.baseDepthIn.source, "snotel");
+  assert.equal(doc.data.tempF.value, 12.2);
+  assert.equal(doc.data.tempF.source, "station:nws");
+  assert.equal(doc.data.forecastNext48hCm.source, "none"); // no stored run for Alta in the fixtures
+  assert.equal(doc.meta.freshness.status, "live");
+  assert.equal(doc.measuredNow.length, 2);
+  assert.match(doc.sentence, /^As of 10:00 a\.m\. MT Dec 20, Alta is open: 7 of 11 lifts open \(operator feed, 1 h old\); base 60 in\. \(SNOTEL, 6 h old\), 12 in\. of new snow in 24 h \(SNOTEL\)\.$/);
+  // The envelope's own schema validates the structured result minus the compatibility subset.
+  const { schemaVersion, schemaUrl, sentence, meta, data, measuredNow, slug, name, canonicalUrl, apiUrl, attribution, license } = alta.structuredContent as Record<string, unknown>;
+  assert.doesNotThrow(() => ResortConditionsSchema.parse({ schemaVersion, schemaUrl, sentence, meta, data, measuredNow, slug, name, canonicalUrl, apiUrl, attribution, license }));
+  const md = text(alta);
+  assert.match(md, /## Status: OPEN — As of/);
+  assert.match(md, /- Lifts open: 7 \(operator, live, 1 h old\)/);
+  assert.match(md, /- Recommendable today: yes/);
+
+  const breck = (await call("get_resort_conditions", { slug: "breckenridge" })).structuredContent as { data: { status: { value: string; source: string }; liftsOpen: { source: string }; reasons: string[] } };
+  assert.equal(breck.data.status.value, "OPEN");
+  assert.equal(breck.data.status.source, "operator");
+  assert.equal(breck.data.liftsOpen.source, "none");
+  assert.match(breck.data.reasons[0], /confirmed opening date 2026-11-07 has passed/);
+
+  // Without its Liftie row Alta has only a projection (2026-11-20, passed): UNKNOWN, never OPEN.
+  const bare = buildTools(fixtureData({ catalog: async () => ({ ...catalog(), operatorStatus: {} }) }));
+  const tool = bare.find((t) => t.name === "get_resort_conditions")!;
+  const res = await tool.handler(tool.inputSchema.parse({ slug: "alta" }) as never);
+  const noFeed = res.structuredContent as { data: { status: { value: string; source: string } } };
+  assert.equal(noFeed.data.status.value, "UNKNOWN");
+  assert.equal(noFeed.data.status.source, "none");
+});
+
+test("ask answers \"is Alta open today\" through the contract: the envelope's status sentence, dated by the operator feed", async () => {
+  const res = await call("ask", { question: "Is Alta open today?" });
+  const answer = AskAnswerSchema.parse(res.structuredContent);
+  assert.equal(answer.answerable, true);
+  assert.equal(answer.intent, "openings");
+  assert.equal(answer.tool, "get_resort_conditions");
+  assert.match(answer.sentence, /^As of 10:00 a\.m\. MT Dec 20, Alta is open: 7 of 11 lifts open \(operator feed, 1 h old\)/);
+  assert.equal(answer.asOf, "2026-12-20T17:00:00.000Z");
+  assert.equal((answer.data as { data: { status: { value: string } } }).data.status.value, "OPEN");
+  const vail = AskAnswerSchema.parse((await call("ask", { question: "is vail open" })).structuredContent);
+  assert.match(vail.sentence, /Vail Mountain is open: confirmed opening Nov 13/);
+});
+
 test("an unknown slug is an isError result that lists close matches", async () => {
   const res = await call("get_resort_conditions", { slug: "breckenrige" });
   assert.equal(res.isError, true);
@@ -815,9 +877,13 @@ test("the peakcam://resorts/{slug} resource lists every resort and reads as mark
   const { resortMarkdown: pageMarkdown } = await import("@/lib/public-api/markdown-page");
   const { serializeResort } = await import("@/lib/public-api/serialize");
   const { serializeOptionsFor } = await import("./tools");
+  const { resortConditionsView } = await import("@/lib/public-api/conditions");
   const cat = catalog();
-  const expected = pageMarkdown(serializeResort(RESORTS[0], serializeOptionsFor(cat, RESORTS[0])), { now: cat.now });
+  const options = serializeOptionsFor(cat, RESORTS[0]);
+  // P6: the resource carries the "Status and freshness" section the page alternate carries.
+  const expected = pageMarkdown(serializeResort(RESORTS[0], options), { now: cat.now, conditions: resortConditionsView(RESORTS[0], { ...options, forecast: { runs: [] } }) });
   assert.equal(content.text, expected);
+  assert.match(content.text ?? "", /## Status and freshness\n\n\*\*OPEN\*\* — /);
   assert.match(content.text ?? "", /^# Breckenridge, .*: snow report and webcams/);
   assert.match(content.text ?? "", /## Webcams \(1\)/);
   assert.match(content.text ?? "", /- Page: https:\/\/www\.peakcam\.io\/resorts\/breckenridge/);

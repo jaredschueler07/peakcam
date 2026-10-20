@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
-import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition, PowderProbability, PowderProbabilityForecast, PowderProbabilityWindow, ResortStationJoined, StationObservation, StationRole, StationRow } from "./types";
+import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition, PowderProbability, PowderProbabilityForecast, PowderProbabilityWindow, ResortStationJoined, StationObservation, StationRole, StationRow, OperatorStatusRow } from "./types";
 import type { ResortOpening } from "./openings";
 import type { StationNormalsSummary } from "./resort-faq";
 import { withResolvedCamNames } from "./cam-name";
@@ -608,6 +608,34 @@ async function fetchResortStationsIndex(): Promise<Record<string, ResortStationJ
 export const getResortStationsIndex = unstable_cache(
   fetchResortStationsIndex,
   ["peakcam:resort-stations:v1", supabaseUrl],
+  { revalidate: PUBLIC_API_STATIONS_REVALIDATE_SECONDS, tags: ["peakcam-resort-catalog"] },
+);
+
+// ─────────────────────────────────────────────────────────────
+// Operator status (migration 032; written by scripts/operator-sync.ts).
+// The newest operator report per resort through `latest_operator_status`,
+// one query for the whole catalogue, cached with the station index so the
+// conditions route, the resort page and the MCP tool read the same row. A
+// database without the migration returns an empty index rather than failing.
+// ─────────────────────────────────────────────────────────────
+
+async function fetchLatestOperatorStatusIndex(): Promise<Record<string, OperatorStatusRow>> {
+  const { data, error } = await supabase.from("latest_operator_status").select("*");
+  if (error) {
+    if (MISSING_TABLE_CODES.has(error.code)) return {};
+    throw error;
+  }
+  const out: Record<string, OperatorStatusRow> = {};
+  for (const row of (data ?? []) as OperatorStatusRow[]) {
+    if (row.resort_id) out[row.resort_id] = row;
+  }
+  return out;
+}
+
+/** The newest operator report per resort, keyed by resort id; `{}` before migration 032. */
+export const getLatestOperatorStatusIndex = unstable_cache(
+  fetchLatestOperatorStatusIndex,
+  ["peakcam:operator-status:v1", supabaseUrl],
   { revalidate: PUBLIC_API_STATIONS_REVALIDATE_SECONDS, tags: ["peakcam-resort-catalog"] },
 );
 

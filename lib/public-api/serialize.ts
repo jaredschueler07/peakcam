@@ -8,7 +8,7 @@
 // whatever they fetched, and the tests build fixtures by hand.
 // ─────────────────────────────────────────────────────────────
 
-import type { Cam, Resort, ResortStationJoined, ResortWithData, SnowReport } from "@/lib/types";
+import type { Cam, OperatorStatusRow, Resort, ResortStationJoined, ResortWithData, SnowReport } from "@/lib/types";
 import { SITE_URL } from "@/lib/site";
 import { cameraPreview } from "@/lib/cam-preview";
 import { camDisplayName } from "@/lib/cam-name";
@@ -69,6 +69,8 @@ export interface SerializeOptions {
    * layer is live and this resort has no station within 25 km.
    */
   observationStations?: ResortStationJoined[] | null;
+  /** The newest operator report (migration 032, P6), read by the conditions contract; the resort document ignores it. */
+  operator?: OperatorStatusRow | null;
   /**
    * Rendered timelapse clips per cam (migrations 025 + 031,
    * `getResortTimelapses`). Omitted → cam objects carry no `timelapses`

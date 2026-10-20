@@ -315,6 +315,86 @@ export function resortSentence(
   return finish(asOf, [{ text: `${stamp}${body}` }]);
 }
 
+// ── Operating status (P6 conditions contract) ────────────────
+
+/** The slice of the contract the status sentence reads (lib/conditions-contract.ts ConditionsContract fits). */
+export interface StatusSentenceInput {
+  status: { value: string | null; source: string; observedAt: string | null; freshness: { tier: string; ageHours: number | null } };
+  liftsOpen: { value: number | null };
+  liftsTotal: { value: number | null; source: string };
+  baseDepthIn: { value: number | null; source: string; freshness: { tier: string; ageHours: number | null } };
+  operatorBaseDepthIn: { value: number | null };
+  newSnow24hIn: { value: number | null; source: string };
+  seasonOpening: { value: string | null; source: string };
+  seasonClosing: { value: string | null };
+  depthDisagreement: { measuredIn: number; operatorIn: number } | null;
+}
+
+const STATUS_WORDS: Record<string, string> = {
+  OPEN: "is open",
+  CLOSED_TODAY: "is closed today",
+  PRE_SEASON: "has not opened for the season",
+  OFF_SEASON: "is closed for the season",
+  UNKNOWN: "has no confirmed operating status",
+};
+
+function contractSourceLabel(source: string): string {
+  if (source === "snotel" || source === "station:snotel") return "SNOTEL";
+  if (source.startsWith("station:")) return `${source.slice(8).toUpperCase()} station`;
+  if (source === "operator") return "operator-reported";
+  if (source === "model") return "model estimate";
+  if (source === "profile") return "catalogue";
+  return source;
+}
+
+function ageClause(ageHours: number | null): string {
+  if (ageHours == null) return "";
+  if (ageHours < 1) return ", under an hour old";
+  return `, ${Math.round(ageHours)} h old`;
+}
+
+/**
+ * The quotable status line: "As of 11:00 a.m. MT Dec 20, Alta is open: 7 of
+ * 11 lifts open (operator feed, 1 h old); base 42 in. (SNOTEL, 5 h old), 6 in.
+ * of new snow in 24 h." The measured base leads; an operator base that
+ * disagrees is named after it, never instead of it. Dated by the status
+ * source's own time when it has one, else by the resort's calendar day.
+ */
+export function conditionsStatusSentence(resortName: string, c: StatusSentenceInput, localDate: string): Quotable {
+  const asOf = c.status.observedAt;
+  const stamp = asOf ? `As of ${formatMountainTime(asOf)}, ` : `As of ${formatOpeningDate(localDate)}, `;
+  const status = c.status.value ?? "UNKNOWN";
+  const segments: QuotableSegment[] = [{ text: stamp }, { text: resortName }, { text: ` ${STATUS_WORDS[status] ?? STATUS_WORDS.UNKNOWN}` }];
+
+  const detail: string[] = [];
+  if (status === "OPEN" || status === "CLOSED_TODAY") {
+    if (c.status.source === "operator" && c.liftsOpen.value != null) {
+      detail.push(`${c.liftsOpen.value} of ${c.liftsTotal.value ?? "?"} lifts open (operator feed${ageClause(c.status.freshness.ageHours)})`);
+    } else if (c.seasonOpening.value && c.seasonOpening.source === "operator") {
+      detail.push(`confirmed opening ${formatOpeningDate(c.seasonOpening.value)}`);
+    } else if (c.seasonClosing.value) {
+      detail.push(`season closes ${formatOpeningDate(c.seasonClosing.value)}`);
+    }
+  } else if (status === "PRE_SEASON" && c.seasonOpening.value) {
+    detail.push(`${c.seasonOpening.source === "operator" ? "confirmed" : "projected"} opening ${formatOpeningDate(c.seasonOpening.value)}`);
+  } else if (status === "OFF_SEASON" && c.seasonClosing.value) {
+    detail.push(`closed ${formatOpeningDate(c.seasonClosing.value)}`);
+  }
+  if (detail.length) segments.push({ text: `: ${detail.join(", ")}` });
+
+  const snow: string[] = [];
+  if (c.baseDepthIn.value != null) {
+    snow.push(`base ${inches(c.baseDepthIn.value)} (${contractSourceLabel(c.baseDepthIn.source)}${ageClause(c.baseDepthIn.freshness.ageHours)})`);
+    if (c.depthDisagreement) snow.push(`the operator reports ${inches(c.depthDisagreement.operatorIn)}`);
+  } else if (c.operatorBaseDepthIn.value != null) {
+    snow.push(`base ${inches(c.operatorBaseDepthIn.value)} (operator-reported)`);
+  }
+  if (c.newSnow24hIn.value != null) snow.push(`${inches(c.newSnow24hIn.value)} of new snow in 24 h (${contractSourceLabel(c.newSnow24hIn.source)})`);
+  if (snow.length) segments.push({ text: `; ${snow.join(", ")}` });
+  segments.push({ text: "." });
+  return finish(asOf, segments);
+}
+
 // ── Percent of normal (Sprint 9 leaderboard) ─────────────────
 
 export interface PctOfNormalEntry {

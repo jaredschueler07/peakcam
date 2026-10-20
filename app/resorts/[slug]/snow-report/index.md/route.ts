@@ -1,5 +1,6 @@
 import { findResort, isValidSlug, loadPublicApiCatalog, optionsFor } from "@/lib/public-api/data";
 import { markdownPageHeaders, snowReportMarkdown } from "@/lib/public-api/markdown-page";
+import { resortConditionsView } from "@/lib/public-api/conditions";
 import { serializeResort } from "@/lib/public-api/serialize";
 import { getResortElevationFt, getSnowpackHistory, getUserConditions } from "@/lib/supabase";
 import { getWeatherForecast } from "@/lib/weather";
@@ -32,7 +33,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
     isUS ? getWeatherForecast(resort.lat, resort.lng) : getOpenMeteoForecast(resort.lat, resort.lng, elevationFt),
     getUserConditions(resort.id),
   ]);
-  const doc = serializeResort(resort, optionsFor(catalog, resort));
-  const body = snowReportMarkdown(doc, { now: catalog.now, history, forecast, userReportCount48h: userConditions.length });
+  const options = optionsFor(catalog, resort);
+  const doc = serializeResort(resort, options);
+  const conditions = resortConditionsView(resort, options);
+  const body = snowReportMarkdown(doc, { now: catalog.now, history, forecast, userReportCount48h: userConditions.length, conditions });
   return new Response(body, { headers: markdownPageHeaders(resortTabUrl(resort.slug, "snow-report")) });
 }

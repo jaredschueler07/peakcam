@@ -12,6 +12,7 @@ export type BatchRouteId =
   | "searchIndex"
   | "resort"
   | "cams"
+  | "conditions"
   | "timelapses"
   | "forecast"
   | "forecastAccuracy"
@@ -35,6 +36,7 @@ const ROUTE_PATTERNS: Array<{ route: BatchRouteId; re: RegExp }> = [
   { route: "searchIndex", re: /^\/api\/v1\/resorts\/search-index$/ },
   { route: "resorts", re: /^\/api\/v1\/resorts$/ },
   { route: "cams", re: /^\/api\/v1\/resorts\/([a-z0-9][a-z0-9-]{0,99})\/cams$/ },
+  { route: "conditions", re: /^\/api\/v1\/resorts\/([a-z0-9][a-z0-9-]{0,99})\/conditions$/ },
   { route: "timelapses", re: /^\/api\/v1\/resorts\/([a-z0-9][a-z0-9-]{0,99})\/timelapses$/ },
   { route: "forecast", re: /^\/api\/v1\/resorts\/([a-z0-9][a-z0-9-]{0,99})\/forecast$/ },
   { route: "forecastAccuracy", re: /^\/api\/v1\/resorts\/([a-z0-9][a-z0-9-]{0,99})\/forecast-accuracy$/ },
@@ -83,7 +85,7 @@ export function parseBatchBody(body: unknown): BatchParse {
       return {
         ok: false,
         error: "disallowed_path",
-        detail: `${path} is not a batchable GET route. Allowed: /api/v1/resorts, /api/v1/resorts/search-index, /api/v1/resorts/{slug}, /api/v1/resorts/{slug}/cams, /api/v1/resorts/{slug}/timelapses, /api/v1/resorts/{slug}/forecast, /api/v1/resorts/{slug}/forecast-accuracy, /api/v1/resorts/{slug}/history, /api/v1/resorts/{slug}/season-stats, /api/v1/resorts/{slug}/monthly, /api/v1/leaderboards/{kind}, /api/v1/powder, /api/v1/status, /api/v1/ask (with query strings).`,
+        detail: `${path} is not a batchable GET route. Allowed: /api/v1/resorts, /api/v1/resorts/search-index, /api/v1/resorts/{slug}, /api/v1/resorts/{slug}/cams, /api/v1/resorts/{slug}/conditions, /api/v1/resorts/{slug}/timelapses, /api/v1/resorts/{slug}/forecast, /api/v1/resorts/{slug}/forecast-accuracy, /api/v1/resorts/{slug}/history, /api/v1/resorts/{slug}/season-stats, /api/v1/resorts/{slug}/monthly, /api/v1/leaderboards/{kind}, /api/v1/powder, /api/v1/status, /api/v1/ask (with query strings).`,
       };
     }
     paths.push(matched);

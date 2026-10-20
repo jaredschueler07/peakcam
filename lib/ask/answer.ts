@@ -343,8 +343,15 @@ export async function answerQuestion(ctx: AskContext, rawQuestion: string, optio
     }
     case "openings": {
       if (first) {
-        const doc = structured as unknown as ResortPublic;
-        sentence = seasonSentence(first, doc.season, now);
+        const doc = structured as unknown as ResortPublic & { sentence?: string; data?: { status: { value: string; observedAt: string | null } } };
+        // P6: the conditions envelope rides on get_resort_conditions; its
+        // dated status sentence is the answer to "is X open today".
+        if (doc.data?.status && typeof doc.sentence === "string") {
+          sentence = doc.sentence;
+          asOf = doc.data.status.observedAt;
+        } else {
+          sentence = seasonSentence(first, doc.season, now);
+        }
       } else {
         sentence = openingsSentence(structured as unknown as OpeningRows, plan);
       }

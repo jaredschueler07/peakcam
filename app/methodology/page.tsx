@@ -174,6 +174,35 @@ export default function MethodologyPage() {
           and carried in the public API as <code>measuredNow[].attribution</code>.
         </p>
 
+        <H2 id="status">Status and freshness</H2>
+        <p className="mb-4">
+          Every number on a resort page, and every field in the conditions document the API
+          serves (<code className="font-mono text-[13px]">/api/v1/resorts/&#123;slug&#125;/conditions</code>),
+          carries four things beside its value: where it came from, when it was observed, how
+          much to trust it, and a freshness tier. Sources are the resort&apos;s NRCS station, a
+          nearby station of another network, the operator&apos;s own published report, a weather
+          model, a static catalogue fact, or a value PeakCam derived from others. The tiers are
+          fixed thresholds, not opinions: <em>live</em> is a reading under three hours old from a
+          source that publishes at least hourly; <em>recent</em> is under thirty hours, which is
+          where a daily station pillow inside its cadence sits; <em>estimated</em> is a model
+          value; <em>stale</em> is anything older than thirty hours; <em>unknown</em> means
+          nothing is on file. Confidence starts from the source (a quality-controlled SNOTEL
+          reading highest, a model estimate lowest) and halves when a value goes stale.
+        </p>
+        <p className="mb-4">
+          The open / closed chip is derived the same way and never defaults to open. A resort
+          reads <em>open</em> only when its operator&apos;s lift-status feed, read twice a day
+          through the open-source Liftie aggregator, shows lifts open or scheduled, or when the
+          resort itself has confirmed an opening date that has passed on the resort&apos;s own
+          calendar day. Every lift closed inside the season reads <em>closed today</em>; a
+          confirmed or projected date still ahead reads <em>pre-season</em>; a closing date behind
+          reads <em>off season</em>; anything else is <em>status unknown</em>, and the page says so
+          rather than guessing from the calendar. The reasons behind the status are printed
+          with it. When the station&apos;s measured base and the operator&apos;s own figure differ by
+          more than thirty percent, both are shown and the measured value leads: a pillow sits at
+          one elevation, an operator picks its deepest stake.
+        </p>
+
         <H2 id="user-reports">On-mountain reports</H2>
         <p className="mb-4">
           Skiers standing on the snow see what a pillow cannot: wind effect, crust, how the
