@@ -309,6 +309,23 @@ export function toCamRecord(resortId, row, warn = console.warn) {
  * conflicts, so a YouTube-only row that already exists would go to INSERT
  * and die on 23505. Rows matching this identity are skipped up front.
  */
+/**
+ * PostgREST bulk upserts require every object in the array to carry the same
+ * keys (PGRST102 "All object keys must match"). toResortRecord/toCamRecord
+ * send optional columns only when the CSV cell is non-blank, so a batch that
+ * mixes rows with and without, say, runs_total must be split by key signature
+ * before it is sent. Pure; order inside each group is preserved.
+ */
+export function groupByKeys(records) {
+  const groups = new Map();
+  for (const record of records) {
+    const sig = Object.keys(record).sort().join("\u0000");
+    if (!groups.has(sig)) groups.set(sig, []);
+    groups.get(sig).push(record);
+  }
+  return [...groups.values()];
+}
+
 export function camIdentity(cam) {
   return `${cam.resort_id}|${cam.name}|${cam.embed_url ?? ""}|${cam.youtube_id ?? ""}`;
 }
@@ -366,9 +383,13 @@ async function importResorts() {
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH).map((r) => toResortRecord(r));
 
-    const data = await supabaseUpsert("resorts", batch, "slug");
-    for (const d of data) slugToId.set(d.slug, d.id);
-    process.stdout.write(`  ✓ Batch ${Math.floor(i / BATCH) + 1}: ${data.length} resorts\n`);
+    let count = 0;
+    for (const group of groupByKeys(batch)) {
+      const data = await supabaseUpsert("resorts", group, "slug");
+      for (const d of data) slugToId.set(d.slug, d.id);
+      count += data.length;
+    }
+    process.stdout.write(`  ✓ Batch ${Math.floor(i / BATCH) + 1}: ${count} resorts\n`);
   }
 
   console.log(`✅  Resorts done. ${slugToId.size} IDs mapped.`);
@@ -454,9 +475,13 @@ async function importCams(slugToId) {
   let total = 0;
   for (let i = 0; i < toUpsert.length; i += BATCH) {
     const batch = toUpsert.slice(i, i + BATCH);
-    const data = await supabaseUpsert("cams", batch, "resort_id,embed_url,name");
-    total += data.length;
-    process.stdout.write(`  ✓ Batch ${Math.floor(i / BATCH) + 1}: ${data.length} cams upserted\n`);
+    let count = 0;
+    for (const group of groupByKeys(batch)) {
+      const data = await supabaseUpsert("cams", group, "resort_id,embed_url,name");
+      count += data.length;
+    }
+    total += count;
+    process.stdout.write(`  ✓ Batch ${Math.floor(i / BATCH) + 1}: ${count} cams upserted\n`);
   }
 
   console.log(`✅  Cams done. ${total} upserted, ${present.length} already present.`);
