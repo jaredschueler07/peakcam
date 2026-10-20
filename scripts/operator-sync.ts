@@ -6,7 +6,7 @@
  * Operator lift status (parity plan block P6). For every resort that
  * data/operator-sources.json maps to a Liftie id, fetch Liftie's parsed copy
  * of the operator's lift-status page and append one `operator_status` row
- * (migration 031), idempotent on (resort, source, observed_at). The
+ * (migration 032), idempotent on (resort, source, observed_at). The
  * conditions contract reads the newest row per resort through
  * `latest_operator_status`; `snow_reports` is never touched.
  *

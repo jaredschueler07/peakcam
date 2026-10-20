@@ -166,7 +166,7 @@ export function isCurrent<T>(f: Field<T>): boolean {
 
 // ── Operator report ──────────────────────────────────────────
 
-/** The latest operator report for a resort (migration 031 `latest_operator_status`), already normalised. */
+/** The latest operator report for a resort (migration 032 `latest_operator_status`), already normalised. */
 export interface OperatorReport {
   /** `liftie` today; other feeds later. */
   source: string;

@@ -31,7 +31,7 @@ import { conditionsTags, resortApiUrl, resortCanonicalUrl, serializeSnow, serial
 import type { MeasuredNowPublic, ResortConditionsPublic } from "./schema";
 
 export interface ConditionsSerializeOptions extends SerializeOptions {
-  /** The newest `operator_status` row for the resort (migration 031), when the caller fetched one. */
+  /** The newest `operator_status` row for the resort (migration 032), when the caller fetched one. */
   operator?: OperatorStatusRow | null;
   /** The stored multi-model runs (migration 027); the summit blend's next-48-h total feeds `forecastNext48hCm`. */
   forecast?: StoredForecast | null;

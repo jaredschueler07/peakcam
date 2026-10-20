@@ -79,7 +79,7 @@ export interface PublicApiCatalog {
   elevations: Record<string, { base_ft: number | null; summit_ft: number | null }>;
   /** Station layer (migration 026) by resort id; `null` when the tables are not there yet. */
   stations: Record<string, ResortStationJoined[]> | null;
-  /** Newest operator report (migration 031) by resort id; optional so fixture catalogues written before P6 still type-check. */
+  /** Newest operator report (migration 032) by resort id; optional so fixture catalogues written before P6 still type-check. */
   operatorStatus?: Record<string, OperatorStatusRow> | null;
   now: Date;
 }

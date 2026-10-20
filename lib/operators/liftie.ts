@@ -174,7 +174,7 @@ export async function fetchLiftieResort(id: string, options: LiftieFetchOptions 
 
 // ── Rows ─────────────────────────────────────────────────────
 
-/** One `operator_status` row (migration 031) as the sync inserts it. */
+/** One `operator_status` row (migration 032) as the sync inserts it. */
 export interface OperatorStatusInsert {
   resort_id: string;
   source: "liftie";

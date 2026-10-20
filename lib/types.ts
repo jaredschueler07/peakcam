@@ -175,7 +175,7 @@ export interface ForecastScoreRow {
   computed_at: string;
 }
 
-// ── Operator status (migration 031, P6: scripts/operator-sync.ts writes these) ──
+// ── Operator status (migration 032, P6: scripts/operator-sync.ts writes these) ──
 /** One `latest_operator_status` row: the newest operator report per resort. */
 export interface OperatorStatusRow {
   resort_id: string;

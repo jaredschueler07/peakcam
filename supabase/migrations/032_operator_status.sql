@@ -1,5 +1,5 @@
 -- ─────────────────────────────────────────────────────────────
--- Migration 031 — operator status (parity plan block P6).
+-- Migration 032 — operator status (parity plan block P6).
 --
 -- WHY A NEW TABLE. `snow_reports` has had lifts_open / lifts_total /
 -- trails_open / trails_total columns since 001, but `latest_snow_reports`

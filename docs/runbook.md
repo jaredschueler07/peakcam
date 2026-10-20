@@ -48,7 +48,7 @@ Then spot-check `/`, a `/resorts/<slug>`, `/snow-report`, `/about`.
 | `com.peakcam.forecast-sync` | Multi-model forecast runs → `forecast_runs` + `forecast_daily` (`scripts/forecast-sync.ts`: one Open-Meteo `models=` call per point, summit and base, nine models for US resorts, seven elsewhere; idempotent per issue hour; retention pass on the first run after 00:00 UTC) | every 6 h (21,600 s, `RunAtLoad`) | **to deploy** (P4, 2026-10-20) — recipe below |
 | `com.peakcam.forecast-score` | Forecast verification → `forecast_scores` (`scripts/forecast-score.ts`: day-1/3/7 MAE, bias ratio, rank per model + `blend`, graded against SNOTEL depth deltas over 90 days) | daily 07:30 local (after snotel-sync) | **to deploy** (P4, 2026-10-20) |
 | `com.peakcam.stations-sync` | Station layer (`scripts/stations-sync.ts`): up to three stations per resort by elevation band from SNOTEL, GHCN-Daily, NWS obs, BC ASWS, ECCC → `stations`, `resort_stations`, `station_observations` (migration 026). Reads only public APIs; never touches `snow_reports`. `docs/stations.md` | hourly (3,600 s) | **plist in repo, not yet loaded on the mini** — recipe below |
-| `com.peakcam.operator-sync` | Operator lift status via Liftie → `operator_status` (`scripts/operator-sync.ts`, migration 031): lifts open / hold / scheduled / closed per resort for the 88 resorts in `data/operator-sources.json`; read by the conditions contract (`/api/v1/resorts/{slug}/conditions`, the status chip). Exits 2 when every fetch is refused by Liftie's Cloudflare challenge | 06:00 and 11:00 local (`StartCalendarInterval` ×2) | **plist in repo (P6, 2026-10-20), blocked upstream** — see "Operator status" below |
+| `com.peakcam.operator-sync` | Operator lift status via Liftie → `operator_status` (`scripts/operator-sync.ts`, migration 032): lifts open / hold / scheduled / closed per resort for the 88 resorts in `data/operator-sources.json`; read by the conditions contract (`/api/v1/resorts/{slug}/conditions`, the status chip). Exits 2 when every fetch is refused by Liftie's Cloudflare challenge | 06:00 and 11:00 local (`StartCalendarInterval` ×2) | **plist in repo (P6, 2026-10-20), blocked upstream** — see "Operator status" below |
 | `com.peakcam.pipeline` | Multi-source blender | daily 06:00 | **prepared but Disabled=true** — awaits migration 010 |
 
 All of the above run from the ops checkout `/Users/maestro_admin/peakcam/peakcam` on the
@@ -459,7 +459,7 @@ are optional until their block lands.
 | `forecast_runs`, `forecast_daily` | 027 | `scripts/forecast-sync.ts` (`com.peakcam.forecast-sync`, every 6 h; live since P4, 2026-10-20) | `Resort.forecast` summary, `/resorts/{slug}/forecast`, `get_forecast`, the resort page strip |
 | `forecast_scores` | 027 | `scripts/forecast-score.ts` (`com.peakcam.forecast-score`, daily 07:30; rewrites per resort/model/window, `blend` row included) | `Resort.forecastScores`, `/resorts/{slug}/forecast-accuracy`, `compare_models` |
 | `resort_scores` | 028 | P7 scoring job | `Resort.score`, leaderboards |
-| `operator_status` + view `latest_operator_status` | 031 (P6, 2026-10-20) | `scripts/operator-sync.ts` (`com.peakcam.operator-sync`, 06:00 and 11:00) via `lib/operators/liftie.ts`; one row per fetch, idempotent on `(resort_id, source, observed_at)`; public read, no write policies | `/api/v1/resorts/{slug}/conditions` (`data.liftsOpen` …), the resort page status chip, `get_resort_conditions`, the markdown "Status and freshness" section |
+| `operator_status` + view `latest_operator_status` | 032 (P6, 2026-10-20) | `scripts/operator-sync.ts` (`com.peakcam.operator-sync`, 06:00 and 11:00) via `lib/operators/liftie.ts`; one row per fetch, idempotent on `(resort_id, source, observed_at)`; public read, no write policies | `/api/v1/resorts/{slug}/conditions` (`data.liftsOpen` …), the resort page status chip, `get_resort_conditions`, the markdown "Status and freshness" section |
 
 Elevations: `resorts.elevation_base_ft/summit_ft` are the canonical home from
 025 on (backfilled from `resort_metadata` for 145 resorts); `getResortElevationIndex()`
@@ -526,7 +526,7 @@ boards say "unavailable" until migration 030 exists. Normals: a station with few
 qualifying winters is logged by the seed (`NOTE fewer than 25 qualifying winters`); the band
 still renders with whatever it has and `curve.normalYears` says how many.
 
-## Operator status (P6, migration 031)
+## Operator status (P6, migration 032)
 
 Branch `feat/p6-conditions`, parity plan block P6. The conditions contract
 (`lib/conditions-contract.ts`, served by `/api/v1/resorts/{slug}/conditions`, inside
@@ -558,7 +558,7 @@ Deploy on the Mini (`ssh mini`, user `maestro_admin`; `zsh -l -c` because npm is
 non-login PATH):
 
 ```bash
-# 1. apply supabase/migrations/031_operator_status.sql by hand (SQL Editor / MCP apply_migration; not during a Vercel build), then:
+# 1. apply supabase/migrations/032_operator_status.sql by hand (SQL Editor / MCP apply_migration; not during a Vercel build), then:
 ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && git pull && npm ci --no-audit --no-fund"'
 ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && npx tsx scripts/operator-sync.ts --dry-run --resort alta | tail -4"'   # "OK Alta …" once Liftie answers; "FAIL … blocked 403" while the challenge stands
 ssh mini 'cd /Users/maestro_admin/peakcam/peakcam && cp com.peakcam.operator-sync.plist ~/Library/LaunchAgents/ && launchctl bootout gui/$(id -u)/com.peakcam.operator-sync 2>/dev/null; launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.peakcam.operator-sync.plist && launchctl list | grep com.peakcam.operator-sync'

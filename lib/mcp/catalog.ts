@@ -27,7 +27,7 @@ export function serializeOptionsFor(catalog: PublicApiCatalog, resort: ResortWit
     elevation,
     // Station layer (migration 026): an index without a row for this resort is an empty list, no index at all is "not served".
     observationStations: catalog.stations ? (catalog.stations[resort.id] ?? []) : null,
-    // Operator status (migration 031, P6): the newest operator report, when one is stored.
+    // Operator status (migration 032, P6): the newest operator report, when one is stored.
     operator: catalog.operatorStatus?.[resort.id] ?? null,
   };
 }

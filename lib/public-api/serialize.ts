@@ -64,7 +64,7 @@ export interface SerializeOptions {
    * layer is live and this resort has no station within 25 km.
    */
   observationStations?: ResortStationJoined[] | null;
-  /** The newest operator report (migration 031, P6), read by the conditions contract; the resort document ignores it. */
+  /** The newest operator report (migration 032, P6), read by the conditions contract; the resort document ignores it. */
   operator?: OperatorStatusRow | null;
 }
 

@@ -183,7 +183,7 @@ export default async function ResortPage({
     // 30-year normals peak for the "typical season" FAQ entry; null without a station.
     getStationNormalsSummary(resort.snotel_station_id),
     getResortStationsIndex(),
-    // Newest operator report (migration 031, P6); an empty index before the job has run.
+    // Newest operator report (migration 032, P6); an empty index before the job has run.
     getLatestOperatorStatusIndex().catch((): Record<string, OperatorStatusRow> => ({})),
   ]);
   const opening = openings.find((row) => row.resort_id === resort.id) ?? null;

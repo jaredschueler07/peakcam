@@ -611,7 +611,7 @@ export const getResortStationsIndex = unstable_cache(
 );
 
 // ─────────────────────────────────────────────────────────────
-// Operator status (migration 031; written by scripts/operator-sync.ts).
+// Operator status (migration 032; written by scripts/operator-sync.ts).
 // The newest operator report per resort through `latest_operator_status`,
 // one query for the whole catalogue, cached with the station index so the
 // conditions route, the resort page and the MCP tool read the same row. A
@@ -631,7 +631,7 @@ async function fetchLatestOperatorStatusIndex(): Promise<Record<string, Operator
   return out;
 }
 
-/** The newest operator report per resort, keyed by resort id; `{}` before migration 031. */
+/** The newest operator report per resort, keyed by resort id; `{}` before migration 032. */
 export const getLatestOperatorStatusIndex = unstable_cache(
   fetchLatestOperatorStatusIndex,
   ["peakcam:operator-status:v1", supabaseUrl],

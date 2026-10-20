@@ -269,7 +269,7 @@ pure `lib/conditions-contract.ts`; schema `ResortConditions`, file
 | --- | --- |
 | `snotel` | The resort's NRCS station as written to the snow report (quality-controlled, 6-hourly sync). |
 | `station:<network>` | A reading from the P3 station layer (`nws`, `ghcn`, `bc_asws`, `eccc`, `snotel`). |
-| `operator` | The resort's own published report: lift status parsed by Liftie (`scripts/operator-sync.ts`, migration 031), or a resort-confirmed opening date. |
+| `operator` | The resort's own published report: lift status parsed by Liftie (`scripts/operator-sync.ts`, migration 032), or a resort-confirmed opening date. |
 | `model` | A weather-model estimate (Open-Meteo report rows, the P4 blend's 48-hour total). |
 | `profile` | A static catalogue fact: lift and run totals, a third-party projected opening date. |
 | `derived` | Computed by PeakCam from other fields (percent of normal, snow quality from the engine's tags). |
