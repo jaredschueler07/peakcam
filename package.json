@@ -22,6 +22,7 @@
     "model-sync": "tsx scripts/model-sync.ts",
     "pipeline-sync": "tsx scripts/pipeline-sync.ts",
     "seed-normals": "tsx scripts/seed-snotel-normals.ts",
+    "snotel-backfill": "tsx scripts/snotel-backfill.ts",
     "seed-openings": "node scripts/seed-resort-openings.mjs",
     "cam-health": "node scripts/cam-health-check.mjs",
     "cam-stills": "tsx scripts/cam-capture-stills.ts",
