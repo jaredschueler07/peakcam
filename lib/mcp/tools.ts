@@ -1290,7 +1290,6 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
     findPowder,
     compareResorts,
     getForecast,
-    compareModels,
     getSnowHistory,
     getOpeningDates,
     getResortProfile,
@@ -1299,6 +1298,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
     getAlertOptions,
     getCamTimeline,
     getStations,
+    compareModels,
   ] as unknown as ToolDefinition[];
 
   const ask = defineTool({

@@ -12,7 +12,6 @@ export const PEAKCAM_TOOL_NAMES = [
   "find_powder",
   "compare_resorts",
   "get_forecast",
-  "compare_models",
   "get_snow_history",
   "get_opening_dates",
   "get_resort_profile",
@@ -21,6 +20,7 @@ export const PEAKCAM_TOOL_NAMES = [
   "get_alert_options",
   "get_cam_timeline",
   "get_stations",
+  "compare_models",
   "ask",
 ] as const;
 
