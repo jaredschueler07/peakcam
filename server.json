@@ -15,6 +15,18 @@
       "url": "https://www.peakcam.io/api/mcp"
     }
   ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "peakcam-mcp",
+      "version": "0.1.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ],
   "_meta": {
     "io.modelcontextprotocol.registry/publisher-provided": {
       "tool": "mcp-publisher",
@@ -23,7 +35,31 @@
       "openapi": "https://www.peakcam.io/api/v1/openapi.json",
       "license": "https://www.peakcam.io/about#terms",
       "authentication": "none",
-      "access": "read-only"
+      "access": "read-only",
+      "tools": [
+        "search_resorts",
+        "get_resort_conditions",
+        "get_resort_cams",
+        "find_powder",
+        "compare_resorts",
+        "get_forecast",
+        "get_snow_history",
+        "get_opening_dates",
+        "get_resort_profile",
+        "get_percent_of_normal",
+        "list_regions",
+        "get_alert_options",
+        "get_cam_timeline",
+        "get_stations",
+        "compare_models",
+        "ask",
+        "get_season_stats",
+        "get_monthly_climatology",
+        "get_leaderboard",
+        "get_timelapses",
+        "get_score"
+      ],
+      "stdio": "npx -y peakcam-mcp"
     }
   }
 }

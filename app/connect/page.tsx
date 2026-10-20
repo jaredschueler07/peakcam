@@ -10,15 +10,20 @@ import {
   absolute,
   CLAUDE_CODE_COMMAND,
   CLAUDE_CONNECTOR_LINK,
+  CLAUDE_DESKTOP_CONFIG_PATHS,
   CONNECT_LINKS,
   CONNECT_TOOLS,
   CONNECT_URL,
   CURSOR_MCP_JSON,
   EXAMPLE_PROMPTS,
   EXTERNAL_LINKS,
+  GPT_ACTION_IMPORT_URL,
   HERMES_WEBHOOK_COMMAND,
   MCP_ENDPOINT,
   MCP_NAME,
+  STDIO_COMMAND,
+  STDIO_MCP_JSON,
+  STDIO_PACKAGE_NAME,
   WEBHOOK_SAMPLE,
 } from "@/components/connect/links";
 import { SITE_URL } from "@/lib/site";
@@ -31,8 +36,8 @@ export const dynamic = "force-static";
 
 const TITLE = "Use PeakCam with your AI assistant";
 const DESCRIPTION =
-  "Connect Claude, ChatGPT, Cursor, Grok, Perplexity or your own agent to PeakCam's MCP server for live snow reports, " +
-  "SNOTEL measurements, webcams and powder rankings across 150 ski resorts. No key, read-only, plus an answer endpoint, REST, OpenAPI, markdown and Atom alternatives.";
+  "Connect Claude, ChatGPT, Cursor, Grok, Perplexity, Claude Desktop or your own agent to PeakCam's MCP server for live snow reports, " +
+  "SNOTEL measurements, forecasts, webcams and powder rankings across 150 ski resorts. No key, read-only, plus a stdio bridge, a Custom GPT, an answer endpoint, REST, OpenAPI, markdown and Atom alternatives.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -188,6 +193,52 @@ export default function ConnectPage() {
               <p>Add the server to <span className="font-mono text-[13px]">.cursor/mcp.json</span> in a project, or to <span className="font-mono text-[13px]">~/.cursor/mcp.json</span> for every project.</p>
               <CodeBlock label="Cursor mcp.json">{CURSOR_MCP_JSON}</CodeBlock>
               <p className="text-sm text-ink/90">The same object works in Windsurf, Zed, VS Code and any client that reads an <span className="font-mono text-[13px]">mcpServers</span> map with a <span className="font-mono text-[13px]">url</span> entry.</p>
+            </ClientCard>
+
+            <ClientCard id="stdio" title="Claude Desktop and stdio-only clients" badge="npx">
+              <p>
+                Clients that start a command instead of opening a URL run the{" "}
+                <span className="font-mono text-[13px]">{STDIO_PACKAGE_NAME}</span> bridge: it forwards every message to the
+                endpoint above and back, keeps nothing, needs Node 20 or newer and no key.
+              </p>
+              <CodeBlock label="stdio mcpServers entry">{STDIO_MCP_JSON}</CodeBlock>
+              <ul className="list-disc space-y-1 pl-5 text-sm text-ink/90">
+                <li>
+                  Claude Desktop: paste the object into{" "}
+                  <span className="font-mono text-[13px]">{CLAUDE_DESKTOP_CONFIG_PATHS.macOS}</span> (macOS) or{" "}
+                  <span className="font-mono text-[13px]">{CLAUDE_DESKTOP_CONFIG_PATHS.windows}</span> (Windows) and restart the app.
+                </li>
+                <li>
+                  Claude Code as stdio: <span className="font-mono text-[13px]">claude mcp add peakcam -- {STDIO_COMMAND}</span>.
+                </li>
+                <li>
+                  Any other client: command <span className="font-mono text-[13px]">{STDIO_COMMAND}</span>; add{" "}
+                  <span className="font-mono text-[13px]">--url</span> to point a preview deployment at it.
+                </li>
+              </ul>
+            </ClientCard>
+
+            <ClientCard id="custom-gpt" title="ChatGPT Custom GPT" badge="Actions">
+              <p>
+                For a GPT you publish to others, the Actions path works on every plan: import the OpenAPI document as an
+                Action and paste the instructions file.
+              </p>
+              <ol className="list-decimal space-y-1 pl-5 text-sm text-ink/90">
+                <li>Explore GPTs → Create → Configure.</li>
+                <li>
+                  Actions → Create new action → Import from URL →{" "}
+                  <span className="font-mono text-[13px]">{GPT_ACTION_IMPORT_URL}</span>, Authentication: None.
+                </li>
+                <li>
+                  Instructions: paste the block from{" "}
+                  <a href={CONNECT_LINKS.gptInstructions.href} className={linkClass}>
+                    {absolute("gptInstructions")}
+                  </a>
+                  . It makes the GPT call <span className="font-mono text-[13px]">getAsk</span> first and label every number with
+                  its source and time.
+                </li>
+                <li>Conversation starters: any of the prompts below. Publish to Anyone with a link, or to the GPT Store.</li>
+              </ol>
             </ClientCard>
 
             <ClientCard id="grok-perplexity" title="Grok and Perplexity" badge="Where supported">

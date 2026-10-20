@@ -14,9 +14,16 @@
  * contents = the key). The key is not a secret: anyone can read the file, and
  * a submission only tells engines to look at a URL on this host.
  *
- * Called from scripts/snotel-sync.ts when INDEXNOW_ENABLED=1 with the slugs
- * whose report changed in that run. Standalone:
- *   npx tsx scripts/indexnow-ping.ts breckenridge vail
+ * Called from scripts/snotel-sync.ts when INDEXNOW_ENABLED=1 with the
+ * resorts whose report changed in that run (slug and state). Standalone,
+ * with the state after a colon so the hub pages can be derived:
+ *   npx tsx scripts/indexnow-ping.ts breckenridge:CO vail:CO
+ *
+ * What a changed report touches (parity plan P10): the resort's page family
+ * (overview, snow report, forecast, webcams, history), its state hubs
+ * (/ski-cams/{hub}, /snow-report/{hub}) and the aggregate pages whose
+ * ranking moves with any report (home, /snow-report, percent-of-normal, the
+ * four leaderboards). Markdown alternates are noindex and are not submitted.
  *
  * The payload builder and batching are pure and unit-tested
  * (scripts/indexnow-ping.test.ts); the network call is injectable and never
@@ -26,6 +33,10 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { SITE_URL } from "../lib/site.js";
+import { stateHub, hubPath } from "../lib/hubs.js";
+import { snowHubPath } from "../lib/snow-hubs.js";
+import { RESORT_TABS, resortTabPath } from "../lib/resort-pages.js";
+import { LEADERBOARD_KINDS, leaderboardPath } from "../lib/leaderboards.js";
 
 /** Must match the file name under public/. Rotate both together. */
 export const INDEXNOW_KEY = "551d48c377508655d288dd5b94130e22";
@@ -61,21 +72,77 @@ export function resortPageUrl(slug: string, baseUrl: string = SITE_URL): string 
   return `${baseUrl}/resorts/${slug}`;
 }
 
+const SLUG = /^[a-z0-9][a-z0-9-]{0,99}$/;
+
+/** A resort whose report changed: the slug, and the `resorts.state` value when the caller has it. */
+export interface ChangedResort {
+  slug: string;
+  state?: string | null;
+}
+
+/** "breckenridge:CO" → { slug, state }; "vail" → { slug }. The CLI form. */
+export function parseChangedResort(token: string): ChangedResort {
+  const [slug, state] = token.split(":");
+  return state ? { slug, state } : { slug };
+}
+
 /**
- * Slugs → page URLs, de-duplicated, in first-seen order, and anything that is
- * not a lowercase kebab-case slug dropped (a malformed slug would otherwise
- * submit a URL that 404s). Resort pages only: the home page and hubs are
- * ISR'd from the same data and re-crawled on their own schedule.
+ * Slugs → overview page URLs, de-duplicated, in first-seen order, and
+ * anything that is not a lowercase kebab-case slug dropped (a malformed slug
+ * would otherwise submit a URL that 404s).
  */
 export function resortUrlsForSlugs(slugs: Iterable<string>, baseUrl: string = SITE_URL): string[] {
   const seen = new Set<string>();
   const urls: string[] = [];
   for (const slug of slugs) {
-    if (!/^[a-z0-9][a-z0-9-]{0,99}$/.test(slug) || seen.has(slug)) continue;
+    if (!SLUG.test(slug) || seen.has(slug)) continue;
     seen.add(slug);
     urls.push(resortPageUrl(slug, baseUrl));
   }
   return urls;
+}
+
+/** The aggregate pages whose content moves with any report, in a fixed order. */
+export function aggregatePageUrls(baseUrl: string = SITE_URL): string[] {
+  return [
+    `${baseUrl}/`,
+    `${baseUrl}/snow-report`,
+    `${baseUrl}/snow-report/percent-of-normal`,
+    ...LEADERBOARD_KINDS.map((kind) => `${baseUrl}${leaderboardPath(kind)}`),
+  ];
+}
+
+/**
+ * Every indexable page a changed report touches: the resort's page family
+ * (every tab in lib/resort-pages.ts), its state's two hubs, and the
+ * aggregate pages — de-duplicated, resorts in first-seen order, hubs and
+ * aggregates after them. Resorts with a malformed slug are dropped;
+ * a resort without a state contributes no hub. Empty input → no URLs, so a
+ * run that changed nothing pings nothing.
+ */
+export function changedPageUrls(changes: Iterable<ChangedResort>, baseUrl: string = SITE_URL): string[] {
+  const seen = new Set<string>();
+  const resortUrls: string[] = [];
+  const hubUrls: string[] = [];
+  const push = (list: string[], url: string) => {
+    if (seen.has(url)) return;
+    seen.add(url);
+    list.push(url);
+  };
+  for (const change of changes) {
+    if (!SLUG.test(change.slug)) continue;
+    for (const tab of RESORT_TABS) push(resortUrls, `${baseUrl}${resortTabPath(change.slug, tab.key)}`);
+    const state = (change.state ?? "").trim();
+    if (state) {
+      const hub = stateHub(state);
+      push(hubUrls, `${baseUrl}${hubPath(hub)}`);
+      push(hubUrls, `${baseUrl}${snowHubPath(hub)}`);
+    }
+  }
+  if (resortUrls.length === 0) return [];
+  const aggregates: string[] = [];
+  for (const url of aggregatePageUrls(baseUrl)) push(aggregates, url);
+  return [...resortUrls, ...hubUrls, ...aggregates];
 }
 
 /** Split a URL list into protocol-sized batches, preserving order. Empty input → no batches. */
@@ -117,8 +184,11 @@ export interface PingOptions {
  * yet verified), 400 (bad request), 403 (key mismatch), 422 (URLs off host),
  * 429 (too many requests).
  */
-export async function pingIndexNow(slugs: Iterable<string>, options: PingOptions = {}): Promise<IndexNowResult> {
-  const urls = resortUrlsForSlugs(slugs, options.baseUrl);
+export async function pingIndexNow(changes: Iterable<string | ChangedResort>, options: PingOptions = {}): Promise<IndexNowResult> {
+  const urls = changedPageUrls(
+    Array.from(changes, (c) => (typeof c === "string" ? { slug: c } : c)),
+    options.baseUrl,
+  );
   const batches = batchUrls(urls);
   const doFetch = options.fetch ?? (globalThis.fetch as unknown as FetchLike);
   const log = options.log ?? ((line) => console.log(line));
@@ -144,10 +214,10 @@ export async function pingIndexNow(slugs: Iterable<string>, options: PingOptions
 
 const invokedDirectly = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (invokedDirectly) {
-  const slugs = process.argv.slice(2);
-  if (slugs.length === 0) {
-    console.error("usage: npx tsx scripts/indexnow-ping.ts <slug> [slug ...]");
+  const tokens = process.argv.slice(2);
+  if (tokens.length === 0) {
+    console.error("usage: npx tsx scripts/indexnow-ping.ts <slug[:STATE]> [slug[:STATE] ...]   e.g. breckenridge:CO vail:CO");
     process.exit(2);
   }
-  pingIndexNow(slugs).then((result) => process.exit(result.ok ? 0 : 1));
+  pingIndexNow(tokens.map(parseChangedResort)).then((result) => process.exit(result.ok ? 0 : 1));
 }

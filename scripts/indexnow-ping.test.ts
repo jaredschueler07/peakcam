@@ -7,9 +7,12 @@ import {
   INDEXNOW_ENDPOINT,
   INDEXNOW_KEY,
   INDEXNOW_MAX_URLS,
+  aggregatePageUrls,
   batchUrls,
   buildIndexNowPayload,
+  changedPageUrls,
   indexNowKeyLocation,
+  parseChangedResort,
   pingIndexNow,
   resortUrlsForSlugs,
   type FetchLike,
@@ -31,6 +34,41 @@ test("resortUrlsForSlugs builds canonical page URLs, de-duplicates and drops mal
     "https://www.peakcam.io/resorts/vail",
   ]);
   assert.deepEqual(resortUrlsForSlugs(["alta"], "https://preview.example"), ["https://preview.example/resorts/alta"]);
+});
+
+test("changedPageUrls submits the page family, the state hubs and the aggregate pages, once each", () => {
+  const urls = changedPageUrls([
+    { slug: "breckenridge", state: "CO" },
+    { slug: "vail", state: "CO" },
+    { slug: "breckenridge", state: "CO" },
+    { slug: "ski-portillo", state: "Chile" },
+    { slug: "no-state" },
+    { slug: "Bad Slug", state: "UT" },
+  ]);
+  const base = "https://www.peakcam.io";
+  assert.deepEqual(urls.slice(0, 5), [
+    `${base}/resorts/breckenridge`,
+    `${base}/resorts/breckenridge/snow-report`,
+    `${base}/resorts/breckenridge/snow-forecast`,
+    `${base}/resorts/breckenridge/webcams`,
+    `${base}/resorts/breckenridge/history`,
+  ]);
+  assert.equal(urls.filter((u) => u.includes("/resorts/")).length, 4 * 5, "five pages per valid resort, no duplicates");
+  assert.ok(urls.includes(`${base}/ski-cams/colorado`) && urls.includes(`${base}/snow-report/colorado`));
+  assert.ok(urls.includes(`${base}/ski-cams/chile`) && urls.includes(`${base}/snow-report/chile`));
+  assert.equal(urls.filter((u) => u.endsWith("/colorado")).length, 2, "one hub pair per state");
+  assert.ok(!urls.some((u) => u.includes("/ski-cams/ut")), "a malformed slug contributes no hub");
+  const aggregates = aggregatePageUrls();
+  assert.deepEqual(urls.slice(-aggregates.length), aggregates);
+  assert.deepEqual(aggregates.slice(0, 3), [`${base}/`, `${base}/snow-report`, `${base}/snow-report/percent-of-normal`]);
+  assert.equal(aggregates.length, 3 + 4, "home, snow report, percent of normal and the four leaderboards");
+  assert.ok(!urls.some((u) => u.endsWith("index.md")), "markdown alternates are noindex and never submitted");
+  assert.equal(new Set(urls).size, urls.length);
+  // Nothing changed → nothing submitted, not even the aggregates.
+  assert.deepEqual(changedPageUrls([]), []);
+  assert.deepEqual(changedPageUrls([{ slug: "Bad Slug", state: "CO" }]), []);
+  assert.deepEqual(parseChangedResort("breckenridge:CO"), { slug: "breckenridge", state: "CO" });
+  assert.deepEqual(parseChangedResort("vail"), { slug: "vail" });
 });
 
 test("buildIndexNowPayload has the four protocol fields and refuses off-host URLs", () => {
@@ -65,7 +103,8 @@ function fakeFetch(statuses: number[]) {
 }
 
 test("pingIndexNow posts one JSON batch per 10,000 URLs to the shared endpoint", async () => {
-  const slugs = Array.from({ length: 10_001 }, (_, i) => `resort-${i}`);
+  // 2,001 resorts × 5 pages + the 7 aggregates = 10,012 URLs → two batches.
+  const slugs = Array.from({ length: 2_001 }, (_, i) => `resort-${i}`);
   const { fetch, calls } = fakeFetch([200, 202]);
   const logs: string[] = [];
   const result = await pingIndexNow(slugs, { fetch, log: (l) => logs.push(l) });
@@ -76,9 +115,18 @@ test("pingIndexNow posts one JSON batch per 10,000 URLs to the shared endpoint",
   assert.equal(first.host, "www.peakcam.io");
   assert.equal(first.key, INDEXNOW_KEY);
   assert.equal(first.urlList.length, 10_000);
-  assert.equal((calls[1].body as { urlList: string[] }).urlList.length, 1);
-  assert.deepEqual(result, { batches: 2, urls: 10_001, statuses: [200, 202], ok: true });
+  assert.equal(first.urlList[0], "https://www.peakcam.io/resorts/resort-0");
+  assert.equal((calls[1].body as { urlList: string[] }).urlList.length, 12);
+  assert.deepEqual(result, { batches: 2, urls: 10_012, statuses: [200, 202], ok: true });
   assert.match(logs[0], /10000 URLs submitted \(HTTP 200\)/);
+});
+
+test("pingIndexNow takes slug-and-state rows (what snotel-sync passes) and submits the hubs", async () => {
+  const { fetch, calls } = fakeFetch([200]);
+  const result = await pingIndexNow([{ slug: "alta", state: "UT" }], { fetch, log: () => {} });
+  const urls = (calls[0].body as { urlList: string[] }).urlList;
+  assert.ok(urls.includes("https://www.peakcam.io/ski-cams/utah") && urls.includes("https://www.peakcam.io/snow-report/utah"));
+  assert.equal(result.urls, 5 + 2 + 7);
 });
 
 test("pingIndexNow with no slugs makes no request", async () => {

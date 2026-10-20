@@ -33,7 +33,7 @@ import type { ConditionRating } from "./types";
 
 const CSV_STATE_VALUES = [
   "CA", "CO", "VT", "Chile", "UT", "Argentina", "WA", "NH", "OR", "ID", "NM", "NY", "MT",
-  "BC", "MI", "MA", "ME", "MN", "NV", "PA", "WY", "AZ", "MD", "VA", "WI", "WV",
+  "BC", "MI", "MA", "ME", "MN", "NV", "PA", "WY", "AZ", "MD", "VA", "WI", "WV", "SD", "AK", "OH", "MO", "IN", "NJ", "NC",
 ];
 
 const CSV_REGION_VALUES = [
@@ -259,7 +259,11 @@ test("CSV: state and region groups reproduce the row counts", () => {
   for (let i = 1; i < states.length; i++) {
     assert.ok(states[i - 1].count >= states[i].count, "count desc");
   }
-  assert.equal(states[0].hub.key, "CA");
+  // The biggest state group leads; which state that is moves with the
+  // catalogue (CA until the P1 coverage import, CO since).
+  const [topState, topCount] = [...expectedStates].sort((a, b) => b[1] - a[1])[0];
+  assert.equal(states[0].hub.key, topState);
+  assert.equal(states[0].count, topCount);
   assert.ok(states[0].count >= 20);
 
   const regions = groupByRegion(CSV);
@@ -456,7 +460,8 @@ test("neighbouringStates is symmetric, self-free, and only names catalogue state
   assert.deepEqual(neighbouringStates("Chile"), ["Argentina"]);
   assert.deepEqual(neighbouringStates("co"), neighbouringStates("CO"));
   assert.deepEqual(neighbouringStates("XX"), []);
-  assert.deepEqual(neighbouringStates("AK"), []);
+  assert.deepEqual(neighbouringStates("AK"), ["BC"]);
+  assert.deepEqual(neighbouringStates("HI"), []);
 });
 
 test("neighbouringStateHubs drops neighbours with no resorts in the list", () => {

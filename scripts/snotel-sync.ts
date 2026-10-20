@@ -503,7 +503,7 @@ async function main(): Promise<void> {
   let noData = 0;
   // Slugs that got a new snow_reports row this run: the pages worth asking
   // search engines to re-crawl now rather than on their next scheduled visit.
-  const changedSlugs: string[] = [];
+  const changedResorts: { slug: string; state: string }[] = [];
 
   for (const resort of resorts) {
     try {
@@ -606,7 +606,7 @@ async function main(): Promise<void> {
 
       // 4k. Update resorts.cond_rating
       await updateResortRating(resort.id, conditions.condRating);
-      changedSlugs.push(resort.slug);
+      changedResorts.push({ slug: resort.slug, state: resort.state });
 
       // Log per-resort status
       const pctStr =
@@ -640,15 +640,16 @@ async function main(): Promise<void> {
   // so a dev-box run against production data never pings for it. A failed
   // ping is logged by pingIndexNow and must not fail the sync: the reports
   // are already written. Enable on the Mini by adding INDEXNOW_ENABLED=1 to
-  // its .env.local (docs/runbook.md, "Discovery surface").
+  // its .env.local (docs/runbook.md, "Discovery surface"). Each changed
+  // resort submits its page family, its state hubs and the aggregate pages.
   if (process.env.INDEXNOW_ENABLED === "1") {
     try {
-      await pingIndexNow(changedSlugs);
+      await pingIndexNow(changedResorts);
     } catch (err) {
       console.error("[indexnow] ping failed:", err instanceof Error ? err.message : err);
     }
-  } else if (changedSlugs.length > 0) {
-    console.log(`[indexnow] disabled (set INDEXNOW_ENABLED=1 to submit ${changedSlugs.length} changed pages)`);
+  } else if (changedResorts.length > 0) {
+    console.log(`[indexnow] disabled (set INDEXNOW_ENABLED=1 to submit the pages of ${changedResorts.length} changed resorts)`);
   }
 }
 

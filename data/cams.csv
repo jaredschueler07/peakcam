@@ -635,3 +635,165 @@ beaver-creek,Arrowhead Village,,iframe,https://player.brownrice.com/embed/bcahou
 beaver-creek,Village Ice Rink,,iframe,https://player.brownrice.com/embed/bcvillageicerink,,true,village,Beaver Creek Resort,https://www.epicpass.com/policies.aspx
 beaver-creek,Snow Stake Live,,iframe,https://player.brownrice.com/embed/bcsnowstake2,,true,snow-stake,Beaver Creek Resort,https://www.epicpass.com/policies.aspx
 stowe,Gondola,,iframe,https://player.brownrice.com/embed/stowemidwaybasestation,,true,,Stowe Mountain Resort,https://www.epicpass.com/policies.aspx
+beaver-mountain,Lodge View Cam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=lodgedreamliftcam&autoplay=1,,true,base,Beaver Mountain Ski Resort,https://www.skithebeav.com/terms-conditions/
+beaver-mountain,Little Beaver View,,iframe,https://g1.ipcamlive.com/player/player.php?alias=littlebeavercam&autoplay=1,,true,base,Beaver Mountain Ski Resort,https://www.skithebeav.com/terms-conditions/
+nordic-valley,Nordic Valley Webcam,5440,youtube,https://www.youtube.com/embed/Ljumxb0U2b0,Ljumxb0U2b0,true,base,Nordic Valley Ski Resort,https://www.nordicvalley.ski/website-terms-of-use/
+antelope-butte,Pow Stick Webcam,,iframe,https://ipcamlive.com/player/player.php?alias=antelopebuttepowstick&autoplay=1,,true,snow-stake,Antelope Butte Foundation,
+grand-targhee,Dreamcatcher,,image,https://copyrighted.seejh.com/gtrdream/gtrdream.jpg,,true,,Grand Targhee Resort,https://www.grandtarghee.com/policies/terms-conditions
+grand-targhee,Stick Of Truth,,image,https://copyrighted.seejh.com/gtrsnowstick/gtrsnowstick.jpg,,true,snow-stake,Grand Targhee Resort,https://www.grandtarghee.com/policies/terms-conditions
+grand-targhee,Summit,,image,https://copyrighted.seejh.com/gtrsummit/gtrsummit.jpg,,true,summit,Grand Targhee Resort,https://www.grandtarghee.com/policies/terms-conditions
+grand-targhee,Habitat / Colter,,image,https://copyrighted.seejh.com/gtrcolter/gtrcolter.jpg,,true,base,Grand Targhee Resort,https://www.grandtarghee.com/policies/terms-conditions
+grand-targhee,Teton Valley View,,image,https://copyrighted.seejh.com/tetonvalley/tetonvalley.jpg,,true,,Grand Targhee Resort (image hosted by SeeJH; may be a SeeJH-owned valley cam),https://www.grandtarghee.com/policies/terms-conditions
+snowy-range,Snow Cam,,iframe,https://www.cameraftp.com/Camera/Cameraplayer.aspx?parentID=397142069&shareID=17935300&isEmbedded=true&mode=live,,true,snow-stake,Snowy Range Ski Area,
+snowy-range,Base Webcam,,iframe,https://www.cameraftp.com/file/PublishCameraplayer.aspx?parentID=224864296&shareID=13751043&isEmbedded=true&mode=live,,true,base,Snowy Range Ski Area,
+snowy-range,Sundance Webcam,,iframe,https://www.cameraftp.com/file/PublishCameraplayer.aspx?parentID=224855203&shareID=13750595&isEmbedded=true&mode=live,,true,,Snowy Range Ski Area,
+snowy-range,Chute Webcam,,iframe,https://www.cameraftp.com/file/PublishCameraplayer.aspx?parentID=224864295&shareID=13789949&isEmbedded=true&mode=live,,true,,Snowy Range Ski Area,
+snowy-range,Colt Webcam,,iframe,https://www.cameraftp.com/Camera/Cameraplayer.aspx?parentID=300668346&shareID=14584106&isEmbedded=true&mode=live,,true,,Snowy Range Ski Area,
+blacktail-mountain,Blacktail Webcam,6780,iframe,https://g1.ipcamlive.com/player/player.php?alias=olycam&autoplay=1,,true,summit,Blacktail Mountain Ski Area,
+discovery,Top Overview,8158,image,https://webcam.skidiscovery.com/webcam-images/top-overview/top-overview/top-overview-webcam.jpg,,true,summit,Discovery Ski Area,
+discovery,OD Front,5770,image,https://webcam.skidiscovery.com/webcam-images/od-front/od-front/od-front-webcam.jpg,,true,base,Discovery Ski Area,
+discovery,Base Stake,5770,image,https://webcam.skidiscovery.com/webcam-images/base-stake/base-stake/base-stake-webcam.jpg,,true,snow-stake,Discovery Ski Area,
+discovery,Top Stake,8158,image,https://webcam.skidiscovery.com/webcam-images/top-stake/top-stake/top-stake-webcam.jpg,,true,snow-stake,Discovery Ski Area,
+montana-snowbowl,Base Web Cam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=690b67247173f&autoplay=1,,true,base,Montana Snowbowl,
+showdown,Mountain Cam,,iframe,https://video.nest.com/embedded/live/AfYTevjCiS,,true,,Showdown Montana,https://www.showdownmontana.com/terms-conditions
+kelly-canyon,Top of the Mountain,,youtube,https://www.youtube.com/embed/tHrldu8CqCs,tHrldu8CqCs,true,summit,Kelly Canyon Resort,https://kellycanyonresort.com/terms-and-conditions
+kelly-canyon,Lost Treasure,,youtube,https://www.youtube.com/embed/mZa2DuN9NdY,mZa2DuN9NdY,true,,Kelly Canyon Resort,https://kellycanyonresort.com/terms-and-conditions
+kelly-canyon,Learners Carpet,,youtube,https://www.youtube.com/embed/hVYOSEtRJZs,hVYOSEtRJZs,true,base,Kelly Canyon Resort,https://kellycanyonresort.com/terms-and-conditions
+pomerelle,Pomerelle Mountain Ski Resort Webcam,,youtube,https://www.youtube.com/embed/uM-oftYVFGA,uM-oftYVFGA,true,,ATC Communications,
+silver-mountain,KREM 2 Camera,,iframe,https://api.wetmet.net/widgets/stream/frame.php?ruc=162-04-01,,true,,KREM 2,https://silvermt.com/terms
+pajarito,View from the top of Pajarito Lodge,,iframe,https://player.brownrice.com/embed/pajarito1,,true,base,Pajarito Mountain Ski Area,https://www.pajarito.ski/website-terms-of-use/
+sandia-peak,East Mountain View,,image,https://webcams.sandiapeak.com/images/cams/ski-cam.jpg,,true,,Sandia Peak Tramway,https://www.sandia.ski/website-terms-of-use
+sandia-peak,Tram Cam,,image,https://webcams.sandiapeak.com/images/cams/tram-cam.jpg,,true,,Sandia Peak Tramway,https://www.sandia.ski/website-terms-of-use
+sipapu,Sipapu Lower Webcam,8200,iframe,https://player.brownrice.com/embed/sipapu1,,true,base,Sipapu Ski and Summer Resort,https://www.sipapu.ski/website-terms-of-use/
+sipapu,Sipapu Upper Webcam,9064,iframe,https://player.brownrice.com/embed/sipapu2,,true,mid,Sipapu Ski and Summer Resort,https://www.sipapu.ski/website-terms-of-use/
+sunrise-park,Sunrise Peak Live,10700,youtube,https://www.youtube.com/embed/mCbHN6zvhpk,mCbHN6zvhpk,true,summit,Sunrise Park Resort,https://www.sunrise.ski/privacy-policy/
+sunrise-park,Sunrise Base Live,9300,youtube,https://www.youtube.com/embed/VX29Awryg30,VX29Awryg30,true,base,Sunrise Park Resort,https://www.sunrise.ski/privacy-policy/
+alyeska,Glacier Bowl 360° Cam,,iframe,https://alyeskaresort.roundshot.com/glacierbowl/,,true,mid,Alyeska Resort,
+alyeska,Sundeck 360° Cam,,iframe,https://alyeskaresort.roundshot.com/tram-summit/,,true,summit,Alyeska Resort,
+alyeska,Turnagain Arm,,image,https://www.alyeskaresort.com/webcamsfolder/Turnagain.jpg,,true,,Alyeska Resort,
+alyeska,Upper Tram,,image,https://www.alyeskaresort.com/webcamsfolder/TramUpper.jpg,,true,summit,Alyeska Resort,
+alyeska,Top of Glacier Bowl Express,,image,https://www.alyeskaresort.com/webcamsfolder/TopGBX.jpg,,true,mid,Alyeska Resort,
+alyeska,The North Face,,image,https://www.alyeskaresort.com/webcamsfolder/NorthFace.jpg,,true,,Alyeska Resort,
+alyeska,Ted's Express Base,,image,https://www.alyeskaresort.com/webcamsfolder/Chair4_3.jpg,,true,base,Alyeska Resort,
+alyeska,Max's Mountain,,image,https://www.alyeskaresort.com/webcamsfolder/Chair4_4.jpg,,true,,Alyeska Resort,
+alyeska,Ted's Express,,image,https://www.alyeskaresort.com/webcamsfolder/Chair4_1.jpg,,true,,Alyeska Resort,
+alyeska,Hotel Courtyard,,image,https://www.alyeskaresort.com/webcamsfolder/CourtYard.jpg,,true,village,Alyeska Resort,
+alyeska,Daylodge,,image,https://www.alyeskaresort.com/webcamsfolder/Chair4_2.jpg,,true,base,Alyeska Resort,
+eaglecrest,Peak Camera 1,,image,https://eaglecams.ci.juneau.ak.us/eagle-ptarm-top-cam-2.jpeg,,true,summit,Eaglecrest Ski Area (City and Borough of Juneau),
+eaglecrest,Peak Camera 2,,image,https://eaglecams.ci.juneau.ak.us/eagle-ptarm-top-cam-3.jpeg,,true,summit,Eaglecrest Ski Area (City and Borough of Juneau),
+eaglecrest,Base Camera 1,,image,https://eaglecams.ci.juneau.ak.us/eagle-ptarm-bot-cam-3.jpeg,,true,base,Eaglecrest Ski Area (City and Borough of Juneau),
+eaglecrest,Base Camera 2,,image,https://eaglecams.ci.juneau.ak.us/eagle-ptarm-bot-cam-2.jpeg,,true,base,Eaglecrest Ski Area (City and Borough of Juneau),
+terry-peak,Stewart Slope from the Stewart Lodge Cam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=5c3526110e41f&autoplay=1,,true,base,Terry Peak Ski Area,
+terry-peak,Terry Peak Summit from the Summit Cam,7100,iframe,https://g1.ipcamlive.com/player/player.php?alias=5c352da4f3420&autoplay=1,,true,summit,Terry Peak Ski Area,
+loup-loup,Upper Mountain Camera,,youtube,https://www.youtube.com/embed/qp-GrRsWBEQ,qp-GrRsWBEQ,true,,Loup Loup Ski Bowl,
+loup-loup,Lower Mountain Camera,,youtube,https://www.youtube.com/embed/1wraMeolGF4,1wraMeolGF4,true,base,Loup Loup Ski Bowl,
+mt-spokane,"Mt. Spokane Web Cam, Snow Stake",,youtube,https://www.youtube.com/embed/lBgqL-YwCcE,lBgqL-YwCcE,true,snow-stake,Mt. Spokane Ski & Snowboard Park,https://www.mtspokane.com/policies
+mt-spokane,"Mt. Spokane Web Cam, Lodge 2",,youtube,https://www.youtube.com/embed/0i8hMjxhnho,0i8hMjxhnho,true,base,Mt. Spokane Ski & Snowboard Park,https://www.mtspokane.com/policies
+mt-spokane,"Mt. Spokane Web Cam, Northwood, Chair 6",,youtube,https://www.youtube.com/embed/m1kzBdiTyFU,m1kzBdiTyFU,true,,Mt. Spokane Ski & Snowboard Park,https://www.mtspokane.com/policies
+mt-spokane,"Parkway Express, Chair 3",,youtube,https://www.youtube.com/embed/KSIuO1ITLlU,KSIuO1ITLlU,true,,Mt. Spokane Ski & Snowboard Park,https://www.mtspokane.com/policies
+mt-spokane,"Mt. Spokane Web Cam, Hourglass, Lodge 1",,youtube,https://www.youtube.com/embed/rvY2pHYzMlE,rvY2pHYzMlE,true,base,Mt. Spokane Ski & Snowboard Park,https://www.mtspokane.com/policies
+mt-spokane,"Mt. Spokane Web Cam, Vista Cruiser",,youtube,https://www.youtube.com/embed/r1N4CmHq0RA,r1N4CmHq0RA,true,,Mt. Spokane Ski & Snowboard Park,https://www.mtspokane.com/policies
+mt-spokane,"Mt. Spokane Webcam, Hidden Treasure, Chair 4",,youtube,https://www.youtube.com/embed/rQnOjOnHrpw,rQnOjOnHrpw,true,,Mt. Spokane Ski & Snowboard Park,https://www.mtspokane.com/policies
+bristol-mountain,Morning Star Webcam,,image,https://www.bristolmountain.com/webcams/morningstarcurrent.jpg,,true,,Bristol Mountain,
+bristol-mountain,Launching Pad Webcam,,image,https://www.bristolmountain.com/webcams/roselandcurrent.jpg,,true,base,Bristol Mountain,
+bristol-mountain,Launching Pad Live Feed,,iframe,https://player.brownrice.com/embed/bristolmountain2,,true,base,Bristol Mountain,
+bristol-mountain,Rocket Webcam,,image,https://www.bristolmountain.com/webcams/rocketcamstill.jpg,,true,,Bristol Mountain,
+bristol-mountain,Rocket Live Feed,,iframe,https://player.brownrice.com/embed/bristolmountain1,,true,,Bristol Mountain,
+buffalo-ski-center,Tam Cam,,youtube,https://www.youtube.com/embed/DOJwy9f70IM,DOJwy9f70IM,true,,Buffalo Ski Center,https://www.buffaloskicenter.com/privacy-policy/
+buffalo-ski-center,Sitz Cam,,youtube,https://www.youtube.com/embed/piySo9PJ9n0,piySo9PJ9n0,true,,Buffalo Ski Center,https://www.buffaloskicenter.com/privacy-policy/
+catamount,Catamount Patio West,,image,https://catamountski.com/images/webcams/snap.jpeg,,true,base,Catamount Mountain Resort,https://catamountski.com/?view=article&id=86:privacy-policy#Terms
+catamount,Catamount Mountain View,,image,https://catamountski.com/images/webcams/mountainview.jpeg,,true,,Catamount Mountain Resort,https://catamountski.com/?view=article&id=86:privacy-policy#Terms
+catamount,Magic Carpet,,image,https://catamountski.com/images/webcams/snap2.jpeg,,true,base,Catamount Mountain Resort,https://catamountski.com/?view=article&id=86:privacy-policy#Terms
+catamount,Toni Matt Race Trail,,image,https://catamountski.com/images/webcams/snap3.jpeg,,true,,Catamount Mountain Resort,https://catamountski.com/?view=article&id=86:privacy-policy#Terms
+catamount,Main Expanse,,image,https://catamountski.com/images/webcams/main-expanse.jpeg,,true,,Catamount Mountain Resort,https://catamountski.com/?view=article&id=86:privacy-policy#Terms
+catamount,Catamount Walkway,,image,https://catamountski.com/images/webcams/walkway.jpeg,,true,base,Catamount Mountain Resort,https://catamountski.com/?view=article&id=86:privacy-policy#Terms
+catamount,Slope Stairs,,image,https://catamountski.com/images/webcams/slopestairs.jpeg,,true,base,Catamount Mountain Resort,https://catamountski.com/?view=article&id=86:privacy-policy#Terms
+greek-peak,Base Cam,,youtube,https://www.youtube.com/embed/JWugDNXhOoA,JWugDNXhOoA,true,base,Greek Peak Mountain Resort,https://www.greekpeak.net/about-greek-peak/terms-conditions/
+greek-peak,Lodge Cam,,youtube,https://www.youtube.com/embed/WK5nRpqGkd8,WK5nRpqGkd8,true,base,Greek Peak Mountain Resort,https://www.greekpeak.net/about-greek-peak/terms-conditions/
+greek-peak,Snowfall Cam,,youtube,https://www.youtube.com/embed/Cm0NAIS5z9o,Cm0NAIS5z9o,true,snow-stake,Greek Peak Mountain Resort,https://www.greekpeak.net/about-greek-peak/terms-conditions/
+holiday-valley,Top of Cindy's,,image,https://img.hdrelay.com/camera/896d837c-d4b2-4d29-a555-0e5fcd81a8ea/snapshot,,true,summit,Holiday Valley,https://www.holidayvalley.com/policies/
+holiday-valley,Main Lodge,,image,https://img.hdrelay.com/camera/691f45852fc3303fedc919bf/snapshot,,true,base,Holiday Valley,https://www.holidayvalley.com/policies/
+holiday-valley,Mardi Gras Top,,image,https://img.hdrelay.com/camera/691f44032fc3303fedc919bc/snapshot,,true,summit,Holiday Valley,https://www.holidayvalley.com/policies/
+holiday-valley,Morning Star Top,,image,https://img.hdrelay.com/camera/691f48292fc3303fedc919c3/snapshot,,true,summit,Holiday Valley,https://www.holidayvalley.com/policies/
+holiday-valley,Tannenbaum,,image,https://img.hdrelay.com/camera/691f41e72fc3303fedc919b6/snapshot,,true,base,Holiday Valley,https://www.holidayvalley.com/policies/
+holiday-valley,Double Black Diamond Golf Course,,image,https://img.hdrelay.com/camera/691f43502fc3303fedc919b9/snapshot,,true,,Holiday Valley,https://www.holidayvalley.com/policies/
+holimont,HoliMont Main Chalet SnowCam,,image,https://img.hdrelay.com/camera/f4fb7d5d-4b50-43e9-b449-4fe204b6244e/snapshot,,true,base,HoliMont,https://holimont.com/policies-practices/
+holimont,Sunset,,youtube,https://www.youtube.com/embed/1TLQieIVRfU,1TLQieIVRfU,true,,HoliMont,https://holimont.com/policies-practices/
+kissing-bridge,Holly Webcam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=kbsaloon&autoplay=1,,true,,Kissing Bridge,
+kissing-bridge,Twister Webcam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=twister&autoplay=1,,true,,Kissing Bridge,
+snow-ridge,Live Feed,,iframe,https://www.myearthcam.com/snowridge?embed,,true,,Snow Ridge,
+titus-mountain,Lower Mountain,,iframe,https://player.brownrice.com/embed/lowertitusmountain,,true,base,Titus Mountain Family Ski Center,https://www.titusmountain.com/termsandconditions
+titus-mountain,Upper Mountain,,iframe,https://player.brownrice.com/embed/titusmountainsnow,,true,,Titus Mountain Family Ski Center,https://www.titusmountain.com/termsandconditions
+west-mountain,West Express Face Cam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=racezoomcam&autoplay=1,,true,,West Mountain,https://westmountain.com/privacy-policy-2/
+west-mountain,Sunrise Cam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=sunrisecam&autoplay=1,,true,,West Mountain,https://westmountain.com/privacy-policy-2/
+bromley,Slope Cam,,image,https://img.hdrelay.com/camera/62c706457fd92a4cfa4d6b39/snapshot,,true,mid,Bromley Mountain Ski Resort,https://bromley.com/terms--conditions
+bromley,Base Area Cam,1950,image,https://img.hdrelay.com/camera/62c7049a7fd92a4cfa4d6b37/snapshot,,true,base,Bromley Mountain Ski Resort,https://bromley.com/terms--conditions
+magic-mountain,Magic Mountain Live Webcam (skimagicvt livestream),,youtube,https://www.youtube.com/embed/iMdj-G2rvfA,iMdj-G2rvfA,true,,Magic Mountain (Ski Magic LLC),
+middlebury-snowbowl,Worth Mtn. Chairlift - Bottom of the Allen,,youtube,https://www.youtube.com/embed/zittSTsKYNs,zittSTsKYNs,true,mid,Middlebury Snow Bowl (Middlebury College),
+crotched,Base Area,1050,iframe,https://player.brownrice.com/embed/crotchedrocket,,true,base,Crotched Mountain (Vail Resorts),https://www.epicpass.com/policies.aspx
+gunstock,Summit (Lake Winnipesaukee view),2300,iframe,https://api.wetmet.net/widgets/stream/frame.php?ruc=196-01-01,,true,summit,Gunstock Mountain Resort,https://www.gunstock.com/policies/policies/privacy-policy/
+gunstock,"Historic Lodge (trails, summit, Ramrod and Panorama lifts)",,iframe,https://api.wetmet.net/widgets/stream/frame.php?ruc=196-02-01,,true,base,Gunstock Mountain Resort,https://www.gunstock.com/policies/policies/privacy-policy/
+gunstock,Base Area (tubing hill and Penny Lift),,iframe,https://api.wetmet.net/widgets/stream/frame.php?ruc=196-03-01,,true,base,Gunstock Mountain Resort,https://www.gunstock.com/policies/policies/privacy-policy/
+mount-sunapee,Summit Camera,2743,iframe,https://player.brownrice.com/embed/sunapeesummit,,true,summit,Mount Sunapee (Vail Resorts),https://www.epicpass.com/policies.aspx
+mount-sunapee,Spruce Lodge,1233,iframe,https://player.brownrice.com/embed/sunapeesprucelodge,,true,base,Mount Sunapee (Vail Resorts),https://www.epicpass.com/policies.aspx
+mount-sunapee,Express Lift,,iframe,https://player.brownrice.com/embed/sunapeeexpresslift,,true,base,Mount Sunapee (Vail Resorts),https://www.epicpass.com/policies.aspx
+pats-peak,Pats Peak LIVE! Cam,,youtube,https://www.youtube.com/embed/KFjl8wPJvyg,KFjl8wPJvyg,true,,Pats Peak Ski Area,
+pats-peak,Pats Peak Bluster Area LIVE!,,youtube,https://www.youtube.com/embed/NYfXOUPjSNI,NYfXOUPjSNI,true,,Pats Peak Ski Area,
+ragged-mountain,Elmwood Lodge Cam,,iframe,https://api.wetmet.net/widgets/stream/frame.php?uid=7dc1cb45d929cdd28e605666a9315cbc,,true,base,Ragged Mountain Resort,https://www.raggedmountainresort.com/privacy-policy/
+ragged-mountain,Meetinghouse Lodge Cam,,iframe,https://api.wetmet.net/widgets/stream/frame.php?uid=1e039d71ff08195e4052b01859843890,,true,base,Ragged Mountain Resort,https://www.raggedmountainresort.com/privacy-policy/
+big-moose,Mountain Cam,,youtube,https://www.youtube.com/embed/8cGtyN9MiwA,8cGtyN9MiwA,true,base,Boston and Maine Live,
+big-moose,Lift Cam,,youtube,https://www.youtube.com/embed/sGrMkMV26Uw,sGrMkMV26Uw,true,,Boston and Maine Live,
+camden-snow-bowl,Web Cam,,iframe,https://player.brownrice.com/embed/camdensnowbowl1,,true,,Camden Snow Bowl,
+saddleback,Top of the World Cam,,image,https://img.hdrelay.com/camera/6201a432a002ff5c9960fef3/snapshot,,true,summit,Saddleback Mountain,https://www.saddlebackmaine.com/terms-of-use/
+saddleback,Top of the Rangeley Cam,,image,https://img.hdrelay.com/camera/6201a4aca002ff5c9960fef4/snapshot,,true,mid,Saddleback Mountain,https://www.saddlebackmaine.com/terms-of-use/
+saddleback,Lodge Cam,,image,https://img.hdrelay.com/camera/6201a37aa002ff5c9960fef2/snapshot,,true,base,Saddleback Mountain,https://www.saddlebackmaine.com/terms-of-use/
+bousquet,Live Cam 1,,iframe,https://streamedian.com/saas/embed/?s=cnRzcDovLzcyLjQzLjI1LjE3MDo3NDQ3L3R5Mm5CVjdtekJrV3NpZFM=&r=NzIweDQ4MA==&w=d3NzOi8vc3RyZWFtZWRpYW4uY29tL2RlbW9uc3RyYXRpb24vd3Mv,,true,,Bousquet Mountain,https://bousquetmountain.com/terms-and-conditions/
+bousquet,Live Cam 2,,iframe,https://streamedian.com/saas/embed/?s=cnRzcDovLzcyLjQzLjI1LjE3MDo3NDQ3L2pzR2w4MTFEajB6dklSd3I=&r=NzIweDQ4MA==&w=d3NzOi8vc3RyZWFtZWRpYW4uY29tL2RlbW9uc3RyYXRpb24vd3Mv,,true,,Bousquet Mountain,https://bousquetmountain.com/terms-and-conditions/
+butternut,Livestream 1,,iframe,https://rtsp.me/embed/Q93RN9H7/,,true,,Ski Butternut,https://skibutternut.com/legal-safety/terms-conditions
+butternut,Livestream 2,,iframe,https://rtsp.me/embed/BK6ynZ7b/,,true,,Ski Butternut,https://skibutternut.com/legal-safety/terms-conditions
+blue-knob,Blue Knob Webcam,,iframe,https://g0.ipcamlive.com/player/player.php?alias=blueknob&autoplay=1,,true,,Blue Knob All Seasons Resort,
+liberty-mountain,Courtyard Cam,,iframe,https://player.brownrice.com/embed/libertyiceskate1,,true,base,Liberty Mountain Resort,https://www.epicpass.com/policies.aspx
+liberty-mountain,Learning Area,,iframe,https://player.brownrice.com/embed/libertymountaintlc,,true,base,Liberty Mountain Resort,https://www.epicpass.com/policies.aspx
+liberty-mountain,Alpine Base,570,iframe,https://player.brownrice.com/embed/libertyalpinebase,,true,base,Liberty Mountain Resort,https://www.epicpass.com/policies.aspx
+liberty-mountain,Summit Cam,1190,iframe,https://player.brownrice.com/embed/libertysummit,,true,summit,Liberty Mountain Resort,https://www.epicpass.com/policies.aspx
+liberty-mountain,Backside,,iframe,https://player.brownrice.com/embed/libertybackside,,true,,Liberty Mountain Resort,https://www.epicpass.com/policies.aspx
+roundtop,Summit,1335,iframe,https://player.brownrice.com/embed/roundtopsummit2,,true,summit,Roundtop Mountain Resort,https://www.epicpass.com/policies.aspx
+whitetail,Base Area,865,iframe,https://player.brownrice.com/embed/whitetailkmc,,true,base,Whitetail Resort,https://www.epicpass.com/policies.aspx
+caberfae-peaks,East Peak Triple,,youtube,https://www.youtube.com/embed/DYIAd-5x48w,DYIAd-5x48w,true,,Caberfae Peaks Ski & Golf Resort,
+caberfae-peaks,North Peak (Vista 1561),,youtube,https://www.youtube.com/embed/H8eQ0D_tQis,H8eQ0D_tQis,true,summit,Caberfae Peaks Ski & Golf Resort,
+caberfae-peaks,South Peak,,youtube,https://www.youtube.com/embed/jTQVAiWkKgc,jTQVAiWkKgc,true,summit,Caberfae Peaks Ski & Golf Resort,
+caberfae-peaks,Arlo's Deck,,youtube,https://www.youtube.com/embed/tq-COKfY29I,tq-COKfY29I,true,base,Caberfae Peaks Ski & Golf Resort,
+crystal-mountain-michigan,Inn View,,image,https://www.crystalmountain.com/sites/default/files/webcams/35496.jpg,,true,village,Crystal Mountain,https://www.crystalmountain.com/privacy-policy
+crystal-mountain-michigan,Lodge View,,image,https://www.crystalmountain.com/sites/default/files/webcams/88841.jpg,,true,base,Crystal Mountain,https://www.crystalmountain.com/privacy-policy
+crystal-mountain-michigan,Base of Loki,,image,https://www.crystalmountain.com/sites/default/files/webcams/117742.jpg,,true,base,Crystal Mountain,https://www.crystalmountain.com/privacy-policy
+crystal-mountain-michigan,Crystal Clipper,,image,https://www.crystalmountain.com/sites/default/files/webcams/114533.jpg,,true,,Crystal Mountain,https://www.crystalmountain.com/privacy-policy
+crystal-mountain-michigan,Golf Learning Center,,image,https://www.crystalmountain.com/sites/default/files/webcams/108594.jpg,,true,,Crystal Mountain,https://www.crystalmountain.com/privacy-policy
+crystal-mountain-michigan,"Mountain Ridge, Hole #7",,image,https://www.crystalmountain.com/sites/default/files/webcams/131842.jpg,,true,,Crystal Mountain,https://www.crystalmountain.com/privacy-policy
+schuss-mountain,Schuss Village View from Top,,youtube,https://www.youtube.com/embed/9KBLem3gwTM,9KBLem3gwTM,true,summit,Shanty Creek Resort,https://www.shantycreek.com/privacy-policy/
+schuss-mountain,Schuss Mountain Face,,youtube,https://www.youtube.com/embed/vYMimVMT6rg,vYMimVMT6rg,true,base,Shanty Creek Resort,https://www.shantycreek.com/privacy-policy/
+schuss-mountain,Shanty Creek Resort,,youtube,https://www.youtube.com/embed/guUYNd2CV8E,guUYNd2CV8E,true,,Shanty Creek Resort,https://www.shantycreek.com/privacy-policy/
+cascade-mountain,Snow Cam 1,,image,https://img.hdrelay.com/camera/7b228510-8133-475f-8d69-aee7020405aa/snapshot,,true,base,Cascade Mountain,https://www.cascademountain.com/terms-conditions/
+cascade-mountain,Snow Cam 2,,image,https://img.hdrelay.com/camera/80bd0e30-cb89-4a4b-bf32-ce44adf13270/snapshot,,true,,Cascade Mountain,https://www.cascademountain.com/terms-conditions/
+christie-mountain,Live Camera,,iframe,https://g1.ipcamlive.com/player/player.php?alias=61a27d760cd67&autoplay=1,,true,,Christie Mountain,
+tyrol-basin,Chairlift A,,youtube,https://www.youtube.com/embed/Am3rSF2FRD4,Am3rSF2FRD4,true,,Tyrol Basin,https://tyrolbasin.com/privacy-policy/
+tyrol-basin,Chairlift B,,youtube,https://www.youtube.com/embed/N85Uaxz26MM,N85Uaxz26MM,true,,Tyrol Basin,https://tyrolbasin.com/privacy-policy/
+tyrol-basin,Tubing,,youtube,https://www.youtube.com/embed/RWppm5SMnOs,RWppm5SMnOs,true,,Tyrol Basin,https://tyrolbasin.com/privacy-policy/
+tyrol-basin,Chairlift C,,youtube,https://www.youtube.com/embed/QbYGbaZ-14E,QbYGbaZ-14E,true,,Tyrol Basin,https://tyrolbasin.com/privacy-policy/
+whitecap-mountain,Webcam,,iframe,https://webcam.whitecapresort.com/,,true,base,Whitecap Mountains Resort,https://whitecapresort.com/terms-of-use
+buck-hill,Plaza Cam,,youtube,https://www.youtube.com/embed/2WzUGFz03v8,2WzUGFz03v8,true,base,Buck Hill Ski & Snowboard Area,https://buckhill.com/terms-and-conditions/
+giants-ridge,Outside Main Chalet,,youtube,https://www.youtube.com/embed/cStMNmvOmOI,cStMNmvOmOI,true,base,Giants Ridge,
+snow-creek,Snow Creek Main Lodge,800,iframe,https://player.brownrice.com/embed/snowcreek1,,true,base,Snow Creek,https://www.epicpass.com/policies.aspx
+canaan-valley,Canaan Valley Resort Webcam - Golf Course & Valley,,iframe,https://g1.ipcamlive.com/player/player.php?alias=6788f7b7d0365&autoplay=1,,true,,Canaan Valley Resort State Park,
+canaan-valley,Canaan Valley Resort Webcam - Slope Base,,iframe,https://g1.ipcamlive.com/player/player.php?alias=67588ef2adde5&autoplay=1,,true,,Canaan Valley Resort State Park,
+bryce-resort,Bryce Resort,,iframe,https://www.resortcams.com/webcams/bryce-resort/iframe/,,true,base,Bryce Resort via ResortCams.com,https://bryceresort.com/terms-and-conditions
+massanutten,Massanutten Resort Summit Cam,2922,iframe,https://www.resortcams.com/webcams/massanutten-resort-summit-cam/iframe/,,true,summit,Massanutten Resort via ResortCams.com,https://www.massresort.com/about/terms-of-use/
+massanutten,Massanutten Resort Base Cam,1812,iframe,https://www.resortcams.com/webcams/massanutten-base/iframe/,,true,base,Massanutten Resort via ResortCams.com,https://www.massresort.com/about/terms-of-use/
+massanutten,Massanutten Resort Tubing Cam,,iframe,https://www.resortcams.com/webcams/massanutten/iframe/,,true,,Massanutten Resort via ResortCams.com,https://www.massresort.com/about/terms-of-use/
+beech-mountain,5506' Cam,5506,iframe,https://www.resortcams.com/webcams/beech-mountain-summit/iframe/,,true,summit,Beech Mountain Resort / ResortCams.com,
+cataloochee,Base of Mountain,4660,iframe,https://www.resortcams.com/webcams/cataloochee/iframe/,,true,base,Cataloochee Ski Area / ResortCams.com,
+sugar-mountain,Base,4100,iframe,https://player.castr.com/live_fe980e10d22b11f0affbc9f04d80c8bf,,true,base,Sugar Mountain Resort,https://skisugar.com/privacy-policy/
+sugar-mountain,Easy Street,,iframe,https://player.castr.com/live_7603aa40cecb11f093049346b8bbe416,,true,base,Sugar Mountain Resort,https://skisugar.com/privacy-policy/
+sugar-mountain,Grandfather View,,iframe,https://player.castr.com/live_f373e500cfbe11f0b06b595bb3be6c70,,true,,Sugar Mountain Resort,https://skisugar.com/privacy-policy/
+sugar-mountain,Tennis/Golf,,iframe,https://player.castr.com/live_fbb6bff0d3b311f08758231ac7e26e0b,,true,village,Sugar Mountain Resort,https://skisugar.com/privacy-policy/
+sugar-mountain,Oma's,,iframe,https://player.castr.com/live_c3cb3b10cfbd11f094eff94566b39e7c,,true,mid,Sugar Mountain Resort,https://skisugar.com/privacy-policy/
+sugar-mountain,Oma's Top Lift,,iframe,https://player.castr.com/live_6e6c0df06f2e11f1862cc590260dd311,,true,mid,Sugar Mountain Resort,https://skisugar.com/privacy-policy/

@@ -17,6 +17,42 @@
     "lat": 38.6927,
     "lng": -120.0022
   },
+  "1082:WY:SNTL": {
+    "name": "Grand Targhee",
+    "elevationFt": 9260,
+    "lat": 43.77933,
+    "lng": -110.92783
+  },
+  "1083:NM:SNTL": {
+    "name": "Tres Ritos",
+    "elevationFt": 8740,
+    "lat": 36.1279,
+    "lng": -105.52706
+  },
+  "1103:AK:SNTL": {
+    "name": "Mt. Alyeska",
+    "elevationFt": 1500,
+    "lat": 60.95842,
+    "lng": -149.08858
+  },
+  "1112:NV:SNTL": {
+    "name": "Lee Canyon",
+    "elevationFt": 8620,
+    "lat": 36.30537,
+    "lng": -115.67508
+  },
+  "1115:UT:SNTL": {
+    "name": "Klondike Narrows",
+    "elevationFt": 7280,
+    "lat": 41.96769,
+    "lng": -111.59713
+  },
+  "1144:MT:SNTL": {
+    "name": "Blacktail Mtn",
+    "elevationFt": 5660,
+    "lat": 47.98317,
+    "lng": -114.35443
+  },
   "1154:UT:SNTL": {
     "name": "Brian Head",
     "elevationFt": 10040,
@@ -53,6 +89,18 @@
     "lat": 39.25259,
     "lng": -119.8771
   },
+  "1259:WA:SNTL": {
+    "name": "Muckamuck",
+    "elevationFt": 4470,
+    "lat": 48.58526,
+    "lng": -119.86624
+  },
+  "1299:ID:SNTL": {
+    "name": "Pebble Creek",
+    "elevationFt": 6520,
+    "lat": 42.7674,
+    "lng": -112.10648
+  },
   "1300:UT:SNTL": {
     "name": "Powder Mountain",
     "elevationFt": 8490,
@@ -83,6 +131,12 @@
     "lat": 43.05723,
     "lng": -73.03892
   },
+  "2043:NH:SCAN": {
+    "name": "Mascoma River",
+    "elevationFt": 1400,
+    "lat": 43.7756,
+    "lng": -72.02593
+  },
   "2069:NH:SCAN": {
     "name": "Hubbard Brook",
     "elevationFt": 1480,
@@ -101,11 +155,41 @@
     "lat": 37.63423,
     "lng": -118.82643
   },
+  "2227:MO:SCAN": {
+    "name": "Shaw Nature Reserve",
+    "elevationFt": 580,
+    "lat": 38.47902,
+    "lng": -90.80641
+  },
+  "310:AZ:SNTL": {
+    "name": "Baldy",
+    "elevationFt": 9210,
+    "lat": 33.97845,
+    "lng": -109.50357
+  },
+  "326:WY:SNTL": {
+    "name": "Beartooth Lake",
+    "elevationFt": 9360,
+    "lat": 44.94307,
+    "lng": -109.56743
+  },
+  "333:UT:SNTL": {
+    "name": "Ben Lomond Trail",
+    "elevationFt": 5970,
+    "lat": 41.38291,
+    "lng": -111.92103
+  },
   "338:ID:SNTL": {
     "name": "Big Creek Summit",
     "elevationFt": 6550,
     "lat": 44.62621,
     "lng": -115.79561
+  },
+  "339:UT:SNTL": {
+    "name": "Big Flat",
+    "elevationFt": 10320,
+    "lat": 38.30183,
+    "lng": -112.35672
   },
   "341:OR:SNTL": {
     "name": "Big Red Mountain",
@@ -125,11 +209,23 @@
     "lat": 38.60801,
     "lng": -119.92455
   },
+  "358:WY:SNTL": {
+    "name": "Bone Springs Div",
+    "elevationFt": 9340,
+    "lat": 44.67881,
+    "lng": -107.5811
+  },
   "366:UT:SNTL": {
     "name": "Brighton",
     "elevationFt": 8790,
     "lat": 40.59936,
     "lng": -111.58167
+  },
+  "367:WY:SNTL": {
+    "name": "Brooklyn Lake",
+    "elevationFt": 10250,
+    "lat": 41.36038,
+    "lng": -106.23038
   },
   "376:WA:SNTL": {
     "name": "Bunchgrass Mdw",
@@ -173,6 +269,12 @@
     "lat": 39.32565,
     "lng": -120.36807
   },
+  "437:MT:SNTL": {
+    "name": "Deadman Creek",
+    "elevationFt": 6440,
+    "lat": 46.79279,
+    "lng": -110.67545
+  },
   "457:CO:SNTL": {
     "name": "Dry Lake",
     "elevationFt": 8240,
@@ -184,6 +286,12 @@
     "elevationFt": 7650,
     "lat": 38.849,
     "lng": -120.0795
+  },
+  "468:WY:SNTL": {
+    "name": "Elkhart Park G.S.",
+    "elevationFt": 9410,
+    "lat": 43.00657,
+    "lng": -109.75893
   },
   "469:MT:SNTL": {
     "name": "Emery Creek",
@@ -214,6 +322,12 @@
     "elevationFt": 4800,
     "lat": 44.42042,
     "lng": -121.85655
+  },
+  "534:ID:SNTL": {
+    "name": "Howell Canyon",
+    "elevationFt": 8010,
+    "lat": 42.32029,
+    "lng": -113.61587
   },
   "541:CA:SNTL": {
     "name": "Independence Lake",
@@ -275,6 +389,18 @@
     "lat": 39.31573,
     "lng": -119.89473
   },
+  "656:MT:SNTL": {
+    "name": "Mule Creek",
+    "elevationFt": 8300,
+    "lat": 45.40957,
+    "lng": -112.95927
+  },
+  "658:CO:SNTL": {
+    "name": "Nast Lake",
+    "elevationFt": 8710,
+    "lat": 39.29695,
+    "lng": -106.60786
+  },
   "669:CO:SNTL": {
     "name": "North Lost Trail",
     "elevationFt": 9190,
@@ -299,11 +425,41 @@
     "lat": 38.48864,
     "lng": -106.33967
   },
+  "703:WY:SNTL": {
+    "name": "Powder River Pass",
+    "elevationFt": 9480,
+    "lat": 44.16188,
+    "lng": -107.12622
+  },
+  "707:WA:SNTL": {
+    "name": "Quartz Peak",
+    "elevationFt": 4710,
+    "lat": 47.87927,
+    "lng": -117.08938
+  },
+  "708:NM:SNTL": {
+    "name": "Quemazon",
+    "elevationFt": 9500,
+    "lat": 35.92195,
+    "lng": -106.39179
+  },
+  "713:CO:SNTL": {
+    "name": "Red Mountain Pass",
+    "elevationFt": 11060,
+    "lat": 37.89168,
+    "lng": -107.71389
+  },
   "715:NM:SNTL": {
     "name": "Red River Pass #2",
     "elevationFt": 9840,
     "lat": 36.69935,
     "lng": -105.34145
+  },
+  "727:MT:SNTL": {
+    "name": "Saddle Mtn.",
+    "elevationFt": 7890,
+    "lat": 45.69259,
+    "lng": -113.96828
   },
   "738:ID:SNTL": {
     "name": "Schweitzer Basin",
@@ -316,6 +472,12 @@
     "elevationFt": 9170,
     "lat": 40.56914,
     "lng": -111.65852
+  },
+  "769:ID:SNTL": {
+    "name": "Soldier R.S.",
+    "elevationFt": 5780,
+    "lat": 43.48407,
+    "lng": -114.82692
   },
   "782:ID:SNTL": {
     "name": "Puhi Flat",
@@ -334,6 +496,18 @@
     "elevationFt": 3940,
     "lat": 47.74607,
     "lng": -121.09288
+  },
+  "803:ID:SNTL": {
+    "name": "Sunset",
+    "elevationFt": 5570,
+    "lat": 47.55545,
+    "lng": -115.82422
+  },
+  "807:WY:SNTL": {
+    "name": "Sylvan Road",
+    "elevationFt": 7140,
+    "lat": 44.47825,
+    "lng": -110.03808
   },
   "814:UT:SNTL": {
     "name": "Thaynes Canyon",
@@ -389,6 +563,12 @@
     "lat": 46.64142,
     "lng": -121.38153
   },
+  "873:OR:SNTL": {
+    "name": "Wolf Creek",
+    "elevationFt": 5730,
+    "lat": 45.06704,
+    "lng": -118.15185
+  },
   "874:CO:SNTL": {
     "name": "Wolf Creek Summit",
     "elevationFt": 10930,
@@ -401,11 +581,23 @@
     "lat": 43.7685,
     "lng": -114.41812
   },
+  "903:MT:SNTL": {
+    "name": "Nevada Ridge",
+    "elevationFt": 7030,
+    "lat": 46.84234,
+    "lng": -112.50787
+  },
   "909:WA:SNTL": {
     "name": "Wells Creek",
     "elevationFt": 4040,
     "lat": 48.8661,
     "lng": -121.78976
+  },
+  "920:SD:SNTL": {
+    "name": "North Rapid Creek",
+    "elevationFt": 6150,
+    "lat": 44.20617,
+    "lng": -103.78758
   },
   "922:NM:SNTL": {
     "name": "Santa Fe",
@@ -424,6 +616,12 @@
     "elevationFt": 6610,
     "lat": 45.87395,
     "lng": -110.92783
+  },
+  "930:MT:SNTL": {
+    "name": "Peterson Meadows",
+    "elevationFt": 7190,
+    "lat": 46.12588,
+    "lng": -113.30792
   },
   "978:ID:SNTL": {
     "name": "Bogus Basin",

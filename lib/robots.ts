@@ -54,11 +54,22 @@ function group(userAgent: string, extraLines: string[] = []): string {
   ].join("\n");
 }
 
+/**
+ * Sitemap lines (parity plan P10). `/sitemap.xml` is an index whose children
+ * live under `/sitemaps/`: `pages.xml` holds every static page plus the
+ * per-state `/ski-cams/{hub}` and `/snow-report/{hub}` hubs, the `/passes`
+ * pages and the leaderboards; `resorts-{cc}.xml` holds one resort page
+ * family per country and is named by whatever countries the catalogue has,
+ * so only the index can list those. Crawlers that read `Sitemap:` lines get
+ * the index (the authority) and the hub file directly.
+ */
+export const SITEMAP_LINES = [`Sitemap: ${SITE_URL}/sitemap.xml`, `Sitemap: ${SITE_URL}/sitemaps/pages.xml`];
+
 /** The full robots.txt body, trailing newline included. */
 export function robotsTxt(): string {
   const groups = [
     group("*", [`Content-Signal: ${CONTENT_SIGNAL}`]),
     ...AI_CRAWLERS.map((ua) => group(ua)),
   ];
-  return `${groups.join("\n\n")}\n\nSitemap: ${SITE_URL}/sitemap.xml\n`;
+  return `${groups.join("\n\n")}\n\n${SITEMAP_LINES.join("\n")}\n`;
 }
