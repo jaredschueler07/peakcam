@@ -70,6 +70,8 @@ export function PeakFooter() {
                 { href: "/ski-cams", label: "Webcams by state" },
                 { href: "/opening-dates", label: "Opening dates" },
                 { href: "/snow-report", label: "Snow reports" },
+                { href: "/snow-report/leaderboards", label: "Leaderboards" },
+                { href: "/passes", label: "Season passes" },
                 { href: "/compare", label: "Compare" },
                 { href: "/map", label: "Map" },
                 { href: "/alerts", label: "Powder alerts" },

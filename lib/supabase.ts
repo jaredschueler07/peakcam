@@ -705,6 +705,8 @@ export interface ResortSitemapEntry {
   /** Raw `resorts.state` ("CO", "BC", "Chile") — groups the entry into its /ski-cams hub. */
   state: string;
   region: string;
+  /** "US" | "CA" | "CL" | "AR" — picks the resort's sitemap child file. */
+  country: string;
   /** updated_at of the latest snow report, null when a resort has none. */
   lastReportAt: string | null;
 }
@@ -717,7 +719,7 @@ export interface ResortSitemapEntry {
  */
 export async function getResortSitemapEntries(): Promise<ResortSitemapEntry[]> {
   const [resortsRes, reportsRes] = await Promise.all([
-    supabase.from("resorts").select("id, slug, name, state, region").eq("is_active", true),
+    supabase.from("resorts").select("id, slug, name, state, region, country").eq("is_active", true),
     supabase.from("latest_snow_reports").select("resort_id, updated_at"),
   ]);
   if (resortsRes.error) throw resortsRes.error;
@@ -731,6 +733,7 @@ export async function getResortSitemapEntries(): Promise<ResortSitemapEntry[]> {
     name: r.name,
     state: r.state,
     region: r.region,
+    country: r.country,
     lastReportAt: lastByResort.get(r.id) ?? null,
   }));
 }
