@@ -49,6 +49,9 @@ const BY_STATE: Record<string, string> = {
   AB: "America/Edmonton",
   ON: "America/Toronto",
   QC: "America/Toronto",
+  NB: "America/Halifax",
+  NS: "America/Halifax",
+  NL: "America/St_Johns",
   // The Andes rows store the country name in `state`.
   Chile: "America/Santiago",
   Argentina: "America/Argentina/Buenos_Aires",

@@ -67,6 +67,8 @@ const STATE_NAMES: Record<string, string> = {
   NM: "New Mexico", NV: "Nevada", NY: "New York", OR: "Oregon",
   PA: "Pennsylvania", UT: "Utah", VA: "Virginia", VT: "Vermont",
   WA: "Washington", WI: "Wisconsin", WV: "West Virginia", WY: "Wyoming",
+  AK: "Alaska", SD: "South Dakota", OH: "Ohio", MO: "Missouri", IN: "Indiana", NJ: "New Jersey", NC: "North Carolina",
+  AB: "Alberta", ON: "Ontario", QC: "Quebec", NB: "New Brunswick", NS: "Nova Scotia", NL: "Newfoundland and Labrador",
   Chile: "Chile",
   Argentina: "Argentina",
 };
