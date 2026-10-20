@@ -140,6 +140,39 @@ export default function MethodologyPage() {
           operators — it does not yet put a warning banner on the resort page.
         </p>
 
+        <H2 id="forecast">Forecast models and verification</H2>
+        <p className="mb-4">
+          The snow forecast on every resort page is a blend, not one model&apos;s opinion. Every six
+          hours PeakCam asks Open-Meteo for the same fourteen days from up to nine numerical weather
+          models at two elevations per resort, summit and base: ECMWF IFS, NOAA GFS, Environment
+          Canada GEM, DWD ICON, JMA, Météo-France ARPEGE/AROME and the UK Met Office, plus NOAA&apos;s
+          NBM and HRRR for U.S. resorts. Each day&apos;s snowfall is the median across the models that
+          reach that day; the band around it is the 25th to 75th percentile, so a wide band means
+          the models disagree. The model count is shown per day because it falls with lead time:
+          HRRR covers two days, Météo-France four, ICON and UKMO seven, GEM ten, JMA and NBM eleven,
+          and only ECMWF and GFS reach day fourteen. A far-out day with two models deserves less
+          trust than tomorrow with nine, and the page says so.
+        </p>
+        <p className="mb-4">
+          The models are graded, every day, against what actually fell. For each resort with a SNOTEL
+          station, the 24-hour new snow is the day-over-day change in measured depth, clipped at
+          zero (a pillow settles, so this is a floor, not an exact total). For every measured day in
+          the trailing 90 days, the forecast each model issued one, three and seven days earlier is
+          compared with that value; the mean absolute error at each lead, a bias ratio (total forecast
+          over total measured; above one means the model over-forecasts snow) and a rank are
+          published per model and per resort, and the blend itself is graded by the same rule. Where
+          a resort has no measured series the accuracy page says so rather than scoring against a
+          model. The whole thing is in the open API:{" "}
+          <code className="font-mono text-[13px]">/api/v1/resorts/&#123;slug&#125;/forecast</code> and{" "}
+          <code className="font-mono text-[13px]">/forecast-accuracy</code>, and the{" "}
+          <code className="font-mono text-[13px]">compare_models</code> MCP tool. Weather data by{" "}
+          <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-ink">
+            Open-Meteo.com
+          </a>{" "}
+          (CC BY 4.0). The U.S. National Weather Service text forecast still supplies the narrative,
+          temperatures and wind on U.S. resort pages; only its snow amounts are replaced by the blend.
+        </p>
+
         <H2 id="limits">What PeakCam does not measure</H2>
         <p className="mb-4">
           Resorts outside the NRCS network — Canada, most of the eastern U.S., and the

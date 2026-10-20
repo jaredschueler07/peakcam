@@ -45,6 +45,8 @@ Then spot-check `/`, a `/resorts/<slug>`, `/snow-report`, `/about`.
 | `com.peakcam.cam-health-check` | Probe every cam, bump `consecutive_failures`, auto-disable dead ones | daily 06:00 | running (scheduled) |
 | `com.peakcam.cam-stills` | Capture one frame per click-to-play cam → bucket `cam-stills`, `cams.still_url` (latest-only cams at most every 6 h); archive a frame for every `archive_allowed` cam → `cam_stills` + `archive/` prefix; prune: all frames 48 h, one per 6 h to 30 d, keepers to 365 d (`scripts/cam-capture-stills.ts`, policy `docs/cams/still-archive-policy.md`) | every 15 min (900 s, P8 block 1; was 21,600 s earlier on 2026-10-18, 7,200 s before that) | running on the mini (scheduled) — deploy note below |
 | `com.peakcam.model-sync` | Weather-model sync (`scripts/model-sync.ts`) | every 6 h | running (scheduled) |
+| `com.peakcam.forecast-sync` | Multi-model forecast runs → `forecast_runs` + `forecast_daily` (`scripts/forecast-sync.ts`: one Open-Meteo `models=` call per point, summit and base, nine models for US resorts, seven elsewhere; idempotent per issue hour; retention pass on the first run after 00:00 UTC) | every 6 h (21,600 s, `RunAtLoad`) | **to deploy** (P4, 2026-10-20) — recipe below |
+| `com.peakcam.forecast-score` | Forecast verification → `forecast_scores` (`scripts/forecast-score.ts`: day-1/3/7 MAE, bias ratio, rank per model + `blend`, graded against SNOTEL depth deltas over 90 days) | daily 07:30 local (after snotel-sync) | **to deploy** (P4, 2026-10-20) |
 | `com.peakcam.pipeline` | Multi-source blender | daily 06:00 | **prepared but Disabled=true** — awaits migration 010 |
 
 All of the above run from the ops checkout `/Users/maestro_admin/peakcam/peakcam` on the
@@ -76,6 +78,31 @@ with unthinned history: `npx tsx scripts/cam-capture-stills.ts --prune-only --pr
 After the first run `select count(*) from cam_stills` should grow by roughly the number
 of archive-allowed active cams (249 on 2026-10-18) per run. The Studio runs only
 `com.peakcam.cam-check` and has no peakcam clone (checked 2026-10-18).
+
+**Deploying the P4 forecast jobs (`com.peakcam.forecast-sync`, `com.peakcam.forecast-score`, 2026-10-20):**
+on the Mac mini as `maestro_admin` (`ssh mini`; use `zsh -l -c` because npm is not on the
+non-login PATH), pull `main` in `/Users/maestro_admin/peakcam/peakcam`, load both plists and
+run one sync now. The first sync writes ~2,600 runs (148 resorts × ≤2 points × ≤9 models);
+scores appear after the first 07:30 scorer run that finds a stored day-1 run for a measured
+date, i.e. from the second day on, and fill in over the following weeks as leads 3 and 7 get
+their issue days.
+
+```bash
+ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && git pull && npm ci --no-audit --no-fund"'
+ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && npx tsx scripts/forecast-sync.ts --dry-run --resort alta | tail -5"'   # Open-Meteo reachable, 18 runs would be written
+ssh mini 'cd /Users/maestro_admin/peakcam/peakcam && cp com.peakcam.forecast-sync.plist com.peakcam.forecast-score.plist ~/Library/LaunchAgents/ && launchctl bootout gui/$(id -u)/com.peakcam.forecast-sync 2>/dev/null; launchctl bootout gui/$(id -u)/com.peakcam.forecast-score 2>/dev/null; launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.peakcam.forecast-sync.plist && launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.peakcam.forecast-score.plist && launchctl list | grep com.peakcam.forecast'
+# RunAtLoad starts the first sync at bootstrap; watch it finish (≈ 5 min at 150 ms between calls):
+ssh mini 'tail -f /Users/maestro_admin/peakcam/peakcam/scripts/forecast-sync.log'            # ends "[forecast-sync] Done. 148 resorts, ~290 Open-Meteo calls, ~2600 runs written ..."
+ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && npx tsx scripts/forecast-score.ts --dry-run --resort alta | tail -3"'   # "no stored runs yet" today; a scored line from tomorrow
+ssh mini 'launchctl kickstart -k gui/$(id -u)/com.peakcam.forecast-score'                   # optional: run the scorer now instead of waiting for 07:30
+```
+
+Verify in the database (Supabase SQL Editor / MCP): `select point, count(*) from forecast_runs
+group by 1` (≈ 145 summit + 148 base after the first run), `select count(*) from forecast_daily`
+(≈ 25 k), `select model, count(*) from forecast_scores group by 1` (empty until the scorer has
+a day-1 pair). Then the production smoke checks under "Public API" below. Cadence or retention
+changes: `StartInterval` in the plist for the sync; `THIN_AFTER_DAYS` / `DELETE_AFTER_DAYS` in
+`lib/forecast/retention.ts`.
 
 ## Launchd Services (Studio)
 
@@ -275,6 +302,8 @@ cached catalogue (`getAllResorts()`, 1 h) plus `resort_openings` and
 | `GET /api/v1/resorts` | Light list: every active resort, headline numbers, rating, season status, cam counts | ISR 900 s |
 | `GET /api/v1/resorts/{slug}` | Full document: location, snow report per field with provenance, season, cams | ISR 900 s |
 | `GET /api/v1/resorts/{slug}/cams` | Active cams: `live` health, still URL, `capturedAt` (PeakCam captures only) | ISR 900 s |
+| `GET /api/v1/resorts/{slug}/forecast?point=summit\|base` | Blended 14-day forecast (median across models, 25th/75th band, `modelCount` per day, summary) + every model run in provider units; `credits` and `X-Attribution` carry the Open-Meteo CC BY 4.0 line (P4) | 900 s |
+| `GET /api/v1/resorts/{slug}/forecast-accuracy` | Per-model 90-day verification: day-1/3/7 MAE (cm), bias ratio, samples, rank, `truthBasis`, `measuredDays` (P4) | 900 s |
 | `GET /api/v1/powder?window=24h\|48h&state=&minInches=&source=&limit=` | Ranked new snow; `source=snotel` = measured only | ISR 900 s per URL |
 | `GET /api/v1/openapi.json` | OpenAPI 3.1, generated from the zod registry in `lib/public-api/schema.ts` | static, 1 h / 24 h CDN |
 | `GET /.well-known/api-catalog` | RFC 9727 linkset pointing at the OpenAPI document | static, 1 h / 24 h CDN |
@@ -340,7 +369,18 @@ curl -s https://www.peakcam.io/api/v1/resorts/search-index | jq '{count, breck: 
 curl -s https://www.peakcam.io/api/v1/status | jq '{status, age: .checks.snowReports.ageHours, live: .checks.cams.liveRatio, issues}'
 curl -s https://www.peakcam.io/.well-known/schemas | jq '.count'
 curl -s https://www.peakcam.io/.well-known/schemas/resort.json | jq '."$id"'
-curl -s https://www.peakcam.io/llms-full.txt | grep -c '^### '          # 14 tools + 10 REST routes = 24
+curl -s https://www.peakcam.io/llms-full.txt | grep -c '^### '          # 15 tools + 12 REST routes = 27
+# P4 forecast (available:false with empty arrays until com.peakcam.forecast-sync has run on the mini)
+curl -sI https://www.peakcam.io/api/v1/resorts/alta/forecast | grep -i '^x-attribution'   # ends "Weather data by Open-Meteo.com (CC BY 4.0)"
+curl -s https://www.peakcam.io/api/v1/resorts/alta/forecast | jq '{available, point, points, models: .summary.modelCount, next7: .summary.total7dIn, peak: .summary.peak, days: (.daily|length), byModel: [.byModel[] | {model, horizonDays, issuedAt}]}'
+curl -s 'https://www.peakcam.io/api/v1/resorts/alta/forecast?point=base' | jq '{point, note, first: .daily[0]}'
+curl -s https://www.peakcam.io/api/v1/resorts/alta/forecast-accuracy | jq '{truthBasis, measuredDays, scoredPoint, best: .bestModel, computedAt, models: [.models[] | {model, rank, day1Mae, day3Mae, day7Mae, biasRatio, samples}]}'
+curl -s https://www.peakcam.io/api/v1/resorts/alta | jq '{forecast, scores: (.forecastScores|length)}'
+curl -s https://www.peakcam.io/api/v1/batch -H 'content-type: application/json' -d '{"requests":[{"path":"/api/v1/resorts/alta/forecast"},{"path":"/api/v1/resorts/alta/forecast-accuracy"}]}' | jq '.results[] | {path, status}'
+npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_forecast --tool-arg slug=alta | head -30
+npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name compare_models --tool-arg slug=alta | head -30
+curl -s 'https://www.peakcam.io/api/v1/ask?q=forecast+for+alta' | jq '{tool, sentence}'
+curl -s https://www.peakcam.io/resorts/alta | grep -o '14-day snow outlook[^<]*' | head -1   # the strip renders once a run is stored
 curl -sI https://www.peakcam.io/gpt-instructions.md | grep -i '^content-type'
 ```
 
@@ -370,8 +410,8 @@ are optional until their block lands.
 | `cam_timelapses` (`"window"` is quoted in SQL: reserved word) | 025 | P8 timelapse job (mini, ffmpeg, Storage bucket pending the user's budget call) | cam pages, `Cam.timelapses` |
 | `stations`, `resort_stations` | 026 | P3 station-discovery job | `Resort.stations` |
 | `station_observations` (PK `(station_id, observed_at)` is the read index) | 026 | P3 per-source fetchers (NWS, METAR, GHCN, ECCC, BC ASWS, road cams) | `Resort.measuredNow` |
-| `forecast_runs`, `forecast_daily` | 027 | P4 forecast-sync job | `Resort.forecast` |
-| `forecast_scores` | 027 | P4 verification job (rewrites per resort/model/window) | `Resort.forecastScores` |
+| `forecast_runs`, `forecast_daily` | 027 | `scripts/forecast-sync.ts` (`com.peakcam.forecast-sync`, every 6 h; live since P4, 2026-10-20) | `Resort.forecast` summary, `/resorts/{slug}/forecast`, `get_forecast`, the resort page strip |
+| `forecast_scores` | 027 | `scripts/forecast-score.ts` (`com.peakcam.forecast-score`, daily 07:30; rewrites per resort/model/window, `blend` row included) | `Resort.forecastScores`, `/resorts/{slug}/forecast-accuracy`, `compare_models` |
 | `resort_scores` | 028 | P7 scoring job | `Resort.score`, leaderboards |
 
 Elevations: `resorts.elevation_base_ft/summit_ft` are the canonical home from
