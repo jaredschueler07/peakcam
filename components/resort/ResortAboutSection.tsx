@@ -1,41 +1,25 @@
 import Link from "next/link";
 import type { ResortWithData } from "@/lib/types";
-import { buildAboutParagraphs, buildResortFaq } from "@/lib/resort-copy";
+import { buildAboutParagraphs } from "@/lib/resort-copy";
+import type { ResortFaqItem } from "@/lib/resort-faq";
 import { RESORT_EDITORIAL } from "@/data/resort-editorial";
 import { SITE_URL } from "@/lib/site";
 
 /**
  * Server-rendered "About + FAQ" block for resort pages. All prose is either
  * hand-curated (data/resort-editorial.ts) or synthesized from live DB fields
- * (lib/resort-copy.ts), and the FAQPage JSON-LD mirrors ONLY the Q&A visibly
- * rendered here — invisible-schema mismatch is a Google penalty.
+ * (lib/resort-copy.ts). The FAQ list arrives from the page (lib/resort-faq.ts
+ * buildResortFaqPage), which emits the FAQPage JSON-LD from the very same
+ * array — the structured data mirrors ONLY the Q&A visibly rendered here;
+ * invisible-schema mismatch is a Google penalty.
  */
-export function ResortAboutSection({ resort }: { resort: ResortWithData }) {
+export function ResortAboutSection({ resort, faq }: { resort: ResortWithData; faq: readonly ResortFaqItem[] }) {
   const now = new Date();
   const editorial = RESORT_EDITORIAL[resort.slug];
   const paragraphs = buildAboutParagraphs(resort, now);
-  const faq = buildResortFaq(resort, now);
-
-  const faqLd = faq.length
-    ? {
-        "@context": "https://schema.org",
-        "@type": "FAQPage",
-        mainEntity: faq.map((f) => ({
-          "@type": "Question",
-          name: f.question,
-          acceptedAnswer: { "@type": "Answer", text: f.answer },
-        })),
-      }
-    : null;
 
   return (
     <section aria-labelledby="about-heading" className="max-w-3xl mx-auto px-6 py-12">
-      {faqLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }}
-        />
-      )}
 
       <h2
         id="about-heading"
@@ -52,7 +36,7 @@ export function ResortAboutSection({ resort }: { resort: ResortWithData }) {
       </div>
 
       {faq.length > 0 && (
-        <div className="mt-10">
+        <div className="mt-10" id="faq">
           <h3 className="font-mono font-bold text-[11px] text-bark uppercase tracking-[0.18em] mb-4">
             Frequently Asked
           </h3>

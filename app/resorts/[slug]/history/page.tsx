@@ -7,11 +7,13 @@ import { buildMonthlyClimatology, buildResortHistory, buildSeasonStats, mountain
 import { cumulativeByDay, groupBySeason, hemisphereOf, type CumulativeNormalRow } from "@/lib/snow-history";
 import { POWDER_DAY_IN, seasonSentence, seasonToDate } from "@/lib/season-stats";
 import { stationFor } from "@/lib/stations";
-import { HUB_BASE_PATH, stateHub, stateHubPath } from "@/lib/hubs";
+import { breadcrumbListLd, resortBreadcrumb } from "@/lib/resort-pages";
 import { SITE_URL } from "@/lib/site";
 import { Header } from "@/components/layout/Header";
 import { PeakFooter } from "@/components/home/PeakFooter";
-import { HubBreadcrumb, type BreadcrumbItem } from "@/components/hubs/HubBreadcrumb";
+import { HubBreadcrumb } from "@/components/hubs/HubBreadcrumb";
+import { ResortTabs } from "@/components/resort/ResortTabs";
+import { FreshnessSentence } from "@/components/resort/FreshnessSentence";
 import { SeasonCurveChart } from "@/components/history/SeasonCurveChart";
 import { PastSeasonsTable } from "@/components/history/PastSeasonsTable";
 import { MonthlyBars } from "@/components/history/MonthlyBars";
@@ -72,24 +74,9 @@ export default async function ResortHistoryPage({ params }: { params: Promise<{ 
     : null;
 
   const url = pageUrl(slug);
-  const stateCode = resort.state;
-  const crumbHub = stateCode ? { label: stateHub(stateCode).label, href: stateHubPath(stateCode) } : { label: "Ski cams", href: HUB_BASE_PATH };
-  const breadcrumb: BreadcrumbItem[] = [
-    { label: "Home", href: "/" },
-    { label: crumbHub.label, href: crumbHub.href },
-    { label: resort.name, href: `/resorts/${resort.slug}` },
-    { label: "History" },
-  ];
-  const breadcrumbLd = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: breadcrumb.map((item, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      name: item.label,
-      item: index === breadcrumb.length - 1 ? url : item.href === "/" ? SITE_URL : `${SITE_URL}${item.href}`,
-    })),
-  };
+  // The page family's trail (lib/resort-pages.ts): Home › state hub › resort › History.
+  const breadcrumb = resortBreadcrumb(resort, "history");
+  const breadcrumbLd = breadcrumbListLd(breadcrumb);
   const webPageLd = {
     "@context": "https://schema.org",
     "@type": "WebPage",
@@ -129,29 +116,23 @@ export default async function ResortHistoryPage({ params }: { params: Promise<{ 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(datasetLd) }} />
       <Header showSearch={false} />
-      <main id="main-content" className="mx-auto max-w-4xl px-4 py-10 sm:px-5 md:py-12">
-        <HubBreadcrumb items={breadcrumb} />
+      <div className="border-b border-bark/30 bg-cream px-4 py-6 md:px-8 md:py-8">
+        <div className="mx-auto max-w-5xl">
+          <HubBreadcrumb items={breadcrumb} />
+          <p className="pc-eyebrow mb-2 mt-5">
+            Season {history.season.label} · {history.source === "snotel" ? "SNOTEL-measured" : history.source === "open_meteo" ? "model estimate" : "no data"}
+          </p>
+          <h1 className="font-display text-4xl font-black leading-[0.95] tracking-[-0.02em] text-ink md:text-5xl [overflow-wrap:anywhere]">
+            {resort.name} snow history
+          </h1>
+          {/* Quotable, dated by the newest station day, links on the resort. */}
+          <FreshnessSentence segments={sentence.segments} />
+          <p className="mt-1.5 text-sm text-bark">{sourceLine}</p>
+        </div>
+      </div>
+      <ResortTabs slug={resort.slug} active="history" />
 
-        <p className="pc-eyebrow mb-3 mt-6">
-          Season {history.season.label} · {history.source === "snotel" ? "SNOTEL-measured" : history.source === "open_meteo" ? "model estimate" : "no data"}
-        </p>
-        <h1 className="font-display text-4xl font-black leading-[0.95] tracking-[-0.02em] text-ink md:text-5xl [overflow-wrap:anywhere]">
-          {resort.name} snow history
-        </h1>
-
-        {/* Quotable, dated by the newest station day, links on the resort. */}
-        <p className="mt-5 max-w-2xl text-balance text-lg leading-snug text-bark-dk" data-testid="history-freshness">
-          {sentence.segments.map((segment, index) =>
-            segment.href ? (
-              <Link key={index} href={segment.href} prefetch={false} className="font-bold text-ink underline decoration-alpen/60 decoration-2 underline-offset-[3px] hover:decoration-alpen">
-                {segment.text}
-              </Link>
-            ) : (
-              <span key={index}>{segment.text}</span>
-            ),
-          )}
-        </p>
-        <p className="mt-2 text-sm text-bark">{sourceLine}</p>
+      <main id="main-content" className="mx-auto max-w-5xl px-4 py-10 md:px-8">
 
         <section aria-labelledby="season-stats-heading" className="mt-10">
           <h2 id="season-stats-heading" className="font-display text-2xl font-black tracking-[-0.01em] text-ink">

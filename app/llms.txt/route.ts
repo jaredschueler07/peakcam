@@ -75,6 +75,7 @@ often quote their upper mountain). Full details: ${SITE_URL}/methodology
 - OpenAPI 3.1: ${SITE_URL}/api/v1/openapi.json — JSON Schemas per shape: ${SITE_URL}/.well-known/schemas
 - API catalog (RFC 9727): ${SITE_URL}/.well-known/api-catalog
 - Markdown alternates: ${SITE_URL}/index.md and ${SITE_URL}/resorts/{slug}/index.md (also rel="alternate" in each HTML page's Link header)
+- Per-resort subpages: ${SITE_URL}/resorts/{slug}/snow-report (measured numbers, 7-day history, forecast) and ${SITE_URL}/resorts/{slug}/webcams (every cam with health and archived frames), each with its own /index.md
 - Powder feed per resort (Atom): ${SITE_URL}/resorts/{slug}/powder.xml
 - MCP server io.peakcam/snow (Streamable HTTP, no auth, read-only; ${PEAKCAM_TOOL_NAMES.join(", ")}): ${SITE_URL}/api/mcp — setup per client: ${SITE_URL}/connect — server card: ${SITE_URL}/.well-known/mcp/server-card.json
 - Custom GPT instructions (Actions from the OpenAPI document): ${SITE_URL}/gpt-instructions.md
