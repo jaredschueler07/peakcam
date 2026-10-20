@@ -8,7 +8,7 @@
 
 import { SITE_URL } from "./site";
 
-export type ResortTabKey = "overview" | "snow-report" | "webcams" | "history";
+export type ResortTabKey = "overview" | "snow-report" | "snow-forecast" | "webcams" | "history";
 
 export interface ResortTab {
   key: ResortTabKey;
@@ -18,10 +18,15 @@ export interface ResortTab {
   segment: string;
 }
 
-/** Overview first; History is P5 (season curve, past seasons, monthly climatology); Forecast joins with P4. */
+/**
+ * Overview first, then the question order a skier asks in: what is on the
+ * ground (snow report), what is coming (forecast, P4), what does it look like
+ * (webcams), how does this season compare (history, P5).
+ */
 export const RESORT_TABS: readonly ResortTab[] = [
   { key: "overview", label: "Overview", segment: "" },
   { key: "snow-report", label: "Snow report", segment: "snow-report" },
+  { key: "snow-forecast", label: "Forecast", segment: "snow-forecast" },
   { key: "webcams", label: "Webcams", segment: "webcams" },
   { key: "history", label: "History", segment: "history" },
 ];
@@ -54,6 +59,11 @@ export function resortTabMarkdownPath(slug: string, key: ResortTabKey): string {
 /** "{Resort} Snow Report — Measured Conditions | PeakCam" */
 export function snowReportTitle(resortName: string): string {
   return `${resortName} Snow Report — Measured Conditions | PeakCam`;
+}
+
+/** "{Resort} Snow Forecast — 14-Day Multi-Model Blend | PeakCam" */
+export function snowForecastTitle(resortName: string): string {
+  return `${resortName} Snow Forecast — 14-Day Multi-Model Blend | PeakCam`;
 }
 
 /** "{Resort} Webcams — 4 Live Cams | PeakCam" (singular when there is one). */

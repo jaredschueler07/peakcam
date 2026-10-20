@@ -30,7 +30,8 @@ import type {
   ResortPublic,
   SeasonPublic,
 } from "./schema";
-import type { MonthlyClimatologyPublic, ResortHistoryPublic, SeasonStatsPublic } from "./schema";
+import type { ForecastAccuracyPublic, ForecastPublic, MonthlyClimatologyPublic, ResortHistoryPublic, SeasonStatsPublic } from "./schema";
+import { modelLabel } from "@/lib/forecast/open-meteo-models";
 
 export const MARKDOWN_CONTENT_TYPE = "text/markdown; charset=utf-8";
 
@@ -597,5 +598,95 @@ export function historyMarkdown(history: ResortHistoryPublic, stats: SeasonStats
     for (const m of monthly.months.filter((x) => x.baselineNote)) lines.push(`- ${m.label}: ${m.baselineNote}`);
   }
   lines.push(monthly.note, "", `Methodology: ${SITE_URL}/methodology#history  ·  Attribution: PeakCam (https://www.peakcam.io), SNOTEL data: USDA NRCS  ·  Terms: ${SITE_URL}/about#terms`, "");
+  return lines.join("\n");
+}
+
+// ── /resorts/{slug}/snow-forecast/index.md ───────────────────
+
+export interface ForecastMarkdownInput {
+  /** The blended document for the summit point (or whatever point the resort has). */
+  summit: ForecastPublic;
+  /** The base point when the resort has both; null when it does not. */
+  base: ForecastPublic | null;
+  accuracy: ForecastAccuracyPublic;
+  pageUrl: string;
+}
+
+function tempsMd(day: { tempMaxF: number | null; tempMinF: number | null }): string {
+  if (day.tempMaxF == null && day.tempMinF == null) return "–";
+  return `${day.tempMaxF ?? "–"}° / ${day.tempMinF ?? "–"}°`;
+}
+
+function blendTableMd(doc: ForecastPublic): string[] {
+  if (!doc.available || !doc.summary) return [doc.note ?? "No current model run stored for this point."];
+  const s = doc.summary;
+  const lines = [
+    `Issued ${formatMountainTime(s.issuedAt)} · ${s.models.length} models (${s.models.map(modelLabel).join(", ")}) · next 48 h ${inchesMd(s.next48hIn)} · 7 days ${inchesMd(s.total7dIn)} · 14 days ${inchesMd(s.total14dIn)}${s.peak ? ` · peak ${inchesMd(s.peak.in)} on ${s.peak.date}` : ""}`,
+    "",
+    "| Date | Snow (median) | Low – high (p25–p75) | High / low °F | Precip % | Gust mph | Models |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+  ];
+  for (const d of doc.daily) {
+    lines.push(`| ${d.date} | ${inchesMd(d.snowfallIn)} | ${inchesMd(d.snowfallLoIn)} – ${inchesMd(d.snowfallHiIn)} | ${tempsMd(d)} | ${d.precipProb ?? "–"} | ${d.windGustMph ?? "–"} | ${d.modelCount} |`);
+  }
+  return lines;
+}
+
+function byModelMd(doc: ForecastPublic): string[] {
+  if (!doc.available || !doc.byModel.length) return [];
+  const dates = doc.daily.map((d) => d.date);
+  const lines = [
+    `| Model | Issued | Horizon | ${dates.map((d) => d.slice(5)).join(" | ")} |`,
+    `| --- | --- | --- | ${dates.map(() => "---").join(" | ")} |`,
+  ];
+  for (const run of doc.byModel) {
+    const byDate = new Map(run.days.map((d) => [d.date, d.snowfallCm]));
+    const cells = dates.map((date) => {
+      const cm = byDate.get(date);
+      return cm == null ? "–" : String(Math.round(cm * 10) / 10);
+    });
+    lines.push(`| ${modelLabel(run.model)} | ${formatMountainTime(run.issuedAt)} | ${run.horizonDays} d | ${cells.join(" | ")} |`);
+  }
+  lines.push("", "Per-model values are snowfall in cm per day as the provider stores them; a dash means the model does not reach that day.");
+  return lines;
+}
+
+/** The forecast subpage as markdown: the blend at each point, every model run, and the verification table. */
+export function forecastMarkdown(input: ForecastMarkdownInput): string {
+  const { summit, base, accuracy, pageUrl } = input;
+  const apiUrl = `${summit.canonicalUrl.replace("/resorts/", "/api/v1/resorts/")}/forecast`;
+  const lines: string[] = [
+    `# ${summit.name} snow forecast, 14-day multi-model blend`,
+    "",
+    `Canonical page: ${pageUrl}  ·  Resort: ${summit.canonicalUrl}  ·  JSON: ${apiUrl}  ·  Accuracy JSON: ${apiUrl}-accuracy`,
+    "",
+    summit.method,
+    "",
+    `## Blend at the ${summit.point}`,
+    "",
+    ...blendTableMd(summit),
+  ];
+  if (base) {
+    lines.push("", `## Blend at the ${base.point}`, "", ...blendTableMd(base));
+  }
+  const models = byModelMd(summit);
+  if (models.length) lines.push("", `## Every model, ${summit.point} point`, "", ...models);
+  lines.push("", `## How the models have verified here (${accuracy.periodDays} days)`, "");
+  if (accuracy.models.length) {
+    lines.push(
+      `Truth: ${accuracy.truthBasis === "snotel" ? `24 h depth change at ${accuracy.station?.name ?? accuracy.station?.id ?? "the resort's SNOTEL station"}` : "no measured series"}; ${accuracy.measuredDays} measured days${accuracy.scoredPoint ? `; graded at the ${accuracy.scoredPoint} point` : ""}.`,
+      "",
+      "| Rank | Model | Day-1 MAE cm | Day-3 MAE cm | Day-7 MAE cm | Bias ratio | Samples |",
+      "| --- | --- | --- | --- | --- | --- | --- |",
+    );
+    for (const m of accuracy.models) {
+      lines.push(`| ${m.rank ?? "–"} | ${modelLabel(m.model)} | ${m.day1Mae ?? "–"} | ${m.day3Mae ?? "–"} | ${m.day7Mae ?? "–"} | ${m.biasRatio ?? "–"} | ${m.samples ?? "–"} |`);
+    }
+    lines.push("", accuracy.method);
+  } else {
+    lines.push(accuracy.measuredDays > 0 ? "No scores computed yet; the scorer runs daily once a model run has been graded against a measured day." : "No measured snow series at this resort, so the models cannot be verified here.");
+  }
+  const credit = summit.credits[0];
+  lines.push("", `Weather data by Open-Meteo.com (${credit?.license ?? "CC BY 4.0"}, ${credit?.url ?? "https://open-meteo.com"}). Methodology: ${SITE_URL}/methodology#forecast  ·  Attribution: PeakCam (${SITE_URL})  ·  Terms: ${SITE_URL}/about#terms`, "");
   return lines.join("\n");
 }
