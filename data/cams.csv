@@ -635,3 +635,53 @@ beaver-creek,Arrowhead Village,,iframe,https://player.brownrice.com/embed/bcahou
 beaver-creek,Village Ice Rink,,iframe,https://player.brownrice.com/embed/bcvillageicerink,,true,village,Beaver Creek Resort,https://www.epicpass.com/policies.aspx
 beaver-creek,Snow Stake Live,,iframe,https://player.brownrice.com/embed/bcsnowstake2,,true,snow-stake,Beaver Creek Resort,https://www.epicpass.com/policies.aspx
 stowe,Gondola,,iframe,https://player.brownrice.com/embed/stowemidwaybasestation,,true,,Stowe Mountain Resort,https://www.epicpass.com/policies.aspx
+beaver-mountain,Lodge View Cam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=lodgedreamliftcam&autoplay=1,,true,base,Beaver Mountain Ski Resort,https://www.skithebeav.com/terms-conditions/
+beaver-mountain,Little Beaver View,,iframe,https://g1.ipcamlive.com/player/player.php?alias=littlebeavercam&autoplay=1,,true,base,Beaver Mountain Ski Resort,https://www.skithebeav.com/terms-conditions/
+nordic-valley,Nordic Valley Webcam,5440,youtube,https://www.youtube.com/embed/Ljumxb0U2b0,Ljumxb0U2b0,true,base,Nordic Valley Ski Resort,https://www.nordicvalley.ski/website-terms-of-use/
+antelope-butte,Pow Stick Webcam,,iframe,https://ipcamlive.com/player/player.php?alias=antelopebuttepowstick&autoplay=1,,true,snow-stake,Antelope Butte Foundation,
+grand-targhee,Dreamcatcher,,image,https://copyrighted.seejh.com/gtrdream/gtrdream.jpg,,true,,Grand Targhee Resort,https://www.grandtarghee.com/policies/terms-conditions
+grand-targhee,Stick Of Truth,,image,https://copyrighted.seejh.com/gtrsnowstick/gtrsnowstick.jpg,,true,snow-stake,Grand Targhee Resort,https://www.grandtarghee.com/policies/terms-conditions
+grand-targhee,Summit,,image,https://copyrighted.seejh.com/gtrsummit/gtrsummit.jpg,,true,summit,Grand Targhee Resort,https://www.grandtarghee.com/policies/terms-conditions
+grand-targhee,Habitat / Colter,,image,https://copyrighted.seejh.com/gtrcolter/gtrcolter.jpg,,true,base,Grand Targhee Resort,https://www.grandtarghee.com/policies/terms-conditions
+grand-targhee,Teton Valley View,,image,https://copyrighted.seejh.com/tetonvalley/tetonvalley.jpg,,true,,Grand Targhee Resort (image hosted by SeeJH; may be a SeeJH-owned valley cam),https://www.grandtarghee.com/policies/terms-conditions
+snowy-range,Snow Cam,,iframe,https://www.cameraftp.com/Camera/Cameraplayer.aspx?parentID=397142069&shareID=17935300&isEmbedded=true&mode=live,,true,snow-stake,Snowy Range Ski Area,
+snowy-range,Base Webcam,,iframe,https://www.cameraftp.com/file/PublishCameraplayer.aspx?parentID=224864296&shareID=13751043&isEmbedded=true&mode=live,,true,base,Snowy Range Ski Area,
+snowy-range,Sundance Webcam,,iframe,https://www.cameraftp.com/file/PublishCameraplayer.aspx?parentID=224855203&shareID=13750595&isEmbedded=true&mode=live,,true,,Snowy Range Ski Area,
+snowy-range,Chute Webcam,,iframe,https://www.cameraftp.com/file/PublishCameraplayer.aspx?parentID=224864295&shareID=13789949&isEmbedded=true&mode=live,,true,,Snowy Range Ski Area,
+snowy-range,Colt Webcam,,iframe,https://www.cameraftp.com/Camera/Cameraplayer.aspx?parentID=300668346&shareID=14584106&isEmbedded=true&mode=live,,true,,Snowy Range Ski Area,
+blacktail-mountain,Blacktail Webcam,6780,iframe,https://g1.ipcamlive.com/player/player.php?alias=olycam&autoplay=1,,true,summit,Blacktail Mountain Ski Area,
+discovery,Top Overview,8158,image,https://webcam.skidiscovery.com/webcam-images/top-overview/top-overview/top-overview-webcam.jpg,,true,summit,Discovery Ski Area,
+discovery,OD Front,5770,image,https://webcam.skidiscovery.com/webcam-images/od-front/od-front/od-front-webcam.jpg,,true,base,Discovery Ski Area,
+discovery,Base Stake,5770,image,https://webcam.skidiscovery.com/webcam-images/base-stake/base-stake/base-stake-webcam.jpg,,true,snow-stake,Discovery Ski Area,
+discovery,Top Stake,8158,image,https://webcam.skidiscovery.com/webcam-images/top-stake/top-stake/top-stake-webcam.jpg,,true,snow-stake,Discovery Ski Area,
+montana-snowbowl,Base Web Cam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=690b67247173f&autoplay=1,,true,base,Montana Snowbowl,
+showdown,Mountain Cam,,iframe,https://video.nest.com/embedded/live/AfYTevjCiS,,true,,Showdown Montana,https://www.showdownmontana.com/terms-conditions
+kelly-canyon,Top of the Mountain,,youtube,https://www.youtube.com/embed/tHrldu8CqCs,tHrldu8CqCs,true,summit,Kelly Canyon Resort,https://kellycanyonresort.com/terms-and-conditions
+kelly-canyon,Lost Treasure,,youtube,https://www.youtube.com/embed/mZa2DuN9NdY,mZa2DuN9NdY,true,,Kelly Canyon Resort,https://kellycanyonresort.com/terms-and-conditions
+kelly-canyon,Learners Carpet,,youtube,https://www.youtube.com/embed/hVYOSEtRJZs,hVYOSEtRJZs,true,base,Kelly Canyon Resort,https://kellycanyonresort.com/terms-and-conditions
+pomerelle,Pomerelle Mountain Ski Resort Webcam,,youtube,https://www.youtube.com/embed/uM-oftYVFGA,uM-oftYVFGA,true,,ATC Communications,
+silver-mountain,KREM 2 Camera,,iframe,https://api.wetmet.net/widgets/stream/frame.php?ruc=162-04-01,,true,,KREM 2,https://silvermt.com/terms
+pajarito,View from the top of Pajarito Lodge,,iframe,https://player.brownrice.com/embed/pajarito1,,true,base,Pajarito Mountain Ski Area,https://www.pajarito.ski/website-terms-of-use/
+sandia-peak,East Mountain View,,image,https://webcams.sandiapeak.com/images/cams/ski-cam.jpg,,true,,Sandia Peak Tramway,https://www.sandia.ski/website-terms-of-use
+sandia-peak,Tram Cam,,image,https://webcams.sandiapeak.com/images/cams/tram-cam.jpg,,true,,Sandia Peak Tramway,https://www.sandia.ski/website-terms-of-use
+sipapu,Sipapu Lower Webcam,8200,iframe,https://player.brownrice.com/embed/sipapu1,,true,base,Sipapu Ski and Summer Resort,https://www.sipapu.ski/website-terms-of-use/
+sipapu,Sipapu Upper Webcam,9064,iframe,https://player.brownrice.com/embed/sipapu2,,true,mid,Sipapu Ski and Summer Resort,https://www.sipapu.ski/website-terms-of-use/
+sunrise-park,Sunrise Peak Live,10700,youtube,https://www.youtube.com/embed/mCbHN6zvhpk,mCbHN6zvhpk,true,summit,Sunrise Park Resort,https://www.sunrise.ski/privacy-policy/
+sunrise-park,Sunrise Base Live,9300,youtube,https://www.youtube.com/embed/VX29Awryg30,VX29Awryg30,true,base,Sunrise Park Resort,https://www.sunrise.ski/privacy-policy/
+alyeska,Glacier Bowl 360° Cam,,iframe,https://alyeskaresort.roundshot.com/glacierbowl/,,true,mid,Alyeska Resort,
+alyeska,Sundeck 360° Cam,,iframe,https://alyeskaresort.roundshot.com/tram-summit/,,true,summit,Alyeska Resort,
+alyeska,Turnagain Arm,,image,https://www.alyeskaresort.com/webcamsfolder/Turnagain.jpg,,true,,Alyeska Resort,
+alyeska,Upper Tram,,image,https://www.alyeskaresort.com/webcamsfolder/TramUpper.jpg,,true,summit,Alyeska Resort,
+alyeska,Top of Glacier Bowl Express,,image,https://www.alyeskaresort.com/webcamsfolder/TopGBX.jpg,,true,mid,Alyeska Resort,
+alyeska,The North Face,,image,https://www.alyeskaresort.com/webcamsfolder/NorthFace.jpg,,true,,Alyeska Resort,
+alyeska,Ted's Express Base,,image,https://www.alyeskaresort.com/webcamsfolder/Chair4_3.jpg,,true,base,Alyeska Resort,
+alyeska,Max's Mountain,,image,https://www.alyeskaresort.com/webcamsfolder/Chair4_4.jpg,,true,,Alyeska Resort,
+alyeska,Ted's Express,,image,https://www.alyeskaresort.com/webcamsfolder/Chair4_1.jpg,,true,,Alyeska Resort,
+alyeska,Hotel Courtyard,,image,https://www.alyeskaresort.com/webcamsfolder/CourtYard.jpg,,true,village,Alyeska Resort,
+alyeska,Daylodge,,image,https://www.alyeskaresort.com/webcamsfolder/Chair4_2.jpg,,true,base,Alyeska Resort,
+eaglecrest,Peak Camera 1,,image,https://eaglecams.ci.juneau.ak.us/eagle-ptarm-top-cam-2.jpeg,,true,summit,Eaglecrest Ski Area (City and Borough of Juneau),
+eaglecrest,Peak Camera 2,,image,https://eaglecams.ci.juneau.ak.us/eagle-ptarm-top-cam-3.jpeg,,true,summit,Eaglecrest Ski Area (City and Borough of Juneau),
+eaglecrest,Base Camera 1,,image,https://eaglecams.ci.juneau.ak.us/eagle-ptarm-bot-cam-3.jpeg,,true,base,Eaglecrest Ski Area (City and Borough of Juneau),
+eaglecrest,Base Camera 2,,image,https://eaglecams.ci.juneau.ak.us/eagle-ptarm-bot-cam-2.jpeg,,true,base,Eaglecrest Ski Area (City and Borough of Juneau),
+terry-peak,Stewart Slope from the Stewart Lodge Cam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=5c3526110e41f&autoplay=1,,true,base,Terry Peak Ski Area,
+terry-peak,Terry Peak Summit from the Summit Cam,7100,iframe,https://g1.ipcamlive.com/player/player.php?alias=5c352da4f3420&autoplay=1,,true,summit,Terry Peak Ski Area,
