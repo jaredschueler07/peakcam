@@ -25,6 +25,25 @@ export const SCORE_LEADS = [1, 3, 7] as const;
 export type ScoreLead = (typeof SCORE_LEADS)[number];
 export const SCORE_PERIOD_DAYS = 90;
 
+/**
+ * Which stored point a station's series is graded against: the one whose
+ * elevation is nearest the station's (a SNOTEL pillow usually sits between
+ * base and summit), base when the station elevation is unknown. The scorer
+ * and the accuracy document both call this, so they agree without a column.
+ */
+export function scoredPointFor(
+  resort: { elevation_summit_ft?: number | null; elevation_base_ft?: number | null },
+  stationElevationFt: number | null | undefined,
+  available: readonly ("summit" | "base")[] = ["summit", "base"],
+): "summit" | "base" {
+  const summit = resort.elevation_summit_ft ?? null;
+  const base = resort.elevation_base_ft ?? null;
+  const want: "summit" | "base" =
+    stationElevationFt != null && summit != null && base != null && Math.abs(summit - stationElevationFt) < Math.abs(base - stationElevationFt) ? "summit" : "base";
+  if (available.includes(want)) return want;
+  return available[0] ?? want;
+}
+
 export interface ScorePair {
   model: string;
   lead: ScoreLead;

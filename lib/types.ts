@@ -301,6 +301,8 @@ export interface WeatherPeriod {
   windGust: number | null;        // mph
   precipProbability: number | null; // 0-100
   feelsLike: number | null;       // °F (wind chill adjusted)
+  /** Where `snowInches` came from: the stored multi-model blend (lib/forecast), or the NWS wording heuristic when no blend was available. */
+  snowSource?: "blend" | "nws_keyword" | "open_meteo";
 }
 
 /** Raw hourly data from NWS */
@@ -330,6 +332,8 @@ export interface ForecastPeriod {
   snowInches: number;      // total
   precipProbability: number; // max
   shortForecast: string;   // most representative
+  /** YYYY-MM-DD on the resort's wall clock, so a daily blend can be applied to the day's periods. */
+  date?: string;
 }
 
 // ── Dashboard & Favorites ────────────────────────────────────
