@@ -9,8 +9,11 @@ import type { NearbyResortsData } from "@/components/resort/NearbyResorts";
 import { nearbyResorts, summarizeNearby } from "@/lib/geo";
 import { HUB_BASE_PATH, groupByRegion, hubPath, stateHub, stateHubPath } from "@/lib/hubs";
 import { isOffSeason } from "@/lib/map-utils";
-import { getWeatherForecast, getHourlyForecast, bucketIntoPeriods } from "@/lib/weather";
+import { getWeatherForecast, getHourlyForecast, bucketIntoPeriods, applyBlendToPeriods, type SnowByDateInches } from "@/lib/weather";
 import { getOpenMeteoForecast, getOpenMeteoHourly } from "@/lib/open-meteo";
+import { loadResortForecast } from "@/lib/public-api/data";
+import { blendForPoint, serializeBlendDays, serializeSummary } from "@/lib/public-api/forecast";
+import type { ForecastStripData } from "@/components/resort/ForecastStrip";
 import { ResortDetailPage } from "@/components/resort/ResortDetailPage";
 import { camDisplayName } from "@/lib/cam-name";
 import { cameraPreview } from "@/lib/cam-preview";
@@ -127,9 +130,28 @@ export default async function ResortPage({
     ...resort.cams.filter((cam) => cam.is_active && !cam.auto_disabled && cam.embed_type === "link"),
   ].map((cam) => cam.id);
 
-  const [weather, hourlyRaw, liveConditions, userConditions, allResorts, openings, camTimeline] = await Promise.all([
+  // Stored multi-model blend (P4; scripts/forecast-sync.ts every 6 h, read
+  // through the same 15-minute cache as /api/v1). The blend supplies the snow
+  // amounts for every forecast surface on the page; NWS and Open-Meteo keep
+  // supplying the narrative, temperatures and wind. A resort with no stored
+  // run yet (or a read failure) falls back to the keyword heuristic and
+  // shows no strip — the page never fails on the forecast tables.
+  const stored = await loadResortForecast(resort.id).catch(() => ({ runs: [] }));
+  const blended = blendForPoint(stored, "summit");
+  const forecastStrip: ForecastStripData | null = blended
+    ? {
+        summary: serializeSummary(blended.blend, blended.point, blended.issuedAt),
+        daily: serializeBlendDays(blended.blend),
+        apiUrl: `/api/v1/resorts/${resort.slug}/forecast`,
+      }
+    : null;
+  const blendByDate: SnowByDateInches | null = forecastStrip
+    ? Object.fromEntries(forecastStrip.daily.map((d) => [d.date, d.snowfallIn]))
+    : null;
+
+  const [weatherRaw, hourlyRaw, liveConditions, userConditions, allResorts, openings, camTimeline] = await Promise.all([
     isUS
-      ? getWeatherForecast(resort.lat, resort.lng)
+      ? getWeatherForecast(resort.lat, resort.lng, blendByDate)
       : getOpenMeteoForecast(resort.lat, resort.lng, elevationFt),
     isUS
       ? getHourlyForecast(resort.lat, resort.lng)
@@ -155,7 +177,12 @@ export default async function ResortPage({
     opening: openings.find((row) => row.resort_id === resort.id) ?? null,
   });
 
-  const forecastPeriods = hourlyRaw ? bucketIntoPeriods(hourlyRaw) : null;
+  // The NWS path applied the blend inside getWeatherForecast; the Open-Meteo
+  // single-model path carries dates too, so the same per-date override works.
+  const weather = weatherRaw && blendByDate
+    ? weatherRaw.map((p) => (p.date && blendByDate[p.date] != null ? { ...p, snowInches: blendByDate[p.date], snowSource: "blend" as const } : p))
+    : weatherRaw;
+  const forecastPeriods = hourlyRaw ? applyBlendToPeriods(bucketIntoPeriods(hourlyRaw), blendByDate) : null;
 
   // Nearby resorts (growth-audit S2). Ranked here from the full catalogue and
   // reduced to ≤5 summary rows plus two hub targets, so the client component
@@ -345,7 +372,7 @@ export default async function ResortPage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageLd) }}
         />
       )}
-      <ResortDetailPage resort={resort} weather={weather} forecastPeriods={forecastPeriods} hourlyData={hourlyRaw} liveConditions={liveConditions} userConditions={userConditions} nearby={nearby} freshness={{ segments: freshness.segments }} breadcrumb={breadcrumb} camTimeline={camTimeline} />
+      <ResortDetailPage resort={resort} weather={weather} forecastPeriods={forecastPeriods} forecastStrip={forecastStrip} hourlyData={hourlyRaw} liveConditions={liveConditions} userConditions={userConditions} nearby={nearby} freshness={{ segments: freshness.segments }} breadcrumb={breadcrumb} camTimeline={camTimeline} />
       <ResortAboutSection resort={resort} />
     </main>
   );

@@ -15,6 +15,7 @@ import { cameraPreview } from "@/lib/cam-preview";
 import { CamLightbox } from "@/components/cam/CamLightbox";
 import { ConditionsHero } from "@/components/resort/ConditionsHero";
 import { ForecastTable } from "@/components/resort/ForecastTable";
+import { ForecastStrip, type ForecastStripData } from "@/components/resort/ForecastStrip";
 import { HourlyTimeline } from "@/components/resort/HourlyTimeline";
 import dynamic from "next/dynamic";
 const ConditionVoter = dynamic(() => import("./ConditionVoter").then(m => ({ default: m.ConditionVoter })));
@@ -40,6 +41,8 @@ interface Props {
   resort: ResortWithData;
   weather: WeatherPeriod[] | null;
   forecastPeriods?: ForecastPeriod[] | null;
+  /** The stored multi-model blend (P4), already serialised; null when no run is current. */
+  forecastStrip?: ForecastStripData | null;
   hourlyData?: HourlyWeather[] | null;
   liveConditions?: LiveConditions | null;
   userConditions?: UserCondition[];
@@ -397,7 +400,7 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData, liveConditions, userConditions = [], nearby = null, freshness = null, breadcrumb = null, camTimeline = null }: Props) {
+export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStrip = null, hourlyData, liveConditions, userConditions = [], nearby = null, freshness = null, breadcrumb = null, camTimeline = null }: Props) {
   const activeCams = resort.cams.filter((c) => c.is_active);
   const embeddableCams = activeCams.filter((c) => c.embed_type !== "link");
   const snow = resort.snow_report;
@@ -687,15 +690,26 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
                 </a>
               )}
             </div>
+            {/* The 14-day blended strip (P4) sits above the period table; the
+                table's snow totals are re-scaled to the same blend upstream. */}
+            {forecastStrip && (
+              <div className="mb-4">
+                <ForecastStrip data={forecastStrip} />
+              </div>
+            )}
             <ForecastTable periods={forecastPeriods} />
             <p className="text-text-muted text-xs mt-2">
-              {isUS ? "Via National Weather Service · Updated hourly" : "Via Open-Meteo · Updated hourly"}
+              {forecastStrip
+                ? `Snow amounts: PeakCam blend of ${forecastStrip.summary.models.length} models (Open-Meteo, CC BY 4.0) · Narrative, temperature and wind: ${isUS ? "National Weather Service" : "Open-Meteo"} · Updated hourly`
+                : isUS
+                  ? "Via National Weather Service · Updated hourly · Snow amounts are estimates from the forecast wording"
+                  : "Via Open-Meteo · Updated hourly"}
             </p>
           </section>
         ) : (
           <section id="forecast" className="scroll-mt-20">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">5-Day Forecast</h2>
+              <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">{forecastStrip ? "14-Day Forecast" : "5-Day Forecast"}</h2>
               {isUS && (
                 <a
                   href={`https://forecast.weather.gov/MapClick.php?lat=${resort.lat}&lon=${resort.lng}`}
@@ -707,9 +721,13 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, hourlyData,
                 </a>
               )}
             </div>
-            <div className="bg-surface border border-border rounded-xl p-6 text-center text-text-muted text-sm">
-              Weather data temporarily unavailable.
-            </div>
+            {forecastStrip ? (
+              <ForecastStrip data={forecastStrip} />
+            ) : (
+              <div className="bg-surface border border-border rounded-xl p-6 text-center text-text-muted text-sm">
+                Weather data temporarily unavailable.
+              </div>
+            )}
           </section>
         )}
 
