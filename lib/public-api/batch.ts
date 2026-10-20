@@ -23,7 +23,10 @@ export type BatchRouteId =
   | "history"
   | "seasonStats"
   | "monthly"
-  | "leaderboard";
+  | "leaderboard"
+  // P7 score
+  | "scoreComponents"
+  | "snowReport";
 
 export interface BatchPath {
   path: string;
@@ -49,6 +52,9 @@ const ROUTE_PATTERNS: Array<{ route: BatchRouteId; re: RegExp }> = [
   { route: "seasonStats", re: /^\/api\/v1\/resorts\/([a-z0-9][a-z0-9-]{0,99})\/season-stats$/ },
   { route: "monthly", re: /^\/api\/v1\/resorts\/([a-z0-9][a-z0-9-]{0,99})\/monthly$/ },
   { route: "leaderboard", re: /^\/api\/v1\/leaderboards\/([a-z-]{1,40})$/ },
+  // P7 score
+  { route: "scoreComponents", re: /^\/api\/v1\/resorts\/([a-z0-9][a-z0-9-]{0,99})\/score-components$/ },
+  { route: "snowReport", re: /^\/api\/v1\/snow-report$/ },
 ];
 
 export function matchBatchPath(path: string): BatchPath | null {
@@ -85,7 +91,7 @@ export function parseBatchBody(body: unknown): BatchParse {
       return {
         ok: false,
         error: "disallowed_path",
-        detail: `${path} is not a batchable GET route. Allowed: /api/v1/resorts, /api/v1/resorts/search-index, /api/v1/resorts/{slug}, /api/v1/resorts/{slug}/cams, /api/v1/resorts/{slug}/conditions, /api/v1/resorts/{slug}/timelapses, /api/v1/resorts/{slug}/forecast, /api/v1/resorts/{slug}/forecast-accuracy, /api/v1/resorts/{slug}/history, /api/v1/resorts/{slug}/season-stats, /api/v1/resorts/{slug}/monthly, /api/v1/leaderboards/{kind}, /api/v1/powder, /api/v1/status, /api/v1/ask (with query strings).`,
+        detail: `${path} is not a batchable GET route. Allowed: /api/v1/resorts, /api/v1/resorts/search-index, /api/v1/resorts/{slug}, /api/v1/resorts/{slug}/cams, /api/v1/resorts/{slug}/conditions, /api/v1/resorts/{slug}/timelapses, /api/v1/resorts/{slug}/forecast, /api/v1/resorts/{slug}/forecast-accuracy, /api/v1/resorts/{slug}/score-components, /api/v1/resorts/{slug}/history, /api/v1/resorts/{slug}/season-stats, /api/v1/resorts/{slug}/monthly, /api/v1/leaderboards/{kind}, /api/v1/snow-report, /api/v1/powder, /api/v1/status, /api/v1/ask (with query strings).`,
       };
     }
     paths.push(matched);

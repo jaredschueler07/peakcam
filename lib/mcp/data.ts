@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { unstable_cache } from "next/cache";
-import { loadPublicApiCatalog, loadResortAccuracy, loadResortForecast, loadResortHistory, loadResortTimelapses, loadSeasonAggregates } from "@/lib/public-api/data";
+import { loadPublicApiCatalog, loadResortAccuracy, loadResortForecast, loadResortHistory, loadResortScoreHistory, loadResortTimelapses, loadSeasonAggregates } from "@/lib/public-api/data";
 import { PUBLIC_API_REVALIDATE_SECONDS } from "@/lib/public-api/headers";
 import { getCamStillFrames, supabase } from "@/lib/supabase";
 import { getWeatherForecast } from "@/lib/weather";
@@ -82,4 +82,6 @@ export const productionDataSource: McpDataSource = {
   seasonAggregates: (seasonStart, weekStart) => loadSeasonAggregates(seasonStart, weekStart),
   // P8: the same 15-minute Data Cache entry the /cams and /timelapses routes read.
   timelapses: (resortId) => loadResortTimelapses(resortId),
+  // P7: the same 15-minute Data Cache entry /score-components reads.
+  scoreHistory: (resortId) => loadResortScoreHistory(resortId),
 };

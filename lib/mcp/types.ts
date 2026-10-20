@@ -7,7 +7,7 @@
 // one from fixtures.
 // ─────────────────────────────────────────────────────────────
 
-import type { ResortWithData, WeatherPeriod } from "@/lib/types";
+import type { ResortScoreRow, ResortWithData, WeatherPeriod } from "@/lib/types";
 import type { PublicApiCatalog } from "@/lib/public-api/data";
 import type { AccuracyInput } from "@/lib/public-api/forecast";
 import type { StoredForecast } from "@/lib/forecast/store";
@@ -81,6 +81,13 @@ export interface McpDataSource extends McpHistorySource {
    * tool then answers `available: false`).
    */
   timelapses?(resortId: string): Promise<CamTimelapses[] | null>;
+  /**
+   * Snow Score rows over the trailing 30 days for a resort (`resort_scores`,
+   * migration 028, P7), oldest first; empty before the first scoring run.
+   * Absent on data sources written before P7 (the tool then answers
+   * `available: false`); today's row rides on the catalogue's score index.
+   */
+  scoreHistory?(resortId: string): Promise<ResortScoreRow[]>;
 }
 
 // ── P5: season history ───────────────────────────────────────

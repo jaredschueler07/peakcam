@@ -9,9 +9,10 @@
 // ─────────────────────────────────────────────────────────────
 
 import { unstable_cache } from "next/cache";
-import { getAllResorts, getForecastRuns, getForecastScores, getLatestOperatorStatusIndex, getResortElevationIndex, getResortOpenings, getResortStationsIndex, getResortTimelapses, getSnowDepthHistory } from "@/lib/supabase";
+import { getAllResorts, getForecastRuns, getForecastScores, getLatestOperatorStatusIndex, getLatestScoresIndex, getResortElevationIndex, getResortOpenings, getResortScoreHistory, getResortStationsIndex, getResortTimelapses, getSnowDepthHistory } from "@/lib/supabase";
 import type { CamTimelapses } from "@/lib/cam-timelapse";
-import type { OperatorStatusRow, ResortStationJoined, ResortWithData } from "@/lib/types";
+import type { OperatorStatusRow, ResortScoreRow, ResortStationJoined, ResortWithData } from "@/lib/types";
+import { SCORE_HISTORY_DAYS } from "@/lib/score";
 import type { ResortOpening } from "@/lib/openings";
 import type { ForecastScoreRow, StoredForecast } from "@/lib/forecast/store";
 import { SCORE_PERIOD_DAYS, measuredFromDepth, scoredPointFor } from "@/lib/forecast/score";
@@ -51,6 +52,19 @@ const getResortTimelapsesCached = unstable_cache((resortId: string) => getResort
 /** Rendered clips per cam of a resort; null when the clip view is unavailable (migration 031 not applied). */
 export function loadResortTimelapses(resortId: string): Promise<CamTimelapses[] | null> {
   return getResortTimelapsesCached(resortId);
+}
+
+// ── Snow Score history (migration 028, P7) ───────────────────
+// The scorer writes once a day, so a 15-minute window per resort loses
+// nothing; same tag as the catalogue so a manual purge clears both.
+const getResortScoreHistoryCached = unstable_cache((resortId: string, days: number) => getResortScoreHistory(resortId, days), ["peakcam:public-api:score-history:v1"], {
+  revalidate: PUBLIC_API_REVALIDATE_SECONDS,
+  tags: ["peakcam-resort-catalog"],
+});
+
+/** Score rows over the trailing window for one resort, oldest first; empty before the first scoring run. */
+export function loadResortScoreHistory(resortId: string, days: number = SCORE_HISTORY_DAYS): Promise<ResortScoreRow[]> {
+  return getResortScoreHistoryCached(resortId, days);
 }
 
 /** The newest run per point and model for a resort; `{ runs: [] }` when none is current. Never throws past a missing table. */
@@ -95,6 +109,8 @@ export interface PublicApiCatalog {
   stations: Record<string, ResortStationJoined[]> | null;
   /** Newest operator report (migration 032) by resort id; optional so fixture catalogues written before P6 still type-check. */
   operatorStatus?: Record<string, OperatorStatusRow> | null;
+  /** Newest Snow Score row (≤ 3 days old, migration 028) by resort id; optional so fixture catalogues written before P7 still type-check. */
+  scores?: Record<string, ResortScoreRow> | null;
   now: Date;
 }
 
@@ -107,12 +123,13 @@ const getOpeningsCached = unstable_cache(getResortOpenings, ["peakcam:public-api
 });
 
 export async function loadPublicApiCatalog(): Promise<PublicApiCatalog> {
-  const [resorts, openingRows, elevations, stations, operatorStatus] = await Promise.all([
+  const [resorts, openingRows, elevations, stations, operatorStatus, scores] = await Promise.all([
     getAllResorts(),
     getOpeningsCached(),
     getResortElevationIndex(),
     getResortStationsIndex(),
     getLatestOperatorStatusIndex(),
+    getLatestScoresIndex(),
   ]);
   return {
     resorts,
@@ -120,6 +137,7 @@ export async function loadPublicApiCatalog(): Promise<PublicApiCatalog> {
     elevations,
     stations,
     operatorStatus,
+    scores,
     now: new Date(),
   };
 }
@@ -136,6 +154,8 @@ export function optionsFor(catalog: PublicApiCatalog, resort: ResortWithData): S
     // An index that exists but has no row for this resort means "no station within 25 km": an empty list, not an absent block.
     observationStations: catalog.stations ? (catalog.stations[resort.id] ?? []) : null,
     operator: catalog.operatorStatus?.[resort.id] ?? null,
+    // P7: a served index without a row for this resort is "no current score" (null), no index at all leaves the key off.
+    ...(catalog.scores !== undefined ? { score: catalog.scores ? (catalog.scores[resort.id] ?? null) : null } : {}),
   };
 }
 

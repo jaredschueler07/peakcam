@@ -198,13 +198,23 @@ export interface OperatorStatusRow {
   verified: boolean;
 }
 
-// ── Scores (migration 028, P7 writes these) ──────────────────
+// ── Scores (migration 028, written by scripts/score-sync.ts, P7) ──
+/** One component of the Snow Score as stored in `resort_scores.components` (lib/score.ts ScoreComponent). */
+export interface ResortScoreComponentRow {
+  points: number;
+  max: number;
+  basis: string;
+  source: string;
+}
+
 export interface ResortScoreRow {
   resort_id: string;
   date: string;                 // YYYY-MM-DD
   score: number;                // 0–100
   rating: ConditionRating | null;
-  components: Record<string, number | null>;
+  /** Keyed by lib/score.ts SCORE_COMPONENT_IDS; parse with parseStoredComponents. */
+  components: Record<string, ResortScoreComponentRow>;
+  /** `algorithmic` for every row the scorer writes. */
   scored_by: string | null;
 }
 

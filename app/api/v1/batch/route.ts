@@ -17,6 +17,8 @@ import { GET as getHistory } from "@/app/api/v1/resorts/[slug]/history/route";
 import { GET as getSeasonStats } from "@/app/api/v1/resorts/[slug]/season-stats/route";
 import { GET as getMonthly } from "@/app/api/v1/resorts/[slug]/monthly/route";
 import { GET as getLeaderboard } from "@/app/api/v1/leaderboards/[kind]/route";
+import { GET as getScoreComponents } from "@/app/api/v1/resorts/[slug]/score-components/route";
+import { GET as getSnowReport } from "@/app/api/v1/snow-report/route";
 
 // POST /api/v1/batch — up to 10 GET /api/v1/* paths in one request, answered
 // in order with each route's own status and JSON body. The paths are run
@@ -38,7 +40,7 @@ async function dispatch(item: BatchPath): Promise<Response> {
   const ctx: SlugContext = { params: Promise.resolve({ slug: item.slug ?? "" }) };
   switch (item.route) {
     case "resorts":
-      return getResorts();
+      return getResorts(request);
     case "searchIndex":
       return getSearchIndex();
     case "resort":
@@ -67,6 +69,10 @@ async function dispatch(item: BatchPath): Promise<Response> {
       return getMonthly(request, ctx);
     case "leaderboard":
       return getLeaderboard(request, { params: Promise.resolve({ kind: item.slug ?? "" }) });
+    case "scoreComponents":
+      return getScoreComponents(request, ctx);
+    case "snowReport":
+      return getSnowReport(request);
   }
 }
 

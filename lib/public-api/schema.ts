@@ -359,22 +359,82 @@ export const ForecastAccuracySchema = z
   })
   .register(publicApiRegistry, { id: "ForecastAccuracy", description: "How each forecast model, and the blend, has verified at this resort against measured snow." });
 
+// ── Snow Score (P7, lib/score.ts) ────────────────────────────
+
+export const ScoreSourceSchema = z
+  .enum(["snotel", "model", "operator", "profile", "derived", "none"])
+  .register(publicApiRegistry, { id: "ScoreSource", description: "What a score component rests on. `none` means the component earned nothing because PeakCam has no input for it." });
+
+export const ScoreComponentSchema = z
+  .object({
+    points: z.number().min(0).describe("Points earned, one decimal."),
+    max: z.number().int().describe("The component's weight; the five maximums add to 100."),
+    basis: z.string().describe("One line saying what the points rest on, quotable as is."),
+    source: ScoreSourceSchema,
+  })
+  .register(publicApiRegistry, { id: "ScoreComponent" });
+
 export const ScoreComponentsSchema = z
-  .record(z.string(), z.number().nullable())
+  .object({
+    depthVsNormal: ScoreComponentSchema.describe("30: snowpack against the station's 1991–2020 median (SWE); without a normal, base depth on a fixed scale capped at 27."),
+    recentSnow7d: ScoreComponentSchema.describe("25: measured or modelled new snow over the last 7 days (24 in is full marks)."),
+    forecast7d: ScoreComponentSchema.describe("20: the blended next-7-day forecast total (20 in is full marks)."),
+    snowQuality: ScoreComponentSchema.describe("15: days since the last snow day × the 3-day high temperature × the engine's surface tags."),
+    operatingStatus: ScoreComponentSchema.describe("10: OPEN full, PRE_SEASON and CLOSED_TODAY half, OFF_SEASON and UNKNOWN none."),
+  })
   .register(publicApiRegistry, {
     id: "ScoreComponents",
-    description: "Named contributions to the score, e.g. `{\"newSnow24h\": 32, \"baseDepth\": 18}`.",
+    description: "The five named components of the Snow Score, each with points, max, basis and source.",
   });
 
 export const ResortScoreSchema = z
   .object({
-    date: z.string().describe("YYYY-MM-DD the score is for."),
+    date: z.string().describe("YYYY-MM-DD the score is for (Mountain-time day of the scoring run)."),
     score: z.number().int().min(0).max(100),
-    rating: ConditionRatingSchema.nullable(),
+    rating: ConditionRatingSchema.describe("The score's four-tier label: great ≥ 75, good ≥ 55, fair ≥ 35, else poor."),
+    tagline: z.string().describe("Dated sentence to quote: the score, its rating and the components strongest first."),
     components: ScoreComponentsSchema,
-    scoredBy: z.string().nullable().describe("Scorer version, e.g. `score-v1`."),
+    scoredBy: z.literal("algorithmic").describe("Always `algorithmic`: a fixed function of measured and modelled inputs, never an editorial call."),
+    version: z.string().describe("Formula version, e.g. `score-v1`; a change re-scores the history."),
   })
-  .register(publicApiRegistry, { id: "ResortScore", description: "PeakCam's 0–100 conditions score with its components." });
+  .register(publicApiRegistry, { id: "ResortScore", description: "PeakCam's 0–100 Snow Score for one day with its five components." });
+
+export const ScoreLightSchema = z
+  .object({
+    date: z.string().describe("YYYY-MM-DD."),
+    score: z.number().int().min(0).max(100),
+    rating: ConditionRatingSchema,
+  })
+  .register(publicApiRegistry, { id: "ScoreLight", description: "A score without its components: list rows and the 30-day history." });
+
+export const ResortScoreHistorySchema = z
+  .object({
+    slug: z.string(),
+    name: z.string(),
+    canonicalUrl: z.string(),
+    apiUrl: z.string().describe("This document."),
+    pageUrl: z.string().describe("Where the score ring and sparkline render."),
+    available: z.boolean().describe("False when the scorer has not written a row for this resort yet (or the table is not served)."),
+    today: ResortScoreSchema.nullable().describe("The newest score at most 3 days old, else null."),
+    history: z.array(ScoreLightSchema).describe("One point per scored day over the trailing window, oldest first."),
+    days: z.number().int().describe("The history window, days."),
+    weights: z.object({
+      depthVsNormal: z.number().int(),
+      recentSnow7d: z.number().int(),
+      forecast7d: z.number().int(),
+      snowQuality: z.number().int(),
+      operatingStatus: z.number().int(),
+    }),
+    ladder: z.object({ great: z.number().int(), good: z.number().int(), fair: z.number().int() }).describe("Score at or above each cutoff earns the label; below `fair` is `poor`."),
+    sentence: z.string().describe("The dated tagline, or why there is no score."),
+    scoredBy: z.literal("algorithmic"),
+    version: z.string(),
+    methodologyUrl: z.string(),
+    attribution: z.string(),
+    license: z.string(),
+    generatedAt: z.string(),
+  })
+  .register(publicApiRegistry, { id: "ResortScoreHistory", description: "Today's Snow Score with its components, plus the 30-day history for the sparkline." });
 
 export const EmbedTypeSchema = z.enum(["youtube", "iframe", "image", "link"]);
 
@@ -430,7 +490,7 @@ export const ResortSchema = z
     measuredNow: z.array(MeasuredNowSchema).optional().describe("Latest observation per station, once the station layer is live."),
     forecast: ForecastSummarySchema.nullable().optional().describe("Headline numbers from the blended 14-day forecast (summit point when one exists). Null when no run is current; absent on list and compare rows. The full daily blend and every model run are at `/resorts/{slug}/forecast`."),
     forecastScores: z.array(ForecastScoreSchema).optional().describe("Per-model verification at this resort over 90 days, ranked; empty until the scorer has measured days. Detail at `/resorts/{slug}/forecast-accuracy`."),
-    score: ResortScoreSchema.nullable().optional().describe("Today's 0–100 score, once the scorer is live."),
+    score: ResortScoreSchema.nullable().optional().describe("Today's 0–100 Snow Score with components (P7). Null when the scorer has not written a row at most 3 days old; absent only when the score table is not served."),
     websiteUrl: z.string().nullable(),
     attribution: z.string(),
     license: z.string().describe("URL of the terms that govern reuse."),
@@ -456,11 +516,29 @@ export const ResortLightSchema = z
       })
       .nullable(),
     rating: ConditionRatingSchema.nullable(),
+    score: ScoreLightSchema.nullable().optional().describe("Today's Snow Score (P7); null before the first scoring run, absent when the table is not served. Components at `/resorts/{slug}/score-components`."),
     seasonStatus: SeasonStatusSchema,
     camCount: z.number().int(),
     liveCamCount: z.number().int().describe("Cams whose last health check passed."),
   })
   .register(publicApiRegistry, { id: "ResortLight", description: "List-row view of a resort." });
+
+export const SNOW_REPORT_SORTS = ["name", "score", "newSnow24h", "baseDepth"] as const;
+export const SnowReportSortSchema = z.enum(SNOW_REPORT_SORTS);
+
+export const SnowReportListSchema = z
+  .object({
+    sort: SnowReportSortSchema.describe("How the rows are ordered. `score` ranks by today's Snow Score (unscored resorts last); `newSnow24h` and `baseDepth` rank by the report; `name` is alphabetical."),
+    state: z.string().nullable().describe("The state filter applied, or null."),
+    scoredAsOf: z.string().nullable().describe("YYYY-MM-DD of the newest score among the rows, or null when none is scored."),
+    sentence: z.string().describe("Dated sentence naming the top Snow Scores among the rows, or why there are none."),
+    count: z.number().int(),
+    resorts: z.array(ResortLightSchema),
+    attribution: z.string(),
+    license: z.string(),
+    generatedAt: z.string(),
+  })
+  .register(publicApiRegistry, { id: "SnowReportList", description: "The snow-report table: every active resort as a light row, sortable by Snow Score, new snow or base." });
 
 export const ResortListSchema = z
   .object({
@@ -528,6 +606,7 @@ export const PowderEntrySchema = z
     newSnow24h: MeasurementSchema,
     newSnow48h: MeasurementSchema,
     baseDepth: MeasurementSchema,
+    score: ScoreLightSchema.nullable().optional().describe("Today's Snow Score (P7), when the caller loaded the score index."),
   })
   .register(publicApiRegistry, { id: "PowderEntry" });
 
@@ -698,8 +777,13 @@ export type ForecastSummaryPublic = z.infer<typeof ForecastSummarySchema>;
 export type ForecastPublic = z.infer<typeof ForecastSchema>;
 export type ForecastTruthBasis = z.infer<typeof ForecastTruthBasisSchema>;
 export type ForecastAccuracyPublic = z.infer<typeof ForecastAccuracySchema>;
-export type ScoreComponents = z.infer<typeof ScoreComponentsSchema>;
+export type ScoreComponentPublic = z.infer<typeof ScoreComponentSchema>;
+export type ScoreComponentsPublic = z.infer<typeof ScoreComponentsSchema>;
 export type ResortScorePublic = z.infer<typeof ResortScoreSchema>;
+export type ScoreLightPublic = z.infer<typeof ScoreLightSchema>;
+export type ResortScoreHistoryPublic = z.infer<typeof ResortScoreHistorySchema>;
+export type SnowReportSort = z.infer<typeof SnowReportSortSchema>;
+export type SnowReportListPublic = z.infer<typeof SnowReportListSchema>;
 export type LocationPublic = z.infer<typeof LocationSchema>;
 export type ResortPublic = z.infer<typeof ResortSchema>;
 export type ResortLightPublic = z.infer<typeof ResortLightSchema>;

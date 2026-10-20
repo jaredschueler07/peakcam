@@ -40,10 +40,14 @@ import {
   ResortConditionsSchema,
   ResortLightSchema,
   ResortSchema,
+  ResortScoreHistorySchema,
   SeasonSchema,
   StationSchema,
   type MeasurementSource,
 } from "@/lib/public-api/schema";
+import { buildScoreDocument } from "@/lib/public-api/score";
+import { SCORE_COMPONENT_IDS, SCORE_COMPONENT_LABELS } from "@/lib/score";
+import type { ResortScoreRow } from "@/lib/types";
 import {
   camLive,
   rankPowder,
@@ -310,7 +314,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
     name: "find_powder",
     title: "Find powder",
     description:
-      "Rank resorts by new snow in the last 24 or 48 hours, optionally within one state/province and above a minimum. Pass sourceOnly=\"snotel\" to answer \"where did it snow most, measured only\" with station data alone. Resorts with no report are left out; zero inches is a measurement. " +
+      "Rank resorts by new snow in the last 24 or 48 hours, optionally within one state/province and above a minimum. Pass sourceOnly=\"snotel\" to answer \"where did it snow most, measured only\" with station data alone. Resorts with no report are left out; zero inches is a measurement. Each row also carries today's Snow Score (`score`, 0–100 with a rating) when one is stored; get_score explains it. " +
       sourceNote,
     inputSchema: z.object({
       window: PowderWindowSchema.default("24h").describe("Which window ranks first; the other breaks ties."),
@@ -325,7 +329,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
       const doc = rankPowder(
         catalog.resorts,
         { window, state: state ?? null, minInches: minInches ?? null, source: (sourceOnly as MeasurementSource | undefined) ?? null, limit },
-        { now: catalog.now },
+        { now: catalog.now, ...(catalog.scores !== undefined ? { scores: catalog.scores } : {}) },
       );
       const filters = [
         state ? `in ${state}` : null,
@@ -341,7 +345,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
           ? doc.results.map((r) => {
               const m = r[primary];
               const station = formatStation(m.station);
-              return `${r.rank}. **${r.name}** (\`${r.slug}\`, ${r.state}, ${r.country}) — ${formatMeasurement(m)} in ${window} · ${window === "24h" ? "48 h" : "24 h"} ${formatMeasurement(r[secondary])} · base ${formatMeasurement(r.baseDepth)} · ${sourceLabel(m.source)}${station ? ` (${station})` : ""}, ${formatInstant(m.measuredAt)} · ${r.canonicalUrl}`;
+              return `${r.rank}. **${r.name}** (\`${r.slug}\`, ${r.state}, ${r.country}) — ${formatMeasurement(m)} in ${window} · ${window === "24h" ? "48 h" : "24 h"} ${formatMeasurement(r[secondary])} · base ${formatMeasurement(r.baseDepth)} · ${r.score ? `score ${r.score.score} (${r.score.rating}, ${r.score.date}) · ` : ""}${sourceLabel(m.source)}${station ? ` (${station})` : ""}, ${formatInstant(m.measuredAt)} · ${r.canonicalUrl}`;
             })
           : ["No resort passed these filters. Loosen minInches or drop the state filter; it may also simply not have snowed."]),
         "",
@@ -359,7 +363,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
   const compareResorts = defineTool({
     name: "compare_resorts",
     title: "Compare resorts",
-    description: `Side-by-side latest snow, season status and cam counts for 2–${MAX_COMPARE} resorts. Every slug must resolve; an unknown one returns suggestions.`,
+    description: `Side-by-side latest snow, today's Snow Score (0–100 with a rating; get_score explains it), season status and cam counts for 2–${MAX_COMPARE} resorts. Every slug must resolve; an unknown one returns suggestions.`,
     inputSchema: z.object({
       slugs: z.array(SlugInput).min(2).max(MAX_COMPARE).describe(`2–${MAX_COMPARE} resort slugs.`),
     }),
@@ -386,19 +390,21 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
         const { cams, ...rest } = doc;
         return { ...rest, camCount: cams.length, liveCamCount: cams.filter((c) => c.live === true).length };
       });
-      const header = "| Resort | 24 h | 48 h | Base | SWE % normal | Rating | Season | Source | Cams live |";
+      const header = "| Resort | Score | 24 h | 48 h | Base | SWE % normal | Rating | Season | Source | Cams live |";
       const rows = entries.map((e) => {
         const s = e.snow;
-        return `| [${e.name}](${e.canonicalUrl}) | ${formatMeasurement(s?.newSnow24h)} | ${formatMeasurement(s?.newSnow48h)} | ${formatMeasurement(s?.baseDepth)} | ${formatMeasurement(s?.pctOfNormal)} | ${s?.rating ?? "n/a"} | ${e.season.status} | ${s ? `${sourceLabel(s.source, true)} ${formatInstant(s.reportedAt)}` : "none"} | ${e.liveCamCount}/${e.camCount} |`;
+        const score = e.score ? `${e.score.score} (${e.score.rating})` : "n/a";
+        return `| [${e.name}](${e.canonicalUrl}) | ${score} | ${formatMeasurement(s?.newSnow24h)} | ${formatMeasurement(s?.newSnow48h)} | ${formatMeasurement(s?.baseDepth)} | ${formatMeasurement(s?.pctOfNormal)} | ${s?.rating ?? "n/a"} | ${e.season.status} | ${s ? `${sourceLabel(s.source, true)} ${formatInstant(s.reportedAt)}` : "none"} | ${e.liveCamCount}/${e.camCount} |`;
       });
+      const scoredDay = entries.map((e) => e.score?.date ?? "").filter(Boolean).sort().reverse()[0];
       const lines = [
         `Comparison as of ${formatInstant(catalog.now.toISOString())}:`,
         "",
         header,
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
         ...rows,
         "",
-        "SNOTEL = station-measured; model = Open-Meteo estimate. SWE % normal is null without a station or when SWE is under 2 in.",
+        `SNOTEL = station-measured; model = Open-Meteo estimate. SWE % normal is null without a station or when SWE is under 2 in. Score = PeakCam Snow Score 0–100${scoredDay ? ` as of ${scoredDay}` : ""} (get_score lists the components).`,
       ];
       return ok(lines.join("\n"), { count: entries.length, resorts: entries, generatedAt: catalog.now.toISOString() });
     },
@@ -1456,7 +1462,53 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
     },
   });
 
-  return [...baseTools, ask as unknown as ToolDefinition, ...historyTools, getTimelapses as unknown as ToolDefinition];
+  // ── get_score (P7, migration 028) ─────────────────────────
+  const getScore = defineTool({
+    name: "get_score",
+    title: "Snow Score",
+    description:
+      "PeakCam's 0–100 Snow Score for one resort, scored once a day by a fixed formula (scoredBy is always `algorithmic`): `today` carries the score, its four-tier rating (great ≥ 75, good ≥ 55, fair ≥ 35, else poor; the same words as the conditions rating), a dated tagline to quote and five components, each with points, max, a one-line basis and its source: depth vs the station's 1991–2020 normal (30), new snow over the last 7 days (25), the blended 7-day forecast (20), snow quality from days since snow, the 3-day high and the surface tags (15), and the operating status (10). `history` is one point per scored day over the last 30 days. Use it for \"how good is X right now and why\", \"score X out of 100\", \"is X better than last week\"; for a ranking use find_powder, compare_resorts or /api/v1/snow-report?sort=score. `available: false` before the first scoring run.",
+    inputSchema: z.object({ slug: SlugInput }),
+    outputSchema: ResortScoreHistorySchema,
+    async handler({ slug }) {
+      const catalog = await data.catalog();
+      const hit = resolve(catalog, slug);
+      if (!hit.ok) return hit.result;
+      const resort = hit.resort;
+      let history: ResortScoreRow[] | null = null;
+      if (data.scoreHistory) {
+        try {
+          history = await data.scoreHistory(resort.id);
+        } catch {
+          history = null;
+        }
+      }
+      const doc = buildScoreDocument(resort, { today: catalog.scores?.[resort.id] ?? null, history }, { now: catalog.now });
+      const lines = [`# ${resort.name} Snow Score${doc.today ? `: ${doc.today.score} of 100 (${doc.today.rating})` : ""} — ${doc.pageUrl}`, "", doc.sentence, ""];
+      if (doc.today) {
+        lines.push("| Component | Points | Max | Basis | Source |", "| --- | --- | --- | --- | --- |");
+        for (const id of SCORE_COMPONENT_IDS) {
+          const c = doc.today.components[id];
+          lines.push(`| ${SCORE_COMPONENT_LABELS[id]} | ${c.points} | ${c.max} | ${c.basis} | ${c.source} |`);
+        }
+        lines.push("");
+      }
+      if (doc.history.length) {
+        lines.push(`Last ${doc.history.length} scored day${doc.history.length === 1 ? "" : "s"}: ${sparkline(doc.history.map((h) => h.score))} (${doc.history[0].date} ${doc.history[0].score} → ${doc.history[doc.history.length - 1].date} ${doc.history[doc.history.length - 1].score})`, "");
+      }
+      lines.push(`Ladder: great ≥ ${doc.ladder.great}, good ≥ ${doc.ladder.good}, fair ≥ ${doc.ladder.fair}, else poor. Weights ${SCORE_COMPONENT_IDS.map((id) => `${id} ${doc.weights[id]}`).join(", ")}. Formula: ${doc.methodologyUrl}. JSON: ${doc.apiUrl}`);
+      return ok(lines.join("\n"), doc);
+    },
+  });
+
+  return [...baseTools, ask as unknown as ToolDefinition, ...historyTools, getTimelapses as unknown as ToolDefinition, getScore as unknown as ToolDefinition];
+}
+
+const SPARK = "▁▂▃▄▅▆▇█";
+
+/** A text sparkline over 0–100 scores for the markdown content block. */
+export function sparkline(values: readonly number[]): string {
+  return values.map((v) => SPARK[Math.max(0, Math.min(SPARK.length - 1, Math.round((Math.max(0, Math.min(100, v)) / 100) * (SPARK.length - 1))))]).join("");
 }
 
 export { camLine };
