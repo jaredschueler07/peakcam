@@ -548,3 +548,61 @@ test("the OpenAPI components carry the parity shapes and the resort document ref
   assert.ok(schemas.Cam.required!.includes("kind"));
   assert.ok(!schemas.Cam.required!.includes("timelapses"));
 });
+
+// ── Stations (migration 026) ─────────────────────────────────
+
+test("serializeStations: every linked station listed, measuredNow only for rows with an observation and a known network, ages from `now`", async () => {
+  const { serializeStations } = await import("./serialize");
+  const { MeasuredNowSchema, ObservationStationSchema } = await import("./schema");
+  const now = new Date("2026-12-20T18:00:00Z");
+  const rows = [
+    {
+      role: "base" as const,
+      distance_km: 0.3,
+      rank: 2,
+      station: { id: "st-1", source: "snotel", source_id: "1308:UT:SNTL", name: "Atwater", lat: 40.59, lng: -111.64, elevation_ft: 8750, kind: "snotel" as const },
+      latest: { station_id: "st-1", observed_at: "2026-12-19T23:59:59+00:00", snow_depth_in: 61, swe_in: 14.2, new_snow_in: 11, temp_f: 18, wind_mph: null, source_payload: null },
+    },
+    {
+      role: "summit" as const,
+      distance_km: 2.3,
+      rank: 1,
+      station: { id: "st-2", source: "nws", source_id: "AMB", name: "ALTA - MT BALDY", lat: 40.57, lng: -111.64, elevation_ft: 11066, kind: "nws_obs" as const },
+      latest: { station_id: "st-2", observed_at: "2026-12-20T17:00:00+00:00", snow_depth_in: null, swe_in: null, new_snow_in: null, temp_f: 12.2, wind_mph: 31, source_payload: null },
+    },
+    {
+      role: "mid" as const,
+      distance_km: 9,
+      rank: 3,
+      station: { id: "st-3", source: "mystery_net", source_id: "X1", name: null, lat: null, lng: null, elevation_ft: null, kind: "nws_obs" as const },
+      latest: { station_id: "st-3", observed_at: "2026-12-20T17:00:00+00:00", snow_depth_in: 1, swe_in: null, new_snow_in: null, temp_f: null, wind_mph: null, source_payload: null },
+    },
+  ];
+  const out = serializeStations(rows, now);
+  assert.deepEqual(out.stations.map((s) => [s.rank, s.role, s.sourceId]), [[1, "summit", "AMB"], [2, "base", "1308:UT:SNTL"], [3, "mid", "X1"]]);
+  for (const s of out.stations) ObservationStationSchema.parse(s);
+  assert.deepEqual(out.measuredNow.map((m) => m.sourceId), ["AMB", "1308:UT:SNTL"], "an undocumented network is listed but gets no measuredNow row");
+  for (const m of out.measuredNow) MeasuredNowSchema.parse(m);
+  const [summit, base] = out.measuredNow;
+  assert.equal(summit.ageMinutes, 60);
+  assert.equal(summit.observedAt, "2026-12-20T17:00:00.000Z");
+  assert.equal(summit.windMph, 31);
+  assert.equal(base.ageMinutes, 1080);
+  assert.equal(base.snowDepthIn, 61);
+  assert.equal(base.attribution, "USDA NRCS SNOTEL");
+  assert.equal(summit.attribution, "NOAA National Weather Service");
+});
+
+test("serializeResort: stations/measuredNow appear only when the caller passes observationStations", async () => {
+  const { serializeResort } = await import("./serialize");
+  const { ResortSchema } = await import("./schema");
+  const fixture = resort();
+  const without = serializeResort(fixture, { now: new Date("2026-12-20T18:00:00Z") });
+  assert.equal("stations" in without, false);
+  assert.equal("measuredNow" in without, false);
+  ResortSchema.parse(without);
+  const withEmpty = serializeResort(fixture, { now: new Date("2026-12-20T18:00:00Z"), observationStations: [] });
+  assert.deepEqual(withEmpty.stations, []);
+  assert.deepEqual(withEmpty.measuredNow, []);
+  ResortSchema.parse(withEmpty);
+});

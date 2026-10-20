@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
-import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition, PowderProbability, PowderProbabilityForecast, PowderProbabilityWindow } from "./types";
+import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition, PowderProbability, PowderProbabilityForecast, PowderProbabilityWindow, ResortStationJoined, StationObservation, StationRole, StationRow } from "./types";
 import type { ResortOpening } from "./openings";
 import { withResolvedCamNames } from "./cam-name";
 import { clampHours, pickResortTimeline, shapeTimeline, toFrame, MAX_TIMELINE_HOURS, type CamStillRow, type CamTimeline, type CamTimelineFrame } from "./cam-timeline";
@@ -21,6 +21,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 const SUPABASE_FETCH_TIMEOUT_MS = 8_000;
 const RESORT_CATALOG_REVALIDATE_SECONDS = 60 * 60;
+// Stations refresh hourly on the mini; a 15-minute cache keeps "age" honest without a query per request.
+const PUBLIC_API_STATIONS_REVALIDATE_SECONDS = 15 * 60;
 
 /**
  * Wraps `fetch` so every request the client makes aborts after `ms` instead
@@ -476,6 +478,74 @@ export const getResortElevationIndex = unstable_cache(
   fetchResortElevationIndex,
   ["peakcam:resort-elevations:v1", supabaseUrl],
   { revalidate: RESORT_CATALOG_REVALIDATE_SECONDS, tags: ["peakcam-resort-catalog"] },
+);
+
+// ─────────────────────────────────────────────────────────────
+// Station layer (migration 026): each resort's stations with the newest
+// observation per station. One query for the whole catalogue through
+// PostgREST's embedded ordering/limit, so the API, the resort page and the
+// MCP tool share a 15-minute cache like the catalogue. A database without
+// migration 026 yet returns an empty index rather than failing the page.
+// ─────────────────────────────────────────────────────────────
+
+const RESORT_STATIONS_SELECT =
+  "resort_id, role, distance_km, rank, " +
+  "station:stations!inner(id, source, source_id, name, lat, lng, elevation_ft, kind, " +
+  "station_observations(station_id, observed_at, snow_depth_in, swe_in, new_snow_in, temp_f, wind_mph))";
+
+interface ResortStationQueryRow {
+  resort_id: string;
+  role: StationRole;
+  distance_km: number | string | null;
+  rank: number;
+  station: StationRow & { station_observations: Array<Omit<StationObservation, "source_payload">> | null };
+}
+
+async function fetchResortStationsIndex(): Promise<Record<string, ResortStationJoined[]>> {
+  const { data, error } = await supabase
+    .from("resort_stations")
+    .select(RESORT_STATIONS_SELECT)
+    .neq("role", "approach")
+    .order("rank", { ascending: true })
+    .order("observed_at", { referencedTable: "stations.station_observations", ascending: false })
+    .limit(1, { referencedTable: "stations.station_observations" });
+  if (error) {
+    if (MISSING_TABLE_CODES.has(error.code)) return {};
+    throw error;
+  }
+  const out: Record<string, ResortStationJoined[]> = {};
+  for (const row of (data ?? []) as unknown as ResortStationQueryRow[]) {
+    if (!row.station) continue;
+    const { station_observations, ...station } = row.station;
+    const latest = station_observations?.[0] ?? null;
+    const num = (v: number | string | null | undefined) => (v == null ? null : Number(v));
+    (out[row.resort_id] ??= []).push({
+      role: row.role,
+      distance_km: num(row.distance_km),
+      rank: row.rank,
+      station: { ...station, elevation_ft: num(station.elevation_ft) },
+      latest: latest
+        ? {
+            station_id: latest.station_id,
+            observed_at: latest.observed_at,
+            snow_depth_in: num(latest.snow_depth_in),
+            swe_in: num(latest.swe_in),
+            new_snow_in: num(latest.new_snow_in),
+            temp_f: num(latest.temp_f),
+            wind_mph: num(latest.wind_mph),
+            source_payload: null,
+          }
+        : null,
+    });
+  }
+  return out;
+}
+
+/** Stations and their newest observation for every resort, keyed by resort id. Cached with the catalogue. */
+export const getResortStationsIndex = unstable_cache(
+  fetchResortStationsIndex,
+  ["peakcam:resort-stations:v1", supabaseUrl],
+  { revalidate: PUBLIC_API_STATIONS_REVALIDATE_SECONDS, tags: ["peakcam-resort-catalog"] },
 );
 
 /** Midpoint elevation (base+summit)/2 in feet, for resorts with resort_metadata. Returns base-only or null if incomplete/missing. */
