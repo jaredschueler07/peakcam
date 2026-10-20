@@ -39,8 +39,45 @@ export function withFetchTimeout(fetchImpl: typeof fetch, ms: number): typeof fe
     fetchImpl(input, { ...init, signal: init?.signal ?? AbortSignal.timeout(ms) });
 }
 
+/** Status codes PostgREST and the Supabase gateway return while they are briefly unavailable. */
+const RETRYABLE_STATUS = new Set([502, 503, 504]);
+const RETRY_DELAYS_MS = [1_000, 3_000, 6_000];
+
+/**
+ * Retries idempotent requests (GET/HEAD) that fail transiently: a 502/503/504
+ * from the gateway, a network error, or the per-attempt timeout above.
+ *
+ * Why: PostgREST answers 503 `PGRST002` ("Could not query the database for the
+ * schema cache") for roughly a minute after any DDL on the project, and the
+ * schema-cache queries themselves took 13-20 s on 2026-10-20 01:33 UTC. Vercel
+ * builds that happened to prerender in that window failed on the 8 s abort
+ * even though the database itself was idle; Next's own
+ * `staticGenerationRetryCount` could not help because the whole retry budget
+ * elapsed inside the outage. Three retries with 1/3/6 s backoff cover that
+ * window at the cost of at most ~34 s on a request that would have failed
+ * anyway. Writes are never retried. A caller-supplied signal that aborts
+ * stops the retries immediately.
+ */
+export function withFetchRetry(fetchImpl: typeof fetch, delays: readonly number[] = RETRY_DELAYS_MS): typeof fetch {
+  return async (input, init) => {
+    const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+    const idempotent = method === "GET" || method === "HEAD";
+    let attempt = 0;
+    for (;;) {
+      try {
+        const res = await fetchImpl(input, init);
+        if (!idempotent || !RETRYABLE_STATUS.has(res.status) || attempt >= delays.length) return res;
+      } catch (err) {
+        if (!idempotent || attempt >= delays.length || init?.signal?.aborted) throw err;
+      }
+      await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+      attempt += 1;
+    }
+  };
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  global: { fetch: withFetchTimeout(fetch, SUPABASE_FETCH_TIMEOUT_MS) },
+  global: { fetch: withFetchRetry(withFetchTimeout(fetch, SUPABASE_FETCH_TIMEOUT_MS)) },
 });
 
 // ─────────────────────────────────────────────────────────────
