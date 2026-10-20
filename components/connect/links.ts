@@ -57,6 +57,13 @@ export const CONNECT_LINKS = {
   apiStatus: { href: "/api/v1/status", label: "REST: service status" },
   apiAsk: { href: "/api/v1/ask?q=is+alta+open", label: "REST: ask a question" },
   apiBatch: { href: "/api/v1/batch", label: "REST: batch (POST)" },
+  apiHistory: { href: "/api/v1/resorts/breckenridge/history", label: "REST: season history" },
+  apiSeasonStats: { href: "/api/v1/resorts/breckenridge/season-stats", label: "REST: season stats" },
+  apiMonthly: { href: "/api/v1/resorts/breckenridge/monthly", label: "REST: monthly climatology" },
+  apiLeaderboard: { href: "/api/v1/leaderboards/season-snowfall", label: "REST: a leaderboard" },
+  historyPage: { href: "/resorts/breckenridge/history", label: "Season history page" },
+  historyMd: { href: "/resorts/breckenridge/history/index.md", label: "Markdown: season history" },
+  seasonSnowfall: { href: "/snow-report/season-snowfall", label: "Season snowfall leaderboard" },
   nlwebAsk: { href: "/ask?query=where+did+it+snow+most", label: "NLWeb: /ask" },
   openapi: { href: "/api/v1/openapi.json", label: "OpenAPI 3.1" },
   schemas: { href: "/.well-known/schemas", label: "JSON Schemas" },
@@ -169,6 +176,18 @@ const TOOL_COPY: Record<PeakCamToolName, Omit<ConnectTool, "name">> = {
     title: "Ask PeakCam",
     summary: "A plain question routed to the right tool by name and keywords, with a dated sentence to quote. No model, no guessing.",
   },
+  get_season_stats: {
+    title: "Season stats",
+    summary: "Season-to-date measured snowfall, powder days, base, percent of normal on two baselines and the same day last year for one resort.",
+  },
+  get_monthly_climatology: {
+    title: "Monthly climatology",
+    summary: "Average snowfall, snow days, depth and biggest storm per month at the resort's station, 30-winter and recent-decade.",
+  },
+  get_leaderboard: {
+    title: "Leaderboard",
+    summary: "Resorts ranked by 7-day snow, season powder days, deepest base or season snowfall, by state, measured-only option.",
+  },
 };
 
 /** In the server's registration order. */
@@ -205,6 +224,8 @@ export const EXAMPLE_PROMPTS: readonly ExamplePrompt[] = [
   { prompt: "What did Alta's cams look like over the last 24 hours?", tools: "get_cam_timeline (alta, 24 h; links only)" },
   { prompt: "Tell me about Jackson Hole: where it is, how high, and where its snow numbers come from.", tools: "get_resort_profile" },
   { prompt: "Is Breck open yet, and how do I get an alert when it dumps?", tools: "ask (\"is Breck open\"), get_alert_options" },
+  { prompt: "How is this season going at Breckenridge compared with normal and with last year?", tools: "get_season_stats, get_snow_history (season)" },
+  { prompt: "Which resorts have had the most powder days this season?", tools: "get_leaderboard (season-powder-days)" },
 ];
 
 // ── Client recipes ───────────────────────────────────────────

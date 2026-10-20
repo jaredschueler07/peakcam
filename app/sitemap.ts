@@ -3,6 +3,7 @@ import { getResortOpenings, getResortSitemapEntries } from "@/lib/supabase";
 import { SITE_URL } from "@/lib/site";
 import { isDropInEnabled } from "@/lib/drop-in";
 import { HUB_BASE_PATH, hubPath, listHubs } from "@/lib/hubs";
+import { LEADERBOARD_KINDS, leaderboardPath } from "@/lib/leaderboards";
 
 // Match the data pages' ISR window: the sitemap's lastModified values come
 // from snow_reports, which the sync jobs append every 6h (and, for
@@ -36,6 +37,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: e.lastReportAt ? new Date(e.lastReportAt) : buildTime,
     changeFrequency: "hourly",
     priority: 0.8,
+  }));
+
+  // P5: one history subpage per resort. Its data-bearing content (the season
+  // curve, the stats) changes when the resort's daily row does, which the
+  // 6-hourly sync writes alongside the report, so the report time is honest.
+  const historyEntries: MetadataRoute.Sitemap = entries.map((e) => ({
+    url: `${SITE_URL}/resorts/${e.slug}/history`,
+    lastModified: e.lastReportAt ? new Date(e.lastReportAt) : buildTime,
+    changeFrequency: "daily",
+    priority: 0.6,
   }));
 
   // The aggregate pages (/, /snow-report, /map) change exactly when the newest
@@ -90,6 +101,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Percent-of-normal leaderboard: ranks the SNOTEL-fed resorts, so it
     // changes with the newest report like the other aggregate pages.
     { url: `${SITE_URL}/snow-report/percent-of-normal`, lastModified: dataModified, changeFrequency: "hourly", priority: 0.7 },
+    // P5 leaderboards: season snowfall, powder days, deepest base and the
+    // 7-day board all move with the newest report / daily row.
+    ...LEADERBOARD_KINDS.map((kind) => ({ url: `${SITE_URL}${leaderboardPath(kind)}`, lastModified: dataModified, changeFrequency: "daily" as const, priority: 0.7 })),
     { url: `${SITE_URL}/map`, lastModified: dataModified, changeFrequency: "hourly", priority: 0.8 },
     { url: `${SITE_URL}/compare`, lastModified: buildTime, changeFrequency: "weekly", priority: 0.6 },
     // Powder-alert sign-up landing page: the only dedicated conversion page,
@@ -115,5 +129,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/methodology`, lastModified: buildTime, changeFrequency: "monthly", priority: 0.5 },
     ...hubEntries,
     ...resortEntries,
+    ...historyEntries,
   ];
 }

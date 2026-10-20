@@ -128,6 +128,8 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
       { name: "ask", description: "The deterministic answer endpoint." },
       { name: "batch", description: "Several reads in one request." },
       { name: "status", description: "Service health derived from the data." },
+      { name: "history", description: "Season history, season-to-date stats and monthly climatology per resort." },
+      { name: "leaderboards", description: "Season rankings: 7-day snow, powder days, deepest base, season snowfall." },
     ],
     paths: {
       "/resorts": {
@@ -239,13 +241,68 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
           },
         },
       },
+      // ── P5: history, season stats, monthly climatology, leaderboards ──
+      "/resorts/{slug}/history": {
+        get: {
+          operationId: "getResortHistory",
+          tags: ["history"],
+          summary: "Season snowfall curve vs the station's normal band, plus ten past seasons",
+          description:
+            "The current season's cumulative measured snowfall by day (daily new snow = the positive change in station depth, a floor on what fell) against the station's 30-winter normal band (mean, p25, p75, with the recent-decade mean), and up to ten past seasons with totals, snow and powder days, the biggest storm, the deepest base, weekly cumulative totals and the winter's ENSO phase. Resorts without a station get the curve without a band. Backs https://www.peakcam.io/resorts/{slug}/history.",
+          parameters: [SLUG_PARAM],
+          responses: { "200": jsonResponse("The history document.", "ResortHistory"), "404": ERROR_404, "403": ERROR_403 },
+        },
+      },
+      "/resorts/{slug}/season-stats": {
+        get: {
+          operationId: "getResortSeasonStats",
+          tags: ["history"],
+          summary: "Season-to-date snowfall, powder days, base and percent of normal on two baselines",
+          description:
+            "Season-to-date measured snowfall, days measured, snow days, powder days (8 in or more, the alert threshold), current and deepest base, percent of the 30-winter normal to this day and of the recent decade (with a `baselineNote` when the two differ by more than 10 %), the same day last year, a 7-day trend and a dated sentence to quote.",
+          parameters: [SLUG_PARAM],
+          responses: { "200": jsonResponse("The season stats.", "SeasonStats"), "404": ERROR_404, "403": ERROR_403 },
+        },
+      },
+      "/resorts/{slug}/monthly": {
+        get: {
+          operationId: "getResortMonthly",
+          tags: ["history"],
+          summary: "Monthly climatology at the resort's station",
+          description:
+            "Average snowfall, snow days, depth and the biggest storm per calendar month over the 30 most recent complete winters and, separately, the 10 most recent, with the recent decade as a percent of the 30-winter figure. `available: false` for resorts without a station normal.",
+          parameters: [SLUG_PARAM],
+          responses: { "200": jsonResponse("The monthly climatology.", "MonthlyClimatology"), "404": ERROR_404, "403": ERROR_403 },
+        },
+      },
+      "/leaderboards/{kind}": {
+        get: {
+          operationId: "getLeaderboard",
+          tags: ["leaderboards"],
+          summary: "One of the four season leaderboards",
+          description:
+            "`best-powder-this-week` (measured new snow in the last 7 days), `season-powder-days` (days with 8 in or more since Oct 1), `deepest-base` (latest station or model depth) and `season-snowfall` (measured new snow since Oct 1). The two season-bound boards cover the Northern hemisphere only. Each answers a dated sentence, the rule in words and ranked rows with source and station. Same data as https://www.peakcam.io/snow-report/{kind}.",
+          parameters: [
+            { name: "kind", in: "path", required: true, schema: ref("LeaderboardKind"), example: "season-snowfall" },
+            { name: "state", in: "query", description: "State/province code or country name as stored, case-insensitive (`CO`, `BC`, `Chile`).", schema: { type: "string" } },
+            { name: "source", in: "query", description: "Keep only rows from this source (`snotel` = measured only).", schema: ref("MeasurementSource") },
+            { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 200, default: 25 } },
+          ],
+          responses: {
+            "200": jsonResponse("The leaderboard.", "Leaderboard"),
+            "400": ERROR_400,
+            "404": { description: "Unknown leaderboard kind.", content: { "application/json": { schema: ref("Error") } } },
+            "403": ERROR_403,
+          },
+        },
+      },
       "/batch": {
         post: {
           operationId: "batchRead",
           tags: ["batch"],
           summary: `Run up to ${BATCH_MAX_REQUESTS} GET requests in one call`,
           description:
-            `Accepts up to ${BATCH_MAX_REQUESTS} GET paths under /api/v1 (with query strings) and answers them in order, each with the status and body that path would have returned on its own. The paths run in-process against the same handlers, so a batch is one function invocation and one request against the edge rate limit. Read-only by construction: only /resorts, /resorts/search-index, /resorts/{slug}, /resorts/{slug}/cams, /powder, /status and /ask (GET) dispatch; any other path fails the whole batch with a 400 naming it. The response is never cached.`,
+            `Accepts up to ${BATCH_MAX_REQUESTS} GET paths under /api/v1 (with query strings) and answers them in order, each with the status and body that path would have returned on its own. The paths run in-process against the same handlers, so a batch is one function invocation and one request against the edge rate limit. Read-only by construction: only /resorts, /resorts/search-index, /resorts/{slug}, /resorts/{slug}/cams, /resorts/{slug}/history, /resorts/{slug}/season-stats, /resorts/{slug}/monthly, /leaderboards/{kind}, /powder, /status and /ask (GET) dispatch; any other path fails the whole batch with a 400 naming it. The response is never cached.`,
           requestBody: {
             required: true,
             content: {

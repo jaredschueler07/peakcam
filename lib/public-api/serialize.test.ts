@@ -417,7 +417,11 @@ test("publicJson / publicError / publicOptions / withPublicHeaders", async () =>
 test("the OpenAPI document references only schemas it defines", () => {
   const doc = buildOpenApiDocument() as { openapi: string; paths: Record<string, unknown>; components: { schemas: Record<string, Record<string, unknown>> } };
   assert.equal(doc.openapi, "3.1.0");
-  assert.deepEqual(Object.keys(doc.paths), ["/resorts", "/resorts/{slug}", "/resorts/{slug}/cams", "/resorts/search-index", "/powder", "/status", "/ask", "/batch"]);
+  assert.deepEqual(Object.keys(doc.paths), ["/resorts", "/resorts/{slug}", "/resorts/{slug}/cams", "/resorts/search-index", "/powder", "/status", "/ask",
+    "/resorts/{slug}/history",
+    "/resorts/{slug}/season-stats",
+    "/resorts/{slug}/monthly",
+    "/leaderboards/{kind}", "/batch"]);
   const ids = new Set(Object.keys(doc.components.schemas));
   for (const id of ["Resort", "ResortList", "CamList", "PowderList", "Measurement", "Station", "Season", "Cam", "Error", "SearchIndex", "Status", "AskAnswer", "BatchRequest", "BatchResponse"]) {
     assert.ok(ids.has(id), `missing component ${id}`);

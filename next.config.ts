@@ -243,6 +243,11 @@ const nextConfig: NextConfig = {
         source: "/resorts/:slug",
         headers: [{ key: "Link", value: discoveryLinkHeader("/resorts/:slug/index.md") }],
       },
+      // P5: the season history subpage advertises its own markdown alternate.
+      {
+        source: "/resorts/:slug/history",
+        headers: [{ key: "Link", value: discoveryLinkHeader("/resorts/:slug/history/index.md") }],
+      },
     ];
   },
   async redirects() {

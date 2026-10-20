@@ -29,6 +29,9 @@ export const TOOL_EXAMPLES: Record<PeakCamToolName, ToolExample> = {
   get_alert_options: { prompt: "How do I get an alert when it dumps at Alta?", args: { slug: "alta" } },
   get_cam_timeline: { prompt: "What did Breckenridge's cams look like over the last 24 hours?", args: { slug: "breckenridge", hours: 24 } },
   ask: { prompt: "Is Breck open?", args: { question: "Is Breck open?" } },
+  get_season_stats: { prompt: "How much snow has Breckenridge had this season, and is that normal?", args: { slug: "breckenridge" } },
+  get_monthly_climatology: { prompt: "Which month is snowiest at Alta?", args: { slug: "alta" } },
+  get_leaderboard: { prompt: "Which Colorado resorts have had the most powder days this season?", args: { kind: "season-powder-days", state: "CO", limit: 10 } },
 };
 
 /** `--tool-arg k=v` pairs for the MCP Inspector CLI (arrays and objects as JSON). */

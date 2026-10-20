@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { unstable_cache } from "next/cache";
-import { loadPublicApiCatalog } from "@/lib/public-api/data";
+import { loadPublicApiCatalog, loadResortHistory, loadSeasonAggregates } from "@/lib/public-api/data";
 import { PUBLIC_API_REVALIDATE_SECONDS } from "@/lib/public-api/headers";
 import { getCamStillFrames, supabase } from "@/lib/supabase";
 import { getWeatherForecast } from "@/lib/weather";
@@ -73,4 +73,8 @@ export const productionDataSource: McpDataSource = {
   snowHistory: (resortId, days) => getSnowHistoryCached(resortId, days),
   camStills: (filter, hours) => getCamStillFramesCached(filter.camId ?? null, filter.resortId ?? null, hours),
   logUnmatchedQuestion,
+  // P5: the same 15-minute Data Cache entries the /history, /season-stats,
+  // /monthly and /leaderboards routes read.
+  resortHistory: (resort) => loadResortHistory(resort),
+  seasonAggregates: (seasonStart, weekStart) => loadSeasonAggregates(seasonStart, weekStart),
 };

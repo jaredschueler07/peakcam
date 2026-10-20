@@ -9,6 +9,10 @@ import { GET as getCams } from "@/app/api/v1/resorts/[slug]/cams/route";
 import { GET as getPowder } from "@/app/api/v1/powder/route";
 import { GET as getStatus } from "@/app/api/v1/status/route";
 import { GET as getAsk } from "@/app/api/v1/ask/route";
+import { GET as getHistory } from "@/app/api/v1/resorts/[slug]/history/route";
+import { GET as getSeasonStats } from "@/app/api/v1/resorts/[slug]/season-stats/route";
+import { GET as getMonthly } from "@/app/api/v1/resorts/[slug]/monthly/route";
+import { GET as getLeaderboard } from "@/app/api/v1/leaderboards/[kind]/route";
 
 // POST /api/v1/batch — up to 10 GET /api/v1/* paths in one request, answered
 // in order with each route's own status and JSON body. The paths are run
@@ -43,6 +47,14 @@ async function dispatch(item: BatchPath): Promise<Response> {
       return getStatus();
     case "ask":
       return getAsk(request);
+    case "history":
+      return getHistory(request, ctx);
+    case "seasonStats":
+      return getSeasonStats(request, ctx);
+    case "monthly":
+      return getMonthly(request, ctx);
+    case "leaderboard":
+      return getLeaderboard(request, { params: Promise.resolve({ kind: item.slug ?? "" }) });
   }
 }
 

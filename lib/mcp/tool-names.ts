@@ -20,6 +20,10 @@ export const PEAKCAM_TOOL_NAMES = [
   "get_alert_options",
   "get_cam_timeline",
   "ask",
+  // P5 history
+  "get_season_stats",
+  "get_monthly_climatology",
+  "get_leaderboard",
 ] as const;
 
 export type PeakCamToolName = (typeof PEAKCAM_TOOL_NAMES)[number];
