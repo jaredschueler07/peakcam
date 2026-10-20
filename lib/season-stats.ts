@@ -367,13 +367,13 @@ export function seasonSentence(
   source: { kind: "snotel" | "model"; stationName?: string | null },
 ): SeasonSentence {
   const segments: SeasonSentenceSegment[] = [];
-  const year = Number(stats.season.startDate.slice(0, 4));
   const start = formatDayLabel(stats.season.startDate);
   if (!stats.lastMeasuredDate) {
     segments.push({ text: `No daily measurements yet this season for ` }, { text: resort.name, href: `/resorts/${resort.slug}` }, { text: `; the season curve starts with the first reading after ${start}.` });
     return { text: segments.map((s) => s.text).join(""), segments, asOfDay: null };
   }
-  const through = formatDayLabel(stats.lastMeasuredDate, year);
+  // No year: the season label and "a year ago" carry it, and "Jan 12, 2027" reads as stale.
+  const through = formatDayLabel(stats.lastMeasuredDate);
   segments.push({ text: `Through ${through}, ` });
   if (source.kind === "snotel") {
     segments.push({ text: "the " });

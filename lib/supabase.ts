@@ -4,6 +4,8 @@ import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuali
 import type { ResortOpening } from "./openings";
 import { withResolvedCamNames } from "./cam-name";
 import { clampHours, pickResortTimeline, shapeTimeline, toFrame, MAX_TIMELINE_HOURS, type CamStillRow, type CamTimeline, type CamTimelineFrame } from "./cam-timeline";
+import type { CumulativeNormalRow, DailyRow, MonthlyNormalRow, NormalWindow } from "./snow-history";
+import type { SeasonAggregateRow } from "./leaderboards";
 
 // ─────────────────────────────────────────────────────────────
 // Client
@@ -641,4 +643,151 @@ export async function getLatestArchivedStill(resortId: string): Promise<CamTimel
     return null;
   }
   return data ? toFrame(data as CamStillRow, supabaseUrl) : null;
+}
+
+// ── Season history (P5, migration 030) ───────────────────────
+
+
+/** Error codes for a column or function that a migration has not created yet. */
+const MISSING_COLUMN_CODES = new Set(["42703", "PGRST204"]);
+const MISSING_FUNCTION_CODES = new Set(["PGRST202", "42883"]);
+
+const HISTORY_PAGE_SIZE = 1000;
+
+/**
+ * Every `snowpack_daily` row for a resort on or after `since`, oldest
+ * first, paged through PostgREST's 1,000-row limit. Ten water years is
+ * about 3,650 rows (four pages). Throws on a failed query, like the
+ * catalogue reads, so an ISR revalidation fails rather than caching an
+ * empty history.
+ */
+export async function getSnowpackDailySince(resortId: string, since: string): Promise<DailyRow[]> {
+  const out: DailyRow[] = [];
+  for (let from = 0; ; from += HISTORY_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("snowpack_daily")
+      .select("date,snow_depth_in,swe_in,new_snow_in,qc_flag")
+      .eq("resort_id", resortId)
+      .gte("date", since)
+      .order("date", { ascending: true })
+      .range(from, from + HISTORY_PAGE_SIZE - 1);
+    if (error) {
+      // Before migration 030 the new_snow_in column does not exist; read without it.
+      if (MISSING_COLUMN_CODES.has(error.code)) return getSnowpackDailyLegacy(resortId, since);
+      throw error;
+    }
+    for (const r of data ?? []) {
+      out.push({
+        date: String(r.date),
+        snowDepthIn: r.snow_depth_in == null ? null : Number(r.snow_depth_in),
+        sweIn: r.swe_in == null ? null : Number(r.swe_in),
+        newSnowIn: r.new_snow_in == null ? null : Number(r.new_snow_in),
+        qcFlag: r.qc_flag,
+      });
+    }
+    if (!data || data.length < HISTORY_PAGE_SIZE) return out;
+  }
+}
+
+async function getSnowpackDailyLegacy(resortId: string, since: string): Promise<DailyRow[]> {
+  const out: DailyRow[] = [];
+  for (let from = 0; ; from += HISTORY_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("snowpack_daily")
+      .select("date,snow_depth_in,swe_in,qc_flag")
+      .eq("resort_id", resortId)
+      .gte("date", since)
+      .order("date", { ascending: true })
+      .range(from, from + HISTORY_PAGE_SIZE - 1);
+    if (error) throw error;
+    for (const r of data ?? []) {
+      out.push({ date: String(r.date), snowDepthIn: r.snow_depth_in == null ? null : Number(r.snow_depth_in), sweIn: r.swe_in == null ? null : Number(r.swe_in), newSnowIn: null, qcFlag: r.qc_flag });
+    }
+    if (!data || data.length < HISTORY_PAGE_SIZE) return out;
+  }
+}
+
+/**
+ * The cumulative new-snow normal for a station (migration 030 columns on
+ * `snotel_normals`), by day of water year. Empty before the normals seed
+ * has run or when the columns do not exist yet (fails soft: the page shows
+ * the curve without a band).
+ */
+export async function getStationCumulativeNormals(stationId: string): Promise<CumulativeNormalRow[]> {
+  const { data, error } = await supabase
+    .from("snotel_normals")
+    .select("day_of_water_year,cum_snow_mean_in,cum_snow_p25_in,cum_snow_p75_in,cum_snow_years,cum_snow_recent_mean_in,cum_snow_recent_years")
+    .eq("station_id", stationId)
+    .order("day_of_water_year", { ascending: true });
+  if (error) {
+    if (MISSING_COLUMN_CODES.has(error.code) || MISSING_TABLE_CODES.has(error.code)) {
+      console.warn("[PeakCam] snotel_normals cumulative columns missing — apply migration 030 and run seed-normals");
+      return [];
+    }
+    throw error;
+  }
+  return (data ?? [])
+    .filter((r) => r.cum_snow_mean_in != null)
+    .map((r) => ({
+      dayOfWaterYear: r.day_of_water_year,
+      meanIn: Number(r.cum_snow_mean_in),
+      p25In: r.cum_snow_p25_in == null ? null : Number(r.cum_snow_p25_in),
+      p75In: r.cum_snow_p75_in == null ? null : Number(r.cum_snow_p75_in),
+      years: r.cum_snow_years,
+      recentMeanIn: r.cum_snow_recent_mean_in == null ? null : Number(r.cum_snow_recent_mean_in),
+      recentYears: r.cum_snow_recent_years,
+    }));
+}
+
+/** The monthly climatology rows for a station (migration 030); empty when the table is missing. */
+export async function getStationMonthlyNormals(stationId: string): Promise<MonthlyNormalRow[]> {
+  const { data, error } = await supabase.from("snotel_monthly_normals").select("*").eq("station_id", stationId);
+  if (error) {
+    if (MISSING_TABLE_CODES.has(error.code)) {
+      console.warn("[PeakCam] snotel_monthly_normals missing — apply migration 030 and run seed-normals");
+      return [];
+    }
+    throw error;
+  }
+  return (data ?? []).map((r) => ({
+    month: r.month,
+    window: r.window as NormalWindow,
+    avgSnowfallIn: r.avg_snowfall_in == null ? null : Number(r.avg_snowfall_in),
+    avgSnowDays: r.avg_snow_days == null ? null : Number(r.avg_snow_days),
+    avgDepthIn: r.avg_depth_in == null ? null : Number(r.avg_depth_in),
+    maxStormIn: r.max_storm_in == null ? null : Number(r.max_storm_in),
+    maxStormStart: r.max_storm_start ?? null,
+    maxStormEnd: r.max_storm_end ?? null,
+    yearsTracked: r.years_tracked ?? 0,
+  }));
+}
+
+/**
+ * Per-resort season aggregates from the `season_stats` SQL function
+ * (migration 030). `powderIn` is lib/season-stats.ts POWDER_DAY_IN, passed
+ * in so the threshold lives in one place. Null when the function does not
+ * exist yet, so the leaderboards can say "not available" instead of 500.
+ */
+export async function getSeasonAggregates(powderIn: number, seasonStart: string, weekStart: string): Promise<SeasonAggregateRow[] | null> {
+  const { data, error } = await supabase.rpc("season_stats", { powder_in: powderIn, season_start: seasonStart, week_start: weekStart });
+  if (error) {
+    if (MISSING_FUNCTION_CODES.has(error.code)) {
+      console.warn("[PeakCam] season_stats() missing — apply migration 030; leaderboards unavailable");
+      return null;
+    }
+    throw error;
+  }
+  return ((data ?? []) as Array<Record<string, unknown>>).map((r) => ({
+    resortId: String(r.resort_id),
+    stationId: (r.station_id as string | null) ?? null,
+    seasonTotalIn: Number(r.season_total_in ?? 0),
+    snowDays: Number(r.snow_days ?? 0),
+    powderDays: Number(r.powder_days ?? 0),
+    daysMeasured: Number(r.days_measured ?? 0),
+    deepestBaseIn: r.deepest_base_in == null ? null : Number(r.deepest_base_in),
+    deepestBaseDate: (r.deepest_base_date as string | null) ?? null,
+    weekTotalIn: Number(r.week_total_in ?? 0),
+    lastDate: (r.last_date as string | null) ?? null,
+    latestDepthIn: r.latest_depth_in == null ? null : Number(r.latest_depth_in),
+  }));
 }

@@ -138,6 +138,13 @@ export interface Leaderboard {
   unavailable: boolean;
 }
 
+/** The season start (Northern water year) and 7-day window start for a clock read, shared by the data layer and the boards. */
+export function leaderboardWindow(now: Date): { seasonStart: string; weekStart: string; season: SeasonRef } {
+  const today = now.toISOString().slice(0, 10);
+  const season = seasonOf(today, "north");
+  return { seasonStart: season.startDate, weekStart: new Date(now.getTime() - 6 * 86_400_000).toISOString().slice(0, 10), season };
+}
+
 function normalize(value: string | null | undefined): string {
   return (value ?? "").trim().toLowerCase();
 }
@@ -173,9 +180,7 @@ export function buildLeaderboard(
   filters: LeaderboardFilters = {},
 ): Leaderboard {
   const copy = LEADERBOARD_COPY[kind];
-  const today = now.toISOString().slice(0, 10);
-  const season = seasonOf(today, "north");
-  const weekStart = new Date(now.getTime() - 6 * 86_400_000).toISOString().slice(0, 10);
+  const { season, weekStart } = leaderboardWindow(now);
   const byResort = new Map((aggregates ?? []).map((a) => [a.resortId, a]));
   const limit = filters.limit ?? 25;
 
