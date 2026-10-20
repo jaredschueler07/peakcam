@@ -6,6 +6,7 @@ import { GET as getResorts } from "@/app/api/v1/resorts/route";
 import { GET as getSearchIndex } from "@/app/api/v1/resorts/search-index/route";
 import { GET as getResort } from "@/app/api/v1/resorts/[slug]/route";
 import { GET as getCams } from "@/app/api/v1/resorts/[slug]/cams/route";
+import { GET as getConditions } from "@/app/api/v1/resorts/[slug]/conditions/route";
 import { GET as getForecast } from "@/app/api/v1/resorts/[slug]/forecast/route";
 import { GET as getForecastAccuracy } from "@/app/api/v1/resorts/[slug]/forecast-accuracy/route";
 import { GET as getPowder } from "@/app/api/v1/powder/route";
@@ -43,6 +44,8 @@ async function dispatch(item: BatchPath): Promise<Response> {
       return getResort(request, ctx);
     case "cams":
       return getCams(request, ctx);
+    case "conditions":
+      return getConditions(request, ctx);
     case "forecast":
       return getForecast(request, ctx);
     case "forecastAccuracy":

@@ -26,6 +26,8 @@ const FILE_STEMS: Record<string, string> = {
   BatchRequest: "batch-request",
   BatchResponse: "batch",
   Error: "error",
+  // P6: the conditions contract carries its major version in the file name.
+  ResortConditions: "resort-conditions-v1",
 };
 
 function kebab(id: string): string {

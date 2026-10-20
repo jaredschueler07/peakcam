@@ -169,6 +169,21 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
           },
         },
       },
+      "/resorts/{slug}/conditions": {
+        get: {
+          operationId: "getResortConditions",
+          tags: ["resorts"],
+          summary: "Conditions contract v2: every field with source, time, confidence and freshness, plus the derived status",
+          description:
+            "The versioned conditions envelope (`schemaVersion`, `schemaUrl`). `data` carries one Field per measure (`value`, `source`, `observedAt`, `confidence`, `freshness.tier` and `ageHours`): base depth (measured, with the operator's own figure beside it and a `depthDisagreement` block when they differ by more than 30 %), new snow 24/48 h, SWE, percent of normal, lifts and runs open and total, surface, snow quality, temperature and wind from the nearest station, the blended 48-hour forecast, and the season dates. `data.status` is derived from the operator feed, the resort's confirmed opening date and the resort's own calendar day: OPEN, CLOSED_TODAY, PRE_SEASON, OFF_SEASON or UNKNOWN, never defaulting to open; `recommendableToday` and `reasons` say why. `meta.freshness` lists the tier per field; `measuredNow` is the station layer. `sentence` is a dated line to quote.",
+          parameters: [SLUG_PARAM],
+          responses: {
+            "200": jsonResponse("The conditions envelope.", "ResortConditions"),
+            "404": ERROR_404,
+            "403": ERROR_403,
+          },
+        },
+      },
       "/resorts/{slug}/forecast": {
         get: {
           operationId: "getResortForecast",
@@ -334,7 +349,7 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
           tags: ["batch"],
           summary: `Run up to ${BATCH_MAX_REQUESTS} GET requests in one call`,
           description:
-            `Accepts up to ${BATCH_MAX_REQUESTS} GET paths under /api/v1 (with query strings) and answers them in order, each with the status and body that path would have returned on its own. The paths run in-process against the same handlers, so a batch is one function invocation and one request against the edge rate limit. Read-only by construction: only /resorts, /resorts/search-index, /resorts/{slug}, /resorts/{slug}/cams, /resorts/{slug}/forecast, /resorts/{slug}/forecast-accuracy, /resorts/{slug}/history, /resorts/{slug}/season-stats, /resorts/{slug}/monthly, /leaderboards/{kind}, /powder, /status and /ask (GET) dispatch; any other path fails the whole batch with a 400 naming it. The response is never cached.`,
+            `Accepts up to ${BATCH_MAX_REQUESTS} GET paths under /api/v1 (with query strings) and answers them in order, each with the status and body that path would have returned on its own. The paths run in-process against the same handlers, so a batch is one function invocation and one request against the edge rate limit. Read-only by construction: only /resorts, /resorts/search-index, /resorts/{slug}, /resorts/{slug}/cams, /resorts/{slug}/conditions, /resorts/{slug}/forecast, /resorts/{slug}/forecast-accuracy, /resorts/{slug}/history, /resorts/{slug}/season-stats, /resorts/{slug}/monthly, /leaderboards/{kind}, /powder, /status and /ask (GET) dispatch; any other path fails the whole batch with a 400 naming it. The response is never cached.`,
           requestBody: {
             required: true,
             content: {
