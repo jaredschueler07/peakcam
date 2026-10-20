@@ -193,7 +193,7 @@ export function snowHubMarkdown(page: SnowHubPage, baseUrl: string = SITE_URL): 
   const lines: string[] = [
     `# ${page.hub.label} snow report, ${plural(page.count, "resort")}`,
     "",
-    `Canonical page: ${page.pageUrl}  ·  Webcams: ${baseUrl}/ski-cams/${page.hub.slug}  ·  JSON: ${baseUrl}/api/v1/resorts?state=${encodeURIComponent(page.hub.kind === "region" ? "" : page.hub.key)}`,
+    `Canonical page: ${page.pageUrl}  ·  Webcams: ${baseUrl}/ski-cams/${page.hub.slug}  ·  JSON: ${baseUrl}/api/v1/resorts${page.hub.kind === "region" ? "" : `?state=${encodeURIComponent(page.hub.key)}`}`,
     "",
     page.sentence.text,
     "",
