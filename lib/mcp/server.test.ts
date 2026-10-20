@@ -16,6 +16,11 @@ import {
 import { MAX_CAMS, PEAKCAM_TOOL_NAMES, buildTools, diceSimilarity, editDistance, matchResorts, normalizeText, scoreResort } from "./tools";
 import type { McpDataSource, SnowHistoryRow, UnmatchedQuestion } from "./types";
 import type { CamTimelineFrame } from "@/lib/cam-timeline";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { ALL_MODELS, parseModelRuns, type OpenMeteoMultiModelResponse } from "@/lib/forecast/open-meteo-models";
+import type { StoredForecast } from "@/lib/forecast/store";
+import type { AccuracyInput } from "@/lib/public-api/forecast";
 import { AskAnswerSchema } from "@/lib/public-api/schema";
 
 // ── Fixtures ─────────────────────────────────────────────────
@@ -168,7 +173,28 @@ const FRAMES: CamTimelineFrame[] = [
   { id: 3, camId: BRECK_CAM_ID, url: "https://x.supabase.co/storage/v1/object/public/cam-stills/archive/a/2026-12-18T12-00-00Z.jpg", capturedAt: "2026-12-18T12:00:00Z", snow24hAtCapture: 2, keeper: false },
 ];
 
-const calls = { catalog: 0, forecast: 0, history: 0, stills: 0 };
+// Stored multi-model runs for Vail only, from the recorded Alta response
+// (dates 2026-10-18..31; the fixture catalogue's "now" is 2026-12-20, which
+// the blend does not care about — it blends whatever is stored).
+const OPEN_METEO_FIXTURE = JSON.parse(
+  readFileSync(join(__dirname, "..", "forecast", "fixtures", "open-meteo-alta-summit-2026-10-18.json"), "utf8"),
+) as OpenMeteoMultiModelResponse;
+const STORED: StoredForecast = {
+  runs: parseModelRuns(OPEN_METEO_FIXTURE, ALL_MODELS).map((r) => ({ id: `run-${r.model}`, point: "summit" as const, issuedAt: "2026-10-18T12:00:00.000Z", ...r })),
+};
+const ACCURACY: AccuracyInput = {
+  truthBasis: "snotel",
+  measuredDays: 41,
+  station: { id: "842:CO:SNTL", name: "Vail Mountain", elevationFt: 10300 },
+  scoredPoint: "summit",
+  scores: [
+    { resort_id: "id-vail", model: "gfs_seamless", period_days: 90, day1_mae: 4.2, day3_mae: 6.1, day7_mae: 8, samples: 41, bias_ratio: 1.3, computed_at: "2026-12-20T07:30:00Z" },
+    { resort_id: "id-vail", model: "ecmwf_ifs025", period_days: 90, day1_mae: 2.5, day3_mae: 4, day7_mae: 7.2, samples: 41, bias_ratio: 0.9, computed_at: "2026-12-20T07:30:00Z" },
+    { resort_id: "id-vail", model: "blend", period_days: 90, day1_mae: 2.1, day3_mae: 3.8, day7_mae: 6.9, samples: 41, bias_ratio: 1.05, computed_at: "2026-12-20T07:30:00Z" },
+  ],
+};
+
+const calls = { catalog: 0, forecast: 0, history: 0, stills: 0, runs: 0 };
 const logged: UnmatchedQuestion[] = [];
 
 function fixtureData(over: Partial<McpDataSource> = {}): McpDataSource {
@@ -177,9 +203,17 @@ function fixtureData(over: Partial<McpDataSource> = {}): McpDataSource {
       calls.catalog++;
       return catalog();
     },
-    async forecast(r) {
+    async forecast(r, blendByDate) {
       calls.forecast++;
-      return r.country === "US" ? FORECAST : null;
+      if (r.country !== "US") return null;
+      return FORECAST.map((p) => (p.date && blendByDate?.[p.date] != null ? { ...p, snowInches: blendByDate[p.date], snowSource: "blend" as const } : { ...p, snowSource: "nws_keyword" as const }));
+    },
+    async forecastRuns(resortId) {
+      calls.runs++;
+      return resortId === "id-vail" ? STORED : { runs: [] };
+    },
+    async forecastAccuracy(r) {
+      return r.id === "id-vail" ? ACCURACY : { scores: [], measuredDays: 0, truthBasis: "none" };
     },
     async snowHistory(resortId, days) {
       calls.history++;
@@ -246,13 +280,13 @@ test("initialize reports io.peakcam/snow, the package version and instructions",
   console.log(`negotiated protocol version ${version} (${client.getProtocolEra()} era)`);
 });
 
-test("tools/list returns the fourteen tools, each read-only with input and output schemas", async () => {
+test("tools/list returns the fifteen tools, each read-only with input and output schemas", async () => {
   const { tools } = await client.listTools();
   assert.deepEqual(
     tools.map((t) => t.name),
     [...PEAKCAM_TOOL_NAMES],
   );
-  assert.equal(tools.length, 14);
+  assert.equal(tools.length, 15);
   for (const tool of tools) {
     assert.deepEqual(tool.annotations, READ_ONLY_TOOL_ANNOTATIONS, `${tool.name} annotations`);
     assert.ok(tool.title, `${tool.name} has a title`);
@@ -471,28 +505,60 @@ test("compare_resorts builds a side-by-side table and refuses unknown slugs", as
 
 // ── get_forecast ─────────────────────────────────────────────
 
-test("get_forecast returns NWS periods for US resorts and available=false elsewhere", async () => {
+test("get_forecast returns the 14-day blend with modelCount and the band, plus the NWS narrative for US resorts", async () => {
   const res = await call("get_forecast", { slug: "vail" });
-  const doc = res.structuredContent as { available: boolean; provider: string; periods: Array<{ dow: string; snowInchesEstimate: number }>; note: string | null };
+  const doc = res.structuredContent as {
+    available: boolean;
+    provider: string;
+    point: string;
+    modelCount: number;
+    models: string[];
+    summary: { total14dIn: number; peak: { date: string } | null } | null;
+    days: Array<{ date: string; snowfallIn: number; snowfallLoIn: number; snowfallHiIn: number; modelCount: number }>;
+    periods: Array<{ dow: string; date: string | null; snowInches: number; snowSource: string }>;
+    credits: Array<{ text: string; license: string }>;
+    note: string | null;
+  };
+  assert.notEqual(res.isError, true);
   assert.equal(doc.available, true);
-  assert.equal(doc.provider, "nws");
-  assert.equal(doc.periods.length, 2);
-  assert.equal(doc.periods[0].snowInchesEstimate, 8);
+  assert.equal(doc.provider, "blend");
+  assert.equal(doc.point, "summit");
+  assert.equal(doc.modelCount, 9);
+  assert.equal(doc.models.length, 9);
+  assert.equal(doc.days.length, 14);
+  assert.equal(doc.days[13].modelCount, 2, "only two models reach day 14");
+  assert.ok(doc.days.every((d) => d.snowfallLoIn <= d.snowfallIn && d.snowfallIn <= d.snowfallHiIn));
+  assert.equal(doc.summary?.peak?.date, "2026-10-29");
+  assert.equal(doc.periods.length, 2, "NWS narrative still present for a US resort");
+  assert.equal(doc.periods[0].snowSource, "nws_keyword", "the NWS dates are outside the stored blend's range, so the keyword value stands");
   assert.equal(doc.note, null);
+  assert.match(doc.credits[0].text, /Open-Meteo/);
   const md = text(res);
-  assert.match(md, /\| Today 2026-12-20 \| Heavy Snow \| 22 \/ 9 \| 90 \| 15 mph W \| ~8 in \|/);
-  assert.match(md, /keyword heuristics/);
+  assert.match(md, /blend of 9 models/);
+  assert.match(md, /\| 2026-10-23 \| 2\.2 \| /);
+  assert.match(md, /Weather data by Open-Meteo\.com \(CC BY 4\.0\)/);
+});
+
+test("get_forecast: no stored run → NWS narrative with keyword amounts for a US resort, available=false elsewhere", async () => {
+  const breck = (await call("get_forecast", { slug: "breckenridge" })).structuredContent as { available: boolean; provider: string; note: string | null; days: unknown[]; periods: Array<{ snowInches: number; snowSource: string }> };
+  assert.equal(breck.available, true);
+  assert.equal(breck.provider, "nws");
+  assert.deepEqual(breck.days, []);
+  assert.equal(breck.periods[0].snowInches, 8);
+  assert.equal(breck.periods[0].snowSource, "nws_keyword");
+  assert.match(breck.note ?? "", /keyword estimates/);
 
   const before = calls.forecast;
-  const chile = (await call("get_forecast", { slug: "ski-portillo" })).structuredContent as { available: boolean; note: string | null; periods: unknown[] };
+  const chile = (await call("get_forecast", { slug: "ski-portillo" })).structuredContent as { available: boolean; provider: string; note: string | null; periods: unknown[] };
   assert.equal(chile.available, false);
-  assert.match(chile.note ?? "", /US resorts only/);
+  assert.equal(chile.provider, "none");
+  assert.match(chile.note ?? "", /every 6 hours/);
   assert.deepEqual(chile.periods, []);
   assert.equal(calls.forecast, before, "no NWS call for a non-US resort");
 });
 
-test("get_forecast degrades to available=false when NWS does not answer", async () => {
-  const { client: c, server: s } = await connect(fixtureData({ forecast: async () => null }));
+test("get_forecast degrades to available=false when nothing is stored and NWS does not answer", async () => {
+  const { client: c, server: s } = await connect(fixtureData({ forecast: async () => null, forecastRuns: async () => ({ runs: [] }) }));
   try {
     const res = await c.callTool({ name: "get_forecast", arguments: { slug: "vail" } });
     const doc = res.structuredContent as { available: boolean; note: string | null };
@@ -503,6 +569,40 @@ test("get_forecast degrades to available=false when NWS does not answer", async 
     await c.close();
     await s.close();
   }
+});
+
+// ── compare_models ───────────────────────────────────────────
+
+test("compare_models returns ranked scores with the truth basis and each model's 7-day outlook", async () => {
+  const res = await call("compare_models", { slug: "vail" });
+  assert.notEqual(res.isError, true);
+  const doc = res.structuredContent as {
+    truthBasis: string;
+    measuredDays: number;
+    bestModel: string | null;
+    scores: Array<{ model: string; rank: number | null }>;
+    outlook: Array<{ model: string; total7dIn: number; horizonDays: number }>;
+    blendTotal7dIn: number | null;
+    note: string | null;
+  };
+  assert.equal(doc.truthBasis, "snotel");
+  assert.equal(doc.measuredDays, 41);
+  assert.equal(doc.bestModel, "blend");
+  assert.deepEqual(doc.scores.map((s) => [s.model, s.rank]), [["blend", 1], ["ecmwf_ifs025", 2], ["gfs_seamless", 3]]);
+  assert.equal(doc.outlook.length, 9);
+  assert.equal(doc.outlook.find((o) => o.model === "gfs_hrrr")?.horizonDays, 2);
+  assert.ok(doc.outlook[0].total7dIn >= doc.outlook[8].total7dIn, "outlook sorted by 7-day total");
+  assert.equal(typeof doc.blendTotal7dIn, "number");
+  assert.equal(doc.note, null);
+  const md = text(res);
+  assert.match(md, /SNOTEL-measured 24 h snow on 41 days of the last 90 \(Vail Mountain\)/);
+  assert.match(md, /\| 1 \| PeakCam blend \| 2\.1 \|/);
+
+  const none = (await call("compare_models", { slug: "ski-portillo" })).structuredContent as { truthBasis: string; scores: unknown[]; outlook: unknown[]; note: string | null };
+  assert.equal(none.truthBasis, "none");
+  assert.deepEqual(none.scores, []);
+  assert.deepEqual(none.outlook, []);
+  assert.match(none.note ?? "", /No measured snow series/);
 });
 
 // ── get_snow_history ─────────────────────────────────────────
@@ -611,6 +711,7 @@ test("every tool's structuredContent parses against its own outputSchema", async
     find_powder: { window: "48h" },
     compare_resorts: { slugs: ["vail", "alta"] },
     get_forecast: { slug: "vail" },
+    compare_models: { slug: "vail" },
     get_snow_history: { slug: "breckenridge", days: 2 },
     get_opening_dates: { state: "CO" },
     get_resort_profile: { slug: "breckenridge" },

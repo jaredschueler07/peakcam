@@ -43,7 +43,7 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
 };
 
-const COUNT_WORDS: Record<number, string> = { 8: "Eight", 10: "Ten", 12: "Twelve", 14: "Fourteen", 16: "Sixteen" };
+const COUNT_WORDS: Record<number, string> = { 8: "Eight", 10: "Ten", 12: "Twelve", 14: "Fourteen", 15: "Fifteen", 16: "Sixteen" };
 
 const linkClass = "font-bold text-ink underline decoration-alpen/60 decoration-2 underline-offset-[3px] hover:decoration-alpen";
 const chipClass =

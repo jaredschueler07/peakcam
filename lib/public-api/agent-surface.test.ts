@@ -161,7 +161,7 @@ test("well-known schemas: every $ref points at a file the directory serves, with
 const never = async (): Promise<never> => {
   throw new Error("not called");
 };
-const STUB: McpDataSource = { catalog: never, forecast: never, snowHistory: never, camStills: never };
+const STUB: McpDataSource = { catalog: never, forecast: never, forecastRuns: never, forecastAccuracy: never, snowHistory: never, camStills: never };
 
 test("llms-full.txt documents every tool with an example that parses, every REST route, the attribution line and the real rate limit", () => {
   const text = buildLlmsFull();
