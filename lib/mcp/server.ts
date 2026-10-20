@@ -17,6 +17,7 @@ import pkg from "@/package.json";
 import { SITE_URL } from "@/lib/site";
 import { resortMarkdown as resortPageMarkdown } from "@/lib/public-api/markdown-page";
 import { serializeResort } from "@/lib/public-api/serialize";
+import { resortConditionsView } from "@/lib/public-api/conditions";
 import { buildTools, closeMatches, findResort, serializeOptionsFor } from "./tools";
 import type { McpDataSource } from "./types";
 
@@ -115,8 +116,12 @@ export function registerPeakCam(server: McpServer, data: McpDataSource): void {
         const close = closeMatches(catalog.resorts, slug, 3).map((r) => resortResourceUri(r.slug));
         throw new Error(`No active resort with slug "${slug}".${close.length ? ` Close matches: ${close.join(", ")}` : ""}`);
       }
-      const doc = serializeResort(resort, serializeOptionsFor(catalog, resort));
-      return { contents: [{ uri: uri.href, mimeType: "text/markdown", text: resortPageMarkdown(doc, { now: catalog.now }) }] };
+      const options = serializeOptionsFor(catalog, resort);
+      const doc = serializeResort(resort, options);
+      // P6: the status and freshness section, with the stored blend when the source has one.
+      const stored = await data.forecastRuns(resort.id).catch(() => ({ runs: [] }));
+      const conditions = resortConditionsView(resort, { ...options, forecast: stored });
+      return { contents: [{ uri: uri.href, mimeType: "text/markdown", text: resortPageMarkdown(doc, { now: catalog.now, conditions }) }] };
     },
   );
 }

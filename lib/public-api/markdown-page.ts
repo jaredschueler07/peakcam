@@ -18,6 +18,9 @@ import type { WeatherPeriod } from "@/lib/types";
 import type { CamTimeline } from "@/lib/cam-timeline";
 import type { SnowHistoryRow } from "@/lib/mcp/types";
 import { DESCRIPTION_SOURCE_LABELS, type ResortDescription } from "@/lib/resort-profile";
+import { CONDITION_FIELD_NAMES, type ConditionsContract, type Field } from "@/lib/conditions-contract";
+import type { ResortConditionsView } from "./conditions";
+import { schemaUrl } from "./json-schemas";
 import { RESORT_SUBPAGES, resortTabMarkdownPath, resortTabPath } from "@/lib/resort-pages";
 import { publicApiHeaders } from "./headers";
 import { STATION_SOURCES } from "@/lib/stations/index";
@@ -41,6 +44,8 @@ export interface MarkdownPageOptions {
   baseUrl?: string;
   /** The stored `resorts.description` with its provenance, when the row has one (P2 plumbing). */
   description?: ResortDescription | null;
+  /** The P6 conditions contract for the resort; adds the "Status and freshness" section when given. */
+  conditions?: ResortConditionsView | null;
 }
 
 /**
@@ -164,6 +169,59 @@ function attributionBlock(canonicalUrl: string, attribution: string, license: st
   ].join("\n");
 }
 
+// ── Status and freshness (P6) ────────────────────────────────
+
+const FIELD_LABELS: Record<(typeof CONDITION_FIELD_NAMES)[number], { label: string; unit: string }> = {
+  status: { label: "Status", unit: "" },
+  seasonOpening: { label: "Season opening", unit: "" },
+  seasonClosing: { label: "Season closing", unit: "" },
+  baseDepthIn: { label: "Base depth (measured)", unit: " in" },
+  operatorBaseDepthIn: { label: "Base depth (operator)", unit: " in" },
+  newSnow24hIn: { label: "New snow, 24 h", unit: " in" },
+  newSnow48hIn: { label: "New snow, 48 h", unit: " in" },
+  sweIn: { label: "Snow water equivalent", unit: " in" },
+  liftsOpen: { label: "Lifts open", unit: "" },
+  liftsTotal: { label: "Lifts total", unit: "" },
+  runsOpen: { label: "Runs open", unit: "" },
+  runsTotal: { label: "Runs total", unit: "" },
+  surface: { label: "Surface", unit: "" },
+  snowQuality: { label: "Snow quality", unit: "" },
+  tempF: { label: "Temperature", unit: " °F" },
+  windMph: { label: "Wind", unit: " mph" },
+  forecastNext48hCm: { label: "Blended forecast, next 48 h", unit: " cm" },
+  percentOfNormal: { label: "Percent of normal", unit: " %" },
+};
+
+function tierCell(f: Field<unknown>): string {
+  const age = f.freshness.ageHours == null ? "" : ` (${f.freshness.ageHours} h)`;
+  return `${f.freshness.tier}${age}`;
+}
+
+/**
+ * The "Status and freshness" section: the dated status sentence, one table
+ * row per populated field with value, source, observation time and tier,
+ * the verdict with its reasons, and the schema the JSON validates against.
+ */
+export function conditionsSection(view: ResortConditionsView, apiUrl: string, baseUrl: string = SITE_URL): string[] {
+  const c: ConditionsContract = view.contract;
+  const lines: string[] = ["## Status and freshness", "", `**${c.status.value ?? "UNKNOWN"}** — ${view.sentence}`, ""];
+  lines.push("| Field | Value | Source | Observed (UTC) | Freshness |", "| --- | --- | --- | --- | --- |");
+  for (const name of CONDITION_FIELD_NAMES) {
+    const f = c[name] as Field<unknown>;
+    if (f.value == null) continue;
+    const { label, unit } = FIELD_LABELS[name];
+    lines.push(`| ${label} | ${String(f.value)}${unit} | ${f.source} | ${f.observedAt ?? "static"} | ${tierCell(f)} |`);
+  }
+  lines.push("", `Recommendable today: ${c.recommendableToday ? "yes" : "no"}. ${c.reasons.join("; ")}.`);
+  if (c.depthDisagreement) lines.push("", c.depthDisagreement.note);
+  lines.push(
+    "",
+    `Tiers: live ≤ 3 h from an hourly source; recent ≤ 30 h; estimated = model value; stale > 30 h; unknown = nothing on file. Status is OPEN only on a fresh operator lift feed or a resort-confirmed opening date. Local day ${view.localDate} (${view.timeZone}). JSON: ${apiUrl}/conditions, schema ${schemaUrl("ResortConditions", baseUrl)}.`,
+    "",
+  );
+  return lines;
+}
+
 // ── /resorts/{slug}/index.md ─────────────────────────────────
 
 /** The dated opening sentence, in the same voice as the resort page's summary. */
@@ -234,6 +292,8 @@ export function resortMarkdown(resort: ResortPublic, opts: MarkdownPageOptions =
   }
 
   lines.push(seasonLine(resort.season), "");
+
+  if (opts.conditions) lines.push(...conditionsSection(opts.conditions, resort.apiUrl, opts.baseUrl));
 
   if (resort.measuredNow && resort.measuredNow.length > 0) {
     lines.push("## What the instruments say", "");
@@ -347,6 +407,7 @@ export function snowReportMarkdown(resort: ResortPublic, extras: SnowReportMarkd
     lines.push("## Today's numbers", "", "No snow report yet this season.", "");
   }
   lines.push(seasonLine(resort.season), "");
+  if (extras.conditions) lines.push(...conditionsSection(extras.conditions, resort.apiUrl, base));
   lines.push(`## Last ${extras.history.length || 7} days`, "", ...historyTable(extras.history), "");
   lines.push("## Forecast", "", ...forecastTable(extras.forecast, resort.location.country), "");
   const n = extras.userReportCount48h;

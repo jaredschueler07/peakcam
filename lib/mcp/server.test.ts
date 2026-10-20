@@ -864,9 +864,13 @@ test("the peakcam://resorts/{slug} resource lists every resort and reads as mark
   const { resortMarkdown: pageMarkdown } = await import("@/lib/public-api/markdown-page");
   const { serializeResort } = await import("@/lib/public-api/serialize");
   const { serializeOptionsFor } = await import("./tools");
+  const { resortConditionsView } = await import("@/lib/public-api/conditions");
   const cat = catalog();
-  const expected = pageMarkdown(serializeResort(RESORTS[0], serializeOptionsFor(cat, RESORTS[0])), { now: cat.now });
+  const options = serializeOptionsFor(cat, RESORTS[0]);
+  // P6: the resource carries the "Status and freshness" section the page alternate carries.
+  const expected = pageMarkdown(serializeResort(RESORTS[0], options), { now: cat.now, conditions: resortConditionsView(RESORTS[0], { ...options, forecast: { runs: [] } }) });
   assert.equal(content.text, expected);
+  assert.match(content.text ?? "", /## Status and freshness\n\n\*\*OPEN\*\* — /);
   assert.match(content.text ?? "", /^# Breckenridge, .*: snow report and webcams/);
   assert.match(content.text ?? "", /## Webcams \(1\)/);
   assert.match(content.text ?? "", /- Page: https:\/\/www\.peakcam\.io\/resorts\/breckenridge/);

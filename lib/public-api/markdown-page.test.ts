@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { CamPublic, ResortListPublic, ResortPublic } from "./schema";
 import { PUBLIC_API_ATTRIBUTION, PUBLIC_API_LICENSE_URL } from "./headers";
+import { resortConditionsView } from "./conditions";
 import {
   formatMountainTime,
   indexMarkdown,
@@ -265,6 +266,33 @@ test("indexMarkdown honours baseUrl for site links (previews)", () => {
 // ── Subpage alternates (parity plan P2) ──────────────────────
 
 import { snowReportMarkdown, webcamsMarkdown } from "./markdown-page";
+
+test("resortMarkdown adds the Status and freshness section when the P6 contract is passed", () => {
+  const view = resortConditionsView(
+    {
+      id: "id-alta", name: "Alta", slug: "alta", state: "UT", country: "US", region: "Wasatch", lat: 40.59, lng: -111.64, website_url: null, cam_page_url: null, cond_rating: "great",
+      snotel_station_id: "766:UT:SNTL", x_url: null, facebook_url: null, instagram_url: null, is_active: true, created_at: "2026-01-01T00:00:00Z", cams: [], lifts_total: 11, runs_total: 119,
+      snow_report: { id: "sr", resort_id: "id-alta", base_depth: 60, new_snow_24h: 12, new_snow_48h: 20, trails_open: null, trails_total: null, lifts_open: null, lifts_total: null, conditions: "Powder Day||Deep.", source: "snotel", updated_at: "2026-12-20T12:00:00Z", swe_in: 14, pct_of_normal: 118, trend_7d: "rising", outlook: "more_snow", auto_cond_rating: "great", snowing_now: false },
+    },
+    {
+      now: new Date("2026-12-20T18:00:00Z"),
+      opening: { id: "o", resort_id: "id-alta", season: "2026-27", projected_open: "2026-11-20", confirmed_open: null, closing_date: null, source_url: null, notes: null, updated_at: "2026-10-01T00:00:00Z" },
+      operator: { resort_id: "id-alta", id: "os", source: "liftie", source_id: "alta", observed_at: "2026-12-20T17:00:00Z", fetched_at: "2026-12-20T17:05:00Z", lifts_open: 7, lifts_hold: 1, lifts_scheduled: 0, lifts_closed: 3, lifts_total: 11, trails_open: null, trails_total: null, base_depth_in: null, surface: null, opening_date: null, source_url: null, verified: false },
+      observationStations: [],
+    },
+  );
+  const md = resortMarkdown(resort(), { now: new Date(AT), conditions: view });
+  assert.match(md, /## Status and freshness\n\n\*\*OPEN\*\* — As of 10:00 a\.m\. MT Dec 20, Alta is open: 7 of 11 lifts open \(operator feed, 1 h old\)/);
+  assert.match(md, /\| Lifts open \| 7 \| operator \| 2026-12-20T17:00:00\.000Z \| live \(1 h\) \|/);
+  assert.match(md, /\| Base depth \(measured\) \| 60 in \| snotel \| 2026-12-20T12:00:00\.000Z \| recent \(6 h\) \|/);
+  assert.match(md, /\| Runs total \| 119 \| profile \| static \| recent \|/);
+  assert.match(md, /Recommendable today: yes\. operator feed \(1 h old\): 7 of 11 lifts open; base 60 in/);
+  assert.match(md, /schema https:\/\/www\.peakcam\.io\/\.well-known\/schemas\/resort-conditions-v1\.json/);
+  assert.doesNotMatch(resortMarkdown(resort(), { now: new Date(AT) }), /Status and freshness/);
+  // The section sits between the season line and the instruments block.
+  assert.ok(md.indexOf("Season:") < md.indexOf("## Status and freshness"));
+  assert.ok(md.indexOf("## Status and freshness") < md.indexOf("## Webcams"));
+});
 
 test("resortMarkdown labels a stored description with its source and links the subpages", () => {
   const md = resortMarkdown(resort(), { now: new Date(AT), description: { text: "Alta-style powder.", source: "operator" } });

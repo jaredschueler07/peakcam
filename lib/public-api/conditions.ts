@@ -112,6 +112,19 @@ export function buildResortConditions(resort: ResortWithData, options: Condition
   return { contract, measuredNow, timeZone, localDate, now };
 }
 
+/** The slice the resort pages and the markdown alternates render: the contract, its sentence and the resort's day. */
+export interface ResortConditionsView {
+  contract: ConditionsContract;
+  sentence: string;
+  localDate: string;
+  timeZone: string;
+}
+
+export function resortConditionsView(resort: ResortWithData, options: ConditionsSerializeOptions = {}): ResortConditionsView {
+  const { contract, localDate, timeZone } = buildResortConditions(resort, options);
+  return { contract, sentence: conditionsStatusSentence(resort.name, contract, localDate).text, localDate, timeZone };
+}
+
 export function serializeConditions(resort: ResortWithData, options: ConditionsSerializeOptions = {}): ResortConditionsPublic {
   const { contract, measuredNow, timeZone, localDate, now } = buildResortConditions(resort, options);
   return {

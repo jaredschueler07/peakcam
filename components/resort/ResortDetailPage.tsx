@@ -34,6 +34,9 @@ import { CamTimelineStrip } from "@/components/resort/CamTimelineStrip";
 import type { CamTimeline } from "@/lib/cam-timeline";
 import { MeasuredNow } from "@/components/resort/MeasuredNow";
 import type { MeasuredNowPublic } from "@/lib/public-api/schema";
+import { StatusChip } from "@/components/resort/StatusChip";
+import { FreshnessLabels } from "@/components/resort/FreshnessLabels";
+import type { ResortConditionsView } from "@/lib/public-api/conditions";
 
 interface Props {
   resort: ResortWithData;
@@ -56,6 +59,8 @@ interface Props {
   subnav?: React.ReactNode;
   /** Station layer rows (lib/public-api/serialize.ts serializeStations); empty/omitted → no "What the instruments say" block. */
   measuredNow?: MeasuredNowPublic[] | null;
+  /** The P6 conditions contract (lib/public-api/conditions.ts resortConditionsView): status chip in the hero, freshness labels under the snow strip. Omitted → neither. */
+  conditions?: ResortConditionsView | null;
 }
 
 // ─── "Updated …" stamp ───────────────────────────────────────────────────────
@@ -188,7 +193,7 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStrip = null, hourlyData, liveConditions, userConditions = [], nearby = null, freshness = null, breadcrumb = null, camTimeline = null, subnav = null, measuredNow = null }: Props) {
+export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStrip = null, hourlyData, liveConditions, userConditions = [], nearby = null, freshness = null, breadcrumb = null, camTimeline = null, subnav = null, measuredNow = null, conditions = null }: Props) {
   const activeCams = resort.cams.filter((c) => c.is_active);
   const embeddableCams = activeCams.filter((c) => c.embed_type !== "link");
   const snow = resort.snow_report;
@@ -301,6 +306,9 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
               </p>
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-3">
+              {conditions && conditions.contract.status.value && (
+                <StatusChip status={conditions.contract.status.value} sentence={conditions.sentence} source={conditions.contract.status.source} />
+              )}
               {resort.cond_rating && (
                 <ConditionBadge
                   rating={resort.cond_rating}
@@ -446,6 +454,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
             <p className="text-text-muted text-xs mt-2">
               Updated <UpdatedStamp iso={snow.updated_at} /> · Source: {snow.source}
             </p>
+            {conditions && <FreshnessLabels contract={conditions.contract} />}
           </section>
         ) : (
           <section id="conditions-report" className="scroll-mt-20">
