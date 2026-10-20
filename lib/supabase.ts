@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
 import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition, PowderProbability, PowderProbabilityForecast, PowderProbabilityWindow, ResortStationJoined, StationObservation, StationRole, StationRow } from "./types";
 import type { ResortOpening } from "./openings";
+import type { StationNormalsSummary } from "./resort-faq";
 import { withResolvedCamNames } from "./cam-name";
 import { clampHours, pickResortTimeline, shapeTimeline, toFrame, MAX_TIMELINE_HOURS, type CamStillRow, type CamTimeline, type CamTimelineFrame } from "./cam-timeline";
 
@@ -501,30 +502,40 @@ export interface ResortElevationRow {
 }
 
 async function fetchResortElevationIndex(): Promise<Record<string, ResortElevationRow>> {
-  const { data, error } = await supabase
-    .from("resort_metadata")
-    .select("resort_id, elevation_base_ft, elevation_summit_ft");
-  if (error) {
-    if (MISSING_TABLE_CODES.has(error.code)) return {};
-    throw error;
-  }
+  // Migration 025 made resorts.elevation_base_ft/summit_ft the canonical
+  // home; resort_metadata (migration 007) is the legacy copy and only fills a
+  // gap the profile row leaves. A missing legacy table is not an outage.
+  const [profileRes, legacyRes] = await Promise.all([
+    supabase.from("resorts").select("id, elevation_base_ft, elevation_summit_ft").eq("is_active", true),
+    supabase.from("resort_metadata").select("resort_id, elevation_base_ft, elevation_summit_ft"),
+  ]);
+  if (profileRes.error) throw profileRes.error;
+  if (legacyRes.error && !MISSING_TABLE_CODES.has(legacyRes.error.code)) throw legacyRes.error;
   const out: Record<string, ResortElevationRow> = {};
-  for (const row of data ?? []) {
+  for (const row of legacyRes.data ?? []) {
     out[row.resort_id] = { base_ft: row.elevation_base_ft ?? null, summit_ft: row.elevation_summit_ft ?? null };
+  }
+  for (const row of profileRes.data ?? []) {
+    const legacy = out[row.id];
+    out[row.id] = {
+      base_ft: row.elevation_base_ft ?? legacy?.base_ft ?? null,
+      summit_ft: row.elevation_summit_ft ?? legacy?.summit_ft ?? null,
+    };
   }
   return out;
 }
 
 /**
- * Base/summit elevation for every resort with a `resort_metadata` row, keyed
- * by resort id. One query for the whole catalogue (the public API serialises
- * all 148 resorts per revalidation), cached alongside the catalogue for the
- * same window and tag. A failed query throws like getAllResorts so the ISR
- * route keeps serving its last good document.
+ * Base/summit elevation for every resort, keyed by resort id: the `resorts`
+ * profile columns first, the legacy `resort_metadata` row where the profile
+ * is blank. One pass for the whole catalogue (the public API serialises all
+ * resorts per revalidation), cached alongside the catalogue for the same
+ * window and tag. A failed query throws like getAllResorts so the ISR route
+ * keeps serving its last good document.
  */
 export const getResortElevationIndex = unstable_cache(
   fetchResortElevationIndex,
-  ["peakcam:resort-elevations:v1", supabaseUrl],
+  ["peakcam:resort-elevations:v2", supabaseUrl],
   { revalidate: RESORT_CATALOG_REVALIDATE_SECONDS, tags: ["peakcam-resort-catalog"] },
 );
 
@@ -596,20 +607,18 @@ export const getResortStationsIndex = unstable_cache(
   { revalidate: PUBLIC_API_STATIONS_REVALIDATE_SECONDS, tags: ["peakcam-resort-catalog"] },
 );
 
-/** Midpoint elevation (base+summit)/2 in feet, for resorts with resort_metadata. Returns base-only or null if incomplete/missing. */
+/** Midpoint elevation (base+summit)/2 in feet from the cached index (profile columns, legacy fallback). Base-only or null when incomplete. */
 export async function getResortElevationFt(resortId: string): Promise<number | null> {
-  const { data, error } = await supabase
-    .from("resort_metadata")
-    .select("elevation_base_ft, elevation_summit_ft")
-    .eq("resort_id", resortId)
-    .maybeSingle();
-
-  if (error || !data) return null;
-  const { elevation_base_ft, elevation_summit_ft } = data;
-  if (elevation_base_ft != null && elevation_summit_ft != null) {
-    return Math.round((elevation_base_ft + elevation_summit_ft) / 2);
+  let index: Record<string, ResortElevationRow>;
+  try {
+    index = await getResortElevationIndex();
+  } catch {
+    return null;
   }
-  return elevation_base_ft ?? null;
+  const row = index[resortId];
+  if (!row) return null;
+  if (row.base_ft != null && row.summit_ft != null) return Math.round((row.base_ft + row.summit_ft) / 2);
+  return row.base_ft ?? null;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -652,8 +661,7 @@ export async function getResortSitemapEntries(): Promise<ResortSitemapEntry[]> {
   }));
 }
 
-/** Fetch all resort slugs — used for generateStaticParams. */
-export async function getAllResortSlugs(): Promise<string[]> {
+async function fetchAllResortSlugs(): Promise<string[]> {
   const { data, error } = await supabase
     .from("resorts")
     .select("slug")
@@ -661,6 +669,16 @@ export async function getAllResortSlugs(): Promise<string[]> {
 
   if (error) throw error;
   return data?.map((r) => r.slug) ?? [];
+}
+
+// Single-flight: the resort page family (overview, snow-report, webcams) runs
+// three generateStaticParams concurrently while `next build` collects page
+// data, and they must all see the same slug list — one query, three callers.
+const fetchAllResortSlugsSingleFlight = singleFlight(fetchAllResortSlugs);
+
+/** Fetch all resort slugs — used for generateStaticParams. */
+export function getAllResortSlugs(): Promise<string[]> {
+  return fetchAllResortSlugsSingleFlight();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -759,4 +777,95 @@ export async function getLatestArchivedStill(resortId: string): Promise<CamTimel
     return null;
   }
   return data ? toFrame(data as CamStillRow, supabaseUrl) : null;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Resort subpages (parity plan P2): history, normals, every cam's timeline
+// ─────────────────────────────────────────────────────────────
+
+/** One `snowpack_daily` row as the snow-report subpage reads it (migration 005). */
+export interface SnowpackHistoryRow {
+  date: string;
+  station_id: string;
+  snow_depth_in: number | null;
+  swe_in: number | null;
+  precip_accum_in: number | null;
+  temp_max_f: number | null;
+  temp_min_f: number | null;
+  qc_flag: string;
+}
+
+const SNOWPACK_HISTORY_COLUMNS = "date,station_id,snow_depth_in,swe_in,precip_accum_in,temp_max_f,temp_min_f,qc_flag";
+
+/**
+ * The most recent `days` rows of `snowpack_daily` for a resort, newest first
+ * (the same columns the MCP get_snow_history tool reads). Fails soft to []:
+ * the history table is one section of the snow-report subpage, whose core
+ * numbers come from getResortBySlug, and a missing table must not fail the
+ * ISR revalidation.
+ */
+export async function getSnowpackHistory(resortId: string, days = 7): Promise<SnowpackHistoryRow[]> {
+  const { data, error } = await supabase
+    .from("snowpack_daily")
+    .select(SNOWPACK_HISTORY_COLUMNS)
+    .eq("resort_id", resortId)
+    .order("date", { ascending: false })
+    .limit(Math.max(1, Math.min(days, 60)));
+  if (error) {
+    if (!MISSING_TABLE_CODES.has(error.code)) console.warn("[PeakCam] Could not fetch snowpack history:", error.message);
+    return [];
+  }
+  return (data ?? []) as unknown as SnowpackHistoryRow[];
+}
+
+/**
+ * The peak of a station's 1991–2020 median snow depth across the water year
+ * (`snotel_normals`, migration 005): the "typical season" figure the FAQ
+ * quotes. Null for a resort without a station, a station the normals seed
+ * does not cover, or a failed query (the FAQ then drops the question).
+ */
+export async function getStationNormalsSummary(stationId: string | null | undefined): Promise<StationNormalsSummary | null> {
+  if (!stationId) return null;
+  // Live-DB drift: migration 005 names these columns median_depth_in /
+  // median_swe_in, but the table in prod (what scripts/seed-snotel-normals.ts
+  // writes and scripts/snotel-sync.ts reads) has median_depth / median_swe.
+  const { data, error } = await supabase
+    .from("snotel_normals")
+    .select("day_of_water_year, median_depth, median_swe")
+    .eq("station_id", stationId)
+    .not("median_depth", "is", null)
+    .order("median_depth", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    if (!MISSING_TABLE_CODES.has(error.code)) console.warn("[PeakCam] Could not fetch station normals:", error.message);
+    return null;
+  }
+  if (!data || data.median_depth == null) return null;
+  const peak = Number(data.median_depth);
+  if (!Number.isFinite(peak) || peak <= 0) return null;
+  return {
+    peakMedianDepthIn: peak,
+    peakDayOfWaterYear: Number(data.day_of_water_year),
+    peakMedianSweIn: data.median_swe == null ? null : Number(data.median_swe),
+  };
+}
+
+/**
+ * A timeline per archive-allowed cam for the webcams subpage: one query for
+ * the resort, shaped per cam, in `camOrder`. Cams with nothing on tape are
+ * absent from the map. Null when the view is missing or the query failed.
+ */
+export async function getResortCamTimelines(resortId: string, camOrder: readonly string[], hours = 24): Promise<Map<string, CamTimeline> | null> {
+  const h = clampHours(hours);
+  const now = new Date();
+  const rows = await fetchCamStillRows({ resortId }, h, now);
+  if (!rows) return null;
+  const ids = new Set(rows.map((r) => r.cam_id));
+  const out = new Map<string, CamTimeline>();
+  for (const camId of [...camOrder.filter((id) => ids.has(id)), ...[...ids].filter((id) => !camOrder.includes(id))]) {
+    const t = shapeTimeline(rows, { camId, hours: h, now, supabaseUrl });
+    if (t) out.set(camId, t);
+  }
+  return out;
 }

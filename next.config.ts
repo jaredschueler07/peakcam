@@ -243,6 +243,16 @@ const nextConfig: NextConfig = {
         source: "/resorts/:slug",
         headers: [{ key: "Link", value: discoveryLinkHeader("/resorts/:slug/index.md") }],
       },
+      // The page family's subpages (lib/resort-pages.ts) advertise their own
+      // markdown alternates the same way.
+      {
+        source: "/resorts/:slug/snow-report",
+        headers: [{ key: "Link", value: discoveryLinkHeader("/resorts/:slug/snow-report/index.md") }],
+      },
+      {
+        source: "/resorts/:slug/webcams",
+        headers: [{ key: "Link", value: discoveryLinkHeader("/resorts/:slug/webcams/index.md") }],
+      },
     ];
   },
   async redirects() {

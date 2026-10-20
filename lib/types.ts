@@ -46,6 +46,9 @@ export interface Resort {
 
 export type DescriptionSource = "operator" | "generated" | "editor";
 export type ResortPass = "ikon" | "epic" | "mountain-collective" | "indy" | "power";
+/** Aliases used by lib/resort-profile.ts and the importer (P2). */
+export type ResortDescriptionSource = DescriptionSource;
+export type SeasonPass = ResortPass;
 
 // ── Cams ─────────────────────────────────────────────────────
 export interface Cam {
