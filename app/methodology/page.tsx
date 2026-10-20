@@ -122,6 +122,29 @@ export default function MethodologyPage() {
           elsewhere.
         </p>
 
+        <H2 id="instruments">Nearby instruments by elevation</H2>
+        <p className="mb-4">
+          One pillow at one elevation cannot say what the summit is doing. Each resort page
+          therefore carries a &ldquo;What the instruments say&rdquo; table: up to three stations
+          within 25&nbsp;km, sorted into summit, mid-mountain and base bands by their elevation
+          against the resort&apos;s own vertical, each row naming its network, elevation, distance
+          and the age of the reading. The networks are the USDA NRCS SNOTEL/SCAN pillows (daily
+          depth and water equivalent), NOAA NCEI&apos;s GHCN-Daily cooperative observers (daily
+          depth and new snow, published a day late), hourly National Weather Service surface
+          observations from airports and mountain mesonet sensors (temperature and wind, no depth),
+          and in Canada the BC River Forecast Centre&apos;s automated snow stations and Environment
+          and Climate Change Canada&apos;s hourly observations. Where a SNOTEL station exists it is
+          always one of the three and remains the base-depth figure in the snow report; the other
+          rows add context, they never overwrite it.
+        </p>
+        <p className="mb-4">
+          An hourly row that is days old means the sensor has gone quiet (many mountain sensors are
+          seasonal), and PeakCam shows the age rather than hiding the row. Daily values are stamped
+          at the end of their day. Nothing here is a mountain average: every number describes the
+          one spot the instrument sits on. Attribution for each network is printed under the table
+          and carried in the public API as <code>measuredNow[].attribution</code>.
+        </p>
+
         <H2 id="user-reports">On-mountain reports</H2>
         <p className="mb-4">
           Skiers standing on the snow see what a pillow cannot: wind effect, crust, how the

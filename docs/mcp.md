@@ -4,7 +4,7 @@ Read-only [Model Context Protocol](https://modelcontextprotocol.io) server that 
 assistant the same data as the site and `/api/v1`: the latest snow report per resort with its
 provenance, season status, webcams as links and archived stills, NWS forecasts, SNOTEL daily
 history, percent-of-normal rankings, resort profiles, regions, alert recipes, and an `ask` tool
-that routes a plain question to the right one of them deterministically. Fifteen tools.
+that routes a plain question to the right one of them deterministically. Sixteen tools.
 
 | | |
 | --- | --- |
@@ -48,6 +48,7 @@ with the resort's canonical URL) and a `structuredContent` document that matches
 | `get_alert_options` | `slug?` | `{ thresholdInches, schedule, manageUrl, channels[], resortFeed, webhook, writes: false }` | Explains e-mail, signed webhook, Atom, iCal and the public per-resort feed. Never writes; a person registers destinations on `/alerts/manage`. |
 | `get_cam_timeline` | `slug`, `camId?` (uuid), `hours?` 1–48 (24) | `{ camCount, frameCount, newestCapturedAt, lastStorm, cams: { camId, camName, frames[], lastStorm }[] , note }` | Archived stills from `cam_still_timeline` (migration 024) as links with capture times, 8 per cam, 12 cams; only archive-allowed cams. Degrades to `note` when the view is unavailable. S8 item 7. |
 | `ask` | `question` ≤ 300 chars | `AskAnswer` (`answerable`, `intent`, `tool`, `arguments`, `resort(s)`, `sentence`, `asOf`, `data`, `citations`, `suggestions`) | Deterministic router (`lib/ask/router.ts`): resort by name/slug/nickname with one typo of slack, intent by keywords, one tool call, a `lib/quotable.ts` sentence. `answerable: false` with suggestions instead of a guess; unmatched questions are logged to `agent_memory` (`entity = ask:unmatched`, salted IP hash only over HTTP, 30-day TTL). |
+| `get_stations` | `slug` | `{ available, count, stations: ObservationStation[], measuredNow: MeasuredNow[], sources[] }` | Up to three stations within 25 km by elevation band (summit / mid / base) with network, elevation, distance, reading time and age, depth, new snow, SWE, temperature, wind. `available: false` until the station layer is populated. Markdown is a table plus the attribution lines. |
 
 Unknown slugs return `isError: true` with up to five close matches, for example:
 
@@ -65,6 +66,13 @@ them:
 | `snotel` | SNOTEL-measured (USDA NRCS) | Read from the NRCS station nearest the resort, quality-controlled, refreshed every 6 h. Valid at the station's elevation (in `station.elevationFt`), not the summit. |
 | `open_meteo` | model estimate (Open-Meteo) | Weather-model estimate for resorts without a station (most of Canada and the Andes). |
 | `pipeline` / `manual` / `resort` | PeakCam multi-source blend / hand-entered / resort-reported | Rare today. |
+
+`get_stations` names observation networks rather than report sources (`measuredNow[].source`):
+`snotel` (USDA NRCS, daily, depth + SWE), `ghcn` (NOAA NCEI GHCN-Daily cooperative observers,
+daily, depth + new snow), `nws` (NOAA NWS hourly surface observations: METAR and mesonet,
+temperature + wind), `bc_asws` (BC River Forecast Centre automated snow stations, hourly),
+`eccc` (Environment and Climate Change Canada, hourly). Each row carries the attribution line
+its terms ask for; `docs/stations.md` has the endpoints and licences.
 
 ## Resource
 

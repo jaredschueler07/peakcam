@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getResortBySlug, getAllResortSlugs, getAllResorts, getLiveConditions, getUserConditions, getResortElevationFt, getResortOpenings, getResortCamTimeline } from "@/lib/supabase";
+import { getResortBySlug, getAllResortSlugs, getAllResorts, getLiveConditions, getUserConditions, getResortElevationFt, getResortOpenings, getResortCamTimeline, getResortStationsIndex } from "@/lib/supabase";
+import { serializeStations } from "@/lib/public-api/serialize";
 import { resortSentence } from "@/lib/quotable";
 import { stationFor } from "@/lib/stations";
 import type { BreadcrumbItem } from "@/components/hubs/HubBreadcrumb";
@@ -149,7 +150,7 @@ export default async function ResortPage({
     ? Object.fromEntries(forecastStrip.daily.map((d) => [d.date, d.snowfallIn]))
     : null;
 
-  const [weatherRaw, hourlyRaw, liveConditions, userConditions, allResorts, openings, camTimeline] = await Promise.all([
+  const [weatherRaw, hourlyRaw, liveConditions, userConditions, allResorts, openings, camTimeline, stationIndex] = await Promise.all([
     isUS
       ? getWeatherForecast(resort.lat, resort.lng, blendByDate)
       : getOpenMeteoForecast(resort.lat, resort.lng, elevationFt),
@@ -163,7 +164,14 @@ export default async function ResortPage({
     // report yet, so the openings table is read only in that case.
     resort.snow_report ? Promise.resolve([]) : getResortOpenings(),
     getResortCamTimeline(resort.id, camOrder, 24),
+    getResortStationsIndex(),
   ]);
+
+  // "What the instruments say": the station layer's rows for this resort
+  // (migration 026), serialised exactly as /api/v1/resorts/{slug}.measuredNow
+  // so the page and the API never disagree. Age is measured from the same
+  // `new Date()` the freshness sentence uses, once per ISR render.
+  const measuredNow = stationIndex[resort.id]?.length ? serializeStations(stationIndex[resort.id], new Date()).measuredNow : [];
 
   // First sentence under the H1 (lib/quotable.ts): dated by the report's own
   // updated_at, labelled by its source. The SNOTEL wording names the station
@@ -372,7 +380,7 @@ export default async function ResortPage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageLd) }}
         />
       )}
-      <ResortDetailPage resort={resort} weather={weather} forecastPeriods={forecastPeriods} forecastStrip={forecastStrip} hourlyData={hourlyRaw} liveConditions={liveConditions} userConditions={userConditions} nearby={nearby} freshness={{ segments: freshness.segments }} breadcrumb={breadcrumb} camTimeline={camTimeline} />
+      <ResortDetailPage resort={resort} weather={weather} forecastPeriods={forecastPeriods} forecastStrip={forecastStrip} hourlyData={hourlyRaw} liveConditions={liveConditions} userConditions={userConditions} nearby={nearby} freshness={{ segments: freshness.segments }} breadcrumb={breadcrumb} camTimeline={camTimeline} measuredNow={measuredNow} />
       <ResortAboutSection resort={resort} />
     </main>
   );

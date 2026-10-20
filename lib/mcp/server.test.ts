@@ -1,7 +1,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
-import type { Cam, ResortWithData, SnowReport, WeatherPeriod } from "@/lib/types";
+import type { Cam, ResortStationJoined, ResortWithData, SnowReport, WeatherPeriod } from "@/lib/types";
 import type { ResortOpening } from "@/lib/openings";
 import type { PublicApiCatalog } from "@/lib/public-api/data";
 import { CamListSchema, PowderListSchema, ResortSchema } from "@/lib/public-api/schema";
@@ -150,9 +150,39 @@ function catalog(): PublicApiCatalog {
     resorts: RESORTS,
     openings: new Map(OPENINGS.map((o) => [o.resort_id, o])),
     elevations: { "id-breckenridge": { base_ft: 9600, summit_ft: 12998 } },
+    stations: STATIONS,
     now: NOW,
   };
 }
+
+// Station layer (migration 026): Alta has a summit mesonet sensor, a SNOTEL
+// pillow at the base and one station with no observation yet; Vail has none.
+const STATIONS: Record<string, ResortStationJoined[]> = {
+  "id-alta": [
+    {
+      role: "summit",
+      distance_km: 2.3,
+      rank: 1,
+      station: { id: "st-amb", source: "nws", source_id: "AMB", name: "ALTA - MT BALDY", lat: 40.57, lng: -111.64, elevation_ft: 11066, kind: "nws_obs" },
+      latest: { station_id: "st-amb", observed_at: "2026-12-20T17:00:00+00:00", snow_depth_in: null, swe_in: null, new_snow_in: null, temp_f: 12.2, wind_mph: 31, source_payload: null },
+    },
+    {
+      role: "base",
+      distance_km: 0.3,
+      rank: 2,
+      station: { id: "st-atwater", source: "snotel", source_id: "1308:UT:SNTL", name: "Atwater", lat: 40.59, lng: -111.64, elevation_ft: 8750, kind: "snotel" },
+      latest: { station_id: "st-atwater", observed_at: "2026-12-19T23:59:59+00:00", snow_depth_in: 61, swe_in: 14.2, new_snow_in: 11, temp_f: 18, wind_mph: null, source_payload: null },
+    },
+    {
+      role: "mid",
+      distance_km: 1.3,
+      rank: 3,
+      station: { id: "st-cln", source: "nws", source_id: "CLN", name: "ALTA - COLLINS", lat: 40.58, lng: -111.64, elevation_ft: 9662, kind: "nws_obs" },
+      latest: null,
+    },
+  ],
+  "id-vail": [],
+};
 
 const FORECAST: WeatherPeriod[] = [
   { dow: "Today", date: "2026-12-20", condition: "heavy-snow", high: 22, low: 9, snowInches: 8, shortForecast: "Heavy Snow", windSpeed: 15, windDirection: "W", windGust: null, precipProbability: 90, feelsLike: 8 },
@@ -280,13 +310,13 @@ test("initialize reports io.peakcam/snow, the package version and instructions",
   console.log(`negotiated protocol version ${version} (${client.getProtocolEra()} era)`);
 });
 
-test("tools/list returns the fifteen tools, each read-only with input and output schemas", async () => {
+test("tools/list returns the sixteen tools, each read-only with input and output schemas", async () => {
   const { tools } = await client.listTools();
   assert.deepEqual(
     tools.map((t) => t.name),
     [...PEAKCAM_TOOL_NAMES],
   );
-  assert.equal(tools.length, 15);
+  assert.equal(tools.length, 16);
   for (const tool of tools) {
     assert.deepEqual(tool.annotations, READ_ONLY_TOOL_ANNOTATIONS, `${tool.name} annotations`);
     assert.ok(tool.title, `${tool.name} has a title`);
@@ -298,6 +328,49 @@ test("tools/list returns the fifteen tools, each read-only with input and output
   const props = powder.inputSchema.properties as Record<string, { description?: string }>;
   assert.deepEqual(Object.keys(props).sort(), ["limit", "minInches", "sourceOnly", "state", "window"]);
   assert.ok(props.sourceOnly.description?.includes("snotel"));
+});
+
+// ── get_stations ─────────────────────────────────────────────
+
+test("get_stations: bands, networks, ages and attribution for Alta; empty list for Vail; suggestions for a typo", async () => {
+  const res = await call("get_stations", { slug: "alta" });
+  assert.notEqual(res.isError, true);
+  const doc = res.structuredContent as { available: boolean; count: number; stations: { role: string; source: string }[]; measuredNow: { role: string; sourceId: string; ageMinutes: number; tempF: number | null; snowDepthIn: number | null; attribution: string }[]; sources: { source: string }[] };
+  assert.equal(doc.available, true);
+  assert.equal(doc.count, 3, "every linked station is listed");
+  assert.deepEqual(doc.stations.map((s) => s.role), ["summit", "base", "mid"]);
+  assert.deepEqual(doc.measuredNow.map((m) => m.sourceId), ["AMB", "1308:UT:SNTL"], "Collins has no observation yet, so no measuredNow row");
+  const [summit, base] = doc.measuredNow;
+  assert.equal(summit.ageMinutes, 60, "17:00 reading at 18:00 generatedAt");
+  assert.equal(summit.tempF, 12.2);
+  assert.equal(base.snowDepthIn, 61);
+  assert.equal(base.ageMinutes, 18 * 60);
+  assert.match(base.attribution, /USDA NRCS SNOTEL/);
+  assert.deepEqual(doc.sources.map((s) => s.source), ["nws", "snotel"]);
+  const text = (res.content[0] as { text: string }).text;
+  assert.match(text, /\| Summit \| ALTA - MT BALDY \(`AMB`\) \| NWS \| 11,066 ft \| 2\.3 km \| n\/a \| n\/a \| n\/a \| 12\.2 °F \| 31 mph \| 2026-12-20 17:00 UTC \(1 h ago\) \|/);
+  assert.match(text, /\| Base \| Atwater \(`1308:UT:SNTL`\) \| SNOTEL \| 8,750 ft \| 0\.3 km \| 61 in \| 11 in \| 14\.2 in \| 18 °F \| – \|/);
+  assert.match(text, /https:\/\/www\.peakcam\.io\/resorts\/alta/);
+
+  const vail = await call("get_stations", { slug: "vail" });
+  const vailDoc = vail.structuredContent as { available: boolean; count: number };
+  assert.equal(vailDoc.available, true);
+  assert.equal(vailDoc.count, 0);
+  assert.match((vail.content[0] as { text: string }).text, /No observation station within 25 km/);
+
+  const typo = await call("get_stations", { slug: "atla" });
+  assert.equal(typo.isError, true);
+  assert.match((typo.content[0] as { text: string }).text, /alta/);
+});
+
+test("get_stations: a catalogue without the station layer says so instead of inventing an empty list", async () => {
+  const bare: McpDataSource = fixtureData({ catalog: async () => ({ ...catalog(), stations: null }) });
+  const tool = buildTools(bare).find((t) => t.name === "get_stations")!;
+  const res = await tool.handler({ slug: "alta" });
+  const doc = res.structuredContent as { available: boolean; count: number };
+  assert.equal(doc.available, false);
+  assert.equal(doc.count, 0);
+  assert.match((res.content[0] as { text: string }).text, /not populated/);
 });
 
 // ── find_powder ──────────────────────────────────────────────
@@ -714,6 +787,7 @@ test("every tool's structuredContent parses against its own outputSchema", async
     compare_models: { slug: "vail" },
     get_snow_history: { slug: "breckenridge", days: 2 },
     get_opening_dates: { state: "CO" },
+    get_stations: { slug: "alta" },
     get_resort_profile: { slug: "breckenridge" },
     get_percent_of_normal: { state: "CO" },
     list_regions: {},

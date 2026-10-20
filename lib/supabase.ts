@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
-import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition, PowderProbability, PowderProbabilityForecast, PowderProbabilityWindow } from "./types";
+import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition, PowderProbability, PowderProbabilityForecast, PowderProbabilityWindow, ResortStationJoined, StationObservation, StationRole, StationRow } from "./types";
 import type { ResortOpening } from "./openings";
 import { withResolvedCamNames } from "./cam-name";
 import { clampHours, pickResortTimeline, shapeTimeline, toFrame, MAX_TIMELINE_HOURS, type CamStillRow, type CamTimeline, type CamTimelineFrame } from "./cam-timeline";
@@ -22,6 +22,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 const SUPABASE_FETCH_TIMEOUT_MS = 8_000;
 const RESORT_CATALOG_REVALIDATE_SECONDS = 60 * 60;
+// Stations refresh hourly on the mini; a 15-minute cache keeps "age" honest without a query per request.
+const PUBLIC_API_STATIONS_REVALIDATE_SECONDS = 15 * 60;
 
 /**
  * Wraps `fetch` so every request the client makes aborts after `ms` instead
@@ -38,8 +40,45 @@ export function withFetchTimeout(fetchImpl: typeof fetch, ms: number): typeof fe
     fetchImpl(input, { ...init, signal: init?.signal ?? AbortSignal.timeout(ms) });
 }
 
+/** Status codes PostgREST and the Supabase gateway return while they are briefly unavailable. */
+const RETRYABLE_STATUS = new Set([502, 503, 504]);
+const RETRY_DELAYS_MS = [1_000, 3_000, 6_000];
+
+/**
+ * Retries idempotent requests (GET/HEAD) that fail transiently: a 502/503/504
+ * from the gateway, a network error, or the per-attempt timeout above.
+ *
+ * Why: PostgREST answers 503 `PGRST002` ("Could not query the database for the
+ * schema cache") for roughly a minute after any DDL on the project, and the
+ * schema-cache queries themselves took 13-20 s on 2026-10-20 01:33 UTC. Vercel
+ * builds that happened to prerender in that window failed on the 8 s abort
+ * even though the database itself was idle; Next's own
+ * `staticGenerationRetryCount` could not help because the whole retry budget
+ * elapsed inside the outage. Three retries with 1/3/6 s backoff cover that
+ * window at the cost of at most ~34 s on a request that would have failed
+ * anyway. Writes are never retried. A caller-supplied signal that aborts
+ * stops the retries immediately.
+ */
+export function withFetchRetry(fetchImpl: typeof fetch, delays: readonly number[] = RETRY_DELAYS_MS): typeof fetch {
+  return async (input, init) => {
+    const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+    const idempotent = method === "GET" || method === "HEAD";
+    let attempt = 0;
+    for (;;) {
+      try {
+        const res = await fetchImpl(input, init);
+        if (!idempotent || !RETRYABLE_STATUS.has(res.status) || attempt >= delays.length) return res;
+      } catch (err) {
+        if (!idempotent || attempt >= delays.length || init?.signal?.aborted) throw err;
+      }
+      await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+      attempt += 1;
+    }
+  };
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  global: { fetch: withFetchTimeout(fetch, SUPABASE_FETCH_TIMEOUT_MS) },
+  global: { fetch: withFetchRetry(withFetchTimeout(fetch, SUPABASE_FETCH_TIMEOUT_MS)) },
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -477,6 +516,74 @@ export const getResortElevationIndex = unstable_cache(
   fetchResortElevationIndex,
   ["peakcam:resort-elevations:v1", supabaseUrl],
   { revalidate: RESORT_CATALOG_REVALIDATE_SECONDS, tags: ["peakcam-resort-catalog"] },
+);
+
+// ─────────────────────────────────────────────────────────────
+// Station layer (migration 026): each resort's stations with the newest
+// observation per station. One query for the whole catalogue through
+// PostgREST's embedded ordering/limit, so the API, the resort page and the
+// MCP tool share a 15-minute cache like the catalogue. A database without
+// migration 026 yet returns an empty index rather than failing the page.
+// ─────────────────────────────────────────────────────────────
+
+const RESORT_STATIONS_SELECT =
+  "resort_id, role, distance_km, rank, " +
+  "station:stations!inner(id, source, source_id, name, lat, lng, elevation_ft, kind, " +
+  "station_observations(station_id, observed_at, snow_depth_in, swe_in, new_snow_in, temp_f, wind_mph))";
+
+interface ResortStationQueryRow {
+  resort_id: string;
+  role: StationRole;
+  distance_km: number | string | null;
+  rank: number;
+  station: StationRow & { station_observations: Array<Omit<StationObservation, "source_payload">> | null };
+}
+
+async function fetchResortStationsIndex(): Promise<Record<string, ResortStationJoined[]>> {
+  const { data, error } = await supabase
+    .from("resort_stations")
+    .select(RESORT_STATIONS_SELECT)
+    .neq("role", "approach")
+    .order("rank", { ascending: true })
+    .order("observed_at", { referencedTable: "stations.station_observations", ascending: false })
+    .limit(1, { referencedTable: "stations.station_observations" });
+  if (error) {
+    if (MISSING_TABLE_CODES.has(error.code)) return {};
+    throw error;
+  }
+  const out: Record<string, ResortStationJoined[]> = {};
+  for (const row of (data ?? []) as unknown as ResortStationQueryRow[]) {
+    if (!row.station) continue;
+    const { station_observations, ...station } = row.station;
+    const latest = station_observations?.[0] ?? null;
+    const num = (v: number | string | null | undefined) => (v == null ? null : Number(v));
+    (out[row.resort_id] ??= []).push({
+      role: row.role,
+      distance_km: num(row.distance_km),
+      rank: row.rank,
+      station: { ...station, elevation_ft: num(station.elevation_ft) },
+      latest: latest
+        ? {
+            station_id: latest.station_id,
+            observed_at: latest.observed_at,
+            snow_depth_in: num(latest.snow_depth_in),
+            swe_in: num(latest.swe_in),
+            new_snow_in: num(latest.new_snow_in),
+            temp_f: num(latest.temp_f),
+            wind_mph: num(latest.wind_mph),
+            source_payload: null,
+          }
+        : null,
+    });
+  }
+  return out;
+}
+
+/** Stations and their newest observation for every resort, keyed by resort id. Cached with the catalogue. */
+export const getResortStationsIndex = unstable_cache(
+  fetchResortStationsIndex,
+  ["peakcam:resort-stations:v1", supabaseUrl],
+  { revalidate: PUBLIC_API_STATIONS_REVALIDATE_SECONDS, tags: ["peakcam-resort-catalog"] },
 );
 
 /** Midpoint elevation (base+summit)/2 in feet, for resorts with resort_metadata. Returns base-only or null if incomplete/missing. */

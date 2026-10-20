@@ -1,0 +1,340 @@
+{
+ "data": [
+  {
+   "cctv": {
+    "index": "1",
+    "recordTimestamp": {
+     "recordDate": "2026-09-18",
+     "recordTime": "15:42:22",
+     "recordEpoch": "1789771342"
+    },
+    "location": {
+     "district": "3",
+     "locationName": "Hwy 5 at Pocket",
+     "nearbyPlace": "Sacramento",
+     "longitude": "-121.510528",
+     "latitude": "38.481128",
+     "elevation": "22",
+     "direction": "Median",
+     "county": "Sacramento",
+     "route": "I-5",
+     "routeSuffix": "",
+     "postmilePrefix": "",
+     "postmile": "16.13",
+     "alignment": "",
+     "milepost": "511.43"
+    },
+    "inService": "true",
+    "imageData": {
+     "imageDescription": "",
+     "streamingVideoURL": "https://wzmedia.dot.ca.gov/D3/5_Pocket_Rd_OC_SAC5_SB.stream/playlist.m3u8",
+     "static": {
+      "currentImageUpdateFrequency": "1",
+      "currentImageURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy5atpocket/hwy5atpocket.jpg",
+      "referenceImageUpdateFrequency": "15",
+      "referenceImage1UpdateAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy5atpocket/previous/hwy5atpocket-1.jpg",
+      "referenceImage2UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy5atpocket/previous/hwy5atpocket-2.jpg",
+      "referenceImage3UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy5atpocket/previous/hwy5atpocket-3.jpg",
+      "referenceImage4UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy5atpocket/previous/hwy5atpocket-4.jpg",
+      "referenceImage5UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy5atpocket/previous/hwy5atpocket-5.jpg",
+      "referenceImage6UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy5atpocket/previous/hwy5atpocket-6.jpg",
+      "referenceImage7UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy5atpocket/previous/hwy5atpocket-7.jpg",
+      "referenceImage8UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy5atpocket/previous/hwy5atpocket-8.jpg",
+      "referenceImage9UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy5atpocket/previous/hwy5atpocket-9.jpg",
+      "referenceImage10UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy5atpocket/previous/hwy5atpocket-10.jpg",
+      "referenceImage11UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy5atpocket/previous/hwy5atpocket-11.jpg",
+      "referenceImage12UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy5atpocket/previous/hwy5atpocket-12.jpg"
+     }
+    }
+   }
+  },
+  {
+   "cctv": {
+    "index": "36",
+    "recordTimestamp": {
+     "recordDate": "2026-09-02",
+     "recordTime": "05:05:48",
+     "recordEpoch": "1788350748"
+    },
+    "location": {
+     "district": "3",
+     "locationName": "Hwy 50 at Meyers",
+     "nearbyPlace": "Meyers",
+     "longitude": "-120.022959",
+     "latitude": "38.850899",
+     "elevation": "6345",
+     "direction": "West",
+     "county": "El Dorado",
+     "route": "US-50",
+     "routeSuffix": "",
+     "postmilePrefix": "",
+     "postmile": "70.58",
+     "alignment": "",
+     "milepost": "98.75"
+    },
+    "inService": "true",
+    "imageData": {
+     "imageDescription": "",
+     "streamingVideoURL": "https://wzmedia.dot.ca.gov/D3/50_Meyers_ED50_WB.stream/playlist.m3u8",
+     "static": {
+      "currentImageUpdateFrequency": "1",
+      "currentImageURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atmeyers/hwy50atmeyers.jpg",
+      "referenceImageUpdateFrequency": "15",
+      "referenceImage1UpdateAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atmeyers/previous/hwy50atmeyers-1.jpg",
+      "referenceImage2UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atmeyers/previous/hwy50atmeyers-2.jpg",
+      "referenceImage3UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atmeyers/previous/hwy50atmeyers-3.jpg",
+      "referenceImage4UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atmeyers/previous/hwy50atmeyers-4.jpg",
+      "referenceImage5UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atmeyers/previous/hwy50atmeyers-5.jpg",
+      "referenceImage6UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atmeyers/previous/hwy50atmeyers-6.jpg",
+      "referenceImage7UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atmeyers/previous/hwy50atmeyers-7.jpg",
+      "referenceImage8UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atmeyers/previous/hwy50atmeyers-8.jpg",
+      "referenceImage9UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atmeyers/previous/hwy50atmeyers-9.jpg",
+      "referenceImage10UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atmeyers/previous/hwy50atmeyers-10.jpg",
+      "referenceImage11UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atmeyers/previous/hwy50atmeyers-11.jpg",
+      "referenceImage12UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atmeyers/previous/hwy50atmeyers-12.jpg"
+     }
+    }
+   }
+  },
+  {
+   "cctv": {
+    "index": "71",
+    "recordTimestamp": {
+     "recordDate": "2023-04-17",
+     "recordTime": "11:23:32",
+     "recordEpoch": "1681755812"
+    },
+    "location": {
+     "district": "3",
+     "locationName": "Hwy 80 at Kingvale WB",
+     "nearbyPlace": "Soda Springs",
+     "longitude": "-120.439405",
+     "latitude": "39.31582",
+     "elevation": "6128",
+     "direction": "West",
+     "county": "Placer",
+     "route": "I-80",
+     "routeSuffix": "",
+     "postmilePrefix": "",
+     "postmile": "69.66",
+     "alignment": "",
+     "milepost": "171.01"
+    },
+    "inService": "true",
+    "imageData": {
+     "imageDescription": "",
+     "streamingVideoURL": "https://wzmedia.dot.ca.gov/D3/80_Kingvale_PLA80_WB.stream/playlist.m3u8",
+     "static": {
+      "currentImageUpdateFrequency": "1",
+      "currentImageURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atkingvalewb/hwy80atkingvalewb.jpg",
+      "referenceImageUpdateFrequency": "15",
+      "referenceImage1UpdateAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atkingvalewb/previous/hwy80atkingvalewb-1.jpg",
+      "referenceImage2UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atkingvalewb/previous/hwy80atkingvalewb-2.jpg",
+      "referenceImage3UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atkingvalewb/previous/hwy80atkingvalewb-3.jpg",
+      "referenceImage4UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atkingvalewb/previous/hwy80atkingvalewb-4.jpg",
+      "referenceImage5UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atkingvalewb/previous/hwy80atkingvalewb-5.jpg",
+      "referenceImage6UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atkingvalewb/previous/hwy80atkingvalewb-6.jpg",
+      "referenceImage7UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atkingvalewb/previous/hwy80atkingvalewb-7.jpg",
+      "referenceImage8UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atkingvalewb/previous/hwy80atkingvalewb-8.jpg",
+      "referenceImage9UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atkingvalewb/previous/hwy80atkingvalewb-9.jpg",
+      "referenceImage10UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atkingvalewb/previous/hwy80atkingvalewb-10.jpg",
+      "referenceImage11UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atkingvalewb/previous/hwy80atkingvalewb-11.jpg",
+      "referenceImage12UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atkingvalewb/previous/hwy80atkingvalewb-12.jpg"
+     }
+    }
+   }
+  },
+  {
+   "cctv": {
+    "index": "72",
+    "recordTimestamp": {
+     "recordDate": "2026-01-05",
+     "recordTime": "13:23:31",
+     "recordEpoch": "1767648211"
+    },
+    "location": {
+     "district": "3",
+     "locationName": "Hwy 80 at Soda Springs EB",
+     "nearbyPlace": "Soda Springs",
+     "longitude": "-120.389657",
+     "latitude": "39.326506",
+     "elevation": "6692",
+     "direction": "East",
+     "county": "Nevada",
+     "route": "I-80",
+     "routeSuffix": "",
+     "postmilePrefix": "R",
+     "postmile": "2.64",
+     "alignment": "R",
+     "milepost": "173.76"
+    },
+    "inService": "true",
+    "imageData": {
+     "imageDescription": "",
+     "streamingVideoURL": "https://wzmedia.dot.ca.gov/D3/80_Soda_Springs_NEV80_EB.stream/playlist.m3u8",
+     "static": {
+      "currentImageUpdateFrequency": "1",
+      "currentImageURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atsodaspringseb/hwy80atsodaspringseb.jpg",
+      "referenceImageUpdateFrequency": "15",
+      "referenceImage1UpdateAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atsodaspringseb/previous/hwy80atsodaspringseb-1.jpg",
+      "referenceImage2UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atsodaspringseb/previous/hwy80atsodaspringseb-2.jpg",
+      "referenceImage3UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atsodaspringseb/previous/hwy80atsodaspringseb-3.jpg",
+      "referenceImage4UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atsodaspringseb/previous/hwy80atsodaspringseb-4.jpg",
+      "referenceImage5UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atsodaspringseb/previous/hwy80atsodaspringseb-5.jpg",
+      "referenceImage6UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atsodaspringseb/previous/hwy80atsodaspringseb-6.jpg",
+      "referenceImage7UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atsodaspringseb/previous/hwy80atsodaspringseb-7.jpg",
+      "referenceImage8UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atsodaspringseb/previous/hwy80atsodaspringseb-8.jpg",
+      "referenceImage9UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atsodaspringseb/previous/hwy80atsodaspringseb-9.jpg",
+      "referenceImage10UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atsodaspringseb/previous/hwy80atsodaspringseb-10.jpg",
+      "referenceImage11UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atsodaspringseb/previous/hwy80atsodaspringseb-11.jpg",
+      "referenceImage12UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atsodaspringseb/previous/hwy80atsodaspringseb-12.jpg"
+     }
+    }
+   }
+  },
+  {
+   "cctv": {
+    "index": "77",
+    "recordTimestamp": {
+     "recordDate": "2026-09-07",
+     "recordTime": "18:37:37",
+     "recordEpoch": "1788831457"
+    },
+    "location": {
+     "district": "3",
+     "locationName": "Hwy 80 at Truckee Scales",
+     "nearbyPlace": "Truckee",
+     "longitude": "-120.130051",
+     "latitude": "39.362234",
+     "elevation": "5826",
+     "direction": "West",
+     "county": "Nevada",
+     "route": "I-80",
+     "routeSuffix": "",
+     "postmilePrefix": "",
+     "postmile": "19.28",
+     "alignment": "",
+     "milepost": "189.85"
+    },
+    "inService": "true",
+    "imageData": {
+     "imageDescription": "",
+     "streamingVideoURL": "https://wzmedia.dot.ca.gov/D3/80_Truckee_Scales_NEV80_WB.stream/playlist.m3u8",
+     "static": {
+      "currentImageUpdateFrequency": "1",
+      "currentImageURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80attruckeescales/hwy80attruckeescales.jpg",
+      "referenceImageUpdateFrequency": "15",
+      "referenceImage1UpdateAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80attruckeescales/previous/hwy80attruckeescales-1.jpg",
+      "referenceImage2UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80attruckeescales/previous/hwy80attruckeescales-2.jpg",
+      "referenceImage3UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80attruckeescales/previous/hwy80attruckeescales-3.jpg",
+      "referenceImage4UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80attruckeescales/previous/hwy80attruckeescales-4.jpg",
+      "referenceImage5UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80attruckeescales/previous/hwy80attruckeescales-5.jpg",
+      "referenceImage6UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80attruckeescales/previous/hwy80attruckeescales-6.jpg",
+      "referenceImage7UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80attruckeescales/previous/hwy80attruckeescales-7.jpg",
+      "referenceImage8UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80attruckeescales/previous/hwy80attruckeescales-8.jpg",
+      "referenceImage9UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80attruckeescales/previous/hwy80attruckeescales-9.jpg",
+      "referenceImage10UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80attruckeescales/previous/hwy80attruckeescales-10.jpg",
+      "referenceImage11UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80attruckeescales/previous/hwy80attruckeescales-11.jpg",
+      "referenceImage12UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80attruckeescales/previous/hwy80attruckeescales-12.jpg"
+     }
+    }
+   }
+  },
+  {
+   "cctv": {
+    "index": "104",
+    "recordTimestamp": {
+     "recordDate": "2026-06-29",
+     "recordTime": "12:44:01",
+     "recordEpoch": "1782762241"
+    },
+    "location": {
+     "district": "3",
+     "locationName": "Hwy 80 at Donner Summit",
+     "nearbyPlace": "Soda Springs",
+     "longitude": "-120.347722",
+     "latitude": "39.339039",
+     "elevation": "7221",
+     "direction": "East",
+     "county": "Nevada",
+     "route": "I-80",
+     "routeSuffix": "",
+     "postmilePrefix": "R",
+     "postmile": "5.17",
+     "alignment": "R",
+     "milepost": "176.29"
+    },
+    "inService": "true",
+    "imageData": {
+     "imageDescription": "",
+     "streamingVideoURL": "https://wzmedia.dot.ca.gov/D3/80_Donner_Summit_JWO_NEV80_EB.stream/playlist.m3u8",
+     "static": {
+      "currentImageUpdateFrequency": "1",
+      "currentImageURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atdonnersummit/hwy80atdonnersummit.jpg",
+      "referenceImageUpdateFrequency": "15",
+      "referenceImage1UpdateAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atdonnersummit/previous/hwy80atdonnersummit-1.jpg",
+      "referenceImage2UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atdonnersummit/previous/hwy80atdonnersummit-2.jpg",
+      "referenceImage3UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atdonnersummit/previous/hwy80atdonnersummit-3.jpg",
+      "referenceImage4UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atdonnersummit/previous/hwy80atdonnersummit-4.jpg",
+      "referenceImage5UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atdonnersummit/previous/hwy80atdonnersummit-5.jpg",
+      "referenceImage6UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atdonnersummit/previous/hwy80atdonnersummit-6.jpg",
+      "referenceImage7UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atdonnersummit/previous/hwy80atdonnersummit-7.jpg",
+      "referenceImage8UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atdonnersummit/previous/hwy80atdonnersummit-8.jpg",
+      "referenceImage9UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atdonnersummit/previous/hwy80atdonnersummit-9.jpg",
+      "referenceImage10UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atdonnersummit/previous/hwy80atdonnersummit-10.jpg",
+      "referenceImage11UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atdonnersummit/previous/hwy80atdonnersummit-11.jpg",
+      "referenceImage12UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy80atdonnersummit/previous/hwy80atdonnersummit-12.jpg"
+     }
+    }
+   }
+  },
+  {
+   "cctv": {
+    "index": "106",
+    "recordTimestamp": {
+     "recordDate": "2025-03-20",
+     "recordTime": "12:05:08",
+     "recordEpoch": "1742497508"
+    },
+    "location": {
+     "district": "3",
+     "locationName": "Hwy 50 at Echo Summit",
+     "nearbyPlace": "South Lake Tahoe",
+     "longitude": "-120.02928",
+     "latitude": "38.81321",
+     "elevation": "7427",
+     "direction": "East",
+     "county": "El Dorado",
+     "route": "US-50",
+     "routeSuffix": "",
+     "postmilePrefix": "",
+     "postmile": "66.84",
+     "alignment": "",
+     "milepost": "95"
+    },
+    "inService": "true",
+    "imageData": {
+     "imageDescription": "",
+     "streamingVideoURL": "https://wzmedia.dot.ca.gov/D3/50_Echo_Summit_ED50_EB.stream/playlist.m3u8",
+     "static": {
+      "currentImageUpdateFrequency": "1",
+      "currentImageURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atechosummit/hwy50atechosummit.jpg",
+      "referenceImageUpdateFrequency": "15",
+      "referenceImage1UpdateAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atechosummit/previous/hwy50atechosummit-1.jpg",
+      "referenceImage2UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atechosummit/previous/hwy50atechosummit-2.jpg",
+      "referenceImage3UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atechosummit/previous/hwy50atechosummit-3.jpg",
+      "referenceImage4UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atechosummit/previous/hwy50atechosummit-4.jpg",
+      "referenceImage5UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atechosummit/previous/hwy50atechosummit-5.jpg",
+      "referenceImage6UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atechosummit/previous/hwy50atechosummit-6.jpg",
+      "referenceImage7UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atechosummit/previous/hwy50atechosummit-7.jpg",
+      "referenceImage8UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atechosummit/previous/hwy50atechosummit-8.jpg",
+      "referenceImage9UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atechosummit/previous/hwy50atechosummit-9.jpg",
+      "referenceImage10UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atechosummit/previous/hwy50atechosummit-10.jpg",
+      "referenceImage11UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atechosummit/previous/hwy50atechosummit-11.jpg",
+      "referenceImage12UpdatesAgoURL": "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atechosummit/previous/hwy50atechosummit-12.jpg"
+     }
+    }
+   }
+  }
+ ]
+}

@@ -45,7 +45,7 @@ function resort(slug: string, name: string, over: Partial<ResortWithData> = {}):
 }
 
 function catalog(resorts: ResortWithData[], now = NOW): PublicApiCatalog {
-  return { resorts, openings: new Map(), elevations: {}, now };
+  return { resorts, openings: new Map(), elevations: {}, stations: null, now };
 }
 
 const HEALTHY = catalog([
