@@ -34,6 +34,7 @@ import {
   ObservationStationSchema,
   PowderListSchema,
   PowderWindowSchema,
+  ResortConditionsSchema,
   ResortLightSchema,
   ResortSchema,
   SeasonSchema,
@@ -66,6 +67,7 @@ import {
   sourceLabel,
 } from "@/lib/public-api/markdown";
 import { FORECAST_CREDITS, blendForPoint, serializeBlendDays, serializeForecastAccuracy, serializeSummary, type AccuracyInput } from "@/lib/public-api/forecast";
+import { serializeConditions } from "@/lib/public-api/conditions";
 import { OPEN_METEO_ATTRIBUTION, OPEN_METEO_LICENSE, modelLabel } from "@/lib/forecast/open-meteo-models";
 import { runsForPoint, type StoredForecast } from "@/lib/forecast/store";
 import { cmToInches } from "@/lib/open-meteo";
@@ -226,17 +228,53 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
     name: "get_resort_conditions",
     title: "Resort conditions",
     description:
-      "The latest snow report for one resort with provenance: new snow 24 h / 48 h, base depth, snow water equivalent, percent of normal, 7-day trend, rating, season status, plus a cam summary and the canonical PeakCam URL to cite. " +
+      "The latest snow report for one resort with provenance, inside the conditions contract v2 envelope: `data.status` is the derived operating status (OPEN, CLOSED_TODAY, PRE_SEASON, OFF_SEASON or UNKNOWN; OPEN only on a fresh operator lift feed or a resort-confirmed opening date, never by default) with `reasons`; every field in `data` (base depth measured and operator-reported, new snow 24 h / 48 h, SWE, percent of normal, lifts and runs open / total, surface, snow quality, temperature, wind, blended 48-hour forecast, season dates) is `{value, source, observedAt, confidence, freshness: {tier, ageHours}}`; `depthDisagreement` is set when the station and the operator differ by more than 30 % (quote the measured value); `sentence` is a dated line to quote. The classic Resort document (`snow`, `season`, `cams`, `profile`, `measuredNow`) rides alongside for compatibility. Use it for \"is X open today\" as well as \"what are conditions at X\". " +
       sourceNote,
     inputSchema: z.object({ slug: SlugInput }),
-    outputSchema: ResortSchema,
+    outputSchema: ResortSchema.extend({
+      schemaVersion: ResortConditionsSchema.shape.schemaVersion,
+      schemaUrl: ResortConditionsSchema.shape.schemaUrl,
+      sentence: ResortConditionsSchema.shape.sentence,
+      meta: ResortConditionsSchema.shape.meta,
+      data: ResortConditionsSchema.shape.data,
+    }),
     async handler({ slug }) {
       const catalog = await data.catalog();
       const hit = resolve(catalog, slug);
       if (!hit.ok) return hit.result;
-      const doc = serializeResort(hit.resort, serializeOptionsFor(catalog, hit.resort));
-      const trimmed = { ...doc, cams: doc.cams.slice(0, MAX_CAMS) };
-      return ok(resortMarkdown(doc, { cams: "count" }), trimmed);
+      const options = serializeOptionsFor(catalog, hit.resort);
+      const doc = serializeResort(hit.resort, options);
+      let stored: StoredForecast | null = null;
+      try {
+        stored = await data.forecastRuns(hit.resort.id);
+      } catch {
+        stored = null;
+      }
+      const envelope = serializeConditions(hit.resort, { ...options, forecast: stored });
+      const { measuredNow: layerRows, ...contract } = envelope;
+      const trimmed = { ...doc, measuredNow: doc.measuredNow ?? layerRows, cams: doc.cams.slice(0, MAX_CAMS), schemaVersion: contract.schemaVersion, schemaUrl: contract.schemaUrl, sentence: contract.sentence, meta: contract.meta, data: contract.data };
+      const c = envelope.data;
+      const fieldLine = (label: string, f: { value: unknown; source: string; freshness: { tier: string; ageHours: number | null } }, unit = "") =>
+        f.value == null ? null : `- ${label}: ${f.value}${unit} (${f.source}, ${f.freshness.tier}${f.freshness.ageHours != null ? `, ${f.freshness.ageHours} h old` : ""})`;
+      const statusLines = [
+        `## Status: ${c.status.value} — ${envelope.sentence}`,
+        "",
+        ...[
+          fieldLine("Lifts open", c.liftsOpen),
+          fieldLine("Lifts total", c.liftsTotal),
+          fieldLine("Runs open", c.runsOpen),
+          fieldLine("Base depth (measured)", c.baseDepthIn, " in"),
+          fieldLine("Base depth (operator)", c.operatorBaseDepthIn, " in"),
+          fieldLine("Blended forecast next 48 h", c.forecastNext48hCm, " cm"),
+          fieldLine("Temperature", c.tempF, " °F"),
+          fieldLine("Wind", c.windMph, " mph"),
+        ].filter((l): l is string => l != null),
+        `- Recommendable today: ${c.recommendableToday ? "yes" : "no"} — ${c.reasons.join("; ")}`,
+        ...(c.depthDisagreement ? [`- Depth disagreement: ${c.depthDisagreement.note}`] : []),
+        "",
+      ];
+      const md = resortMarkdown(doc, { cams: "count" }).replace("\n## Snow\n", `\n${statusLines.join("\n")}\n## Snow\n`);
+      return ok(md, trimmed);
     },
   });
 

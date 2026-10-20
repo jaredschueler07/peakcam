@@ -52,6 +52,8 @@ export const CONNECT_LINKS = {
   apiResorts: { href: "/api/v1/resorts", label: "REST: resort list" },
   apiResort: { href: "/api/v1/resorts/breckenridge", label: "REST: one resort" },
   apiCams: { href: "/api/v1/resorts/breckenridge/cams", label: "REST: a resort's cams" },
+  apiConditions: { href: "/api/v1/resorts/breckenridge/conditions", label: "REST: conditions contract (status, provenance, freshness)" },
+  conditionsSchema: { href: "/.well-known/schemas/resort-conditions-v1.json", label: "JSON Schema: conditions contract v1" },
   apiForecast: { href: "/api/v1/resorts/breckenridge/forecast", label: "REST: blended 14-day forecast" },
   apiForecastAccuracy: { href: "/api/v1/resorts/breckenridge/forecast-accuracy", label: "REST: forecast accuracy by model" },
   apiPowder: { href: "/api/v1/powder?source=snotel", label: "REST: powder ranking" },
@@ -128,7 +130,7 @@ const TOOL_COPY: Record<PeakCamToolName, Omit<ConnectTool, "name">> = {
   },
   get_resort_conditions: {
     title: "Resort conditions",
-    summary: "The latest snow report for one resort, every number labelled with its source and time, plus the page URL to cite.",
+    summary: "Conditions contract: a derived open / closed / pre-season status that never defaults to open; every number with source, time, freshness.",
   },
   get_resort_cams: {
     title: "Resort webcams",
@@ -234,6 +236,7 @@ export const EXAMPLE_PROMPTS: readonly ExamplePrompt[] = [
   { prompt: "Which Utah resorts are above normal snowpack right now?", tools: "get_percent_of_normal (UT)" },
   { prompt: "What did Alta's cams look like over the last 24 hours?", tools: "get_cam_timeline (alta, 24 h; links only)" },
   { prompt: "Tell me about Jackson Hole: where it is, how high, and where its snow numbers come from.", tools: "get_resort_profile" },
+  { prompt: "Is Alta open today?", tools: "ask or get_resort_conditions (data.status from the operator's lift feed or a confirmed date; never a guess)" },
   { prompt: "Is Breck open yet, and how do I get an alert when it dumps?", tools: "ask (\"is Breck open\"), get_alert_options" },
   { prompt: "How is this season going at Breckenridge compared with normal and with last year?", tools: "get_season_stats, get_snow_history (season)" },
   { prompt: "Which resorts have had the most powder days this season?", tools: "get_leaderboard (season-powder-days)" },

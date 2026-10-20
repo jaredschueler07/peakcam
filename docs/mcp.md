@@ -4,7 +4,7 @@ Read-only [Model Context Protocol](https://modelcontextprotocol.io) server that 
 assistant the same data as the site and `/api/v1`: the latest snow report per resort with its
 provenance, season status, webcams as links and archived stills, NWS forecasts, SNOTEL daily
 history, percent-of-normal rankings, resort profiles, regions, alert recipes, and an `ask` tool
-that routes a plain question to the right one of them deterministically. Sixteen tools.
+that routes a plain question to the right one of them deterministically. Nineteen tools.
 
 | | |
 | --- | --- |
@@ -34,7 +34,7 @@ with the resort's canonical URL) and a `structuredContent` document that matches
 | Tool | Arguments | Returns | Notes |
 | --- | --- | --- | --- |
 | `search_resorts` | `query` (name, fragment or region), `state?`, `country?` (ISO-2), `limit?` 1–20 (10) | `{ query, count, resorts: ResortLight[] }` | Typo-tolerant. Call first to turn a name into a slug. |
-| `get_resort_conditions` | `slug` | `Resort` (full `/api/v1/resorts/{slug}` document, cams capped at 12) | Snow numbers with `source`, `measuredAt` and `station`; season status; canonical URL. |
+| `get_resort_conditions` | `slug` | `Resort` (full `/api/v1/resorts/{slug}` document, cams capped at 12) **plus the P6 envelope**: `schemaVersion`, `schemaUrl`, `sentence`, `meta` (freshness tier per field, sources, the resort's local date and zone), `data` (the `ConditionsContract`) | `data.status` is OPEN / CLOSED_TODAY / PRE_SEASON / OFF_SEASON / UNKNOWN with `reasons`, OPEN only on a fresh operator lift feed or a resort-confirmed date; every `data` field is `{value, source, observedAt, confidence, freshness: {tier, ageHours}}`; `depthDisagreement` when station and operator differ by more than 30 %. The markdown opens with a `## Status` block. |
 | `get_resort_cams` | `slug` | `CamList` (cams capped at 12) | Links only: PeakCam page, operator source, still-image URL, health (`live`/`down`/`unchecked`). |
 | `find_powder` | `window?` `24h`\|`48h` (24h), `state?`, `minInches?`, `sourceOnly?` `snotel`, `limit?` 1–25 (10) | `PowderList` | Ranked by new snow; `sourceOnly=snotel` answers "measured only". Resorts with no report are left out. |
 | `compare_resorts` | `slugs[]` 2–6 | `{ count, resorts: (Resort without cams + camCount/liveCamCount)[] }` | Markdown table side by side. Any unknown slug is an error with suggestions. |
@@ -256,6 +256,47 @@ npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --metho
 npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_leaderboard --tool-arg kind=season-snowfall --tool-arg state=CO
 npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_snow_history --tool-arg slug=alta --tool-arg season=2024-25
 ```
+
+## Conditions contract v2 and operator status (P6, 2026-10-20)
+
+`get_resort_conditions` now returns the conditions envelope on top of the Resort document, the
+same JSON as `GET /api/v1/resorts/{slug}/conditions` (`lib/public-api/conditions.ts` over the
+pure `lib/conditions-contract.ts`; schema `ResortConditions`, file
+`/.well-known/schemas/resort-conditions-v1.json`). Every field is a `Field`:
+`{value, source, observedAt, confidence, freshness: {tier, ageHours}}`.
+
+| Source | Meaning |
+| --- | --- |
+| `snotel` | The resort's NRCS station as written to the snow report (quality-controlled, 6-hourly sync). |
+| `station:<network>` | A reading from the P3 station layer (`nws`, `ghcn`, `bc_asws`, `eccc`, `snotel`). |
+| `operator` | The resort's own published report: lift status parsed by Liftie (`scripts/operator-sync.ts`, migration 031), or a resort-confirmed opening date. |
+| `model` | A weather-model estimate (Open-Meteo report rows, the P4 blend's 48-hour total). |
+| `profile` | A static catalogue fact: lift and run totals, a third-party projected opening date. |
+| `derived` | Computed by PeakCam from other fields (percent of normal, snow quality from the engine's tags). |
+| `none` | Nothing on file. |
+
+Tiers: `live` (≤ 3 h from an hourly source), `recent` (≤ 30 h), `estimated` (a model value
+≤ 30 h), `stale` (> 30 h), `unknown`. Confidence: SNOTEL 0.9, other stations 0.8, operator 0.7,
+profile and derived 0.6, model 0.5; halved when stale, 0 when unknown.
+
+`data.status` is derived, never defaulting to open: a fresh operator feed with lifts open or
+scheduled → `OPEN`; every lift closed inside the season → `CLOSED_TODAY`; a confirmed opening
+date that has passed → `OPEN`; a confirmed or projected date ahead → `PRE_SEASON`; a closing
+date passed → `OFF_SEASON`; otherwise `UNKNOWN`. `today` is the resort's own calendar day
+(`lib/resort-timezone.ts`). `recommendableToday` needs OPEN, a current base depth and a
+rating above poor; `reasons` spells out both. The `ask` tool answers "is Alta open today"
+with the envelope's `sentence`, dated by the operator feed.
+
+```bash
+npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_resort_conditions --tool-arg slug=alta | head -40
+npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name ask --tool-arg question="is Alta open today"
+curl -s https://www.peakcam.io/api/v1/resorts/alta/conditions | jq '{status: .data.status, lifts: [.data.liftsOpen.value, .data.liftsTotal.value], verdict: .data.recommendableToday, reasons: .data.reasons, sentence}'
+```
+
+Liftie (liftie.info) sits behind a Cloudflare managed challenge for non-browser clients as of
+2026-10-20 (403, `cf-mitigated: challenge`, from the Air and the mini alike); until that
+clears, `liftsOpen` carries `source: "none"` and the status falls back to the opening row.
+`docs/runbook.md` "Operator status" has the job and the follow-up list of operator feeds.
 
 ## Discovery (Sprint 6)
 
