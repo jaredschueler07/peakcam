@@ -22,7 +22,7 @@ import { SeasonStatTiles } from "@/components/history/SeasonStatTiles";
 // /resorts/{slug}/history — the season so far against the station's normal
 // band, ten past seasons and the monthly climatology (parity plan P5).
 // Rendered on demand with hourly ISR rather than prerendered: each page
-// reads ~3,650 daily rows, and 148 of those at build time is what starves
+// reads ~3,650 daily rows, and 268 of those at build time is what starves
 // Supabase. A slug the catalogue does not know is a 404.
 export const revalidate = 3600;
 

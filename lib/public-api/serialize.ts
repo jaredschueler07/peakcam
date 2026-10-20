@@ -8,8 +8,10 @@
 // whatever they fetched, and the tests build fixtures by hand.
 // ─────────────────────────────────────────────────────────────
 
-import type { Cam, OperatorStatusRow, Resort, ResortStationJoined, ResortWithData, SnowReport } from "@/lib/types";
+import type { Cam, OperatorStatusRow, Resort, ResortScoreRow, ResortStationJoined, ResortWithData, SnowReport } from "@/lib/types";
 import { SITE_URL } from "@/lib/site";
+import { SCORE_VERSION, parseStoredComponents, scoreRating } from "@/lib/score";
+import { scoreSentence } from "@/lib/quotable";
 import { cameraPreview } from "@/lib/cam-preview";
 import { camDisplayName } from "@/lib/cam-name";
 import { conditionsNarrative } from "@/lib/resort-copy";
@@ -36,6 +38,8 @@ import type {
   ResortPass,
   ResortProfilePublic,
   ResortPublic,
+  ResortScorePublic,
+  ScoreLightPublic,
   SeasonPublic,
   SeasonStatus,
   Station,
@@ -78,6 +82,14 @@ export interface SerializeOptions {
    * cam carries one, empty for cams without a clip.
    */
   timelapses?: CamTimelapses[] | null;
+  /**
+   * The resort's newest score row (migration 028, `getLatestScoresIndex`,
+   * P7). Omitted → no `score` key (the table is not served); null → the
+   * key is present and null (served, but no row at most 3 days old).
+   */
+  score?: ResortScoreRow | null;
+  /** The whole score index by resort id, for the list and powder serializers; same omitted / null semantics. */
+  scores?: Record<string, ResortScoreRow> | null;
 }
 
 export type { StationMeta };
@@ -472,6 +484,36 @@ export function serializeStations(rows: readonly ResortStationJoined[], now: Dat
 
 const finite = (v: number | null | undefined): number | null => (v == null || !Number.isFinite(v) ? null : v);
 
+// ── Snow Score (migration 028, P7) ───────────────────────────
+
+/** A stored score row as the API serves it; the rating is recomputed from the score when the row carries none. */
+export function serializeScore(resort: Pick<ResortWithData, "name" | "slug">, row: ResortScoreRow): ResortScorePublic {
+  const score = Math.max(0, Math.min(100, Math.round(Number(row.score))));
+  const rating = row.rating ?? scoreRating(score);
+  const components = parseStoredComponents(row.components);
+  return {
+    date: row.date,
+    score,
+    rating,
+    tagline: scoreSentence(resort, { date: row.date, score, rating, components }).text,
+    components,
+    scoredBy: "algorithmic",
+    version: SCORE_VERSION,
+  };
+}
+
+export function serializeScoreLight(row: ResortScoreRow): ScoreLightPublic {
+  const score = Math.max(0, Math.min(100, Math.round(Number(row.score))));
+  return { date: row.date, score, rating: row.rating ?? scoreRating(score) };
+}
+
+/** The score row for a resort from the options: the single row wins, else the index; `undefined` when neither was passed. */
+function scoreRowFor(resort: Pick<ResortWithData, "id">, options: SerializeOptions): ResortScoreRow | null | undefined {
+  if (options.score !== undefined) return options.score;
+  if (options.scores !== undefined) return options.scores ? (options.scores[resort.id] ?? null) : null;
+  return undefined;
+}
+
 // ── Resort ───────────────────────────────────────────────────
 
 export function serializeResort(resort: ResortWithData, options: SerializeOptions = {}): ResortPublic {
@@ -479,6 +521,7 @@ export function serializeResort(resort: ResortWithData, options: SerializeOption
   const cams = activeCams(resort).map((cam) => serializeCam(cam, resort, options));
   const elevation = resolveElevation(resort, options);
   const stationLayer = options.observationStations ? serializeStations(options.observationStations, options.now ?? new Date()) : null;
+  const scoreRow = scoreRowFor(resort, options);
   return {
     slug: resort.slug,
     name: resort.name,
@@ -498,6 +541,7 @@ export function serializeResort(resort: ResortWithData, options: SerializeOption
     season: serializeSeason(resort, options),
     cams,
     ...(stationLayer ?? {}),
+    ...(scoreRow !== undefined ? { score: scoreRow ? serializeScore(resort, scoreRow) : null } : {}),
     websiteUrl: resort.website_url ?? null,
     attribution: PUBLIC_API_ATTRIBUTION,
     license: PUBLIC_API_LICENSE_URL,
@@ -508,6 +552,7 @@ export function serializeResort(resort: ResortWithData, options: SerializeOption
 export function serializeResortLight(resort: ResortWithData, options: SerializeOptions = {}): ResortLightPublic {
   const report = resort.snow_report;
   const cams = activeCams(resort);
+  const scoreRow = scoreRowFor(resort, options);
   return {
     slug: resort.slug,
     name: resort.name,
@@ -531,6 +576,7 @@ export function serializeResortLight(resort: ResortWithData, options: SerializeO
         }
       : null,
     rating: report?.auto_cond_rating ?? resort.cond_rating ?? null,
+    ...(scoreRow !== undefined ? { score: scoreRow ? serializeScoreLight(scoreRow) : null } : {}),
     seasonStatus: serializeSeason(resort, options).status,
     camCount: cams.length,
     liveCamCount: cams.filter((c) => camLive(c) === true).length,
@@ -539,12 +585,17 @@ export function serializeResortLight(resort: ResortWithData, options: SerializeO
 
 export function serializeResortList(
   resorts: readonly ResortWithData[],
-  options: SerializeOptions & { openings?: ReadonlyMap<string, ResortOpening> } = {},
+  options: SerializeOptions & { openings?: ReadonlyMap<string, ResortOpening>; sort?: "name" | "score" } = {},
 ): ResortListPublic {
   const now = options.now ?? new Date();
   const rows = [...resorts]
     .sort((a, b) => a.name.localeCompare(b.name, "en"))
     .map((r) => serializeResortLight(r, { ...options, now, opening: options.openings?.get(r.id) ?? null }));
+  // `score` (P7): highest Snow Score first, unscored rows last in name order.
+  if (options.sort === "score") {
+    const n = (v: number | undefined) => (v == null ? -Infinity : v);
+    rows.sort((a, b) => n(b.score?.score) - n(a.score?.score) || a.name.localeCompare(b.name, "en"));
+  }
   return {
     count: rows.length,
     resorts: rows,
@@ -616,6 +667,7 @@ export function rankPowder(
   const results: PowderEntryPublic[] = limited.map((resort, i) => {
     const report = resort.snow_report!;
     const station = stationFor(resort, stations);
+    const scoreRow = scoreRowFor(resort, options);
     return {
       rank: i + 1,
       slug: resort.slug,
@@ -627,6 +679,7 @@ export function rankPowder(
       newSnow24h: measurement(report.new_snow_24h, "in", report, station),
       newSnow48h: measurement(report.new_snow_48h, "in", report, station),
       baseDepth: measurement(report.base_depth, "in", report, station),
+      ...(scoreRow !== undefined ? { score: scoreRow ? serializeScoreLight(scoreRow) : null } : {}),
     };
   });
 

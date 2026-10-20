@@ -1,7 +1,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
-import type { Cam, OperatorStatusRow, ResortStationJoined, ResortWithData, SnowReport, WeatherPeriod } from "@/lib/types";
+import type { Cam, OperatorStatusRow, ResortScoreRow, ResortStationJoined, ResortWithData, SnowReport, WeatherPeriod } from "@/lib/types";
 import type { ResortOpening } from "@/lib/openings";
 import type { PublicApiCatalog } from "@/lib/public-api/data";
 import { CamListSchema, PowderListSchema, ResortConditionsSchema, ResortSchema } from "@/lib/public-api/schema";
@@ -158,6 +158,24 @@ const OPERATORS: Record<string, OperatorStatusRow> = {
   },
 };
 
+// P7: Alta and Breckenridge have score rows (Breck's is a day old, still current); the others are unscored.
+const SCORE_COMPONENTS = {
+  depthVsNormal: { points: 26.9, max: 30, basis: "snowpack 118% of the station's 1991–2020 median for today (SNOTEL), base 60 in.", source: "snotel" },
+  recentSnow7d: { points: 20, max: 25, basis: "16 in. of new snow in the last 7 days (SNOTEL)", source: "snotel" },
+  forecast7d: { points: 10, max: 20, basis: "6 in. forecast over the next 7 days (median of 7 models, Open-Meteo)", source: "model" },
+  snowQuality: { points: 15, max: 15, basis: "snow within the last day, 3-day high 24°F (SNOTEL)", source: "derived" },
+  operatingStatus: { points: 10, max: 10, basis: "open (operator feed or confirmed date)", source: "operator" },
+};
+const SCORES: Record<string, ResortScoreRow> = {
+  "id-alta": { resort_id: "id-alta", date: "2026-12-20", score: 82, rating: "great", components: SCORE_COMPONENTS, scored_by: "algorithmic" },
+  "id-breckenridge": { resort_id: "id-breckenridge", date: "2026-12-19", score: 61, rating: null, components: { ...SCORE_COMPONENTS, operatingStatus: { points: 5, max: 10, basis: "pre-season (projected date)", source: "profile" } }, scored_by: "algorithmic" },
+};
+const SCORE_HISTORY: ResortScoreRow[] = [
+  { resort_id: "id-alta", date: "2026-12-18", score: 70, rating: "good", components: SCORE_COMPONENTS, scored_by: "algorithmic" },
+  { resort_id: "id-alta", date: "2026-12-19", score: 76, rating: "great", components: SCORE_COMPONENTS, scored_by: "algorithmic" },
+  SCORES["id-alta"],
+];
+
 function catalog(): PublicApiCatalog {
   return {
     resorts: RESORTS,
@@ -165,6 +183,7 @@ function catalog(): PublicApiCatalog {
     elevations: { "id-breckenridge": { base_ft: 9600, summit_ft: 12998 } },
     stations: STATIONS,
     operatorStatus: OPERATORS,
+    scores: SCORES,
     now: NOW,
   };
 }
@@ -318,6 +337,9 @@ function fixtureData(over: Partial<McpDataSource> = {}): McpDataSource {
     async timelapses(resortId) {
       return resortId === "id-breckenridge" ? CLIPS : [];
     },
+    async scoreHistory(resortId) {
+      return resortId === "id-alta" ? SCORE_HISTORY : resortId === "id-breckenridge" ? [SCORES["id-breckenridge"]] : [];
+    },
     ...over,
   };
 }
@@ -449,6 +471,10 @@ test("find_powder ranks measured snow, labels sources and links canonical URLs",
   assert.equal(doc.results[0].rank, 1);
   assert.equal(doc.results[0].newSnow24h.value, 12);
   assert.equal(doc.results[0].newSnow24h.source, "snotel");
+  // P7: each row carries today's score when one is stored, null otherwise.
+  assert.deepEqual(doc.results[0].score, { date: "2026-12-20", score: 82, rating: "great" });
+  assert.equal(doc.results[3].score, null);
+  assert.match(text(res), /score 82 \(great, 2026-12-20\)/);
   assert.equal(doc.results[3].newSnow24h.source, "open_meteo");
   assert.equal(doc.generatedAt, NOW.toISOString());
   const md = text(res);
@@ -677,9 +703,15 @@ test("compare_resorts builds a side-by-side table and refuses unknown slugs", as
   assert.equal(doc.resorts[1].camCount, MAX_CAMS + 3);
   assert.equal(doc.resorts[1].cams, undefined, "compare entries carry counts, not cam lists");
   const md = text(res);
-  assert.match(md, /\| Resort \| 24 h \| 48 h \| Base \| SWE % normal \| Rating \| Season \| Source \| Cams live \|/);
-  assert.match(md, /\| \[Alta\]\(https:\/\/www\.peakcam\.io\/resorts\/alta\) \| 12 in \| 20 in \| 60 in \| 118 % \| great \| unknown \| SNOTEL 2026-12-20 12:00 UTC \| 15\/15 \|/);
-  assert.match(md, /\| \[Ski Portillo\]\(https:\/\/www\.peakcam\.io\/resorts\/ski-portillo\) \| 3 in \| 4 in \| 20 in \| n\/a \| great \| closed \| model 2026-12-20 12:00 UTC \| 1\/1 \|/);
+  assert.match(md, /\| Resort \| Score \| 24 h \| 48 h \| Base \| SWE % normal \| Rating \| Season \| Source \| Cams live \|/);
+  assert.match(md, /\| \[Alta\]\(https:\/\/www\.peakcam\.io\/resorts\/alta\) \| 82 \(great\) \| 12 in \| 20 in \| 60 in \| 118 % \| great \| unknown \| SNOTEL 2026-12-20 12:00 UTC \| 15\/15 \|/);
+  assert.match(md, /\| \[Ski Portillo\]\(https:\/\/www\.peakcam\.io\/resorts\/ski-portillo\) \| n\/a \| 3 in \| 4 in \| 20 in \| n\/a \| great \| closed \| model 2026-12-20 12:00 UTC \| 1\/1 \|/);
+  assert.match(md, /Score = PeakCam Snow Score 0–100 as of 2026-12-20/);
+  // P7: the score rides on every compare entry; a null one says "no current score", not "not served".
+  const scored = doc.resorts as Array<{ slug: string; score?: { score: number; rating: string; date: string } | null }>;
+  assert.equal(scored[1].score?.score, 82);
+  assert.equal(scored[0].score?.rating, "good", "a stored row without a rating gets one from the ladder");
+  assert.equal(scored[2].score, null);
 
   const bad = await call("compare_resorts", { slugs: ["alta", "vial"] });
   assert.equal(bad.isError, true);
@@ -915,6 +947,7 @@ test("every tool's structuredContent parses against its own outputSchema", async
     get_monthly_climatology: { slug: "breckenridge" },
     get_leaderboard: { kind: "season-snowfall", state: "CO" },
     get_timelapses: { slug: "breckenridge" },
+    get_score: { slug: "alta" },
   };
   for (const tool of tools) {
     const args = tool.inputSchema.parse(samples[tool.name]);
@@ -1156,4 +1189,50 @@ test("get_snow_history with season returns every daily row of that season, oldes
   assert.equal((current.structuredContent as { count: number }).count, 80);
   const plain = await call("get_snow_history", { slug: "breckenridge", days: 2 });
   assert.equal((plain.structuredContent as { season: string | null }).season, null);
+});
+
+// ── get_score (P7) ───────────────────────────────────────────
+
+test("get_score returns today's score with components, the 30-day history and a dated tagline; unscored resorts answer available: false", async () => {
+  const { ResortScoreHistorySchema } = await import("@/lib/public-api/schema");
+  const res = await call("get_score", { slug: "alta" });
+  assert.notEqual(res.isError, true);
+  const doc = ResortScoreHistorySchema.parse(res.structuredContent);
+  assert.equal(doc.available, true);
+  assert.equal(doc.today?.score, 82);
+  assert.equal(doc.today?.rating, "great");
+  assert.equal(doc.today?.scoredBy, "algorithmic");
+  assert.equal(doc.today?.components.depthVsNormal.points, 26.9);
+  assert.deepEqual(doc.history.map((h) => h.score), [70, 76, 82]);
+  assert.deepEqual(doc.weights, { depthVsNormal: 30, recentSnow7d: 25, forecast7d: 20, snowQuality: 15, operatingStatus: 10 });
+  assert.deepEqual(doc.ladder, { great: 75, good: 55, fair: 35 });
+  assert.match(doc.sentence, /^As of Dec 20, Alta's PeakCam Snow Score is 82 of 100 \(great\): /);
+  assert.equal(doc.apiUrl, "https://www.peakcam.io/api/v1/resorts/alta/score-components");
+  assert.equal(doc.pageUrl, "https://www.peakcam.io/resorts/alta#snow-score");
+  const md = text(res);
+  assert.match(md, /^# Alta Snow Score: 82 of 100 \(great\) — https:\/\/www\.peakcam\.io\/resorts\/alta#snow-score/);
+  assert.match(md, /\| Depth vs normal \| 26\.9 \| 30 \| snowpack 118%/);
+  assert.match(md, /Last 3 scored days: [▁▂▃▄▅▆▇█]{3} \(2026-12-18 70 → 2026-12-20 82\)/);
+  assert.match(md, /Formula: https:\/\/www\.peakcam\.io\/methodology#score/);
+
+  const none = ResortScoreHistorySchema.parse((await call("get_score", { slug: "vail" })).structuredContent);
+  assert.equal(none.available, false);
+  assert.equal(none.today, null);
+  assert.deepEqual(none.history, []);
+  assert.match(none.sentence, /No Snow Score for this resort yet/);
+
+  const bad = await call("get_score", { slug: "vial" });
+  assert.equal(bad.isError, true);
+  assert.match(text(bad), /did you mean/i);
+});
+
+test("get_score on a data source without scoreHistory answers available: false without throwing", async () => {
+  const tools = buildTools(fixtureData({ scoreHistory: undefined, catalog: async () => ({ ...catalog(), scores: undefined }) }));
+  const tool = tools.find((t) => t.name === "get_score")!;
+  const res = await tool.handler({ slug: "alta" });
+  assert.notEqual(res.isError, true);
+  const doc = res.structuredContent as { available: boolean; today: unknown; history: unknown[] };
+  assert.equal(doc.available, false);
+  assert.equal(doc.today, null);
+  assert.deepEqual(doc.history, []);
 });

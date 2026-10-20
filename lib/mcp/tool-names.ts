@@ -28,6 +28,8 @@ export const PEAKCAM_TOOL_NAMES = [
   "get_leaderboard",
   // P8 timelapses
   "get_timelapses",
+  // P7 score
+  "get_score",
 ] as const;
 
 export type PeakCamToolName = (typeof PEAKCAM_TOOL_NAMES)[number];

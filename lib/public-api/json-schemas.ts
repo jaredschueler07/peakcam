@@ -29,6 +29,10 @@ const FILE_STEMS: Record<string, string> = {
   Error: "error",
   // P6: the conditions contract carries its major version in the file name.
   ResortConditions: "resort-conditions-v1",
+  // P7: the score document is named after its route; the components record keeps a distinct stem.
+  ResortScoreHistory: "score-components",
+  ScoreComponents: "score-component-set",
+  SnowReportList: "snow-report",
 };
 
 function kebab(id: string): string {

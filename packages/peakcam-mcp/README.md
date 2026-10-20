@@ -49,11 +49,11 @@ Only `https://` endpoints are accepted (plus `localhost` for development).
 
 ## What you get
 
-Twenty read-only tools (`search_resorts`, `get_resort_conditions`, `get_resort_cams`,
+Twenty-one read-only tools (`search_resorts`, `get_resort_conditions`, `get_resort_cams`,
 `find_powder`, `compare_resorts`, `get_forecast`, `compare_models`, `get_snow_history`,
 `get_opening_dates`, `get_resort_profile`, `get_percent_of_normal`, `list_regions`,
 `get_alert_options`, `get_cam_timeline`, `get_stations`, `ask`, `get_season_stats`,
-`get_monthly_climatology`, `get_leaderboard`, `get_timelapses`) and one resource,
+`get_monthly_climatology`, `get_leaderboard`, `get_timelapses`, `get_score`) and one resource,
 `peakcam://resorts/{slug}` (markdown). Every snow number carries its source and time.
 The full guide is <https://www.peakcam.io/llms-full.txt>.
 

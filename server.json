@@ -56,7 +56,8 @@
         "get_season_stats",
         "get_monthly_climatology",
         "get_leaderboard",
-        "get_timelapses"
+        "get_timelapses",
+        "get_score"
       ],
       "stdio": "npx -y peakcam-mcp"
     }

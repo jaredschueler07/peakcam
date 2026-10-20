@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
-import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition, PowderProbability, PowderProbabilityForecast, PowderProbabilityWindow, ResortStationJoined, StationObservation, StationRole, StationRow, OperatorStatusRow } from "./types";
+import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition, PowderProbability, PowderProbabilityForecast, PowderProbabilityWindow, ResortStationJoined, StationObservation, StationRole, StationRow, OperatorStatusRow, ResortScoreRow } from "./types";
 import type { ResortOpening } from "./openings";
 import type { StationNormalsSummary } from "./resort-faq";
 import { withResolvedCamNames } from "./cam-name";
@@ -27,7 +27,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 /**
  * Per-attempt fetch timeout. 8 s at runtime keeps a stuck connection from
  * holding an ISR revalidation (see withFetchTimeout). During `next build`
- * the 148+ prerenders share PostgREST's 10-connection pool with the Mac
+ * the 268+ prerenders share PostgREST's 10-connection pool with the Mac
  * mini's jobs (stills every 15 min, hourly stations sync, the daily cam
  * health check's 640 PATCHes); a burst from those queued build reads past
  * 8 s on 2026-10-20 01:51 UTC with an otherwise idle database. A build has
@@ -638,6 +638,51 @@ export const getLatestOperatorStatusIndex = unstable_cache(
   ["peakcam:operator-status:v1", supabaseUrl],
   { revalidate: PUBLIC_API_STATIONS_REVALIDATE_SECONDS, tags: ["peakcam-resort-catalog"] },
 );
+
+// ─────────────────────────────────────────────────────────────
+// Snow Score (migration 028; written by scripts/score-sync.ts, P7).
+// The newest row per resort inside a short window is "today's score": the
+// scorer writes one row per resort per day, so a missed run still shows
+// yesterday's row, dated as such, rather than nothing. One query for the
+// whole catalogue, cached beside the station and operator indexes. A
+// database without the table returns an empty index rather than failing.
+// ─────────────────────────────────────────────────────────────
+
+/** Days back the "today" lookup will accept a score row; older rows are history, not a current score. */
+export const SCORE_CURRENT_MAX_AGE_DAYS = 3;
+const SCORE_COLUMNS = "resort_id, date, score, rating, components, scored_by";
+
+async function fetchLatestScoresIndex(): Promise<Record<string, ResortScoreRow>> {
+  const since = new Date(Date.now() - SCORE_CURRENT_MAX_AGE_DAYS * 86_400_000).toISOString().slice(0, 10);
+  const { data, error } = await supabase.from("resort_scores").select(SCORE_COLUMNS).gte("date", since).order("date", { ascending: false }).limit(2000);
+  if (error) {
+    if (MISSING_TABLE_CODES.has(error.code)) return {};
+    throw error;
+  }
+  const out: Record<string, ResortScoreRow> = {};
+  for (const row of (data ?? []) as ResortScoreRow[]) {
+    if (row.resort_id && !out[row.resort_id]) out[row.resort_id] = row;
+  }
+  return out;
+}
+
+/** The newest score row (≤ 3 days old) per resort, keyed by resort id; `{}` before the first scoring run or migration 028. */
+export const getLatestScoresIndex = unstable_cache(
+  fetchLatestScoresIndex,
+  ["peakcam:resort-scores:v1", supabaseUrl],
+  { revalidate: PUBLIC_API_STATIONS_REVALIDATE_SECONDS, tags: ["peakcam-resort-catalog"] },
+);
+
+/** Score rows for one resort over the trailing `days`, oldest first. Empty (not an error) without the table. */
+export async function getResortScoreHistory(resortId: string, days: number): Promise<ResortScoreRow[]> {
+  const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  const { data, error } = await supabase.from("resort_scores").select(SCORE_COLUMNS).eq("resort_id", resortId).gte("date", since).order("date", { ascending: true }).limit(days + 2);
+  if (error) {
+    if (MISSING_TABLE_CODES.has(error.code)) return [];
+    throw error;
+  }
+  return (data ?? []) as ResortScoreRow[];
+}
 
 /** Midpoint elevation (base+summit)/2 in feet from the cached index (profile columns, legacy fallback). Base-only or null when incomplete. */
 export async function getResortElevationFt(resortId: string): Promise<number | null> {

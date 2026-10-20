@@ -166,6 +166,7 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
       { name: "status", description: "Service health derived from the data." },
       { name: "history", description: "Season history, season-to-date stats and monthly climatology per resort." },
       { name: "leaderboards", description: "Season rankings: 7-day snow, powder days, deepest base, season snowfall." },
+      { name: "score", description: "The 0–100 Snow Score: components, history and the sortable snow-report table." },
     ],
     paths: {
       "/resorts": {
@@ -173,8 +174,34 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
           operationId: "listResorts",
           tags: ["resorts"],
           summary: "List every active resort with headline snow numbers",
-          description: "Alphabetical. One row per resort with base depth and new snow, the report source, rating, season status and cam counts. Fetch `/resorts/{slug}` for provenance per field, the season detail and the cam list.",
-          responses: { "200": jsonResponse("The resort list.", "ResortList"), "403": ERROR_403 },
+          description: "Alphabetical by default; `sort=score` puts the highest Snow Score first. One row per resort with base depth and new snow, the report source, rating, today's Snow Score (`score`, P7), season status and cam counts. Fetch `/resorts/{slug}` for provenance per field, the season detail and the cam list.",
+          parameters: [{ name: "sort", in: "query", description: "`name` (default) or `score` (today's Snow Score, unscored resorts last).", schema: { type: "string", enum: ["name", "score"], default: "name" } }],
+          responses: { "200": jsonResponse("The resort list.", "ResortList"), "400": ERROR_400, "403": ERROR_403 },
+        },
+      },
+      "/snow-report": {
+        get: {
+          operationId: "getSnowReport",
+          tags: ["score"],
+          summary: "The snow-report table, sortable by Snow Score, new snow or base",
+          description:
+            "Every active resort as a light row (the same shape as `/resorts`), ordered by `sort`: `score` ranks by today's 0–100 Snow Score with unscored resorts last, `newSnow24h` and `baseDepth` rank by the latest report, `name` is alphabetical. `state` keeps one state / province (or `Chile` / `Argentina`). The dated `sentence` names the top three Snow Scores among the rows kept, and `scoredAsOf` is the newest score day among them. Components per resort: `/resorts/{slug}/score-components`.",
+          parameters: [
+            { name: "sort", in: "query", schema: { type: "string", enum: ["name", "score", "newSnow24h", "baseDepth"], default: "name" } },
+            { name: "state", in: "query", description: "Case-insensitive `resorts.state` match: `CO`, `BC`, `Chile`.", schema: { type: "string", minLength: 1, maxLength: 40 } },
+          ],
+          responses: { "200": jsonResponse("The snow-report table.", "SnowReportList"), "400": ERROR_400, "403": ERROR_403 },
+        },
+      },
+      "/resorts/{slug}/score-components": {
+        get: {
+          operationId: "getResortScoreComponents",
+          tags: ["score"],
+          summary: "Today's Snow Score with its five components and the 30-day history",
+          description:
+            "PeakCam's 0–100 Snow Score for one resort: `today` carries the score, its four-tier `rating` (great ≥ 75, good ≥ 55, fair ≥ 35, else poor), a dated `tagline` to quote and the five `components` (depth vs normal 30, new snow over 7 days 25, blended 7-day forecast 20, snow quality 15, operating status 10), each with `points`, `max`, a one-line `basis` and its `source`. `history` is one `{date, score, rating}` per scored day over the trailing 30 days for a sparkline. `scoredBy` is always `algorithmic`: the score is a fixed function of measured and modelled inputs, documented at https://www.peakcam.io/methodology#score. `available: false` before the first scoring run.",
+          parameters: [SLUG_PARAM],
+          responses: { "200": jsonResponse("The score document.", "ResortScoreHistory"), "404": ERROR_404, "403": ERROR_403 },
         },
       },
       "/resorts/{slug}": {
@@ -399,7 +426,7 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
           tags: ["batch"],
           summary: `Run up to ${BATCH_MAX_REQUESTS} GET requests in one call`,
           description:
-            `Accepts up to ${BATCH_MAX_REQUESTS} GET paths under /api/v1 (with query strings) and answers them in order, each with the status and body that path would have returned on its own. The paths run in-process against the same handlers, so a batch is one function invocation and one request against the edge rate limit. Read-only by construction: only /resorts, /resorts/search-index, /resorts/{slug}, /resorts/{slug}/cams, /resorts/{slug}/conditions, /resorts/{slug}/timelapses, /resorts/{slug}/forecast, /resorts/{slug}/forecast-accuracy, /resorts/{slug}/history, /resorts/{slug}/season-stats, /resorts/{slug}/monthly, /leaderboards/{kind}, /powder, /status and /ask (GET) dispatch; any other path fails the whole batch with a 400 naming it. The response is never cached.`,
+            `Accepts up to ${BATCH_MAX_REQUESTS} GET paths under /api/v1 (with query strings) and answers them in order, each with the status and body that path would have returned on its own. The paths run in-process against the same handlers, so a batch is one function invocation and one request against the edge rate limit. Read-only by construction: only /resorts, /resorts/search-index, /resorts/{slug}, /resorts/{slug}/cams, /resorts/{slug}/conditions, /resorts/{slug}/timelapses, /resorts/{slug}/forecast, /resorts/{slug}/forecast-accuracy, /resorts/{slug}/score-components, /resorts/{slug}/history, /resorts/{slug}/season-stats, /resorts/{slug}/monthly, /leaderboards/{kind}, /snow-report, /powder, /status and /ask (GET) dispatch; any other path fails the whole batch with a 400 naming it. The response is never cached.`,
           requestBody: {
             required: true,
             content: {
