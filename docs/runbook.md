@@ -317,6 +317,8 @@ cached catalogue (`getAllResorts()`, 1 h) plus `resort_openings` and
 | `GET\|POST /api/v1/ask` | Deterministic answer endpoint (`lib/ask/*`): `?q=` or `{"query"}`; `AskAnswer` with `answerable`, `sentence`, `data`, `citations`; 400 only for a missing/oversized question (P9) | 900 s; `no-store` when unanswerable |
 | `GET\|POST /ask` | NLWeb-shaped wrapper over the same router (`query_id`, `results[]`, `peakcam`); excluded from `proxy.ts` like `/api/v1` (P9) | same |
 | `POST /api/v1/batch` | ≤ 10 GET paths (`{"requests":[{"path"}]}` or a string array) dispatched in-process to the route handlers, results in order; 400 names a disallowed path (P9) | `no-store` |
+| `GET /api/v1/resorts/{slug}/history`, `/season-stats`, `/monthly` | P5: season curve vs the station's normal band + ten past seasons; season-to-date on two baselines with last year; monthly climatology (`lib/public-api/history.ts`, reads `snowpack_daily` paged + the migration-030 normals, 15-min Data Cache per resort) | 900 s |
+| `GET /api/v1/leaderboards/{kind}?state=&source=&limit=` | P5: `best-powder-this-week`, `season-powder-days`, `deepest-base`, `season-snowfall` over `season_stats(powder_in, …)` (migration 030); `unavailable: true` until it is applied | 900 s |
 | `GET /.well-known/schemas` + `/{file}.json` | Standalone JSON Schemas (draft 2020-12) per registered shape, `lib/public-api/json-schemas.ts` | static, 1 h / 24 h CDN |
 | `GET /llms-full.txt` | Long agent guide built from the tool definitions and `lib/mcp/examples.ts` (`lib/public-api/llms-full.ts`) | static, 1 h / 24 h CDN |
 | `GET /gpt-instructions.md` | Custom GPT instructions (`lib/public-api/gpt-instructions.ts`) | static, 1 h / 24 h CDN |
@@ -419,6 +421,59 @@ Apply / re-apply: the four files are idempotent; `apply_migration` via the
 Supabase MCP or paste into the SQL Editor. Verify with
 `select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE'`
 (34 after 028).
+
+## Season history (P5, migration 030)
+
+Branch `feat/p5-history`, parity plan block P5. The history page
+(`/resorts/{slug}/history`, markdown at `/history/index.md`), the three per-resort routes,
+the four leaderboards under `/snow-report/` and the three MCP tools all read
+`snowpack_daily` (one QC'd row per resort per day, now with `new_snow_in`) and the station
+normals. Two run-once jobs fill them; nothing is scheduled.
+
+| Job | What | When | Runtime / volume |
+| --- | --- | --- | --- |
+| `npm run snotel-backfill` | Ten water years of daily SNOTEL values per station from AWDB → `snowpack_daily` (upsert on `(resort_id, date)`, 500-row batches), QC'd day by day like the sync, daily new snow derived | Once, after migration 030; re-run is safe | 72 AWDB calls (~12 s, ~760 KB each) + ~650 PostgREST requests for 89 resorts × ~3,650 rows; ~20 min |
+| `npm run seed-normals` | 1991–2020 SWE/depth percentiles (unchanged) + 30- and 10-winter cumulative new-snow normal on `snotel_normals` + `snotel_monthly_normals` | Once, then every October after the water year closes | 72 AWDB calls (35 years of SNWD+WTEQ, ~1 MB each) + 3 requests per station; ~3 min |
+| `com.peakcam.snotel-sync` (existing) | Now also writes `snowpack_daily.new_snow_in` on today's row | every 6 h | unchanged |
+
+On the Mini (`ssh mini`, user `maestro_admin`; npm is not on the non-login PATH, so wrap in
+`zsh -l -c`):
+
+```bash
+ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && git pull && npm ci"'
+# 1. apply supabase/migrations/030_history_normals.sql by hand (SQL Editor / MCP apply_migration), then:
+ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && npm run snotel-backfill -- --dry-run --resort breckenridge"'   # one AWDB read, no writes
+ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && npm run snotel-backfill 2>&1 | tee scripts/snotel-backfill.log"'
+ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && npm run seed-normals 2>&1 | tee scripts/seed-normals.log"'
+```
+
+Verify in prod (SQL Editor / MCP `execute_sql`):
+
+```sql
+select count(*), min(date), max(date), count(new_snow_in) as with_new_snow from snowpack_daily;   -- ≈ 330k rows back to 2016-10-01
+select count(*) filter (where cum_snow_mean_in is not null) as band_days, count(distinct station_id) from snotel_normals;   -- 72 stations × 273 band days
+select count(*), count(distinct station_id) from snotel_monthly_normals;   -- 72 × 24
+select resort_id, season_total_in, powder_days, week_total_in from season_stats(8) order by season_total_in desc limit 5;
+```
+
+Then on the site:
+
+```bash
+curl -s https://www.peakcam.io/api/v1/resorts/breckenridge/history | jq '{season: .season.label, asOf, points: (.curve.points|length), band: (.curve.band|length), normalYears: .curve.normalYears, past: [.pastSeasons[] | {s: .season.label, totalIn, powderDays, enso: .enso.label}]}'   # 10 past seasons, band 273, normalYears ≥ 25
+curl -s https://www.peakcam.io/api/v1/resorts/breckenridge/season-stats | jq '{sentence, seasonToDateIn, powderDays, pct: .percentOfNormal, lastYear}'
+curl -s https://www.peakcam.io/api/v1/resorts/alta/monthly | jq '{available, months: [.months[] | {label, avg: .thirtyYear.avgSnowfallIn, recent: .recentDecade.avgSnowfallIn, pct: .recentVsThirtyPct}]}'
+curl -s 'https://www.peakcam.io/api/v1/leaderboards/season-snowfall?limit=5' | jq '{sentence, unavailable, rows: [.results[] | {rank, name, value, source}]}'
+curl -sI https://www.peakcam.io/resorts/breckenridge/history | grep -i '^link'                # rel="alternate" → /resorts/breckenridge/history/index.md
+curl -s https://www.peakcam.io/resorts/breckenridge/history/index.md | head -12
+curl -s https://www.peakcam.io/snow-report/season-powder-days | grep -o 'data-testid="leaderboard-freshness"[^<]*<[^>]*>[^<]*' | head -1
+npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_season_stats --tool-arg slug=breckenridge
+```
+
+Before the backfill runs the pages still render: the curve shows the rows the sync has
+written since 2026-03-21, past seasons are empty, the band is absent, and the two season
+boards say "unavailable" until migration 030 exists. Normals: a station with fewer than 25
+qualifying winters is logged by the seed (`NOTE fewer than 25 qualifying winters`); the band
+still renders with whatever it has and `curve.normalYears` says how many.
 
 ## Discovery surface (markdown alternates, Link headers, robots, llms.txt, IndexNow)
 

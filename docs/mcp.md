@@ -39,7 +39,7 @@ with the resort's canonical URL) and a `structuredContent` document that matches
 | `find_powder` | `window?` `24h`\|`48h` (24h), `state?`, `minInches?`, `sourceOnly?` `snotel`, `limit?` 1–25 (10) | `PowderList` | Ranked by new snow; `sourceOnly=snotel` answers "measured only". Resorts with no report are left out. |
 | `compare_resorts` | `slugs[]` 2–6 | `{ count, resorts: (Resort without cams + camCount/liveCamCount)[] }` | Markdown table side by side. Any unknown slug is an error with suggestions. |
 | `get_forecast` | `slug` | `{ available, provider: "nws", note, periods[] }` | Five-day NWS forecast for US resorts; `available: false` for Canada and the Andes, or when NWS does not answer. Snow inches are keyword heuristics, not QPF. |
-| `get_snow_history` | `slug`, `days?` 1–30 (14) | `{ source, station, rows[] }` | Daily depth, SWE, precipitation accumulation, temperatures and QC flag from `snowpack_daily`, newest first. |
+| `get_snow_history` | `slug`, `days?` 1–30 (14), `season?` (`2024-25`, `2026` for the Andes, or `current`) | `{ source, station, season, rows[] }` | Daily depth, SWE, precipitation accumulation, temperatures and QC flag from `snowpack_daily`, newest first; with `season`, every daily row of that season oldest first with `newSnowIn` (P5). |
 | `get_opening_dates` | `state?`, `limit?` 1–150 (50) | `{ asOf, totalMatching, resorts: { season }[] }` | Season open/closed/unknown with confirmed or projected dates, soonest first. |
 | `get_resort_profile` | `slug` | `{ urls, location (elevations), websiteUrl, camPageUrl, socials, station, dataSource, season, camCount, liveCamCount }` | Identity without the snow numbers: where, how high, which station, every PeakCam URL (page, JSON, markdown, Atom, state hub). P9 block 1. |
 | `get_percent_of_normal` | `state?`, `limit?` 1–50 (10) | `{ asOf, phase, sentence, rule, stationFedCount, totalMatching, results[] }` | SNOTEL-fed resorts ranked by SWE against the station's 1991–2020 median (`lib/percent-of-normal.ts`); the 10–300 % / 2 in rule withholds early-season noise. |
@@ -47,6 +47,9 @@ with the resort's canonical URL) and a `structuredContent` document that matches
 | `get_alert_options` | `slug?` | `{ thresholdInches, schedule, manageUrl, channels[], resortFeed, webhook, writes: false }` | Explains e-mail, signed webhook, Atom, iCal and the public per-resort feed. Never writes; a person registers destinations on `/alerts/manage`. |
 | `get_cam_timeline` | `slug`, `camId?` (uuid), `hours?` 1–48 (24) | `{ camCount, frameCount, newestCapturedAt, lastStorm, cams: { camId, camName, frames[], lastStorm }[] , note }` | Archived stills from `cam_still_timeline` (migration 024) as links with capture times, 8 per cam, 12 cams; only archive-allowed cams. Degrades to `note` when the view is unavailable. S8 item 7. |
 | `ask` | `question` ≤ 300 chars | `AskAnswer` (`answerable`, `intent`, `tool`, `arguments`, `resort(s)`, `sentence`, `asOf`, `data`, `citations`, `suggestions`) | Deterministic router (`lib/ask/router.ts`): resort by name/slug/nickname with one typo of slack, intent by keywords, one tool call, a `lib/quotable.ts` sentence. `answerable: false` with suggestions instead of a guess; unmatched questions are logged to `agent_memory` (`entity = ask:unmatched`, salted IP hash only over HTTP, 30-day TTL). |
+| `get_season_stats` | `slug` | `SeasonStats` + `available` | Season-to-date measured snowfall, days measured, snow/powder days (≥ 8 in, `POWDER_DAY_IN`), current and deepest base, percent of normal on the 30-winter and recent-decade baselines (`baselineNote` when they differ > 10 %), same day last year, 7-day trend, dated sentence. `lib/mcp/tools-history.ts`, P5. |
+| `get_monthly_climatology` | `slug` | `MonthlyClimatology` | Average snowfall, snow days, depth and biggest storm per month at the station, 30-winter and recent-decade; `available: false` without a station normal. P5. |
+| `get_leaderboard` | `kind` (`best-powder-this-week` \| `season-powder-days` \| `deepest-base` \| `season-snowfall`), `state?`, `sourceOnly?` `snotel`, `limit?` 1–50 (10) | `Leaderboard` | The four season boards over `season_stats()` (migration 030); deepest-base needs only the catalogue. `unavailable: true` when the function is missing. P5. |
 | `get_stations` | `slug` | `{ available, count, stations: ObservationStation[], measuredNow: MeasuredNow[], sources[] }` | Up to three stations within 25 km by elevation band (summit / mid / base) with network, elevation, distance, reading time and age, depth, new snow, SWE, temperature, wind. `available: false` until the station layer is populated. Markdown is a table plus the attribution lines. |
 
 Unknown slugs return `isError: true` with up to five close matches, for example:
@@ -217,6 +220,26 @@ dispatched in-process to the route handlers, results in order), `GET /api/v1/res
 when the read fails). Discovery: `/llms-full.txt` (built from the tool definitions and
 `lib/mcp/examples.ts`), `/gpt-instructions.md`, `/.well-known/schemas` (+ `/{file}.json` per
 registered shape). All documented in `/api/v1/openapi.json`; smoke checks in `docs/runbook.md`.
+
+## Season history (P5, 2026-10-19)
+
+Three tools over PeakCam's own daily station record (`snowpack_daily`, ten water years from
+`scripts/snotel-backfill.ts`) and the station normals (`scripts/seed-snotel-normals.ts`, migration
+030): `get_season_stats`, `get_monthly_climatology`, `get_leaderboard`, plus `season` on
+`get_snow_history`. The structured shapes are the REST documents at
+`/api/v1/resorts/{slug}/history`, `/season-stats`, `/monthly` and `/api/v1/leaderboards/{kind}`
+(`lib/public-api/history.ts`); the pure maths is `lib/snow-history.ts`, `lib/season-stats.ts`
+and `lib/leaderboards.ts`. Daily new snow is the positive change in station depth (a measured
+floor); the powder-day threshold is `POWDER_DAY_IN` (8 in) in one place, passed to the SQL
+function as `powder_in`. A data source without the optional `resortHistory` /
+`seasonAggregates` methods (fixtures written before P5) gets `available: false` /
+`unavailable: true`, never an error.
+
+```bash
+npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_season_stats --tool-arg slug=breckenridge
+npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_leaderboard --tool-arg kind=season-snowfall --tool-arg state=CO
+npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_snow_history --tool-arg slug=alta --tool-arg season=2024-25
+```
 
 ## Discovery (Sprint 6)
 
