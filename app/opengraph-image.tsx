@@ -159,7 +159,7 @@ export default function OpengraphImage() {
               boxShadow: `5px 5px 0 ${INK}`,
             }}
           >
-            150+ RESORTS
+            300+ RESORTS
           </div>
           <div
             style={{

@@ -296,7 +296,7 @@ export async function answerQuestion(ctx: AskContext, rawQuestion: string, optio
         ? "Ask a question about a ski resort PeakCam tracks."
         : plan.reason === "no_intent"
           ? "PeakCam answers questions about snow, cams, forecasts, season dates and powder rankings at the resorts it tracks; it could not tell what this one asks for."
-          : "PeakCam could not match a resort in that question. Name one of the ~150 resorts it tracks, or ask a catalogue-wide question.";
+          : "PeakCam could not match a resort in that question. Name one of the ~300 resorts it tracks, or ask a catalogue-wide question.";
     if (plan.reason !== "empty") await logUnmatched(ctx, plan.question, options);
     return {
       ...base,

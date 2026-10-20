@@ -47,7 +47,7 @@ export const metadata: Metadata = {
   },
   description:
     "Live cams, snow reports, and weather forecasts for ski resorts across North & South America. " +
-    "Browse 150+ resorts on an interactive map.",
+    "Browse 300+ resorts on an interactive map.",
   keywords: [
     "ski cams",
     "live mountain cams",
@@ -70,12 +70,12 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "PeakCam",
     title: "PeakCam — Live Mountain Cams & Snow Reports",
-    description: "Browse live cams and snow conditions for 150+ ski resorts across North & South America.",
+    description: "Browse live cams and snow conditions for 300+ ski resorts across North & South America.",
   },
   twitter: {
     card: "summary_large_image",
     title: "PeakCam — Live Mountain Cams",
-    description: "Browse live cams and snow conditions for 150+ ski resorts across North & South America.",
+    description: "Browse live cams and snow conditions for 300+ ski resorts across North & South America.",
   },
   robots: { index: true, follow: true },
   verification: {

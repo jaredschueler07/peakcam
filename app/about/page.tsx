@@ -27,7 +27,7 @@ export default function About() {
 
           <p>
             PeakCam is the fastest way to check real-time conditions across
-            150+ ski resorts from the Rockies to the Andes — Colorado, Utah,
+            300+ ski resorts from the Rockies to the Andes — Colorado, Utah,
             Chile, Argentina, and everywhere in between. Live webcams, snow
             totals, weather forecasts, and trail counts — all on one page, all
             free, no account required.

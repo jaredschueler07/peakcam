@@ -122,7 +122,7 @@ export function buildLlmsFull(baseUrl: string = SITE_URL): string {
   const lines: string[] = [
     "# PeakCam — full guide for agents",
     "",
-    `> Live ski-resort snow reports, SNOTEL measurements, webcams, forecasts, season dates and powder rankings for about 150 resorts in the US, Canada, Chile and Argentina, as an MCP server, a REST API, an answer endpoint and markdown pages. Everything here is read-only, anonymous and free. Short form: ${baseUrl}/llms.txt. Human setup page: ${baseUrl}/connect.`,
+    `> Live ski-resort snow reports, SNOTEL measurements, webcams, forecasts, season dates and powder rankings for about 300 resorts in the US, Canada, Chile and Argentina, as an MCP server, a REST API, an answer endpoint and markdown pages. Everything here is read-only, anonymous and free. Short form: ${baseUrl}/llms.txt. Human setup page: ${baseUrl}/connect.`,
     "",
     "## What the data is",
     "",
