@@ -395,6 +395,74 @@ export function conditionsStatusSentence(resortName: string, c: StatusSentenceIn
   return finish(asOf, segments);
 }
 
+// ── Snow Score (P7) ──────────────────────────────────────────
+
+/** The slice of a score row the tagline reads (lib/score.ts ScoreResult and the API's ResortScore both fit). */
+export interface ScoreSentenceInput {
+  /** YYYY-MM-DD the score is for. */
+  date: string;
+  score: number;
+  rating: string;
+  components: Record<string, { points: number; max: number; source: string }>;
+}
+
+const SCORE_CLAUSE_LABELS: Record<string, string> = {
+  depthVsNormal: "depth vs normal",
+  recentSnow7d: "7-day snow",
+  forecast7d: "7-day forecast",
+  snowQuality: "snow quality",
+  operatingStatus: "operating status",
+};
+
+/**
+ * The score tagline: "As of Oct 20, Alta's PeakCam Snow Score is 72 of 100
+ * (good): depth vs normal 24 of 30, 7-day snow 17 of 25, 7-day forecast 10
+ * of 20, snow quality 12 of 15, operating status 10 of 10." Dated by the
+ * score's own day, never the render; components with nothing behind them
+ * are left out rather than printed as zero.
+ */
+export function scoreSentence(resort: Pick<ResortWithData, "name" | "slug">, score: ScoreSentenceInput): Quotable {
+  const clauses = Object.entries(score.components)
+    .filter(([, c]) => c.source !== "none")
+    .sort(([, a], [, b]) => b.points / b.max - a.points / a.max)
+    .map(([id, c]) => `${SCORE_CLAUSE_LABELS[id] ?? id} ${c.points} of ${c.max}`);
+  const segments: QuotableSegment[] = [
+    { text: `As of ${formatOpeningDate(score.date)}, ` },
+    { text: resort.name, href: `/resorts/${resort.slug}` },
+    { text: `'s PeakCam Snow Score is ${score.score} of 100 (${score.rating})` },
+  ];
+  segments.push({ text: clauses.length ? `: ${clauses.join(", ")}.` : "; no component has data behind it yet." });
+  return finish(null, segments);
+}
+
+export interface ScoreLeader {
+  name: string;
+  slug: string;
+  score: number;
+  date: string;
+}
+
+/**
+ * The homepage "Where's it good?" sentence: "As of Oct 20, the best PeakCam
+ * Snow Scores are Alta (82 of 100), Snowbird (79) and Brighton (76)." Dated
+ * by the newest score day among the leaders; with no scores it says so.
+ */
+export function scoreLeadersSentence(leaders: readonly ScoreLeader[], limit = 3): Quotable {
+  const top = leaders.slice(0, limit);
+  if (!top.length) {
+    return finish(null, [{ text: "No PeakCam Snow Scores yet; the daily scoring run writes the first ones." }]);
+  }
+  const day = top.map((l) => l.date).sort().reverse()[0];
+  const segments: QuotableSegment[] = [{ text: `As of ${formatOpeningDate(day)}, the best PeakCam Snow Score${top.length === 1 ? " is" : "s are"} ` }];
+  top.forEach((l, i) => {
+    if (i > 0) segments.push({ text: i === top.length - 1 ? " and " : ", " });
+    segments.push({ text: l.name, href: `/resorts/${l.slug}` });
+    segments.push({ text: i === 0 ? ` (${l.score} of 100)` : ` (${l.score})` });
+  });
+  segments.push({ text: "." });
+  return finish(null, segments);
+}
+
 // ── Percent of normal (Sprint 9 leaderboard) ─────────────────
 
 export interface PctOfNormalEntry {

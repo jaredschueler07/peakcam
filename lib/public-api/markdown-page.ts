@@ -315,6 +315,9 @@ export function resortMarkdown(resort: ResortPublic, opts: MarkdownPageOptions =
 
   lines.push(seasonLine(resort.season), "");
 
+  // P7: the score tagline is dated by its own day and lists the components; the JSON link carries the 30-day history.
+  if (resort.score) lines.push(`Snow Score: ${resort.score.tagline} Algorithmic, formula ${resort.score.version}; components and 30-day history at ${resort.apiUrl}/score-components.`, "");
+
   if (opts.conditions) lines.push(...conditionsSection(opts.conditions, resort.apiUrl, opts.baseUrl));
 
   if (resort.measuredNow && resort.measuredNow.length > 0) {

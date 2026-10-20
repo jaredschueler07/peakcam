@@ -117,9 +117,12 @@ test("batch: parses both body shapes, caps at ten, and refuses anything that is 
     assert.equal(ok.paths[0].slug, "alta");
     assert.equal(ok.paths[2].slug, "vail");
   }
-  const bare = parseBatchBody(["/api/v1/status", "/api/v1/resorts/search-index", "/api/v1/ask?q=is+alta+open", "/api/v1/resorts"]);
+  const bare = parseBatchBody(["/api/v1/status", "/api/v1/resorts/search-index", "/api/v1/ask?q=is+alta+open", "/api/v1/resorts", "/api/v1/resorts/alta/score-components", "/api/v1/snow-report?sort=score&state=UT"]);
   assert.ok(bare.ok);
-  if (bare.ok) assert.deepEqual(bare.paths.map((p) => p.route), ["status", "searchIndex", "ask", "resorts"]);
+  if (bare.ok) {
+    assert.deepEqual(bare.paths.map((p) => p.route), ["status", "searchIndex", "ask", "resorts", "scoreComponents", "snowReport"]);
+    assert.equal(bare.paths[4].slug, "alta");
+  }
 
   const tooMany = parseBatchBody(Array.from({ length: BATCH_MAX_REQUESTS + 1 }, () => "/api/v1/status"));
   assert.ok(!tooMany.ok && tooMany.error === "too_many_requests");
@@ -139,7 +142,7 @@ test("well-known schemas: every $ref points at a file the directory serves, with
   const files = buildJsonSchemas();
   const index = buildSchemaIndex();
   assert.equal(index.count, Object.keys(files).length);
-  for (const stem of ["resort", "cams", "powder", "status", "search-index", "ask", "batch", "resort-list", "measurement", "cam", "resort-conditions-v1", "conditions-contract", "condition-number-field"]) {
+  for (const stem of ["resort", "cams", "powder", "status", "search-index", "ask", "batch", "resort-list", "measurement", "cam", "resort-conditions-v1", "conditions-contract", "condition-number-field", "score-components", "score-component-set", "snow-report", "resort-score", "score-light"]) {
     assert.ok(stem in files, `missing ${stem}.json`);
   }
   assert.equal(schemaFileStem("CamList"), "cams");
@@ -174,7 +177,7 @@ test("llms-full.txt documents every tool with an example that parses, every REST
     const example = TOOL_EXAMPLES[tool.name];
     assert.doesNotThrow(() => tool.inputSchema.parse(example.args), `${tool.name} example parses against its inputSchema`);
   }
-  for (const route of ["GET /api/v1/resorts", "GET /api/v1/resorts/search-index", "GET /api/v1/resorts/{slug}", "GET /api/v1/resorts/{slug}/cams", "GET /api/v1/resorts/{slug}/conditions", "GET /api/v1/powder", "GET /api/v1/status", "GET /api/v1/ask", "POST /api/v1/ask", "POST /api/v1/batch", "GET /ask"]) {
+  for (const route of ["GET /api/v1/resorts", "GET /api/v1/resorts/search-index", "GET /api/v1/resorts/{slug}", "GET /api/v1/resorts/{slug}/cams", "GET /api/v1/resorts/{slug}/conditions", "GET /api/v1/resorts/{slug}/score-components", "GET /api/v1/snow-report?sort=name|score|newSnow24h|baseDepth&state=", "GET /api/v1/powder", "GET /api/v1/status", "GET /api/v1/ask", "POST /api/v1/ask", "POST /api/v1/batch", "GET /ask"]) {
     assert.ok(text.includes(`### ${route}`), `${route} is documented`);
   }
   assert.ok(text.includes("PeakCam (https://www.peakcam.io) - SNOTEL data: USDA NRCS"));

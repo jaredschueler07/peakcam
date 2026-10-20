@@ -1,8 +1,11 @@
 import { hasFreshSnowForecast } from "@/lib/snow-forecast";
 import { SITE_URL } from "@/lib/site";
 import { Suspense } from "react";
-import { getAllResorts, getResortOpenings } from "@/lib/supabase";
-import { homeSentence } from "@/lib/quotable";
+import { getAllResorts, getLatestScoresIndex, getResortOpenings } from "@/lib/supabase";
+import { homeSentence, scoreLeadersSentence } from "@/lib/quotable";
+import { scoreLeaders } from "@/lib/public-api/score";
+import { serializeScoreLight } from "@/lib/public-api/serialize";
+import type { FeaturedScores } from "@/components/browse/BrowsePage";
 import { getRadarFrames } from "@/lib/weather-radar";
 import { BrowsePage } from "@/components/browse/BrowsePage";
 import { PeakHero } from "@/components/home/PeakHero";
@@ -57,14 +60,26 @@ export default async function Home() {
   // Next.js keeps serving the last good cached page instead of caching an
   // empty state at 200. Radar is best-effort so a RainViewer outage never
   // blocks the page (or the sidebar map's radar layer).
-  const [resorts, radarFrames, openings] = await Promise.all([
+  const [resorts, radarFrames, openings, scoreIndex] = await Promise.all([
     getAllResorts(),
     getRadarFrames().catch(() => []),
     // Only the off-season sentence reads these; a missing table is already
     // handled inside getResortOpenings (returns []), a failed query fails the
     // revalidation like getAllResorts.
     getResortOpenings(),
+    // P7: today's Snow Score per resort for the "Best right now" strip; a
+    // failed read means the strip falls back to the rating order, not a 500.
+    getLatestScoresIndex().catch(() => null),
   ]);
+
+  // "Where's it good?": the strip ranks on the score when any resort has one,
+  // under a sentence dated by the score day (lib/quotable.ts scoreLeadersSentence).
+  const featured: FeaturedScores | null = scoreIndex && Object.keys(scoreIndex).length
+    ? {
+        scores: Object.fromEntries(Object.entries(scoreIndex).map(([id, row]) => [id, serializeScoreLight(row)])),
+        sentence: { segments: scoreLeadersSentence(scoreLeaders(resorts, scoreIndex)).segments },
+      }
+    : null;
 
   // The quotable line under the wordmark: dated by the newest report, not by
   // this render. `new Date()` is used only to decide which openings are still
@@ -122,7 +137,7 @@ export default async function Home() {
       />
       <PeakHero resortCount={resorts.length} freshness={{ segments: freshness.segments }} />
       <PowderTicker alerts={powderAlerts} />
-      <BrowsePage resorts={resorts} radarFrames={radarFrames} />
+      <BrowsePage resorts={resorts} radarFrames={radarFrames} featured={featured} />
       {snowCams.length > 0 && (
         <Suspense fallback={<div className="h-96 animate-pulse bg-surface rounded-lg" />}>
           <SnowCams snowCams={snowCams} />

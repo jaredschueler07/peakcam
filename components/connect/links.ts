@@ -66,6 +66,9 @@ export const CONNECT_LINKS = {
   apiSeasonStats: { href: "/api/v1/resorts/breckenridge/season-stats", label: "REST: season stats" },
   apiMonthly: { href: "/api/v1/resorts/breckenridge/monthly", label: "REST: monthly climatology" },
   apiLeaderboard: { href: "/api/v1/leaderboards/season-snowfall", label: "REST: a leaderboard" },
+  apiScore: { href: "/api/v1/resorts/breckenridge/score-components", label: "REST: Snow Score with components and 30-day history" },
+  apiSnowReport: { href: "/api/v1/snow-report?sort=score", label: "REST: snow-report table sorted by Snow Score" },
+  scoreMethodology: { href: "/methodology#score", label: "How the Snow Score is computed" },
   historyPage: { href: "/resorts/breckenridge/history", label: "Season history page" },
   historyMd: { href: "/resorts/breckenridge/history/index.md", label: "Markdown: season history" },
   seasonSnowfall: { href: "/snow-report/season-snowfall", label: "Season snowfall leaderboard" },
@@ -139,11 +142,11 @@ const TOOL_COPY: Record<PeakCamToolName, Omit<ConnectTool, "name">> = {
   },
   find_powder: {
     title: "Find powder",
-    summary: "Rank resorts by new snow in the last 24 or 48 hours, by state, with a measured-only option.",
+    summary: "Rank resorts by new snow in the last 24 or 48 hours, by state, with a measured-only option; each row carries its Snow Score.",
   },
   compare_resorts: {
     title: "Compare resorts",
-    summary: "Side-by-side snow, season status and cam counts for two to six resorts.",
+    summary: "Side-by-side snow, Snow Score, season status and cam counts for two to six resorts.",
   },
   get_forecast: {
     title: "Resort forecast",
@@ -205,6 +208,10 @@ const TOOL_COPY: Record<PeakCamToolName, Omit<ConnectTool, "name">> = {
     title: "Leaderboard",
     summary: "Resorts ranked by 7-day snow, season powder days, deepest base or season snowfall, by state, measured-only option.",
   },
+  get_score: {
+    title: "Snow Score",
+    summary: "The 0–100 Snow Score for one resort with its five weighted components, a dated tagline and the 30-day history.",
+  },
 };
 
 /** In the server's registration order. */
@@ -246,6 +253,7 @@ export const EXAMPLE_PROMPTS: readonly ExamplePrompt[] = [
   { prompt: "How is this season going at Breckenridge compared with normal and with last year?", tools: "get_season_stats, get_snow_history (season)" },
   { prompt: "Which resorts have had the most powder days this season?", tools: "get_leaderboard (season-powder-days)" },
   { prompt: "Show me a timelapse of the last 24 hours at Alta, and the last storm on tape.", tools: "get_timelapses (alta; links only)" },
+  { prompt: "How good is Alta right now, out of 100, and why?", tools: "get_score (alta): the score, its rating and the five components with their basis" },
 ];
 
 // ── Client recipes ───────────────────────────────────────────

@@ -42,7 +42,8 @@ export async function GET(request: Request): Promise<Response> {
   const body = rankPowder(
     catalog.resorts,
     { window: q.window, state: q.state ?? null, minInches: q.minInches ?? null, source: q.source ?? null, limit: q.limit },
-    { now: catalog.now },
+    // P7: each entry carries today's Snow Score when the index is served.
+    { now: catalog.now, ...(catalog.scores !== undefined ? { scores: catalog.scores } : {}) },
   );
   return publicJson(body);
 }

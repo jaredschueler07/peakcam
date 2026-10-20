@@ -29,6 +29,8 @@ export function serializeOptionsFor(catalog: PublicApiCatalog, resort: ResortWit
     observationStations: catalog.stations ? (catalog.stations[resort.id] ?? []) : null,
     // Operator status (migration 032, P6): the newest operator report, when one is stored.
     operator: catalog.operatorStatus?.[resort.id] ?? null,
+    // Snow Score (migration 028, P7): the newest row at most 3 days old, when the index is served.
+    ...(catalog.scores !== undefined ? { score: catalog.scores ? (catalog.scores[resort.id] ?? null) : null, scores: catalog.scores } : {}),
   };
 }
 

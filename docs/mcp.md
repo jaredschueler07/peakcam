@@ -4,7 +4,7 @@ Read-only [Model Context Protocol](https://modelcontextprotocol.io) server that 
 assistant the same data as the site and `/api/v1`: the latest snow report per resort with its
 provenance, season status, webcams as links and archived stills, NWS forecasts, SNOTEL daily
 history, percent-of-normal rankings, resort profiles, regions, alert recipes, and an `ask` tool
-that routes a plain question to the right one of them deterministically. Twenty tools.
+that routes a plain question to the right one of them deterministically. Twenty-one tools.
 
 | | |
 | --- | --- |
@@ -36,8 +36,8 @@ with the resort's canonical URL) and a `structuredContent` document that matches
 | `search_resorts` | `query` (name, fragment or region), `state?`, `country?` (ISO-2), `limit?` 1–20 (10) | `{ query, count, resorts: ResortLight[] }` | Typo-tolerant. Call first to turn a name into a slug. |
 | `get_resort_conditions` | `slug` | `Resort` (full `/api/v1/resorts/{slug}` document, cams capped at 12) **plus the P6 envelope**: `schemaVersion`, `schemaUrl`, `sentence`, `meta` (freshness tier per field, sources, the resort's local date and zone), `data` (the `ConditionsContract`) | `data.status` is OPEN / CLOSED_TODAY / PRE_SEASON / OFF_SEASON / UNKNOWN with `reasons`, OPEN only on a fresh operator lift feed or a resort-confirmed date; every `data` field is `{value, source, observedAt, confidence, freshness: {tier, ageHours}}`; `depthDisagreement` when station and operator differ by more than 30 %. The markdown opens with a `## Status` block. |
 | `get_resort_cams` | `slug` | `CamList` (cams capped at 12) | Links only: PeakCam page, operator source, still-image URL, health (`live`/`down`/`unchecked`). |
-| `find_powder` | `window?` `24h`\|`48h` (24h), `state?`, `minInches?`, `sourceOnly?` `snotel`, `limit?` 1–25 (10) | `PowderList` | Ranked by new snow; `sourceOnly=snotel` answers "measured only". Resorts with no report are left out. |
-| `compare_resorts` | `slugs[]` 2–6 | `{ count, resorts: (Resort without cams + camCount/liveCamCount)[] }` | Markdown table side by side. Any unknown slug is an error with suggestions. |
+| `find_powder` | `window?` `24h`\|`48h` (24h), `state?`, `minInches?`, `sourceOnly?` `snotel`, `limit?` 1–25 (10) | `PowderList` | Ranked by new snow; `sourceOnly=snotel` answers "measured only". Resorts with no report are left out. Each row carries `score` (`ScoreLight`, P7) when the score index is served. |
+| `compare_resorts` | `slugs[]` 2–6 | `{ count, resorts: (Resort without cams + camCount/liveCamCount)[] }` | Markdown table side by side with a Score column (P7). Any unknown slug is an error with suggestions. |
 | `get_forecast` | `slug`, `point?` `summit`\|`base` (summit) | `{ provider: "blend"\|"nws"\|"none", available, note, point, issuedAt, modelCount, models[], summary, days: ForecastBlendDay[] (≤ 14), periods[] (NWS narrative, US only), credits[] }` | The stored multi-model blend (P4): per day the median snowfall across the models that reach it, `snowfallLoIn`/`snowfallHiIn` as the 25th/75th percentile, `modelCount`. US resorts also get the NWS narrative with its snow amounts replaced by the blend (`snowSource`). `provider: "nws"` with keyword amounts only when no run is stored yet; `available: false` when neither exists. Credit: Weather data by Open-Meteo.com (CC BY 4.0). |
 | `compare_models` | `slug` | `{ periodDays: 90, truthBasis: "snotel"\|"ghcn"\|"none", measuredDays, station, scoredPoint, bestModel, scores: ForecastScore[], outlook: { model, label, total7dIn, horizonDays, issuedAt }[], blendTotal7dIn, note, credits[] }` | Per-model verification at the resort (day-1/3/7 MAE in cm, bias ratio, samples, rank; the `blend` row graded by the same rule) from `forecast_scores`, plus what each stored run says for the next 7 days. Scores are empty, with `note`, until the scorer has measured days. P4. |
 | `get_snow_history` | `slug`, `days?` 1–30 (14), `season?` (`2024-25`, `2026` for the Andes, or `current`) | `{ source, station, season, rows[] }` | Daily depth, SWE, precipitation accumulation, temperatures and QC flag from `snowpack_daily`, newest first; with `season`, every daily row of that season oldest first with `newSnowIn` (P5). |
@@ -52,6 +52,7 @@ with the resort's canonical URL) and a `structuredContent` document that matches
 | `get_monthly_climatology` | `slug` | `MonthlyClimatology` | Average snowfall, snow days, depth and biggest storm per month at the station, 30-winter and recent-decade; `available: false` without a station normal. P5. |
 | `get_leaderboard` | `kind` (`best-powder-this-week` \| `season-powder-days` \| `deepest-base` \| `season-snowfall`), `state?`, `sourceOnly?` `snotel`, `limit?` 1–50 (10) | `Leaderboard` | The four season boards over `season_stats()` (migration 030); deepest-base needs only the catalogue. `unavailable: true` when the function is missing. P5. |
 | `get_stations` | `slug` | `{ available, count, stations: ObservationStation[], measuredNow: MeasuredNow[], sources[] }` | Up to three stations within 25 km by elevation band (summit / mid / base) with network, elevation, distance, reading time and age, depth, new snow, SWE, temperature, wind. `available: false` until the station layer is populated. Markdown is a table plus the attribution lines. |
+| `get_score` | `slug` | `ResortScoreHistory` (`available`, `today: ResortScore \| null` with `score`, `rating`, `tagline`, `components` {depthVsNormal, recentSnow7d, forecast7d, snowQuality, operatingStatus: {points, max, basis, source}}, `scoredBy: "algorithmic"`, `version`; `history: ScoreLight[]` 30 days; `weights`, `ladder`, `sentence`, `methodologyUrl`) | The 0–100 Snow Score from `resort_scores` (migration 028, `scripts/score-sync.ts`), today = the newest row ≤ 3 days old. Markdown: the tagline, a components table, a text sparkline. `available: false` before the first scoring run. P7. |
 | `get_timelapses` | `slug`, `camId?` (uuid) | `TimelapseList` (`available`, `clipCount`, `lastStorm`, `cams: { camId, camName, pageUrl, current: CamTimelapse \| null, storms: CamTimelapse[] }[]`, `note`) | Rendered clips from `cam_timelapse_current` (migrations 025 + 031) as links: the rolling 24 h MP4 per cam (7 fps, 720p max, ≤ 3 MB, poster JPEG, frame bounds) and storm reels (one per storm day, kept a year). Only archive-allowed cams. `available: false` when the view is not served; never inline media. P8 block 2. |
 
 Unknown slugs return `isError: true` with up to five close matches, for example:
@@ -109,6 +110,7 @@ resort's `canonicalUrl`.
 - "Which Utah resorts are above normal snowpack right now?" → `get_percent_of_normal(state="UT")`
 - "What did Alta's cams look like over the last 24 hours?" → `get_cam_timeline("alta", hours=24)` (links only)
 - "Show me a timelapse of the last 24 hours at Alta, and the last storm on tape." → `get_timelapses("alta")` (links only)
+- "How good is Alta right now, out of 100, and why?" → `get_score("alta")` (the five components with their basis)
 - "Tell me about Jackson Hole: where it is, how high, and where its snow numbers come from." → `get_resort_profile("jackson-hole")`
 - "Is Breck open yet, and how do I get an alert when it dumps?" → `ask("is Breck open")`, `get_alert_options("breckenridge")`
 
@@ -318,6 +320,34 @@ Liftie (liftie.info) sits behind a Cloudflare managed challenge for non-browser 
 2026-10-20 (403, `cf-mitigated: challenge`, from the Air and the mini alike); until that
 clears, `liftsOpen` carries `source: "none"` and the status falls back to the opening row.
 `docs/runbook.md` "Operator status" has the job and the follow-up list of operator feeds.
+
+## Snow Score (P7, 2026-10-20)
+
+`get_score` returns the same JSON as `GET /api/v1/resorts/{slug}/score-components`
+(`lib/public-api/score.ts buildScoreDocument` over the pure `lib/score.ts`; schema
+`ResortScoreHistory`, file `/.well-known/schemas/score-components.json`). The score is 0–100,
+scored once a day by `scripts/score-sync.ts` on the mini, `scoredBy` always `algorithmic`,
+formula `score-v1`:
+
+| Component | Max | Rests on |
+| --- | --- | --- |
+| `depthVsNormal` | 30 | SWE vs the station's 1991–2020 median (70 % → 15, 100 % → 24, 125 % → 30); without a normal, base depth (20 in → 12, 24 in → 15, 60 in → 27 cap) |
+| `recentSnow7d` | 25 | daily new snow summed over 7 days (6 in → 10, 12 in → 17, 24 in → 25) |
+| `forecast7d` | 20 | the blend's next-7-day total from the run stored that day (6 in → 10, 20 in → 20) |
+| `snowQuality` | 15 | days since a ≥ 1 in day × 3-day high (°F) × surface tags (rain at base 0.5, icy 0.6, spring 0.75; powder day floors freshness at 0.9) |
+| `operatingStatus` | 10 | P6 status: OPEN 10, PRE_SEASON / CLOSED_TODAY 5, OFF_SEASON / UNKNOWN 0 |
+
+`rating` is cut at great ≥ 75, good ≥ 55, fair ≥ 35, else poor; the same four words as the
+conditions rating, which the engine keeps computing on its own and which may differ. `history`
+is one `{date, score, rating}` per scored day over 30 days; `find_powder` rows and the
+`compare_resorts` table carry `ScoreLight`; `/api/v1/snow-report?sort=score` ranks the whole
+catalogue. Formula: https://www.peakcam.io/methodology#score.
+
+```bash
+npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_score --tool-arg slug=alta | head -24
+curl -s https://www.peakcam.io/api/v1/resorts/alta/score-components | jq '{available, today: {score: .today.score, rating: .today.rating, tagline: .today.tagline}, history: [.history[] | .score]}'
+curl -s 'https://www.peakcam.io/api/v1/snow-report?sort=score&state=CO' | jq '{sentence, top: [.resorts[:3][] | {slug, score}]}'
+```
 
 ## Discovery (Sprint 6, extended in P9 part 2)
 
