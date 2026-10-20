@@ -2,7 +2,17 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { CONNECT_LINKS, CLAUDE_CONNECTOR_LINK, CURSOR_MCP_JSON, MCP_ENDPOINT } from "@/components/connect/links";
+import {
+  CONNECT_LINKS,
+  CLAUDE_CONNECTOR_LINK,
+  CURSOR_MCP_JSON,
+  GPT_ACTION_IMPORT_URL,
+  GPT_INSTRUCTIONS_URL,
+  MCP_ENDPOINT,
+  STDIO_COMMAND,
+  STDIO_MCP_JSON,
+  STDIO_PACKAGE_NAME,
+} from "@/components/connect/links";
 
 // Every internal href /connect renders must resolve to a route under app/
 // (page.tsx or route.ts, with [param] segments matching any value) or a file
@@ -76,4 +86,15 @@ test("the client recipes all point at the one MCP endpoint", () => {
   assert.equal(url.searchParams.get("modal"), "add-custom-connector");
   assert.equal(url.searchParams.get("connectorName"), "PeakCam");
   assert.equal(url.searchParams.get("connectorUrl"), MCP_ENDPOINT);
+});
+
+test("the stdio and Custom GPT recipes point at the published bridge and the served documents", () => {
+  assert.equal(STDIO_PACKAGE_NAME, "peakcam-mcp");
+  assert.equal(STDIO_COMMAND, "npx -y peakcam-mcp");
+  const stdio = JSON.parse(STDIO_MCP_JSON) as { mcpServers: { peakcam: { command: string; args: string[] } } };
+  assert.deepEqual(stdio.mcpServers.peakcam, { command: "npx", args: ["-y", "peakcam-mcp"] });
+  assert.ok(existsSync(join(ROOT, "packages/peakcam-mcp/bin/peakcam-mcp.mjs")));
+  assert.equal(GPT_ACTION_IMPORT_URL, `https://www.peakcam.io${CONNECT_LINKS.openapi.href}`);
+  assert.equal(GPT_INSTRUCTIONS_URL, `https://www.peakcam.io${CONNECT_LINKS.gptInstructions.href}`);
+  assert.ok(routeExists(pathOf(CONNECT_LINKS.gptInstructions.href)) && routeExists(pathOf(CONNECT_LINKS.openapi.href)));
 });
