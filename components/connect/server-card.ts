@@ -37,7 +37,7 @@ export const SERVER_CARD_MEDIA_TYPE = "application/mcp-server-card+json";
 
 /** Schema caps `description` at 100 characters; the test enforces it. */
 export const MCP_DESCRIPTION =
-  "Live snow reports, SNOTEL measurements, webcams and powder rankings for 150 ski resorts.";
+  "Live snow reports, SNOTEL measurements, webcams and powder rankings for 300 ski resorts.";
 
 /** The version `initialize` reports (lib/mcp/server.ts reads it from package.json). */
 export const MCP_VERSION: string = PEAKCAM_MCP_VERSION;

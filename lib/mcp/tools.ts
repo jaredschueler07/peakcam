@@ -199,7 +199,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
     name: "search_resorts",
     title: "Search resorts",
     description:
-      "Find PeakCam resorts by name (or part of one, or a region) and get their slugs with a one-line snow summary each. Call this first when the user names a resort; then use the slug with the other tools. Covers about 150 resorts in the US, Canada, Chile and Argentina.",
+      "Find PeakCam resorts by name (or part of one, or a region) and get their slugs with a one-line snow summary each. Call this first when the user names a resort; then use the slug with the other tools. Covers about 300 resorts in the US, Canada, Chile and Argentina.",
     inputSchema: z.object({
       query: z.string().trim().min(1).max(80).describe("Resort name or fragment, e.g. `vail`, `big sky`, `portillo`, `tahoe`. Also matches region names."),
       state: StateInput,

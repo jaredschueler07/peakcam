@@ -153,7 +153,7 @@ export default async function OgImage({ params }: { params: Promise<{ hub: strin
           {deepest ? (
             <div style={stamp(FOREST, CREAM_50)}>{`DEEPEST BASE ${deepest.value}″ · ${deepest.name.toUpperCase()}`}</div>
           ) : (
-            <div style={stamp(FOREST, CREAM_50)}>{resolved ? "SENSOR & MODEL SNOW DATA" : "150+ RESORTS"}</div>
+            <div style={stamp(FOREST, CREAM_50)}>{resolved ? "SENSOR & MODEL SNOW DATA" : "300+ RESORTS"}</div>
           )}
           <div style={stamp(CREAM_50, INK)}>FREE POWDER ALERTS</div>
         </div>

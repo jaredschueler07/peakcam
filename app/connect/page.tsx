@@ -37,7 +37,7 @@ export const dynamic = "force-static";
 const TITLE = "Use PeakCam with your AI assistant";
 const DESCRIPTION =
   "Connect Claude, ChatGPT, Cursor, Grok, Perplexity, Claude Desktop or your own agent to PeakCam's MCP server for live snow reports, " +
-  "SNOTEL measurements, forecasts, webcams and powder rankings across 150 ski resorts. No key, read-only, plus a stdio bridge, a Custom GPT, an answer endpoint, REST, OpenAPI, markdown and Atom alternatives.";
+  "SNOTEL measurements, forecasts, webcams and powder rankings across 300 ski resorts. No key, read-only, plus a stdio bridge, a Custom GPT, an answer endpoint, REST, OpenAPI, markdown and Atom alternatives.";
 
 export const metadata: Metadata = {
   title: TITLE,
