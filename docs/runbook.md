@@ -44,6 +44,7 @@ Then spot-check `/`, a `/resorts/<slug>`, `/snow-report`, `/about`.
 | `com.peakcam.snotel-sync` | SNOTEL data sync → `snow_reports` | daily 07:00 | running (scheduled) |
 | `com.peakcam.cam-health-check` | Probe every cam, bump `consecutive_failures`, auto-disable dead ones | daily 06:00 | running (scheduled) |
 | `com.peakcam.cam-stills` | Capture one frame per click-to-play cam → bucket `cam-stills`, `cams.still_url` (latest-only cams at most every 6 h); archive a frame for every `archive_allowed` cam → `cam_stills` + `archive/` prefix; prune: all frames 48 h, one per 6 h to 30 d, keepers to 365 d (`scripts/cam-capture-stills.ts`, policy `docs/cams/still-archive-policy.md`) | every 15 min (900 s, P8 block 1; was 21,600 s earlier on 2026-10-18, 7,200 s before that) | running on the mini (scheduled) — deploy note below |
+| `com.peakcam.cam-timelapse` | Render timelapse clips from the still archive (`scripts/cam-timelapse.ts`): a 24 h MP4 + poster per `archive_allowed` cam (H.264, 7 fps, 720p max, ≤ 3 MB, replaced each run) and storm reels while the resort's measured 24 h snow is ≥ 8 in (one per storm day, kept 365 d) → bucket `cam-timelapses`, table `cam_timelapses`; needs ffmpeg and migration 031 | every 6 h (21,600 s, `RunAtLoad`) | **to deploy** (P8 block 2, 2026-10-20) — recipe below |
 | `com.peakcam.model-sync` | Weather-model sync (`scripts/model-sync.ts`) | every 6 h | running (scheduled) |
 | `com.peakcam.forecast-sync` | Multi-model forecast runs → `forecast_runs` + `forecast_daily` (`scripts/forecast-sync.ts`: one Open-Meteo `models=` call per point, summit and base, nine models for US resorts, seven elsewhere; idempotent per issue hour; retention pass on the first run after 00:00 UTC) | every 6 h (21,600 s, `RunAtLoad`) | **to deploy** (P4, 2026-10-20) — recipe below |
 | `com.peakcam.forecast-score` | Forecast verification → `forecast_scores` (`scripts/forecast-score.ts`: day-1/3/7 MAE, bias ratio, rank per model + `blend`, graded against SNOTEL depth deltas over 90 days) | daily 07:30 local (after snotel-sync) | **to deploy** (P4, 2026-10-20) |
@@ -112,6 +113,34 @@ and in SQL: `select source, count(*) from stations group by 1;`
 `select count(distinct resort_id) from resort_stations;`
 `select max(observed_at) from station_observations;`. The API and the page cache the
 station index for 15 minutes, so allow that long after the first sync.
+
+**Deploying `com.peakcam.cam-timelapse` (P8 block 2, 2026-10-20):** on the Mac mini as
+`maestro_admin`. ffmpeg 9.0.2 with libx264 is already installed there (`/opt/homebrew/bin/ffmpeg`,
+checked 2026-10-20). Apply migration 031 first (the renderer writes `poster_url`, `starts_at`,
+`ends_at`, `bytes` and the site reads `cam_timelapse_current`); the renderer creates the public
+bucket `cam-timelapses` itself if the migration did not. A dry run renders to a temp dir and
+writes nothing; the first real run over ~374 cams takes 10–20 min at concurrency 2.
+
+```bash
+ssh mini 'zsh -l -c "ffmpeg -version | head -1 && ffmpeg -hide_banner -encoders | grep libx264"'   # ffmpeg 9.0.2, libx264 present
+ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && git pull && npm ci --no-audit --no-fund"'
+ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && npx tsx scripts/cam-timelapse.ts --dry-run --resort alta | tail -8"'   # "✓ alta/<cam> 24h: N frames WxH K KB (dry run, not stored)"
+ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && npx tsx scripts/cam-timelapse.ts --resort alta | tail -8"'             # first real clips for one resort
+ssh mini 'cd /Users/maestro_admin/peakcam/peakcam && cp com.peakcam.cam-timelapse.plist ~/Library/LaunchAgents/ && launchctl bootout gui/$(id -u)/com.peakcam.cam-timelapse 2>/dev/null; launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.peakcam.cam-timelapse.plist && launchctl list | grep com.peakcam.cam-timelapse'
+# RunAtLoad starts the first full render at bootstrap; watch it finish:
+ssh mini 'tail -f /Users/maestro_admin/peakcam/peakcam/scripts/cam-timelapse.log'   # ends "[cam-timelapse] done: N × 24 h and M storm clips rendered (X MB), ..."
+```
+
+Verify in the database: `select "window", count(*), max(rendered_at), round(avg(bytes)/1024) as avg_kb, max(bytes) as max_bytes from cam_timelapses group by 1`
+(every `max_bytes` ≤ 3,145,728), `select count(*) from cam_timelapse_current`. Then in production (allow the
+15-minute API cache): `curl -s https://www.peakcam.io/api/v1/resorts/alta/timelapses | jq '{available, clipCount, lastStorm: .lastStorm.stormDate, cams: [.cams[] | {camName, clip: .current.url}]}'`,
+`curl -s https://www.peakcam.io/api/v1/resorts/alta/cams | jq '.cams[0].timelapses'`,
+`curl -s https://www.peakcam.io/resorts/alta/webcams/index.md | grep -i timelapse`,
+`npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_timelapses --tool-arg slug=alta`,
+and `curl -sI "$(curl -s https://www.peakcam.io/api/v1/resorts/alta/timelapses | jq -r '.cams[0].current.url')" | grep -i 'content-type\|content-length'`
+(video/mp4, under 3 MB). The webcams page shows the "Last 24 hours" strip after its hourly ISR window.
+Cadence: `StartInterval` in the plist; frame rate, size cap and storm rules: the constants at the
+top of `lib/cam-timelapse.ts`. `--prune-only` runs the storm-reel retention pass alone.
 
 **Deploying the P4 forecast jobs (`com.peakcam.forecast-sync`, `com.peakcam.forecast-score`, 2026-10-20):**
 on the Mac mini as `maestro_admin` (`ssh mini`; use `zsh -l -c` because npm is not on the
@@ -443,7 +472,7 @@ are optional until their block lands.
 | --- | --- | --- | --- |
 | `resorts.runs_total, lifts_total, skiable_acres, vertical_ft, annual_snowfall_in, longest_run_mi, description, description_source, trail_map_url, wikidata_id, aliases[], passes[], elevation_base_ft, elevation_summit_ft` | 025 | `scripts/import-resorts-standalone.mjs` (optional CSV columns), later the P2 enrichment job | `/api/v1` `profile` + `location`, resort pages (P2) |
 | `cams.kind, credit, source_terms_url` | 025 | importer (optional `cams.csv` columns), `scripts/approach-cams-sync.ts` (kind=approach), P8 cam audit | `/api/v1` cams |
-| `cam_timelapses` (`"window"` is quoted in SQL: reserved word) | 025 | P8 timelapse job (mini, ffmpeg, Storage bucket pending the user's budget call) | cam pages, `Cam.timelapses` |
+| `cam_timelapses` (`"window"` is quoted in SQL: reserved word) + `poster_url`, `starts_at`, `ends_at`, `bytes` and view `cam_timelapse_current` (031) | 025, 031 | `scripts/cam-timelapse.ts` (`com.peakcam.cam-timelapse`, every 6 h; bucket `cam-timelapses`) | webcams subpage strip + overview tile, `/resorts/{slug}/timelapses`, `Cam.timelapses` on `/cams`, MCP `get_timelapses`, markdown alternates |
 | `stations`, `resort_stations` | 026 | `scripts/stations-sync.ts` (hourly, `com.peakcam.stations-sync`) | `Resort.stations`, resort page "What the instruments say", MCP `get_stations` |
 | `station_observations` (PK `(station_id, observed_at)` is the read index) | 026 | `scripts/stations-sync.ts` via `lib/stations/` (SNOTEL, GHCN, NWS, BC ASWS, ECCC) | `Resort.measuredNow` |
 | `forecast_runs`, `forecast_daily` | 027 | `scripts/forecast-sync.ts` (`com.peakcam.forecast-sync`, every 6 h; live since P4, 2026-10-20) | `Resort.forecast` summary, `/resorts/{slug}/forecast`, `get_forecast`, the resort page strip |

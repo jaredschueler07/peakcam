@@ -5,6 +5,7 @@
 > Owner: PeakCam ops. Takedown contact: see "Takedown and opt-out" below.
 > Code: `scripts/cam-capture-stills.ts` (writes), `lib/cam-timeline.ts` (rules),
 > `lib/supabase.ts` `getCamTimeline()` (reads), `supabase/migrations/024_cam_still_history.sql`.
+> Clips (section 8): `scripts/cam-timelapse.ts`, `lib/cam-timelapse.ts`, migrations 025 + 031.
 
 PeakCam links to and embeds webcams that resorts and their camera providers publish.
 Until October 2026 it kept nothing from any of them beyond a single "latest frame" for
@@ -172,4 +173,35 @@ update cams set archive_allowed = false where id = '<cam uuid>';
 update cams set archive_allowed = true where id = '<cam uuid>';
 ```
 
-The capture job reads the column on every run; no restart is needed.
+The capture job reads the column on every run; no restart is needed. The timelapse
+renderer (section 8) reads it too, and the clip view hides a switched-off cam's clips
+at once; delete its objects from bucket `cam-timelapses` and its `cam_timelapses` rows by
+hand the same way as the frames above.
+
+## 8. Timelapse clips (P8 block 2, from 2026-10-20)
+
+A clip is made only of frames this archive already holds, so **clips inherit
+`archive_allowed`**: no clip is ever rendered for a cam outside section 1, and the public
+read view `cam_timelapse_current` (migration 031) joins through `archive_allowed and
+is_active and not auto_disabled` exactly like `cam_still_timeline`. Flipping a cam off
+hides its clips from the site, the API and the MCP tool immediately.
+
+| | |
+| --- | --- |
+| Renderer | `scripts/cam-timelapse.ts` on the Mac mini, `com.peakcam.cam-timelapse`, every 6 h (`StartInterval` 21600). ffmpeg (libx264). |
+| 24 h clip | Every archived frame of the last 24 h (at least `MIN_FRAMES_24H` = 12, at most `MAX_FRAMES` = 240, subsampled evenly beyond that), 7 fps, H.264 yuv420p, 720p max, **at most 3 MB** (`encodeAttempt` ladder: crf 26 → 30 → 34 → 480p), faststart, no audio. One object per cam, `{resortSlug}/{camId}/24h.mp4`, replaced in place every run; its poster `24h.jpg` is the last frame. A cam whose newest frame is older than its last render is skipped. |
+| Storm reel | Rendered while the resort's measured new snow is at or past `STORM_TRIGGER_IN` = 8 in (`POWDER_DAY_IN`, the alert threshold: `latest_snow_reports.new_snow_24h` or the newest `snowpack_daily.new_snow_in`). Window: from the first frame after the last dry day (a day under `DRY_DAY_MAX_IN` = 1 in, walking back over `snowpack_daily`) to now, capped at 72 h. One row per (cam, `storm_date`), re-rendered while the storm goes on, `storm-YYYY-MM-DD.mp4` + `.jpg`. |
+| Retention | 24 h clips never accumulate (replaced). Storm clips: 365 days (`STORM_RETENTION_DAYS`), pruned by the renderer, object first, then row. |
+| Rows | `cam_timelapses` (025) + `poster_url`, `starts_at`, `ends_at`, `bytes` (031). Public read through `cam_timelapse_current`. |
+| Where it shows | `/resorts/{slug}/webcams` "Last 24 hours" strip (poster + play; the MP4 is requested only on press, `<video preload="none">`) and "Last storm on tape" tile; the resort overview's "Last 24 h on tape" tile; `GET /api/v1/resorts/{slug}/timelapses` and `Cam.timelapses` on `/cams`; MCP `get_timelapses`; the markdown alternates list clip URLs under each cam. Links only, never inline media. |
+| Frame cache | The renderer keeps each downloaded frame once under `~/.cache/peakcam/cam-timelapse/frames/` on the mini (pruned past 80 h), so a frame costs one storage egress in its life rather than one per render. |
+
+### Storage estimate (clips)
+
+| | |
+| --- | --- |
+| 24 h clips, 374 archive-allowed cams | about 1 MB each at crf 26 (hard cap 3 MB): about 0.4 GB held, at most 1.1 GB; rewritten 4 × a day, about 1.5 to 4.5 GB written a day (not retained) |
+| Posters | about 80 KB × 374, negligible |
+| Storm reels | at most 3 MB per cam per storm day; 30 storm days across 374 cams is at most 34 GB a season, about 10 GB in practice; kept a year |
+| Frame egress for rendering | with the cache, each frame once: about 374 × 96 × 35 KB ≈ 1.3 GB a day (≈ 40 GB a month) |
+| Steady state | stills (about 6 GB, section 4) + clips (about 1 GB rolling + up to 34 GB of storm reels a year) stays inside the Pro plan's 100 GB |
