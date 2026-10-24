@@ -8,6 +8,7 @@ import { HubSummaryStrip } from "@/components/hubs/HubSummaryStrip";
 import { HubAlertCta } from "@/components/hubs/HubAlertCta";
 import { HubResortTable } from "@/components/hubs/HubResortTable";
 import { HubFeaturedCams } from "@/components/hubs/HubFeaturedCams";
+import { HubLineup, type LineupOption } from "@/components/hubs/HubLineup";
 import { HubFaq } from "@/components/hubs/HubFaq";
 import { HubLinks } from "@/components/hubs/HubLinks";
 import {
@@ -114,6 +115,17 @@ export default async function HubPage({ params }: { params: Params }) {
   const summary = hubSummary(resorts);
   const table = sortHubTable(resorts);
   const featured = featuredHubCams(resorts);
+  // Only the fields the chooser renders cross to the browser: real snow and
+  // cam counts, no emails, no cam URLs and no second copy of the catalog.
+  const lineupOptions: LineupOption[] = table.map((resort) => ({
+    id: resort.id,
+    name: resort.name,
+    slug: resort.slug,
+    region: resort.region || null,
+    baseIn: resort.snow_report?.base_depth ?? null,
+    newSnow24hIn: resort.snow_report?.new_snow_24h ?? null,
+    camCount: resort.cams.filter((cam) => cam.is_active).length,
+  }));
   const paragraphs = buildHubParagraphs(hub, resorts, now);
   const faq = buildHubFaq(hub, resorts, now);
   const editorial = HUB_EDITORIAL[hub.slug];
@@ -199,21 +211,45 @@ export default async function HubPage({ params }: { params: Params }) {
         <p className="pc-eyebrow mb-3 mt-6">
           {kindLine} · {count} {count === 1 ? "resort" : "resorts"}
         </p>
-        <h1 className="font-display text-4xl font-black leading-[0.95] tracking-[-0.02em] text-ink md:text-5xl [overflow-wrap:anywhere]">
+        <h1 className="font-display text-3xl font-black leading-[0.95] tracking-[-0.02em] text-ink sm:text-4xl md:text-5xl [overflow-wrap:anywhere]">
           {h1}
         </h1>
-        <p className="mt-5 max-w-2xl text-lg text-bark">
+
+        {lineupOptions.length > 0 && (
+          <div className="mt-6 sm:mt-8">
+            <HubLineup hubSlug={hub.slug} hubLabel={hub.label} options={lineupOptions} />
+          </div>
+        )}
+
+        {/* The long ranking/SEO introduction sits below the account benefit so
+            the primary signup CTA is in the first mobile screen. The exact copy
+            is unchanged; only its order on the page moved. */}
+        <p className="mt-6 max-w-2xl text-[15.5px] leading-relaxed text-bark sm:text-lg">
           Every {hub.label} resort PeakCam tracks, ranked by base depth, with live cams a click away — and one email the
           morning any of them gets fresh snow. Snow data refreshes every six hours.
         </p>
 
-        <div className="mt-8">
+        <div className="mt-6">
           <HubSummaryStrip summary={summary} syncLabel={hubSyncLabel(resorts)} offSeason={offSeason} />
         </div>
 
         <div className="mt-6">
           <HubAlertCta hub={hub} resorts={resorts} offSeason={offSeason} />
         </div>
+
+        {featured.length > 0 && (
+          <section aria-labelledby="hub-cams-heading" className="mt-12">
+            <div className="flex flex-col gap-1 md:flex-row md:items-baseline md:justify-between md:gap-4">
+              <h2 id="hub-cams-heading" className="font-display text-2xl font-black tracking-[-0.01em] text-ink">
+                Featured cams
+              </h2>
+              <p className="text-sm text-bark">The first live YouTube cam from the best-rated resorts. Nothing plays until you ask.</p>
+            </div>
+            <div className="mt-4">
+              <HubFeaturedCams featured={featured} />
+            </div>
+          </section>
+        )}
 
         <section aria-labelledby="hub-table-heading" className="mt-12">
           <div className="flex flex-col gap-1 md:flex-row md:items-baseline md:justify-between md:gap-4">
@@ -231,20 +267,6 @@ export default async function HubPage({ params }: { params: Params }) {
             />
           </div>
         </section>
-
-        {featured.length > 0 && (
-          <section aria-labelledby="hub-cams-heading" className="mt-12">
-            <div className="flex flex-col gap-1 md:flex-row md:items-baseline md:justify-between md:gap-4">
-              <h2 id="hub-cams-heading" className="font-display text-2xl font-black tracking-[-0.01em] text-ink">
-                Featured cams
-              </h2>
-              <p className="text-sm text-bark">The first live YouTube cam from the best-rated resorts. Nothing plays until you ask.</p>
-            </div>
-            <div className="mt-4">
-              <HubFeaturedCams featured={featured} />
-            </div>
-          </section>
-        )}
 
         <section aria-labelledby="hub-about-heading" className="mt-12 max-w-3xl">
           <h2 id="hub-about-heading" className="font-display text-2xl font-black tracking-[-0.01em] text-ink">

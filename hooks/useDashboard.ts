@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { subscribeFavoritesChanged } from "@/lib/favorites-events";
 import {
   type WidgetConfig,
   type UserFavorite,
@@ -190,6 +191,11 @@ export function useDashboard() {
       await syncDashboard();
     };
     runSync();
+    // A lineup saved after auth (or in another tab) must reach a dashboard
+    // that was already mounted, otherwise it stays empty/stale until reload.
+    return subscribeFavoritesChanged(() => {
+      void syncDashboard();
+    });
   }, [syncDashboard]);
 
   return { widgets, resolved, isLoading, refresh: syncDashboard };

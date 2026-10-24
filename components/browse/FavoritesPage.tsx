@@ -30,7 +30,7 @@ export function FavoritesPage({ resorts }: Props) {
 
   return (
     <div className="min-h-screen bg-bg">
-      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} redirectTo="/favorites" />}
+      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} redirectTo="/favorites" source="favorites_page" heading="Save your mountains." />}
       <Header showSearch={false} />
 
       <main id="main-content" className="max-w-screen-2xl mx-auto px-4 py-8 md:px-8">

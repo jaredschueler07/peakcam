@@ -6,6 +6,7 @@
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import type { FavoriteType } from "@/lib/types";
 import { track, EVENTS } from "@/lib/analytics-events";
+import { notifyFavoritesChanged } from "@/lib/favorites-events";
 
 /** Fetch all favorite item IDs for the current user, optionally filtered by type. */
 export async function getFavoriteIds(type?: FavoriteType): Promise<Set<string>> {
@@ -62,6 +63,7 @@ export async function toggleFavorite(
       .eq("id", existing.id);
     if (error) return { favorited: true, error: error.message };
     track(EVENTS.FAVORITE_REMOVED, { item_id: itemId, item_type: itemType });
+    notifyFavoritesChanged();
     return { favorited: false };
   } else {
     // Add favorite
@@ -70,6 +72,7 @@ export async function toggleFavorite(
       .insert({ user_id: user.id, item_type: itemType, item_id: itemId });
     if (error) return { favorited: false, error: error.message };
     track(EVENTS.FAVORITE_ADDED, { item_id: itemId, item_type: itemType });
+    notifyFavoritesChanged();
     return { favorited: true };
   }
 }

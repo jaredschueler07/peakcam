@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { BugReportProvider } from "@/components/feedback/BugReportProvider";
 import { PostHogProvider } from "@/lib/posthog";
 import { SignupWelcomeTracker } from "@/components/analytics/SignupWelcomeTracker";
+import { LineupIntentBridge } from "@/components/auth/LineupIntentBridge";
 
 // NOTE: PostHogProvider is imported statically on purpose. It wraps every
 // page's `children`, and a `dynamic(..., { ssr: false })` wrapper here made
@@ -39,6 +40,10 @@ export function ClientProviders({ children, release = "local" }: { children: Rea
       <Suspense>
         <SignupWelcomeTracker />
       </Suspense>
+      {/* Finishes a guest mountain lineup after OAuth, email confirmation or a
+          returning sign-in. One global consumer so every auth landing page
+          gets the same idempotent save and success link. */}
+      <LineupIntentBridge />
       {GOOGLE_ADS_ENABLED && <GoogleTag />}
       {REDDIT_PIXEL_ENABLED && <RedditPixel />}
       {META_PIXEL_ENABLED && <MetaPixel />}
