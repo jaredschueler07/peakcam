@@ -7,6 +7,7 @@ import { safeNext } from "@/lib/safe-redirect";
 import { track, EVENTS } from "@/lib/analytics-events";
 import { authErrorMessage } from "@/lib/auth-errors";
 import { OAUTH_PROVIDER, googleSignInOptions, isOAuthProviderEnabled } from "@/lib/auth-oauth";
+import { readLineupAttribution } from "@/lib/lineup";
 import { GoogleSignInButton } from "./GoogleSignInButton";
 
 export type AuthMode = "signin" | "signup" | "link" | "reset" | "confirm";
@@ -62,6 +63,10 @@ export function AuthForm({
     submitting.current = true;
     setLoading(true); setError(null);
     try {
+      // A pending guest lineup is bounded attribution for the signup funnel:
+      // source label and count only, read before the account exists. A save,
+      // a returning sign-in and the completion event below are unaffected.
+      const lineupProps = requestMode === "signup" ? readLineupAttribution() : null;
       const client = createSupabaseBrowserClient();
       const callback = new URL("/auth/callback", window.location.origin);
       callback.searchParams.set("next", requestMode === "reset" ? "/auth/update-password" : next);
@@ -71,15 +76,15 @@ export function AuthForm({
         finish();
       } else if (requestMode === "signup") {
         const email_domain = email.trim().split("@")[1] ?? "";
-        track(EVENTS.AUTH_SIGNUP_STARTED, { email_domain });
+        track(EVENTS.AUTH_SIGNUP_STARTED, { email_domain, ...(lineupProps ?? {}) });
         const { data, error } = await client.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: callback.href } });
         if (error) throw error;
         // Not "completed": the account is unconfirmed until the email link is
         // followed. AUTH_SIGNUP_COMPLETED fires from the callback landing.
-        track(EVENTS.AUTH_SIGNUP_SUBMITTED, { email_domain, session_issued: Boolean(data.session) });
+        track(EVENTS.AUTH_SIGNUP_SUBMITTED, { email_domain, session_issued: Boolean(data.session), ...(lineupProps ?? {}) });
         // With email confirmation disabled the account is live at once and
         // /auth/callback is never visited, so the completion is recorded here.
-        if (data.session) { track(EVENTS.AUTH_SIGNUP_COMPLETED, { email_domain, confirmation: "none" }); finish(); } else setSent(true);
+        if (data.session) { track(EVENTS.AUTH_SIGNUP_COMPLETED, { email_domain, confirmation: "none", ...(lineupProps ?? {}) }); finish(); } else setSent(true);
       } else if (requestMode === "confirm") {
         const { error } = await client.auth.resend({ type: "signup", email: email.trim(), options: { emailRedirectTo: callback.href } });
         if (error) throw error;
@@ -111,13 +116,14 @@ export function AuthForm({
     submitting.current = true;
     setGoogleBusy(true); setLoading(true); setError(null);
     try {
-      if (mode === "signup") track(EVENTS.AUTH_SIGNUP_STARTED, { method: "google" });
+      const lineupProps = mode === "signup" ? readLineupAttribution() : null;
+      if (mode === "signup") track(EVENTS.AUTH_SIGNUP_STARTED, { method: "google", ...(lineupProps ?? {}) });
       const enabled = await isOAuthProviderEnabled(OAUTH_PROVIDER, {
         supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
         apiKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
       });
       if (enabled === false) throw { code: "google_not_enabled" };
-      if (mode === "signup") track(EVENTS.AUTH_SIGNUP_SUBMITTED, { method: "google", session_issued: false });
+      if (mode === "signup") track(EVENTS.AUTH_SIGNUP_SUBMITTED, { method: "google", session_issued: false, ...(lineupProps ?? {}) });
       const { error } = await createSupabaseBrowserClient().auth.signInWithOAuth(googleSignInOptions(window.location.origin, next));
       if (error) throw error;
       // The browser is navigating to Google now; the state reset below only

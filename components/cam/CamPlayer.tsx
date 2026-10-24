@@ -112,7 +112,16 @@ export function CamPlayer({
           </div>
         </a>
         <div className="absolute top-2 right-2 z-20">
-          <FavoriteButton itemId={cam.id} itemType="cam" label={cam.name} variant="ghost" className="bg-surface/50 backdrop-blur-sm" />
+          <FavoriteButton
+            itemId={cam.id}
+            itemType="cam"
+            label={cam.name}
+            variant="ghost"
+            className="bg-surface/50 backdrop-blur-sm"
+            source="cam_save"
+            authHeading={`Save ${label}.`}
+            authNote="A free account keeps your saved cameras and mountains on every device."
+          />
         </div>
       </div>
     );
@@ -165,7 +174,16 @@ export function CamPlayer({
           </>
         )}
         <div className="absolute top-2 right-2 z-20">
-          <FavoriteButton itemId={cam.id} itemType="cam" label={cam.name} variant="ghost" className="bg-surface/50 backdrop-blur-sm" />
+          <FavoriteButton
+            itemId={cam.id}
+            itemType="cam"
+            label={cam.name}
+            variant="ghost"
+            className="bg-surface/50 backdrop-blur-sm"
+            source="cam_save"
+            authHeading={`Save ${label}.`}
+            authNote="A free account keeps your saved cameras and mountains on every device."
+          />
         </div>
       </div>
     );
@@ -221,7 +239,16 @@ export function CamPlayer({
 
       {/* Favorite Button (overlay) */}
       <div className="absolute top-2 right-2 z-20">
-        <FavoriteButton itemId={cam.id} itemType="cam" label={cam.name} variant="ghost" className="bg-surface/50 backdrop-blur-sm" />
+        <FavoriteButton
+          itemId={cam.id}
+          itemType="cam"
+          label={cam.name}
+          variant="ghost"
+          className="bg-surface/50 backdrop-blur-sm"
+          source="cam_save"
+          authHeading={`Save ${label}.`}
+          authNote="A free account keeps your saved cameras and mountains on every device."
+        />
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ import { PowderAlertSignup } from "@/components/alerts/PowderAlertSignup";
 import { useFavorites } from "@/lib/useFavorites";
 import { Modal } from "@/components/ui/Modal";
 import { AuthModal } from "@/components/auth/AuthModal";
+import { stageGuestLineup } from "@/components/auth/lineup-gate";
 import type { ResortWithData } from "@/lib/types";
 import type { RadarFrame } from "@/lib/weather-radar";
 import { isOffSeason } from "@/lib/map-utils";
@@ -464,6 +465,9 @@ export function BrowsePage({ resorts, radarFrames = [], featured = null }: Props
   const [showMap, setShowMap] = useState(false);
   const [showStates, setShowStates] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authResortName, setAuthResortName] = useState<string | null>(null);
+  const [authIntentNote, setAuthIntentNote] = useState<string | null>(null);
+  const [authIntentWarning, setAuthIntentWarning] = useState<string | null>(null);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
 
   // Badge on the mobile "Filters" trigger — non-default choices hidden in the sheet
@@ -836,7 +840,16 @@ export function BrowsePage({ resorts, radarFrames = [], featured = null }: Props
                       <SummitResortCard
                         resort={resort}
                         favorited={isFavorite(resort.id)}
-                        onToggleFavorite={user ? () => toggleFav(resort.id) : () => setShowAuthModal(true)}
+                        onToggleFavorite={user ? () => toggleFav(resort.id) : () => {
+                          const staged = stageGuestLineup(
+                            { item_type: "resort", item_id: resort.id },
+                            { source: "browse_card", noun: "mountain" },
+                          );
+                          setAuthResortName(resort.name);
+                          setAuthIntentNote(staged.stored ? staged.note : null);
+                          setAuthIntentWarning(staged.stored ? null : staged.message);
+                          setShowAuthModal(true);
+                        }}
                         animate={i < 12}
                       />
                     </div>
@@ -881,7 +894,21 @@ export function BrowsePage({ resorts, radarFrames = [], featured = null }: Props
         </div>
       </div>
 
-      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
+      {showAuthModal && (
+        <AuthModal
+          onClose={() => {
+            setShowAuthModal(false);
+            setAuthResortName(null);
+            setAuthIntentNote(null);
+            setAuthIntentWarning(null);
+          }}
+          source="browse_card"
+          heading={authResortName ? `Save ${authResortName}.` : undefined}
+          intentNote={authIntentNote ?? undefined}
+          intentWarning={authIntentWarning ?? undefined}
+          lineup={authIntentNote ? { lineup_source: "browse_card", lineup_count: 1 } : null}
+        />
+      )}
       <FilterSheet
         open={showFilterSheet}
         onClose={() => setShowFilterSheet(false)}

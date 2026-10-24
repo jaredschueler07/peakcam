@@ -6,7 +6,9 @@ import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { Button } from "./Button";
 import { type FavoriteType } from "@/lib/types";
 import { AuthModal } from "../auth/AuthModal";
+import { stageGuestLineup } from "../auth/lineup-gate";
 import { track, EVENTS } from "@/lib/analytics-events";
+import { notifyFavoritesChanged, subscribeFavoritesChanged } from "@/lib/favorites-events";
 
 interface FavoriteButtonProps {
   itemId: string;
@@ -19,6 +21,11 @@ interface FavoriteButtonProps {
    */
   label?: string;
   className?: string;
+  /** Surface that raised the auth gate, for AUTH_GATE_SHOWN attribution. */
+  source?: string;
+  /** Personalised modal heading ("Save Main Street.") instead of the generic default. */
+  authHeading?: string;
+  authNote?: string;
 }
 
 export function FavoriteButton({
@@ -28,12 +35,22 @@ export function FavoriteButton({
   size = "sm",
   label,
   className = "",
+  source,
+  authHeading,
+  authNote,
 }: FavoriteButtonProps) {
   const [isFavorited, setIsFavorited] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [intentNote, setIntentNote] = useState<string | null>(null);
+  const [intentWarning, setIntentWarning] = useState<string | null>(null);
   const supabase = createSupabaseBrowserClient();
+
+  // A guest save writes the clicked item through the shared intent before the
+  // modal opens, so a camera stays that camera after auth (never a resort).
+  const gateSource = source ?? (itemType === "cam" ? "cam_save" : "resort_save");
+  const noun = itemType === "resort" ? "mountain" : itemType === "cam" ? "camera" : "region";
 
   const checkFavoriteStatus = useCallback(async () => {
     try {
@@ -76,6 +93,10 @@ export function FavoriteButton({
     checkFavoriteStatus();
   }, [checkFavoriteStatus]);
 
+  // The lineup bridge (or another tab) can save this exact item while the
+  // button is mounted; reconcile the heart instead of leaving it stale.
+  useEffect(() => subscribeFavoritesChanged(() => { void checkFavoriteStatus(); }), [checkFavoriteStatus]);
+
   const toggleFavorite = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -83,6 +104,9 @@ export function FavoriteButton({
     
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
+      const staged = stageGuestLineup({ item_type: itemType, item_id: itemId }, { source: gateSource, noun });
+      setIntentNote(staged.stored ? staged.note : null);
+      setIntentWarning(staged.stored ? null : staged.message);
       setShowAuthModal(true);
       return;
     }
@@ -100,7 +124,7 @@ export function FavoriteButton({
 
         if (error) throw error;
         setIsFavorited(false);
-        track(EVENTS.FAVORITE_REMOVED, { item_id: itemId, item_type: itemType });
+        track(EVENTS.FAVORITE_REMOVED, { item_id: itemId, item_type: itemType, ...(source ? { source } : {}) });
       } else {
         const { error } = await supabase
           .from("user_favorites")
@@ -112,8 +136,9 @@ export function FavoriteButton({
 
         if (error) throw error;
         setIsFavorited(true);
-        track(EVENTS.FAVORITE_ADDED, { item_id: itemId, item_type: itemType });
+        track(EVENTS.FAVORITE_ADDED, { item_id: itemId, item_type: itemType, ...(source ? { source } : {}) });
       }
+      notifyFavoritesChanged();
     } catch (err: any) {
       console.error("[FavoriteButton] Error toggling favorite:", err.message || err);
       console.dir(err);
@@ -129,19 +154,33 @@ export function FavoriteButton({
 
   const starOpacity = isLoading ? "opacity-40" : "opacity-100";
 
-  // With a label the name is specific ("Add Summit Cam to favorites"); without
-  // one it stays exactly as it was before the label prop existed.
+  // The visible control is an icon, so the accessible name has to carry both
+  // the action and the specific thing it applies to ("Save Main Street to your
+  // saved cameras"), not just "Add to Favorites".
   const accessibleName = label
     ? isFavorited
-      ? `Remove ${label} from favorites`
-      : `Add ${label} to favorites`
+      ? `Remove ${label} from your saved ${noun}s`
+      : `Save ${label} to your saved ${noun}s`
     : isFavorited
       ? "Remove from Favorites"
       : "Add to Favorites";
 
   return (
     <>
-      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
+      {showAuthModal && (
+        <AuthModal
+          onClose={() => {
+            setShowAuthModal(false);
+            setIntentNote(null);
+            setIntentWarning(null);
+          }}
+          source={gateSource}
+          heading={authHeading ?? (label ? `Save ${label}.` : undefined)}
+          intentNote={intentNote ?? (intentWarning ? undefined : authNote)}
+          intentWarning={intentWarning ?? undefined}
+          lineup={intentNote ? { lineup_source: gateSource, lineup_count: 1 } : null}
+        />
+      )}
       <Button
         variant={variant}
         size={size}

@@ -30,8 +30,22 @@ export const EVENTS = {
   // AuthModal opened for a signed-out visitor. `source` names the surface that
   // raised the gate (favorite_card, user_report, alert_done, …) so gate →
   // sign-up conversion can be read per surface; without it the account funnel
-  // had a single measured step.
+  // had a single measured step. Also used for the lineup signup prompt.
   AUTH_GATE_SHOWN: "auth_gate_shown",
+  // A visible account entry point was clicked (header create-account, hub
+  // "Choose my mountains"). A click is never a signup conversion: the Meta and
+  // Google ads mirrors only listen to AUTH_SIGNUP_COMPLETED.
+  ACCOUNT_CTA_CLICKED: "account_cta_clicked",
+  // The visitor committed a lineup (pressed Save my mountains with 1..8
+  // chooser picks, or the alert-success nudge with its full selection).
+  // `selected_count` is coarse; names and emails never ride along.
+  LINEUP_SELECTED: "lineup_selected",
+  // The missing favourites were written to the account. Fires only after a
+  // real successful insert, never for a guest selection or a prompt view.
+  LINEUP_SAVED: "lineup_saved",
+  // The write was attempted and failed. `reason` is a short code, never a
+  // provider message or user data. Fired instead of LINEUP_SAVED.
+  LINEUP_SAVE_FAILED: "lineup_save_failed",
   FAVORITE_ADDED: "favorite_added",
   FAVORITE_REMOVED: "favorite_removed",
   CONDITION_VOTED: "condition_voted",

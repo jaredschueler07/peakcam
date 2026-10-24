@@ -2,12 +2,24 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { Check, Loader2, Search, X } from "lucide-react";
 import type { Resort } from "@/lib/types";
 import { POPULAR_SLUGS } from "@/lib/popular-resorts";
 import { DEFAULT_THRESHOLD, thresholdOptionsFor } from "@/lib/alerts/client";
 import { useAlertSubscribe } from "@/lib/alerts/use-alert-subscribe";
 import { track, EVENTS } from "@/lib/analytics-events";
+import { addFavoriteItems } from "@/lib/lineup-favorites";
+import {
+  MAX_LINEUP_INTENT,
+  lineupEventProperties,
+  lineupIntentNote,
+  lineupSignupHeading,
+  lineupStorage,
+  writeLineupIntent,
+} from "@/lib/lineup";
+import { LINEUP_STORAGE_BLOCKED_MESSAGE } from "@/components/auth/lineup-gate";
+import { useAuthUser } from "@/lib/use-auth-user";
 import { Button } from "@/components/ui/Button";
 
 // Only reachable from the success state, so the Supabase auth client behind it
@@ -103,6 +115,13 @@ export function PowderAlertForm({
   const [email, setEmail] = useState("");
   const [openingAlerts, setOpeningAlerts] = useState(defaultOpeningAlerts);
   const [showAuth, setShowAuth] = useState(false);
+  const [intentStored, setIntentStored] = useState(false);
+  const [authWarning, setAuthWarning] = useState<string | null>(null);
+  const [alertStorageError, setAlertStorageError] = useState<string | null>(null);
+  const [accountSave, setAccountSave] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [accountSaveAdded, setAccountSaveAdded] = useState(0);
+  const [accountSaveCount, setAccountSaveCount] = useState(0);
+  const { user } = useAuthUser();
   const emailRef = useRef<HTMLInputElement>(null);
   // Focus the email field only when the visitor moved to that step themselves;
   // a preselected form starting on it must not yank focus on page load.
@@ -146,6 +165,87 @@ export function PowderAlertForm({
     [bySlug]
   );
   const selectedResorts = resorts.filter((r) => selected.has(r.id));
+
+  /**
+   * The optional account step after a successful alert subscription. It uses
+   * the same lineup intent as the hub chooser: a signed-out visitor's picks
+   * are written to the one-shot browser queue and finished by
+   * LineupIntentBridge after auth; a signed-in visitor is written directly.
+   * Nothing here makes the alert subscription itself require an account.
+   */
+  const saveAlertLineup = async () => {
+    if (accountSave === "saving") return;
+    const resortIds = selectedResorts.map((r) => r.id);
+    if (resortIds.length === 0) return;
+    // A hub preselects every resort in the state, and the alert API accepts up
+    // to 200. Never truncate that silently: save all of it, or say plainly
+    // that this selection is too large to carry into an account.
+    if (resortIds.length > MAX_LINEUP_INTENT) {
+      setAccountSave("error");
+      setAlertStorageError(
+        `Your alert subscription keeps all ${resortIds.length} mountains. A free account can save up to ${MAX_LINEUP_INTENT} at once — remove a few and try the account step again.`,
+      );
+      return;
+    }
+    const props = lineupEventProperties("alert_done", "alert_done", selectedResorts.length);
+    track(EVENTS.LINEUP_SELECTED, props);
+    setAlertStorageError(null);
+    setAuthWarning(null);
+    setAccountSaveCount(resortIds.length);
+
+    if (user) {
+      setAccountSave("saving");
+      try {
+        const result = await addFavoriteItems(
+          selectedResorts.map((r) => ({ item_type: "resort" as const, item_id: r.id })),
+          { source: "alert_done", expectedUserId: user.id },
+        );
+        if (result.ok) {
+          setAccountSave("saved");
+          setAccountSaveAdded(result.added.length);
+          if (result.added.length > 0) {
+            track(EVENTS.LINEUP_SAVED, { ...props, added_count: result.added.length, first_save: result.firstSave });
+          }
+          return;
+        }
+        setAccountSave("error");
+        setAccountSaveAdded(result.added.length);
+        track(EVENTS.LINEUP_SAVE_FAILED, {
+          ...props,
+          reason: result.reason ?? "unknown",
+          added_count: result.added.length,
+        });
+      } catch {
+        setAccountSave("error");
+        setAccountSaveAdded(0);
+        track(EVENTS.LINEUP_SAVE_FAILED, { ...props, reason: "threw" });
+      }
+      return;
+    }
+
+    const written = writeLineupIntent(lineupStorage(), resortIds, "alert_done");
+    if (!written.ok) {
+      setAlertStorageError(
+        written.reason === "blocked"
+          ? LINEUP_STORAGE_BLOCKED_MESSAGE
+          : "Pick at least one mountain before continuing.",
+      );
+      setAccountSave("error");
+      track(EVENTS.LINEUP_SAVE_FAILED, { ...props, reason: `intent_${written.reason}` });
+      return;
+    }
+    setAlertStorageError(null);
+    setIntentStored(true);
+    setShowAuth(true);
+  };
+
+  const openAuthAnyway = () => {
+    setIntentStored(false);
+    setAlertStorageError(null);
+    setAuthWarning(LINEUP_STORAGE_BLOCKED_MESSAGE);
+    setShowAuth(true);
+  };
+
   const thresholdValues = selectedResorts.map((r) => thresholds[r.id] ?? DEFAULT_THRESHOLD);
   // One shared <select> on the email step while every mountain agrees; per-
   // mountain choices made in the picker are left alone.
@@ -215,27 +315,82 @@ export function PowderAlertForm({
         )}
         {doneExtra}
         <div className="mt-6 border-t border-ink/15 pt-5">
-          <p className="text-sm text-bark">Want them as favorites too?</p>
-          <button
-            type="button"
-            onClick={() => setShowAuth(true)}
-            className="mt-1 min-h-11 text-sm font-bold text-forest underline"
-          >
-            Create a free account →
-          </button>
+          {user ? (
+            accountSave === "saved" ? (
+              <div role="status">
+                <p className="text-sm font-bold text-forest">
+                  {accountSaveAdded === 0
+                    ? "Those mountains are already in your dashboard."
+                    : `Saved ${accountSaveAdded} ${accountSaveAdded === 1 ? "mountain" : "mountains"} to your dashboard.`}
+                </p>
+                <Link href="/dashboard" className="mt-1 inline-flex min-h-11 items-center text-sm font-bold text-forest underline">
+                  Open My Peak →
+                </Link>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm font-bold text-ink">Keep these mountains on your dashboard.</p>
+                <p className="mt-1 text-xs leading-relaxed text-bark">
+                  Favorites sync across your devices and open My Peak. Your powder alerts stay exactly as they are.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void saveAlertLineup()}
+                  disabled={accountSave === "saving"}
+                  className="mt-1 min-h-11 text-sm font-bold text-forest underline disabled:opacity-60"
+                >
+                  {accountSave === "saving" ? "Saving…" : accountSave === "error" ? "Try saving again →" : "Save these to my dashboard →"}
+                </button>
+                {accountSave === "error" && (
+                  <p role="alert" className="mt-1 text-xs text-poor">
+                    {alertStorageError ??
+                      (accountSaveAdded > 0
+                        ? `We saved ${accountSaveAdded} of ${accountSaveCount} to your dashboard, then hit an error. Try again to finish — the saved ones won’t be duplicated.`
+                        : "We couldn’t save them yet. Nothing was saved — please try again.")}
+                  </p>
+                )}
+              </>
+            )
+          ) : (
+            <>
+              <p className="text-sm font-bold text-ink">Keep these mountains on your dashboard.</p>
+              <p className="mt-1 text-xs leading-relaxed text-bark">
+                A free account saves them as favorites, syncs across devices, and opens My Peak. Powder alerts stay
+                account-free — this step is optional.
+              </p>
+              <button
+                type="button"
+                onClick={() => void saveAlertLineup()}
+                className="mt-1 min-h-11 text-sm font-bold text-forest underline"
+              >
+                Create a free account to save them →
+              </button>
+              {alertStorageError && (
+                <div role="alert" className="mt-1 text-xs text-poor">
+                  <p>{alertStorageError}</p>
+                  <button type="button" onClick={openAuthAnyway} className="mt-1 min-h-11 text-sm font-bold underline">
+                    Create a free account anyway →
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </div>
         {onClose && (
           <Button type="button" variant="outline" size="sm" className="mt-5" onClick={onClose}>
             Done
           </Button>
         )}
-        {showAuth && (
+        {showAuth && !user && (
           <AuthModal
             onClose={() => setShowAuth(false)}
             initialMode="signup"
             initialEmail={email.trim()}
             source="alert_done"
-            heading={selectedResorts.length === 1 ? "Save this mountain." : "Save these mountains."}
+            heading={lineupSignupHeading(selectedResorts.length, selectedResorts[0]?.name)}
+            intentNote={intentStored ? lineupIntentNote(selectedResorts.length) : undefined}
+            intentWarning={authWarning ?? undefined}
+            lineup={intentStored ? { lineup_source: "alert_done", lineup_count: selectedResorts.length } : null}
           />
         )}
       </div>

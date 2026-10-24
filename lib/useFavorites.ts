@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { getFavoriteResortIds, toggleFavorite } from "@/lib/favorites";
+import { subscribeFavoritesChanged } from "@/lib/favorites-events";
 import type { User } from "@supabase/supabase-js";
 
 export function useFavorites() {
@@ -34,13 +35,24 @@ export function useFavorites() {
     }
 
     let cancelled = false;
-    getFavoriteResortIds().then((ids) => {
-      if (!cancelled) {
-        setFavorites(ids);
-        setLoaded(true);
-      }
+    const load = () =>
+      getFavoriteResortIds().then((ids) => {
+        if (!cancelled) {
+          setFavorites(ids);
+          setLoaded(true);
+        }
+      });
+    void load();
+
+    // The lineup bridge can finish a save after this hook mounted (and another
+    // tab can too), so reconcile from the table whenever favourites change.
+    const unsubscribe = subscribeFavoritesChanged(() => {
+      void load();
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [user]);
 
   const toggle = useCallback(

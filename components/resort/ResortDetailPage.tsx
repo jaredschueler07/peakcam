@@ -20,6 +20,7 @@ const UserConditionsForm = dynamic(() => import("./UserConditionsForm").then(m =
 const UserConditionsList = dynamic(() => import("./UserConditionsList").then(m => ({ default: m.UserConditionsList })));
 import { useFavorites } from "@/lib/useFavorites";
 import { AuthModal } from "@/components/auth/AuthModal";
+import { stageGuestLineup } from "@/components/auth/lineup-gate";
 import { trackResortView, trackCamClick } from "@/lib/posthog";
 import { trackViewContent } from "@/lib/meta-pixel-events";
 import { isDropInResort } from "@/lib/drop-in";
@@ -209,9 +210,29 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
   const forecastTime = useForecastTime();
   const isUS = resort.country === "US";
   const { user, isFavorite, toggle: toggleFav } = useFavorites();
-  // Which surface raised the auth gate (favorite_resort, resort_nudge) — the
-  // modal stamps it on AUTH_GATE_SHOWN; null when closed.
+  // Which surface raised the auth gate (resort_save, resort_nudge) — the
+  // modal stamps it on AUTH_GATE_SHOWN; null when closed. The note/warning is
+  // only set after the clicked resort was actually written to the pending
+  // intent (or the browser refused, in which case the modal says so).
   const [authSource, setAuthSource] = useState<string | null>(null);
+  const [authIntentNote, setAuthIntentNote] = useState<string | null>(null);
+  const [authIntentWarning, setAuthIntentWarning] = useState<string | null>(null);
+
+  const openSaveGate = (source: "resort_save" | "resort_nudge") => {
+    const staged = stageGuestLineup(
+      { item_type: "resort", item_id: resort.id },
+      { source, noun: "mountain" },
+    );
+    setAuthIntentNote(staged.stored ? staged.note : null);
+    setAuthIntentWarning(staged.stored ? null : staged.message);
+    setAuthSource(source);
+  };
+
+  const closeSaveGate = () => {
+    setAuthSource(null);
+    setAuthIntentNote(null);
+    setAuthIntentWarning(null);
+  };
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   // Shared across every ResortAlertCapture on the page so subscribing in one
   // flips them all to the success state.
@@ -253,7 +274,16 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
 
   return (
     <div className="min-h-screen bg-bg">
-      {authSource && <AuthModal onClose={() => setAuthSource(null)} source={authSource} />}
+      {authSource && (
+        <AuthModal
+          onClose={closeSaveGate}
+          source={authSource}
+          heading={authSource === "resort_save" ? `Save ${resort.name}.` : `Save ${resort.name} to your mountains.`}
+          intentNote={authIntentNote ?? undefined}
+          intentWarning={authIntentWarning ?? undefined}
+          lineup={authIntentNote ? { lineup_source: authSource, lineup_count: 1 } : null}
+        />
+      )}
       <Header showSearch={false} />
 
       {/* ── Hero ──────────────────────────────────────────────── */}
@@ -327,18 +357,20 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
               <button
                 onClick={event => {
                   event.currentTarget.focus();
-                  if (!user) { setAuthSource("favorite_resort"); return; }
+                  if (!user) { openSaveGate("resort_save"); return; }
                   toggleFav(resort.id);
                 }}
-                className={`min-h-11 min-w-11 p-2 rounded-lg border transition-all duration-[220ms] ${
+                className={`inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 text-sm font-bold transition-all duration-[220ms] ${
                   favorited
                     ? "bg-alpenglow/15 border-alpenglow/40 text-alpenglow hover:bg-alpenglow/25"
                     : "bg-surface2/50 border-border text-text-muted hover:text-alpenglow hover:border-alpenglow/30 hover:bg-alpenglow/10"
                 }`}
-                aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
-                title={favorited ? "Remove from favorites" : user ? "Add to favorites" : "Sign in to save favorites"}
+                aria-label={favorited ? `Remove ${resort.name} from your saved mountains` : `Save ${resort.name} to your mountains`}
+                aria-pressed={favorited}
+                title={favorited ? `Remove ${resort.name} from your saved mountains` : user ? `Save ${resort.name} to your mountains` : `Save ${resort.name} with a free account`}
               >
-                <Heart size={18} fill={favorited ? "currentColor" : "none"} strokeWidth={favorited ? 0 : 1.5} />
+                <Heart size={18} fill={favorited ? "currentColor" : "none"} strokeWidth={favorited ? 0 : 1.5} aria-hidden />
+                <span>{favorited ? "Saved" : "Save mountain"}</span>
               </button>
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 {resort.instagram_url && (
@@ -658,10 +690,10 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
               <p className="text-text-muted text-xs text-center">
                 <button
                   type="button"
-                  onClick={() => setAuthSource("resort_nudge")}
+                  onClick={() => openSaveGate("resort_nudge")}
                   className="inline-flex min-h-11 items-center px-1 text-cyan hover:underline"
                 >
-                  Sign in to save favorites
+                  Save {resort.name} with a free account
                 </button>
               </p>
             )}
