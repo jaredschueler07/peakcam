@@ -33,8 +33,22 @@ const handler = createMcpHandler((server) => registerPeakCam(server, productionD
   serverInfo: peakCamServerInfo,
   onEvent: (event) => {
     if (event.type === "ERROR") console.error("[mcp]", event.context ?? "", event.error);
+    // One line per request so a 60 s runtime timeout can be matched to the
+    // JSON-RPC method that preceded it (the request log carries no body).
+    // Tool arguments are not logged: a `tools/call` logs only the tool name.
+    else if (event.type === "REQUEST_RECEIVED") console.log(`[mcp] received ${describeRequest(event.method, event.parameters)}`);
+    else if (event.type === "REQUEST_COMPLETED") console.log(`[mcp] completed ${event.method} status=${event.status} duration=${event.duration ?? "?"}ms`);
   },
 });
+
+/** `method` plus, for a tool call, the tool name; never the arguments. */
+function describeRequest(method: string, parameters: unknown): string {
+  const body = parameters !== null && typeof parameters === "object" ? (parameters as Record<string, unknown>) : {};
+  const params = body.params !== null && typeof body.params === "object" ? (body.params as Record<string, unknown>) : {};
+  const id = "id" in body ? JSON.stringify(body.id) : "none";
+  const tool = method === "tools/call" && typeof params.name === "string" ? ` tool=${params.name}` : "";
+  return `${method}${tool} id=${id}`;
+}
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
