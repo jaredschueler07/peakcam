@@ -52,9 +52,21 @@ export const peakCamServerInfo = {
   websiteUrl: SITE_URL,
 };
 
+/**
+ * The catalogue is fixed for the life of a deploy (tools come from code, the
+ * resource list from the resort table at build/revalidate time), so neither
+ * list ever changes while a client is connected. `listChanged` is therefore
+ * declared false rather than left to the SDK's default of true: a 2026-07-28
+ * client (claude.ai's connector among them) opens a `subscriptions/listen`
+ * stream for every `listChanged` capability the server advertises, and on
+ * Vercel that held-open stream is a function invocation that runs until
+ * `maxDuration`, logs a runtime timeout, and is immediately reopened by the
+ * client. With nothing honoured, the SDK acknowledges and completes the
+ * subscription in one round trip instead.
+ */
 export const peakCamServerOptions: ServerOptions = {
   instructions: PEAKCAM_MCP_INSTRUCTIONS,
-  capabilities: { tools: {}, resources: {} },
+  capabilities: { tools: { listChanged: false }, resources: { listChanged: false } },
 };
 
 export function resortResourceUri(slug: string): string {

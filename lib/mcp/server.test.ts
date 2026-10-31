@@ -12,7 +12,11 @@ import {
   PEAKCAM_RESOURCE_TEMPLATE,
   READ_ONLY_TOOL_ANNOTATIONS,
   createPeakCamServer,
+  peakCamServerInfo,
+  peakCamServerOptions,
+  registerPeakCam,
 } from "./server";
+import { createMcpHandler } from "mcp-handler";
 import { MAX_CAMS, PEAKCAM_TOOL_NAMES, buildTools, diceSimilarity, editDistance, matchResorts, normalizeText, scoreResort } from "./tools";
 import type { McpDataSource, SnowHistoryRow, UnmatchedQuestion } from "./types";
 import type { ResortHistoryData } from "@/lib/public-api/data";
@@ -391,6 +395,11 @@ test("initialize reports io.peakcam/snow, the package version and instructions",
   const version = client.getNegotiatedProtocolVersion();
   assert.ok(typeof version === "string" && /^\d{4}-\d{2}-\d{2}$/.test(version), `negotiated protocol version: ${version}`);
   console.log(`negotiated protocol version ${version} (${client.getProtocolEra()} era)`);
+  // The catalogue never changes within a deploy, so no list-changed
+  // subscription is offered (see peakCamServerOptions for the Vercel reason).
+  const capabilities = client.getServerCapabilities();
+  assert.equal(capabilities?.tools?.listChanged, false);
+  assert.equal(capabilities?.resources?.listChanged, false);
 });
 
 test("tools/list returns every tool in the name tuple, each read-only with input and output schemas", async () => {
@@ -1235,4 +1244,44 @@ test("get_score on a data source without scoreHistory answers available: false w
   assert.equal(doc.available, false);
   assert.equal(doc.today, null);
   assert.deepEqual(doc.history, []);
+});
+
+// ── Streamable HTTP: subscriptions/listen must not hold a stream open ──
+
+test("subscriptions/listen completes in one round trip: the static catalogue honours no listChanged subscription", async () => {
+  const handler = createMcpHandler((server) => registerPeakCam(server, fixtureData()), {
+    ...peakCamServerOptions,
+    serverInfo: peakCamServerInfo,
+  });
+  const envelope = {
+    "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+    "io.modelcontextprotocol/clientInfo": { name: "peakcam-test-client", version: "0.0.0" },
+    "io.modelcontextprotocol/clientCapabilities": {},
+  };
+  const response = await handler(
+    new Request("http://peakcam.test/api/mcp", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        "mcp-protocol-version": "2026-07-28",
+        "mcp-method": "subscriptions/listen",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "listen-1",
+        method: "subscriptions/listen",
+        params: { notifications: { toolsListChanged: true, resourcesListChanged: true }, _meta: envelope },
+      }),
+    }),
+  );
+  assert.equal(response.status, 200);
+  // A held-open stream never resolves `text()`; the deadline is the failure.
+  const text = await Promise.race([
+    response.text(),
+    new Promise<string>((_, reject) => setTimeout(() => reject(new Error("subscriptions/listen stream stayed open")), 3000)),
+  ]);
+  assert.match(text, /"method":"notifications\/subscriptions\/acknowledged"/);
+  assert.match(text, /"notifications":\{\}/, "no notification type is honoured");
+  assert.match(text, /"resultType":"complete"/, "the subscription completes immediately");
 });
