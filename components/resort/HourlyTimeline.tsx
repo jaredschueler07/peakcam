@@ -24,9 +24,14 @@ function compassDeg(dir: string): number {
   return map[dir.toUpperCase()] ?? 180;
 }
 
-function snowOpacity(inches: number): number {
-  if (inches >= 1) return 1;
-  if (inches >= 0.3) return 0.6;
+// `snowInches` is per hour (lib/weather.ts NWS_KEYWORD_PERIOD_HOURS, Open-Meteo
+// hourly), so 0.5 in/h is a solid snow hour: full-height bar, full opacity.
+const PX_PER_HOURLY_INCH = 48;
+const BAR_MAX_PX = 40;
+
+function snowOpacity(inchesPerHour: number): number {
+  if (inchesPerHour >= 0.17) return 1;
+  if (inchesPerHour >= 0.05) return 0.6;
   return 0.3;
 }
 
@@ -137,9 +142,9 @@ export function HourlyTimeline({ hourlyData }: HourlyTimelineProps) {
                 <rect
                   key={`snow-${i}`}
                   x={i * chartData.slotW + 2}
-                  y={chartData.chartH - chartData.padBottom - Math.min(h.snowInches * 8, 40)}
+                  y={chartData.chartH - chartData.padBottom - Math.min(h.snowInches * PX_PER_HOURLY_INCH, BAR_MAX_PX)}
                   width={chartData.slotW - 4}
-                  height={Math.min(h.snowInches * 8, 40)}
+                  height={Math.min(h.snowInches * PX_PER_HOURLY_INCH, BAR_MAX_PX)}
                   fill={SNOW_BAR}
                   opacity={snowOpacity(h.snowInches)}
                   rx={2}

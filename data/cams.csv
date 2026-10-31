@@ -954,3 +954,11 @@ stoneham,Sommet Montagne 2,,image,https://secure.skircr.com/cams/stocam3/image.j
 stoneham,Sommet Montagne 4,,image,https://secure.skircr.com/cams/stocam4/image.jpg,,true,summit,Stoneham,https://ski-stoneham.com/montagne/conditions/conditions-generales/
 val-d-irene,Mont Val-d'Irene | 685m,2247,iframe,https://www.skaping.com/tourisme-gaspesie/parc-regional-val-irene,,true,summit,Tourisme Gaspesie / Parc regional de Val-d'Irene,
 cape-smokey,Cape Smokey - Mountain top,1001,image,https://api.skaping.com/media/getLatest?api_key=CH4Gx-9Ifwu-FLZzi-ks5qa&camera=2647&format=jpg,,true,summit,Cape Smokey,https://www.capesmokey.ca/terms-conditions-1
+silverton,Silverton US-550 & CO-110 North,9318,image,https://cocam.carsprogram.org/Cellular/550N07065CAM1RHS-N.jpg,,true,approach,COtrip (CDOT),https://www.cotrip.org/about-cotrip/
+silverton,Silverton US-550 & CO-110 South,9318,image,https://cocam.carsprogram.org/Cellular/550N07065CAM1RHS-S.jpg,,true,approach,COtrip (CDOT),https://www.cotrip.org/about-cotrip/
+silverton,Silverton US-550 & CO-110 West,9318,image,https://cocam.carsprogram.org/Cellular/550N07065CAM1RHS-RW.jpg,,true,approach,COtrip (CDOT),https://www.cotrip.org/about-cotrip/
+silverton,Red Mountain Pass South (Ironton),9700,image,https://cocam.carsprogram.org/Cellular/550N08795CAM1RHS-S.jpg,,true,approach,COtrip (CDOT),https://www.cotrip.org/about-cotrip/
+silverton,Red Mountain Pass North (Ironton),9700,image,https://cocam.carsprogram.org/Cellular/550N08795CAM1RHS-N.jpg,,true,approach,COtrip (CDOT),https://www.cotrip.org/about-cotrip/
+aspen-mountain,Aspen Mountain 360,11212,iframe,https://aspen.roundshot.com/aspen/,,true,summit,Aspen Snowmass,https://www.aspensnowmass.com/terms-and-conditions
+aspen-highlands,Highlands 360,11675,iframe,https://aspen.roundshot.com/highlands/,,true,summit,Aspen Snowmass,https://www.aspensnowmass.com/terms-and-conditions
+buttermilk,Buttermilk 360,9900,iframe,https://aspen.roundshot.com/buttermilk/,,true,summit,Aspen Snowmass,https://www.aspensnowmass.com/terms-and-conditions

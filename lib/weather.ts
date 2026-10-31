@@ -144,6 +144,10 @@ export async function getWeatherForecast(
 
     // Collapse daytime/nighttime pairs into days
     const days: WeatherPeriod[] = [];
+    // After about 6 pm local NWS leads with a nighttime period ("Tonight"),
+    // which is skipped like every other unpaired night; the first collapsed
+    // day is then tomorrow and must carry its weekday, not "Today".
+    let leadingNightSkipped = false;
     let i = 0;
     while (i < periods.length && days.length < 5) {
       const p = periods[i];
@@ -161,7 +165,7 @@ export async function getWeatherForecast(
         );
         days.push({
           date,
-          dow: days.length === 0 ? "Today" : p.name.substring(0, 3),
+          dow: days.length === 0 && !leadingNightSkipped ? "Today" : p.name.substring(0, 3),
           condition: forecastToCondition(p.shortForecast),
           high,
           low,
@@ -176,6 +180,7 @@ export async function getWeatherForecast(
         });
         i += next && !next.isDaytime ? 2 : 1;
       } else {
+        if (days.length === 0) leadingNightSkipped = true;
         i++;
       }
     }
@@ -190,6 +195,15 @@ export async function getWeatherForecast(
  * Fetch 48-hour hourly forecast from NWS.
  * Returns null if NWS is unreachable.
  */
+/**
+ * `estimateSnow()` reads NWS wording as a per-period amount (NWS forecast
+ * periods are 6 to 12 hours), so an hourly row gets a sixth of it: the six
+ * hourly rows `bucketIntoPeriods()` sums into a morning/afternoon/evening
+ * bucket then add back up to one period's estimate instead of six.
+ * HourlyTimeline scales its bars for these per-hour values.
+ */
+export const NWS_KEYWORD_PERIOD_HOURS = 6;
+
 export async function getHourlyForecast(
   lat: number,
   lng: number
@@ -225,7 +239,7 @@ export async function getHourlyForecast(
           windDirection: p.windDirection,
           shortForecast: p.shortForecast,
           condition: forecastToCondition(p.shortForecast),
-          snowInches: estimateSnow(p.shortForecast),
+          snowInches: Math.round((estimateSnow(p.shortForecast) / NWS_KEYWORD_PERIOD_HOURS) * 10) / 10,
           precipProbability: p.probabilityOfPrecipitation?.value ?? 0,
           feelsLike: windChill(temp, ws),
         };

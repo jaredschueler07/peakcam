@@ -8,6 +8,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { Snowflake, Play } from "lucide-react";
 import type { Cam, ResortWithData } from "@/lib/types";
 import { camDisplayName } from "@/lib/cam-name";
+import { cameraPreview } from "@/lib/cam-preview";
 import { entranceMotionProps } from "@/lib/motion-entrance";
 import { trackCamPlayed } from "@/lib/posthog";
 
@@ -101,9 +102,13 @@ function SnowCamCard({
 }) {
   const snow = resort.snow_report;
   const name = camDisplayName(cam);
+  const [posterFailed, setPosterFailed] = useState(false);
   // Entrance fade honours Reduce Motion by becoming instant, never by being
   // skipped — see lib/motion-entrance.ts.
   const entrance = entranceMotionProps(true, useReducedMotion());
+
+  const preview = cameraPreview(cam);
+  const showPoster = Boolean(preview && !posterFailed);
 
   const embedSrc =
     cam.embed_type === "youtube" && cam.youtube_id
@@ -135,7 +140,7 @@ function SnowCamCard({
       transition={entrance.transition}
     >
       {/* Cam embed */}
-      <div className="relative aspect-video bg-cream border-b-[1.5px] border-ink">
+      <div className="relative aspect-video bg-cream border-b-[1.5px] border-ink overflow-hidden">
         {isLoaded ? (
           isImage ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -161,14 +166,33 @@ function SnowCamCard({
           <button
             onClick={onLoad}
             className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2
-                       hover:bg-ink/5 transition-colors"
+                       hover:bg-ink/5 transition-colors overflow-hidden"
           >
-            <span className="inline-flex items-center justify-center w-12 h-12 rounded-full
+            {showPoster && preview && (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={preview.src}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  onError={() => setPosterFailed(true)}
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                />
+                <span
+                  aria-hidden
+                  className="absolute inset-0 bg-gradient-to-t from-ink/80 via-ink/40 to-ink/25"
+                />
+              </>
+            )}
+            <span className="relative z-10 inline-flex items-center justify-center w-12 h-12 rounded-full
                              bg-alpen text-cream-50 border-[1.5px] border-ink shadow-stamp-sm
                              group-hover:shadow-stamp transition-shadow">
               <Play className="w-5 h-5 ml-0.5" />
             </span>
-            <span className="font-mono text-[11px] text-bark uppercase tracking-[0.14em]">Load cam</span>
+            <span className={`relative z-10 font-mono text-[11px] uppercase tracking-[0.14em] ${showPoster ? "text-cream-50 font-bold" : "text-bark"}`}>
+              Load cam
+            </span>
           </button>
         )}
 

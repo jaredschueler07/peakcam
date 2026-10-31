@@ -63,17 +63,18 @@ function isBestLow(value: number | null, allValues: (number | null)[]): boolean 
   return value === min;
 }
 
+import { cameraPreviews } from "@/lib/cam-preview";
+
 /** Cams are always an array from getAllResorts(), but never trust partial data. */
 function camsOf(resort: ResortWithData) {
   return Array.isArray(resort?.cams) ? resort.cams : [];
 }
 
 function getFirstCamThumbnail(resort: ResortWithData) {
-  const cams = camsOf(resort);
-  const ytCam = cams.find((c) => c.embed_type === "youtube" && c.youtube_id);
-  if (ytCam) return { type: "youtube" as const, url: `https://img.youtube.com/vi/${ytCam.youtube_id}/mqdefault.jpg` };
-  const imgCam = cams.find((c) => c.embed_type === "image" && c.embed_url && c.is_active);
-  if (imgCam) return { type: "image" as const, url: imgCam.embed_url! };
+  const previews = cameraPreviews(camsOf(resort));
+  if (previews.length > 0) {
+    return { type: previews[0].label, url: previews[0].src };
+  }
   return null;
 }
 
@@ -577,7 +578,7 @@ export function ComparePage({
               }}
             >
               {/* Header row — the corner cell labels the row-header column */}
-              <div className="bg-cream border-b-[1.5px] border-r-[1.5px] border-dashed border-bark flex items-end px-4 py-3">
+              <div className="bg-cream sticky left-0 z-10 border-b-[1.5px] border-r-[1.5px] border-dashed border-bark flex items-end px-4 py-3">
                 <span className="font-mono font-bold text-[11px] tracking-[0.14em] uppercase text-bark">
                   Stat
                 </span>

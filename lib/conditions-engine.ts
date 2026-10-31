@@ -74,7 +74,10 @@ export interface ConditionsOutput {
 export const RATING_THRESHOLDS = {
   great: { newSnow24h: 6, newSnow48h: 12 },
   good:  { newSnow24h: 2, pctOfNormal: 100, minDepth: 24 },
-  fair:  { pctOfNormal: 70, minDepth: 20 },
+  // An early-season pack this deep rates FAIR on 2in+ of fresh snow alone,
+  // below `fair.minDepth` (the no-fresh-snow FAIR floor) but deep enough that
+  // a warm spike on a dusting cannot read as skiable.
+  fair:  { pctOfNormal: 70, minDepth: 20, earlySeasonMinDepth: 12 },
 } as const;
 
 const TREND_THRESHOLD_IN = 0.5;  // SWE change in inches
@@ -252,9 +255,11 @@ export function computeSnotelRating(
   // of settled base depth as well as 2in of recent snow. This keeps warm,
   // thin conditions (for example 74°F with a 2in base) from reading as GOOD.
   if (newSnow24h >= t.good.newSnow24h && snowDepthIn != null && snowDepthIn >= t.good.minDepth) return "good";
-  // Unknown depth cannot qualify for GOOD, but fresh snow is still evidence
-  // for FAIR. Keep the existing fallback path for other missing-depth cases.
-  if (snowDepthIn == null && newSnow24h >= t.good.newSnow24h) return "fair";
+  // Unknown depth or an early-season pack (fair.earlySeasonMinDepth up to the
+  // fair.minDepth base floor) cannot qualify for GOOD, but 2in+ of fresh snow
+  // is still evidence for FAIR. Thinner bases stay POOR to guard against
+  // warm spikes.
+  if ((snowDepthIn == null || snowDepthIn >= t.fair.earlySeasonMinDepth) && newSnow24h >= t.good.newSnow24h) return "fair";
   if (snowDepthIn != null && snowDepthIn >= t.fair.minDepth && (pctOfNormal == null || pctOfNormal >= t.fair.pctOfNormal)) return "fair";
 
   return "poor";
