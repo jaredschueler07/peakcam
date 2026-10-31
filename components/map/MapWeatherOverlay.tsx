@@ -32,6 +32,7 @@ export default function MapWeatherOverlay({
           type="raster"
           tiles={[frame.tileUrl]}
           tileSize={256}
+          maxzoom={7}
         >
           <Layer
             id={`weather-radar-layer-${frame.time}`}

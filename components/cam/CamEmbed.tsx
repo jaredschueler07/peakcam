@@ -51,10 +51,15 @@ function ImageFeed({ url, name, refreshMs, allowFill, onLoaded }: { url: string;
     if (img.complete && img.naturalWidth > 0) markLoaded();
   };
 
+  // While a frame has failed the feed keeps retrying, more slowly (no 5 s
+  // badge tick, one refresh every few minutes), and refreshes on tab return:
+  // operator stills drop out for a minute at a time and must self-heal
+  // without the user finding the Retry button.
+  const retryMs = failed ? Math.max(refreshMs * 4, 120_000) : refreshMs;
   useEffect(() => {
     const start = () => {
-      timers.current.refresh = setInterval(refresh, refreshMs);
-      timers.current.tick = setInterval(() => forceTick((n) => n + 1), 5_000);
+      timers.current.refresh = setInterval(refresh, retryMs);
+      if (!failed) timers.current.tick = setInterval(() => forceTick((n) => n + 1), 5_000);
     };
     const stop = () => {
       clearInterval(timers.current.refresh);
@@ -74,7 +79,7 @@ function ImageFeed({ url, name, refreshMs, allowFill, onLoaded }: { url: string;
       document.removeEventListener("visibilitychange", onVisibility);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url, refreshMs]);
+  }, [url, retryMs, failed]);
 
   if (failed) {
     return (

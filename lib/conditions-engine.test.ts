@@ -63,8 +63,10 @@ test("GOOD requires recent snow and a known substantial base", () => {
   assert.equal(computeSnotelRating(2, 2, 23, null), "fair");
   assert.equal(computeSnotelRating(0, 0, 30, 100), "fair");
 });
-test("unknown depth with fresh snow remains FAIR, not POOR or GOOD", () => {
+test("unknown or early-season (12-19in) depth with fresh snow remains FAIR, not POOR or GOOD", () => {
   assert.equal(computeSnotelRating(4, 4, null, null), "fair");
+  assert.equal(computeSnotelRating(2, 2, 14, null), "fair");
+  assert.equal(computeSnotelRating(0, 0, 14, null), "poor");
   assert.equal(computeSnotelRating(0, 0, null, null), "poor");
 });
 test("GREAT retains the existing depth-blind threshold", () => {

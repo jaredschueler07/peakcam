@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { withResolvedCamNames } from "@/lib/cam-name";
 import { subscribeFavoritesChanged } from "@/lib/favorites-events";
 import {
   type WidgetConfig,
@@ -14,6 +15,47 @@ import {
 } from "@/lib/types";
 
 type BrowserClient = ReturnType<typeof createSupabaseBrowserClient>;
+
+export function reconcileDashboardWidgets(
+  existingWidgets: readonly WidgetConfig[],
+  favorites: readonly UserFavorite[],
+): WidgetConfig[] {
+  const syncedWidgets: WidgetConfig[] = [];
+  const matchedFavKeys = new Set<string>();
+
+  // 1. Preserve the user's saved widget order (including List View Move Up / Move Down)
+  // for every existing widget that is still in favorites.
+  for (const existing of existingWidgets) {
+    const match = favorites.find(
+      (fav) => fav.item_id === existing.id && fav.item_type === existing.type,
+    ) ?? favorites.find((fav) => fav.item_id === existing.id);
+    if (match) {
+      const key = `${match.item_type}:${match.item_id}`;
+      if (!matchedFavKeys.has(key)) {
+        matchedFavKeys.add(key);
+        syncedWidgets.push(existing);
+      }
+    }
+  }
+
+  // 2. Append any newly favorited items not yet in the saved layout.
+  for (const fav of favorites) {
+    const key = `${fav.item_type}:${fav.item_id}`;
+    if (matchedFavKeys.has(key)) continue;
+    matchedFavKeys.add(key);
+    const index = syncedWidgets.length;
+    syncedWidgets.push({
+      id: fav.item_id,
+      type: fav.item_type,
+      x: (index * 4) % 12,
+      y: Math.floor(index / 3) * 3,
+      w: 4,
+      h: 3,
+    });
+  }
+
+  return syncedWidgets;
+}
 
 async function resolveWidgets(
   supabase: BrowserClient,
@@ -34,7 +76,7 @@ async function resolveWidgets(
     if (error) {
       console.warn("[PeakCam] Could not fetch dashboard cams:", error.message);
     } else {
-      for (const cam of (data ?? []) as Cam[]) {
+      for (const cam of withResolvedCamNames((data ?? []) as Cam[])) {
         camById.set(cam.id, cam);
         resortIds.add(cam.resort_id);
       }
@@ -74,10 +116,14 @@ async function resolveWidgets(
     if (camsResult.error) {
       console.warn("[PeakCam] Could not fetch dashboard resort cams:", camsResult.error.message);
     } else {
+      const grouped = new Map<string, Cam[]>();
       for (const cam of (camsResult.data ?? []) as Cam[]) {
-        const list = camsByResort.get(cam.resort_id) ?? [];
+        const list = grouped.get(cam.resort_id) ?? [];
         list.push(cam);
-        camsByResort.set(cam.resort_id, list);
+        grouped.set(cam.resort_id, list);
+      }
+      for (const [resortId, list] of grouped) {
+        camsByResort.set(resortId, withResolvedCamNames(list));
       }
     }
   }
@@ -120,15 +166,28 @@ export function useDashboard() {
   const [widgets, setWidgets] = useState<WidgetConfig[]>([]);
   const [resolved, setResolved] = useState<Map<string, ResolvedWidget>>(() => new Map());
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const supabase = createSupabaseBrowserClient();
+  // The user the dashboard was last synced for (null = signed out, undefined =
+  // never synced). Auth events for the same user are no-ops; see below.
+  const syncedUserId = useRef<string | null | undefined>(undefined);
 
   const syncDashboard = useCallback(async () => {
-    setIsLoading(true);
+    // Only the first load shows the page-level spinner. Later syncs (favorites
+    // changed, refresh, account change) update the grid in place, because the
+    // spinner unmounts DashboardGrid and with it the edit mode, list/grid
+    // choice, cam switcher positions and any unsaved drag.
+    if (syncedUserId.current === undefined) setIsLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
+    syncedUserId.current = user?.id ?? null;
     if (!user) {
+      setIsAuthenticated(false);
+      setWidgets([]);
+      setResolved(new Map());
       setIsLoading(false);
       return;
     }
+    setIsAuthenticated(true);
 
     // 1. Fetch favorites and current layout in parallel
     const [favsResult, layoutResult] = await Promise.all([
@@ -140,31 +199,8 @@ export function useDashboard() {
     const layout: DashboardLayout | null = layoutResult.data;
     const existingWidgets = layout?.config.widgets || [];
 
-    // 2. Reconcile:
-    // - Keep existing widgets that are still in favorites
-    // - Add new favorites as new widgets
-    // - Remove widgets that are no longer favorited
-    
-    const syncedWidgets: WidgetConfig[] = [];
-    
-    // Process favorites
-    favorites.forEach((fav) => {
-      const existing = existingWidgets.find(w => w.id === fav.item_id);
-      if (existing) {
-        syncedWidgets.push(existing);
-      } else {
-        // New favorite! 3-across on 12 cols; y is a real row (Infinity serializes to null).
-        const index = syncedWidgets.length;
-        syncedWidgets.push({
-          id: fav.item_id,
-          type: fav.item_type,
-          x: (index * 4) % 12,
-          y: Math.floor(index / 3) * 3,
-          w: fav.item_type === "cam" ? 4 : 3,
-          h: fav.item_type === "cam" ? 3 : 2,
-        });
-      }
-    });
+    // 2. Reconcile while preserving the user's saved widget order
+    const syncedWidgets = reconcileDashboardWidgets(existingWidgets, favorites);
 
     const resolvedMap = await resolveWidgets(supabase, syncedWidgets);
     setWidgets(syncedWidgets);
@@ -184,19 +220,28 @@ export function useDashboard() {
   }, [supabase]);
 
   useEffect(() => {
-    // We use a void IIFE or similar to avoid the "set-state-in-effect" warning 
-    // if the linter thinks we are doing something synchronously wrong.
-    // In reality, syncDashboard is async.
     const runSync = async () => {
       await syncDashboard();
     };
-    runSync();
-    // A lineup saved after auth (or in another tab) must reach a dashboard
-    // that was already mounted, otherwise it stays empty/stale until reload.
-    return subscribeFavoritesChanged(() => {
+    void runSync();
+    // supabase-js emits INITIAL_SESSION on subscribe (the first sync above
+    // already covers it), TOKEN_REFRESHED on every token rotation and
+    // SIGNED_IN again on every tab refocus (_recoverAndRefresh). Only a change
+    // of account, in or out, is a reason to rebuild the dashboard.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") return;
+      const nextUserId = session?.user?.id ?? null;
+      if (syncedUserId.current !== undefined && nextUserId === syncedUserId.current) return;
       void syncDashboard();
     });
-  }, [syncDashboard]);
+    const unsubscribeFavs = subscribeFavoritesChanged(() => {
+      void syncDashboard();
+    });
+    return () => {
+      subscription.unsubscribe();
+      unsubscribeFavs();
+    };
+  }, [supabase, syncDashboard]);
 
-  return { widgets, resolved, isLoading, refresh: syncDashboard };
+  return { widgets, resolved, isLoading, isAuthenticated, refresh: syncDashboard };
 }

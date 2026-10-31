@@ -60,7 +60,7 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortKey(key);
-      setSortDir(key === "name" ? "asc" : "desc");
+      setSortDir(key === "name" || key === "conditions" ? "asc" : "desc");
     }
   }
 

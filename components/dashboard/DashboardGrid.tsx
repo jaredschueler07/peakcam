@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Responsive, WidthProvider } from "react-grid-layout/legacy";
+import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { type WidgetConfig, type ResolvedWidget } from "@/lib/types";
 import { DashboardWidget } from "./DashboardWidget";
@@ -19,9 +20,14 @@ const EMPTY_RESOLVED = new Map<string, ResolvedWidget>();
 interface DashboardGridProps {
   initialLayout?: WidgetConfig[];
   resolved?: Map<string, ResolvedWidget>;
+  isAuthenticated?: boolean;
 }
 
-export function DashboardGrid({ initialLayout = EMPTY_LAYOUT, resolved = EMPTY_RESOLVED }: DashboardGridProps) {
+export function DashboardGrid({
+  initialLayout = EMPTY_LAYOUT,
+  resolved = EMPTY_RESOLVED,
+  isAuthenticated = true,
+}: DashboardGridProps) {
   const [layout, setLayout] = useState<WidgetConfig[]>(initialLayout);
   const [compact, setCompact] = useState(false);
   const [listView, setListView] = useState(false);
@@ -100,14 +106,22 @@ export function DashboardGrid({ initialLayout = EMPTY_LAYOUT, resolved = EMPTY_R
 
   return (
     <div className="relative min-h-[600px] w-full">
-      <div className="flex flex-wrap justify-end mb-4 gap-2">
-        {!compact && <button className="min-h-11 rounded-full border border-ink px-4 text-sm font-bold" aria-pressed={listView} onClick={() => setListView(value => !value)}>{listView ? "Grid layout" : "List layout"}</button>}
+      <div className="sticky top-[64px] z-30 -mx-2 px-2 py-2 mb-3 bg-bg/95 backdrop-blur-sm flex flex-wrap justify-end gap-2">
+        {!compact && (
+          <button
+            className="min-h-11 rounded-full border-[1.5px] border-ink bg-cream-50 text-ink px-4 text-sm font-bold shadow-stamp-sm hover:shadow-stamp transition-shadow"
+            aria-pressed={listView}
+            onClick={() => setListView(value => !value)}
+          >
+            {listView ? "Grid layout" : "List layout"}
+          </button>
+        )}
         <button
           onClick={() => setIsEditMode(!isEditMode)}
           className={`px-4 py-2 min-h-11 rounded-full text-[13px] font-semibold border-[1.5px] transition-[transform,box-shadow] duration-100 ${
             isEditMode
-              ? "bg-alpen-dk text-cream-50 border-ink shadow-stamp hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]"
-              : "bg-cream-50 text-ink border-ink shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]"
+              ? "bg-alpen-dk text-cream-50 border-ink shadow-stamp hover:shadow-stamp-hover"
+              : "bg-cream-50 text-ink border-ink shadow-stamp-sm hover:shadow-stamp"
           }`}
         >
           {isEditMode ? "Finish editing" : "Customize layout"}
@@ -121,7 +135,7 @@ export function DashboardGrid({ initialLayout = EMPTY_LAYOUT, resolved = EMPTY_R
           <button className="min-h-11 rounded-full border border-ink px-3 text-sm disabled:opacity-40" disabled={index === 0} onClick={() => move(widget.id, -1)}>Move up</button>
           <button className="min-h-11 rounded-full border border-ink px-3 text-sm disabled:opacity-40" disabled={index === ordered.length - 1} onClick={() => move(widget.id, 1)}>Move down</button>
         </div>}
-        <div className="h-64" inert={isEditMode || undefined}><DashboardWidget widget={widget} resolved={resolved.get(widget.id)} /></div>
+        <div className="h-72" inert={isEditMode || undefined}><DashboardWidget widget={widget} resolved={resolved.get(widget.id)} isListView /></div>
       </section>)}</div> : <ResponsiveGridLayout
         className="layout"
         layouts={{ lg: rglLayout }}
@@ -155,11 +169,23 @@ export function DashboardGrid({ initialLayout = EMPTY_LAYOUT, resolved = EMPTY_R
       </ResponsiveGridLayout>}
 
       {layout.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-20 border-[1.5px] border-dashed border-bark rounded-[18px] bg-cream-50/50">
-          <p className="font-display font-black text-ink text-2xl mb-2">Your dashboard is <em className="italic text-alpen">empty</em>.</p>
-          <p className="text-bark text-sm max-w-xs text-center">
-            Tap the heart on a resort or camera to add it here.
+        <div className="flex flex-col items-center justify-center py-20 px-4 border-[1.5px] border-dashed border-bark rounded-[18px] bg-cream-50/50 text-center">
+          <p className="font-display font-black text-ink text-2xl mb-2">
+            Your dashboard is <em className="italic text-alpen">empty</em>.
           </p>
+          <p className="text-bark text-sm max-w-xs text-center">
+            {isAuthenticated
+              ? "Tap the heart on a resort or camera to add it here."
+              : "Sign in to load your saved mountains and cameras, or tap the heart on any resort to start your dashboard."}
+          </p>
+          {!isAuthenticated && (
+            <Link
+              href="/auth?next=%2Fdashboard"
+              className="mt-5 inline-flex items-center justify-center min-h-11 px-5 py-2.5 rounded-full bg-alpen-dk text-cream-50 font-semibold text-sm border-[1.5px] border-ink shadow-stamp-sm hover:shadow-stamp transition-shadow"
+            >
+              Sign in to My Peak →
+            </Link>
+          )}
         </div>
       )}
     </div>

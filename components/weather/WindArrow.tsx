@@ -58,12 +58,12 @@ export default function WindArrow({
       {/* Upward-pointing arrow (default points north / up) */}
       <path
         d="M8 2L12 10H4L8 2Z"
-        fill="#E8E8E8"
+        fill="currentColor"
         fillOpacity={0.9}
       />
       <line
         x1="8" y1="10" x2="8" y2="14"
-        stroke="#E8E8E8"
+        stroke="currentColor"
         strokeWidth={1.5}
         strokeLinecap="round"
       />

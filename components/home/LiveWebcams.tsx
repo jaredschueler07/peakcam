@@ -5,6 +5,7 @@ import { Camera, Play } from "lucide-react";
 import { useRef, useState } from "react";
 import type { Cam } from "@/lib/types";
 import { camDisplayName } from "@/lib/cam-name";
+import { cameraPreview } from "@/lib/cam-preview";
 import { entranceMotionProps } from "@/lib/motion-entrance";
 import { trackCamPlayed } from "@/lib/posthog";
 
@@ -86,15 +87,21 @@ function WebcamTile({
   isHero?: boolean;
 }) {
   const name = camDisplayName(cam);
+  const [posterFailed, setPosterFailed] = useState(false);
   // Entrance fade honours Reduce Motion by becoming instant, never by being
   // skipped — see lib/motion-entrance.ts.
   const reducedMotion = useReducedMotion();
   const entrance = entranceMotionProps(true, reducedMotion);
 
+  const preview = cameraPreview(cam);
+  const showPoster = Boolean(preview && !posterFailed);
+
   const embedSrc =
     cam.embed_type === "youtube" && cam.youtube_id
       ? `https://www.youtube.com/embed/${cam.youtube_id}?autoplay=1&mute=1`
       : cam.embed_url;
+
+  const isImage = cam.embed_type === "image";
 
   // The feed actually showing (player document loaded), as opposed to the
   // "Load live feed" click. Once per tile: a player that navigates internally
@@ -119,14 +126,26 @@ function WebcamTile({
     >
       {/* Loaded state: actual embed */}
       {isLoaded && embedSrc && (
-        <iframe
-          src={embedSrc}
-          className="w-full h-full border-0"
-          allow="autoplay; encrypted-media"
-          allowFullScreen
-          title={name}
-          onLoad={handlePlayed}
-        />
+        isImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={embedSrc}
+            alt={name}
+            className="w-full h-full object-cover"
+            loading="lazy"
+            decoding="async"
+            onLoad={handlePlayed}
+          />
+        ) : (
+          <iframe
+            src={embedSrc}
+            className="w-full h-full border-0"
+            allow="autoplay; encrypted-media"
+            allowFullScreen
+            title={name}
+            onLoad={handlePlayed}
+          />
+        )
       )}
 
       {/* Unloaded poster overlay */}
@@ -137,12 +156,31 @@ function WebcamTile({
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          <span className="inline-flex items-center justify-center rounded-full
+          {showPoster && preview && (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={preview.src}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                onError={() => setPosterFailed(true)}
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+              />
+              <span
+                aria-hidden
+                className="absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/50 to-ink/35"
+              />
+            </>
+          )}
+          <span className="relative z-10 inline-flex items-center justify-center rounded-full
                          bg-cream-50 border-[1.5px] border-ink shadow-stamp-sm p-3">
             <Camera className="text-ink" size={isHero ? 40 : 32} strokeWidth={2} />
           </span>
-          <div className="text-center px-4">
-            <h3 className="font-display font-black text-ink text-2xl leading-tight">{name}</h3>
+          <div className="relative z-10 text-center px-4">
+            <h3 className={`font-display font-black text-2xl leading-tight ${showPoster ? "text-cream-50 drop-shadow-sm" : "text-ink"}`}>
+              {name}
+            </h3>
             {cam.elevation && (
               <span className="mt-2 inline-block font-mono font-bold text-[10.5px] px-2.5 py-0.5
                                rounded-full bg-ink text-cream-50 uppercase tracking-[0.14em]">
@@ -152,7 +190,7 @@ function WebcamTile({
           </div>
           <button
             onClick={onLoad}
-            className="inline-flex items-center gap-2 px-5 py-2.5 pointer-coarse:min-h-11
+            className="relative z-10 inline-flex items-center gap-2 px-5 py-2.5 pointer-coarse:min-h-11
                        bg-alpen text-cream-50 font-semibold text-[14px]
                        rounded-full border-[1.5px] border-ink shadow-stamp
                        hover:shadow-stamp-hover hover:-translate-x-[1px] hover:-translate-y-[1px]

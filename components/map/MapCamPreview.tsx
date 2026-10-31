@@ -3,29 +3,29 @@
 import { useMemo, useState } from "react";
 import type { Cam } from "@/lib/types";
 import { camDisplayName } from "@/lib/cam-name";
+import { cameraPreview } from "@/lib/cam-preview";
 
 // Small live-cam thumbnail for the map's popup card and bottom sheet — the
 // "conditions + map + webcam in one view" piece. Previewable cams:
-//   image   → the snapshot URL itself (cache-busted once on mount) — a genuinely
-//             fresh frame, badged "Live"
-//   youtube → YouTube's static thumbnail for the stream id — possibly hours
-//             old, so badged "Preview" (never "Live"; honesty beats flash)
-// iframe/link cams can't be thumbnailed; callers keep showing the cam count.
+//   image / live provider snapshot → cache-busted once on mount, badged "Live"
+//   youtube / captured still       → static preview frame, badged "Preview"
 export function pickPreview(
   cams: Cam[],
 ): { cam: Cam; src: string; kind: "live" | "preview" } | null {
-  const active = cams.filter((c) => c.is_active);
+  const active = cams.filter((c) => c.is_active && !c.auto_disabled);
   const image = active.find((c) => c.embed_type === "image" && c.embed_url);
   if (image) {
     const sep = image.embed_url!.includes("?") ? "&" : "?";
     return { cam: image, src: `${image.embed_url}${sep}_t=${Date.now()}`, kind: "live" };
   }
-  const yt = active.find((c) => c.embed_type === "youtube" && c.youtube_id);
-  if (yt) {
+  for (const cam of active) {
+    const preview = cameraPreview(cam);
+    if (!preview) continue;
+    const isLiveStill = preview.label === "Camera still";
     return {
-      cam: yt,
-      src: `https://i.ytimg.com/vi/${yt.youtube_id}/mqdefault.jpg`,
-      kind: "preview",
+      cam,
+      src: preview.src,
+      kind: isLiveStill ? "live" : "preview",
     };
   }
   return null;
