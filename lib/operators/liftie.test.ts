@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  LIFTIE_ATTRIBUTION,
   fetchLiftieResort,
   isChallengeResponse,
+  liftieApiBase,
   liftieIdFor,
   liftiePairs,
   operatorStatusRow,
@@ -133,4 +135,32 @@ test("data/operator-sources.json: every entry names a Liftie id in Liftie's id f
   assert.equal(liftieIdFor(SOURCES, "ski-portillo"), null);
   const ids = pairs.map((p) => p.liftieId);
   assert.equal(new Set(ids).size, ids.length, "a Liftie id maps to one PeakCam resort");
+});
+
+test("LIFTIE_API_BASE: liftie.info by default; an override set after import is used by fetchLiftieResort; attribution still credits liftie.info", async () => {
+  assert.equal(liftieApiBase(undefined), "https://liftie.info");
+  assert.equal(liftieApiBase("  "), "https://liftie.info");
+  assert.equal(liftieApiBase("http://127.0.0.1:3100//"), "http://127.0.0.1:3100");
+
+  const body = JSON.stringify(fixture("liftie-alta.json"));
+  const urls: string[] = [];
+  const recording = (async (input: RequestInfo | URL) => {
+    urls.push(String(input));
+    return new Response(body, { status: 200, headers: { "content-type": "application/json" } });
+  }) as unknown as typeof fetch;
+
+  const prev = process.env.LIFTIE_API_BASE;
+  try {
+    delete process.env.LIFTIE_API_BASE;
+    await fetchLiftieResort("alta", { fetchImpl: recording, now: () => FETCHED });
+    process.env.LIFTIE_API_BASE = "http://127.0.0.1:3100/";
+    const res = await fetchLiftieResort("alta", { fetchImpl: recording, now: () => FETCHED });
+    assert.ok(res.ok);
+    assert.equal(res.report.sourceUrl, "https://www.alta.com/lift-terrain-status");
+  } finally {
+    if (prev === undefined) delete process.env.LIFTIE_API_BASE;
+    else process.env.LIFTIE_API_BASE = prev;
+  }
+  assert.deepEqual(urls, ["https://liftie.info/api/resort/alta", "http://127.0.0.1:3100/api/resort/alta"]);
+  assert.match(LIFTIE_ATTRIBUTION, /via Liftie \(liftie\.info\)/);
 });

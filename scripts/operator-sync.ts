@@ -19,7 +19,8 @@
  * Mac mini (the 11:00 read catches lifts that have opened; the 06:00 read
  * carries the day's `scheduled` list).
  *
- * Reads:  .env.local (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY).
+ * Reads:  .env.local (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+ *         optional LIFTIE_API_BASE, default https://liftie.info).
  *         A dry run needs no service key: it reads the catalogue with the
  *         anon key when present, else from data/resorts.csv.
  * Writes: operator_status (service role).
@@ -35,7 +36,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseCsv } from "csv-parse/sync";
 
-import { fetchLiftieResort, liftiePairs, operatorStatusRow, type LiftieFetchFailure, type OperatorSourceMap } from "../lib/operators/liftie.js";
+import { fetchLiftieResort, liftieApiBase, liftiePairs, operatorStatusRow, type LiftieFetchFailure, type OperatorSourceMap } from "../lib/operators/liftie.js";
 
 // ─── Env ──────────────────────────────────────────────────────────────────
 
@@ -126,7 +127,7 @@ async function insertRow(row: ReturnType<typeof operatorStatusRow>): Promise<"in
 
 async function main(): Promise<void> {
   const now = new Date();
-  console.log(`[operator-sync] ${DRY_RUN ? "DRY RUN — " : ""}starting${ONLY_SLUG ? ` for ${ONLY_SLUG}` : ""}`);
+  console.log(`[operator-sync] ${DRY_RUN ? "DRY RUN — " : ""}starting${ONLY_SLUG ? ` for ${ONLY_SLUG}` : ""} (Liftie base: ${liftieApiBase()})`);
   const sources = loadSources();
   const pairs = liftiePairs(sources);
   const resorts = await fetchResorts();
@@ -181,7 +182,7 @@ async function main(): Promise<void> {
   if (sample.length) console.log(`[operator-sync] First failures: ${sample.join(" | ")}`);
   const blocked = failures.get("blocked") ?? 0;
   if (blocked > 0 && inserted + duplicates + noLifts === 0) {
-    console.error("[operator-sync] Every fetch was refused by the Cloudflare challenge in front of liftie.info; no operator status this run. See docs/runbook.md 'Operator status'.");
+    console.error(`[operator-sync] Every fetch was refused by the Cloudflare challenge in front of ${liftieApiBase()}; no operator status this run. See docs/runbook.md 'Operator status'.`);
     process.exit(2);
   }
 }

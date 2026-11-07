@@ -54,7 +54,8 @@ service-role key in that checkout's `.env.local`, and log to the path in the las
 | `com.peakcam.forecast-sync` | `npx tsx scripts/forecast-sync.ts` | every 6 h (21,600, `RunAtLoad`) | `forecast_runs`, `forecast_daily` (027); ~240 Open-Meteo calls a run; retention pass after 00:00 UTC | `scripts/forecast-sync.log` |
 | `com.peakcam.forecast-score` | `npx tsx scripts/forecast-score.ts` | daily 07:30 (`StartCalendarInterval`) | `forecast_scores` (027), graded against SNOTEL depth deltas over 90 days | `scripts/forecast-score.log` |
 | `com.peakcam.score-sync` | `npx tsx scripts/score-sync.ts` | 07:45 and 19:45 (`StartCalendarInterval` ×2, `RunAtLoad`) | `resort_scores` (028): one 0–100 Snow Score row per resort per day with five components (`lib/score.ts`), idempotent on `(resort_id, date)`; **to deploy** (P7, 2026-10-20, see "Snow Score") | `scripts/score-sync.log` |
-| `com.peakcam.operator-sync` | `npx tsx scripts/operator-sync.ts` | 06:00 and 11:00 (`StartCalendarInterval` ×2) | `operator_status` (032) via Liftie; writes nothing while Liftie's Cloudflare challenge stands (exit 2, see "Operator status") | `scripts/operator-sync.log` |
+| `com.peakcam.operator-sync` | `npx tsx scripts/operator-sync.ts` | 06:00 and 11:00 (`StartCalendarInterval` ×2) | `operator_status` (032) via Liftie (`LIFTIE_API_BASE`, default `https://liftie.info`; `http://127.0.0.1:3100` with `com.peakcam.liftie`); writes nothing while Liftie's Cloudflare challenge stands against the public host (exit 2, see "Operator status") | `scripts/operator-sync.log` |
+| `com.peakcam.liftie` | `node app` (in `/Users/maestro_admin/liftie`) | always-on (`KeepAlive`, `RunAtLoad`, `PORT=3100`) | nothing (local Liftie HTTP service for `operator-sync`; **to deploy**, see "Self-hosted Liftie on the Mini") | `~/liftie/liftie.log` |
 | `com.peakcam.cam-stills` | `npx tsx scripts/cam-capture-stills.ts` | every 15 min (900, `RunAtLoad`) | bucket `cam-stills`, `cams.still_url`, `cam_stills` (archive_allowed cams; 48 h / 6-h buckets to 30 d / keepers a year) | `scripts/cam-capture-stills.log` |
 | `com.peakcam.cam-timelapse` | `npx tsx scripts/cam-timelapse.ts` | every 6 h (21,600, `RunAtLoad`) | bucket `cam-timelapses`, `cam_timelapses` (031): the 24 h MP4 + poster per archive-allowed cam, storm reels | `scripts/cam-timelapse.log` |
 | `com.peakcam.cam-health-check` | `node scripts/cam-health-check.mjs` | daily 06:00 (`StartCalendarInterval`) | `cams.last_checked_at`, `consecutive_failures`, auto-disables dead cams | `scripts/cam-health-check.log` |
@@ -688,18 +689,22 @@ of those is new: `operator_status` (one row per fetch) and `latest_operator_stat
 
 | Job | What | When | Notes |
 | --- | --- | --- | --- |
-| `com.peakcam.operator-sync` (`npm run operator-sync`) | For each of the 88 resorts mapped in `data/operator-sources.json`, GET `https://liftie.info/api/resort/<id>` (Liftie, BSD-3, parses the operator's own lift-status page) → lifts open / hold / scheduled / closed, the provider's timestamp, the operator page URL, a published opening date | 06:00 and 11:00 local | `--dry-run --resort alta` needs no service key. Exit 2 when every fetch was challenged. ~90 requests, 400 ms apart, ≈ 40 s |
+| `com.peakcam.operator-sync` (`npm run operator-sync`) | For each of the 88 resorts mapped in `data/operator-sources.json`, GET `<LIFTIE_API_BASE>/api/resort/<id>` (default `https://liftie.info`, or `http://127.0.0.1:3100` against `com.peakcam.liftie`; Liftie, BSD-3, parses the operator's own lift-status page) → lifts open / hold / scheduled / closed, the provider's timestamp, the operator page URL, a published opening date | 06:00 and 11:00 local | `--dry-run --resort alta` needs no service key and prints the active base. Exit 2 when every fetch was challenged. ~90 requests, 400 ms apart, ≈ 40 s |
+| `com.peakcam.liftie` | Self-hosted Liftie (`github.com/pirxpilot/liftie`, `node app` on `PORT=3100` in `/Users/maestro_admin/liftie`) serving `/api/resort/<id>` locally for `operator-sync` | always-on (`KeepAlive`, `RunAtLoad`) | **To deploy.** Polls every resort Liftie knows in the background, see "Self-hosted Liftie on the Mini"; logs to `~/liftie/liftie.log` |
 
 **Blocked upstream (2026-10-20).** liftie.info answers every non-browser request from the
 Air and from the mini with HTTP 403, `cf-mitigated: challenge` and a Cloudflare "Just a
-moment" page; the Liftie API is not open to scripts from these hosts today. The fetcher
+moment" page; the public Liftie API is not open to scripts from these hosts today. The fetcher
 names that case `blocked`, the sync logs it and exits 2, and the contract falls back: `data.liftsOpen`
 carries `source: "none"` and `data.status` rests on the opening row (OPEN only after a
-resort-confirmed date). PeakCam does not scrape operator HTML itself. Options, in order:
+resort-confirmed date). PeakCam's own code carries no operator HTML scraper: against
+liftie.info it reads only Liftie's parsed JSON. With `LIFTIE_API_BASE` pointed at a
+self-hosted Liftie on the Mini (below), the Mini does fetch the operators' status pages
+itself, through Liftie's parsers. Options, in order:
 ask the Liftie maintainer (github.com/pirxpilot/liftie) for an allow-listed user agent or
-run a self-hosted Liftie (it is open source and runs with `node app` against the same resort
-parsers); otherwise the follow-up list of operator feeds with public JSON and terms that
-permit reuse: Vail Resorts (`*.com/api/…` lift status behind the EpicMix app, terms
+run a self-hosted Liftie on the Mini (below; it is open source and runs with `node app` against
+the same resort parsers); otherwise the follow-up list of operator feeds with public JSON and
+terms that permit reuse: Vail Resorts (`*.com/api/…` lift status behind the EpicMix app, terms
 unclear), Alterra (per-resort), Powdr, Boyne, Arapahoe Basin's own JSON, Alta's
 `window.Alta` script block (the page Liftie parses), Perisher-style verified portals.
 Each needs a terms read before a fetcher is written; record `verified=true` only for an
@@ -721,6 +726,60 @@ Verify in the database: `select source, count(*), max(observed_at) from operator
 site (allow the 15-minute cache): the P6 lines under "Public API" above. Without rows the
 contract still validates for every resort; `/api/v1/resorts/alta/conditions` shows
 `data.liftsOpen.source = "none"` and the status from the opening row.
+
+### Self-hosted Liftie on the Mini
+
+**To deploy; not yet installed.** Liftie (`github.com/pirxpilot/liftie`, BSD-3-Clause) is the
+same Node app that serves liftie.info: `make` builds it, `node app` serves it (port 3000 by
+default, `PORT` overrides) and `/api/resort/<id>` returns the JSON `lib/operators/liftie.ts`
+already parses. Run on the Mini, it sidesteps the Cloudflare challenge in front of liftie.info.
+The attribution stays "via Liftie (liftie.info)" because the parsers are Liftie's.
+
+What this changes, plainly: **the Mini then fetches the operators' lift-status pages itself**,
+through Liftie's parsers, with our user agent (`LIFTIE_USER_AGENT` in the plist; Liftie sends
+none of its own when it is unset). Liftie does not fetch on request only. Per its
+`lib/routes/data.js` and `lib/lifts/index.js` it re-fetches **every resort it knows
+(about 200, not only our 88) at least every 30 minutes** while running, and within a minute of
+a request for that resort. An API request returns what is already cached and triggers the
+refresh in the background, so a reading can be up to 30 minutes old; `observed_at` keeps the
+provider's own timestamp. The one-minute cache means our twice-daily run adds almost nothing,
+but an always-on Liftie makes on the order of 200 × 48 ≈ 9,600 operator page fetches a day.
+Decide before loading the agent whether that is acceptable, or cut Liftie down to the 88
+resorts in `data/operator-sources.json` in the local clone (untested here).
+
+On the Mini as `maestro_admin` (`ssh mini`; `zsh -l -c` so `/opt/homebrew/bin` and pnpm are on
+`PATH`):
+
+1. **Clone and build** in `/Users/maestro_admin/liftie`. Liftie's Readme says `make`, which runs
+   `pnpm install` itself and then lint, test and build:
+   ```bash
+   ssh mini 'zsh -l -c "git clone https://github.com/pirxpilot/liftie /Users/maestro_admin/liftie && cd /Users/maestro_admin/liftie && make"'
+   ```
+2. **Install the agent** `com.peakcam.liftie` from the plist in the repo root (`KeepAlive`,
+   `RunAtLoad`, `PORT=3100` so it does not collide with Next's or Liftie's default 3000, `PATH`
+   with `/opt/homebrew/bin`, log `~/liftie/liftie.log`):
+   ```bash
+   ssh mini 'cd /Users/maestro_admin/peakcam/peakcam && git pull && cp com.peakcam.liftie.plist ~/Library/LaunchAgents/ && launchctl bootout gui/$(id -u)/com.peakcam.liftie 2>/dev/null; launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.peakcam.liftie.plist && launchctl list | grep com.peakcam.liftie'
+   ssh mini 'sleep 5 && tail -20 ~/liftie/liftie.log'
+   ```
+3. **Check the local API** (the first answer after a start can have no lifts until the
+   background fetch lands; repeat after a minute):
+   ```bash
+   ssh mini 'curl -s http://127.0.0.1:3100/api/resort/alta | jq "{id, name, href, timestamp, stats: .lifts.stats}"'
+   ```
+4. **Point `operator-sync` at it:** add `LIFTIE_API_BASE=http://127.0.0.1:3100` to
+   `/Users/maestro_admin/peakcam/peakcam/.env.local`, check the dry run, then kickstart:
+   ```bash
+   ssh mini 'grep -q "^LIFTIE_API_BASE=" /Users/maestro_admin/peakcam/peakcam/.env.local && sed -i "" "s|^LIFTIE_API_BASE=.*|LIFTIE_API_BASE=http://127.0.0.1:3100|" /Users/maestro_admin/peakcam/peakcam/.env.local || printf "\nLIFTIE_API_BASE=http://127.0.0.1:3100\n" >> /Users/maestro_admin/peakcam/peakcam/.env.local'
+   ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && npx tsx scripts/operator-sync.ts --dry-run --resort alta"'   # "(Liftie base: http://127.0.0.1:3100)" then "OK   Alta …"
+   ssh mini 'launchctl kickstart -k gui/$(id -u)/com.peakcam.operator-sync && sleep 60 && tail -10 /Users/maestro_admin/peakcam/peakcam/scripts/operator-sync.log'
+   ```
+5. **Verify** with the `operator_status` queries above (`select source, count(*),
+   max(observed_at) from operator_status group by 1;` should show `liftie` rows from this run).
+
+To go back to the public host, remove `LIFTIE_API_BASE` from `.env.local` and `launchctl bootout
+gui/$(id -u)/com.peakcam.liftie`. If the local Liftie is down the sync logs `network` failures
+(not `blocked`) and writes nothing.
 
 ## Discovery surface (markdown alternates, Link headers, robots, llms.txt, IndexNow)
 

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.peakcam.liftie</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/node</string>
+        <string>app</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/maestro_admin/liftie</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/maestro_admin/liftie/liftie.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/maestro_admin/liftie/liftie.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PORT</key>
+        <string>3100</string>
+        <key>LIFTIE_USER_AGENT</key>
+        <string>PeakCam/1.0 (+https://www.peakcam.io; hello@peakcam.io)</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>

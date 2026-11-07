@@ -11,17 +11,30 @@
 // shape is read from the project's lib/lifts/stats.js and lib/routes/data.js
 // (History.md 2.1.1 moved the map from `status` to `lifts.status`).
 //
-// Pure parsing here, one network call in `fetchLiftieResort`. The site sits
-// behind a Cloudflare managed challenge for non-browser clients (observed
+// Pure parsing here, one network call in `fetchLiftieResort`. The public site
+// sits behind a Cloudflare managed challenge for non-browser clients (observed
 // 2026-10-20 from the Air and the Mac mini: HTTP 403, `cf-mitigated:
 // challenge`, an HTML "Just a moment" body), so the fetcher names that case
 // as `blocked` rather than reporting a parse error, and the sync job counts
-// it. PeakCam never scrapes an operator's HTML itself; Liftie is the only
-// operator source in this block.
+// it. `LIFTIE_API_BASE` (default `https://liftie.info`) can point at a
+// self-hosted Liftie on the Mac mini (`http://127.0.0.1:3100`); that Liftie
+// process then fetches the operators' status pages itself, through Liftie's
+// parsers. `LIFTIE_SITE` and `LIFTIE_ATTRIBUTION` still credit liftie.info
+// because the parsers are Liftie's.
 // ─────────────────────────────────────────────────────────────
 
-export const LIFTIE_API = "https://liftie.info/api/resort";
 export const LIFTIE_SITE = "https://liftie.info";
+
+/**
+ * Liftie API base: `LIFTIE_API_BASE` when set (e.g. the self-hosted Liftie on
+ * the Mac mini), else liftie.info; trailing slashes dropped. Read on every
+ * call rather than at module load, so a script that imports this module before
+ * loading `.env.local` (ES imports are hoisted) still sees the override.
+ */
+export function liftieApiBase(raw: string | undefined = process.env.LIFTIE_API_BASE): string {
+  return raw?.trim().replace(/\/+$/, "") || LIFTIE_SITE;
+}
+
 export const LIFTIE_USER_AGENT = "PeakCam/1.0 (+https://www.peakcam.io; hello@peakcam.io)";
 export const LIFTIE_ATTRIBUTION = "Lift status via Liftie (liftie.info), parsed from the operator's own status page";
 
@@ -145,7 +158,7 @@ export interface LiftieFetchOptions {
 /** One GET of a Liftie resort document, with the challenge page named as `blocked`. */
 export async function fetchLiftieResort(id: string, options: LiftieFetchOptions = {}): Promise<LiftieFetchResult> {
   const fetchImpl = options.fetchImpl ?? fetch;
-  const url = `${LIFTIE_API}/${encodeURIComponent(id)}`;
+  const url = `${liftieApiBase()}/api/resort/${encodeURIComponent(id)}`;
   let res: Response;
   try {
     res = await fetchImpl(url, {
