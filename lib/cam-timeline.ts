@@ -70,7 +70,7 @@ export interface CamTimeline {
   hours: number;
   /** Oldest → newest, at most STRIP_FRAMES, all inside the window. */
   frames: CamTimelineFrame[];
-  /** Newest keeper for the cam, inside the window or not; null when none is on tape. */
+  /** The cam's most recent storm keeper that survives thinning (stormKeeper), inside the window or not; null when none is on tape. */
   lastStorm: CamTimelineFrame | null;
 }
 
@@ -211,12 +211,64 @@ export function toFrame(row: CamStillRow, supabaseUrl: string): CamTimelineFrame
 }
 
 /**
+ * Read-side counterpart to `selectPrune`: drops rows with invalid timestamps,
+ * rows older than `ARCHIVE_RETENTION_DAYS` (`KEEPER_RETENTION_DAYS` for
+ * keepers), and frames older than `FULL_RETENTION_HOURS` that are not the
+ * surviving representative of their 6 h bucket.
+ */
+export function filterRetained<T extends PruneRow>(rows: readonly T[], now: Date): T[] {
+  const doomed = new Set(selectPrune(rows, now));
+  return rows.filter((r) => !Number.isNaN(Date.parse(r.captured_at)) && !doomed.has(r));
+}
+
+/**
+ * The "last storm on tape" frame: the earliest keeper in the 6 h bucket of
+ * the newest keeper. selectPrune keeps exactly that frame for
+ * KEEPER_RETENTION_DAYS once the bucket ages past FULL_RETENTION_HOURS and
+ * deletes the bucket's later keepers, so a page, crawler or agent that keeps
+ * this URL keeps a working link (the newest keeper itself would 400 after
+ * 48 h). It is at most THIN_BUCKET_HOURS older than the newest keeper.
+ * `items` must already be filtered by filterRetained and hold the whole
+ * bucket for the answer to match the pruner; with a partial bucket it falls
+ * back to the earliest keeper present.
+ */
+export function stormKeeper<T>(items: readonly T[], at: (x: T) => string, keeper: (x: T) => boolean): T | null {
+  let newest: { x: T; t: number } | null = null;
+  for (const x of items) {
+    const t = Date.parse(at(x));
+    if (keeper(x) && !Number.isNaN(t) && (!newest || t > newest.t)) newest = { x, t };
+  }
+  if (!newest) return null;
+  const bucket = thinBucket(newest.t);
+  let first = newest;
+  for (const x of items) {
+    const t = Date.parse(at(x));
+    if (keeper(x) && thinBucket(t) === bucket && t < first.t) first = { x, t };
+  }
+  return first.x;
+}
+
+/** Same retention and 6 h bucket-survivor filter over mapped `CamTimelineFrame`s (MCP `get_cam_timeline`). */
+export function filterRetainedFrames(frames: readonly CamTimelineFrame[], now: Date): CamTimelineFrame[] {
+  const wrapped = frames.map((frame) => ({
+    id: frame.id,
+    cam_id: frame.camId,
+    captured_at: frame.capturedAt,
+    keeper: frame.keeper,
+    frame,
+  }));
+  return filterRetained(wrapped, now).map((w) => w.frame);
+}
+
+/**
  * Shape rows for one cam into the strip model. `rows` may be in any order and
  * may include frames outside the window (the keeper query returns the newest
  * keeper regardless of age); only in-window frames make the strip, the
- * newest STRIP_FRAMES of them, oldest first. `lastStorm` is the newest keeper
- * among all rows. Returns null when there is nothing to show, so callers can
- * render nothing instead of an empty strip.
+ * newest STRIP_FRAMES of them, oldest first. `lastStorm` is stormKeeper()
+ * over all retained rows (the newest storm bucket's surviving keeper). Rows past retention or thinned out by the 6 h
+ * bucket rule past 48 h are filtered out first so a reader never hands out a
+ * pruned storage URL. Returns null when there is nothing to show, so callers
+ * can render nothing instead of an empty strip.
  */
 export function shapeTimeline(
   rows: readonly CamStillRow[],
@@ -224,14 +276,17 @@ export function shapeTimeline(
 ): CamTimeline | null {
   const max = opts.max ?? STRIP_FRAMES;
   const since = opts.now.getTime() - opts.hours * 3_600_000;
-  const own = rows.filter((r) => r.cam_id === opts.camId);
-  const newestFirst = [...own].sort((a, b) => Date.parse(b.captured_at) - Date.parse(a.captured_at));
+  const own = filterRetained(
+    rows.filter((r) => r.cam_id === opts.camId),
+    opts.now,
+  );
+  const newestFirst = [...own].sort((a, b) => Date.parse(b.captured_at) - Date.parse(a.captured_at) || b.id - a.id);
   const inWindow = newestFirst.filter((r) => {
     const t = Date.parse(r.captured_at);
     return !Number.isNaN(t) && t >= since && t <= opts.now.getTime() + 60_000;
   });
   const frames = inWindow.slice(0, max).reverse().map((r) => toFrame(r, opts.supabaseUrl));
-  const keeperRow = newestFirst.find((r) => r.keeper) ?? null;
+  const keeperRow = stormKeeper(own, (r) => r.captured_at, (r) => r.keeper);
   const lastStorm = keeperRow ? toFrame(keeperRow, opts.supabaseUrl) : null;
   if (frames.length === 0 && !lastStorm) return null;
   return { camId: opts.camId, hours: opts.hours, frames, lastStorm };

@@ -16,7 +16,7 @@ import type { ResortWithData, WeatherPeriod } from "@/lib/types";
 import type { PublicApiCatalog } from "@/lib/public-api/data";
 import { SITE_URL } from "@/lib/site";
 import { stateHubPath, stateLabel } from "@/lib/hubs";
-import { KEEPER_MIN_SNOW_24H_IN, MAX_TIMELINE_HOURS, clampHours, type CamTimelineFrame } from "@/lib/cam-timeline";
+import { KEEPER_MIN_SNOW_24H_IN, MAX_TIMELINE_HOURS, clampHours, filterRetainedFrames, stormKeeper, type CamTimelineFrame } from "@/lib/cam-timeline";
 import { clipDurationSeconds, type CamTimelapses } from "@/lib/cam-timelapse";
 import { resortTabUrl } from "@/lib/resort-pages";
 import { PCT_OF_NORMAL_RULE, buildPctOfNormalPage } from "@/lib/percent-of-normal";
@@ -1217,7 +1217,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
       camCount: z.number().int().describe("Cams with at least one frame in the result."),
       frameCount: z.number().int(),
       newestCapturedAt: z.string().nullable(),
-      lastStorm: TimelineFrameSchema.extend({ camId: z.string(), camName: z.string() }).nullable().describe("Newest storm frame across the resort, any age."),
+      lastStorm: TimelineFrameSchema.extend({ camId: z.string(), camName: z.string() }).nullable().describe("Most recent storm frame across the resort, any age: the surviving keeper of the newest 6 h storm bucket, so the link outlives thinning."),
       cams: z.array(
         z.object({
           camId: z.string(),
@@ -1248,8 +1248,9 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
       const canonicalUrl = resortCanonicalUrl(resort.slug);
       const since = catalog.now.getTime() - h * 3_600_000;
       const camOrder = resort.cams.map((c) => c.id);
+      const retained = filterRetainedFrames(frames ?? [], catalog.now);
       const byCam = new Map<string, CamTimelineFrame[]>();
-      for (const f of frames ?? []) {
+      for (const f of retained) {
         const list = byCam.get(f.camId) ?? [];
         list.push(f);
         byCam.set(f.camId, list);
@@ -1262,7 +1263,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
           const cam = resort.cams.find((c) => c.id === id);
           const newestFirst = [...list].sort((a, b) => Date.parse(b.capturedAt) - Date.parse(a.capturedAt));
           const inWindow = newestFirst.filter((f) => Date.parse(f.capturedAt) >= since);
-          const keeper = newestFirst.find((f) => f.keeper) ?? null;
+          const keeper = stormKeeper(list, (f) => f.capturedAt, (f) => f.keeper);
           return {
             camId: id,
             camName: cam?.name ?? id,

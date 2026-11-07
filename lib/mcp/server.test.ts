@@ -1076,6 +1076,23 @@ test("get_cam_timeline returns frames as links inside the window plus the last s
 
   const down = await call("get_cam_timeline", { slug: "breckenridge" }).catch(() => null);
   assert.ok(down);
+
+  // Thinned-out and expired frames (>48 h non-earliest in a 6 h bucket, >30 d non-keepers, >365 d keepers) are filtered out.
+  const withStale = buildTools(
+    fixtureData({
+      camStills: async () => [
+        // Two keepers in the same 6 h bucket 5 days ago: prune keeps the earliest (12:00) and deletes 14:00.
+        { id: 10, camId: BRECK_CAM_ID, url: "https://x.supabase.co/storage/v1/object/public/cam-stills/archive/a/2026-12-15T12-00-00Z.jpg", capturedAt: "2026-12-15T12:00:00Z", snow24hAtCapture: 10, keeper: true },
+        { id: 11, camId: BRECK_CAM_ID, url: "https://x.supabase.co/storage/v1/object/public/cam-stills/archive/a/2026-12-15T14-00-00Z.jpg", capturedAt: "2026-12-15T14:00:00Z", snow24hAtCapture: 10, keeper: true },
+        // Expired keeper (>365 d old).
+        { id: 12, camId: BRECK_CAM_ID, url: "https://x.supabase.co/storage/v1/object/public/cam-stills/archive/a/2025-12-01T12-00-00Z.jpg", capturedAt: "2025-12-01T12:00:00Z", snow24hAtCapture: 12, keeper: true },
+      ],
+    }),
+  ).find((t) => t.name === "get_cam_timeline")!;
+  const filtered = (await withStale.handler(withStale.inputSchema.parse({ slug: "breckenridge", hours: 24 }))).structuredContent as {
+    lastStorm: { capturedAt: string } | null;
+  };
+  assert.equal(filtered.lastStorm?.capturedAt, "2026-12-15T12:00:00Z");
 });
 
 test("get_cam_timeline degrades when the archive read fails", async () => {

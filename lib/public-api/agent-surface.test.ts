@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Cam, ResortWithData, SnowReport } from "@/lib/types";
 import type { PublicApiCatalog } from "./data";
-import { buildStatus, STATUS_REPORT_MAX_AGE_HOURS } from "./status";
+import { buildStatus, STATUS_REPORT_MAX_AGE_HOURS, STATUS_STILL_MAX_AGE_HOURS } from "./status";
 import { buildSearchIndex } from "./search-index";
 import { matchBatchPath, parseBatchBody, BATCH_MAX_REQUESTS } from "./batch";
 import { buildJsonSchemas, buildSchemaIndex, schemaFileStem, schemaUrl } from "./json-schemas";
@@ -44,8 +44,12 @@ function resort(slug: string, name: string, over: Partial<ResortWithData> = {}):
   };
 }
 
-function catalog(resorts: ResortWithData[], now = NOW): PublicApiCatalog {
-  return { resorts, openings: new Map(), elevations: {}, stations: null, now };
+function catalog(
+  resorts: ResortWithData[],
+  now = NOW,
+  newestCamStillAt: string | null = new Date(now.getTime() - 15 * 60_000).toISOString(),
+): PublicApiCatalog {
+  return { resorts, openings: new Map(), elevations: {}, stations: null, newestCamStillAt, now };
 }
 
 const HEALTHY = catalog([
@@ -63,6 +67,9 @@ test("status: ok when the newest report is fresh and most cams pass; cam ratio b
   assert.equal(fine.status, "ok");
   assert.deepEqual(fine.issues, []);
   assert.equal(fine.checks.cams.liveRatio, 1);
+  assert.equal(fine.checks.camStills.status, "ok");
+  assert.equal(fine.checks.camStills.ageHours, 0.3);
+  assert.equal(fine.thresholds.stillMaxAgeHours, STATUS_STILL_MAX_AGE_HOURS);
 
   const doc = StatusSchema.parse(buildStatus(HEALTHY));
   assert.equal(doc.checks.snowReports.status, "ok");
@@ -76,6 +83,7 @@ test("status: ok when the newest report is fresh and most cams pass; cam ratio b
   assert.equal(doc.checks.cams.unchecked, 1);
   assert.equal(doc.checks.cams.liveRatio, 0.667, "2 of 3 checked");
   assert.equal(doc.checks.cams.status, "degraded");
+  assert.equal(doc.checks.camStills.status, "ok");
   assert.equal(doc.status, "degraded");
 });
 
@@ -83,6 +91,7 @@ test("status: degraded when the newest report is older than the sync cadence all
   const late = catalog(HEALTHY.resorts.map((r) => ({ ...r, cams: [cam()] })), new Date("2026-12-21T12:00:00Z"));
   const doc = buildStatus(late);
   assert.equal(doc.checks.cams.status, "ok");
+  assert.equal(doc.checks.camStills.status, "ok");
   assert.equal(doc.checks.snowReports.status, "degraded");
   assert.equal(doc.checks.snowReports.ageHours, 24);
   assert.equal(doc.checks.snowReports.staleResorts, 0, "24 h is not yet over the 24 h stale line");
@@ -90,6 +99,26 @@ test("status: degraded when the newest report is older than the sync cadence all
   const empty = buildStatus(catalog([resort("x", "X", { snow_report: null, cams: [] })]));
   assert.equal(empty.status, "degraded");
   assert.match(empty.issues[0], /No resort has a snow report/);
+});
+
+test("status: degraded when cam stills are stale or missing", () => {
+  const liveResorts = HEALTHY.resorts.map((r) => ({ ...r, cams: r.cams.map((c) => cam({ id: c.id })) }));
+  const staleStillsAt = new Date(NOW.getTime() - 13.2 * 3_600_000).toISOString();
+  const staleDoc = StatusSchema.parse(buildStatus(catalog(liveResorts, NOW, staleStillsAt)));
+  assert.equal(staleDoc.status, "degraded");
+  assert.equal(staleDoc.checks.snowReports.status, "ok");
+  assert.equal(staleDoc.checks.cams.status, "ok");
+  assert.equal(staleDoc.checks.camStills.status, "degraded");
+  assert.equal(staleDoc.checks.camStills.newestCapturedAt, staleStillsAt);
+  assert.equal(staleDoc.checks.camStills.ageHours, 13.2);
+  assert.deepEqual(staleDoc.issues, ["The newest cam still is 13.2 h old; the capture job writes every 15 min."]);
+
+  const missingDoc = StatusSchema.parse(buildStatus(catalog(liveResorts, NOW, null)));
+  assert.equal(missingDoc.status, "degraded");
+  assert.equal(missingDoc.checks.camStills.status, "degraded");
+  assert.equal(missingDoc.checks.camStills.newestCapturedAt, null);
+  assert.equal(missingDoc.checks.camStills.ageHours, null);
+  assert.match(missingDoc.issues[0], /No cam still has been captured/);
 });
 
 // ── search index ─────────────────────────────────────────────

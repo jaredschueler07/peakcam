@@ -684,15 +684,21 @@ export const StatusSchema = z
         liveRatio: z.number().nullable().describe("live / (live + down); null when nothing has been checked. Below 0.9 is degraded."),
         newestCheckAt: z.string().nullable(),
       }),
+      camStills: z.object({
+        status: StatusLevelSchema,
+        newestCapturedAt: z.string().nullable().describe("Newest `cam_stills.captured_at` across the archive."),
+        ageHours: z.number().nullable().describe("Hours since `newestCapturedAt`. The capture job writes every 15 min, so above 2 h is degraded."),
+      }),
     }),
     thresholds: z.object({
       reportMaxAgeHours: z.number(),
       camLiveMinRatio: z.number(),
+      stillMaxAgeHours: z.number(),
     }),
     issues: z.array(z.string()).describe("One sentence per failing check; empty when `ok`."),
     attribution: z.string(),
   })
-  .register(publicApiRegistry, { id: "Status", description: "Service status derived from the data itself: snow-report freshness and cam health." });
+  .register(publicApiRegistry, { id: "Status", description: "Service status derived from the data itself: snow-report freshness, cam health and cam-still archive freshness." });
 
 export const BatchRequestSchema = z
   .object({

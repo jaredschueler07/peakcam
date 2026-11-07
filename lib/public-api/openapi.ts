@@ -16,7 +16,7 @@ import {
 } from "./headers";
 import { PUBLIC_API_VERSION, publicApiRegistry } from "./schema";
 import { SCHEMAS_PATH } from "./json-schemas";
-import { STATUS_REPORT_MAX_AGE_HOURS, STATUS_CAM_LIVE_MIN_RATIO } from "./status";
+import { STATUS_REPORT_MAX_AGE_HOURS, STATUS_CAM_LIVE_MIN_RATIO, STATUS_STILL_MAX_AGE_HOURS } from "./status";
 import { BATCH_MAX_REQUESTS } from "./batch";
 
 type JsonObject = Record<string, unknown>;
@@ -327,7 +327,7 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
           operationId: "getServiceStatus",
           tags: ["status"],
           summary: "Service status derived from the data",
-          description: `Two checks with stated thresholds: the newest snow report must be under ${STATUS_REPORT_MAX_AGE_HOURS} h old (the sync jobs write every 6 h) and at least ${Math.round(STATUS_CAM_LIVE_MIN_RATIO * 100)} % of checked cams must have passed their last probe. Answers 200 with \`status: "degraded"\` when a check fails, so read the body; a 503 means the catalogue read itself failed. Cached 5 minutes.`,
+          description: `Three checks with stated thresholds: the newest snow report must be under ${STATUS_REPORT_MAX_AGE_HOURS} h old (the sync jobs write every 6 h), at least ${Math.round(STATUS_CAM_LIVE_MIN_RATIO * 100)} % of checked cams must have passed their last probe, and the newest captured cam still must be under ${STATUS_STILL_MAX_AGE_HOURS} h old (captures run every 15 min). Answers 200 with \`status: "degraded"\` when a check fails, so read the body; a 503 means the catalogue read itself failed. Cached 5 minutes.`,
           responses: {
             "200": jsonResponse("The status document (ok or degraded).", "Status"),
             "503": { description: "The status check itself failed.", content: { "application/json": { schema: { type: "object", properties: { status: { type: "string", const: "degraded" }, generatedAt: { type: "string" }, issues: { type: "array", items: { type: "string" } } } } } } },
