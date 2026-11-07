@@ -125,7 +125,8 @@ starts the next run at the next 900 s tick. Exit 3 in the log means a run was cu
 the job is down; repeated exit 3s mean one step keeps reaching its timeout, and the in-flight list
 names the cams. `pruneArchive()` deletes storage objects first, then the `cam_stills` rows, each
 tried twice; a batch that fails either step keeps its rows and is re-selected next run, so neither
-orphan objects nor permanent dead rows can accumulate.
+orphan objects nor permanent dead rows can accumulate, and the readers' `filterRetained()` hides
+doomed rows in between.
 
 **Loading `com.peakcam.stations-sync` for the first time (parity block P3):** on the
 Mac mini as `maestro_admin`, pull `main`, prove the fetchers against public APIs with a

@@ -67,7 +67,7 @@ import {
   type StormWindow,
   type TimelapseWindow,
 } from "../lib/cam-timelapse.js";
-import { STORAGE_BUCKET as STILLS_BUCKET } from "../lib/cam-timeline.js";
+import { STORAGE_BUCKET as STILLS_BUCKET, THIN_BUCKET_HOURS, filterRetained, thinBucket } from "../lib/cam-timeline.js";
 
 const exec = promisify(execFile);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -104,7 +104,7 @@ const CACHE_MAX_AGE_MS = 80 * 3_600_000;
 const FFMPEG = process.env.FFMPEG ?? "ffmpeg";
 
 type CamRow = { id: string; name: string; resort_id: string; resorts: { slug: string } | null };
-type StillRow = { path: string; captured_at: string };
+type StillRow = { id: number; cam_id: string; path: string; captured_at: string; keeper: boolean };
 type ExistingRow = Pick<CamTimelapseRow, "id" | "cam_id" | "window" | "rendered_at" | "storm_date" | "url">;
 
 // ─── supabase helpers ────────────────────────────────────────────────────
@@ -325,9 +325,13 @@ async function main() {
         try {
           const storm = NO_STORMS ? null : stormWindow({ now, daily: dailyByResort.get(cam.resort_id) ?? [], latest24hIn: snow24h.get(cam.resort_id) });
           const from24 = new Date(now.getTime() - WINDOW_24H_HOURS * 3_600_000);
-          const from = storm && storm.from < from24 ? storm.from : from24;
-          const stills = await rest<StillRow[]>(`cam_stills?select=path,captured_at&cam_id=eq.${cam.id}&captured_at=gte.${from.toISOString()}&order=captured_at.asc&limit=1000`);
-          const refs: FrameRef[] = stills.map((s) => ({ path: s.path, capturedAt: s.captured_at }));
+          // Snapped down to a 6 h bucket edge so filterRetained() sees whole
+          // buckets (storm windows reach 72 h back, past the 48 h thinning
+          // edge); selectFrames still clips each clip to its own window.
+          const rawFrom = storm && storm.from < from24 ? storm.from : from24;
+          const from = new Date(thinBucket(rawFrom.getTime()) * THIN_BUCKET_HOURS * 3_600_000);
+          const stills = await rest<StillRow[]>(`cam_stills?select=id,cam_id,path,captured_at,keeper&cam_id=eq.${cam.id}&captured_at=gte.${from.toISOString()}&order=captured_at.asc&limit=1000`);
+          const refs: FrameRef[] = filterRetained(stills, now).map((s) => ({ path: s.path, capturedAt: s.captured_at }));
           const newest = refs.length ? refs[refs.length - 1].capturedAt : null;
 
           const frames24 = selectFrames(refs, { from: from24, to: now, maxFrames: MAX_FRAMES });

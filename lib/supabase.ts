@@ -4,7 +4,7 @@ import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuali
 import type { ResortOpening } from "./openings";
 import type { StationNormalsSummary } from "./resort-faq";
 import { withResolvedCamNames } from "./cam-name";
-import { clampHours, pickResortTimeline, shapeTimeline, toFrame, MAX_TIMELINE_HOURS, type CamStillRow, type CamTimeline, type CamTimelineFrame } from "./cam-timeline";
+import { CAPTURE_INTERVAL_S, clampHours, filterRetained, KEEPER_RETENTION_DAYS, MAX_TIMELINE_HOURS, pickResortTimeline, shapeTimeline, THIN_BUCKET_HOURS, toFrame, type CamStillRow, type CamTimeline, type CamTimelineFrame } from "./cam-timeline";
 import { shapeTimelapses, type CamTimelapseRow, type CamTimelapses } from "./cam-timelapse";
 import { assembleStoredRuns, latestRunsPerModel, type ForecastDailyRow, type ForecastRunRow, type ForecastScoreRow, type StoredForecast } from "./forecast/store";
 import type { CumulativeNormalRow, DailyRow, MonthlyNormalRow, NormalWindow } from "./snow-history";
@@ -843,17 +843,27 @@ export function getAllResortSlugs(): Promise<string[]> {
  * data comes from getResortBySlug, and a missing view (migration 024 not
  * applied) must not fail the ISR revalidation.
  */
+/** Frames one cam can write into one 6 h thinning bucket (24 at 900 s). */
+const KEEPER_BUCKET_ROWS = (THIN_BUCKET_HOURS * 3_600) / CAPTURE_INTERVAL_S;
+
 async function fetchCamStillRows(filter: { camId?: string; resortId?: string }, hours: number, now: Date): Promise<CamStillRow[] | null> {
   const since = new Date(now.getTime() - hours * 3_600_000).toISOString();
+  const keeperSince = new Date(now.getTime() - KEEPER_RETENTION_DAYS * 86_400_000).toISOString();
   const base = () => {
     let q = supabase.from("cam_still_timeline").select("*");
     if (filter.camId) q = q.eq("cam_id", filter.camId);
     if (filter.resortId) q = q.eq("resort_id", filter.resortId);
     return q;
   };
+  // Keepers: filterRetained()/stormKeeper() must see the newest storm bucket
+  // whole to agree with selectPrune. A 6 h bucket holds at most
+  // KEEPER_BUCKET_ROWS frames per cam at the 15-min cadence; the resort limit
+  // covers 16 archive cams storming at once (prod max is 12 per resort,
+  // 2026-11-07). The window query is unchanged: it is ≤ 48 h, which the
+  // thinning never touches.
   const [win, keep] = await Promise.all([
     base().gte("captured_at", since).order("captured_at", { ascending: false }).limit(filter.camId ? MAX_TIMELINE_HOURS : 240),
-    base().eq("keeper", true).order("captured_at", { ascending: false }).limit(filter.camId ? 1 : 12),
+    base().eq("keeper", true).gte("captured_at", keeperSince).order("captured_at", { ascending: false }).limit(filter.camId ? 2 * KEEPER_BUCKET_ROWS : 16 * KEEPER_BUCKET_ROWS),
   ]);
   const error = win.error ?? keep.error;
   if (error) {
@@ -871,7 +881,7 @@ async function fetchCamStillRows(filter: { camId?: string; resortId?: string }, 
     seen.add(row.id);
     rows.push(row);
   }
-  return rows;
+  return filterRetained(rows, now);
 }
 
 /**
@@ -913,20 +923,23 @@ export async function getResortCamTimeline(resortId: string, camOrder: readonly 
   return pickResortTimeline(rows, camOrder, { hours: h, now, supabaseUrl });
 }
 
-/** Newest archived frame for a resort (any cam, any age) — the OG image background. Null when none. */
+/** Newest retained archived frame for a resort — the OG image background. Null when none. */
 export async function getLatestArchivedStill(resortId: string): Promise<CamTimelineFrame | null> {
+  const now = new Date();
+  const keeperSince = new Date(now.getTime() - KEEPER_RETENTION_DAYS * 86_400_000).toISOString();
   const { data, error } = await supabase
     .from("cam_still_timeline")
     .select("*")
     .eq("resort_id", resortId)
+    .gte("captured_at", keeperSince)
     .order("captured_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(64);
   if (error) {
     if (!MISSING_TABLE_CODES.has(error.code)) console.warn("[PeakCam] Could not fetch latest archived still:", error.message);
     return null;
   }
-  return data ? toFrame(data as CamStillRow, supabaseUrl) : null;
+  const retained = filterRetained((data ?? []) as CamStillRow[], now);
+  return retained[0] ? toFrame(retained[0], supabaseUrl) : null;
 }
 
 // ─────────────────────────────────────────────────────────────
