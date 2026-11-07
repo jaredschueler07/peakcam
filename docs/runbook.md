@@ -722,6 +722,14 @@ site (allow the 15-minute cache): the P6 lines under "Public API" above. Without
 contract still validates for every resort; `/api/v1/resorts/alta/conditions` shows
 `data.liftsOpen.source = "none"` and the status from the opening row.
 
+## Supabase performance advisor (migration 033)
+
+`supabase/migrations/033_performance_advisor.sql` (2026-11-07, idempotent; apply by hand via SQL Editor or MCP `apply_migration`, not during a Vercel build):
+- Wraps `auth.uid()` as `(select auth.uid())` on `dashboard_layouts`, `user_favorites`, and `user_conditions` RLS policies (`auth_rls_initplan`).
+- Drops the untracked hand-created duplicate policies on `user_conditions` (keeping the `004_user_conditions.sql` trio scoped `to authenticated` on insert/delete) and collapses `drop_in_runs` SELECT policies to one per role (`anon`: `accepted = true`; `authenticated`: `accepted = true or user_id = (select auth.uid())`).
+- Adds FK covering indexes `bug_reports_updated_by_idx`, `drop_in_morning_conditions_snow_report_id_idx`, and `powder_alert_log_resort_id_idx`; drops 11 unused/redundant indexes (a guard keeps any that turns out to be the only index covering a foreign key, with a NOTICE) and keeps 18 that back live code paths or FK constraints on small/empty tables (per-index ledger in the migration header).
+- Relocates `pg_trgm` and `vector` from `public` to `extensions` with `ALTER EXTENSION ... SET SCHEMA` inside a dependency-checked `DO` block (raises and rolls back everything if a column, index, view or function depends on them). `anon`/`authenticated` do not have `extensions` on their search_path, so any future use must schema-qualify. Verify in the Supabase Performance & Security Advisors (expect 0 warnings for `auth_rls_initplan`, `multiple_permissive_policies`, `unindexed_foreign_keys`, and `extension_in_public`) and with the SQL checks in the migration header.
+
 ## Discovery surface (markdown alternates, Link headers, robots, llms.txt, IndexNow)
 
 Added 2026-10-18 (branch `feat/discovery-surface`, execution plan Sprint 4). All
