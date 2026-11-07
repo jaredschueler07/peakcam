@@ -3,8 +3,9 @@ import { publicJson, publicOptions } from "@/lib/public-api/headers";
 import { buildStatus, STATUS_CACHE_CONTROL } from "@/lib/public-api/status";
 
 // GET /api/v1/status — service status derived from the data: snow-report
-// freshness against the 6-hourly sync cadence and cam health from the last
-// probe. 200 with `status: "degraded"` when a check fails (read the body);
+// freshness against the 6-hourly sync cadence, cam health from the last
+// probe, and cam-still archive freshness against the 15-minute capture
+// cadence. 200 with `status: "degraded"` when a check fails (read the body);
 // 503 only when the catalogue read itself throws. Five-minute CDN window.
 // Caching: see app/api/v1/resorts/route.ts (OPTIONS makes the route dynamic,
 // so Cache-Control carries the policy).

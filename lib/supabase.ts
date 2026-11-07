@@ -942,6 +942,47 @@ export async function getLatestArchivedStill(resortId: string): Promise<CamTimel
   return retained[0] ? toFrame(retained[0], supabaseUrl) : null;
 }
 
+/**
+ * Newest `cam_stills.captured_at` across the archive, for `/api/v1/status`.
+ * Two one-row probes, `keeper=eq.{false,true}&order=captured_at.desc&limit=1`,
+ * each a backward scan of cam_stills_prune_idx (keeper, captured_at): ~0.6 ms
+ * as anon on 2026-11-07 (98 k rows), where the unfiltered
+ * `order=captured_at.desc&limit=1` is a seq scan + top-N sort (42 ms, growing
+ * with the table) because there is no plain captured_at index. Both values
+ * are needed: in a storm every new frame is a keeper. Fails soft to `null`
+ * (missing table, error, the anon 3 s statement_timeout, empty archive) so
+ * `/status` reports `checks.camStills` degraded instead of a 503.
+ */
+async function fetchNewestCamStillCapturedAt(): Promise<string | null> {
+  const newest = async (keeper: boolean): Promise<string | null> => {
+    const { data, error } = await supabase
+      .from("cam_stills")
+      .select("captured_at")
+      .eq("keeper", keeper)
+      .order("captured_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      if (!MISSING_TABLE_CODES.has(error.code)) console.warn("[PeakCam] Could not fetch newest cam_stills timestamp:", error.message);
+      return null;
+    }
+    return (data as { captured_at?: string } | null)?.captured_at ?? null;
+  };
+  try {
+    const stamps = (await Promise.all([newest(false), newest(true)])).filter((t): t is string => !!t && !Number.isNaN(Date.parse(t)));
+    return stamps.length ? stamps.reduce((a, b) => (Date.parse(a) >= Date.parse(b) ? a : b)) : null;
+  } catch (err) {
+    console.warn("[PeakCam] Could not fetch newest cam_stills timestamp:", err);
+    return null;
+  }
+}
+
+export const getNewestCamStillCapturedAt = unstable_cache(
+  fetchNewestCamStillCapturedAt,
+  ["peakcam:cam-stills:newest:v1", supabaseUrl],
+  { revalidate: 300, tags: ["peakcam-resort-catalog"] },
+);
+
 // ─────────────────────────────────────────────────────────────
 // Resort subpages (parity plan P2): history, normals, every cam's timeline
 // ─────────────────────────────────────────────────────────────

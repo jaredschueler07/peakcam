@@ -126,7 +126,8 @@ the job is down; repeated exit 3s mean one step keeps reaching its timeout, and 
 names the cams. `pruneArchive()` deletes storage objects first, then the `cam_stills` rows, each
 tried twice; a batch that fails either step keeps its rows and is re-selected next run, so neither
 orphan objects nor permanent dead rows can accumulate, and the readers' `filterRetained()` hides
-doomed rows in between.
+doomed rows in between. `/api/v1/status` reports `checks.camStills` (degraded past
+`thresholds.stillMaxAgeHours = 2`).
 
 **Loading `com.peakcam.stations-sync` for the first time (parity block P3):** on the
 Mac mini as `maestro_admin`, pull `main`, prove the fetchers against public APIs with a
@@ -444,7 +445,7 @@ cached catalogue (`getAllResorts()`, 1 h) plus `resort_openings` and
 | `GET /api/v1/openapi.json` | OpenAPI 3.1, generated from the zod registry in `lib/public-api/schema.ts` | static, 1 h / 24 h CDN |
 | `GET /.well-known/api-catalog` | RFC 9727 linkset pointing at the OpenAPI document | static, 1 h / 24 h CDN |
 | `GET /api/v1/resorts/search-index` | Slug, name, aliases (`lib/ask/aliases.ts`), state, country, lat/lon, page URL per resort (P9) | 1 h / 24 h CDN |
-| `GET /api/v1/status` | Report freshness (≤ 12 h) and cam health (≥ 90 % live) with thresholds; 200 `degraded`, 503 only when the read throws (P9) | 5 min CDN |
+| `GET /api/v1/status` | Report freshness (≤ 12 h), cam health (≥ 90 % live) and cam-still archive freshness (≤ 2 h) with thresholds; 200 `degraded`, 503 only when the read throws (P9) | 5 min CDN |
 | `GET\|POST /api/v1/ask` | Deterministic answer endpoint (`lib/ask/*`): `?q=` or `{"query"}`; `AskAnswer` with `answerable`, `sentence`, `data`, `citations`; 400 only for a missing/oversized question (P9) | 900 s; `no-store` when unanswerable |
 | `GET\|POST /ask` | NLWeb-shaped wrapper over the same router (`query_id`, `results[]`, `peakcam`); excluded from `proxy.ts` like `/api/v1` (P9) | same |
 | `POST /api/v1/batch` | ≤ 10 GET paths (`{"requests":[{"path"}]}` or a string array) dispatched in-process to the route handlers, results in order; 400 names a disallowed path (P9) | `no-store` |
@@ -523,7 +524,7 @@ curl -s 'https://www.peakcam.io/ask?query=compare+vail+and+keystone' | jq '{quer
 curl -s https://www.peakcam.io/api/v1/batch -H 'content-type: application/json' -d '{"requests":[{"path":"/api/v1/resorts/alta"},{"path":"/api/v1/resorts/vail/cams"},{"path":"/api/v1/powder?state=UT&limit=3"},{"path":"/api/v1/nope"}]}' | jq '{status: .status, error}'   # 400 disallowed_path
 curl -s https://www.peakcam.io/api/v1/batch -H 'content-type: application/json' -d '{"requests":[{"path":"/api/v1/resorts/alta"},{"path":"/api/v1/status"}]}' | jq '.results[] | {path, status}'
 curl -s https://www.peakcam.io/api/v1/resorts/search-index | jq '{count, breck: (.resorts[] | select(.slug=="breckenridge") | .aliases)}'
-curl -s https://www.peakcam.io/api/v1/status | jq '{status, age: .checks.snowReports.ageHours, live: .checks.cams.liveRatio, issues}'
+curl -s https://www.peakcam.io/api/v1/status | jq '{status, age: .checks.snowReports.ageHours, live: .checks.cams.liveRatio, stills: .checks.camStills.ageHours, issues}'
 curl -s https://www.peakcam.io/.well-known/schemas | jq '.count'
 curl -s https://www.peakcam.io/.well-known/schemas/resort.json | jq '."$id"'
 curl -s https://www.peakcam.io/llms-full.txt | grep -c '^### '          # 21 tools + 20 REST routes = 41 (P7: get_score, score-components, snow-report)
