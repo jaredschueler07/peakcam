@@ -81,7 +81,7 @@ ssh mini "tail -5 /Users/maestro_admin/peakcam/peakcam/scripts/$JOB.log"
 
 `launchctl list | grep peakcam` prints `PID  last-exit  label`; a `-` PID is a scheduled job
 between runs, a non-zero exit is the script's own (operator-sync exits 2 while Liftie is
-blocked). A pull alone is enough for a script change (each run starts a fresh process); a plist
+blocked; cam-stills exits 3 if its 30-min watchdog trips). A pull alone is enough for a script change (each run starts a fresh process); a plist
 change needs the reload. The dependency order when restarting everything: `snotel-sync` and
 `model-sync` first (they feed `snow_reports`), then `stations-sync`, `forecast-sync` (and the
 scorer the next morning), `cam-stills` before `cam-timelapse`.
@@ -111,6 +111,21 @@ with unthinned history: `npx tsx scripts/cam-capture-stills.ts --prune-only --pr
 After the first run `select count(*) from cam_stills` should grow by roughly the number
 of archive-allowed active cams (249 on 2026-10-18) per run. The Studio runs only
 `com.peakcam.cam-check` and has no peakcam clone (checked 2026-10-18).
+
+**Hang hardening & watchdog (2026-11-07):** a healthy `cam-stills` run over ~570 cams at
+concurrency 4 takes ~15–17 min. On 2026-11-07 the 04:56 UTC run wedged for 13 h 37 m: an
+`ffmpeg` child ignored the `SIGTERM` that `execFile`'s timeout sends while it was blocked in TLS
+I/O, and after it was killed by hand a Supabase `fetch` without an `AbortSignal` hung too; launchd
+never starts a second instance, so no run happened. Now every `ffmpeg`/`ffprobe` `execFile` passes
+`killSignal: "SIGKILL"` (plus `-max_reload 2 -m3u8_hold_counters 2` on `.m3u8` inputs only; ffmpeg
+rejects them on other URLs), every fetch carries `AbortSignal.timeout` (20 s cam pages and images,
+30 s Supabase REST, 60 s uploads), and an unref'd 30-min run watchdog (`RUN_WATCHDOG_MS`) logs
+`[cam-stills] watchdog: run exceeded 30 min, exiting (in flight: …)` and exits **3**; launchd
+starts the next run at the next 900 s tick. Exit 3 in the log means a run was cut short, not that
+the job is down; repeated exit 3s mean one step keeps reaching its timeout, and the in-flight list
+names the cams. `pruneArchive()` deletes storage objects first, then the `cam_stills` rows, each
+tried twice; a batch that fails either step keeps its rows and is re-selected next run, so neither
+orphan objects nor permanent dead rows can accumulate.
 
 **Loading `com.peakcam.stations-sync` for the first time (parity block P3):** on the
 Mac mini as `maestro_admin`, pull `main`, prove the fetchers against public APIs with a
