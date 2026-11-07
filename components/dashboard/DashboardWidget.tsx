@@ -271,8 +271,24 @@ function ZeroCamFallback({
         )}
       </div>
 
+      {tileUrl && !tileFailed && (
+        // CARTO's free basemap tiles require visible attribution to CARTO and
+        // OpenStreetMap on every render (same wording as MapView). z-20 lifts
+        // the links above ResortBody's stretched link, like the cam switcher.
+        <p className="relative z-20 mt-auto self-end rounded bg-cream-50/85 px-1 font-mono text-[8px] leading-tight text-ink/70">
+          ©{" "}
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">
+            OpenStreetMap
+          </a>{" "}
+          ©{" "}
+          <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">
+            CARTO
+          </a>
+        </p>
+      )}
+
       {metrics.length > 0 && (
-        <div className="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-auto pt-2">
+        <div className="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-2">
           {metrics.slice(0, 4).map((m) => (
             <div
               key={m.label}
