@@ -1,143 +1,88 @@
 # AGENTS.md — peakcam
 
-> Folder-scoped agent guide. Generated 2026-09-12 by an automated documentation pass.
-> Scope: everything under `peakcam/` and nothing outside it.
+> Repository-wide agent guide (`jaredschueler07/peakcam`). For detailed deployment and ops recipes, also see `CLAUDE.md`, `docs/runbook.md`, and `docs/parity-scorecard.md`.
 
-## What this is
+## What This Is
 
-PeakCam is a live mountain-webcam and snow-report aggregator, in production at
-https://www.peakcam.io (Vercel, auto-deploy on push to `main`, ~148 resorts / ~350 cam
-rows seeded from `data/*.csv`). It serves resort pages, an interactive map, side-by-side
-comparison, a sortable snow report, favorites, powder alerts, and a browser ski game
-("Drop In"). Status: **active production**, not a prototype — `docs/roadmap-2026-09-11.md`
-records the verified release boundary and current priorities. Three adjacent subsystems live
-in the same repo but are *not* the web app: `agents/` (a 9-bot Slack loop, dormant),
-`dashboard/` (standalone Express ops dashboard), and `generate-images.py` (brand images).
+PeakCam (`https://www.peakcam.io`, Vercel auto-deploy on push to `main`) is a live mountain-webcam, snow-telemetry, and multi-model forecast platform covering **318 active ski resorts** across the Americas (246 US, 49 CA, 13 CL, 10 AR), 963 camera rows (`data/cams.csv`), 699 weather stations (`SNOTEL`, `GHCN`, `NWS`, `ECCC`, `BC ASWS`), a 9-model 14-day blended forecast, 10-season SNOTEL history (`snowpack_daily`), algorithmic Snow Scores (0–100), favorites, powder alerts, and the browser 3D ski game ("Drop In").
 
-## Stack & key facts
+Adjacent subsystems inside the same repository (outside the Next.js web app):
+- `agents/` — dormant 9-bot Slack agent loop (`agents/loop.mjs`, `agents/manifests/*.yaml`).
+- `dashboard/` — standalone Express ops/commercialization dashboard (`dashboard/commercialization/server.mjs`, separate `package.json`; unauthenticated — never expose beyond localhost/LAN).
+- `packages/peakcam-mcp/` — MIT stdio MCP bridge (`peakcam-mcp` → `https://www.peakcam.io/api/mcp`).
+- `generate-images.py` — brand image generation script.
 
-- **Language(s):** TypeScript strict (`tsconfig.json`), plus `.mjs` / `.py` / `.sh` tooling. No Python app.
-- **Framework / runtime:** Next.js 16.1.6 App Router + React 19.2.3 on Node. Tailwind CSS 4 via `@tailwindcss/postcss`; theme in `tailwind.config.ts` + `app/globals.css`.
-- **Package manager:** npm — `package-lock.json` is committed and authoritative. `.npmrc` pins `cache=.npm-cache` *inside the repo* (gitignored, never read it).
-- **Entry points:** `app/layout.tsx` → `app/page.tsx` (browse directory at `/`); `app/resorts/[slug]/page.tsx` (SSG resort pages); `proxy.ts` (Next 16 middleware successor — refreshes the Supabase session on non-static requests); data jobs are `scripts/*.ts` run through `tsx`.
-- **Database / auth:** Supabase Postgres + Auth via `@supabase/ssr`. 21 SQL files in `supabase/migrations/`; **applied by hand** (no Supabase CLI config).
-- **External services:** MapTiler + Carto (tiles), RainViewer (radar), NWS + Open-Meteo (forecast), NRCS AWDB/SNOTEL (snow telemetry), Resend (email), PostHog + Vercel Analytics + Meta Pixel (analytics).
-- **3D / game:** `three@0.185.1` + `postprocessing`. Drop In defaults to a **WebGPU** backend with WebGL fallback (`lib/game/rendering/backend.ts`; `?gfx=webgl` forces fallback).
-- **Maps:** `maplibre-gl@5.21` through `react-map-gl@8.1`.
-- **Testing:** `node:test` driven by `tsx` (unit) and Playwright 1.61.1 (`tests/e2e/`).
-- **Scheduling:** Vercel cron (`vercel.json` → `/api/alerts/trigger`, daily 13:00 UTC) plus macOS launchd jobs (`com.peakcam.*.plist`) for the data syncs.
-- **Disk:** ~1.6 GB. The bulk is `node_modules/`, `.next/`, `.npm-cache/`, `public/game/terrain/`, and three extensionless root PNGs (design references, see Gotchas).
+## Stack & Key Facts
 
-## Layout
+- **Language / Runtime:** TypeScript strict (`tsconfig.json`, path alias `@/*` → repo root), plus `.mjs` / `.py` / `.sh` scripts.
+- **Framework:** Next.js 16 App Router + React 19 on Node. Tailwind CSS 4 via `@tailwindcss/postcss`; tokens in `tailwind.config.ts` and `app/globals.css`.
+- **Package Manager:** `npm` (`package-lock.json` committed; `.npmrc` sets `cache=.npm-cache` inside the repo, gitignored).
+- **Database / Auth:** Supabase Postgres + Auth via `@supabase/ssr`. **37 SQL files** under `supabase/migrations/` (`001`–`032` with duplicate `004`/`005` numbers plus three dated `20260907*` bug-report migrations). Migrations are **applied by hand** (no Supabase CLI migration runner) — verify live production schema before assuming a migration file matches prod (`CLAUDE.md` documents known historical view/column drift).
+- **Session Proxy:** `proxy.ts` (Next 16 middleware replacement) refreshes Supabase auth cookies on page requests while excluding `_next/static`, `_next/image`, `drop-in/`, `api/v1/`, `api/mcp`, `ask`, and static image extensions.
+- **Maps & Tiles:** `maplibre-gl` via `react-map-gl/maplibre` + MapTiler / CARTO / RainViewer radar. Mount MapLibre components with `dynamic(..., { ssr: false })`.
+- **3D / Game:** `three` + `postprocessing`. Drop In defaults to WebGPU with WebGL fallback (`lib/game/rendering/backend.ts`; `?gfx=webgl` forces WebGL).
+- **Testing:** `node:test` via `tsx` (unit) and Playwright (`tests/e2e/`).
+- **Scheduling:** Vercel cron (`vercel.json` → `/api/alerts/trigger` daily 13:00 UTC) plus macOS `launchd` plists in the repo root (`com.peakcam.*.plist`) for sync, still capture, timelapse, and scoring jobs.
+
+## Repository Layout
 
 | Path | Contents |
 | --- | --- |
-| `app/` | App Router. Pages: `auth`, `account`, `admin/bug-reports`, `alerts` (+ `manage`), `about`, `compare`, `dashboard`, `drop-in`, `favorites`, `map`, `methodology`, `resorts/[slug]` (+ `/drop-in`), `snow-report`. Also `sitemap.ts`, `robots.ts`, `manifest.ts`, `opengraph-image.tsx`, `llms.txt/route.ts`, `not-found.tsx`. |
-| `app/api/` | 16 route handlers — see the API table below. |
-| `components/` | 75 files, domain-grouped: `alerts`, `auth`, `browse`, `cam`, `compare`, `dashboard`, `drop-in`, `feedback`, `home`, `layout`, `map`, `resort`, `snow-report`, `ui`, `weather`. |
-| `lib/` | Supabase clients (`supabase.ts` anon / `supabase-browser.ts` / `supabase-server.ts`), pure engines (`conditions-engine.ts`, `snow-quality.ts`, `snow-forecast.ts`, `resort-search.ts`), `types.ts`, plus colocated `*.test.ts`. |
-| `lib/game/` | 224 files — the Drop In engine: `core/`, `physics/`, `terrain/`, `rendering/`, `runtime/`, `replay/`, `server/`, `competition/`, `config/`, `audio/`, `input/`, `analytics/`. |
-| `lib/pipeline/` | Multi-source blender (SNOTEL/NWS/Liftie/SNODAS/Weather Unlocked/user reports). Code-complete but **dormant in prod** — see Gotchas. |
-| `scripts/` | Data ingestion, terrain bake, health checks, image generation. Mix of `.ts` (tsx) and `.mjs`; many have colocated tests. |
-| `supabase/` | `migrations/` (21 SQL), `seeds/`, `email-templates/`. |
-| `data/` | `resorts.csv` (148 rows), `cams.csv` (349), `resort_socials.csv`, `snotel_stations.json` (17 MB), `resort-editorial.ts`. Import source for `import-resorts:standalone`. |
-| `tests/` | `e2e/` Playwright specs, `fixtures/` (incl. `drop-in-v1/*.json`), `drop-in-v1-parity.test.ts`. |
-| `plugins/`, `agents/` | Nine `.plugin` files (zip archives) and the Slack bot loop + `agents/manifests/*.yaml`. Effectively dormant. |
-| `dashboard/` | Separate Express app (port 3333) with its **own** `package.json`; not covered by the root test/lint setup. |
-| `docs/` | 144 files: `runbook.md`, `roadmap-2026-09-11.md`, `design-system/`, `terrain/`, `drop-in-v2/`, `reviews/`. |
-| `qa-findings/` | 2026-08-10 live-site QA reports. A dated snapshot, not current state. |
-| `public/game/` | Committed game assets: `terrain/`, `textures/`, `audio/`, `basis/`. |
-| root | `CLAUDE.md` (owner's guide, accurate), `GEMINI.md` (stale on styling), `TASKS.md` + `UX-AUDIT-PLAN*.md` (historical), `README.md` (unmodified create-next-app boilerplate). |
+| `app/` | App Router pages: `/` (`BrowsePage`), `/about`, `/account`, `/admin/bug-reports`, `/alerts` (`+ manage`, `feed/[token]`), `/auth` (`+ callback`, `update-password`), `/compare`, `/connect`, `/dashboard`, `/drop-in`, `/favorites`, `/map`, `/methodology`, `/opening-dates`, `/passes` (`+ [pass]`), `/ski-cams` (`+ [hub]`), `/snow-report` (`+ [hub]`, `leaderboards`, `percent-of-normal`, `best-powder-this-week`, `season-powder-days`, `deepest-base`, `season-snowfall`), and `/resorts/[slug]` (`+ snow-report`, `snow-forecast`, `webcams`, `history`, `drop-in`, `powder.xml`, `index.md`, `opengraph-image.tsx`). Also `/index.md`, `sitemap.xml/route.ts`, `sitemaps/[file]/route.ts`, `robots.txt`, `llms.txt`, `llms-full.txt`, `gpt-instructions.md`, `ask/route.ts`, `resorts/route.ts` (308 → `/`), and `/.well-known/*` (`api-catalog`, `mcp/server-card.json`, `schemas`, `schemas/[file]`). |
+| `app/api/` | **38 `route.ts` handlers**: `admin/bug-reports*`, `alerts/{subscribe,manage,unsubscribe,trigger}`, `bug-reports`, `cam-reports/submit`, `cams/[id]/status`, `conditions/vote`, `csp-report`, `drop-in/{sessions,runs,leaderboard,morning,ghosts/[runId]}`, `mcp` (`+ server-card`), `user-conditions/submit`, `v1/*` (`resorts*`, `powder`, `snow-report`, `leaderboards/[kind]`, `status`, `batch`, `ask`, `openapi.json`). |
+| `components/` | Domain-grouped React components: `alerts`, `analytics`, `auth`, `browse`, `cam`, `compare`, `connect`, `dashboard`, `drop-in`, `feedback`, `forecast`, `history`, `home`, `hubs`, `layout`, `map`, `openings`, `resort`, `snow-report`, `ui`, `weather`. |
+| `lib/` | Supabase clients (`supabase.ts`, `supabase-browser.ts`, `supabase-server.ts`), conditions & scoring (`conditions-contract.ts`, `conditions-engine.ts`, `score.ts`, `snow-quality.ts`, `snow-history.ts`, `season-stats.ts`, `leaderboards.ts`, `percent-of-normal.ts`), forecast (`lib/forecast/`), stations (`lib/stations/`), operators (`lib/operators/`), public API & markdown (`lib/public-api/`), deterministic Q&A (`lib/ask/`), MCP server (`lib/mcp/` — 21 tools in `PEAKCAM_TOOL_NAMES`), Drop In (`lib/game/`), dormant `lib/pipeline/`, and colocated `*.test.ts`. |
+| `data/` | Authoritative CSV/JSON seeds: `resorts.csv` (320 lines: 319 data rows, 318 active), `cams.csv` (964 lines / 963 data rows), `resort-profiles.csv` (320 lines / 319 data rows), `resort-openings.csv` (55 lines / 54 data rows), `operator-sources.json` (90 Liftie mappings), `resort_socials.csv`, `resort-editorial.ts`, `snotel_stations.json` (~17 MB). |
+| `scripts/` | Syncs, importers, terrain bakes, health/timelapse scripts (`.ts` / `.mjs`) with colocated tests. |
+| `supabase/` | `migrations/` (37 SQL files), `seeds/`, `email-templates/`. |
+| `tests/` | `e2e/` Playwright specs, `fixtures/` (including `drop-in-v1/`), and `drop-in-v1-parity.test.ts`. |
+| `docs/` | Runbook (`runbook.md`), parity scorecard (`parity-scorecard.md`), design system (`design-system/`), cams, terrain, drop-in-v2, marketing, and reviews. |
+| `public/` | Static assets (`public/game/{terrain,textures,audio,basis}/`, `public/images/`). Note: `public/drop-in/` no longer exists; `eslint.config.mjs` ignores the historical `public/drop-in/three.module.js` path. |
 
-### API routes (`app/api/`)
-
-Sixteen handlers, each with its own auth model — read the handler before changing it.
-
-| Route | Auth model (verified where noted) |
-| --- | --- |
-| `alerts/subscribe`, `alerts/manage`, `alerts/unsubscribe` | Capability `manage_token`; direct PostgREST writes with the service-role key. |
-| `alerts/trigger` | `Authorization: Bearer $CRON_SECRET`, fails closed if unset; Vercel cron daily 13:00 UTC. |
-| `conditions/vote` | Anonymous (localStorage session UUID). |
-| `user-conditions/submit` | Supabase auth session + RLS + service-role write. |
-| `cam-reports/submit` | Anonymous, validated via `lib/cam-reports/validate.ts`, salted IP hash, Resend admin email. |
-| `cams/[id]/status` | Not verified in this pass. |
-| `bug-reports`, `admin/bug-reports`, `admin/bug-reports/[id]` | Service-role; the admin page redirects to `/auth?next=…` on `ReviewAccessError` 401. |
-| `drop-in/sessions`, `drop-in/runs`, `drop-in/leaderboard`, `drop-in/ghosts/[runId]` | Run-ticket flow (`DROP_IN_TICKET_KEYS`, server-only); details not verified in this pass. |
-| `drop-in/morning` | `CRON_SECRET`; hourly job that only captures each resort's 07:00 hour. |
-
-Three more route handlers live outside `app/api/`: `app/resorts/route.ts` (308 → `/`),
-`app/auth/callback/route.ts` (OAuth/magic-link exchange), `app/llms.txt/route.ts` (ISR
-markdown index for LLM crawlers).
-
-## Build / Run / Test
-
-Every command below exists in `package.json` unless flagged. Source of truth: `package.json` `scripts`.
+## Build, Run & Test
 
 ```bash
-npm run dev      # next dev (localhost:3000) — needs .env.local first
-npm run build    # next build — prerenders ~148 resort pages against live Supabase
-npm run start    # next start
-npm run lint     # eslint (flat config: next/core-web-vitals + next/typescript)
-npm test         # node --import tsx --test lib/*.test.ts 'lib/game/**/*.test.ts' scripts/*.test.ts tests/*.test.ts
-npx tsc --noEmit # type check (documented in CLAUDE.md; passes per docs/roadmap-2026-09-11.md)
+npm run dev       # next dev (needs .env.local; lib/supabase.ts throws at import if env vars missing)
+npm run build     # next build — prerenders resort pages against live Supabase
+npm run start     # next start
+npx tsc --noEmit  # TypeScript check
+npm run lint      # ESLint (flat config)
+npm test          # node --import tsx --test 'lib/**/*.test.ts' 'scripts/**/*.test.ts' 'scripts/**/*.test.mjs' 'tests/**/*.test.ts'
 
-# Playwright e2e — the config's webServer runs `npm run start`, so build first.
-npx playwright test                                   # drop-in suite on :3113
+# Playwright E2E
+npx playwright test                                # Drop In (runs `npm run start` — run `npm run build` first)
 PLAYWRIGHT_WEBGPU=1 npx playwright test --project=chromium-webgpu --headed
-npx playwright test -c playwright.auth.config.ts      # auth/account, boots its own fixture server
-npx playwright test -c playwright.mobile.config.ts    # mobile-review + mobile-flows
-
-# Data & ops scripts (all read .env.local themselves; writes use the service-role key)
-npm run import-resorts:standalone  # seed resorts/cams from data/*.csv (the maintained importer)
-npm run snotel-sync                # production SNOTEL feed
-npm run cam-health                 # probe cam URLs, stamp cams.last_checked_at
-npm run seed-normals               # 30-year SNOTEL normals (run-once/annual)
-npm run pipeline-sync              # multi-source pipeline (dormant in prod)
-npm run bake-terrain               # tsx scripts/bake-resort.ts
-npm run validate-game-assets       # tsx scripts/validate-game-assets.ts
+npx playwright test -c playwright.meta-pixel.config.ts # Meta Pixel replay (runs `npm run start` — run `npm run build` first)
+npx playwright test -c playwright.auth.config.ts   # Auth/account flows (runs `npm run dev` + fixture auth server)
+npx playwright test -c playwright.mobile.config.ts # Mobile flows (targets running server at MOBILE_TEST_URL, default 127.0.0.1:3116)
 ```
 
-**Cannot run locally as-is:**
+Important `package.json` script notes:
+- Use `npm run import-resorts:standalone` (never stale non-standalone `npm run import-resorts` from older docs, or stale `npm run drop-in:sync-three`, neither of which exists in `package.json`) to seed `data/*.csv` into Supabase. `scripts/import-resorts-standalone.mjs` deduplicates cameras against the live `cams_unique_per_resort` identity (`camIdentity()` / `partitionCamRecords()`).
+- Live snow reports come from `npm run snotel-sync` + `npm run model-sync`. `lib/pipeline/` (`npm run pipeline-sync`) is dormant in production; both `snotel-sync` and `lib/pipeline/` write `snow_reports` and `resorts.cond_rating` (last writer wins).
+- Other maintained sync/seed scripts: `stations-sync`, `forecast-sync`, `forecast-score`, `score-sync`, `operator-sync`, `approach-cams-sync`, `cam-health`, `cam-stills`, `cam-timelapse`, `seed-openings`, `seed-normals`, `snotel-backfill`, `generate-descriptions`, `powder-alerts`, plus `npx tsx scripts/import-profiles.ts --dry-run`.
 
-- There is **no `.env.local`** in this workspace. `lib/supabase.ts` throws at import when env vars are missing, so `dev`, `build` and any Supabase-touching test fail until you copy `.env.local.example` → `.env.local` and fill it in.
-- Builds need live Supabase egress; `generateStaticParams` fails closed and the fetch has an 8 s abort (`next.config.ts` sets `staticGenerationRetryCount: 3`).
-- **5 of 1410 tests fail here**: GDAL terrain-bake tests shell out to `gdal_translate`, which is not on PATH. `docs/roadmap-2026-09-11.md` reports the same failure class.
-- Playwright `webServer` runs `npm run start`, so an e2e run requires a completed `npm run build` first.
-- Drop In run submission requires server-only `DROP_IN_TICKET_KEYS` (roadmap P0: currently needs restoring in prod).
-- Anything that mutates prod Supabase needs `SUPABASE_SERVICE_ROLE_KEY` — do not run those without explicit instruction.
+## Conventions & Gotchas
 
-## Conventions & gotchas
+1. **Design System (Light Theme Only):** `tailwind.config.ts` and `app/globals.css` define the retro ski-poster light theme (`--pc-cream` `#f1e7cf`, `--pc-cream-50` `#faf4e6`, `--pc-cream-dk` `#e3d5b2`, `--pc-ink` `#2a1f14`, `--pc-bark` `#63482d`, `--pc-bark-50` `#b59b74`, `--pc-forest` `#3c5a3a`, `--pc-alpen` `#d9552f`; Fraunces, DM Sans, JetBrains Mono). Never extend or add new usages of the legacy dark-theme aliases (`bg`, `surface*`, `cyan`).
+2. **Three Supabase Clients:**
+   - `lib/supabase.ts`: anon client for public reads (throws at import if Supabase URL/key are missing).
+   - `lib/supabase-browser.ts`: client auth UI/favorites/dashboard.
+   - `lib/supabase-server.ts`: cookie-bound RSC & route-handler user sessions.
+3. **`snow_reports` & `conditions` Format:** `snow_reports` is append-only; reads query the `latest_snow_reports` view, which must stay index-friendly under the anon role's 3s `statement_timeout` (see `CLAUDE.md`). Its `conditions` column is stored as `"tag1,tag2||narrative"` — every consumer must split on `||`.
+4. **Static Params, CSV → Supabase Split & Cache:**
+   - `dynamicParams = false` is set on `/resorts/[slug]`, `/resorts/[slug]/snow-report`, `/resorts/[slug]/webcams`, `/snow-report/[hub]`, `/ski-cams/[hub]`, `/passes/[pass]`, and `/.well-known/schemas/[file]` (while `/resorts/[slug]/snow-forecast` and `/resorts/[slug]/history` render on-demand with hourly ISR).
+   - **CSV edits vs. live Supabase:** Editing CSVs under `data/` (`resorts.csv`, `cams.csv`, `resort-profiles.csv`, `resort-openings.csv`) and merging to `main` does **not** update production Supabase on Vercel. Live changes require an explicit, owner-approved importer/seed run (`npm run import-resorts:standalone`, `npm run seed-openings`, or `npx tsx scripts/import-profiles.ts`), plus a subsequent deploy so `dynamicParams = false` pages pick up any new slugs.
+   - `/api/v1/*` routes use `Cache-Control: s-maxage=900` + `unstable_cache` (they export `OPTIONS`). Open-Meteo data surfaces must retain CC BY 4.0 attribution (`"Weather data by Open-Meteo.com"`).
+5. **Drop In Architecture & Lint Contract:** Drop In is a React client app (`components/drop-in/DropInGame.tsx` + `lib/game/`), **not** an iframe around `public/drop-in/engine.html` (the old iframe description in `CLAUDE.md` is historical). `eslint.config.mjs` enforces pure determinism inside `lib/game/{core,physics,terrain,replay}` by forbidding React, DOM, `three`, network, audio, analytics imports, and browser globals (`window`, `document`, `fetch`, etc.). `tests/drop-in-v1-parity.test.ts` guards v1 profile/fixture parity.
+6. **Powder Threshold:** `POWDER_DAY_IN = 8` (in `lib/season-stats.ts`) and copy strings may appear in multiple places — grep before changing.
+7. **Auth Flows:** `/auth` (email/password + Google OAuth) and `AuthModal` (magic link + Google OAuth) both route through `/auth/callback`.
 
-- `CLAUDE.md` is the owner's authoritative guide and is accurate; keep following it. `GEMINI.md` and `README.md` are partly stale (below).
-- Path alias `@/*` maps to the repo root (`tsconfig.json`).
-- Read path: each data page is a thin Server Component with `export const revalidate = 3600` that fetches via `lib/supabase.ts` and hands the dataset to one large `"use client"` component. There is no client-side fetching of resort/snow data.
-- Pick the right Supabase client: `lib/supabase.ts` (anon reads), `lib/supabase-browser.ts` (client components with auth), `lib/supabase-server.ts` (route handlers / RSC with the user session).
-- `snow_reports` is append-only; the latest row per resort comes from the `latest_snow_reports` view. `snow_reports.conditions` is an overloaded string, `"tag1,tag2||narrative"` — split on `||`.
-- `/resorts/[slug]` sets `dynamicParams = false`, so a newly imported resort has no live page until the next deploy.
-- `cams` has no unique constraint: re-running the importer duplicates cam rows.
-- Two auth UX flows coexist — `/auth` (email + password) and the magic-link `AuthModal`; both land on `/auth/callback`.
-- MapLibre components must be mounted with `dynamic(..., { ssr: false })`.
-- Powder threshold (8") and the resort-count copy are hardcoded in several places — grep before changing either.
-- `lib/pipeline/` is code-complete but dormant: its launchd job has never succeeded, the blender has stubbed inputs, and no UI reads its output tables. Both it and `scripts/snotel-sync.ts` write `snow_reports` / overwrite `resorts.cond_rating` — last writer wins.
-- The three extensionless root files `header-and-cards` (6673×11933), `resort-detail`, `filter-chips-closeup` are PNG design references, not source or text.
-- `dashboard/` is unauthenticated and can spawn privileged processes — never expose it beyond localhost/LAN.
+## For Agents Working Here
 
-### Conflicts with the pre-existing guides (code verified; guides left untouched)
-
-1. **Theme.** `GEMINI.md` describes an "Alpine Bold" dark theme with `bg`/`surface`/`cyan` tokens. The code is a **light** cream/ink/forest "retro ski poster" theme (`tailwind.config.ts`, `--pc-*` tokens in `app/globals.css`), and `tailwind.config.ts:101` explicitly remaps legacy `cyan` → forest "for any stragglers". `CLAUDE.md` is correct; use `pc-*`/poster tokens for new work.
-2. **Drop In architecture.** `CLAUDE.md` says the game is `public/drop-in/engine.html`, a bundler-free single file in an iframe sandboxed without `allow-same-origin`, with a vendored `three.module.js`, and that `RESORT_PROFILES` in the engine must stay hand-synced with `PROFILES` in `lib/drop-in.ts`. **None of that exists now**: `public/drop-in/` is gone, and there is no `engine.html` or non-`node_modules` `three.module.js` anywhere. Drop In is a React client app — `components/drop-in/DropInGame.tsx` drives `lib/game/runtime/GameRuntime.ts` on `lib/game/rendering/Renderer`; `lib/drop-in.ts` is a thin facade over `lib/game/config/profiles`. The drift guard is now `tests/drop-in-v1-parity.test.ts` against byte-identical fixtures in `tests/fixtures/drop-in-v1/`. `eslint.config.mjs` still ignores the removed `public/drop-in/three.module.js` — harmless, stale.
-3. **Scripts that do not exist.** `CLAUDE.md` cites `npm run drop-in:sync-three` and `npm run import-resorts`; neither is in `package.json`. Separately, `npm run liftie-sync` and `npm run snodas-sync` **do** exist but point at `scripts/liftie-sync.ts` / `scripts/snodas-sync.ts`, which are missing (that logic lives in `lib/pipeline/fetchers/`) — both are broken.
-4. **API route count.** `CLAUDE.md` says "7 route handlers in `app/api/`"; there are 16, plus the 3 outside it listed above.
-5. **Migration range.** `CLAUDE.md` says `001–011`; there are 21 files through `017`, and **migration 016 is absent from `main`** even though `docs/roadmap-2026-09-11.md` references it for open PR 69.
-6. **`public/images/`.** `CLAUDE.md` says nothing there is referenced by app code; `components/cam/CamEmbed.tsx:62` loads `/images/cam-placeholder.jpg`.
-7. **Schedules.** `docs/runbook.md` (snotel daily 07:00, cam-health weekly) disagrees with `CLAUDE.md` (snotel every 6 h, cam-health daily 06:00). The launchd plists are ground truth — verify before trusting either.
-8. **`qa-findings/` is a snapshot.** Agent 1's `/resorts` 404 is fixed by `app/resorts/route.ts` (308 → `/`), and agent 3's "no `/drop-in` entry point" is fixed by `app/drop-in/page.tsx` (static roster hub). Treat the remaining findings as unverified leads.
-
-## For agents working here
-
-- **Safe to change:** `app/`, `components/`, `lib/` (outside `lib/game/core|physics|terrain|replay`), `scripts/`, `docs/`, tests, and new additive files in `supabase/migrations/`.
-- **Mind the lint contract in `lib/game/`:** `eslint.config.mjs` forbids React, the DOM, `three`, network/audio/analytics imports, and browser globals inside `lib/game/{core,physics,terrain,replay}` — the deterministic core must stay pure and portable.
-- **Do not touch:** `package-lock.json`, `next-env.d.ts`, `tsconfig.tsbuildinfo`, `CLAUDE.md`/`GEMINI.md` (owner's guides), and the historical records `TASKS.md`, `UX-AUDIT-PLAN*.md`, `qa-findings/`.
-- **Generated / vendored (never edit):** `node_modules/`, `.next/`, `.npm-cache/`, `*.tsbuildinfo`, `public/game/terrain/*.br` (baked — regenerate with `npm run bake-terrain`, and note `*.height.u16` raw intermediates are gitignored), `plugins/*.plugin` (zips).
-- **Never commit or paste into a prompt/log:** `.env*`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, `DROP_IN_TICKET_KEYS`, `CAM_REPORT_SALT`, `RESEND_API_KEY`, `ANTHROPIC_API_KEY`, Slack bot tokens.
-- **Before finishing a change:** `npx tsc --noEmit && npm run lint && npm test`. For Drop In or runtime work, also `npm run build && npx playwright test`. Expect the 5 GDAL terrain-bake failures unless GDAL is installed — that is environmental, not your regression.
+- **Worktree hygiene:** Do feature and fix work in an isolated git worktree branched off `origin/main`, leaving the primary checkout on clean `main`.
+- **Safe to change:** `app/`, `components/`, `lib/` (respecting `eslint.config.mjs` purity rules in `lib/game/core|physics|terrain|replay`), `data/` (remember CSV edits still require an owner-approved prod import + deploy as noted above), `scripts/`, `docs/`, tests, and new additive files under `supabase/migrations/`.
+- **Do not edit carelessly / generated artifacts:** `CLAUDE.md` (owner's detailed reference — edit only when explicitly requested), historical audit/tracking docs (`TASKS.md`, `UX-AUDIT-PLAN.md`, `UX-AUDIT-PLAN-V2.md`, `qa-findings/`), `package-lock.json`, `next-env.d.ts`, `*.tsbuildinfo`, `node_modules/`, `.next/`, `.npm-cache/`, `public/game/terrain/*.height.u16` (raw intermediate; `.br` is committed), `plugins/*.plugin` (zip archives), and root PNG design references (`header-and-cards`, `resort-detail`, `filter-chips-closeup` — extensionless PNGs, not source text).
+- **Never commit or print secrets:** `.env*`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, `DROP_IN_TICKET_KEYS`, `CAM_REPORT_SALT`, `RESEND_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, DOT API keys, or Slack tokens.
+- **No unapproved production writes, pushes, or analytics pollution:** Never run write-capable sync/import scripts, DB mutations, Vercel changes against production, or push/merge to `main` without explicit owner confirmation. During read-only browser QA against `peakcam.io`, block analytics/ad hosts (`facebook.com`/`facebook.net`, `googletagmanager.com`, `google-analytics.com`, `googleadservices.com`, `doubleclick.net`, `posthog.com`, `redditstatic.com`, `reddit.com`, `vercel-insights.com`, `vercel-scripts.com`, `/_vercel/insights/*`, `/_vercel/speed-insights/*`, `/ingest`, `/api/csp-report`), and avoid calling `/api/v1/ask`, `/ask`, or the `ask` MCP tool unless testing Q&A logging.
+- **Before finishing any change:** Run `npx tsc --noEmit && npm run lint && npm test`. Expect 5 GDAL terrain-bake test failures if `gdal_translate` is not installed on `PATH` — confirm no new failures were introduced.
