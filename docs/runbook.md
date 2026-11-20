@@ -48,10 +48,10 @@ service-role key in that checkout's `.env.local`, and log to the path in the las
 | Label | Script (`ProgramArguments`) | Schedule | Writes | Log |
 |---|---|---|---|---|
 | `com.peakcam.agents` | `node agents/loop.mjs` | always-on (`KeepAlive`, `RunAtLoad`) | `agent_memory`, Slack | `agents/loop.log` |
-| `com.peakcam.snotel-sync` | `npx tsx scripts/snotel-sync.ts` | every 6 h (`StartInterval` 21,600) | `snowpack_daily`, `snow_reports` (source `snotel`), `resorts.cond_rating`; IndexNow ping when `INDEXNOW_ENABLED=1` | `scripts/snotel-sync.log` |
-| `com.peakcam.model-sync` | `npx tsx scripts/model-sync.ts` | every 6 h (21,600) | `snow_reports` (source `open_meteo`) for the resorts without a station, `cond_rating` | `scripts/model-sync.log` |
+| `com.peakcam.snotel-sync` | `npx tsx scripts/snotel-sync.ts` | 00:15, 05:15, 06:15, 12:15, 18:15 Central (`StartCalendarInterval` ×5; two morning runs because NRCS has the day's values from about 11:00 UTC and sometimes answers 5xx) | `snowpack_daily`, `snow_reports` (source `snotel`), `resorts.cond_rating`; IndexNow ping when `INDEXNOW_ENABLED=1` | `scripts/snotel-sync.log` |
+| `com.peakcam.model-sync` | `npx tsx scripts/model-sync.ts` | 00:45, 06:45, 12:45, 18:45 Central (`StartCalendarInterval` ×4) | `snow_reports` (source `open_meteo`) for the resorts without a station, `cond_rating` | `scripts/model-sync.log` |
 | `com.peakcam.stations-sync` | `npx tsx scripts/stations-sync.ts` | hourly (3,600) | `stations`, `resort_stations`, `station_observations` (migration 026); never `snow_reports` | `scripts/stations-sync.log` |
-| `com.peakcam.forecast-sync` | `npx tsx scripts/forecast-sync.ts` | every 6 h (21,600, `RunAtLoad`) | `forecast_runs`, `forecast_daily` (027); ~240 Open-Meteo calls a run; retention pass after 00:00 UTC | `scripts/forecast-sync.log` |
+| `com.peakcam.forecast-sync` | `npx tsx scripts/forecast-sync.ts` | 01:05, 09:05, 17:05 Central (`StartCalendarInterval` ×3, no `RunAtLoad`) | `forecast_runs`, `forecast_daily` (027); ~240 Open-Meteo calls a run; retention pass after 00:00 UTC | `scripts/forecast-sync.log` |
 | `com.peakcam.forecast-score` | `npx tsx scripts/forecast-score.ts` | daily 07:30 (`StartCalendarInterval`) | `forecast_scores` (027), graded against SNOTEL depth deltas over 90 days | `scripts/forecast-score.log` |
 | `com.peakcam.score-sync` | `npx tsx scripts/score-sync.ts` | 07:45 and 19:45 (`StartCalendarInterval` ×2, `RunAtLoad`) | `resort_scores` (028): one 0–100 Snow Score row per resort per day with five components (`lib/score.ts`), idempotent on `(resort_id, date)`; **to deploy** (P7, 2026-10-20, see "Snow Score") | `scripts/score-sync.log` |
 | `com.peakcam.operator-sync` | `npx tsx scripts/operator-sync.ts` | 06:00 and 11:00 (`StartCalendarInterval` ×2) | `operator_status` (032), read from each operator's own lift-status page with Liftie's parsers (see "Operator status"); exit 1 only when every resort fails | `scripts/operator-sync.log` |
@@ -85,6 +85,24 @@ fails). A pull alone is enough for a script change (each run starts a fresh proc
 change needs the reload. The dependency order when restarting everything: `snotel-sync` and
 `model-sync` first (they feed `snow_reports`), then `stations-sync`, `forecast-sync` (and the
 scorer the next morning), `cam-stills` before `cam-timelapse`.
+
+**Why three jobs run at fixed clock times (2026-11-20).** `snotel-sync`, `model-sync` and
+`forecast-sync` used `StartInterval` 21,600. launchd counts an interval from the end of the
+previous run, so each start drifted later every day (about 17 minutes for `snotel-sync`).
+Two things broke:
+
+- The powder-alert cron runs at 13:00 UTC (`vercel.json`) and reads `latest_snow_reports`.
+  By 2026-11-19 the morning SNOTEL run had drifted past 13:00 UTC, so alerts went out on the
+  previous day's numbers. The 06:15 and 06:45 Central runs now finish before 13:00 UTC in
+  both standard and daylight time.
+- Open-Meteo allows 10,000 weighted calls per UTC day per address. A forecast run costs about
+  2,631 and a model run about 330. Most UTC days held four forecast runs (10,524 + 1,320),
+  which ran the allowance out mid-afternoon. Three forecast runs and four model runs cost
+  about 9,213 and leave roughly 790 for local builds. `forecast-sync` no longer has
+  `RunAtLoad`, so reloading the job does not spend a run.
+
+To run one now, kickstart it; a kickstart does not move the calendar times. Count an extra
+forecast or model run against the same daily allowance before starting it.
 
 First-time deploy notes for the individual jobs follow; they are kept because each carries
 its dry-run and verification commands.

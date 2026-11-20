@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { getAllResorts, getLatestScoresIndex, getResortOpenings } from "@/lib/supabase";
 import { homeSentence, scoreLeadersSentence } from "@/lib/quotable";
 import { scoreLeaders } from "@/lib/public-api/score";
-import { isFeaturedCandidate } from "@/lib/featured-resorts";
+import { FEATURED_LIMIT, isFeaturedCandidate, pickFeatured } from "@/lib/featured-resorts";
 import { serializeScoreLight } from "@/lib/public-api/serialize";
 import type { FeaturedScores } from "@/components/browse/BrowsePage";
 import { getRadarFrames } from "@/lib/weather-radar";
@@ -14,6 +14,8 @@ import { PowderTicker } from "@/components/home/PowderTicker";
 import { LiveWebcams } from "@/components/home/LiveWebcams";
 import { SnowCams } from "@/components/home/SnowCams";
 import { PeakFooter } from "@/components/home/PeakFooter";
+import { FeatureShowcase } from "@/components/home/FeatureShowcase";
+import { pickShowcaseResort } from "@/lib/home-showcase";
 import type { ResortWithData } from "@/lib/types";
 
 export const revalidate = 3600;
@@ -76,12 +78,19 @@ export default async function Home() {
   // "Where's it good?": the strip ranks on the score when any resort has one,
   // under a sentence dated by the score day (lib/quotable.ts scoreLeadersSentence).
   const featured: FeaturedScores | null = scoreIndex && Object.keys(scoreIndex).length
-    ? {
-        scores: Object.fromEntries(Object.entries(scoreIndex).map(([id, row]) => [id, serializeScoreLight(row)])),
-        // Same gate as the cards below it (lib/featured-resorts.ts), so the
-        // sentence never names a resort the strip leaves out.
-        sentence: { segments: scoreLeadersSentence(scoreLeaders(resorts.filter((r) => isFeaturedCandidate(r, new Date())), scoreIndex)).segments },
-      }
+    ? (() => {
+        const scores = Object.fromEntries(Object.entries(scoreIndex).map(([id, row]) => [id, serializeScoreLight(row)]));
+        const now = new Date();
+        // The sentence names exactly the resorts on the cards below it, in the
+        // cards' order: both come from pickFeatured (lib/featured-resorts.ts),
+        // which breaks score ties on new snow. When the strip shows nothing
+        // (every pick rated poor) the sentence falls back to the gated leaders.
+        const shown = pickFeatured(resorts, scores, now);
+        const leaders = shown.length
+          ? shown.map((r) => ({ name: r.name, slug: r.slug, score: Math.round(Number(scoreIndex[r.id].score)), date: scoreIndex[r.id].date }))
+          : scoreLeaders(resorts.filter((r) => isFeaturedCandidate(r, now)), scoreIndex);
+        return { scores, sentence: { segments: scoreLeadersSentence(leaders, FEATURED_LIMIT).segments } };
+      })()
     : null;
 
   // The quotable line under the wordmark: dated by the newest report, not by
@@ -140,7 +149,12 @@ export default async function Home() {
       />
       <PeakHero resortCount={resorts.length} freshness={{ segments: freshness.segments }} />
       <PowderTicker alerts={powderAlerts} />
-      <BrowsePage resorts={resorts} radarFrames={radarFrames} featured={featured} />
+      <BrowsePage
+        resorts={resorts}
+        radarFrames={radarFrames}
+        featured={featured}
+        afterFeatured={<FeatureShowcase resort={pickShowcaseResort(resorts, scoreIndex, new Date())} />}
+      />
       {snowCams.length > 0 && (
         <Suspense fallback={<div className="h-96 animate-pulse bg-surface rounded-lg" />}>
           <SnowCams snowCams={snowCams} />
