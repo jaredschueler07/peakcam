@@ -69,8 +69,11 @@ function loadEnv(file: string) {
 loadEnv(path.join(ROOT, ".env.local")); loadEnv(path.join(ROOT, ".env"));
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!SUPABASE_URL || !SERVICE_KEY) { console.error("Missing NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY"); process.exit(1); }
-const sb = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` };
+// Only a real run needs the keys: the unit test imports the pure helpers
+// (frameStats, isBlankFrame) and must load with no env at all.
+const invokedDirectly = !!process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (invokedDirectly && (!SUPABASE_URL || !SERVICE_KEY)) { console.error("Missing NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY"); process.exit(1); }
+const sb = { apikey: SERVICE_KEY ?? "", Authorization: `Bearer ${SERVICE_KEY ?? ""}` };
 
 const args = process.argv.slice(2);
 const DRY = args.includes("--dry-run");
@@ -334,5 +337,4 @@ async function main() {
   console.log(`[cam-stills] done: ${summary.stored} latest stored, ${summary.archived} archived (${summary.keepers} keepers), ${summary.blank} blank, ${summary.failed} failed, ${pruneNote}`);
 }
 
-const invokedDirectly = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (invokedDirectly) main().catch(e => { console.error("[cam-stills] fatal:", e); process.exit(1); });
