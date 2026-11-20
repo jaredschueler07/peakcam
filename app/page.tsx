@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { getAllResorts, getLatestScoresIndex, getResortOpenings } from "@/lib/supabase";
 import { homeSentence, scoreLeadersSentence } from "@/lib/quotable";
 import { scoreLeaders } from "@/lib/public-api/score";
+import { isFeaturedCandidate } from "@/lib/featured-resorts";
 import { serializeScoreLight } from "@/lib/public-api/serialize";
 import type { FeaturedScores } from "@/components/browse/BrowsePage";
 import { getRadarFrames } from "@/lib/weather-radar";
@@ -77,7 +78,9 @@ export default async function Home() {
   const featured: FeaturedScores | null = scoreIndex && Object.keys(scoreIndex).length
     ? {
         scores: Object.fromEntries(Object.entries(scoreIndex).map(([id, row]) => [id, serializeScoreLight(row)])),
-        sentence: { segments: scoreLeadersSentence(scoreLeaders(resorts, scoreIndex)).segments },
+        // Same gate as the cards below it (lib/featured-resorts.ts), so the
+        // sentence never names a resort the strip leaves out.
+        sentence: { segments: scoreLeadersSentence(scoreLeaders(resorts.filter((r) => isFeaturedCandidate(r, new Date())), scoreIndex)).segments },
       }
     : null;
 

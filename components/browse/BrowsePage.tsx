@@ -14,7 +14,7 @@ import { AuthModal } from "@/components/auth/AuthModal";
 import { stageGuestLineup } from "@/components/auth/lineup-gate";
 import type { ResortWithData } from "@/lib/types";
 import type { RadarFrame } from "@/lib/weather-radar";
-import { isOffSeason } from "@/lib/map-utils";
+import { pickFeatured } from "@/lib/featured-resorts";
 import type { ScoreLightPublic } from "@/lib/public-api/schema";
 import type { Quotable } from "@/lib/quotable";
 // Curated popularity ranking — order matters, top of list = top of grid. Based
@@ -241,27 +241,12 @@ function AlertSignupBanner({ resorts }: { resorts: ResortWithData[] }) {
 
 function FeaturedRow({ resorts, scores }: { resorts: ResortWithData[]; scores?: FeaturedScores | null }) {
   const byScore = Boolean(scores && Object.keys(scores.scores).length);
-  const featured = useMemo(() => {
-    const now = new Date();
-    // In-season only: a stale "great" on a summer-closed resort shouldn't
-    // headline "Today's Top" (matches the map's off-season treatment).
-    const inSeason = resorts.filter((r) => r.snow_report && r.cond_rating && !isOffSeason(r.lat, now));
-    if (byScore) {
-      // P7: rank on today's Snow Score; a resort without a score sorts last.
-      const score = (r: ResortWithData) => scores?.scores[r.id]?.score ?? -1;
-      const sorted = [...inSeason].sort((a, b) => score(b) - score(a) || (b.snow_report?.new_snow_24h ?? 0) - (a.snow_report?.new_snow_24h ?? 0)).slice(0, 4);
-      return sorted.some((r) => (scores?.scores[r.id]?.rating ?? "poor") !== "poor") ? sorted : [];
-    }
-    const sorted = inSeason
-      .sort((a, b) => {
-        const condDiff = (CONDITION_ORDER[a.cond_rating] ?? 99) - (CONDITION_ORDER[b.cond_rating] ?? 99);
-        if (condDiff !== 0) return condDiff;
-        return (b.snow_report?.new_snow_24h ?? 0) - (a.snow_report?.new_snow_24h ?? 0);
-      })
-      .slice(0, 4);
-    const hasGoodOrBetter = sorted.some(r => r.cond_rating === "great" || r.cond_rating === "good");
-    return hasGoodOrBetter ? sorted : [];
-  }, [resorts, scores, byScore]);
+  // Candidates and order live in lib/featured-resorts.ts (in season, at least
+  // two active resort cams, ranked on today's Snow Score when there is one).
+  const featured = useMemo(
+    () => pickFeatured(resorts, byScore ? scores?.scores : null, new Date()),
+    [resorts, scores, byScore],
+  );
 
   if (featured.length === 0) return null;
 
