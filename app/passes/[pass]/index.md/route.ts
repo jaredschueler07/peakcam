@@ -16,6 +16,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pas
       headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
     });
   }
-  const page = buildPassPage(pass, await getAllResorts(), SITE_URL, await getHubLiftsIndex(new Date()));
+  const resorts = await getAllResorts();
+  const page = buildPassPage(pass, resorts, SITE_URL, await getHubLiftsIndex(new Date(), resorts));
   return new Response(passMarkdown(page), { headers: markdownPageHeaders(page.pageUrl) });
 }

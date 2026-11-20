@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ResortWithData } from "@/lib/types";
 import { isOffSeason } from "@/lib/map-utils";
 import { regionHubPath, slugifyHub, stateHubPath, stateLabel } from "@/lib/hubs";
-import { hasOpenLifts, hubDisplayRating, liftsCellLabel, liftsCellText, liftsFootnote, type HubLiftsIndex } from "@/lib/hub-lifts";
+import { hasOpenLifts, hubDisplayRating, liftsCellLabel, liftsCellText, liftsFootnote, liftsMobileText, opensToday, type HubLiftsIndex } from "@/lib/hub-lifts";
 import { HubRatingPill } from "./HubRatingPill";
 import { OpenPerFeedChip } from "./OpenPerFeedChip";
 
@@ -98,11 +98,11 @@ export function HubResortTable({ resorts, placeColumn, linkedRegionSlugs, now, l
                   <Link href={`/resorts/${resort.slug}`} className="font-bold text-ink underline-offset-2 hover:underline">
                     {resort.name}
                   </Link>
-                  {hasOpenLifts(resortLifts) && (
+                  {resortLifts && (hasOpenLifts(resortLifts) || opensToday(resortLifts)) && (
                     <>
                       {" "}
-                      <OpenPerFeedChip label={liftsCellLabel(resortLifts, resort.name)} />
-                      <span className="block text-xs font-bold text-forest-dk sm:hidden">{liftsCellText(resortLifts)} lifts open</span>
+                      <OpenPerFeedChip label={liftsCellLabel(resortLifts, resort.name)} variant={opensToday(resortLifts) ? "opens-today" : "open"} />
+                      <span className={`block text-xs font-bold sm:hidden ${opensToday(resortLifts) ? "text-bark" : "text-forest-dk"}`}>{liftsMobileText(resortLifts)}</span>
                     </>
                   )}
                   <span className="block text-xs text-bark md:hidden">

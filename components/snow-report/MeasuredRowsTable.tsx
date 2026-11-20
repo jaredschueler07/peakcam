@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { MeasuredRow } from "@/lib/snow-hubs";
 import { stateLabel } from "@/lib/hubs";
 import { formatMountainTime, inches, sourceLabel } from "@/lib/quotable";
-import { hasOpenLifts, liftsCellLabel, liftsCellText, liftsFootnote } from "@/lib/hub-lifts";
+import { hasOpenLifts, liftsCellLabel, liftsCellText, liftsFootnote, liftsMobileText, opensToday } from "@/lib/hub-lifts";
 import { OpenPerFeedChip } from "@/components/hubs/OpenPerFeedChip";
 
 /**
@@ -49,11 +49,11 @@ export function MeasuredRowsTable({ rows, placeColumn }: { rows: MeasuredRow[]; 
                 <Link href={`/resorts/${row.slug}`} prefetch={false} className="font-bold text-ink underline-offset-2 hover:underline">
                   {row.name}
                 </Link>
-                {hasOpenLifts(row.lifts) && (
+                {row.lifts && (hasOpenLifts(row.lifts) || opensToday(row.lifts)) && (
                   <>
                     {" "}
-                    <OpenPerFeedChip label={liftsCellLabel(row.lifts, row.name)} />
-                    <span className="block text-xs font-bold text-forest-dk sm:hidden">{liftsCellText(row.lifts)} lifts open</span>
+                    <OpenPerFeedChip label={liftsCellLabel(row.lifts, row.name)} variant={opensToday(row.lifts) ? "opens-today" : "open"} />
+                    <span className={`block text-xs font-bold sm:hidden ${opensToday(row.lifts) ? "text-bark" : "text-forest-dk"}`}>{liftsMobileText(row.lifts)}</span>
                   </>
                 )}
                 <span className="block text-xs text-bark">

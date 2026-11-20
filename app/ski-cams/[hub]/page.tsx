@@ -112,7 +112,7 @@ export default async function HubPage({ params }: { params: Params }) {
   // FAQ all derive from it, so they cannot disagree about the season.
   const now = new Date();
   // Operator lift counts for the table (fails soft to none).
-  const lifts = await getHubLiftsIndex(now);
+  const lifts = await getHubLiftsIndex(now, resorts);
   const offSeason = hubOffSeason(resorts, now);
   const summary = hubSummary(resorts);
   const table = sortHubTable(resorts);

@@ -43,7 +43,8 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 export default async function PassPage({ params }: { params: Params }) {
   const { pass } = await params;
   if (!isSeasonPassSlug(pass)) return notFound();
-  const [resorts, lifts] = await Promise.all([getAllResorts(), getHubLiftsIndex(new Date())]);
+  const resorts = await getAllResorts();
+  const lifts = await getHubLiftsIndex(new Date(), resorts);
   const page = buildPassPage(pass, resorts, SITE_URL, lifts);
   const { info } = page;
   const title = passTitle(page);

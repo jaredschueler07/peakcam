@@ -1119,6 +1119,21 @@ export const ConditionsContractSchema = z
     status: ConditionStatusFieldSchema,
     recommendableToday: z.boolean().describe("True only when the status is OPEN on a usable source, a current base depth is on file and the rating is not poor."),
     reasons: z.array(z.string()).describe("Why the status and the verdict came out as they did, in order; quote them."),
+    liftDay: z
+      .object({
+        state: z.enum(["operated", "scheduled", "closed"]).describe("`operated`: a reading today showed a lift open, so the resort is open for the rest of its local day. `scheduled`: none open yet, some scheduled to open today. `closed`: a reading between 10:00 and 15:00 resort time showed none open and none scheduled."),
+        localDate: z.string().describe("YYYY-MM-DD at the resort."),
+        liftsOpen: z.number().describe("For `operated`, lifts open in the day's latest reading that showed any open; otherwise 0."),
+        liftsTotal: z.number().nullable(),
+        liftsScheduled: z.number().nullable(),
+        observedAt: z.string().describe("The reading the count comes from (ISO)."),
+        newestAt: z.string().describe("The day's newest reading (ISO)."),
+        current: z.boolean().describe("True when the newest reading itself still shows lifts open."),
+        carried: z.boolean().describe("True between resort-local midnight and the day's first reading: the count is the previous day's last open reading and `localDate` is that previous day. Do not call it today's."),
+      })
+      .nullable()
+      .optional()
+      .describe("What the operator's lift feed said over the resort's local day, when the feed decided `status`; null when the season dates decided. `liftsOpen` (the field) is always the newest reading; after the last chair it reads 0 while this still records that lifts ran today."),
     depthDisagreement: DepthDisagreementSchema.nullable(),
     seasonOpening: ConditionTextFieldSchema.describe("YYYY-MM-DD. Source `operator` for a resort-confirmed date, `profile` for a third-party projection."),
     seasonClosing: ConditionTextFieldSchema.describe("YYYY-MM-DD, mainly Southern-hemisphere rows."),

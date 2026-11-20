@@ -196,6 +196,20 @@ export interface OperatorStatusRow {
   opening_date: string | null;  // YYYY-MM-DD
   source_url: string | null;
   verified: boolean;
+  /**
+   * Not a column: lib/supabase.ts attaches the resort's readings from the
+   * last 30 h (newest first) so the day rules (lib/operator-day.ts) can read
+   * the whole local day. Absent when that read failed or was not made.
+   */
+  recent?: OperatorRecentReading[];
+}
+
+/** The slim columns of one `operator_status` row that the day rules read. */
+export interface OperatorRecentReading {
+  observed_at: string;
+  lifts_open: number | null;
+  lifts_scheduled: number | null;
+  lifts_total: number | null;
 }
 
 // ── Scores (migration 028, written by scripts/score-sync.ts, P7) ──

@@ -97,7 +97,7 @@ test("no hub slug in the catalogue shadows a static /snow-report child", () => {
 });
 
 test("a row carries its lift count and the markdown table prints it with the feed's time", () => {
-  const lifts = { [ROWS[0].id]: { open: 8, total: 35, observedAt: "2026-11-20T17:00:00.000Z" } };
+  const lifts = { [ROWS[0].id]: { state: "operated" as const, open: 8, total: 35, scheduled: null, observedAt: "2026-11-20T17:00:00.000Z", current: true, carried: false } };
   const page = buildSnowHub("colorado", ROWS, "https://x.test", lifts)!;
   const wolf = page.rows.find((r) => r.slug === ROWS[0].slug)!;
   assert.deepEqual(wolf.lifts, lifts[ROWS[0].id]);
