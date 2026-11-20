@@ -1,0 +1,18 @@
+{
+  "name": "Vail",
+  "url": {
+    "host": "https://www.vail.com",
+    "pathname": "/the-mountain/mountain-conditions/terrain-and-lift-status.aspx"
+  },
+  "tags": [
+    "Colorado",
+    "Vail Epic"
+  ],
+  "opening": "2017-11-17",
+  "ll": [
+    -106.356155,
+    39.605026
+  ],
+  "twitter": "vailmtn",
+  "noaa": "GJT/174,119"
+}

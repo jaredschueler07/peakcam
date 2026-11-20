@@ -1,0 +1,22 @@
+{
+  "name": "Waterville Valley",
+  "url": {
+    "host": "http://www.waterville.com",
+    "pathname": "/snow-report-maps"
+  },
+  "dataUrl": {
+    "host": "http://features.waterville.com",
+    "pathname": "/propsnow/"
+  },
+  "tags": [
+    "New Hampshire",
+    "New England"
+  ],
+  "opening": "2017-11-24",
+  "ll": [
+    -71.519989,
+    43.961613
+  ],
+  "twitter": "waterville",
+  "noaa": "GYX/28,64"
+}

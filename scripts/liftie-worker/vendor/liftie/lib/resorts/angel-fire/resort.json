@@ -1,0 +1,17 @@
+{
+  "name": "Angel Fire",
+  "url": {
+    "host": "https://www.angelfireresort.com",
+    "pathname": "/trail-and-lift-status/"
+  },
+  "tags": [
+    "New Mexico"
+  ],
+  "opening": "2017-12-09",
+  "ll": [
+    -105.273903,
+    36.387402
+  ],
+  "twitter": "AngelFireResort",
+  "noaa": "ABQ/153,175"
+}

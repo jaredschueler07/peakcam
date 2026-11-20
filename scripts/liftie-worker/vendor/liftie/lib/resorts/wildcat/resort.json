@@ -1,0 +1,19 @@
+{
+  "name": "Wildcat",
+  "url": {
+    "host": "https://www.skiwildcat.com",
+    "pathname": "/the-mountain/mountain-conditions/lift-and-terrain-status.aspx"
+  },
+  "tags": [
+    "New Hampshire",
+    "New England",
+    "Vail Epic"
+  ],
+  "ll": [
+    -71.236725,
+    44.264626
+  ],
+  "twitter": "skiwildcat",
+  "opening": "2017-11-25",
+  "noaa": "GYX/35,80"
+}

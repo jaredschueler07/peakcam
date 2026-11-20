@@ -1,0 +1,16 @@
+{
+  "name": "Gore Mountain",
+  "url": {
+    "host": "https://goremountain.com",
+    "pathname": "/the-mountain/conditions/"
+  },
+  "tags": [
+    "New York"
+  ],
+  "ll": [
+    -74.007172,
+    43.672653
+  ],
+  "twitter": "GoreMountain",
+  "noaa": "ALY/56,108"
+}

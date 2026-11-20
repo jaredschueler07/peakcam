@@ -1,0 +1,22 @@
+{
+  "name": "Jay Peak",
+  "url": {
+    "host": "https://jaypeakresort.com",
+    "pathname": "/skiing-riding/snow-report-maps/snow-report"
+  },
+  "dataUrl": {
+    "host": "https://digital.jaypeakresort.com",
+    "pathname": "/conditions/snow-report/snow-report/"
+  },
+  "tags": [
+    "New England",
+    "Vermont"
+  ],
+  "ll": [
+    -72.501701,
+    44.928837
+  ],
+  "twitter": "jaypeakresort",
+  "opening": "2017-11-24",
+  "noaa": "BTV/108,81"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "Crested Butte",
+  "url": {
+    "host": "https://www.skicb.com",
+    "pathname": "/the-mountain/mountain-conditions/lift-and-terrain-status.aspx"
+  },
+  "tags": [
+    "Colorado",
+    "Vail Epic"
+  ],
+  "ll": [
+    -106.964821,
+    38.899502
+  ],
+  "twitter": "skicrestedbutte",
+  "opening": "2017-11-23",
+  "noaa": "GJT/150,89"
+}

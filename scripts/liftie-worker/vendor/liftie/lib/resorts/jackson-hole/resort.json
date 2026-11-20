@@ -1,0 +1,21 @@
+{
+  "name": "Jackson Hole",
+  "url": {
+    "host": "https://www.jacksonhole.com",
+    "pathname": "/maps/mountain-winter"
+  },
+  "api": {
+    "host": "https://www.jacksonhole.com",
+    "pathname": "/api/all.json"
+  },
+  "tags": [
+    "Wyoming"
+  ],
+  "opening": "2017-11-25",
+  "ll": [
+    -110.827438,
+    43.588318
+  ],
+  "twitter": "jhski",
+  "noaa": "RIW/40,144"
+}

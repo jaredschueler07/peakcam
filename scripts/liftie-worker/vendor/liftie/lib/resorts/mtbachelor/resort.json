@@ -1,0 +1,21 @@
+{
+  "name": "Mount Bachelor",
+  "url": {
+    "host": "https://www.mtbachelor.com",
+    "pathname": "/the-mountain/weather-operations/lift-trail-report"
+  },
+  "api": {
+    "host": "https://api.mtbachelor.com",
+    "pathname": "/api/v1/dor/drupal/lifts"
+  },
+  "tags": [
+    "Oregon",
+    "Powdr"
+  ],
+  "ll": [
+    -121.67865,
+    44.003559
+  ],
+  "twitter": "mtbachelor",
+  "noaa": "PDT/23,41"
+}

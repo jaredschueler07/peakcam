@@ -1,0 +1,21 @@
+{
+  "name": "Mammoth Mountain",
+  "url": {
+    "host": "https://www.mammothmountain.com",
+    "pathname": "/on-the-mountain/mountain-report#lifts-and-trails"
+  },
+  "api": {
+    "host": "https://mtnpowder.com",
+    "pathname": "/feed/60/lifts"
+  },
+  "tags": [
+    "California"
+  ],
+  "opening": "2017-11-09",
+  "ll": [
+    -119.037346,
+    37.651772
+  ],
+  "twitter": "MammothMountain",
+  "noaa": "REV/57,18"
+}
