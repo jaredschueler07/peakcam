@@ -14,6 +14,8 @@ import { PowderTicker } from "@/components/home/PowderTicker";
 import { LiveWebcams } from "@/components/home/LiveWebcams";
 import { SnowCams } from "@/components/home/SnowCams";
 import { PeakFooter } from "@/components/home/PeakFooter";
+import { FeatureShowcase } from "@/components/home/FeatureShowcase";
+import { pickShowcaseResort } from "@/lib/home-showcase";
 import type { ResortWithData } from "@/lib/types";
 
 export const revalidate = 3600;
@@ -140,7 +142,12 @@ export default async function Home() {
       />
       <PeakHero resortCount={resorts.length} freshness={{ segments: freshness.segments }} />
       <PowderTicker alerts={powderAlerts} />
-      <BrowsePage resorts={resorts} radarFrames={radarFrames} featured={featured} />
+      <BrowsePage
+        resorts={resorts}
+        radarFrames={radarFrames}
+        featured={featured}
+        afterFeatured={<FeatureShowcase resort={pickShowcaseResort(resorts, scoreIndex, new Date())} />}
+      />
       {snowCams.length > 0 && (
         <Suspense fallback={<div className="h-96 animate-pulse bg-surface rounded-lg" />}>
           <SnowCams snowCams={snowCams} />
