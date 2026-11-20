@@ -190,9 +190,13 @@ export const DISABLE_THRESHOLD = 3;
  * Returns { body, transition } — body is the PATCH payload,
  * transition is null | "disabled" | "recovered" (for logging).
  * Never touches manually-disabled cams (is_active=false && !auto_disabled).
+ * `countFailure: false` records the check without moving the failure counter
+ * or the disable switch — used for a stream that is expected to be dark (an
+ * off-season resort), which must neither be disabled nor read as recovered.
  */
-export function computeCamUpdate(cam, isAlive) {
+export function computeCamUpdate(cam, isAlive, { countFailure = true } = {}) {
   const body = { last_checked_at: new Date().toISOString() };
+  if (!isAlive && !countFailure) return { body, transition: null };
   const manuallyDisabled = !cam.is_active && !cam.auto_disabled;
   if (isAlive) {
     body.consecutive_failures = 0;
@@ -218,6 +222,72 @@ export function computeCamUpdate(cam, isAlive) {
   return { body, transition: null };
 }
 
+// ─── ipcamlive stream state ─────────────────────────────────────────────
+//
+// An ipcamlive player page (`…ipcamlive.com/player/player.php?alias=X`) answers
+// 200 whether or not the camera is streaming, so the generic iframe probe below
+// called a dark player healthy (China Peak, 2026-11-20: five of six cams with
+// no stream, all reported live). The player itself asks
+// `/player/getcamerastreamstate.php?alias=X` and shows its offline card when
+// `details.streamavailable` is 0, so the probe asks the same question.
+
+export const IPCAMLIVE_NO_STREAM = "ipcamlive: no stream";
+
+/**
+ * Pure. For an ipcamlive player URL returns { alias, stateUrl } on the same
+ * host; null for anything else (other hosts, no alias, an unparsable URL).
+ */
+export function ipcamliveStateUrl(embedUrl) {
+  if (typeof embedUrl !== "string" || !embedUrl) return null;
+  let url;
+  try {
+    url = new URL(embedUrl);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+  const host = url.hostname.toLowerCase();
+  if (host !== "ipcamlive.com" && !host.endsWith(".ipcamlive.com")) return null;
+  if (!/\/player\/player\.php$/.test(url.pathname)) return null;
+  const alias = url.searchParams.get("alias");
+  if (!alias || !/^[A-Za-z0-9]+$/.test(alias)) return null;
+  return { alias, stateUrl: `https://${host}/player/getcamerastreamstate.php?alias=${alias}` };
+}
+
+/**
+ * Pure. Reads a getcamerastreamstate.php body.
+ *   "up"      details.streamavailable is "1" / 1
+ *   "down"    details.streamavailable is "0" / 0
+ *   "unknown" anything else (not JSON, no details, another value) — the caller
+ *             falls back to the generic probe rather than count a failure.
+ */
+export function ipcamliveVerdict(payload) {
+  let data = payload;
+  if (typeof payload === "string") {
+    try {
+      data = JSON.parse(payload);
+    } catch {
+      return "unknown";
+    }
+  }
+  const flag = data && typeof data === "object" ? data.details?.streamavailable : undefined;
+  if (flag === "1" || flag === 1) return "up";
+  if (flag === "0" || flag === 0) return "down";
+  return "unknown";
+}
+
+/**
+ * Pure. Same months as isOffSeason() in lib/map-utils.ts (this script runs
+ * under plain node and cannot import that TypeScript module; the test pins the
+ * two together). A resort with no usable latitude is treated as in season.
+ */
+export function isOffSeasonAt(lat, date) {
+  if (typeof lat !== "number" || !Number.isFinite(lat)) return false;
+  const month = date.getMonth() + 1;
+  const inSeason = lat >= 0 ? month >= 11 || month <= 4 : month >= 5 && month <= 10;
+  return !inSeason;
+}
+
 // ─── Step 1: Fetch all cams ─────────────────────────────────────────────
 
 async function fetchAllCams() {
@@ -234,6 +304,16 @@ async function fetchAllCams() {
   });
   if (!resp.ok) throw new Error(`Supabase cams fetch failed: ${resp.status}`);
   return resp.json();
+}
+
+/** resort id → latitude, for the off-season guard. Read-only. */
+async function fetchResortLatitudes() {
+  const resp = await fetch(`${SUPABASE_URL}/rest/v1/resorts?select=id,lat`, {
+    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+  });
+  if (!resp.ok) throw new Error(`Supabase resorts fetch failed: ${resp.status}`);
+  const rows = await resp.json();
+  return new Map(rows.map((r) => [r.id, typeof r.lat === "number" ? r.lat : Number(r.lat)]));
 }
 
 // ─── Step 2: Check a single cam ─────────────────────────────────────────
@@ -312,6 +392,29 @@ async function checkCamOnce(cam, timeout) {
     }
   }
 
+  // ipcamlive players: ask the provider whether a stream exists. Any trouble
+  // with the state endpoint (network, non-200, unreadable body) is "unknown"
+  // and falls through to the generic probe — it never counts as a failure.
+  const ipcamlive = ipcamliveStateUrl(cam.embed_url);
+  if (ipcamlive) {
+    let verdict = "unknown";
+    try {
+      const resp = await fetch(ipcamlive.stateUrl, {
+        headers: { ...HEADERS, "Accept": "application/json,*/*" },
+        redirect: "follow",
+        signal: AbortSignal.timeout(timeout),
+      });
+      const text = await resp.text();
+      if (resp.ok) verdict = ipcamliveVerdict(text);
+    } catch {
+      verdict = "unknown";
+    }
+    if (verdict === "up") return { ok: true, status: 200 };
+    // Not retryable: the provider answered, and it will say the same thing a
+    // second later.
+    if (verdict === "down") return { ok: false, status: 200, error: IPCAMLIVE_NO_STREAM, retryable: false, noStream: true };
+  }
+
   // iframe / link — GET request with proper headers
   try {
     const resp = await fetch(cam.embed_url, {
@@ -331,10 +434,10 @@ async function checkCamOnce(cam, timeout) {
 
 // ─── Step 3: Update last_checked_at ─────────────────────────────────────
 
-async function updateCamStatus(cam, isAlive) {
+async function updateCamStatus(cam, isAlive, options) {
   // Auto-disable a cam after DISABLE_THRESHOLD consecutive failures; auto-recover
   // it once it comes back alive. Manually disabled cams are never touched.
-  const { body, transition } = computeCamUpdate(cam, isAlive);
+  const { body, transition } = computeCamUpdate(cam, isAlive, options);
 
   const resp = await fetch(
     `${SUPABASE_URL}/rest/v1/cams?id=eq.${cam.id}`,
@@ -365,6 +468,18 @@ async function main() {
   const cams = await fetchAllCams();
   console.log(`[cam-health] Found ${cams.length} cams in database\n`);
 
+  // Off-season guard: a southern-hemisphere cam with no stream in November is
+  // closed for the summer, not broken. If the latitudes cannot be read the
+  // guard is off and every resort counts as in season.
+  let latByResort = new Map();
+  try {
+    latByResort = await fetchResortLatitudes();
+  } catch (err) {
+    console.error(`[cam-health] WARN off-season guard disabled: ${err.message}`);
+  }
+  const now = new Date();
+  let offSeasonDark = 0;
+
   const results = { working: [], dead: [] };
   const deadDetail = new Map(); // cam.id → why, for the summary
   const byType = {};
@@ -391,9 +506,17 @@ async function main() {
       console.log(`  DEAD [${type}] ${cam.name} — ${detail}`);
     }
 
+    // "No stream" at an off-season resort is expected: record the check but
+    // do not count it toward the auto-disable threshold.
+    const countFailure = !(check.noStream && isOffSeasonAt(latByResort.get(cam.resort_id), now));
+    if (!check.ok && !countFailure) {
+      offSeasonDark++;
+      console.log(`  ....  off-season, not counted toward auto-disable: ${cam.name}`);
+    }
+
     // Update last_checked_at, tally consecutive failures, and auto-disable/recover
     try {
-      const transition = await updateCamStatus(cam, check.ok);
+      const transition = await updateCamStatus(cam, check.ok, { countFailure });
       if (transition === "disabled") {
         disabledCount++;
         console.log(`  ⛔  Auto-disabled ${cam.name} after ${DISABLE_THRESHOLD} consecutive failures`);
@@ -434,7 +557,7 @@ async function main() {
     `\n[cam-health] Done. ${results.working.length}/${cams.length} cams healthy.`
   );
   console.log(
-    `[cam-health] ${disabledCount} disabled this run, ${recoveredCount} recovered, ${tlsCount} failing TLS`
+    `[cam-health] ${disabledCount} disabled this run, ${recoveredCount} recovered, ${tlsCount} failing TLS, ${offSeasonDark} off-season with no stream (not counted)`
   );
 }
 

@@ -1,6 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { computeCamUpdate, DISABLE_THRESHOLD, classifyFetchError, TLS_ERROR_CODES } from "./cam-health-check.mjs";
+import {
+  computeCamUpdate,
+  DISABLE_THRESHOLD,
+  classifyFetchError,
+  TLS_ERROR_CODES,
+  ipcamliveStateUrl,
+  ipcamliveVerdict,
+  isOffSeasonAt,
+  IPCAMLIVE_NO_STREAM,
+} from "./cam-health-check.mjs";
+// tsx hands a .ts module to an .mjs importer through CJS interop, so the named
+// export may sit on `default`.
+import * as mapUtils from "../lib/map-utils.ts";
+const isOffSeason = mapUtils.isOffSeason ?? mapUtils.default.isOffSeason;
 
 const cam = (over = {}) => ({ id: "c1", is_active: true, auto_disabled: false, consecutive_failures: 0, ...over });
 
@@ -157,4 +170,89 @@ test("classifyFetchError: unrecognised errors keep the old retry behaviour and n
   assert.strictEqual(classifyFetchError("string thrown").message, "error: string thrown");
   assert.strictEqual(classifyFetchError(null).message, "error: unknown error");
   assert.strictEqual(classifyFetchError(undefined).kind, "unknown");
+});
+
+// ─── ipcamlive stream state ─────────────────────────────────────────────
+
+test("ipcamliveStateUrl: player URL maps to the state endpoint on the same host", () => {
+  assert.deepStrictEqual(ipcamliveStateUrl("https://g1.ipcamlive.com/player/player.php?alias=8h08e8bpagfd912"), {
+    alias: "8h08e8bpagfd912",
+    stateUrl: "https://g1.ipcamlive.com/player/getcamerastreamstate.php?alias=8h08e8bpagfd912",
+  });
+  assert.strictEqual(
+    ipcamliveStateUrl("https://ipcamlive.com/player/player.php?alias=abc123&autoplay=1").stateUrl,
+    "https://ipcamlive.com/player/getcamerastreamstate.php?alias=abc123",
+  );
+  // http players are upgraded: the state endpoint is asked over https.
+  assert.strictEqual(
+    ipcamliveStateUrl("http://G1.IPCAMLIVE.com/player/player.php?alias=abc123").stateUrl,
+    "https://g1.ipcamlive.com/player/getcamerastreamstate.php?alias=abc123",
+  );
+});
+
+test("ipcamliveStateUrl: everything that is not an ipcamlive player is null", () => {
+  for (const url of [
+    null,
+    undefined,
+    "",
+    "not a url",
+    "https://player.brownrice.com/embed/kirkwoodcornice",
+    "https://evil-ipcamlive.com/player/player.php?alias=abc123",
+    "https://ipcamlive.com.example.org/player/player.php?alias=abc123",
+    "https://g1.ipcamlive.com/player/snapshot.php?alias=abc123",
+    "https://g1.ipcamlive.com/player/player.php",
+    "https://g1.ipcamlive.com/player/player.php?alias=",
+    "https://g1.ipcamlive.com/player/player.php?alias=abc/../x",
+    "ftp://g1.ipcamlive.com/player/player.php?alias=abc123",
+  ]) {
+    assert.strictEqual(ipcamliveStateUrl(url), null, String(url));
+  }
+});
+
+test("ipcamliveVerdict: streamavailable 1 is up, 0 is down, as string or number", () => {
+  assert.strictEqual(ipcamliveVerdict('{"details":{"alias":"x","streamavailable":"1","streamid":"abc"}}'), "up");
+  assert.strictEqual(ipcamliveVerdict({ details: { streamavailable: 1 } }), "up");
+  assert.strictEqual(ipcamliveVerdict('{"details":{"alias":"x","streamavailable":"0","streamid":null}}'), "down");
+  assert.strictEqual(ipcamliveVerdict({ details: { streamavailable: 0 } }), "down");
+});
+
+test("ipcamliveVerdict: an unreadable answer is unknown, never a failure", () => {
+  for (const payload of ["", "<html>404</html>", "{}", '{"details":{}}', '{"details":null}', '{"details":{"streamavailable":"2"}}', null, undefined, 42]) {
+    assert.strictEqual(ipcamliveVerdict(payload), "unknown", String(payload));
+  }
+});
+
+test("the no-stream reason string is stable (the run log and alerts key on it)", () => {
+  assert.strictEqual(IPCAMLIVE_NO_STREAM, "ipcamlive: no stream");
+});
+
+test("isOffSeasonAt matches lib/map-utils isOffSeason for every month in both hemispheres", () => {
+  for (const lat of [37.23, 46.9, -32.83, -41.15]) {
+    for (let month = 0; month < 12; month++) {
+      const date = new Date(2026, month, 15, 12);
+      assert.strictEqual(isOffSeasonAt(lat, date), isOffSeason(lat, date), `lat ${lat}, month ${month + 1}`);
+    }
+  }
+});
+
+test("isOffSeasonAt: a missing latitude counts as in season, so the failure is counted", () => {
+  const november = new Date(2026, 10, 20, 12);
+  for (const lat of [undefined, null, NaN, "37.2"]) assert.strictEqual(isOffSeasonAt(lat, november), false);
+  assert.strictEqual(isOffSeasonAt(-32.83, november), true, "Portillo in November");
+  assert.strictEqual(isOffSeasonAt(37.23, november), false, "China Peak in November");
+});
+
+test("countFailure: false records the check and leaves the counter and the switches alone", () => {
+  for (const state of [cam({ consecutive_failures: 2 }), cam({ is_active: false, auto_disabled: true, consecutive_failures: 3 }), cam({ is_active: false })]) {
+    const { body, transition } = computeCamUpdate(state, false, { countFailure: false });
+    assert.deepStrictEqual(Object.keys(body), ["last_checked_at"]);
+    assert.strictEqual(transition, null);
+  }
+});
+
+test("countFailure: false does not change what a healthy check does", () => {
+  const { body, transition } = computeCamUpdate(cam({ is_active: false, auto_disabled: true, consecutive_failures: 3 }), true, { countFailure: false });
+  assert.strictEqual(transition, "recovered");
+  assert.strictEqual(body.is_active, true);
+  assert.strictEqual(body.consecutive_failures, 0);
 });
