@@ -2,7 +2,7 @@ resort_slug,name,elevation,embed_type,embed_url,youtube_id,is_active,kind,credit
 vail,Sun Up Bowl,11250,iframe,https://player.brownrice.com/embed/vailch11,,true
 vail,Back Bowl,11250,iframe,https://player.brownrice.com/embed/vailch21,,true
 vail,Gore Range,11250,iframe,https://player.brownrice.com/embed/vailch2,,true
-vail,Snow Stake,10350,iframe,https://timecam.tv/view_cam_embed.aspx?C=FDBEBCIPC5B3,,true
+vail,Snow Stake,10350,iframe,https://timecam.tv/view_cam_embed.aspx?C=FDBEBCIPC5B3,,false
 vail,Eagle's Nest,,iframe,https://player.brownrice.com/embed/vaileaglesnest,,true
 vail,Snow Stake Summit,,iframe,https://player.brownrice.com/embed/vailsnowsummit,,true
 breckenridge,Peak 7,12998,iframe,https://player.brownrice.com/embed/breckenridge7,,true
@@ -17,7 +17,7 @@ keystone,Snow Stake,11640,image,https://cache.snow.com/Mtncams/KeySnowStake.jpg,
 beaver-creek,Spruce Saddle,11440,iframe,https://player.brownrice.com/embed/bcspruce,,true
 beaver-creek,McCoy Park,11440,iframe,https://player.brownrice.com/embed/bcmccoy,,true
 beaver-creek,Village,8100,iframe,https://player.brownrice.com/embed/bcvillage,,true
-beaver-creek,Snow Stake,11440,iframe,https://player.timecam.tv/express/index.html?C=1B67AJEJ8032,,true
+beaver-creek,Snow Stake,11440,iframe,https://player.timecam.tv/express/index.html?C=1B67AJEJ8032,,false
 crested-butte,Base,9375,iframe,https://player.brownrice.com/embed/Crestedbuttebase,,true
 crested-butte,Umbrella Bar,10200,iframe,https://player.brownrice.com/embed/Crestedbuttebar,,true
 crested-butte,Paradise,11875,iframe,https://player.brownrice.com/embed/Crestedbuttewarm,,true
@@ -29,26 +29,26 @@ aspen-snowmass,Aspen Mountain,11212,iframe,https://aspen.roundshot.com/aspen/,,t
 aspen-snowmass,Highlands,11675,iframe,https://aspen.roundshot.com/highlands/,,true
 aspen-snowmass,Snowmass Sam's Knob,12510,iframe,https://aspen.roundshot.com/snowmass-samsknob/,,true
 aspen-snowmass,Snow Stake,8104,iframe,https://g1.ipcamlive.com/player/player.php?alias=5c6d8ba5a8388&skin=white&autoplay=1,,true
-arapahoe-basin,Snow Stake,10780,image,https://img.hdrelay.com/camera/929449a8-672b-46c4-8191-b1a6d0842a3f/snapshot,,true
-arapahoe-basin,Summit,13050,image,https://img.hdrelay.com/camera/61f47337c621805ca7d0e6fb/snapshot,,true
-steamboat,Christie Peak,9080,youtube,https://www.youtube.com/embed/fI30YzAmCHw,fI30YzAmCHw,true
-steamboat,Thunderhead,9080,youtube,https://www.youtube.com/embed/qjAqCiwCW34,qjAqCiwCW34,true
-steamboat,Champagne Powder,10568,youtube,https://www.youtube.com/embed/8w4tZE2k7AE,8w4tZE2k7AE,true
-winter-park,Snow Stake,10700,youtube,https://www.youtube.com/embed/_wOIgFEMypY,_wOIgFEMypY,true
+arapahoe-basin,Snow Stake,10780,image,https://watch.hdrelay.io/api/public/poster/cam_arapahoe_basin_snow_stake_camera_1790623452872,,true
+arapahoe-basin,Summit,13050,image,https://watch.hdrelay.io/api/public/poster/cam_arapahoe_basin_patrol_headquarters_1790624063379,,true
+steamboat,Christie Peak,9080,youtube,https://www.youtube.com/embed/fI30YzAmCHw,fI30YzAmCHw,false
+steamboat,Thunderhead,9080,youtube,https://www.youtube.com/embed/qjAqCiwCW34,qjAqCiwCW34,false
+steamboat,Champagne Powder,10568,youtube,https://www.youtube.com/embed/8w4tZE2k7AE,8w4tZE2k7AE,false
+winter-park,Snow Stake,10700,youtube,https://www.youtube.com/embed/_wOIgFEMypY,_wOIgFEMypY,false
 winter-park,Lunch Rock,12060,youtube,https://www.youtube.com/embed/HfX4H3MSwXs,HfX4H3MSwXs,true
-winter-park,Village,9000,youtube,https://www.youtube.com/embed/0pL3kjrpJRU,0pL3kjrpJRU,true
+winter-park,Village,9000,youtube,https://www.youtube.com/embed/0pL3kjrpJRU,0pL3kjrpJRU,false
 copper-mountain,Union Peak,12313,image,https://img.hdrelay.com/frames/73c252b4-e74a-47fa-b8ea-5a34f0b6469a/default/last.jpg,,true
 copper-mountain,Snow Stake,,image,https://img.hdrelay.com/frames/fb469125-f1f3-459f-aeb4-98cb674e395f/default/last.jpg,,true
 copper-mountain,Aerie,12313,image,https://img.hdrelay.com/frames/671bcfb507697ecebbaffc13/default/last.jpg,,true
-loveland,Snow Stake,10800,image,https://photosskiloveland.com/Report/15minutes/data.jpg,,true
-loveland,Ptarmigan,12700,image,https://photosskiloveland.com/ptarmigan/image.jpg,,true
-loveland,Basin,10800,image,https://photosskiloveland.com/basin/image.jpg,,true
+loveland,Snow Stake,10800,image,https://photosskiloveland.com/Report/15minutes/data.jpg,,false
+loveland,Ptarmigan,12700,image,https://photosskiloveland.com/ptarmigan/image.jpg,,false
+loveland,Basin,10800,image,https://photosskiloveland.com/basin/image.jpg,,false
 wolf-creek,Base,10300,iframe,https://live2.brownrice.com/embed/wolfcreektreasure&em=1,,true
 wolf-creek,Summit,11904,iframe,https://live2.brownrice.com/embed/wolfcreeksummit,,true
 wolf-creek,Lift Line,10300,iframe,https://live2.brownrice.com/embed/wolfcreektresurlift,,true
-eldora,Snow Stake,10800,image,https://b14.hdrelay.com/camera/b7ceb08f-5cbb-42f1-9a9f-920f2ac5c4dc/snapshot,,true
-eldora,Alpenglow,10800,image,https://b14.hdrelay.com/camera/0e9787f3-7961-4ae4-bd59-8cbbcd79ed31/snapshot,,true
-eldora,Lower Mountain,9200,image,https://img.hdrelay.com/frames/eldora-lower-mountain/default/last.jpg,,true
+eldora,Snow Stake,10800,image,https://b14.hdrelay.com/camera/b7ceb08f-5cbb-42f1-9a9f-920f2ac5c4dc/snapshot,,false
+eldora,Alpenglow,10800,image,https://b14.hdrelay.com/camera/0e9787f3-7961-4ae4-bd59-8cbbcd79ed31/snapshot,,false
+eldora,Lower Mountain,9200,image,https://img.hdrelay.com/frames/eldora-lower-mountain/default/last.jpg,,false
 sunlight,Snow Stake,9895,iframe,https://g1.ipcamlive.com/player/player.php?alias=sunlightsnowstake,,true
 sunlight,Leonards Lookout,9895,iframe,https://g1.ipcamlive.com/player/player.php?alias=sopris&autoplay=1&mute=1,,true
 granby-ranch,Base,8202,link,https://camstreamer.com/live/stream/1865,,true
@@ -61,24 +61,24 @@ snowbird,Snow Stake,9600,image,https://manage.hdrelay.com/snapshot/8611e276-7ee5
 snowbird,Base Area,7760,image,https://b15.hdrelay.com/camera/db2a69c5-66e9-4c48-a713-919eaf191fc1/snapshot,,true
 alta,Albion Basin,10550,image,https://app.prismcam.com/public/helpers/realtime_preview.php?c=65&s=720,,true
 alta,Mt Baldy,11068,image,https://app.prismcam.com/public/helpers/realtime_preview.php?c=88&s=720,,true
-alta,Snow Stake,9600,image,https://altaskiarea.s3-us-west-2.amazonaws.com/mountain-cams/Collins_Snow_Stake.jpg,,true
-alta,High Rustler,10795,image,https://altaskiarea.s3-us-west-2.amazonaws.com/mountain-cams/Highrustler.jpg,,true
+alta,Snow Stake,9600,image,https://altaskiarea.s3-us-west-2.amazonaws.com/mountain-cams/Collins_Snow_Stake.jpg,,false
+alta,High Rustler,10795,image,https://altaskiarea.s3-us-west-2.amazonaws.com/mountain-cams/Highrustler.jpg,,false
 solitude,Webcams,8000,link,https://solitudemountain.com/mountain-and-village/webcams,,true
-brighton,Cam 1,8755,youtube,https://www.youtube.com/embed/XLzKPufaAts,XLzKPufaAts,true
+brighton,Cam 1,8755,youtube,https://www.youtube.com/embed/XLzKPufaAts,XLzKPufaAts,false
 brighton,Cam 2,9000,youtube,https://www.youtube.com/embed/4a-3iEM7bHk,4a-3iEM7bHk,true
-brighton,Cam 3,9500,youtube,https://www.youtube.com/embed/HD1S-bdI1AA,HD1S-bdI1AA,true
+brighton,Cam 3,9500,youtube,https://www.youtube.com/embed/HD1S-bdI1AA,HD1S-bdI1AA,false
 brighton,Cam 4,10000,youtube,https://www.youtube.com/embed/Zv8HYwaXjBg,Zv8HYwaXjBg,true
 deer-valley,Webcams,7200,link,https://www.deervalley.com/explore-the-mountain/webcams,,true
-snowbasin,Earl's Plaza,,image,https://img.hdrelay.com/frames/6192dd615233cdcad76d7dba/default/last.jpg,,true
+snowbasin,Earl's Plaza,,image,https://img.hdrelay.com/frames/6192dd615233cdcad76d7dba/default/last.jpg,,false
 snowbasin,Needles,,image,https://img.hdrelay.com/frames/61864e5d-bba4-4906-b134-0fdf9426d5a0/default/last.jpg,,true
 powder-mountain,Webcams,8900,link,https://www.powdermountain.com/resort/the-mountain/conditions/webcams,,true
 brian-head,Snow Stake,,image,https://b14.hdrelay.com/camera/66e069aee2c05fceb65b6688/snapshot,,true
 brian-head,Giant Steps Base,,image,https://img.hdrelay.com/camera/bcca39a1-43c0-477f-9389-5b039c797c5d/snapshot,,true
-sundance,Bearclaw,6100,iframe,https://vauth.command.verkada.com/__v/sundance-mountain-resort/embed/html/78238dd4-916b-42a4-94b5-830413e9b852/,,true
-sundance,Mandan Summit,,image,https://www.skiutah.com/files/blob/webcam/1286533593,,true
+sundance,Bearclaw,6100,iframe,https://vauth.command.verkada.com/__v/sundance-mountain-resort/embed/html/78238dd4-916b-42a4-94b5-830413e9b852/,,false
+sundance,Mandan Summit,,image,https://www.skiutah.com/files/blob/webcam/1286533593,,false
 mammoth,Summit,11053,youtube,https://www.youtube.com/embed/awxz_oIlJE0,awxz_oIlJE0,true
 mammoth,McCoy Station,9630,youtube,https://www.youtube.com/embed/jFK8bVYad0M,jFK8bVYad0M,true
-mammoth,Main Lodge,8909,youtube,https://www.youtube.com/embed/UpfvBbw6kSY,UpfvBbw6kSY,true
+mammoth,Main Lodge,8909,youtube,https://www.youtube.com/embed/UpfvBbw6kSY,UpfvBbw6kSY,false
 mammoth,Canyon Lodge,8343,youtube,https://www.youtube.com/embed/9--ZgYEZBhk,9--ZgYEZBhk,true
 mammoth,The Village,8100,youtube,https://www.youtube.com/embed/MwHWDokyUhw,MwHWDokyUhw,true
 mammoth,Woolly Cam at Main Lodge,8909,youtube,https://www.youtube.com/embed/AXyxIFY3JaA,AXyxIFY3JaA,true
@@ -106,29 +106,29 @@ homewood,Ellis Lift,7000,iframe,https://player.livespotting.com/lsplayer.html?al
 homewood,Snow Stake,7880,iframe,https://live4.brownrice.com/embed/homewood5,,true
 homewood,Lake Tahoe View,7000,iframe,https://explore.org/live-cams/player/lake-tahoe-homewood-mountain-resort-cam,,true
 sierra-at-tahoe,Grandview,8000,youtube,https://www.youtube.com/embed/adxDs4z-y34,adxDs4z-y34,true
-sierra-at-tahoe,West Bowl,8600,youtube,https://www.youtube.com/embed/v8ZE0oA6C8o,v8ZE0oA6C8o,true
-sierra-at-tahoe,Plaza,6640,youtube,https://www.youtube.com/embed/Y1klKdloipI,Y1klKdloipI,true
+sierra-at-tahoe,West Bowl,8600,youtube,https://www.youtube.com/embed/v8ZE0oA6C8o,v8ZE0oA6C8o,false
+sierra-at-tahoe,Plaza,6640,youtube,https://www.youtube.com/embed/Y1klKdloipI,Y1klKdloipI,false
 mt-rose,Summit,9700,iframe,https://live3.brownrice.com/embed/mtrose1,,true
 mt-rose,Main Lodge,8260,iframe,https://live3.brownrice.com/embed/mtrosecam,,true
 mt-rose,Slide Bowl,9000,iframe,https://live3.brownrice.com/embed/mtroseslidebowl,,true
 diamond-peak,Summit,8540,image,https://img.hdrelay.com/frames/544ccabf-7940-470e-86ba-4e06b192c29f/default/last.jpg,,true
 diamond-peak,Mid Mountain,7800,image,https://img.hdrelay.com/frames/0b881044-f574-49ff-b548-e2b617063ae6/default/last.jpg,,true
 diamond-peak,Base Lodge,6840,image,https://img.hdrelay.com/frames/f696eee0-2224-4f36-b215-864ddb36012f/default/last.jpg,,true
-bear-mountain,Summit,8805,youtube,https://www.youtube.com/embed/kydMumfVS5o,kydMumfVS5o,true
-bear-mountain,Midway,8200,youtube,https://www.youtube.com/embed/xnZH7wUCsPU,xnZH7wUCsPU,true
+bear-mountain,Summit,8805,youtube,https://www.youtube.com/embed/kydMumfVS5o,kydMumfVS5o,false
+bear-mountain,Midway,8200,youtube,https://www.youtube.com/embed/xnZH7wUCsPU,xnZH7wUCsPU,false
 bear-mountain,Base,7140,youtube,https://www.youtube.com/embed/f_OUEF4csuo,f_OUEF4csuo,true
 snow-summit,Webcams,7000,link,https://www.bigbearmountainresort.com/webcams/snow-summit,,true
 mt-shasta,Base Cam,,image,https://img.hdrelay.com/snapshots/4b4242f5-f64c-403b-ae05-4105074584c4/last.jpg,,true
 mt-shasta,Douglas Cam,,image,https://b7.hdrelay.com/camera/cb74351c-d928-4ba1-b001-fab4592e7a69/snapshot,,true
-dodge-ridge,Base Lodge,6600,youtube,https://www.youtube.com/embed/jlzZ5jXXOW4,jlzZ5jXXOW4,true
-dodge-ridge,Summit,8200,youtube,https://www.youtube.com/embed/l1gateQVYr4,l1gateQVYr4,true
-june-mountain,Chalet,7545,youtube,https://www.youtube.com/embed/Ewam1RD-Kgk,Ewam1RD-Kgk,true
-june-mountain,Ski Patrol,8600,youtube,https://www.youtube.com/embed/nFMWlayuWec,nFMWlayuWec,true
-june-mountain,J3,10100,youtube,https://www.youtube.com/embed/tTGH5oY23yU,tTGH5oY23yU,true
+dodge-ridge,Base Lodge,6600,youtube,https://www.youtube.com/embed/jlzZ5jXXOW4,jlzZ5jXXOW4,false
+dodge-ridge,Summit,8200,youtube,https://www.youtube.com/embed/l1gateQVYr4,l1gateQVYr4,false
+june-mountain,Chalet,7545,youtube,https://www.youtube.com/embed/Ewam1RD-Kgk,Ewam1RD-Kgk,false
+june-mountain,Ski Patrol,8600,youtube,https://www.youtube.com/embed/nFMWlayuWec,nFMWlayuWec,false
+june-mountain,J3,10100,youtube,https://www.youtube.com/embed/tTGH5oY23yU,tTGH5oY23yU,false
 china-peak,Summit,8700,iframe,https://g1.ipcamlive.com/player/player.php?alias=8h08e8bpagfd912,,false
 china-peak,Mid Mountain,7800,iframe,https://g1.ipcamlive.com/player/player.php?alias=6333584f5ea45,,false
 china-peak,Buckhorn,7100,iframe,https://g1.ipcamlive.com/player/player.php?alias=63335f1b76211,,false
-mt-baldy,7800ft Cam,7800,youtube,https://www.youtube.com/embed/gxbO673T0No,gxbO673T0No,true
+mt-baldy,7800ft Cam,7800,youtube,https://www.youtube.com/embed/gxbO673T0No,gxbO673T0No,false
 snow-valley,Base Lodge,6800,youtube,https://www.youtube.com/embed/RBYyWnu8nhM,RBYyWnu8nhM,true
 snow-valley,Summit,7841,youtube,https://www.youtube.com/embed/1GyTQP4SNDk,1GyTQP4SNDk,true
 tahoe-donner,Webcams,7000,link,https://www.tahoedonner.com/community/webcams/,,true
@@ -142,11 +142,11 @@ stevens-pass,Courtyard,,iframe,https://player.brownrice.com/embed/stevenspasscou
 stevens-pass,Ski and Snowboard School,,iframe,https://player.brownrice.com/embed/stevenspassschool,,true
 stevens-pass,Skyline,,iframe,https://player.brownrice.com/embed/stevenspassskyline,,true
 crystal-mountain,Summit Roundshot,,iframe,https://crystalmountainresort.roundshot.com/summit/,,true
-crystal-mountain,Snow Stake,,image,https://webcams.opensnow.com/current/2003.jpg,,true
-crystal-mountain,Base,,image,https://webcams.opensnow.com/current/2005.jpg,,true
-snoqualmie,Central,,youtube,https://www.youtube.com/embed/BxM71UffjpU,BxM71UffjpU,true
-snoqualmie,Central Express,,youtube,https://www.youtube.com/embed/q2jMYi5mXv8,q2jMYi5mXv8,true
-snoqualmie,Alpental,,youtube,https://www.youtube.com/embed/tGXlFWKi93I,tGXlFWKi93I,true
+crystal-mountain,Snow Stake,,image,https://webcams.opensnow.com/current/2003.jpg,,false
+crystal-mountain,Base,,image,https://webcams.opensnow.com/current/2005.jpg,,false
+snoqualmie,Central,,youtube,https://www.youtube.com/embed/BxM71UffjpU,BxM71UffjpU,false
+snoqualmie,Central Express,,youtube,https://www.youtube.com/embed/q2jMYi5mXv8,q2jMYi5mXv8,false
+snoqualmie,Alpental,,youtube,https://www.youtube.com/embed/tGXlFWKi93I,tGXlFWKi93I,false
 mt-baker,Heather Meadow,,image,https://imgproxy.windy.com/_/full/plain/current/1754508997/original.jpg,,true
 mt-baker,Shuksan,,image,https://imgproxy.windy.com/_/full/plain/current/1754511676/original.jpg,,true
 white-pass,High Camp,,iframe,https://player.brownrice.com/embed/whitepasshighcamp,,true
@@ -156,12 +156,12 @@ white-pass,Base,,iframe,https://player.brownrice.com/embed/whitepasslive,,true
 49-degrees-north,Lodge,,image,https://www.ski49n.com/webcams/lodge.jpg,,true
 ski-bluewood,Base,,image,https://cameraftpapi.drivehq.com/api/Camera/LastImageaspx/shareID17403629/bwdbase.jpg,,true
 ski-bluewood,Summit,,image,https://cameraftpapi.drivehq.com/api/Camera/LastImageaspx/shareID17403860/bwdsummit.jpg,,true
-mission-ridge,Sunspot,,youtube,https://www.youtube.com/embed/Wy1f0CzNaAM,Wy1f0CzNaAM,true
-mission-ridge,Mimi,,youtube,https://www.youtube.com/embed/XaT_9QW-zJM,XaT_9QW-zJM,true
-mission-ridge,Midway,,youtube,https://www.youtube.com/embed/e7qxWn1VrM4,e7qxWn1VrM4,true
-mt-bachelor,Snow Stake,,youtube,https://www.youtube.com/embed/jF9f7hsdlJg,jF9f7hsdlJg,true
-mt-bachelor,Cloudchaser,,youtube,https://www.youtube.com/embed/kVkLyuigAwA,kVkLyuigAwA,true
-mt-bachelor,Pine Marten,,youtube,https://www.youtube.com/embed/qjfPiDu9F50,qjfPiDu9F50,true
+mission-ridge,Sunspot,,youtube,https://www.youtube.com/embed/Wy1f0CzNaAM,Wy1f0CzNaAM,false
+mission-ridge,Mimi,,youtube,https://www.youtube.com/embed/XaT_9QW-zJM,XaT_9QW-zJM,false
+mission-ridge,Midway,,youtube,https://www.youtube.com/embed/e7qxWn1VrM4,e7qxWn1VrM4,false
+mt-bachelor,Snow Stake,,youtube,https://www.youtube.com/embed/jF9f7hsdlJg,jF9f7hsdlJg,false
+mt-bachelor,Cloudchaser,,youtube,https://www.youtube.com/embed/kVkLyuigAwA,kVkLyuigAwA,false
+mt-bachelor,Pine Marten,,youtube,https://www.youtube.com/embed/qjfPiDu9F50,qjfPiDu9F50,false
 mt-hood-meadows,Top of Blue,,iframe,https://api.wetmet.net/widgets/stream/frame.php?uid=c878c340832e23aab90526673b71cc17,,true
 mt-hood-meadows,Blue #2,,iframe,https://api.wetmet.net/widgets/stream/frame.php?uid=1be5f08dfca10d15d5e4ec9627c17c7c,,true
 mt-hood-meadows,Bottom Vista,,iframe,https://api.wetmet.net/widgets/stream/frame.php?uid=eec27f8164fc1105656ea4d46df4cd37,,true
@@ -173,7 +173,7 @@ ski-bowl,Webcams,,link,https://skibowl.com/jet-popup/video-cam-menu/,,true
 hoodoo,Summit,,image,https://santiampsp.org/wx/weather1.jpg,,true
 hoodoo,Base,,image,https://santiampsp.org/wx/weather16.jpg,,true
 hoodoo,Top of Ed,,image,https://santiampsp.org/wx/weather2.jpg,,true
-willamette-pass,Base,,youtube,https://www.youtube.com/embed/9wA71jnfNx0,9wA71jnfNx0,true
+willamette-pass,Base,,youtube,https://www.youtube.com/embed/9wA71jnfNx0,9wA71jnfNx0,false
 mt-ashland,Webcams,,link,https://mtashland.com/webcams/,,true
 jackson-hole,Rendezvous,,image,https://backend.roundshot.com/cams/6f7dc91857e22fe329e8bdeef5ee5750/default,,true
 jackson-hole,Summit,,image,https://backend.roundshot.com/cams/12a4b2c24cd515e0a115d4a0f59ef7f8/default,,true
@@ -183,7 +183,7 @@ big-sky,Town,,iframe,https://lonemountainland.roundshot.com/,,true
 sun-valley,Snow Stake,,image,https://b9.hdrelay.com/camera/9d9a56b7-bf9e-4162-be9c-06c42ca208ff/snapshot,,true
 sun-valley,River Run,,image,https://b9.hdrelay.com/camera/4c82abd4-5ef5-4b16-870f-548c2885d3f0/snapshot,,true
 sun-valley,Bowls,,image,https://b9.hdrelay.com/camera/390488dd-a758-4dd3-ae95-91c408abbff0/snapshot,,true
-tamarack,Summit,,youtube,https://www.youtube.com/embed/V_VTBRzPad8,V_VTBRzPad8,true
+tamarack,Summit,,youtube,https://www.youtube.com/embed/V_VTBRzPad8,V_VTBRzPad8,false
 schweitzer,Summit Roundshot,,iframe,https://schweitzer.roundshot.com/,,true
 bogus-basin,Summit PrismCam,,image,https://storage.googleapis.com/prism-cam-00091/1080-watermark.jpg,,true
 bogus-basin,Snow Marker,,link,https://photos.bogusbasin.org/boguscreek.php,,true
@@ -191,7 +191,7 @@ whitefish,Summit Roundshot,,iframe,https://skiwhitefish.roundshot.com/summit/,,t
 bridger-bowl,Ridge East,,image,https://webcam-images.s3-us-west-1.amazonaws.com/RidgeEast.jpg,,true
 bridger-bowl,Bridger Lift,,image,https://webcam-images.s3-us-west-1.amazonaws.com/bridger_lift.jpg,,true
 bridger-bowl,Base,,image,https://webcam-images.s3-us-west-1.amazonaws.com/parking_lot.jpg,,true
-bridger-bowl,Alpine Lift,,image,https://webcam-images.s3-us-west-1.amazonaws.com/alpine_lift.jpg,,true
+bridger-bowl,Alpine Lift,,image,https://webcam-images.s3-us-west-1.amazonaws.com/alpine_lift.jpg,,false
 red-lodge,Webcam,,link,https://redlodgemountain.com/webcam/,,true
 brundage,Base Snow,,image,https://brundage.com/webcam/snowcam.jpg,,true
 brundage,Top Bird,,iframe,https://camstreamer.com/embed/lp5EwsubCtc7WSvvfEoZ3OBCcnLw3YpUQxhBpdtB,,true
@@ -205,17 +205,17 @@ whistler-blackcomb,Village,,iframe,https://player.brownrice.com/embed/whistlervi
 sun-peaks,Top of Sundance,,image,https://www.mountainwatch.com/Resort/Sun-Peaks-5/LiveStill.jpg,,true
 sun-peaks,Mt Tod,,image,https://www.mountainwatch.com/Resort/Sun-Peaks-7/LiveStill.jpg,,true
 sun-peaks,Village,,image,https://www.mountainwatch.com/Resort/Sun-Peaks-1/LiveStill.jpg,,true
-big-white,Village,,image,https://www.bigwhite.com/sites/default/files/village_535.jpg,,true
-big-white,Pow,,image,https://www.bigwhite.com/sites/default/files/powpow_535.jpg,,true
-big-white,Snow Ghost,,image,https://www.bigwhite.com/sites/default/files/snowghost_535.jpg,,true
+big-white,Village,,image,https://www.bigwhite.com/sites/default/files/village_535.jpg,,false
+big-white,Pow,,image,https://www.bigwhite.com/sites/default/files/powpow_535.jpg,,false
+big-white,Snow Ghost,,image,https://www.bigwhite.com/sites/default/files/snowghost_535.jpg,,false
 stowe,Stowe Village 2,3900,iframe,https://player.brownrice.com/embed/stowevillage2,,true
 stowe,Spruce Peak,3900,iframe,https://player.brownrice.com/embed/stowevillage,,true
 killington,Peak 360,4241,iframe,https://killington.roundshot.com/peaklodge,,true
 killington,Superstar,4241,image,https://img.hdrelay.com/camera/a0de9878-d7b7-4906-9e83-536fde35c8a9/snapshot,,true
 killington,North Ridge,4241,image,https://img.hdrelay.com/camera/61e3ce02-faaa-4499-a547-6574ef6fa4f6/snapshot,,true
-sugarbush,Gatehouse,4083,youtube,https://www.youtube.com/embed/QrpBL6HNxZA,QrpBL6HNxZA,true
-sugarbush,Super Bravo,4083,youtube,https://www.youtube.com/embed/n5QqJSYEZT8,n5QqJSYEZT8,true
-sugarbush,Castle Rock,4083,youtube,https://www.youtube.com/embed/5g8SM1EqTJY,5g8SM1EqTJY,true
+sugarbush,Gatehouse,4083,youtube,https://www.youtube.com/embed/QrpBL6HNxZA,QrpBL6HNxZA,false
+sugarbush,Super Bravo,4083,youtube,https://www.youtube.com/embed/n5QqJSYEZT8,n5QqJSYEZT8,false
+sugarbush,Castle Rock,4083,youtube,https://www.youtube.com/embed/5g8SM1EqTJY,5g8SM1EqTJY,false
 sugarbush,Snow Stake,4083,iframe,https://camstreamer.com/embed/DhlhgO70iUnmfRQuuejOIZO59FrW09AIcUg1iNYb,,true
 mad-river-glen,Single Chair,3637,youtube,https://www.youtube.com/embed/wVOqgmbvCrY,wVOqgmbvCrY,true
 jay-peak,Summit,3968,image,https://storage.googleapis.com/prism-cam-00058/1080-watermark.jpg,,true
@@ -235,24 +235,24 @@ pico,Base Cam,3967,image,https://img.hdrelay.com/camera/84943abb-01cd-4907-8cc2-
 pico,Horizon Cam,3967,image,https://img.hdrelay.com/camera/2a8b98fa-994e-4e36-9c61-d62e00a500b0/snapshot,,true
 bolton-valley,Vista Peak,3150,youtube,https://www.youtube.com/embed/xWdZHDUHjv8,xWdZHDUHjv8,true
 bolton-valley,Base,3150,youtube,https://www.youtube.com/embed/VX9ANOUYO1k,VX9ANOUYO1k,true
-loon,Octagon,3050,youtube,https://www.youtube.com/embed/5NUYOuzzZwc,5NUYOuzzZwc,true
-loon,Peak,3050,youtube,https://www.youtube.com/embed/pkR1I-UkAAk,pkR1I-UkAAk,true
+loon,Octagon,3050,youtube,https://www.youtube.com/embed/5NUYOuzzZwc,5NUYOuzzZwc,false
+loon,Peak,3050,youtube,https://www.youtube.com/embed/pkR1I-UkAAk,pkR1I-UkAAk,false
 loon,Kancamagus,3050,youtube,https://www.youtube.com/embed/1ulgeNTlFJc,1ulgeNTlFJc,true
-cannon,Summit,4080,youtube,https://www.youtube.com/embed/MSl7Gy9tZiA,MSl7Gy9tZiA,true
+cannon,Summit,4080,youtube,https://www.youtube.com/embed/MSl7Gy9tZiA,MSl7Gy9tZiA,false
 cannon,Tram,4080,iframe,https://g1.ipcamlive.com/player/player.php?alias=6894a26492e8d,,true
-bretton-woods,Rosebrook,3100,iframe,https://share.earthcam.net/tJ90CoLmq7TzrY396Yd88ClXTsprOSvXV0M0N-qbZe8!.tJ90CoLmq7TzrY396Yd88Lk4ZZSG9up1iSraH3Jc1UI!/bretton_woods/camera/live,,true
+bretton-woods,Rosebrook,3100,iframe,https://share.earthcam.net/tJ90CoLmq7TzrY396Yd88ClXTsprOSvXV0M0N-qbZe8!.tJ90CoLmq7TzrY396Yd88Lk4ZZSG9up1iSraH3Jc1UI!/bretton_woods/camera/live,,false
 bretton-woods,Base,3100,iframe,https://g1.ipcamlive.com/player/player.php?alias=63c1cffd31643,,true
 waterville-valley,Summit,4004,image,https://b14.hdrelay.com/camera/63d44ef27803e58fc2e6d8cd/snapshot,,true
 waterville-valley,Base,4004,image,https://b14.hdrelay.com/camera/e8f5d990-aca1-4d50-9002-8028bcab466c/snapshot,,true
 wildcat,Snow Stake,4062,iframe,https://player.brownrice.com/embed/wildcat3,,true
 wildcat,Base,4062,iframe,https://player.brownrice.com/embed/wildcat2,,true
-cranmore,Meister,1704,youtube,https://www.youtube.com/embed/1Z98cHpO0Pg,1Z98cHpO0Pg,true
-cranmore,Snow Cam,1704,link,https://yullrstorage.s3.us-east-1.amazonaws.com/cranmore/webcams/cam24/current.mp4,,true
+cranmore,Meister,1704,youtube,https://www.youtube.com/embed/1Z98cHpO0Pg,1Z98cHpO0Pg,false
+cranmore,Snow Cam,1704,link,https://yullrstorage.s3.us-east-1.amazonaws.com/cranmore/webcams/cam24/current.mp4,,false
 attitash,Base,2350,iframe,https://player.brownrice.com/embed/attitash3,,true
 attitash,Bear Peak,2350,iframe,https://player.brownrice.com/embed/attitash1,,true
 sunday-river,Peak Lodge,3140,youtube,https://www.youtube.com/embed/J98tW5YX4Z8,J98tW5YX4Z8,true
 sunday-river,Jordan 8,3140,youtube,https://www.youtube.com/embed/AtXgvVaqy88,AtXgvVaqy88,true
-sunday-river,Barker 6,3140,youtube,https://www.youtube.com/embed/2KZpFcnZ7ig,2KZpFcnZ7ig,true
+sunday-river,Barker 6,3140,youtube,https://www.youtube.com/embed/2KZpFcnZ7ig,2KZpFcnZ7ig,false
 whiteface,Legacy Lodge,4867,image,https://img.hdrelay.com/frames/56ce853a-23fc-48cc-af9b-13907ef75b9a/panorama/last.jpg,,true
 whiteface,Bear Den,4867,image,https://img.hdrelay.com/frames/6467e4a44bca054a8e3c2f0b/panorama/last.jpg,,true
 gore,Base,3600,image,https://img.hdrelay.com/frames/29684ca1-7164-47c4-a217-d3d19c8b21e9/panorama/last.jpg,,true
@@ -273,7 +273,7 @@ wintergreen,Classic,3515,image,https://ftp.resortcams.com/wintergreen/skyline.jp
 wintergreen,Lookout,3515,image,https://ftp.resortcams.com/wintergreen/slopeside.jpg,,true
 wisp,Base,3080,image,https://ftp.resortcams.com/wisp/image.jpg,,true
 wisp,Mountain Park,3080,image,https://ftp.resortcams.com/wisp-resort-mountain-park/image.jpg,,true
-snowshoe,Webcams,4848,link,https://snowshoemtn.com/media-room/web-cams,,true
+snowshoe,Webcams,4848,link,https://snowshoemtn.com/media-room/web-cams,,false
 ski-santa-fe,Quad Top,10350,iframe,https://player.brownrice.com/snapshot/quadtop,,true
 ski-santa-fe,Base,10350,iframe,https://player.brownrice.com/snapshot/santafe,,true
 ski-santa-fe,Chair 5,10350,iframe,https://player.brownrice.com/snapshot/santafechair5,,true
@@ -286,66 +286,66 @@ angel-fire,Base,8600,iframe,https://live1.brownrice.com/embed/afbasearea,,true
 angel-fire,Chile Unload,8600,iframe,https://live3.brownrice.com/embed/afchileunload,,true
 red-river,The Face,10350,link,https://redriverskiarea.com/explore/about/webcams/,,true
 ski-apache,Base PTZ,9600,iframe,https://player.brownrice.com/embed/apache,,true
-arizona-snowbowl,Gondola,11500,youtube,https://www.youtube.com/embed/Gc3jTJZ-WaE,Gc3jTJZ-WaE,true
-arizona-snowbowl,Grand Canyon Express,11500,youtube,https://www.youtube.com/embed/E_nsa206CPc,E_nsa206CPc,true
-boyne-mountain,Hemlock,1120,youtube,https://www.youtube.com/embed/wgU1Dsro-6U,wgU1Dsro-6U,true
+arizona-snowbowl,Gondola,11500,youtube,https://www.youtube.com/embed/Gc3jTJZ-WaE,Gc3jTJZ-WaE,false
+arizona-snowbowl,Grand Canyon Express,11500,youtube,https://www.youtube.com/embed/E_nsa206CPc,E_nsa206CPc,false
+boyne-mountain,Hemlock,1120,youtube,https://www.youtube.com/embed/wgU1Dsro-6U,wgU1Dsro-6U,false
 boyne-mountain,Clock Tower,1120,youtube,https://www.youtube.com/embed/3vuXRsZXFUU,3vuXRsZXFUU,true
 boyne-mountain,Snow Stake,1120,youtube,https://www.youtube.com/embed/dNNJ0xXBkgA,dNNJ0xXBkgA,true
 nubs-nob,Live Cam,1350,link,https://nubsnob.com/cam/,,true
-marquette-mountain,Trail Cam,1544,image,https://it.nmu.edu/campics/mtmesnard.jpg,,true
+marquette-mountain,Trail Cam,1544,image,https://it.nmu.edu/campics/mtmesnard.jpg,,false
 granite-peak,Dasher,1940,image,https://img.hdrelay.com/camera/1446cadc-5c06-427a-9b3f-5178b6a96047/snapshot,,true
 granite-peak,Base Area,1940,image,https://img.hdrelay.com/camera/839ba6a3-b9e3-4153-a720-222a75898532/snapshot,,true
 lutsen,Roundshot 360,1688,iframe,https://lutsen.roundshot.com/,,true
-spirit-mountain,Live Cam,1052,image,https://tools.hbi.com/wx/wdio/dynamic_weather_spiritmtn.jpg,,true
+spirit-mountain,Live Cam,1052,image,https://tools.hbi.com/wx/wdio/dynamic_weather_spiritmtn.jpg,,false
 ski-portillo,Laguna (Inca Lake),,iframe,https://g3.ipcamlive.com/player/player.php?alias=laguna,,true
 ski-portillo,Tío Bob's,,iframe,https://g3.ipcamlive.com/player/player.php?alias=tiobobs,,true
 ski-portillo,Plateau,,iframe,https://g3.ipcamlive.com/player/player.php?alias=plateau,,true
 ski-portillo,Escuela (Ski School),,iframe,https://g3.ipcamlive.com/player/player.php?alias=escuela,,true
-valle-nevado,La Fourchette Terrace,,youtube,https://www.youtube.com/embed/tWNxInShxZI,tWNxInShxZI,true
+valle-nevado,La Fourchette Terrace,,youtube,https://www.youtube.com/embed/tWNxInShxZI,tWNxInShxZI,false
 valle-nevado,Pool (Piscina),,youtube,https://www.youtube.com/embed/uyt8JsITTac,uyt8JsITTac,true
 valle-nevado,Hotel Puerta del Sol,,youtube,https://www.youtube.com/embed/tmS73xQ4zVc,tmS73xQ4zVc,true
-valle-nevado,La Góndola,,youtube,https://www.youtube.com/embed/_oWY76RiLZQ,_oWY76RiLZQ,true
-la-parva,Base Manzanito,,youtube,https://www.youtube.com/embed/vD1tL3bZDlM,vD1tL3bZDlM,true
-el-colorado,Parador Pista,,youtube,https://www.youtube.com/embed/r3vGVM_gW64,r3vGVM_gW64,true
-el-colorado,Mirador Cima,,youtube,https://www.youtube.com/embed/xr0iN3zNe8U,xr0iN3zNe8U,true
-el-colorado,Liebre Base,,youtube,https://www.youtube.com/embed/qxh2rEl_PFU,qxh2rEl_PFU,true
+valle-nevado,La Góndola,,youtube,https://www.youtube.com/embed/_oWY76RiLZQ,_oWY76RiLZQ,false
+la-parva,Base Manzanito,,youtube,https://www.youtube.com/embed/vD1tL3bZDlM,vD1tL3bZDlM,false
+el-colorado,Parador Pista,,youtube,https://www.youtube.com/embed/r3vGVM_gW64,r3vGVM_gW64,false
+el-colorado,Mirador Cima,,youtube,https://www.youtube.com/embed/xr0iN3zNe8U,xr0iN3zNe8U,false
+el-colorado,Liebre Base,,youtube,https://www.youtube.com/embed/qxh2rEl_PFU,qxh2rEl_PFU,false
 nevados-de-chillan,Novicios (Pista Novicios),,iframe,https://g3.ipcamlive.com/player/player.php?alias=pistanovicios&autoplay=1,,true
 nevados-de-chillan,Plaza Tata,,iframe,https://g3.ipcamlive.com/player/player.php?alias=plazatata&autoplay=1,,true
 corralco,Hotel,,iframe,https://www.ipcamlive.com/player/player.php?alias=hotel,,true
 corralco,ZCB Ski Area,,iframe,https://www.ipcamlive.com/player/player.php?alias=zcbski,,true
 corralco,Vista 1600,,iframe,https://www.ipcamlive.com/player/player.php?alias=vista1600,,true
 corralco,Retorno Cornisa,,iframe,https://www.ipcamlive.com/player/player.php?alias=recornisa,,true
-antillanca,Vista Don Pedro (Haique lift view),,image,https://www.antillanca.cl/wp-json/antillanca/v1/webcam/1,,true
-antillanca,Vista Flecha,,image,https://www.antillanca.cl/wp-json/antillanca/v1/webcam/2,,true
-volcan-osorno,Camara VO - Cono VO,,youtube,https://www.youtube.com/embed/2uBn7TRSYjI,2uBn7TRSYjI,true
-volcan-osorno,Camara VO - Zona Boleterias,,youtube,https://www.youtube.com/embed/BhJ-RasFPTM,BhJ-RasFPTM,true
+antillanca,Vista Don Pedro (Haique lift view),,image,https://www.antillanca.cl/wp-json/antillanca/v1/webcam/1,,false
+antillanca,Vista Flecha,,image,https://www.antillanca.cl/wp-json/antillanca/v1/webcam/2,,false
+volcan-osorno,Camara VO - Cono VO,,youtube,https://www.youtube.com/embed/2uBn7TRSYjI,2uBn7TRSYjI,false
+volcan-osorno,Camara VO - Zona Boleterias,,youtube,https://www.youtube.com/embed/BhJ-RasFPTM,BhJ-RasFPTM,false
 cerro-catedral,Punta Princesa (live),,iframe,https://g3.ipcamlive.com/player/player.php?alias=6a2c31a02eaf9&skin=white&autoplay=1&mute=1&disableautofullscreen=1&disablezoombutton=1&disableframecapture=1&disablestorageplayer=1&disabledownloadbutton=1&disableplaybackspeedbutton=1,,true
 cerro-catedral,Centro Superior (Desembarque),,image,https://varitech.ar/cameras/cam006/latest.jpg,,true
-cerro-catedral,Pista Eventos (vista desde la base),,image,https://varitech.ar/cameras/cam005/latest.jpg,,true
+cerro-catedral,Pista Eventos (vista desde la base),,image,https://varitech.ar/cameras/cam005/latest.jpg,,false
 cerro-catedral,Playpark (Base),,image,https://varitech.ar/cameras/cam002/latest.jpg,,true
-cerro-catedral,Plaza Catalina Reynal (Base),,image,https://varitech.ar/cameras/cam003/latest.jpg,,true
+cerro-catedral,Plaza Catalina Reynal (Base),,image,https://varitech.ar/cameras/cam003/latest.jpg,,false
 cerro-catedral,Diente de Caballo Sur,,image,https://varitech.ar/cameras/cam008/latest.jpg,,true
 cerro-catedral,Punta Princesa (static snapshot),,image,https://varitech.ar/cameras/cam001/latest.jpg,,true
 chapelco,Pradera del Puma,,image,https://varitech.ar/cameras/cam016/latest.jpg,,true
 chapelco,Lift del Puente,,image,https://varitech.ar/cameras/cam017/latest.jpg,,true
 chapelco,"Rancho Grande (Desenganche Silla Rancho Grande, hacia la cordillera)",,image,https://varitech.ar/cameras/cam018/latest.jpg,,true
 las-lenas,Base / Live Cam (official),,iframe,https://tv.streamcasthd.com/live-stream-video-widget/laslenas,,true
-las-lenas,Pirámide,,image,https://snow2day.com/imgs/webcams/Valle_de_Las_Lenas_Piramide_ar61783890389805xl.jpg,,true
-las-lenas,Principal,,image,https://snow2day.com/imgs/webcams/Valle_de_Las_Lenas_Principal_ar61783890441754xl.jpg,,true
-cerro-castor,Cerro Castor Live Stream,,youtube,https://www.youtube.com/embed/RVuTqjTyrr0,RVuTqjTyrr0,true
+las-lenas,Pirámide,,image,https://snow2day.com/imgs/webcams/Valle_de_Las_Lenas_Piramide_ar61783890389805xl.jpg,,false
+las-lenas,Principal,,image,https://snow2day.com/imgs/webcams/Valle_de_Las_Lenas_Principal_ar61783890441754xl.jpg,,false
+cerro-castor,Cerro Castor Live Stream,,youtube,https://www.youtube.com/embed/RVuTqjTyrr0,RVuTqjTyrr0,false
 caviahue,Copahue Volcano - Agrio Superior Station (AGS),,image,https://oavv.segemar.gob.ar/CP/AGS.png,,true
 caviahue,Copahue Volcano - Aerodrome Node (AER),,image,https://oavv.segemar.gob.ar/CP/AER.png,,true
 caviahue,Copahue Volcano - Laguna Escondida Station (ESC),,image,https://oavv.segemar.gob.ar/CP/ESC.png,,true
 caviahue,Copahue Volcano - Mellizas Station (MLZ),,image,https://oavv.segemar.gob.ar/CP/MLZ.png,,true
-cerro-bayo,Cumbre (Summit 1800m),,image,https://ipcamlive.com/player/snapshot.php?alias=cumbre,,true
+cerro-bayo,Cumbre (Summit 1800m),,image,https://ipcamlive.com/player/snapshot.php?alias=cumbre,,false
 cerro-bayo,Copitos Pista 3 (1500m),,image,https://ipcamlive.com/player/snapshot.php?alias=copitos,,true
 cerro-bayo,Principiantes 1500,,image,https://ipcamlive.com/player/snapshot.php?alias=principiantes1500,,true
 cerro-bayo,Telecabina 1500,,image,https://ipcamlive.com/player/snapshot.php?alias=telecabina1500,,true
 cerro-bayo,Telesilla Lagos,,image,https://ipcamlive.com/player/snapshot.php?alias=lagos2,,true
-cerro-bayo,Principiantes Pista 2,,image,https://ipcamlive.com/player/snapshot.php?alias=principiantes2,,true
-la-hoya,Principiantes / Plano Base 1600,,image,https://varitech.ar/cameras/cam031/latest.jpg,,true
-pillan,Mirador Pillán Volcan,,youtube,https://www.youtube.com/embed/ZqEkIjvvZy8,ZqEkIjvvZy8,true
-pillan,Mirador Pillán Lago,,youtube,https://www.youtube.com/embed/fZvcy8XcGks,fZvcy8XcGks,true
+cerro-bayo,Principiantes Pista 2,,image,https://ipcamlive.com/player/snapshot.php?alias=principiantes2,,false
+la-hoya,Principiantes / Plano Base 1600,,image,https://varitech.ar/cameras/cam031/latest.jpg,,false
+pillan,Mirador Pillán Volcan,,youtube,https://www.youtube.com/embed/ZqEkIjvvZy8,ZqEkIjvvZy8,false
+pillan,Mirador Pillán Lago,,youtube,https://www.youtube.com/embed/fZvcy8XcGks,fZvcy8XcGks,false
 pillan,Volcán Villarrica (POVI),,image,https://assets1.webcam.io/w/9kAoxz/latest.jpg,,true
 sugarloaf,Golf Course,4237,youtube,https://www.youtube.com/embed/7oFquXv78Ck,7oFquXv78Ck,true
 sugarloaf,The Beach,4237,youtube,https://www.youtube.com/embed/j8VVBhJdyqY,j8VVBhJdyqY,true
@@ -353,17 +353,17 @@ smugglers-notch,Base Lodge,3640,youtube,https://www.youtube.com/embed/kTgqKDE1Sx
 smugglers-notch,Village,3640,youtube,https://www.youtube.com/embed/5paOwJfXRJU,5paOwJfXRJU,true
 burke-mountain,Cam 1,3267,iframe,https://rtsp.me/embed/RQyhZSN2/,,true
 burke-mountain,Cam 2,3267,iframe,https://rtsp.me/embed/Ne77N52Z/,,true
-purgatory,Base,,iframe,https://vauth.command.verkada.com/__v/purgatory/embed/html/ba02eb1a-bb47-47ca-8e92-49477b96ce64/,,true
+purgatory,Base,,iframe,https://vauth.command.verkada.com/__v/purgatory/embed/html/ba02eb1a-bb47-47ca-8e92-49477b96ce64/,,false
 purgatory,Express Summit,,iframe,https://player.brownrice.com/embed/purgatoryparadise,,true
 purgatory,Village Plaza,,iframe,https://player.brownrice.com/embed/purgatoryplaza,,true
-mountain-high,Upper Chisholm,,youtube,https://www.youtube.com/embed/zrvEvsMoS4U,zrvEvsMoS4U,true
-mountain-high,Borderline,,youtube,https://www.youtube.com/embed/KDYnfJzQrQA,KDYnfJzQrQA,true
-mountain-high,West Base,,youtube,https://www.youtube.com/embed/YcQT1a6K1Mo,YcQT1a6K1Mo,true
-mountain-high,Playground,,youtube,https://www.youtube.com/embed/Xgn7yx8t0bM,Xgn7yx8t0bM,true
-mountain-high,WSC Bullwheel,,youtube,https://www.youtube.com/embed/tthdjwzt-PA,tthdjwzt-PA,true
-mountain-high,Yeti's Snowplay,,youtube,https://www.youtube.com/embed/zD-yUTSBUeY,zD-yUTSBUeY,true
-mountain-high,East Summit,,youtube,https://www.youtube.com/embed/r13CcUjD6nY,r13CcUjD6nY,true
-mountain-high,North Lodge,,youtube,https://www.youtube.com/embed/M1moemQxJNU,M1moemQxJNU,true
+mountain-high,Upper Chisholm,,youtube,https://www.youtube.com/embed/zrvEvsMoS4U,zrvEvsMoS4U,false
+mountain-high,Borderline,,youtube,https://www.youtube.com/embed/KDYnfJzQrQA,KDYnfJzQrQA,false
+mountain-high,West Base,,youtube,https://www.youtube.com/embed/YcQT1a6K1Mo,YcQT1a6K1Mo,false
+mountain-high,Playground,,youtube,https://www.youtube.com/embed/Xgn7yx8t0bM,Xgn7yx8t0bM,false
+mountain-high,WSC Bullwheel,,youtube,https://www.youtube.com/embed/tthdjwzt-PA,tthdjwzt-PA,false
+mountain-high,Yeti's Snowplay,,youtube,https://www.youtube.com/embed/zD-yUTSBUeY,zD-yUTSBUeY,false
+mountain-high,East Summit,,youtube,https://www.youtube.com/embed/r13CcUjD6nY,r13CcUjD6nY,false
+mountain-high,North Lodge,,youtube,https://www.youtube.com/embed/M1moemQxJNU,M1moemQxJNU,false
 powderhorn,Cam 1,,image,https://img.hdrelay.com/camera/6376ac116db11e6bbdca2564/snapshot,,true
 powderhorn,Cam 2,,image,https://img.hdrelay.com/camera/635ff7a4ec60cc4e98eca6ea/snapshot,,true
 powderhorn,Cam 3,,image,https://img.hdrelay.com/camera/635ff973ec60cc4e98eca6ec/snapshot,,true
@@ -384,7 +384,7 @@ camelback,Sunbowl,,iframe,https://api.wetmet.net/widgets/stream/frame.php?uid=87
 camelback,Snow Tubing,,iframe,https://api.wetmet.net/widgets/stream/frame.php?uid=3215d5a1e6fdb73f7b162d4a26f4557a,,true
 camelback,Base Area,,iframe,https://api.wetmet.net/widgets/stream/frame.php?uid=7db2868a418b5b0f3344cc99e827e9c1,,true
 deer-valley,Ontario Snowstake,,youtube,,4vi7EiWba7E,true
-deer-valley,Snow Park Lodge,,youtube,,QozKoFs-hL0,true
+deer-valley,Snow Park Lodge,,youtube,,QozKoFs-hL0,false
 deer-valley,Silver Lake Lodge,,youtube,,uE_ent5rC3Y,true
 deer-valley,Galena Express Chairlift,,youtube,,0shWeR7Fvpg,true
 deer-valley,Hoodoo Express Chairlift,,youtube,,RaX_MhXETq4,true
@@ -394,10 +394,10 @@ solitude,Moonbeam Lift Line,,youtube,,NSiItCGabfo,true
 solitude,Apex Express and Sunrise Lift Lines,,youtube,,l2X9DlRzX54,true
 solitude,Snowstake,,youtube,,lkEM6EC8NVA,true
 solitude,Powderhorn II Lift Line,,youtube,,yeoBog_kSzc,true
-tahoe-donner,Downhill Ski Deck,,youtube,,5mrWOcpOs5E,true
+tahoe-donner,Downhill Ski Deck,,youtube,,5mrWOcpOs5E,false
 tahoe-donner,Alder Creek Adventure Center,,youtube,,H88v9HduSdo,true
 tahoe-donner,Alder Creek Adventure Center - Side,,youtube,,feHCVBs81Vs,true
-sugar-bowl,Mt. Disney (village),,image,https://sugar3.sugarbowl.com/graphics/webcams/village/image261014_084655_10.jpg,,true
+sugar-bowl,Mt. Disney (village),,image,https://sugar3.sugarbowl.com/graphics/webcams/village/image261014_084655_10.jpg,,false
 powder-mountain,Paradise,,image,https://storage.googleapis.com/prism-cam-00112/720.jpg,,true
 powder-mountain,Timberline,,image,https://storage.googleapis.com/prism-cam-00113/720.jpg,,true
 red-river,Broadway,,iframe,https://player.brownrice.com/embed/rrsabroadway,,true
@@ -414,33 +414,33 @@ red-lodge,Top of Stache,,iframe,https://v.angelcam.com/iframe?v=16rb82kzr4&autop
 red-lodge,Showoff Alley,,iframe,https://v.angelcam.com/iframe?v=16lb823dl4&autoplay=1&mute=1,,true
 red-lodge,Turnpike from Midway,,iframe,https://v.angelcam.com/iframe?v=2dy6e2kprk&autoplay=1&mute=1,,true
 nubs-nob,Front Side,,iframe,https://v.angelcam.com/iframe?v=ger25omkrm&autoplay=1,,true
-donner-ski-ranch,Mountain Cam,,youtube,,OTgva8-OwaY,true
-donner-ski-ranch,Deck Cam,,youtube,,Yx6uWhysHDw,true
+donner-ski-ranch,Mountain Cam,,youtube,,OTgva8-OwaY,false
+donner-ski-ranch,Deck Cam,,youtube,,Yx6uWhysHDw,false
 snowshoe,Boathouse,,iframe,https://evovision.citynet.net/snowshoe/cam2.cfm?feed=3,,true
 snowshoe,Village,,iframe,https://evovision.citynet.net/snowshoe/cam2.cfm?feed=5,,true
-mt-bachelor,Rock Bar Patio,,image,https://api.mtbachelor.com/api/v1/cams/mtn/2,,true
-mt-bachelor,The Cone,,image,https://api.mtbachelor.com/api/v1/cams/mtn/3,,true
-mt-bachelor,Sunrise Base,,image,https://api.mtbachelor.com/api/v1/cams/mtn/5,,true
-mt-bachelor,Pine Marten Lodge,,image,https://api.mtbachelor.com/api/v1/cams/mtn/9,,true
-mt-bachelor,Outback Lift Line,,image,https://api.mtbachelor.com/api/v1/cams/mtn/11,,true
-mt-bachelor,Tumalo Mountain & Top of Pine Marten,,image,https://api.mtbachelor.com/api/v1/cams/mtn/12,,true
-mt-bachelor,Nordic Center,,image,https://api.mtbachelor.com/api/v1/cams/mtn/16,,true
-mt-bachelor,Top of Sunrise Lift,,youtube,,pXHMtXbmo7k,true
+mt-bachelor,Rock Bar Patio,,image,https://api.mtbachelor.com/api/v1/cams/mtn/2,,false
+mt-bachelor,The Cone,,image,https://api.mtbachelor.com/api/v1/cams/mtn/3,,false
+mt-bachelor,Sunrise Base,,image,https://api.mtbachelor.com/api/v1/cams/mtn/5,,false
+mt-bachelor,Pine Marten Lodge,,image,https://api.mtbachelor.com/api/v1/cams/mtn/9,,false
+mt-bachelor,Outback Lift Line,,image,https://api.mtbachelor.com/api/v1/cams/mtn/11,,false
+mt-bachelor,Tumalo Mountain & Top of Pine Marten,,image,https://api.mtbachelor.com/api/v1/cams/mtn/12,,false
+mt-bachelor,Nordic Center,,image,https://api.mtbachelor.com/api/v1/cams/mtn/16,,false
+mt-bachelor,Top of Sunrise Lift,,youtube,,pXHMtXbmo7k,false
 mt-bachelor,Mid-Mountain Pine Marten Lodge,,youtube,,lyN2JG7zowo,true
-loveland,Basin Deck,,image,https://cams.skiloveland.com/lsacams/basindeck/basindeck.jpg,,true
+loveland,Basin Deck,,image,https://cams.skiloveland.com/lsacams/basindeck/basindeck.jpg,,false
 loveland,Chet's Top,,image,https://cams.skiloveland.com/lsacams/chetstop/chetstop.jpg,,true
 loveland,Valley Deck,,image,https://cams.skiloveland.com/lsacams/valleydeck/valleydeck.jpg,,true
-bogus-basin,J.R. Simplot Base Area,,youtube,,t1cm2D-1TLY,true
+bogus-basin,J.R. Simplot Base Area,,youtube,,t1cm2D-1TLY,false
 bogus-basin,"Snow Marker (6,230 ft)",,youtube,,g714uvR8Rjg,true
 granby-ranch,Granby Base Cam,,iframe,https://player.brownrice.com/embed/granby2,,true
-cranmore,Meister Cam (Mount Washington Observatory),,youtube,,TMwZInXDfvI,true
+cranmore,Meister Cam (Mount Washington Observatory),,youtube,,TMwZInXDfvI,false
 la-parva,Escuela de Ski,,youtube,,LYq7Zt-O81Y,true
 la-parva,Sector 3100,,youtube,,4SjBn7MXbaQ,true
 la-parva,Placa Comercial,,youtube,,rV6JR-lvNQk,true
 monarch-mountain,Mountain Cam (webcam.io),,image,https://webcam.io/webcams/MwKk2M/latest.jpg,,true
-snow-summit,Miracle Mile,,youtube,https://www.youtube.com/embed/IhfQG0suxqs,IhfQG0suxqs,true,,Big Bear Mountain Resort,https://www.alterramtn.co/terms-of-use
+snow-summit,Miracle Mile,,youtube,https://www.youtube.com/embed/IhfQG0suxqs,IhfQG0suxqs,false,,Big Bear Mountain Resort,https://www.alterramtn.co/terms-of-use
 snow-summit,Slopeside Deck,7000,youtube,https://www.youtube.com/embed/SOo3NBmvJQI,SOo3NBmvJQI,true,base,Big Bear Mountain Resort,https://www.alterramtn.co/terms-of-use
-snow-summit,Westridge,,youtube,https://www.youtube.com/embed/-YfeFSNpd5U,-YfeFSNpd5U,true,,Big Bear Mountain Resort,https://www.alterramtn.co/terms-of-use
+snow-summit,Westridge,,youtube,https://www.youtube.com/embed/-YfeFSNpd5U,-YfeFSNpd5U,false,,Big Bear Mountain Resort,https://www.alterramtn.co/terms-of-use
 snowbasin,Mt. Ogden,,image,https://app.prismcam.com/public/helpers/realtime_preview.php?c=54&s=720,,true,summit,Snowbasin Resort,https://www.snowbasin.com/about/legal
 snowbasin,John Paul Lodge,,image,https://app.prismcam.com/public/helpers/realtime_preview.php?c=115&s=720,,true,,Snowbasin Resort,https://www.snowbasin.com/about/legal
 snowbasin,Snowstake,,image,https://manage.hdrelay.com/snapshot/09f922af-169d-4949-9bb7-295c6a859daa?size=800x450,,true,snow-stake,Snowbasin Resort,https://www.snowbasin.com/about/legal
@@ -471,30 +471,30 @@ white-pass,Nordic Headquarters,,iframe,https://player.brownrice.com/embed/whitep
 snow-valley,Slide Peak,7841,youtube,https://www.youtube.com/embed/qPqufIWZAd4,qPqufIWZAd4,true,summit,Big Bear Mountain Resort,https://www.alterramtn.co/terms-of-use
 snow-valley,360,7841,iframe,https://bigbearmountainresort.roundshot.com/snow-valley,,true,summit,Big Bear Mountain Resort,https://www.alterramtn.co/terms-of-use
 whiteface,Summit,,image,https://img.hdrelay.com/frames/69ab45fe431a90730f050ddb/default/last.jpg,,true,summit,Whiteface Mountain,
-big-white,Bullet,,image,https://www.bigwhite.com/sites/default/files/bullet_576.jpg,,true,,Big White Ski Resort,
-big-white,The Cliff,,image,https://www.bigwhite.com/sites/default/files/cliff_573.jpg,,true,,Big White Ski Resort,
-big-white,Happy Valley,,image,https://www.bigwhite.com/sites/default/files/happyvalley_753.jpg,,true,,Big White Ski Resort,
-big-white,Tube Park,,image,https://www.bigwhite.com/sites/default/files/tubepark_576.jpg,,true,,Big White Ski Resort,
-big-white,Gem Lake Top,,image,https://www.bigwhite.com/sites/default/files/gemlake_724.jpg,,true,,Big White Ski Resort,
-big-white,Gem Lake Bottom,,image,https://www.bigwhite.com/sites/default/files/westridge_723.jpg,,true,,Big White Ski Resort,
-big-white,Black Forest,,image,https://www.bigwhite.com/sites/default/files/blackforest_753.jpg,,true,,Big White Ski Resort,
-big-white,Easy Street,,image,https://www.bigwhite.com/sites/default/files/hwy33_753.jpg,,true,,Big White Ski Resort,
-big-white,TELUS Park,,image,https://www.bigwhite.com/sites/default/files/teluspark_578.jpg,,true,,Big White Ski Resort,
+big-white,Bullet,,image,https://www.bigwhite.com/sites/default/files/bullet_576.jpg,,false,,Big White Ski Resort,
+big-white,The Cliff,,image,https://www.bigwhite.com/sites/default/files/cliff_573.jpg,,false,,Big White Ski Resort,
+big-white,Happy Valley,,image,https://www.bigwhite.com/sites/default/files/happyvalley_753.jpg,,false,,Big White Ski Resort,
+big-white,Tube Park,,image,https://www.bigwhite.com/sites/default/files/tubepark_576.jpg,,false,,Big White Ski Resort,
+big-white,Gem Lake Top,,image,https://www.bigwhite.com/sites/default/files/gemlake_724.jpg,,false,,Big White Ski Resort,
+big-white,Gem Lake Bottom,,image,https://www.bigwhite.com/sites/default/files/westridge_723.jpg,,false,,Big White Ski Resort,
+big-white,Black Forest,,image,https://www.bigwhite.com/sites/default/files/blackforest_753.jpg,,false,,Big White Ski Resort,
+big-white,Easy Street,,image,https://www.bigwhite.com/sites/default/files/hwy33_753.jpg,,false,,Big White Ski Resort,
+big-white,TELUS Park,,image,https://www.bigwhite.com/sites/default/files/teluspark_578.jpg,,false,,Big White Ski Resort,
 sugarbush,Gadd Peak Scenic,2877,youtube,https://www.youtube.com/embed/dR2pY9L3md8,dR2pY9L3md8,true,,Sugarbush Resort,https://www.alterramtn.co/terms-of-use
 sugarbush,Gate House Plaza Scenic,1621,youtube,https://www.youtube.com/embed/jhCh3dsEv-M,jhCh3dsEv-M,true,base,Sugarbush Resort,https://www.alterramtn.co/terms-of-use
 sugarbush,Summit Snow Stake,3900,youtube,https://www.youtube.com/embed/gWPiruOopeE,gWPiruOopeE,true,snow-stake,Sugarbush Resort,https://www.alterramtn.co/terms-of-use
 snow-king,Town View Jackson Hole,,youtube,https://www.youtube.com/embed/9ID7fhbc_s0,9ID7fhbc_s0,true,,Snow King Mountain / SeeJH.com,
-snow-king,Mountain Base / Lifts,,youtube,https://www.youtube.com/embed/g4NgJXbRrBk,g4NgJXbRrBk,true,base,Snow King Mountain / SeeJH.com,
+snow-king,Mountain Base / Lifts,,youtube,https://www.youtube.com/embed/g4NgJXbRrBk,g4NgJXbRrBk,false,base,Snow King Mountain / SeeJH.com,
 snow-king,Cowboy Coaster & Alpine Slide,,youtube,https://www.youtube.com/embed/AaTf07Lvz1A,AaTf07Lvz1A,true,,Snow King Mountain / SeeJH.com,
-snow-king,Snake River Brewing,,youtube,https://www.youtube.com/embed/FBq7F_mMYZs,FBq7F_mMYZs,true,village,Snow King Mountain / SeeJH.com,
+snow-king,Snake River Brewing,,youtube,https://www.youtube.com/embed/FBq7F_mMYZs,FBq7F_mMYZs,false,village,Snow King Mountain / SeeJH.com,
 angel-fire,Putting Green,,iframe,https://live3.brownrice.com/embed/aflive1,,true,,Angel Fire Resort,
-solitude,Honeycomb Canyon,,youtube,https://www.youtube.com/embed/gfHReYIuydU,gfHReYIuydU,true,,Solitude Mountain Resort,https://www.alterramtn.co/terms-of-use
+solitude,Honeycomb Canyon,,youtube,https://www.youtube.com/embed/gfHReYIuydU,gfHReYIuydU,false,,Solitude Mountain Resort,https://www.alterramtn.co/terms-of-use
 solitude,Powderhorn,,youtube,https://www.youtube.com/embed/xNER0JHrqLg,xNER0JHrqLg,true,,Solitude Mountain Resort,https://www.alterramtn.co/terms-of-use
 solitude,Moonbeam Parking Lot,,youtube,https://www.youtube.com/embed/ta-4QZbfMXc,ta-4QZbfMXc,true,base,Solitude Mountain Resort,https://www.alterramtn.co/terms-of-use
-solitude,Summit Express Lift Line,,youtube,https://www.youtube.com/embed/rUXoOLxKKX4,rUXoOLxKKX4,true,,Solitude Mountain Resort,https://www.alterramtn.co/terms-of-use
+solitude,Summit Express Lift Line,,youtube,https://www.youtube.com/embed/rUXoOLxKKX4,rUXoOLxKKX4,false,,Solitude Mountain Resort,https://www.alterramtn.co/terms-of-use
 solitude,Link Lift Line,,youtube,https://www.youtube.com/embed/Yx3QmuKfwjY,Yx3QmuKfwjY,true,,Solitude Mountain Resort,https://www.alterramtn.co/terms-of-use
 arapahoe-basin,Mountain Goat Plaza / Base Area,,image,https://dirigo-resorts-f4e2bde5azc2cne6.z02.azurefd.net/arapahoe/images/medium/webcams/abasincam1001m.jpg,,true,base,Arapahoe Basin,https://www.arapahoebasin.com/terms
-arapahoe-basin,Black Mountain Lodge at Mid-Mountain,,image,https://img.hdrelay.com/camera/61f1bacffaf0bf0b5629ac62/snapshot,,true,mid,Arapahoe Basin,https://www.arapahoebasin.com/terms
+arapahoe-basin,Black Mountain Lodge at Mid-Mountain,,image,https://watch.hdrelay.io/api/public/poster/cam_arapahoe_basin_black_mountain_lodge_1790623952319,,true,mid,Arapahoe Basin,https://www.arapahoebasin.com/terms
 arapahoe-basin,Montezuma Bowl,,image,https://dirigo-resorts-f4e2bde5azc2cne6.z02.azurefd.net/arapahoe/images/medium/webcams/abasincam5.jpg,,true,,Arapahoe Basin,https://www.arapahoebasin.com/terms
 arapahoe-basin,Pali + Molly Lifts,,iframe,https://watch.hdrelay.io/player.html?cam=cam_arapahoe_basin_pali_cam_1790623627806&profile=p_muokmxflu1at&sig=c6e953ba2274e80ec94a1a93&exp=1822510424635&dom=,,true,,Arapahoe Basin,https://www.arapahoebasin.com/terms
 mt-rose,North Views,9700,iframe,https://player.brownrice.com/embed/mtrosesummit,,true,summit,Mt. Rose Ski Tahoe,
@@ -525,9 +525,9 @@ snowbird,Hidden Peak 360,,image,https://backend.roundshot.com/cams/09123258cc29c
 brighton,Molly Green's,,youtube,https://www.youtube.com/embed/uZ24vqOWEkQ,uZ24vqOWEkQ,true,,Brighton Resort,
 brighton,Explorer Lift,,youtube,https://www.youtube.com/embed/vMwQRjlfqtA,vMwQRjlfqtA,true,,Brighton Resort,
 brighton,Milly Express,,youtube,https://www.youtube.com/embed/N-d3MuOagLg,N-d3MuOagLg,true,,Brighton Resort,
-dodge-ridge,Summit,8200,youtube,https://www.youtube.com/embed/I5NC8pQ4EAk,I5NC8pQ4EAk,true,summit,Dodge Ridge Mountain Resort,
-dodge-ridge,Mid-Mountain,7000,youtube,https://www.youtube.com/embed/DCXNoIDc_z0,DCXNoIDc_z0,true,mid,Dodge Ridge Mountain Resort,
-dodge-ridge,Base Area,6600,youtube,https://www.youtube.com/embed/C_QzeJSA-uw,C_QzeJSA-uw,true,base,Dodge Ridge Mountain Resort,
+dodge-ridge,Summit,8200,youtube,https://www.youtube.com/embed/I5NC8pQ4EAk,I5NC8pQ4EAk,false,summit,Dodge Ridge Mountain Resort,
+dodge-ridge,Mid-Mountain,7000,youtube,https://www.youtube.com/embed/DCXNoIDc_z0,DCXNoIDc_z0,false,mid,Dodge Ridge Mountain Resort,
+dodge-ridge,Base Area,6600,youtube,https://www.youtube.com/embed/C_QzeJSA-uw,C_QzeJSA-uw,false,base,Dodge Ridge Mountain Resort,
 ski-portillo,Roca Jack,,iframe,https://g3.ipcamlive.com/player/player.php?alias=rocajack,,true,,Ski Portillo,
 ski-portillo,Conejo,,iframe,https://g3.ipcamlive.com/player/player.php?alias=conejolaguna,,true,,Ski Portillo,
 sundance,Bearclaw Summit,,image,https://storage.googleapis.com/prism-cam-00074/720.jpg,,true,summit,Sundance Mountain Resort,
@@ -544,11 +544,11 @@ boyne-mountain,Disciples Overlook,,youtube,https://www.youtube.com/embed/hqUTCpj
 boyne-mountain,Superbowl,,youtube,https://www.youtube.com/embed/54N_P5FqdOc,54N_P5FqdOc,true,,Boyne Mountain Resort,
 snoqualmie,Alpental Base,,youtube,https://www.youtube.com/embed/8wk81COX2cg,8wk81COX2cg,true,base,The Summit at Snoqualmie,
 snoqualmie,Alpental Mid-Mountain,,youtube,https://www.youtube.com/embed/c_XLrUYV8tk,c_XLrUYV8tk,true,mid,The Summit at Snoqualmie,
-snoqualmie,Alpental Top,,youtube,https://www.youtube.com/embed/bWf5rScCIas,bWf5rScCIas,true,summit,The Summit at Snoqualmie,
+snoqualmie,Alpental Top,,youtube,https://www.youtube.com/embed/bWf5rScCIas,bWf5rScCIas,false,summit,The Summit at Snoqualmie,
 snoqualmie,Summit West Base,,youtube,https://www.youtube.com/embed/vhO8nNqg9iw,vhO8nNqg9iw,true,base,The Summit at Snoqualmie,
 snoqualmie,Silver Fir Base,,youtube,https://www.youtube.com/embed/H7HwsNLqVC8,H7HwsNLqVC8,true,base,The Summit at Snoqualmie,
 snoqualmie,Summit Central Top,,youtube,https://www.youtube.com/embed/w4Sno8NIjmU,w4Sno8NIjmU,true,summit,The Summit at Snoqualmie,
-snoqualmie,Summit Central Base,,youtube,https://www.youtube.com/embed/GcIAQ5iD35o,GcIAQ5iD35o,true,base,The Summit at Snoqualmie,
+snoqualmie,Summit Central Base,,youtube,https://www.youtube.com/embed/GcIAQ5iD35o,GcIAQ5iD35o,false,base,The Summit at Snoqualmie,
 china-peak,Basecam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=633360d9d6c1c,,false,base,China Peak Mountain Resort,
 china-peak,Boathouse Cam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=672265473e7cf,,false,,China Peak Mountain Resort,
 china-peak,Landing Cam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=672266c33e268,,true,,China Peak Mountain Resort,
@@ -559,13 +559,13 @@ steamboat,Steamboat Gondola Cam,6900,youtube,https://www.youtube.com/embed/oKKj_
 steamboat,Christie Peak Express & Wild Blue Gondola Cam,6900,youtube,https://www.youtube.com/embed/nfTQNv3jdSQ,nfTQNv3jdSQ,true,base,Steamboat Resort,https://www.alterramtnco.com/terms-of-use/
 steamboat,Four Points Cam,9716,youtube,https://www.youtube.com/embed/Zf21nwFUyUs,Zf21nwFUyUs,true,mid,Steamboat Resort,https://www.alterramtnco.com/terms-of-use/
 arizona-snowbowl,Arizona Gondola Camera,9500,youtube,https://www.youtube.com/embed/WkWctaDP-LE,WkWctaDP-LE,true,,Arizona Snowbowl,https://www.snowbowl.ski/website-terms-of-use/
-arizona-snowbowl,Grand Canyon Express Camera,9300,youtube,https://www.youtube.com/embed/sJn7eqgqXno,sJn7eqgqXno,true,,Arizona Snowbowl,https://www.snowbowl.ski/website-terms-of-use/
-arizona-snowbowl,"Hart Prairie, Aspen, Big & Little Spruce Camera",9300,youtube,https://www.youtube.com/embed/_qduVakNToY,_qduVakNToY,true,,Arizona Snowbowl,https://www.snowbowl.ski/website-terms-of-use/
+arizona-snowbowl,Grand Canyon Express Camera,9300,youtube,https://www.youtube.com/embed/sJn7eqgqXno,sJn7eqgqXno,false,,Arizona Snowbowl,https://www.snowbowl.ski/website-terms-of-use/
+arizona-snowbowl,"Hart Prairie, Aspen, Big & Little Spruce Camera",9300,youtube,https://www.youtube.com/embed/_qduVakNToY,_qduVakNToY,false,,Arizona Snowbowl,https://www.snowbowl.ski/website-terms-of-use/
 hunter,Hunter East,,iframe,https://player.brownrice.com/embed/hunternorthside,,true,,Hunter Mountain,https://www.huntermtn.com/policies?tc_1=4
 powder-mountain,Lightning Ridge,,image,https://storage.googleapis.com/prism-cam-00109/720.jpg,,true,,Powder Mountain,https://powdermountain.com/termsofuse
 powder-mountain,Powder Mountain Road,,image,https://www.ixnay.net/cams/pm/s3/current.jpg,,true,approach,Powder Mountain,https://powdermountain.com/termsofuse
 sunday-river,Golf Club,,youtube,https://www.youtube.com/embed/Hstis9bupws,Hstis9bupws,true,,Sunday River,
-sunday-river,Barker 6,,youtube,https://www.youtube.com/embed/0_K0V_J5DMQ,0_K0V_J5DMQ,true,base,Sunday River,
+sunday-river,Barker 6,,youtube,https://www.youtube.com/embed/0_K0V_J5DMQ,0_K0V_J5DMQ,false,base,Sunday River,
 palisades-tahoe,Far East,,iframe,https://relay.ozolio.com/pub.api?cmd=embed&oid=EMB_EMST000001C4,,true,,Palisades Tahoe,https://www.alterramtnco.com/terms-of-use/
 palisades-tahoe,Alpine Peak,,iframe,https://relay.ozolio.com/pub.api?cmd=embed&oid=EMB_VPAY0000014C,,true,summit,Palisades Tahoe,https://www.alterramtnco.com/terms-of-use/
 palisades-tahoe,Alpine Race,,iframe,https://relay.ozolio.com/pub.api?cmd=embed&oid=EMB_KIYV000003C2,,true,,Palisades Tahoe,https://www.alterramtnco.com/terms-of-use/
@@ -588,17 +588,17 @@ tamarack,Summit,,youtube,https://www.youtube.com/embed/3fJt-3O3bec,3fJt-3O3bec,t
 tamarack,Mid Mountain Lodge,,youtube,https://www.youtube.com/embed/t-kCPs2Epms,t-kCPs2Epms,true,mid,Tamarack Resort,
 tamarack,Mid Mountain Snow Stake,,youtube,https://www.youtube.com/embed/0RzvG2LDymc,0RzvG2LDymc,true,snow-stake,Tamarack Resort,
 tamarack,Osprey Meadows Golf Course,,youtube,https://www.youtube.com/embed/4tV07tNZ9Jg,4tV07tNZ9Jg,true,,Tamarack Resort,
-tamarack,Marina,,youtube,https://www.youtube.com/embed/Ik0q2Q7XldU,Ik0q2Q7XldU,true,,Tamarack Resort,
+tamarack,Marina,,youtube,https://www.youtube.com/embed/Ik0q2Q7XldU,Ik0q2Q7XldU,false,,Tamarack Resort,
 deer-valley,Empire Express,,youtube,https://www.youtube.com/embed/r8qiPv9XCOM,r8qiPv9XCOM,true,,Deer Valley Resort,https://www.alterramtn.co/terms-of-use
 deer-valley,Sterling Express,,youtube,https://www.youtube.com/embed/iNdfTLilLlU,iNdfTLilLlU,true,,Deer Valley Resort,https://www.alterramtn.co/terms-of-use
 deer-valley,Revelator Express,,youtube,https://www.youtube.com/embed/XZjubaPbamE,XZjubaPbamE,true,,Deer Valley Resort,https://www.alterramtn.co/terms-of-use
 deer-valley,Sultan Express,,youtube,https://www.youtube.com/embed/sAjdqw-lzgI,sAjdqw-lzgI,true,,Deer Valley Resort,https://www.alterramtn.co/terms-of-use
 stratton,Golf Course Cam,,youtube,https://www.youtube.com/embed/SqWPtm63rJc,SqWPtm63rJc,true,,Stratton Mountain Resort,https://www.alterramtn.co/terms-of-use
-stratton,Sun Bowl Cam,,youtube,https://www.youtube.com/embed/ju7zEm_gql0,ju7zEm_gql0,true,base,Stratton Mountain Resort,https://www.alterramtn.co/terms-of-use
-bear-valley,Base Cam,,youtube,https://www.youtube.com/embed/HVCL4Nn0FN4,HVCL4Nn0FN4,true,base,Bear Valley,
+stratton,Sun Bowl Cam,,youtube,https://www.youtube.com/embed/ju7zEm_gql0,ju7zEm_gql0,false,base,Stratton Mountain Resort,https://www.alterramtn.co/terms-of-use
+bear-valley,Base Cam,,youtube,https://www.youtube.com/embed/HVCL4Nn0FN4,HVCL4Nn0FN4,false,base,Bear Valley,
 keystone,Bergman,,iframe,https://player.brownrice.com/embed/keystonebergman,,true,,Keystone Resort,https://www.keystoneresort.com/policies?tc_1=4
 keystone,Lakeside Village,,iframe,https://player.brownrice.com/embed/keystonelakeside,,true,village,Keystone Resort,https://www.keystoneresort.com/policies?tc_1=4
-sierra-at-tahoe,West Bowl,,youtube,https://www.youtube.com/embed/-l5RJMV40N0,-l5RJMV40N0,true,,Sierra-at-Tahoe,https://sierraattahoe.com/terms-and-conditions/
+sierra-at-tahoe,West Bowl,,youtube,https://www.youtube.com/embed/-l5RJMV40N0,-l5RJMV40N0,false,,Sierra-at-Tahoe,https://sierraattahoe.com/terms-and-conditions/
 telluride,Hoot Brown Terrain Park,,iframe,https://g1.ipcamlive.com/player/player.php?alias=hootbrown&autoplay=1,,true,,Telluride Ski Resort,
 schweitzer,The Village,,youtube,https://www.youtube.com/embed/aanmce5KMZI,aanmce5KMZI,true,village,Schweitzer,https://www.alterramtnco.com/terms-of-use/
 schweitzer,Basin Express,,youtube,https://www.youtube.com/embed/7INfYvwClC0,7INfYvwClC0,true,,Schweitzer,https://www.alterramtnco.com/terms-of-use/
@@ -618,9 +618,9 @@ whistler-blackcomb,Creekside Camera,2140,iframe,https://player.brownrice.com/emb
 whitefish,Storm Cam,,image,https://skiwhitefish.com/inbound/cams/2425_StumpyCam.jpg,,true,snow-stake,Whitefish Mountain Resort,
 whitefish,Base Lodge,,image,https://skiwhitefish.com/inbound/cams/newbaselodge.jpg,,true,base,Whitefish Mountain Resort,
 whitefish,Lift Plaza,,image,https://skiwhitefish.com/inbound/cams/hellroaring_chalet.jpg,,true,base,Whitefish Mountain Resort,
-la-parva,Parva Chica,,youtube,https://www.youtube.com/embed/IXJ24EBzO_s,IXJ24EBzO_s,true,,La Parva,https://laparva.cl/en/terms-and-conditions/
+la-parva,Parva Chica,,youtube,https://www.youtube.com/embed/IXJ24EBzO_s,IXJ24EBzO_s,false,,La Parva,https://laparva.cl/en/terms-and-conditions/
 la-parva,Base Manzanito,,youtube,https://www.youtube.com/embed/85IzX2kG90o,85IzX2kG90o,true,base,La Parva,https://laparva.cl/en/terms-and-conditions/
-la-parva,Cima Tórtolas,,youtube,https://www.youtube.com/embed/Dkx-_pSWjZw,Dkx-_pSWjZw,true,summit,La Parva,https://laparva.cl/en/terms-and-conditions/
+la-parva,Cima Tórtolas,,youtube,https://www.youtube.com/embed/Dkx-_pSWjZw,Dkx-_pSWjZw,false,summit,La Parva,https://laparva.cl/en/terms-and-conditions/
 taos,Kachina Peak Cam,,iframe,https://player.brownrice.com/embed/tsvlonestar,,true,summit,Taos Ski Valley,
 taos,Lower Plaza,,iframe,https://player.brownrice.com/embed/tsvconstruction,,true,base,Taos Ski Valley,
 brundage,Bear Cam,6490,iframe,https://camstreamer.com/embed/hLQhJ6VOnufDjJbksOH7bBBWpjqZrWxZ8P8EIf32,,true,,Brundage Mountain Resort,
@@ -628,7 +628,7 @@ brundage,Activity Barn Cam,5250,iframe,https://camstreamer.com/embed/omZyNHylJx9
 brundage,May Marina Cam,,image,https://brundage.com/webcam/marina.jpg,,true,approach,Brundage Mountain Resort,
 la-hoya,Plateau,,image,https://varitech.ar/cameras/cam032/latest.jpg,,true,mid,La Hoya,
 ski-santa-fe,Quad Cam,,iframe,https://player.brownrice.com/embed/quadtop,,true,summit,Ski Santa Fe,https://www.skisantafe.com/terms-of-service
-valle-nevado,La Góndola,,youtube,https://www.youtube.com/embed/qd2Zr8gE8Sw,qd2Zr8gE8Sw,true,,Valle Nevado,https://www.vallenevado.com/en/legal/
+valle-nevado,La Góndola,,youtube,https://www.youtube.com/embed/qd2Zr8gE8Sw,qd2Zr8gE8Sw,false,,Valle Nevado,https://www.vallenevado.com/en/legal/
 beaver-creek,Red Buffalo,,iframe,https://player.brownrice.com/embed/bcredbuffalo,,true,,Beaver Creek Resort,https://www.epicpass.com/policies.aspx
 beaver-creek,Talons Restaurant,,iframe,https://player.brownrice.com/embed/bctalons,,true,,Beaver Creek Resort,https://www.epicpass.com/policies.aspx
 beaver-creek,Arrowhead Village,,iframe,https://player.brownrice.com/embed/bcahoutsidebar,,true,village,Beaver Creek Resort,https://www.epicpass.com/policies.aspx
@@ -637,13 +637,13 @@ beaver-creek,Snow Stake Live,,iframe,https://player.brownrice.com/embed/bcsnowst
 stowe,Gondola,,iframe,https://player.brownrice.com/embed/stowemidwaybasestation,,true,,Stowe Mountain Resort,https://www.epicpass.com/policies.aspx
 beaver-mountain,Lodge View Cam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=lodgedreamliftcam&autoplay=1,,true,base,Beaver Mountain Ski Resort,https://www.skithebeav.com/terms-conditions/
 beaver-mountain,Little Beaver View,,iframe,https://g1.ipcamlive.com/player/player.php?alias=littlebeavercam&autoplay=1,,true,base,Beaver Mountain Ski Resort,https://www.skithebeav.com/terms-conditions/
-nordic-valley,Nordic Valley Webcam,5440,youtube,https://www.youtube.com/embed/Ljumxb0U2b0,Ljumxb0U2b0,true,base,Nordic Valley Ski Resort,https://www.nordicvalley.ski/website-terms-of-use/
+nordic-valley,Nordic Valley Webcam,5440,youtube,https://www.youtube.com/embed/Ljumxb0U2b0,Ljumxb0U2b0,false,base,Nordic Valley Ski Resort,https://www.nordicvalley.ski/website-terms-of-use/
 antelope-butte,Pow Stick Webcam,,iframe,https://ipcamlive.com/player/player.php?alias=antelopebuttepowstick&autoplay=1,,true,snow-stake,Antelope Butte Foundation,
-grand-targhee,Dreamcatcher,,image,https://copyrighted.seejh.com/gtrdream/gtrdream.jpg,,true,,Grand Targhee Resort,https://www.grandtarghee.com/policies/terms-conditions
-grand-targhee,Stick Of Truth,,image,https://copyrighted.seejh.com/gtrsnowstick/gtrsnowstick.jpg,,true,snow-stake,Grand Targhee Resort,https://www.grandtarghee.com/policies/terms-conditions
-grand-targhee,Summit,,image,https://copyrighted.seejh.com/gtrsummit/gtrsummit.jpg,,true,summit,Grand Targhee Resort,https://www.grandtarghee.com/policies/terms-conditions
-grand-targhee,Habitat / Colter,,image,https://copyrighted.seejh.com/gtrcolter/gtrcolter.jpg,,true,base,Grand Targhee Resort,https://www.grandtarghee.com/policies/terms-conditions
-grand-targhee,Teton Valley View,,image,https://copyrighted.seejh.com/tetonvalley/tetonvalley.jpg,,true,,Grand Targhee Resort (image hosted by SeeJH; may be a SeeJH-owned valley cam),https://www.grandtarghee.com/policies/terms-conditions
+grand-targhee,Dreamcatcher,,image,https://copyrighted.seejh.com/gtrdream/gtrdream.jpg,,false,,Grand Targhee Resort,https://www.grandtarghee.com/policies/terms-conditions
+grand-targhee,Stick Of Truth,,image,https://copyrighted.seejh.com/gtrsnowstick/gtrsnowstick.jpg,,false,snow-stake,Grand Targhee Resort,https://www.grandtarghee.com/policies/terms-conditions
+grand-targhee,Summit,,image,https://copyrighted.seejh.com/gtrsummit/gtrsummit.jpg,,false,summit,Grand Targhee Resort,https://www.grandtarghee.com/policies/terms-conditions
+grand-targhee,Habitat / Colter,,image,https://copyrighted.seejh.com/gtrcolter/gtrcolter.jpg,,false,base,Grand Targhee Resort,https://www.grandtarghee.com/policies/terms-conditions
+grand-targhee,Teton Valley View,,image,https://copyrighted.seejh.com/tetonvalley/tetonvalley.jpg,,false,,Grand Targhee Resort (image hosted by SeeJH; may be a SeeJH-owned valley cam),https://www.grandtarghee.com/policies/terms-conditions
 snowy-range,Snow Cam,,iframe,https://www.cameraftp.com/Camera/Cameraplayer.aspx?parentID=397142069&shareID=17935300&isEmbedded=true&mode=live,,true,snow-stake,Snowy Range Ski Area,
 snowy-range,Base Webcam,,iframe,https://www.cameraftp.com/file/PublishCameraplayer.aspx?parentID=224864296&shareID=13751043&isEmbedded=true&mode=live,,true,base,Snowy Range Ski Area,
 snowy-range,Sundance Webcam,,iframe,https://www.cameraftp.com/file/PublishCameraplayer.aspx?parentID=224855203&shareID=13750595&isEmbedded=true&mode=live,,true,,Snowy Range Ski Area,
@@ -657,8 +657,8 @@ discovery,Top Stake,8158,image,https://webcam.skidiscovery.com/webcam-images/top
 montana-snowbowl,Base Web Cam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=690b67247173f&autoplay=1,,true,base,Montana Snowbowl,
 showdown,Mountain Cam,,iframe,https://video.nest.com/embedded/live/AfYTevjCiS,,true,,Showdown Montana,https://www.showdownmontana.com/terms-conditions
 kelly-canyon,Top of the Mountain,,youtube,https://www.youtube.com/embed/tHrldu8CqCs,tHrldu8CqCs,true,summit,Kelly Canyon Resort,https://kellycanyonresort.com/terms-and-conditions
-kelly-canyon,Lost Treasure,,youtube,https://www.youtube.com/embed/mZa2DuN9NdY,mZa2DuN9NdY,true,,Kelly Canyon Resort,https://kellycanyonresort.com/terms-and-conditions
-kelly-canyon,Learners Carpet,,youtube,https://www.youtube.com/embed/hVYOSEtRJZs,hVYOSEtRJZs,true,base,Kelly Canyon Resort,https://kellycanyonresort.com/terms-and-conditions
+kelly-canyon,Lost Treasure,,youtube,https://www.youtube.com/embed/mZa2DuN9NdY,mZa2DuN9NdY,false,,Kelly Canyon Resort,https://kellycanyonresort.com/terms-and-conditions
+kelly-canyon,Learners Carpet,,youtube,https://www.youtube.com/embed/hVYOSEtRJZs,hVYOSEtRJZs,false,base,Kelly Canyon Resort,https://kellycanyonresort.com/terms-and-conditions
 pomerelle,Pomerelle Mountain Ski Resort Webcam,,youtube,https://www.youtube.com/embed/uM-oftYVFGA,uM-oftYVFGA,true,,ATC Communications,
 silver-mountain,KREM 2 Camera,,iframe,https://api.wetmet.net/widgets/stream/frame.php?ruc=162-04-01,,true,,KREM 2,https://silvermt.com/terms
 pajarito,View from the top of Pajarito Lodge,,iframe,https://player.brownrice.com/embed/pajarito1,,true,base,Pajarito Mountain Ski Area,https://www.pajarito.ski/website-terms-of-use/
@@ -666,8 +666,8 @@ sandia-peak,East Mountain View,,image,https://webcams.sandiapeak.com/images/cams
 sandia-peak,Tram Cam,,image,https://webcams.sandiapeak.com/images/cams/tram-cam.jpg,,true,,Sandia Peak Tramway,https://www.sandia.ski/website-terms-of-use
 sipapu,Sipapu Lower Webcam,8200,iframe,https://player.brownrice.com/embed/sipapu1,,true,base,Sipapu Ski and Summer Resort,https://www.sipapu.ski/website-terms-of-use/
 sipapu,Sipapu Upper Webcam,9064,iframe,https://player.brownrice.com/embed/sipapu2,,true,mid,Sipapu Ski and Summer Resort,https://www.sipapu.ski/website-terms-of-use/
-sunrise-park,Sunrise Peak Live,10700,youtube,https://www.youtube.com/embed/mCbHN6zvhpk,mCbHN6zvhpk,true,summit,Sunrise Park Resort,https://www.sunrise.ski/privacy-policy/
-sunrise-park,Sunrise Base Live,9300,youtube,https://www.youtube.com/embed/VX29Awryg30,VX29Awryg30,true,base,Sunrise Park Resort,https://www.sunrise.ski/privacy-policy/
+sunrise-park,Sunrise Peak Live,10700,youtube,https://www.youtube.com/embed/mCbHN6zvhpk,mCbHN6zvhpk,false,summit,Sunrise Park Resort,https://www.sunrise.ski/privacy-policy/
+sunrise-park,Sunrise Base Live,9300,youtube,https://www.youtube.com/embed/VX29Awryg30,VX29Awryg30,false,base,Sunrise Park Resort,https://www.sunrise.ski/privacy-policy/
 alyeska,Glacier Bowl 360° Cam,,iframe,https://alyeskaresort.roundshot.com/glacierbowl/,,true,mid,Alyeska Resort,
 alyeska,Sundeck 360° Cam,,iframe,https://alyeskaresort.roundshot.com/tram-summit/,,true,summit,Alyeska Resort,
 alyeska,Turnagain Arm,,image,https://www.alyeskaresort.com/webcamsfolder/Turnagain.jpg,,true,,Alyeska Resort,
@@ -679,10 +679,10 @@ alyeska,Max's Mountain,,image,https://www.alyeskaresort.com/webcamsfolder/Chair4
 alyeska,Ted's Express,,image,https://www.alyeskaresort.com/webcamsfolder/Chair4_1.jpg,,true,,Alyeska Resort,
 alyeska,Hotel Courtyard,,image,https://www.alyeskaresort.com/webcamsfolder/CourtYard.jpg,,true,village,Alyeska Resort,
 alyeska,Daylodge,,image,https://www.alyeskaresort.com/webcamsfolder/Chair4_2.jpg,,true,base,Alyeska Resort,
-eaglecrest,Peak Camera 1,,image,https://eaglecams.ci.juneau.ak.us/eagle-ptarm-top-cam-2.jpeg,,true,summit,Eaglecrest Ski Area (City and Borough of Juneau),
-eaglecrest,Peak Camera 2,,image,https://eaglecams.ci.juneau.ak.us/eagle-ptarm-top-cam-3.jpeg,,true,summit,Eaglecrest Ski Area (City and Borough of Juneau),
-eaglecrest,Base Camera 1,,image,https://eaglecams.ci.juneau.ak.us/eagle-ptarm-bot-cam-3.jpeg,,true,base,Eaglecrest Ski Area (City and Borough of Juneau),
-eaglecrest,Base Camera 2,,image,https://eaglecams.ci.juneau.ak.us/eagle-ptarm-bot-cam-2.jpeg,,true,base,Eaglecrest Ski Area (City and Borough of Juneau),
+eaglecrest,Peak Camera 1,,image,https://eaglecams.ci.juneau.ak.us/eagle-ptarm-top-cam-2.jpeg,,false,summit,Eaglecrest Ski Area (City and Borough of Juneau),
+eaglecrest,Peak Camera 2,,image,https://eaglecams.ci.juneau.ak.us/eagle-ptarm-top-cam-3.jpeg,,false,summit,Eaglecrest Ski Area (City and Borough of Juneau),
+eaglecrest,Base Camera 1,,image,https://eaglecams.ci.juneau.ak.us/eagle-ptarm-bot-cam-3.jpeg,,false,base,Eaglecrest Ski Area (City and Borough of Juneau),
+eaglecrest,Base Camera 2,,image,https://eaglecams.ci.juneau.ak.us/eagle-ptarm-bot-cam-2.jpeg,,false,base,Eaglecrest Ski Area (City and Borough of Juneau),
 terry-peak,Stewart Slope from the Stewart Lodge Cam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=5c3526110e41f&autoplay=1,,true,base,Terry Peak Ski Area,
 terry-peak,Terry Peak Summit from the Summit Cam,7100,iframe,https://g1.ipcamlive.com/player/player.php?alias=5c352da4f3420&autoplay=1,,true,summit,Terry Peak Ski Area,
 loup-loup,Upper Mountain Camera,,youtube,https://www.youtube.com/embed/qp-GrRsWBEQ,qp-GrRsWBEQ,true,,Loup Loup Ski Bowl,
@@ -696,7 +696,7 @@ mt-spokane,"Mt. Spokane Web Cam, Vista Cruiser",,youtube,https://www.youtube.com
 mt-spokane,"Mt. Spokane Webcam, Hidden Treasure, Chair 4",,youtube,https://www.youtube.com/embed/rQnOjOnHrpw,rQnOjOnHrpw,true,,Mt. Spokane Ski & Snowboard Park,https://www.mtspokane.com/policies
 bristol-mountain,Morning Star Webcam,,image,https://www.bristolmountain.com/webcams/morningstarcurrent.jpg,,true,,Bristol Mountain,
 bristol-mountain,Launching Pad Webcam,,image,https://www.bristolmountain.com/webcams/roselandcurrent.jpg,,true,base,Bristol Mountain,
-bristol-mountain,Launching Pad Live Feed,,iframe,https://player.brownrice.com/embed/bristolmountain2,,true,base,Bristol Mountain,
+bristol-mountain,Launching Pad Live Feed,,iframe,https://player.brownrice.com/embed/bristolmountain2,,false,base,Bristol Mountain,
 bristol-mountain,Rocket Webcam,,image,https://www.bristolmountain.com/webcams/rocketcamstill.jpg,,true,,Bristol Mountain,
 bristol-mountain,Rocket Live Feed,,iframe,https://player.brownrice.com/embed/bristolmountain1,,true,,Bristol Mountain,
 buffalo-ski-center,Tam Cam,,youtube,https://www.youtube.com/embed/DOJwy9f70IM,DOJwy9f70IM,true,,Buffalo Ski Center,https://www.buffaloskicenter.com/privacy-policy/
@@ -728,7 +728,7 @@ west-mountain,West Express Face Cam,,iframe,https://g1.ipcamlive.com/player/play
 west-mountain,Sunrise Cam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=sunrisecam&autoplay=1,,true,,West Mountain,https://westmountain.com/privacy-policy-2/
 bromley,Slope Cam,,image,https://img.hdrelay.com/camera/62c706457fd92a4cfa4d6b39/snapshot,,true,mid,Bromley Mountain Ski Resort,https://bromley.com/terms--conditions
 bromley,Base Area Cam,1950,image,https://img.hdrelay.com/camera/62c7049a7fd92a4cfa4d6b37/snapshot,,true,base,Bromley Mountain Ski Resort,https://bromley.com/terms--conditions
-magic-mountain,Magic Mountain Live Webcam (skimagicvt livestream),,youtube,https://www.youtube.com/embed/iMdj-G2rvfA,iMdj-G2rvfA,true,,Magic Mountain (Ski Magic LLC),
+magic-mountain,Magic Mountain Live Webcam (skimagicvt livestream),,youtube,https://www.youtube.com/embed/iMdj-G2rvfA,iMdj-G2rvfA,false,,Magic Mountain (Ski Magic LLC),
 middlebury-snowbowl,Worth Mtn. Chairlift - Bottom of the Allen,,youtube,https://www.youtube.com/embed/zittSTsKYNs,zittSTsKYNs,true,mid,Middlebury Snow Bowl (Middlebury College),
 crotched,Base Area,1050,iframe,https://player.brownrice.com/embed/crotchedrocket,,true,base,Crotched Mountain (Vail Resorts),https://www.epicpass.com/policies.aspx
 gunstock,Summit (Lake Winnipesaukee view),2300,iframe,https://api.wetmet.net/widgets/stream/frame.php?ruc=196-01-01,,true,summit,Gunstock Mountain Resort,https://www.gunstock.com/policies/policies/privacy-policy/
@@ -737,12 +737,12 @@ gunstock,Base Area (tubing hill and Penny Lift),,iframe,https://api.wetmet.net/w
 mount-sunapee,Summit Camera,2743,iframe,https://player.brownrice.com/embed/sunapeesummit,,true,summit,Mount Sunapee (Vail Resorts),https://www.epicpass.com/policies.aspx
 mount-sunapee,Spruce Lodge,1233,iframe,https://player.brownrice.com/embed/sunapeesprucelodge,,true,base,Mount Sunapee (Vail Resorts),https://www.epicpass.com/policies.aspx
 mount-sunapee,Express Lift,,iframe,https://player.brownrice.com/embed/sunapeeexpresslift,,true,base,Mount Sunapee (Vail Resorts),https://www.epicpass.com/policies.aspx
-pats-peak,Pats Peak LIVE! Cam,,youtube,https://www.youtube.com/embed/KFjl8wPJvyg,KFjl8wPJvyg,true,,Pats Peak Ski Area,
+pats-peak,Pats Peak LIVE! Cam,,youtube,https://www.youtube.com/embed/KFjl8wPJvyg,KFjl8wPJvyg,false,,Pats Peak Ski Area,
 pats-peak,Pats Peak Bluster Area LIVE!,,youtube,https://www.youtube.com/embed/NYfXOUPjSNI,NYfXOUPjSNI,true,,Pats Peak Ski Area,
 ragged-mountain,Elmwood Lodge Cam,,iframe,https://api.wetmet.net/widgets/stream/frame.php?uid=7dc1cb45d929cdd28e605666a9315cbc,,true,base,Ragged Mountain Resort,https://www.raggedmountainresort.com/privacy-policy/
 ragged-mountain,Meetinghouse Lodge Cam,,iframe,https://api.wetmet.net/widgets/stream/frame.php?uid=1e039d71ff08195e4052b01859843890,,true,base,Ragged Mountain Resort,https://www.raggedmountainresort.com/privacy-policy/
 big-moose,Mountain Cam,,youtube,https://www.youtube.com/embed/8cGtyN9MiwA,8cGtyN9MiwA,true,base,Boston and Maine Live,
-big-moose,Lift Cam,,youtube,https://www.youtube.com/embed/sGrMkMV26Uw,sGrMkMV26Uw,true,,Boston and Maine Live,
+big-moose,Lift Cam,,youtube,https://www.youtube.com/embed/sGrMkMV26Uw,sGrMkMV26Uw,false,,Boston and Maine Live,
 camden-snow-bowl,Web Cam,,iframe,https://player.brownrice.com/embed/camdensnowbowl1,,true,,Camden Snow Bowl,
 saddleback,Top of the World Cam,,image,https://img.hdrelay.com/camera/6201a432a002ff5c9960fef3/snapshot,,true,summit,Saddleback Mountain,https://www.saddlebackmaine.com/terms-of-use/
 saddleback,Top of the Rangeley Cam,,image,https://img.hdrelay.com/camera/6201a4aca002ff5c9960fef4/snapshot,,true,mid,Saddleback Mountain,https://www.saddlebackmaine.com/terms-of-use/
@@ -768,18 +768,18 @@ crystal-mountain-michigan,Lodge View,,image,https://www.crystalmountain.com/site
 crystal-mountain-michigan,Base of Loki,,image,https://www.crystalmountain.com/sites/default/files/webcams/117742.jpg,,true,base,Crystal Mountain,https://www.crystalmountain.com/privacy-policy
 crystal-mountain-michigan,Crystal Clipper,,image,https://www.crystalmountain.com/sites/default/files/webcams/114533.jpg,,true,,Crystal Mountain,https://www.crystalmountain.com/privacy-policy
 crystal-mountain-michigan,Golf Learning Center,,image,https://www.crystalmountain.com/sites/default/files/webcams/108594.jpg,,true,,Crystal Mountain,https://www.crystalmountain.com/privacy-policy
-crystal-mountain-michigan,"Mountain Ridge, Hole #7",,image,https://www.crystalmountain.com/sites/default/files/webcams/131842.jpg,,true,,Crystal Mountain,https://www.crystalmountain.com/privacy-policy
-schuss-mountain,Schuss Village View from Top,,youtube,https://www.youtube.com/embed/9KBLem3gwTM,9KBLem3gwTM,true,summit,Shanty Creek Resort,https://www.shantycreek.com/privacy-policy/
-schuss-mountain,Schuss Mountain Face,,youtube,https://www.youtube.com/embed/vYMimVMT6rg,vYMimVMT6rg,true,base,Shanty Creek Resort,https://www.shantycreek.com/privacy-policy/
-schuss-mountain,Shanty Creek Resort,,youtube,https://www.youtube.com/embed/guUYNd2CV8E,guUYNd2CV8E,true,,Shanty Creek Resort,https://www.shantycreek.com/privacy-policy/
+crystal-mountain-michigan,"Mountain Ridge, Hole #7",,image,https://www.crystalmountain.com/sites/default/files/webcams/131842.jpg,,false,,Crystal Mountain,https://www.crystalmountain.com/privacy-policy
+schuss-mountain,Schuss Village View from Top,,youtube,https://www.youtube.com/embed/9KBLem3gwTM,9KBLem3gwTM,false,summit,Shanty Creek Resort,https://www.shantycreek.com/privacy-policy/
+schuss-mountain,Schuss Mountain Face,,youtube,https://www.youtube.com/embed/vYMimVMT6rg,vYMimVMT6rg,false,base,Shanty Creek Resort,https://www.shantycreek.com/privacy-policy/
+schuss-mountain,Shanty Creek Resort,,youtube,https://www.youtube.com/embed/guUYNd2CV8E,guUYNd2CV8E,false,,Shanty Creek Resort,https://www.shantycreek.com/privacy-policy/
 cascade-mountain,Snow Cam 1,,image,https://img.hdrelay.com/camera/7b228510-8133-475f-8d69-aee7020405aa/snapshot,,true,base,Cascade Mountain,https://www.cascademountain.com/terms-conditions/
 cascade-mountain,Snow Cam 2,,image,https://img.hdrelay.com/camera/80bd0e30-cb89-4a4b-bf32-ce44adf13270/snapshot,,true,,Cascade Mountain,https://www.cascademountain.com/terms-conditions/
 christie-mountain,Live Camera,,iframe,https://g1.ipcamlive.com/player/player.php?alias=61a27d760cd67&autoplay=1,,true,,Christie Mountain,
 tyrol-basin,Chairlift A,,youtube,https://www.youtube.com/embed/Am3rSF2FRD4,Am3rSF2FRD4,true,,Tyrol Basin,https://tyrolbasin.com/privacy-policy/
 tyrol-basin,Chairlift B,,youtube,https://www.youtube.com/embed/N85Uaxz26MM,N85Uaxz26MM,true,,Tyrol Basin,https://tyrolbasin.com/privacy-policy/
-tyrol-basin,Tubing,,youtube,https://www.youtube.com/embed/RWppm5SMnOs,RWppm5SMnOs,true,,Tyrol Basin,https://tyrolbasin.com/privacy-policy/
+tyrol-basin,Tubing,,youtube,https://www.youtube.com/embed/RWppm5SMnOs,RWppm5SMnOs,false,,Tyrol Basin,https://tyrolbasin.com/privacy-policy/
 tyrol-basin,Chairlift C,,youtube,https://www.youtube.com/embed/QbYGbaZ-14E,QbYGbaZ-14E,true,,Tyrol Basin,https://tyrolbasin.com/privacy-policy/
-whitecap-mountain,Webcam,,iframe,https://webcam.whitecapresort.com/,,true,base,Whitecap Mountains Resort,https://whitecapresort.com/terms-of-use
+whitecap-mountain,Webcam,,iframe,https://webcam.whitecapresort.com/,,false,base,Whitecap Mountains Resort,https://whitecapresort.com/terms-of-use
 buck-hill,Plaza Cam,,youtube,https://www.youtube.com/embed/2WzUGFz03v8,2WzUGFz03v8,true,base,Buck Hill Ski & Snowboard Area,https://buckhill.com/terms-and-conditions/
 giants-ridge,Outside Main Chalet,,youtube,https://www.youtube.com/embed/cStMNmvOmOI,cStMNmvOmOI,true,base,Giants Ridge,
 snow-creek,Snow Creek Main Lodge,800,iframe,https://player.brownrice.com/embed/snowcreek1,,true,base,Snow Creek,https://www.epicpass.com/policies.aspx
@@ -815,13 +815,13 @@ grouse-mountain,Gravity Cam,,iframe,https://www.skaping.com/grouse-mountain-grav
 hudson-bay-mountain,Panorama,,image,https://www.hudsonbaymountainvillage.com/webcam/panorama.jpg,,true,base,Hudson Bay Mountain Village (relayed on the operator snow report),
 hudson-bay-mountain,Skyline,,image,https://www.hudsonbaymountainvillage.com/webcam/skyline.jpg,,true,base,Hudson Bay Mountain Village (relayed on the operator snow report),
 hudson-bay-mountain,Snow Table,,image,https://www.hudsonbaymountainvillage.com/webcam/snowboard.jpg,,true,snow-stake,Hudson Bay Mountain Village (relayed on the operator snow report),
-kicking-horse,Stairway,7920,youtube,https://www.youtube.com/embed/l2DY-ram9_Y,l2DY-ram9_Y,true,summit,Kicking Horse Mountain Resort,https://skircr.com/tac/
-kicking-horse,Terminator,7900,youtube,https://www.youtube.com/embed/5VcEXV7EKAg,5VcEXV7EKAg,true,summit,Kicking Horse Mountain Resort,https://skircr.com/tac/
-kicking-horse,Eagles Eye,7700,youtube,https://www.youtube.com/embed/URWhAMV7irM,URWhAMV7irM,true,summit,Kicking Horse Mountain Resort,https://skircr.com/tac/
-kicking-horse,Crystal Bowl,,youtube,https://www.youtube.com/embed/bEb0o1ivgh8,bEb0o1ivgh8,true,mid,Kicking Horse Mountain Resort,https://skircr.com/tac/
+kicking-horse,Stairway,7920,youtube,https://www.youtube.com/embed/l2DY-ram9_Y,l2DY-ram9_Y,false,summit,Kicking Horse Mountain Resort,https://skircr.com/tac/
+kicking-horse,Terminator,7900,youtube,https://www.youtube.com/embed/5VcEXV7EKAg,5VcEXV7EKAg,false,summit,Kicking Horse Mountain Resort,https://skircr.com/tac/
+kicking-horse,Eagles Eye,7700,youtube,https://www.youtube.com/embed/URWhAMV7irM,URWhAMV7irM,false,summit,Kicking Horse Mountain Resort,https://skircr.com/tac/
+kicking-horse,Crystal Bowl,,youtube,https://www.youtube.com/embed/bEb0o1ivgh8,bEb0o1ivgh8,false,mid,Kicking Horse Mountain Resort,https://skircr.com/tac/
 kicking-horse,Base,3900,youtube,https://www.youtube.com/embed/zg_7iykoEas,zg_7iykoEas,true,base,Kicking Horse Mountain Resort,https://skircr.com/tac/
 kicking-horse,Catamount,,youtube,https://www.youtube.com/embed/fOENzc3vkfc,fOENzc3vkfc,true,,Kicking Horse Mountain Resort,https://skircr.com/tac/
-kicking-horse,Snow Plot,6759,youtube,https://www.youtube.com/embed/ONWooQD5CpI,ONWooQD5CpI,true,snow-stake,Kicking Horse Mountain Resort,https://skircr.com/tac/
+kicking-horse,Snow Plot,6759,youtube,https://www.youtube.com/embed/ONWooQD5CpI,ONWooQD5CpI,false,snow-stake,Kicking Horse Mountain Resort,https://skircr.com/tac/
 kimberley,Caper & Vimy Ridge,,youtube,https://www.youtube.com/embed/Cd_JiApY9y8,Cd_JiApY9y8,true,mid,Kimberley Alpine Resort (Resorts of the Canadian Rockies),https://skircr.com/tac/
 kimberley,Kimberley Quad Top,,youtube,https://www.youtube.com/embed/RBGs7fi1z6U,RBGs7fi1z6U,true,,Kimberley Alpine Resort (Resorts of the Canadian Rockies),https://skircr.com/tac/
 kimberley,Kimberley Base Area,4035,youtube,https://www.youtube.com/embed/RD3_u1nw0Uw,RD3_u1nw0Uw,true,base,Kimberley Alpine Resort (Resorts of the Canadian Rockies),https://skircr.com/tac/
@@ -894,53 +894,53 @@ marmot-basin,Mid Mountain,,image,https://cfeed.skimarmot.com/middle.jpg,,true,mi
 marmot-basin,Lower Mountain One,5570,image,https://cfeed.skimarmot.com/lower.jpg,,true,base,Marmot Basin,
 mount-norquay,Mount Norquay 360,,iframe,https://www.skaping.com/banff/mount-norquay,,true,,Mt. Norquay,https://banffnorquay.com/terms-conditions/
 nakiska,Top Gold Chair Express,,youtube,https://www.youtube.com/embed/nNb6j9T8r5k,nNb6j9T8r5k,true,summit,Nakiska Ski Area,https://skircr.com/tac/
-nakiska,Top of Silver Chair,,youtube,https://www.youtube.com/embed/VNtDiB63aNU,VNtDiB63aNU,true,mid,Nakiska Ski Area,https://skircr.com/tac/
+nakiska,Top of Silver Chair,,youtube,https://www.youtube.com/embed/VNtDiB63aNU,VNtDiB63aNU,false,mid,Nakiska Ski Area,https://skircr.com/tac/
 nakiska,Big Bear,,youtube,https://www.youtube.com/embed/t_Q_rt8Rpsg,t_Q_rt8Rpsg,true,,Nakiska Ski Area,https://skircr.com/tac/
-nakiska,Mid Mountain Lodge,,youtube,https://www.youtube.com/embed/MRl0nW5Gekk,MRl0nW5Gekk,true,mid,Nakiska Ski Area,https://skircr.com/tac/
-nakiska,Kids World and Tube Park,5003,youtube,https://www.youtube.com/embed/kchqCAOHweY,kchqCAOHweY,true,base,Nakiska Ski Area,https://skircr.com/tac/
-nakiska,Kids World from Rentals,5003,youtube,https://www.youtube.com/embed/TJRCd_GxbjE,TJRCd_GxbjE,true,base,Nakiska Ski Area,https://skircr.com/tac/
+nakiska,Mid Mountain Lodge,,youtube,https://www.youtube.com/embed/MRl0nW5Gekk,MRl0nW5Gekk,false,mid,Nakiska Ski Area,https://skircr.com/tac/
+nakiska,Kids World and Tube Park,5003,youtube,https://www.youtube.com/embed/kchqCAOHweY,kchqCAOHweY,false,base,Nakiska Ski Area,https://skircr.com/tac/
+nakiska,Kids World from Rentals,5003,youtube,https://www.youtube.com/embed/TJRCd_GxbjE,TJRCd_GxbjE,false,base,Nakiska Ski Area,https://skircr.com/tac/
 blue-mountain-ontario,Silver Bullet Plaza - 360,,iframe,https://www.skaping.com/blue-mountain/village,,true,village,Blue Mountain Resort,https://www.alterramtnco.com/terms-of-use/
 blue-mountain-ontario,Silver Bullet Mountaintop,,iframe,https://www.skaping.com/blue-mountain/mountain-top,,true,summit,Blue Mountain Resort,https://www.alterramtnco.com/terms-of-use/
 blue-mountain-ontario,Smart Alec Base - Live,,youtube,https://www.youtube.com/embed/52ar9bJWTIA,52ar9bJWTIA,true,base,Blue Mountain Resort,https://www.alterramtnco.com/terms-of-use/
 blue-mountain-ontario,Adventure Park - Live,,youtube,https://www.youtube.com/embed/hPpsWGYXqok,hPpsWGYXqok,true,,Blue Mountain Resort,https://www.alterramtnco.com/terms-of-use/
 blue-mountain-ontario,South Base - Live,,youtube,https://www.youtube.com/embed/fVzgIfHAG3U,fVzgIfHAG3U,true,base,Blue Mountain Resort,https://www.alterramtnco.com/terms-of-use/
-blue-mountain-ontario,Orchard Base - Live,,youtube,https://www.youtube.com/embed/wQqLdKmGkYc,wQqLdKmGkYc,true,base,Blue Mountain Resort,https://www.alterramtnco.com/terms-of-use/
+blue-mountain-ontario,Orchard Base - Live,,youtube,https://www.youtube.com/embed/wQqLdKmGkYc,wQqLdKmGkYc,false,base,Blue Mountain Resort,https://www.alterramtnco.com/terms-of-use/
 blue-mountain-ontario,Valley Base - Live,,youtube,https://www.youtube.com/embed/yYxZrTBne3I,yYxZrTBne3I,true,base,Blue Mountain Resort,https://www.alterramtnco.com/terms-of-use/
 blue-mountain-ontario,Calamity Lane - Live,,youtube,https://www.youtube.com/embed/ezyjNLLIUh0,ezyjNLLIUh0,true,,Blue Mountain Resort,https://www.alterramtnco.com/terms-of-use/
-blue-mountain-ontario,North Base - Live,,youtube,https://www.youtube.com/embed/68mi8QqjbDE,68mi8QqjbDE,true,base,Blue Mountain Resort,https://www.alterramtnco.com/terms-of-use/
+blue-mountain-ontario,North Base - Live,,youtube,https://www.youtube.com/embed/68mi8QqjbDE,68mi8QqjbDE,false,base,Blue Mountain Resort,https://www.alterramtnco.com/terms-of-use/
 blue-mountain-ontario,Monterra - Live,,youtube,https://www.youtube.com/embed/vEo7zDF5BFc,vEo7zDF5BFc,true,,Blue Mountain Resort,https://www.alterramtnco.com/terms-of-use/
-calabogie-peaks,Mountain View Cam,,youtube,https://www.youtube.com/embed/EaTbaUWaO3M,EaTbaUWaO3M,true,,Calabogie Peaks Resort,https://calabogie.com/privacy-policy/
+calabogie-peaks,Mountain View Cam,,youtube,https://www.youtube.com/embed/EaTbaUWaO3M,EaTbaUWaO3M,false,,Calabogie Peaks Resort,https://calabogie.com/privacy-policy/
 horseshoe-resort,lake horseshoe,,youtube,https://www.youtube.com/embed/B2EggpbHHhQ,B2EggpbHHhQ,true,,Horseshoe Valley Resort,https://freed.com/disclaimer/
 horseshoe-resort,snow tubing park,,youtube,https://www.youtube.com/embed/RnvgDV96v-Q,RnvgDV96v-Q,true,,Horseshoe Valley Resort,https://freed.com/disclaimer/
-horseshoe-resort,après patio,,youtube,https://www.youtube.com/embed/4BE6RSz1dk0,4BE6RSz1dk0,true,base,Horseshoe Valley Resort,https://freed.com/disclaimer/
-mount-st-louis-moonstone,Elfie Huter Express Top,,youtube,https://www.youtube.com/embed/uhSp-HupzSE,uhSp-HupzSE,true,summit,Mount St. Louis Moonstone,https://www.mountstlouis.com/terms-and-conditions/
+horseshoe-resort,après patio,,youtube,https://www.youtube.com/embed/4BE6RSz1dk0,4BE6RSz1dk0,false,base,Horseshoe Valley Resort,https://freed.com/disclaimer/
+mount-st-louis-moonstone,Elfie Huter Express Top,,youtube,https://www.youtube.com/embed/uhSp-HupzSE,uhSp-HupzSE,false,summit,Mount St. Louis Moonstone,https://www.mountstlouis.com/terms-and-conditions/
 mount-st-louis-moonstone,Elfie Huter Express Base,,youtube,https://www.youtube.com/embed/B9DekY3M1vo,B9DekY3M1vo,true,base,Mount St. Louis Moonstone,https://www.mountstlouis.com/terms-and-conditions/
-mount-st-louis-moonstone,Adventure Top,,youtube,https://www.youtube.com/embed/qTbxeKrs0sc,qTbxeKrs0sc,true,summit,Mount St. Louis Moonstone,https://www.mountstlouis.com/terms-and-conditions/
+mount-st-louis-moonstone,Adventure Top,,youtube,https://www.youtube.com/embed/qTbxeKrs0sc,qTbxeKrs0sc,false,summit,Mount St. Louis Moonstone,https://www.mountstlouis.com/terms-and-conditions/
 mount-st-louis-moonstone,Moonstone Base,,youtube,https://www.youtube.com/embed/lnUmvtezBnE,lnUmvtezBnE,true,base,Mount St. Louis Moonstone,https://www.mountstlouis.com/terms-and-conditions/
-mount-st-louis-moonstone,MSLM Base,,youtube,https://www.youtube.com/embed/oSolcTkH86o,oSolcTkH86o,true,base,Mount St. Louis Moonstone,https://www.mountstlouis.com/terms-and-conditions/
-mount-st-louis-moonstone,The JunkYard,,youtube,https://www.youtube.com/embed/HW0XTL8Kr3c,HW0XTL8Kr3c,true,,Mount St. Louis Moonstone,https://www.mountstlouis.com/terms-and-conditions/
-mount-st-louis-moonstone,Beginner Area,,youtube,https://www.youtube.com/embed/6bHfM6WaF0M,6bHfM6WaF0M,true,base,Mount St. Louis Moonstone,https://www.mountstlouis.com/terms-and-conditions/
+mount-st-louis-moonstone,MSLM Base,,youtube,https://www.youtube.com/embed/oSolcTkH86o,oSolcTkH86o,false,base,Mount St. Louis Moonstone,https://www.mountstlouis.com/terms-and-conditions/
+mount-st-louis-moonstone,The JunkYard,,youtube,https://www.youtube.com/embed/HW0XTL8Kr3c,HW0XTL8Kr3c,false,,Mount St. Louis Moonstone,https://www.mountstlouis.com/terms-and-conditions/
+mount-st-louis-moonstone,Beginner Area,,youtube,https://www.youtube.com/embed/6bHfM6WaF0M,6bHfM6WaF0M,false,base,Mount St. Louis Moonstone,https://www.mountstlouis.com/terms-and-conditions/
 bromont,Sommet (panoramique),,image,https://api.skaping.com/media/getLatest?format=jpg&api_key=rD22k-kH6kQ-G3R9H-1xlRX&quality=hd,,true,summit,"Bromont, montagne d'expériences",https://www.bromontmontagne.com/conditions-dutilisations/
 bromont,Versant du Village,,image,https://api.skaping.com/media/getLatest?format=jpg&api_key=KIUVD-q4bOQ-CDDan-zsMzo&quality=hd,,true,base,"Bromont, montagne d'expériences",https://www.bromontmontagne.com/conditions-dutilisations/
 bromont,Express du Village,,image,https://api.skaping.com/media/getLatest?format=jpg&api_key=m9Kxm-A5j4C-sUAOG-2fgCN&quality=hd,,true,base,"Bromont, montagne d'expériences",https://www.bromontmontagne.com/conditions-dutilisations/
 bromont,Express du Lac,,image,https://api.skaping.com/zz2G7-k7WgA-UkXeH-oAJQB/media/latest/hd.jpg,,true,base,"Bromont, montagne d'expériences",https://www.bromontmontagne.com/conditions-dutilisations/
 bromont,Express des Épinettes,,image,https://api.skaping.com/media/getLatest?format=jpg&api_key=dAelD-xc8Q6-sXS0o-5fShh&quality=hd,,true,base,"Bromont, montagne d'expériences",https://www.bromontmontagne.com/conditions-dutilisations/
 le-massif,Camp Boule Sommet,2644,iframe,https://www.skaping.com/massif-de-charlevoix/camp-boule,,true,summit,Le Massif de Charlevoix,https://www.lemassif.com/fr/conditions_generales
-le-massif,Echelle d'Igor - Summit,2644,image,https://www.lemassif.com/sites/default/files/webcams/snowcamsommet.jpg,,true,snow-stake,Le Massif de Charlevoix,https://www.lemassif.com/fr/conditions_generales
+le-massif,Echelle d'Igor - Summit,2644,image,https://www.lemassif.com/sites/default/files/webcams/snowcamsommet.jpg,,false,snow-stake,Le Massif de Charlevoix,https://www.lemassif.com/fr/conditions_generales
 mont-orford,Pied de la montagne,,iframe,https://g1.ipcamlive.com/player/player.php?alias=69247706b6ce0&autoplay=1,,true,base,Mont-Orford,
 mont-sainte-anne,Learning Area (Pente ecole),,image,https://secure.skircr.com/cams/msacam1/image.jpg,,true,base,Mont-Sainte-Anne,
 mont-sainte-anne,South Side Base (Base versant Sud),574,image,https://secure.skircr.com/cams/msacam2/image.jpg,,true,base,Mont-Sainte-Anne,
 mont-sainte-anne,South Side Summit (Sommet versant Sud),2625,image,https://secure.skircr.com/cams/msacam3/image.jpg,,true,summit,Mont-Sainte-Anne,
 mont-sainte-anne,North Side Summit (Sommet versant Nord),2625,image,https://secure.skircr.com/cams/msacam4/image.jpg,,true,summit,Mont-Sainte-Anne,
 mont-sainte-anne,Expert Area (Secteur Expert),,image,https://secure.skircr.com/cams/msacam5/image.jpg,,true,,Mont-Sainte-Anne,
-mont-sutton,Vue alt. 840 m,2756,youtube,https://www.youtube.com/embed/QTyitMMTy28,QTyitMMTy28,true,summit,Mont Sutton,https://montsutton.com/politique-et-confidentialite/
+mont-sutton,Vue alt. 840 m,2756,youtube,https://www.youtube.com/embed/QTyitMMTy28,QTyitMMTy28,false,summit,Mont Sutton,https://montsutton.com/politique-et-confidentialite/
 mont-sutton,Vue alt. 400 m,1312,image,https://seebooks.montsutton.com/netcam/netcam.jpg,,true,base,Mont Sutton,https://montsutton.com/politique-et-confidentialite/
 mont-tremblant,Mont Tremblant - Base Sud,,iframe,https://www.skaping.com/tremblant/base-sud/live,,true,base,Tremblant,https://www.alterramtn.co/en/terms-of-use
 mont-tremblant,Mont Tremblant - Pic Flying Mile,,iframe,https://www.skaping.com/tremblant/pic-flying-mile,,true,mid,Tremblant,https://www.alterramtn.co/en/terms-of-use
 mont-tremblant,Mont Tremblant - Versant Sud,,iframe,https://www.skaping.com/tremblant/versant-sud,,true,,Tremblant,https://www.alterramtn.co/en/terms-of-use
-mont-tremblant,Versant Nord / North Side,,iframe,https://tremblantwebcams.com/e/newmain.html?p=nord&vbcam=3&name=VERSANT%20NORD/NORTH%20SIDE,,true,base,Tremblant,https://www.alterramtn.co/en/terms-of-use
-mont-tremblant,Place St-Bernard,,iframe,https://tremblantwebcams.com/e/newmain.html?p=stbernard&vbcam=4&name=PLACE%20ST-BERNARD,,true,village,Tremblant,https://www.alterramtn.co/en/terms-of-use
-mont-tremblant,Place des Voyageurs,,iframe,https://tremblantwebcams.com/e/newmain.html?p=voyageurs&vbcam=3&name=PLACE%20DES%20VOYAGEURS,,true,village,Tremblant,https://www.alterramtn.co/en/terms-of-use
+mont-tremblant,Versant Nord / North Side,,iframe,https://tremblantwebcams.com/e/newmain.html?p=nord&vbcam=3&name=VERSANT%20NORD/NORTH%20SIDE,,false,base,Tremblant,https://www.alterramtn.co/en/terms-of-use
+mont-tremblant,Place St-Bernard,,iframe,https://tremblantwebcams.com/e/newmain.html?p=stbernard&vbcam=4&name=PLACE%20ST-BERNARD,,false,village,Tremblant,https://www.alterramtn.co/en/terms-of-use
+mont-tremblant,Place des Voyageurs,,iframe,https://tremblantwebcams.com/e/newmain.html?p=voyageurs&vbcam=3&name=PLACE%20DES%20VOYAGEURS,,false,village,Tremblant,https://www.alterramtn.co/en/terms-of-use
 owls-head,Chalet (extérieur),,iframe,https://g1.ipcamlive.com/player/player.php?alias=chaletoutside&autoplay=1,,true,base,Owl's Head,https://owlshead.com/conditions-dutilisation/
 ski-la-reserve,La remontée,,iframe,https://g1.ipcamlive.com/player/player.php?alias=base&autoplay=1,,true,base,Ski La Réserve,https://skilareserve.com/conditions/
 ski-la-reserve,Au sommet,2297,iframe,https://g1.ipcamlive.com/player/player.php?alias=sommet&autoplay=1,,true,summit,Ski La Réserve,https://skilareserve.com/conditions/
@@ -971,3 +971,33 @@ china-peak,Top of Chair 7,,youtube,https://www.youtube.com/embed/XY57S1_Dpb0,XY5
 china-peak,Buckhorn Deck,7100,youtube,https://www.youtube.com/embed/MXYJ3MO_u1g,MXYJ3MO_u1g,true,,China Peak Mountain Resort,
 china-peak,Base Cam,,youtube,https://www.youtube.com/embed/uGABP9cNvMk,uGABP9cNvMk,true,base,China Peak Mountain Resort,
 china-peak,Boathouse,,youtube,https://www.youtube.com/embed/MPhvhpaC2oY,MPhvhpaC2oY,true,,China Peak Mountain Resort,
+donner-ski-ranch,Deck Cam,,youtube,https://www.youtube.com/embed/ArDIIhAHwWE,ArDIIhAHwWE,true,base,Donner Ski Ranch,
+june-mountain,Chalet,,iframe,https://camstreamer.com/embed/tE4lQnjGNYDmWJGJR8cq5ZFfk1ayE3eGsk1s9Efk,,true,,June Mountain,
+june-mountain,J3,,iframe,https://camstreamer.com/embed/w9LUOU7DhJifalaO87SUPE9jF9cNytXkD7INTyy0,,true,,June Mountain,
+june-mountain,Patrol,,iframe,https://camstreamer.com/embed/fe1S3BCV9oWLDdx7eOnpCmwgykoYQ7Qk4i3Wr8oE,,true,,June Mountain,
+mammoth,Main Lodge,8909,youtube,https://www.youtube.com/embed/m4u2kGpkYD4,m4u2kGpkYD4,true,,Mammoth Mountain,
+sierra-at-tahoe,Plaza,,youtube,https://www.youtube.com/embed/1-FFKHkaYJE,1-FFKHkaYJE,true,base,Sierra-at-Tahoe,
+sierra-at-tahoe,West Bowl,,youtube,https://www.youtube.com/embed/qTZYSHi6ix0,qTZYSHi6ix0,true,,Sierra-at-Tahoe,
+marquette-mountain,Live Trail View,,iframe,https://g1.ipcamlive.com/player/player.php?alias=67be1a94393b8,,true,,Marquette Mountain,
+deer-valley,Park Peak Snow Stake,,youtube,https://www.youtube.com/embed/k8NiVrlQACQ,k8NiVrlQACQ,true,,Deer Valley Resort,
+kicking-horse,Crystal Bowl,,youtube,https://www.youtube.com/embed/Y1QokmaYAsA,Y1QokmaYAsA,true,,Kicking Horse Mountain Resort,
+kicking-horse,Eagle's Eye,7700,youtube,https://www.youtube.com/embed/WTZX8sq5y6Y,WTZX8sq5y6Y,true,summit,Kicking Horse Mountain Resort,
+kicking-horse,Snow Plot,6759,youtube,https://www.youtube.com/embed/p5qvGfbqwHQ,p5qvGfbqwHQ,true,,Kicking Horse Mountain Resort,
+kicking-horse,Stairway to Heaven,7920,youtube,https://www.youtube.com/embed/mCfxn0_ijJw,mCfxn0_ijJw,true,,Kicking Horse Mountain Resort,
+kicking-horse,Terminator,7900,youtube,https://www.youtube.com/embed/wfYpIsfzapw,wfYpIsfzapw,true,,Kicking Horse Mountain Resort,
+mt-bachelor,Cloudchaser,,iframe,https://camstreamer.com/embed/7WfyGuaHvti06WYRCx5L1XdgpKWyxHqN0iaDpKR4,,true,,Mt. Bachelor,
+mt-bachelor,Snow Stake,,iframe,https://camstreamer.com/embed/yjcHJseJyObWi2YvoWLlmU8inSaI5aY19Jq6Hcoz,,true,,Mt. Bachelor,
+solitude,Eagle Express Lift Line,,youtube,https://www.youtube.com/embed/oWaG8txpW1c,oWaG8txpW1c,true,,Solitude Mountain Resort,
+solitude,Moonbeam Parking Lot,,youtube,https://www.youtube.com/embed/jZ09h9qo-Vs,jZ09h9qo-Vs,true,,Solitude Mountain Resort,
+solitude,Summit Express Lift Line,,youtube,https://www.youtube.com/embed/Yblyfl97Mhc,Yblyfl97Mhc,true,,Solitude Mountain Resort,
+sugarbush,Allyn's Lodge Snow Stake,,youtube,https://www.youtube.com/embed/2Kjx9cnxRXA,2Kjx9cnxRXA,true,,Sugarbush Resort,
+sugarbush,Heaven's Gate Scenic,,youtube,https://www.youtube.com/embed/F5m1Ac9ZvKc,F5m1Ac9ZvKc,true,summit,Sugarbush Resort,
+bear-mountain,Bear Peak,,iframe,https://camstreamer.com/embed/CGe2VBFnva0Xtz4cUkELesjftjTPM4nEJIByGTj7,,true,summit,Big Bear Mountain Resort,
+bear-mountain,Beginner Area,,iframe,https://camstreamer.com/embed/RdgRi1B65dxntTAVheSuzfxyuMVx27oyhUC8ACuw,,true,,Big Bear Mountain Resort,
+bear-mountain,Midway Chair 5,,iframe,https://camstreamer.com/embed/fGUbAbUZbkh6VmHADXzMCNWhCyYY8UsDFMtb4iXY,,true,mid,Big Bear Mountain Resort,
+bridger-bowl,Red Chair Snow Stake,,youtube,https://www.youtube.com/embed/AHARPwavQ_0,AHARPwavQ_0,true,,Bridger Bowl,
+loon,Camp III,,iframe,https://camstreamer.com/embed/5X9Lxz1XA0W43tjhaLj5UuXTLOY9yJMQlolyV54Q,,true,,Loon Mountain Resort,
+loon,Loon Peak,,iframe,https://camstreamer.com/embed/bTSkwcDROmit07OwYenalyn76w0ZIKVlrQ3JZPH6,,true,summit,Loon Mountain Resort,
+loon,Octagon Base Area,,iframe,https://camstreamer.com/embed/X7HniLhNVdyPPKjIekCVxCZ762RvnqAxefwhNpWJ,,true,base,Loon Mountain Resort,
+snow-summit,Miracle Mile,,iframe,https://camstreamer.com/embed/6voUqxnwy6czzHMjNExPov1rHCMR2cKvz8Hk5OlO,,true,,Big Bear Mountain Resort,
+tamarack,Tamarack Marina,,youtube,https://www.youtube.com/embed/AjWJk4x5mGw,AjWJk4x5mGw,true,,Tamarack Resort,
