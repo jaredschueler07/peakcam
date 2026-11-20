@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAllResorts } from "@/lib/supabase";
+import { getAllResorts, getHubLiftsIndex } from "@/lib/supabase";
 import { SEASON_PASSES } from "@/lib/resort-profile";
 import { PASS_BASE_PATH, PASS_INFO, buildPassPage, isSeasonPassSlug, passDescription, passMarkdownPath, passPath, passTitle } from "@/lib/passes";
 import { SITE_URL } from "@/lib/site";
@@ -43,7 +43,8 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 export default async function PassPage({ params }: { params: Params }) {
   const { pass } = await params;
   if (!isSeasonPassSlug(pass)) return notFound();
-  const page = buildPassPage(pass, await getAllResorts());
+  const [resorts, lifts] = await Promise.all([getAllResorts(), getHubLiftsIndex(new Date())]);
+  const page = buildPassPage(pass, resorts, SITE_URL, lifts);
   const { info } = page;
   const title = passTitle(page);
   const description = passDescription(page);
