@@ -2,7 +2,9 @@ import Link from "next/link";
 import type { ResortWithData } from "@/lib/types";
 import { isOffSeason } from "@/lib/map-utils";
 import { regionHubPath, slugifyHub, stateHubPath, stateLabel } from "@/lib/hubs";
+import { hasOpenLifts, hubDisplayRating, liftsCellLabel, liftsCellText, liftsFootnote, type HubLiftsIndex } from "@/lib/hub-lifts";
 import { HubRatingPill } from "./HubRatingPill";
+import { OpenPerFeedChip } from "./OpenPerFeedChip";
 
 interface Props {
   /** Already in display order — lib/hub-copy.ts sortHubTable (base desc, then name). */
@@ -13,6 +15,8 @@ interface Props {
   linkedRegionSlugs: ReadonlySet<string>;
   /** One clock read per render, shared with the strip and the prose. */
   now: Date;
+  /** Current operator lift counts by resort id (lib/hub-lifts.ts); absent rows show a dash. */
+  lifts?: HubLiftsIndex;
 }
 
 const num = "font-mono text-[13px] font-bold tabular-nums";
@@ -52,8 +56,10 @@ function PlaceCell({ resort, placeColumn, linkedRegionSlugs }: Pick<Props, "plac
  * what crawlers index. No sort controls on purpose — the sortable version of
  * this table is /snow-report; this one exists to rank a place.
  */
-export function HubResortTable({ resorts, placeColumn, linkedRegionSlugs, now }: Props) {
+export function HubResortTable({ resorts, placeColumn, linkedRegionSlugs, now, lifts = {} }: Props) {
+  const liftsNote = liftsFootnote(resorts.map((r) => lifts[r.id]));
   return (
+    <>
     <div className="overflow-x-auto rounded-[18px] border-[1.5px] border-ink bg-cream-50 shadow-stamp">
       <table className="w-full min-w-[34rem] text-left text-sm">
         <thead>
@@ -70,6 +76,9 @@ export function HubResortTable({ resorts, placeColumn, linkedRegionSlugs, now }:
             <th scope="col" className="pc-eyebrow px-3 py-3 text-right">
               24h
             </th>
+            <th scope="col" className="pc-eyebrow hidden px-3 py-3 text-right sm:table-cell">
+              Lifts
+            </th>
             <th scope="col" className="pc-eyebrow px-3 py-3 text-right">
               Cams
             </th>
@@ -82,12 +91,20 @@ export function HubResortTable({ resorts, placeColumn, linkedRegionSlugs, now }:
           {resorts.map((resort) => {
             const snow = resort.snow_report;
             const cams = resort.cams.filter((cam) => cam.is_active).length;
+            const resortLifts = lifts[resort.id];
             return (
               <tr key={resort.id}>
                 <td className="px-4 py-3">
                   <Link href={`/resorts/${resort.slug}`} className="font-bold text-ink underline-offset-2 hover:underline">
                     {resort.name}
                   </Link>
+                  {hasOpenLifts(resortLifts) && (
+                    <>
+                      {" "}
+                      <OpenPerFeedChip label={liftsCellLabel(resortLifts, resort.name)} />
+                      <span className="block text-xs font-bold text-forest-dk sm:hidden">{liftsCellText(resortLifts)} lifts open</span>
+                    </>
+                  )}
                   <span className="block text-xs text-bark md:hidden">
                     {placeColumn === "state" ? stateLabel(resort.state) : resort.region}
                   </span>
@@ -100,6 +117,9 @@ export function HubResortTable({ resorts, placeColumn, linkedRegionSlugs, now }:
                 </td>
                 <td className="px-3 py-3 text-right">
                   <Inches value={snow?.new_snow_24h} strong />
+                </td>
+                <td className={`${num} hidden whitespace-nowrap px-3 py-3 text-right sm:table-cell ${hasOpenLifts(resortLifts) ? "text-ink" : "text-bark"}`}>
+                  {liftsCellText(resortLifts) ?? "—"}
                 </td>
                 <td className="px-3 py-3 text-right">
                   {cams > 0 ? (
@@ -117,7 +137,7 @@ export function HubResortTable({ resorts, placeColumn, linkedRegionSlugs, now }:
                   )}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <HubRatingPill rating={resort.cond_rating} offSeason={isOffSeason(resort.lat, now)} />
+                  <HubRatingPill rating={hubDisplayRating(resort.cond_rating, snow?.base_depth)} offSeason={isOffSeason(resort.lat, now)} />
                 </td>
               </tr>
             );
@@ -125,5 +145,11 @@ export function HubResortTable({ resorts, placeColumn, linkedRegionSlugs, now }:
         </tbody>
       </table>
     </div>
+    {liftsNote && (
+      <p data-testid="hub-lifts-note" className="mt-3 text-xs leading-relaxed text-bark">
+        {liftsNote}
+      </p>
+    )}
+    </>
   );
 }

@@ -1,4 +1,5 @@
-import { getAllResorts } from "@/lib/supabase";
+import { getAllResorts, getHubLiftsIndex } from "@/lib/supabase";
+import { SITE_URL } from "@/lib/site";
 import { buildSnowHub } from "@/lib/snow-hubs";
 import { markdownPageHeaders } from "@/lib/public-api/markdown-page";
 import { snowHubMarkdown } from "@/lib/snow-hubs";
@@ -10,7 +11,7 @@ export const revalidate = 900;
 
 export async function GET(_request: Request, { params }: { params: Promise<{ hub: string }> }): Promise<Response> {
   const { hub } = await params;
-  const page = /^[a-z0-9][a-z0-9-]{0,99}$/.test(hub) ? buildSnowHub(hub, await getAllResorts()) : null;
+  const page = /^[a-z0-9][a-z0-9-]{0,99}$/.test(hub) ? buildSnowHub(hub, await getAllResorts(), SITE_URL, await getHubLiftsIndex(new Date())) : null;
   if (!page) {
     return new Response(`No snow-report hub "${hub}". List them at /ski-cams or /index.md.\n`, {
       status: 404,

@@ -7,11 +7,12 @@
 
 import type { ResortWithData, SeasonPass } from "./types";
 import { PASS_LABELS, SEASON_PASSES, profilePasses } from "./resort-profile";
-import { measuredRow, rankByBase, snowHubSentence, type MeasuredRow } from "./snow-hubs";
+import { liftsMarkdownCell, measuredRow, rankByBase, snowHubSentence, type MeasuredRow } from "./snow-hubs";
 import { formatMountainTime, inches, latestUpdatedAt, sourceLabel, type Quotable } from "./quotable";
 import { stateLabel } from "./hubs";
 import { SITE_URL } from "./site";
 import { PUBLIC_API_ATTRIBUTION } from "./public-api/headers";
+import { liftsFootnote, type HubLiftsIndex } from "./hub-lifts";
 
 export const PASS_BASE_PATH = "/passes";
 
@@ -64,10 +65,10 @@ export function resortsOnPass(resorts: readonly ResortWithData[], pass: SeasonPa
   return resorts.filter((r) => profilePasses(r.passes).includes(pass));
 }
 
-export function buildPassPage(pass: SeasonPass, resorts: readonly ResortWithData[], baseUrl: string = SITE_URL): PassPage {
+export function buildPassPage(pass: SeasonPass, resorts: readonly ResortWithData[], baseUrl: string = SITE_URL, lifts: HubLiftsIndex = {}): PassPage {
   const info = PASS_INFO[pass];
   const members = resortsOnPass(resorts, pass);
-  const rows = rankByBase(members.map(measuredRow));
+  const rows = rankByBase(members.map((r) => measuredRow(r, lifts)));
   const reported = rows.filter((r) => r.source);
   const places = [...new Set(members.map((r) => stateLabel(r.state)))].sort((a, b) => a.localeCompare(b, "en"));
   return {
@@ -112,13 +113,15 @@ export function passMarkdown(page: PassPage, baseUrl: string = SITE_URL): string
     "",
     `${page.info.blurb} Membership here comes from the operator's published resort list; PeakCam does not sell passes or know your pass tier.`,
     "",
-    "| # | Resort | State | Base | New 24 h | New 48 h | Source | Dated | Live cams |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| # | Resort | State | Base | New 24 h | New 48 h | Source | Dated | Live cams | Lifts open (operator feed) |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
   ];
   page.rows.forEach((r, i) => {
     const source = r.source ? `${sourceLabel(r.source)}${r.stationName ? ` (${r.stationName})` : ""}` : "no report yet";
-    lines.push(`| ${i + 1} | [${r.name}](${baseUrl}/resorts/${r.slug}) | ${stateLabel(r.state)} | ${cell(r.baseIn)} | ${cell(r.new24In)} | ${cell(r.new48In)} | ${source} | ${r.measuredAt ? formatMountainTime(r.measuredAt) : "–"} | ${r.liveCams} |`);
+    lines.push(`| ${i + 1} | [${r.name}](${baseUrl}/resorts/${r.slug}) | ${stateLabel(r.state)} | ${cell(r.baseIn)} | ${cell(r.new24In)} | ${cell(r.new48In)} | ${source} | ${r.measuredAt ? formatMountainTime(r.measuredAt) : "–"} | ${r.liveCams} | ${liftsMarkdownCell(r.lifts)} |`);
   });
+  const liftsNote = liftsFootnote(page.rows.map((r) => r.lifts));
+  if (liftsNote) lines.push("", liftsNote);
   if (!page.rows.length) lines.push("", "No resort on PeakCam currently names this pass; the profile import fills the column.");
   lines.push("", `Attribution: ${PUBLIC_API_ATTRIBUTION}  ·  Terms: ${baseUrl}/about#terms`, "");
   return lines.join("\n");

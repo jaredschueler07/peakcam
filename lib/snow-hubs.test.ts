@@ -38,7 +38,7 @@ const ROWS: ResortWithData[] = [
 ];
 
 test("rankByBase: deepest first, new snow breaks ties, no report last", () => {
-  const ranked = rankByBase(ROWS.map(measuredRow)).map((r) => r.slug);
+  const ranked = rankByBase(ROWS.map((r) => measuredRow(r))).map((r) => r.slug);
   assert.deepEqual(ranked, ["alta", "wolf-creek", "copper", "loveland", "eldora"]);
 });
 
@@ -94,4 +94,19 @@ test("no hub slug in the catalogue shadows a static /snow-report child", () => {
     assert.ok(!slugs.includes(reserved), `hub slug "${reserved}" collides with a static /snow-report page`);
   }
   assert.ok(slugs.includes("colorado"));
+});
+
+test("a row carries its lift count and the markdown table prints it with the feed's time", () => {
+  const lifts = { [ROWS[0].id]: { open: 8, total: 35, observedAt: "2026-11-20T17:00:00.000Z" } };
+  const page = buildSnowHub("colorado", ROWS, "https://x.test", lifts)!;
+  const wolf = page.rows.find((r) => r.slug === ROWS[0].slug)!;
+  assert.deepEqual(wolf.lifts, lifts[ROWS[0].id]);
+  assert.equal(page.rows.filter((r) => r.lifts).length, 1);
+  const md = snowHubMarkdown(page, "https://x.test");
+  assert.match(md, /Lifts open \(operator feed\)/);
+  assert.match(md, /\| 8 of 35 \(10:00 a\.m\. MT Nov 20\) \|/);
+  assert.match(md, /open per that feed; it is not a confirmation/);
+  // Without a feed the column is a dash and there is no note.
+  const bare = snowHubMarkdown(buildSnowHub("colorado", ROWS, "https://x.test")!, "https://x.test");
+  assert.doesNotMatch(bare, /open per that feed/);
 });

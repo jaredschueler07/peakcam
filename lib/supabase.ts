@@ -9,6 +9,7 @@ import { shapeTimelapses, type CamTimelapseRow, type CamTimelapses } from "./cam
 import { assembleStoredRuns, latestRunsPerModel, type ForecastDailyRow, type ForecastRunRow, type ForecastScoreRow, type StoredForecast } from "./forecast/store";
 import type { CumulativeNormalRow, DailyRow, MonthlyNormalRow, NormalWindow } from "./snow-history";
 import type { SeasonAggregateRow } from "./leaderboards";
+import { buildHubLiftsIndex, type HubLifts } from "./hub-lifts";
 
 // ─────────────────────────────────────────────────────────────
 // Client
@@ -638,6 +639,16 @@ export const getLatestOperatorStatusIndex = unstable_cache(
   ["peakcam:operator-status:v1", supabaseUrl],
   { revalidate: PUBLIC_API_STATIONS_REVALIDATE_SECONDS, tags: ["peakcam-resort-catalog"] },
 );
+
+/**
+ * Current lift counts per resort id for the hub and pass tables
+ * (lib/hub-lifts.ts). Fails soft: a missing view or a failed read gives an
+ * empty index, so the tables render without the lift column's data.
+ */
+export async function getHubLiftsIndex(now: Date): Promise<Record<string, HubLifts>> {
+  const operatorIndex = await getLatestOperatorStatusIndex().catch(() => ({}));
+  return buildHubLiftsIndex(operatorIndex, now);
+}
 
 // ─────────────────────────────────────────────────────────────
 // Snow Score (migration 028; written by scripts/score-sync.ts, P7).

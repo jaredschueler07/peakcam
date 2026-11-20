@@ -1,4 +1,5 @@
-import { getAllResorts } from "@/lib/supabase";
+import { getAllResorts, getHubLiftsIndex } from "@/lib/supabase";
+import { SITE_URL } from "@/lib/site";
 import { buildPassPage, isSeasonPassSlug, passMarkdown } from "@/lib/passes";
 import { markdownPageHeaders } from "@/lib/public-api/markdown-page";
 
@@ -15,6 +16,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pas
       headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
     });
   }
-  const page = buildPassPage(pass, await getAllResorts());
+  const page = buildPassPage(pass, await getAllResorts(), SITE_URL, await getHubLiftsIndex(new Date()));
   return new Response(passMarkdown(page), { headers: markdownPageHeaders(page.pageUrl) });
 }
