@@ -1,30 +1,51 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
-import { Fraunces, DM_Sans, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ClientProviders } from "./client-providers";
 import { SkipLink } from "@/components/layout/SkipLink";
 
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  weight: ["500", "700", "900"],
-  style: ["normal", "italic"],
+// Self-hosted (app/fonts/, SIL OFL 1.1) so the build never has to reach
+// Google: next/font/google downloads at build time, and on 2026-11-20 that
+// download failed intermittently and took production builds down with it.
+//
+// The files are the wght-only variable cuts of the latin subset, the same
+// design Google served for the weight lists below (other axes at their
+// defaults). Each weight is declared as its own face on the one file, as
+// Google's CSS did, so a request for an undeclared weight still resolves to
+// the nearest declared one instead of a new in-between weight.
+const fraunces = localFont({
+  src: [
+    { path: "./fonts/fraunces-latin-wght-normal.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/fraunces-latin-wght-normal.woff2", weight: "700", style: "normal" },
+    { path: "./fonts/fraunces-latin-wght-normal.woff2", weight: "900", style: "normal" },
+    { path: "./fonts/fraunces-latin-wght-italic.woff2", weight: "500", style: "italic" },
+    { path: "./fonts/fraunces-latin-wght-italic.woff2", weight: "700", style: "italic" },
+    { path: "./fonts/fraunces-latin-wght-italic.woff2", weight: "900", style: "italic" },
+  ],
   variable: "--font-fraunces",
   display: "swap",
+  adjustFontFallback: "Times New Roman",
 });
 
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+const dmSans = localFont({
+  src: [
+    { path: "./fonts/dm-sans-latin-wght-normal.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/dm-sans-latin-wght-normal.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/dm-sans-latin-wght-normal.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/dm-sans-latin-wght-normal.woff2", weight: "700", style: "normal" },
+  ],
   variable: "--font-dm-sans",
   display: "swap",
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["500", "700"],
+const jetbrainsMono = localFont({
+  src: [
+    { path: "./fonts/jetbrains-mono-latin-wght-normal.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/jetbrains-mono-latin-wght-normal.woff2", weight: "700", style: "normal" },
+  ],
   variable: "--font-jetbrains",
   display: "swap",
 });
