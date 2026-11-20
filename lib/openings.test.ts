@@ -332,7 +332,14 @@ test("data/resort-openings.csv only names real resorts and well-formed, sourced 
     } else {
       assert.equal(row.closing_date, "", `${row.slug}: Northern rows have no closing date this early`);
       assert.equal(row.season, CURRENT_SEASON);
-      assert.ok(!(row.projected_open && row.confirmed_open), `${row.slug}: once confirmed, drop the projection`);
+      // A row may keep its projection beside the confirmed date (the Nov 2026
+      // campaign kit does, to show how far the estimate was off); every reader
+      // prefers confirmed_open. What would be a mistake is a pair that cannot
+      // describe the same opening.
+      if (row.projected_open && row.confirmed_open) {
+        const days = Math.abs(Date.parse(row.confirmed_open) - Date.parse(row.projected_open)) / 86_400_000;
+        assert.ok(days <= 60, `${row.slug}: confirmed ${row.confirmed_open} is ${days} days from its projection ${row.projected_open} — one of them is probably a typo`);
+      }
     }
   }
 });
