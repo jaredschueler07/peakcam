@@ -48,7 +48,8 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 
 export default async function SnowHubPage({ params }: { params: Params }) {
   const { hub: slug } = await params;
-  const [resorts, lifts] = await Promise.all([getAllResorts(), getHubLiftsIndex(new Date())]);
+  const resorts = await getAllResorts();
+  const lifts = await getHubLiftsIndex(new Date(), resorts);
   const page = buildSnowHub(slug, resorts, SITE_URL, lifts);
   if (!page) return notFound();
   const { hub } = page;

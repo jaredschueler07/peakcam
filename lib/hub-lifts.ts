@@ -16,57 +16,104 @@
 
 import type { ConditionRating, OperatorStatusRow } from "./types";
 import { freshnessFor } from "./conditions-contract";
+import { DEFAULT_OPERATOR_TIME_ZONE, summarizeOperatorDay, type OperatorReading } from "./operator-day";
 import { operatorReportFromRow } from "./public-api/conditions";
 import { formatMountainTime } from "./quotable";
+import { resortTimeZone, type TimeZoneResort } from "./resort-timezone";
 
-/** One resort's lift count from a current operator feed. */
+/**
+ * One resort's lift status for today from a current operator feed, by the
+ * day rules in lib/operator-day.ts (the same ones the conditions contract
+ * uses):
+ *   - `operated`: a reading today showed lifts open. The count is the day's
+ *     latest reading that showed any open, and stays after the last chair.
+ *   - `scheduled`: none open yet today, the newest reading lists lifts
+ *     scheduled to open.
+ * A resort the feed calls closed, or says nothing about today, is absent.
+ */
 export interface HubLifts {
+  state: "operated" | "scheduled";
   open: number;
   total: number;
-  /** The feed's own timestamp for the lift status (ISO). */
+  /** `scheduled` only: lifts the feed lists as scheduled to open today. */
+  scheduled: number | null;
+  /** The reading the count comes from: the feed's own timestamp (ISO). */
   observedAt: string;
+  /** `operated`: whether the newest reading still shows lifts open. */
+  current: boolean;
+  /** True before the day's first reading: the count is the previous local day's last open reading (lib/operator-day.ts). */
+  carried: boolean;
 }
 
 /** Keyed by resort id; a resort without a current feed is absent. */
 export type HubLiftsIndex = Readonly<Record<string, HubLifts | undefined>>;
 
-/** The row's lift count when the feed is current (live or recent) and carries counts; null otherwise. */
-export function hubLiftsFromRow(row: OperatorStatusRow | null | undefined, now: Date): HubLifts | null {
+/** What the index needs to know of a resort: its id and where its clock is. */
+export type HubLiftsResort = TimeZoneResort & { id: string };
+
+/** Today's lift status from the row and its attached readings; null when the feed is stale, carries no counts, or does not say open or scheduled today. */
+export function hubLiftsFromRow(row: OperatorStatusRow | null | undefined, now: Date, timeZone: string = DEFAULT_OPERATOR_TIME_ZONE): HubLifts | null {
   const report = operatorReportFromRow(row);
   if (!report) return null;
   const tier = freshnessFor("operator", report.observedAt, now).tier;
   if (tier !== "live" && tier !== "recent") return null;
-  const { liftsOpen: open, liftsTotal: total } = report;
-  if (open == null || total == null || total <= 0 || open < 0) return null;
-  return { open: Math.min(open, total), total, observedAt: new Date(report.observedAt).toISOString() };
+  const readings: readonly OperatorReading[] = report.readings?.length
+    ? report.readings
+    : [{ observedAt: report.observedAt, liftsOpen: report.liftsOpen, liftsScheduled: report.liftsScheduled, liftsTotal: report.liftsTotal }];
+  const day = summarizeOperatorDay(readings, timeZone, now);
+  if (!day || day.state === "closed" || day.liftsTotal == null) return null;
+  return { state: day.state, open: day.liftsOpen, total: day.liftsTotal, scheduled: day.liftsScheduled, observedAt: day.observedAt, current: day.current, carried: day.carried };
 }
 
-export function buildHubLiftsIndex(operatorIndex: Readonly<Record<string, OperatorStatusRow>> | null | undefined, now: Date): Record<string, HubLifts> {
+export function buildHubLiftsIndex(
+  operatorIndex: Readonly<Record<string, OperatorStatusRow>> | null | undefined,
+  now: Date,
+  resorts: readonly HubLiftsResort[] = [],
+): Record<string, HubLifts> {
+  const zones = new Map(resorts.map((r) => [r.id, resortTimeZone(r)]));
   const out: Record<string, HubLifts> = {};
   for (const [resortId, row] of Object.entries(operatorIndex ?? {})) {
-    const lifts = hubLiftsFromRow(row, now);
+    const lifts = hubLiftsFromRow(row, now, zones.get(resortId));
     if (lifts) out[resortId] = lifts;
   }
   return out;
 }
 
-/** True when the feed reports at least one lift open: the tables show the "Open" chip. */
-export function hasOpenLifts(lifts: HubLifts | null | undefined): lifts is HubLifts {
-  return !!lifts && lifts.open > 0;
+/** True when a reading today showed at least one lift open: the tables show the "Open" chip. */
+export function hasOpenLifts(lifts: HubLifts | null | undefined): boolean {
+  return !!lifts && lifts.state === "operated" && lifts.open > 0;
+}
+
+/** True when no lift has opened yet today and the feed lists some as scheduled: the quieter "Opens today" chip. */
+export function opensToday(lifts: HubLifts | null | undefined): boolean {
+  return !!lifts && lifts.state === "scheduled" && (lifts.scheduled ?? 0) > 0;
 }
 
 /**
- * The cell text: "8 of 35" when lifts are open, null (a dash) otherwise. A
- * feed that lists 0 open lifts is shown as a dash on purpose: before opening
- * day that number would label a pre-season resort "closed".
+ * The cell text: "8 of 35" when lifts ran today, "4 scheduled" before the
+ * first chair on a feed that lists scheduled lifts, null (a dash) otherwise.
+ * A feed that lists 0 open and none scheduled is a dash on purpose: before
+ * opening day that number would label a pre-season resort "closed".
  */
 export function liftsCellText(lifts: HubLifts | null | undefined): string | null {
-  return hasOpenLifts(lifts) ? `${lifts.open} of ${lifts.total}` : null;
+  if (lifts && hasOpenLifts(lifts)) return `${lifts.open} of ${lifts.total}`;
+  if (lifts && opensToday(lifts)) return `${lifts.scheduled} scheduled`;
+  return null;
+}
+
+/** The phone line under the resort name. */
+export function liftsMobileText(lifts: HubLifts | null | undefined): string | null {
+  if (lifts && hasOpenLifts(lifts)) return `${lifts.open} of ${lifts.total} lifts open`;
+  if (lifts && opensToday(lifts)) return `${lifts.scheduled} ${lifts.scheduled === 1 ? "lift" : "lifts"} scheduled`;
+  return null;
 }
 
 /** Screen-reader and title text for one row. */
 export function liftsCellLabel(lifts: HubLifts, name: string): string {
-  return `${name}: ${lifts.open} of ${lifts.total} lifts open per the operator's feed, read at ${formatMountainTime(lifts.observedAt)}`;
+  if (lifts.state === "scheduled") {
+    return `${name}: no lift open yet today, ${lifts.scheduled} scheduled to open per the operator's feed, read at ${formatMountainTime(lifts.observedAt)}`;
+  }
+  return `${name}: ${lifts.open} of ${lifts.total} lifts open per the operator's feed, read at ${formatMountainTime(lifts.observedAt)}${lifts.carried ? ", the last open reading before today's first" : lifts.current ? "" : "; the feed has shown none open since"}`;
 }
 
 /**
@@ -74,10 +121,15 @@ export function liftsCellLabel(lifts: HubLifts, name: string): string {
  * the newest feed reading among the rows shown, never by the render.
  */
 export function liftsFootnote(lifts: readonly (HubLifts | null | undefined)[]): string | null {
-  const shown = lifts.filter(hasOpenLifts);
+  const shown = lifts.filter((l): l is HubLifts => hasOpenLifts(l) || opensToday(l));
   if (!shown.length) return null;
   const newest = shown.map((l) => l.observedAt).sort().reverse()[0];
-  return `Lift counts are what each operator's own feed reported, newest reading ${formatMountainTime(newest)}. "Open" here means open per that feed; it is not a confirmation that a lift is turning.`;
+  const parts = [
+    `Lift counts are what each operator's own feed reported: for each resort, its latest reading that showed lifts open, the newest of them at ${formatMountainTime(newest)}. A count stays after the lifts stop, until the feed's first reading of the resort's next day.`,
+    `"Open" here means open per that feed; it is not a confirmation that a lift is turning.`,
+  ];
+  if (shown.some(opensToday)) parts.push(`"Opens today" means the feed lists lifts as scheduled and none open yet.`);
+  return parts.join(" ");
 }
 
 /**

@@ -38,6 +38,7 @@
 
 import type { ResortOpening } from "./openings";
 import { openingStatus } from "./openings";
+import { DEFAULT_OPERATOR_TIME_ZONE, localClock, summarizeOperatorDay, type OperatorDay, type OperatorReading } from "./operator-day";
 
 export const CONDITIONS_SCHEMA_VERSION = "1.0.0";
 
@@ -185,6 +186,13 @@ export interface OperatorReport {
   /** The operator's own published opening date, when the feed carries one. */
   openingDate: string | null;
   verified: boolean;
+  /**
+   * The feed's readings from the last 30 h, when the caller has them
+   * (lib/supabase.ts attaches them to the latest row). The status rules read
+   * the resort's whole local day from these; without them the report itself
+   * is the only reading.
+   */
+  readings?: readonly OperatorReading[] | null;
 }
 
 // ── Status ───────────────────────────────────────────────────
@@ -196,6 +204,8 @@ export interface StatusInput {
   localDate: string;
   operator: OperatorReport | null;
   now: Date;
+  /** The resort's IANA zone (lib/resort-timezone.ts), for the feed's local day and hours; Mountain time when absent. */
+  timeZone?: string;
 }
 
 export interface StatusResult {
@@ -212,6 +222,8 @@ export interface StatusResult {
   basis: "feed" | "date" | "none";
   observedAt: string | null;
   reasons: string[];
+  /** What the operator feed said over the resort's local day, when it decided the status (lib/operator-day.ts). */
+  liftDay?: OperatorDay | null;
 }
 
 function count(n: number | null | undefined): number {
@@ -221,10 +233,13 @@ function count(n: number | null | undefined): number {
 /**
  * The operating status, never defaulting to open:
  *
- * 1. A fresh operator feed (≤ 30 h) decides first. Lifts open, or lifts
- *    scheduled to open today, → OPEN. Every lift closed or on hold while the
- *    season is otherwise on → CLOSED_TODAY. A feed with no lift data at all
- *    says nothing and falls through.
+ * 1. A fresh operator feed decides first, read over the resort's local day
+ *    (lib/operator-day.ts): any reading today with a lift open → OPEN for
+ *    the rest of that day; else lifts scheduled in the newest reading (before
+ *    the lift day ends) → OPEN; else a core-hours reading (10:00–15:00 local)
+ *    with nothing open or scheduled while the season is on → CLOSED_TODAY.
+ *    A 0/0 reading outside core hours, yesterday's readings and a feed with
+ *    no lift data say nothing and fall through.
  * 2. Else the opening row: a confirmed date that has passed (and no closing
  *    date behind it) → OPEN; a confirmed or projected date still ahead →
  *    PRE_SEASON; a closing date that has passed → OFF_SEASON; a projection
@@ -241,26 +256,36 @@ export function deriveStatus(input: StatusInput): StatusResult {
 
   if (operator) {
     const fresh = freshnessFor("operator", operator.observedAt, now);
-    const total = count(operator.liftsTotal);
-    const open = count(operator.liftsOpen);
-    const scheduled = count(operator.liftsScheduled);
     const age = fresh.ageHours == null ? "" : ` (${fresh.ageHours} h old)`;
     if (fresh.tier === "live" || fresh.tier === "recent") {
-      if (open > 0) {
-        reasons.push(`operator feed${age}: ${open} of ${total || "?"} lifts open`);
-        return { status: "OPEN", source: "operator", basis: "feed", observedAt: toIso(operator.observedAt), reasons };
+      const timeZone = input.timeZone ?? DEFAULT_OPERATOR_TIME_ZONE;
+      const readings: readonly OperatorReading[] = operator.readings?.length
+        ? operator.readings
+        : [{ observedAt: operator.observedAt, liftsOpen: operator.liftsOpen, liftsScheduled: operator.liftsScheduled, liftsTotal: operator.liftsTotal }];
+      const day = summarizeOperatorDay(readings, timeZone, now);
+      if (day?.state === "operated") {
+        reasons.push(
+          day.carried
+            ? `operator feed${age}: no reading yet on ${localDate}; lifts ran on ${day.localDate}, ${day.liftsOpen} of ${day.liftsTotal ?? "?"} open at ${localClock(new Date(day.observedAt), timeZone)} resort time that day`
+            : day.current
+            ? `operator feed${age}: ${day.liftsOpen} of ${day.liftsTotal ?? "?"} lifts open`
+            : `operator feed: lifts ran today, ${day.liftsOpen} of ${day.liftsTotal ?? "?"} open at ${localClock(new Date(day.observedAt), timeZone)} resort time; the newest reading${age} shows none open`,
+        );
+        return { status: "OPEN", source: "operator", basis: "feed", observedAt: day.newestAt, reasons, liftDay: day };
       }
-      if (scheduled > 0) {
-        reasons.push(`operator feed${age}: no lift spinning yet, ${scheduled} scheduled to open today`);
-        return { status: "OPEN", source: "operator", basis: "feed", observedAt: toIso(operator.observedAt), reasons };
+      if (day?.state === "scheduled") {
+        reasons.push(`operator feed${age}: no lift spinning yet, ${day.liftsScheduled} scheduled to open today`);
+        return { status: "OPEN", source: "operator", basis: "feed", observedAt: day.newestAt, reasons, liftDay: day };
       }
-      if (total > 0) {
-        reasons.push(`operator feed${age}: 0 of ${total} lifts open, none scheduled`);
+      if (day?.state === "closed") {
+        reasons.push(`operator feed: 0 of ${day.liftsTotal ?? "?"} lifts open and none scheduled at ${localClock(new Date(day.observedAt), timeZone)} resort time, and no reading today showed a lift open`);
         if (seasonOn) {
           reasons.push(`inside the ${seasonWord} per the confirmed opening date${opening?.confirmed_open ? ` ${opening.confirmed_open}` : ""}`);
-          return { status: "CLOSED_TODAY", source: "operator", basis: "feed", observedAt: toIso(operator.observedAt), reasons };
+          return { status: "CLOSED_TODAY", source: "operator", basis: "feed", observedAt: day.newestAt, reasons, liftDay: day };
         }
         // Not known to be in season: the feed agrees with the calendar below.
+      } else if (count(operator.liftsTotal) > 0) {
+        reasons.push(`operator feed${age}: no reading today shows a lift open or scheduled; outside core hours that does not mean closed, so the dates decide`);
       } else {
         reasons.push(`operator feed${age} carries no lift counts`);
       }
@@ -360,6 +385,13 @@ export interface ConditionsContract {
   recommendableToday: boolean;
   /** Why the status and the verdict came out as they did, in order. */
   reasons: string[];
+  /**
+   * The operator feed over the resort's local day, when it decided the
+   * status: `operated` (lifts ran today; the count is the day's latest open
+   * reading), `scheduled` (none open yet, some scheduled) or `closed`.
+   * Null when the dates, not the feed, decided.
+   */
+  liftDay: OperatorDay | null;
   depthDisagreement: DepthDisagreement | null;
   seasonOpening: Field<string>;
   seasonClosing: Field<string>;
@@ -415,6 +447,8 @@ export interface ConditionsInput {
   hasStation: boolean;
   opening: ResortOpening | null;
   operator: OperatorReport | null;
+  /** The resort's IANA zone; Mountain time when absent. */
+  timeZone?: string;
   profile: { liftsTotal: number | null; runsTotal: number | null };
   measured: readonly MeasuredInput[];
   /** The P4 blend summary's next-48-hour total, cm, and the newest run's issue instant. */
@@ -504,7 +538,7 @@ export function buildConditions(input: ConditionsInput): ConditionsContract {
   const operatorAt = operator?.observedAt ?? null;
   const of = <T>(value: T | null | undefined): Field<T> => field<T>(value, "operator", operatorAt, now);
 
-  const statusResult = deriveStatus({ opening, hemisphere: input.hemisphere, localDate: input.localDate, operator, now });
+  const statusResult = deriveStatus({ opening, hemisphere: input.hemisphere, localDate: input.localDate, operator, now, timeZone: input.timeZone });
   const status: Field<ResortStatus> =
     statusResult.basis === "feed"
       ? field<ResortStatus>(statusResult.status, statusResult.source, statusResult.observedAt, now)
@@ -550,6 +584,7 @@ export function buildConditions(input: ConditionsInput): ConditionsContract {
     status,
     recommendableToday: verdict.value,
     reasons,
+    liftDay: statusResult.liftDay ?? null,
     depthDisagreement: disagreement,
     seasonOpening,
     seasonClosing,

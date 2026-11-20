@@ -730,6 +730,8 @@ API's `version` says which formula is live, not which one scored an old row.
 
 ## Operator status (P6, migration 032)
 
+**How the status reads a day (2026-11-20, `lib/operator-day.ts`).** The site does not judge a resort by the newest reading alone. Over the resort's own calendar day: a reading with a lift open makes it "operated" (OPEN and the hub "Open" chip stay after the last chair, quoting the day's latest open count with its time); else lifts scheduled in the newest reading show "Opens today" until 16:00 local; else a reading between 10:00 and 15:00 local with nothing open or scheduled is CLOSED_TODAY when the season is on; a 0/0 reading outside those hours decides nothing and the opening dates do. Between local midnight and the day's first reading the previous day's last open count is carried, dated as yesterday's. The read behind it (`fetchRecentOperatorReadings`, last 30 h, paged) works without an index; `supabase/migrations/033_operator_status_observed_idx.sql` adds one on `observed_at` and should be applied by hand, as a single statement, when the table has grown (about 1,900 rows a day).
+
 Branch `feat/p6-conditions`, parity plan block P6. The conditions contract
 (`lib/conditions-contract.ts`, served by `/api/v1/resorts/{slug}/conditions`, inside
 `get_resort_conditions`, on the resort page as the status chip and freshness labels, and in

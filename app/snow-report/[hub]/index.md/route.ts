@@ -11,7 +11,7 @@ export const revalidate = 900;
 
 export async function GET(_request: Request, { params }: { params: Promise<{ hub: string }> }): Promise<Response> {
   const { hub } = await params;
-  const page = /^[a-z0-9][a-z0-9-]{0,99}$/.test(hub) ? buildSnowHub(hub, await getAllResorts(), SITE_URL, await getHubLiftsIndex(new Date())) : null;
+  const page = /^[a-z0-9][a-z0-9-]{0,99}$/.test(hub) ? await (async () => { const resorts = await getAllResorts(); return buildSnowHub(hub, resorts, SITE_URL, await getHubLiftsIndex(new Date(), resorts)); })() : null;
   if (!page) {
     return new Response(`No snow-report hub "${hub}". List them at /ski-cams or /index.md.\n`, {
       status: 404,
