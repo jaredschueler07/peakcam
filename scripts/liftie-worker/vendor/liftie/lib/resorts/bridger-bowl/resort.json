@@ -1,0 +1,23 @@
+{
+  "name": "Bridger Bowl",
+  "url": {
+    "host": "https://bridgerbowl.com",
+    "pathname": "/weather/snow-report"
+  },
+  "api": {
+    "host": "https://api.bridgerbowl.com",
+    "pathname": "/graphql",
+    "body": {
+      "query": "query Query { lift_status { display_name status } }"
+    }
+  },
+  "tags": [
+    "Montana"
+  ],
+  "ll": [
+    -110.89814,
+    45.817974
+  ],
+  "twitter": "bridgerbowl",
+  "noaa": "TFX/102,64"
+}

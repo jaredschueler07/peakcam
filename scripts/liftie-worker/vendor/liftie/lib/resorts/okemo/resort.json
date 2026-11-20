@@ -1,0 +1,19 @@
+{
+  "name": "Okemo",
+  "url": {
+    "host": "https://www.okemo.com",
+    "pathname": "/the-mountain/mountain-conditions/lift-and-terrain-status.aspx"
+  },
+  "tags": [
+    "New England",
+    "Vermont",
+    "Vail Epic"
+  ],
+  "ll": [
+    -72.716705,
+    43.401806
+  ],
+  "twitter": "okemomountain",
+  "opening": "2017-11-22",
+  "noaa": "BTV/113,10"
+}

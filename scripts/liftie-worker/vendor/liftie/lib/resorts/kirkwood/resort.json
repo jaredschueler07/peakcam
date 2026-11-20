@@ -1,0 +1,19 @@
+{
+  "name": "Kirkwood",
+  "url": {
+    "host": "https://www.kirkwood.com",
+    "pathname": "/the-mountain/mountain-conditions/terrain-and-lift-status.aspx"
+  },
+  "tags": [
+    "California",
+    "Lake Tahoe",
+    "Vail Epic"
+  ],
+  "opening": "2017-11-22",
+  "ll": [
+    -120.066856,
+    38.683231
+  ],
+  "twitter": "KirkwoodMtn",
+  "noaa": "STO/91,63"
+}

@@ -1,0 +1,20 @@
+{
+  "name": "Brighton",
+  "url": {
+    "host": "https://brightonresort.com",
+    "pathname": "/conditions"
+  },
+  "api": {
+    "host": "https://apim-marketing-001.azure-api.net",
+    "pathname": "/FeedService/v1/Feed/Facilities/Areas/Lifts/All?resortName=br"
+  },
+  "tags": [
+    "Utah"
+  ],
+  "ll": [
+    -111.592041,
+    40.620697
+  ],
+  "twitter": "BrightonResort",
+  "noaa": "SLC/110,168"
+}

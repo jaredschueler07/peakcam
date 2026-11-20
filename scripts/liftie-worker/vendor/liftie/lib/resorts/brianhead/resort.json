@@ -1,0 +1,16 @@
+{
+  "name": "Brian Head",
+  "url": {
+    "host": "https://www.brianhead.com",
+    "pathname": "/weather-conditions-webcams/"
+  },
+  "tags": [
+    "Utah"
+  ],
+  "twitter": "brianheadresort",
+  "ll": [
+    -112.848129,
+    37.692753
+  ],
+  "noaa": "SLC/49,42"
+}

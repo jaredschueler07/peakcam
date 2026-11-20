@@ -1,0 +1,18 @@
+{
+  "name": "Jiminy Peak",
+  "url": {
+    "host": "http://www.jiminypeak.com",
+    "pathname": "/The-Mountain/Mountain-Information/Snow-Report"
+  },
+  "tags": [
+    "Massachusetts",
+    "New England"
+  ],
+  "ll": [
+    -73.291328,
+    42.556477
+  ],
+  "twitter": "jiminypeak",
+  "opening": "2017-11-24",
+  "noaa": "ALY/88,61"
+}

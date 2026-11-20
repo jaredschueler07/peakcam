@@ -1,0 +1,19 @@
+{
+  "name": "Attitash",
+  "url": {
+    "host": "https://www.attitash.com",
+    "pathname": "/the-mountain/mountain-conditions/lift-and-terrain-status.aspx"
+  },
+  "tags": [
+    "New Hampshire",
+    "New England",
+    "Vail Epic"
+  ],
+  "twitter": "AttitashResort",
+  "ll": [
+    -71.282776,
+    44.077778
+  ],
+  "opening": "2017-12-15",
+  "noaa": "GYX/35,71"
+}

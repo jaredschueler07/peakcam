@@ -1,0 +1,17 @@
+{
+  "name": "Snow Valley",
+  "url": {
+    "host": "http://www.snow-valley.com",
+    "pathname": "/current-conditions/snow-report/"
+  },
+  "tags": [
+    "California"
+  ],
+  "ll": [
+    -117.035667,
+    34.228409
+  ],
+  "twitter": "snow_valley_ca",
+  "opening": "2017-11-29",
+  "noaa": "SGX/72,79"
+}

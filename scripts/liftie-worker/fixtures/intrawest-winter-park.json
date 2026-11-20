@@ -1,0 +1,7 @@
+[
+  { "Name": "Arrow", "MountainAreaName": "Winter Park", "Status": "Open", "StatusEnglish": "open", "LiftType": "quad" },
+  { "Name": "Gemini Express", "MountainAreaName": "Winter Park", "Status": "Open", "StatusEnglish": "open", "LiftType": "quad" },
+  { "Name": "Super Gauge Express", "MountainAreaName": "Mary Jane", "Status": "Closed", "StatusEnglish": "closed", "LiftType": "six" },
+  { "Name": "Panoramic Express", "MountainAreaName": "Parsenn Bowl", "Status": "Wind Hold", "StatusEnglish": "wind_hold", "LiftType": "six" },
+  { "Name": "Eagle Wind", "MountainAreaName": "Eagle Wind", "Status": "Expected", "StatusEnglish": "expected", "LiftType": "triple" }
+]

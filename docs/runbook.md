@@ -54,7 +54,7 @@ service-role key in that checkout's `.env.local`, and log to the path in the las
 | `com.peakcam.forecast-sync` | `npx tsx scripts/forecast-sync.ts` | 01:05, 09:05, 17:05 Central (`StartCalendarInterval` ×3, no `RunAtLoad`) | `forecast_runs`, `forecast_daily` (027); ~240 Open-Meteo calls a run; retention pass after 00:00 UTC | `scripts/forecast-sync.log` |
 | `com.peakcam.forecast-score` | `npx tsx scripts/forecast-score.ts` | daily 07:30 (`StartCalendarInterval`) | `forecast_scores` (027), graded against SNOTEL depth deltas over 90 days | `scripts/forecast-score.log` |
 | `com.peakcam.score-sync` | `npx tsx scripts/score-sync.ts` | 07:45 and 19:45 (`StartCalendarInterval` ×2, `RunAtLoad`) | `resort_scores` (028): one 0–100 Snow Score row per resort per day with five components (`lib/score.ts`), idempotent on `(resort_id, date)`; **to deploy** (P7, 2026-10-20, see "Snow Score") | `scripts/score-sync.log` |
-| `com.peakcam.operator-sync` | `npx tsx scripts/operator-sync.ts` | 06:00 and 11:00 (`StartCalendarInterval` ×2) | `operator_status` (032) via Liftie; writes nothing while Liftie's Cloudflare challenge stands (exit 2, see "Operator status") | `scripts/operator-sync.log` |
+| `com.peakcam.operator-sync` | `npx tsx scripts/operator-sync.ts` | 06:00 and 11:00 (`StartCalendarInterval` ×2) | `operator_status` (032), read from each operator's own lift-status page with Liftie's parsers (see "Operator status"); exit 1 only when every resort fails | `scripts/operator-sync.log` |
 | `com.peakcam.cam-stills` | `npx tsx scripts/cam-capture-stills.ts` | every 15 min (900, `RunAtLoad`) | bucket `cam-stills`, `cams.still_url`, `cam_stills` (archive_allowed cams; 48 h / 6-h buckets to 30 d / keepers a year) | `scripts/cam-capture-stills.log` |
 | `com.peakcam.cam-timelapse` | `npx tsx scripts/cam-timelapse.ts` | every 6 h (21,600, `RunAtLoad`) | bucket `cam-timelapses`, `cam_timelapses` (031): the 24 h MP4 + poster per archive-allowed cam, storm reels | `scripts/cam-timelapse.log` |
 | `com.peakcam.cam-health-check` | `node scripts/cam-health-check.mjs` | daily 06:00 (`StartCalendarInterval`) | `cams.last_checked_at`, `consecutive_failures`, auto-disables dead cams | `scripts/cam-health-check.log` |
@@ -80,8 +80,8 @@ ssh mini "tail -5 /Users/maestro_admin/peakcam/peakcam/scripts/$JOB.log"
 ```
 
 `launchctl list | grep peakcam` prints `PID  last-exit  label`; a `-` PID is a scheduled job
-between runs, a non-zero exit is the script's own (operator-sync exits 2 while Liftie is
-blocked). A pull alone is enough for a script change (each run starts a fresh process); a plist
+between runs, a non-zero exit is the script's own (operator-sync exits 1 when every resort
+fails). A pull alone is enough for a script change (each run starts a fresh process); a plist
 change needs the reload. The dependency order when restarting everything: `snotel-sync` and
 `model-sync` first (they feed `snow_reports`), then `stations-sync`, `forecast-sync` (and the
 scorer the next morning), `cam-stills` before `cam-timelapse`.
@@ -342,7 +342,7 @@ See `docs/alerts-verification.md` for the E2E run log.
 | Model sync (mini) | `~/peakcam/peakcam/scripts/model-sync.log` |
 | Station layer (mini) | `~/peakcam/peakcam/scripts/stations-sync.log`; `select max(observed_at) from station_observations` |
 | Forecast runs and scores (mini) | `~/peakcam/peakcam/scripts/forecast-sync.log`, `forecast-score.log`; `select max(issued_at) from forecast_runs` |
-| Operator status (mini) | `~/peakcam/peakcam/scripts/operator-sync.log` (`blocked` lines while Liftie challenges) |
+| Operator status (mini) | `~/peakcam/peakcam/scripts/operator-sync.log` (`OK` / `FAIL <class>` per resort, failure classes counted on the `Done.` line) |
 | Still capture + archive (mini) | `~/peakcam/peakcam/scripts/cam-capture-stills.log`; `select count(*), max(captured_at) from cam_stills` |
 | Timelapse renders (mini) | `~/peakcam/peakcam/scripts/cam-timelapse.log`; `select "window", count(*), max(rendered_at) from cam_timelapses group by 1` |
 | Cam health check (mini) | `~/peakcam/peakcam/scripts/cam-health-check.log` |
@@ -614,7 +614,7 @@ are optional until their block lands.
 | `forecast_runs`, `forecast_daily` | 027 | `scripts/forecast-sync.ts` (`com.peakcam.forecast-sync`, every 6 h; live since P4, 2026-10-20) | `Resort.forecast` summary, `/resorts/{slug}/forecast`, `get_forecast`, the resort page strip |
 | `forecast_scores` | 027 | `scripts/forecast-score.ts` (`com.peakcam.forecast-score`, daily 07:30; rewrites per resort/model/window, `blend` row included) | `Resort.forecastScores`, `/resorts/{slug}/forecast-accuracy`, `compare_models` |
 | `resort_scores` | 028 | `scripts/score-sync.ts` (`com.peakcam.score-sync`, 07:45 and 19:45; P7, 2026-10-20), `scored_by = 'algorithmic'`, `components` jsonb keyed by `lib/score.ts SCORE_COMPONENT_IDS` | `Resort.score` (and `ScoreLight` on list / powder / compare rows), `/resorts/{slug}/score-components`, `/snow-report?sort=score`, MCP `get_score`, the resort page `#snow-score` card, the homepage strip, the markdown alternate |
-| `operator_status` + view `latest_operator_status` | 032 (P6, 2026-10-20) | `scripts/operator-sync.ts` (`com.peakcam.operator-sync`, 06:00 and 11:00) via `lib/operators/liftie.ts`; one row per fetch, idempotent on `(resort_id, source, observed_at)`; public read, no write policies | `/api/v1/resorts/{slug}/conditions` (`data.liftsOpen` …), the resort page status chip, `get_resort_conditions`, the markdown "Status and freshness" section |
+| `operator_status` + view `latest_operator_status` | 032 (P6, 2026-10-20) | `scripts/operator-sync.ts` (`com.peakcam.operator-sync`, 06:00 and 11:00) via `lib/operators/liftie-local.ts` and `scripts/liftie-worker/`; one row per fetch, idempotent on `(resort_id, source, observed_at)`; public read, no write policies | `/api/v1/resorts/{slug}/conditions` (`data.liftsOpen` …), the resort page status chip, `get_resort_conditions`, the markdown "Status and freshness" section |
 
 Elevations: `resorts.elevation_base_ft/summit_ft` are the canonical home from
 025 on (backfilled from `resort_metadata` for 145 resorts); `getResortElevationIndex()`
@@ -739,30 +739,62 @@ of those is new: `operator_status` (one row per fetch) and `latest_operator_stat
 
 | Job | What | When | Notes |
 | --- | --- | --- | --- |
-| `com.peakcam.operator-sync` (`npm run operator-sync`) | For each of the 88 resorts mapped in `data/operator-sources.json`, GET `https://liftie.info/api/resort/<id>` (Liftie, BSD-3, parses the operator's own lift-status page) → lifts open / hold / scheduled / closed, the provider's timestamp, the operator page URL, a published opening date | 06:00 and 11:00 local | `--dry-run --resort alta` needs no service key. Exit 2 when every fetch was challenged. ~90 requests, 400 ms apart, ≈ 40 s |
+| `com.peakcam.operator-sync` (`npm run operator-sync`) | For each of the 93 resorts mapped in `data/operator-sources.json`, read the operator's own lift-status page or feed and parse it with Liftie's open-source parser → lifts open / hold / scheduled / closed, the operator page URL, an opening date still ahead | 06:00 and 11:00 local | `--dry-run` needs no service key; `--resort alta`, `--state CO`, `--only vail,keystone`. Exit 1 only when every resort fails. 93 page reads, 500 ms apart, about 2 minutes |
 
-**Blocked upstream (2026-10-20).** liftie.info answers every non-browser request from the
-Air and from the mini with HTTP 403, `cf-mitigated: challenge` and a Cloudflare "Just a
-moment" page; the Liftie API is not open to scripts from these hosts today. The fetcher
-names that case `blocked`, the sync logs it and exits 2, and the contract falls back: `data.liftsOpen`
-carries `source: "none"` and `data.status` rests on the opening row (OPEN only after a
-resort-confirmed date). PeakCam does not scrape operator HTML itself. Options, in order:
-ask the Liftie maintainer (github.com/pirxpilot/liftie) for an allow-listed user agent or
-run a self-hosted Liftie (it is open source and runs with `node app` against the same resort
-parsers); otherwise the follow-up list of operator feeds with public JSON and terms that
-permit reuse: Vail Resorts (`*.com/api/…` lift status behind the EpicMix app, terms
-unclear), Alterra (per-resort), Powdr, Boyne, Arapahoe Basin's own JSON, Alta's
-`window.Alta` script block (the page Liftie parses), Perisher-style verified portals.
-Each needs a terms read before a fetcher is written; record `verified=true` only for an
-operator's own API.
+**How it reads lift status (since 2026-11-20).** liftie.info's API has answered every
+script with a Cloudflare challenge since 2026-10-20, so `operator_status` never received a
+row from it. Liftie's parsers are open source (github.com/pirxpilot/liftie, BSD-3-Clause),
+so the sync now runs them itself:
+
+- `scripts/liftie-worker/vendor/liftie/` holds the parser files, copied unmodified from the
+  npm package at the version, commit and tarball hash in `VERSION.json` (4.4.2 today).
+  Only the parse helpers, the shared parser families and the resort definitions that
+  `data/operator-sources.json` maps are copied; Liftie's server and build tooling are not.
+  `scripts/liftie-worker/NOTICE.md` carries the licence notice.
+- `scripts/liftie-worker/worker.mjs` fetches and parses. `scripts/operator-sync.ts` starts
+  it as a child process whose environment holds no secrets (`workerEnv` in
+  `lib/operators/liftie-local.ts`), because some parsers evaluate a script block from the
+  operator's page with `node:vm`. Only the parent holds the Supabase keys and writes rows.
+- The worker needs five small parsing libraries of its own:
+  `npm ci --prefix scripts/liftie-worker` (20 packages, about 3 MB, no install scripts). The
+  web app's `package.json` is untouched.
+- One request at a time, 500 ms apart, with a User-Agent that names PeakCam
+  (`OPERATOR_SYNC_USER_AGENT` overrides it). Each operator's `robots.txt` is read once per
+  host per day (cache in the system temp dir) and honoured for the path fetched.
+
+Failure classes on the `FAIL` lines and the `Done.` line:
+
+| Class | Meaning | What to do |
+| --- | --- | --- |
+| `parse_empty` | The page loaded but the parser found no lifts. Normal before a resort's season: the Vail Resorts pages list no lifts until then | Nothing pre-season. In season, the operator changed the page: check upstream for a newer Liftie and re-vendor |
+| `blocked` | 401/403/429, a bot challenge or a waiting room | Leave it. Do not work around a challenge |
+| `robots` | The operator's `robots.txt` disallows the path | Leave it; the resort has no lift status from this source |
+| `network` | No answer from the host, after one retry (DNS, TLS, timeout) | Usually the operator's side; recheck next run |
+| `http` | Any other non-2xx, typically a 404 after a site redesign | Check upstream for a newer Liftie and re-vendor |
+| `invalid` | The feed was not what the parser reads (for example not JSON) | As `http` |
+| `no_parser` | The mapped id has no vendored definition | `node scripts/liftie-worker/vendor.mjs` after editing the mapping |
+
+First full dry run (Studio, 2026-11-20 about 09:30 Mountain): 67 of 93 resorts returned
+lift status, including all 17 mapped Colorado resorts; 16 `parse_empty`, 4 `network`,
+2 `http`, 2 `blocked` (Gore, Whiteface), 1 `invalid`, 1 `robots` (Mountain High).
+
+Re-vendor when parsers break (`node scripts/liftie-worker/vendor.mjs <exact version>`, then
+the two test files named in `NOTICE.md` and a Colorado dry run). Liftie publishes lifts
+only, so trails, base depth and surface stay null; `verified` stays false because the
+status is parsed from a page, not taken from an operator API under an agreement. Each
+operator's website terms have not been reviewed; do that before raising the frequency.
+`npm run operator-sync -- --liftie-api` still takes the old liftie.info path.
+
+Seven Colorado resorts have no Liftie parser: Granby Ranch, Powderhorn, Purgatory,
+Silverton, Ski Cooper, Sunlight and Wolf Creek.
 
 Deploy on the Mini (`ssh mini`, user `maestro_admin`; `zsh -l -c` because npm is not on the
 non-login PATH):
 
 ```bash
 # 1. apply supabase/migrations/032_operator_status.sql by hand (SQL Editor / MCP apply_migration; not during a Vercel build), then:
-ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && git pull && npm ci --no-audit --no-fund"'
-ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && npx tsx scripts/operator-sync.ts --dry-run --resort alta | tail -4"'   # "OK Alta …" once Liftie answers; "FAIL … blocked 403" while the challenge stands
+ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && git pull && npm ci --prefix scripts/liftie-worker --no-audit --no-fund"'   # the worker's own 3 MB of libraries; the root install is unchanged
+ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && npx tsx scripts/operator-sync.ts --dry-run --state CO | tail -22"'   # "OK <resort> — N open … of M" per resort
 ssh mini 'cd /Users/maestro_admin/peakcam/peakcam && cp com.peakcam.operator-sync.plist ~/Library/LaunchAgents/ && launchctl bootout gui/$(id -u)/com.peakcam.operator-sync 2>/dev/null; launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.peakcam.operator-sync.plist && launchctl list | grep com.peakcam.operator-sync'
 ssh mini 'launchctl kickstart -k gui/$(id -u)/com.peakcam.operator-sync && sleep 60 && tail -5 /Users/maestro_admin/peakcam/peakcam/scripts/operator-sync.log'
 ```
