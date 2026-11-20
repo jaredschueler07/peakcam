@@ -22,9 +22,10 @@ npm run lint                # ESLint (flat config in eslint.config.mjs)
 npm test                    # node --import tsx --test across lib/, scripts/, tests/
 
 # Playwright E2E
-npx playwright test                                # Drop In on :3113 (runs `npm run start` — run `npm run build` first)
+npx playwright test drop-in                        # Drop In specs only, on :3113 (runs `npm run start` — run `npm run build` first)
+# A bare `npx playwright test` runs every spec in tests/e2e (auth, mobile, signup, Meta Pixel); use the configs below for those.
 PLAYWRIGHT_WEBGPU=1 npx playwright test --project=chromium-webgpu --headed
-npx playwright test -c playwright.meta-pixel.config.ts # Meta Pixel replay on :3128 (runs `npm run start` — run `npm run build` first)
+npx playwright test -c playwright.meta-pixel.config.ts # Meta Pixel replay on :3128 (runs `npm run start` — run `npm run build` first; skips unless NEXT_PUBLIC_META_PIXEL_ID was set at build time)
 npx playwright test -c playwright.auth.config.ts   # Auth/account flows (runs `npm run dev` + fixture auth server)
 npx playwright test -c playwright.mobile.config.ts # Mobile flows (targets running server at MOBILE_TEST_URL, default 127.0.0.1:3116)
 
@@ -60,4 +61,4 @@ npm run cam-timelapse               # Render 24h MP4 timelapses & storm reels
 - **Never expose secrets:** Never read/print `.env*` or ship `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, `DROP_IN_TICKET_KEYS`, `CAM_REPORT_SALT`, `RESEND_API_KEY`, or API keys to client code or logs.
 - **No unapproved production mutations:** Never mutate production Supabase, Vercel env/deployments, or push/merge to `main` without explicit owner confirmation.
 - **Automated Browser Analytics Hygiene:** When testing `https://www.peakcam.io` with Playwright or headless browsers, abort analytics and ad-pixel requests (`facebook.com`/`facebook.net`, `googletagmanager.com`, `google-analytics.com`, `googleadservices.com`, `doubleclick.net`, `posthog.com`, `redditstatic.com`, `reddit.com`, `vercel-insights.com`, `vercel-scripts.com`, `/_vercel/insights/*`, `/_vercel/speed-insights/*`, `/ingest`, `/api/csp-report`) before first navigation, and avoid `/api/v1/ask`, `/ask`, or the `ask` MCP tool during read-only audits.
-- **Pre-commit Gate:** Run `npx tsc --noEmit && npm run lint && npm test` (note: 5 GDAL terrain-bake tests fail if `gdal_translate` is missing from `PATH`).
+- **Pre-commit Gate:** Run `npx tsc --noEmit && npm run lint && npm test` (note: six GDAL terrain-bake tests skip, they do not fail, when `gdal_translate` is missing from `PATH`).

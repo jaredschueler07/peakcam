@@ -8,7 +8,7 @@ PeakCam (`https://www.peakcam.io`, Vercel auto-deploy on push to `main`) is a li
 
 Adjacent subsystems inside the same repository (outside the Next.js web app):
 - `agents/` — dormant 9-bot Slack agent loop (`agents/loop.mjs`, `agents/manifests/*.yaml`).
-- `dashboard/` — standalone Express ops/commercialization dashboard (`dashboard/commercialization/server.mjs`, separate `package.json`; unauthenticated — never expose beyond localhost/LAN).
+- `dashboard/` — two standalone local servers. `dashboard/server.js` is the Express ops dashboard (own `dashboard/package.json`, port 3333, bound to 127.0.0.1); it is unauthenticated and can spawn `claude --dangerously-skip-permissions`, so never expose it beyond localhost. `dashboard/commercialization/server.mjs` is the commercialization tracker (`npm run commercialization`, port 3334, also 127.0.0.1).
 - `packages/peakcam-mcp/` — MIT stdio MCP bridge (`peakcam-mcp` → `https://www.peakcam.io/api/mcp`).
 - `generate-images.py` — brand image generation script.
 
@@ -50,9 +50,11 @@ npm run lint      # ESLint (flat config)
 npm test          # node --import tsx --test 'lib/**/*.test.ts' 'scripts/**/*.test.ts' 'scripts/**/*.test.mjs' 'tests/**/*.test.ts'
 
 # Playwright E2E
-npx playwright test                                # Drop In (runs `npm run start` — run `npm run build` first)
+npx playwright test drop-in                        # Drop In specs only (runs `npm run start` on :3113 — run `npm run build` first)
+# A bare `npx playwright test` runs every spec in tests/e2e (auth, mobile, signup and Meta Pixel included, 11 files)
+# against :3113 with no fixture server; use the per-suite configs below for those.
 PLAYWRIGHT_WEBGPU=1 npx playwright test --project=chromium-webgpu --headed
-npx playwright test -c playwright.meta-pixel.config.ts # Meta Pixel replay (runs `npm run start` — run `npm run build` first)
+npx playwright test -c playwright.meta-pixel.config.ts # Meta Pixel replay (runs `npm run start` — run `npm run build` first; the spec skips, and still reports green, unless NEXT_PUBLIC_META_PIXEL_ID was set at build time)
 npx playwright test -c playwright.auth.config.ts   # Auth/account flows (runs `npm run dev` + fixture auth server)
 npx playwright test -c playwright.mobile.config.ts # Mobile flows (targets running server at MOBILE_TEST_URL, default 127.0.0.1:3116)
 ```
@@ -73,7 +75,7 @@ Important `package.json` script notes:
 4. **Static Params, CSV → Supabase Split & Cache:**
    - `dynamicParams = false` is set on `/resorts/[slug]`, `/resorts/[slug]/snow-report`, `/resorts/[slug]/webcams`, `/snow-report/[hub]`, `/ski-cams/[hub]`, `/passes/[pass]`, and `/.well-known/schemas/[file]` (while `/resorts/[slug]/snow-forecast` and `/resorts/[slug]/history` render on-demand with hourly ISR).
    - **CSV edits vs. live Supabase:** Editing CSVs under `data/` (`resorts.csv`, `cams.csv`, `resort-profiles.csv`, `resort-openings.csv`) and merging to `main` does **not** update production Supabase on Vercel. Live changes require an explicit, owner-approved importer/seed run (`npm run import-resorts:standalone`, `npm run seed-openings`, or `npx tsx scripts/import-profiles.ts`), plus a subsequent deploy so `dynamicParams = false` pages pick up any new slugs.
-   - `/api/v1/*` routes use `Cache-Control: s-maxage=900` + `unstable_cache` (they export `OPTIONS`). Open-Meteo data surfaces must retain CC BY 4.0 attribution (`"Weather data by Open-Meteo.com"`).
+   - `/api/v1/*` routes use `Cache-Control: s-maxage=900` + `unstable_cache` (they export `OPTIONS`); the exceptions are `status` (300 s) and `resorts/search-index` and `openapi.json` (24 h). Per-route auth is summarised in `CLAUDE.md` ("Write path"). Open-Meteo data surfaces must retain CC BY 4.0 attribution (`"Weather data by Open-Meteo.com"`).
 5. **Drop In Architecture & Lint Contract:** Drop In is a React client app (`components/drop-in/DropInGame.tsx` + `lib/game/`), **not** an iframe around `public/drop-in/engine.html` (the old iframe description in `CLAUDE.md` is historical). `eslint.config.mjs` enforces pure determinism inside `lib/game/{core,physics,terrain,replay}` by forbidding React, DOM, `three`, network, audio, analytics imports, and browser globals (`window`, `document`, `fetch`, etc.). `tests/drop-in-v1-parity.test.ts` guards v1 profile/fixture parity.
 6. **Powder Threshold:** `POWDER_DAY_IN = 8` (in `lib/season-stats.ts`) and copy strings may appear in multiple places — grep before changing.
 7. **Auth Flows:** `/auth` (email/password + Google OAuth) and `AuthModal` (magic link + Google OAuth) both route through `/auth/callback`.
@@ -85,4 +87,4 @@ Important `package.json` script notes:
 - **Do not edit carelessly / generated artifacts:** `CLAUDE.md` (owner's detailed reference — edit only when explicitly requested), historical audit/tracking docs (`TASKS.md`, `UX-AUDIT-PLAN.md`, `UX-AUDIT-PLAN-V2.md`, `qa-findings/`), `package-lock.json`, `next-env.d.ts`, `*.tsbuildinfo`, `node_modules/`, `.next/`, `.npm-cache/`, `public/game/terrain/*.height.u16` (raw intermediate; `.br` is committed), `plugins/*.plugin` (zip archives), and root PNG design references (`header-and-cards`, `resort-detail`, `filter-chips-closeup` — extensionless PNGs, not source text).
 - **Never commit or print secrets:** `.env*`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, `DROP_IN_TICKET_KEYS`, `CAM_REPORT_SALT`, `RESEND_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, DOT API keys, or Slack tokens.
 - **No unapproved production writes, pushes, or analytics pollution:** Never run write-capable sync/import scripts, DB mutations, Vercel changes against production, or push/merge to `main` without explicit owner confirmation. During read-only browser QA against `peakcam.io`, block analytics/ad hosts (`facebook.com`/`facebook.net`, `googletagmanager.com`, `google-analytics.com`, `googleadservices.com`, `doubleclick.net`, `posthog.com`, `redditstatic.com`, `reddit.com`, `vercel-insights.com`, `vercel-scripts.com`, `/_vercel/insights/*`, `/_vercel/speed-insights/*`, `/ingest`, `/api/csp-report`), and avoid calling `/api/v1/ask`, `/ask`, or the `ask` MCP tool unless testing Q&A logging.
-- **Before finishing any change:** Run `npx tsc --noEmit && npm run lint && npm test`. Expect 5 GDAL terrain-bake test failures if `gdal_translate` is not installed on `PATH` — confirm no new failures were introduced.
+- **Before finishing any change:** Run `npx tsc --noEmit && npm run lint && npm test`. Six GDAL terrain-bake tests skip (they do not fail) when `gdal_translate` is not on `PATH`; any failure is a real one.
