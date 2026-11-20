@@ -9,6 +9,18 @@ import {
   ipcamliveVerdict,
   isOffSeasonAt,
   IPCAMLIVE_NO_STREAM,
+  youtubeLiveness,
+  YOUTUBE_ENDED,
+  YOUTUBE_UNAVAILABLE,
+  YOUTUBE_LOGIN_REQUIRED,
+  YOUTUBE_NOT_EMBEDDABLE,
+  YOUTUBE_NOT_LIVE,
+  isCamstreamerUrl,
+  youtubeIdFromEmbedPage,
+  sniffImage,
+  imageVerdict,
+  IMAGE_STALE_DAYS,
+  countsTowardDisable,
 } from "./cam-health-check.mjs";
 // tsx hands a .ts module to an .mjs importer through CJS interop, so the named
 // export may sit on `default`.
@@ -255,4 +267,190 @@ test("countFailure: false does not change what a healthy check does", () => {
   assert.strictEqual(transition, "recovered");
   assert.strictEqual(body.is_active, true);
   assert.strictEqual(body.consecutive_failures, 0);
+});
+
+// ─── YouTube liveness ───────────────────────────────────────────────────
+// Fixtures are the relevant slices of real watch pages fetched 2026-11-20
+// (ids in the comments), trimmed to the fields the parser reads.
+
+const YT = {
+  // awxz_oIlJE0 — Mammoth "Summit", broadcasting
+  live: 'var ytInitialPlayerResponse = {"playabilityStatus":{"status":"OK","playableInEmbed":true,"liveStreamability":{"liveStreamabilityRenderer":{"videoId":"awxz_oIlJE0","broadcastId":"3","pollDelayMs":"15000"}}},"videoDetails":{"videoId":"awxz_oIlJE0","isLiveContent":true,"isLive":true},"microformat":{"playerMicroformatRenderer":{"liveBroadcastDetails":{"isLiveNow":true,"startTimestamp":"2026-11-13T15:02:11+00:00"}}}};',
+  // UpfvBbw6kSY — Mammoth "Main Lodge", ended 2026-03-09
+  ended: 'var ytInitialPlayerResponse = {"playabilityStatus":{"status":"UNPLAYABLE","reason":"This live stream recording is not available.","errorScreen":{"playerInterstitialRenderer":{"content":{"interstitialViewModel":{"title":{"content":"Video unavailable"}}}}},"playableInEmbed":true},"videoDetails":{"videoId":"UpfvBbw6kSY","isLiveContent":true},"microformat":{"playerMicroformatRenderer":{"liveBroadcastDetails":{"isLiveNow":false,"startTimestamp":"2026-02-27T16:40:00+00:00","endTimestamp":"2026-03-09T18:11:25+00:00"}}}};',
+  // Ljumxb0U2b0 — Nordic Valley, a finished stream left up as a playable recording
+  recording: 'var ytInitialPlayerResponse = {"playabilityStatus":{"status":"OK","playableInEmbed":true,"miniplayer":{"miniplayerRenderer":{"playbackMode":"PLAYBACK_MODE_ALLOW"}}},"videoDetails":{"videoId":"Ljumxb0U2b0","isLiveContent":true},"microformat":{"playerMicroformatRenderer":{"liveBroadcastDetails":{"isLiveNow":false,"endTimestamp":"2026-10-20T23:01:00+00:00"}}}};',
+  // C_QzeJSA-uw — Dodge Ridge "Base Area", removed by the uploader
+  removed: 'var ytInitialPlayerResponse = {"playabilityStatus":{"status":"ERROR","reason":"Video unavailable","errorScreen":{"playerInterstitialRenderer":{"content":{"interstitialViewModel":{"title":{"content":"Video unavailable"},"description":{"content":"This video has been removed by the uploader"}}}}}}};',
+  // kchqCAOHweY — Nakiska, made private
+  private: 'var ytInitialPlayerResponse = {"playabilityStatus":{"status":"LOGIN_REQUIRED","reason":"Private video","messages":["This is a private video. Please sign in to verify that you may see it."]}};',
+};
+
+test("youtubeLiveness: a broadcasting, embeddable stream is live", () => {
+  assert.deepStrictEqual(youtubeLiveness(YT.live), { verdict: "live", reason: null });
+});
+
+test("youtubeLiveness: an ended stream is dead, whether YouTube calls it unplayable or leaves the recording up", () => {
+  assert.deepStrictEqual(youtubeLiveness(YT.ended), { verdict: "dead", reason: YOUTUBE_ENDED });
+  assert.deepStrictEqual(youtubeLiveness(YT.recording), { verdict: "dead", reason: YOUTUBE_ENDED });
+  const offline = '{"playabilityStatus":{"status":"LIVE_STREAM_OFFLINE","reason":"This live event will begin in a few moments."}}';
+  assert.deepStrictEqual(youtubeLiveness(offline), { verdict: "dead", reason: YOUTUBE_ENDED });
+});
+
+test("youtubeLiveness: removed and private videos carry their own reasons", () => {
+  assert.deepStrictEqual(youtubeLiveness(YT.removed), { verdict: "dead", reason: YOUTUBE_UNAVAILABLE });
+  assert.deepStrictEqual(youtubeLiveness(YT.private), { verdict: "dead", reason: YOUTUBE_LOGIN_REQUIRED });
+  const unplayableUpload = '{"playabilityStatus":{"status":"UNPLAYABLE","reason":"Video unavailable in your country"},"videoDetails":{"isLiveContent":false}}';
+  assert.deepStrictEqual(youtubeLiveness(unplayableUpload), { verdict: "dead", reason: YOUTUBE_UNAVAILABLE });
+});
+
+test("youtubeLiveness: live but blocked from embedding is dead for a site that only embeds", () => {
+  const html = YT.live.replace('"playableInEmbed":true', '"playableInEmbed":false');
+  assert.deepStrictEqual(youtubeLiveness(html), { verdict: "dead", reason: YOUTUBE_NOT_EMBEDDABLE });
+});
+
+test("youtubeLiveness: a plain upload is not a webcam", () => {
+  const upload = '{"playabilityStatus":{"status":"OK","playableInEmbed":true},"videoDetails":{"videoId":"abcdefghijk","isLiveContent":false}}';
+  assert.deepStrictEqual(youtubeLiveness(upload), { verdict: "dead", reason: YOUTUBE_NOT_LIVE });
+});
+
+test("youtubeLiveness: anything it cannot read is unknown, never a failure", () => {
+  const botWall = '{"playabilityStatus":{"status":"LOGIN_REQUIRED","reason":"Sign in to confirm you’re not a bot"}}';
+  const botWallAscii = '{"playabilityStatus":{"status":"UNPLAYABLE","reason":"Sign in to confirm you\'re not a bot"}}';
+  const noLiveFields = '{"playabilityStatus":{"status":"OK","playableInEmbed":true}}';
+  const newStatus = '{"playabilityStatus":{"status":"SOMETHING_NEW"}}';
+  for (const html of [botWall, botWallAscii, noLiveFields, newStatus, "<html>Before you continue to YouTube</html>", "", null, undefined, 42]) {
+    assert.deepStrictEqual(youtubeLiveness(html), { verdict: "unknown", reason: null }, String(html).slice(0, 60));
+  }
+});
+
+test("the YouTube reason strings are stable (the run log and the daily report key on them)", () => {
+  assert.strictEqual(YOUTUBE_ENDED, "youtube: stream ended");
+  assert.strictEqual(YOUTUBE_UNAVAILABLE, "youtube: unavailable");
+  assert.strictEqual(YOUTUBE_LOGIN_REQUIRED, "youtube: login required");
+  assert.strictEqual(YOUTUBE_NOT_EMBEDDABLE, "youtube: not embeddable");
+});
+
+// ─── camstreamer ────────────────────────────────────────────────────────
+
+test("isCamstreamerUrl: embed and live pages on camstreamer.com only", () => {
+  assert.ok(isCamstreamerUrl("https://camstreamer.com/embed/qNANAbY1LFNjIC2aSgnh9Rh688XN31WQnGM1PmyD"));
+  assert.ok(isCamstreamerUrl("https://camstreamer.com/embed/4caf8cbab6999c9/S-16675"));
+  assert.ok(isCamstreamerUrl("https://camstreamer.com/live/stream/1865"));
+  for (const url of ["https://camstreamer.com/", "https://camstreamer.com.evil.example/embed/x", "https://www.youtube.com/embed/awxz_oIlJE0", "not a url", "", null]) {
+    assert.strictEqual(isCamstreamerUrl(url), false, String(url));
+  }
+});
+
+test("youtubeIdFromEmbedPage: prefers the URL the request ended on, then the body", () => {
+  assert.strictEqual(youtubeIdFromEmbedPage("https://www.youtube.com/embed/RjXOWYVMqA0?autoplay=1&mute=1", "<html></html>"), "RjXOWYVMqA0");
+  assert.strictEqual(youtubeIdFromEmbedPage("https://www.youtube-nocookie.com/embed/cuMEPeePwjY", ""), "cuMEPeePwjY");
+  const wrapped = '<iframe src="https://www.youtube.com/embed/DMVtrxOK-JM?rel=0" allowfullscreen></iframe>';
+  assert.strictEqual(youtubeIdFromEmbedPage("https://camstreamer.com/embed/T2Fr", wrapped), "DMVtrxOK-JM");
+  assert.strictEqual(youtubeIdFromEmbedPage("https://camstreamer.com/embed/x", '<a href="https://www.youtube.com/watch?v=QDGBc2xzH1w">'), "QDGBc2xzH1w");
+  assert.strictEqual(youtubeIdFromEmbedPage("https://camstreamer.com/embed/x", '{"videoId":"Tu2d8gii-tE"}'), "Tu2d8gii-tE");
+});
+
+test("youtubeIdFromEmbedPage: no id is null (channel live_stream embeds, other players, junk)", () => {
+  assert.strictEqual(youtubeIdFromEmbedPage("https://www.youtube.com/embed/live_stream?channel=UC8PLnOk6bqpOBUpIjgGGPhQ", ""), null);
+  assert.strictEqual(youtubeIdFromEmbedPage("https://camstreamer.com/embed/x", "<video src=stream.m3u8>"), null);
+  assert.strictEqual(youtubeIdFromEmbedPage(null, null), null);
+});
+
+// ─── Image cams ─────────────────────────────────────────────────────────
+
+const JPEG = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
+const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const GIF = Uint8Array.from([0x47, 0x49, 0x46, 0x38, 0x39, 0x61]);
+const WEBP = Uint8Array.from([0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50]);
+const HTML = new TextEncoder().encode("<!DOCTYPE html><html>");
+const NOW = new Date("2026-11-20T16:00:00Z");
+const img = (over = {}) => ({ ok: true, status: 200, contentType: "image/jpeg", lastModified: null, head: JPEG, now: NOW, ...over });
+
+test("sniffImage: JPEG, PNG, GIF and WebP by their first bytes; everything else is null", () => {
+  assert.strictEqual(sniffImage(JPEG), "jpeg");
+  assert.strictEqual(sniffImage(PNG), "png");
+  assert.strictEqual(sniffImage(GIF), "gif");
+  assert.strictEqual(sniffImage(WEBP), "webp");
+  assert.strictEqual(sniffImage(HTML), null);
+  assert.strictEqual(sniffImage(new Uint8Array(0)), null);
+  assert.strictEqual(sniffImage(null), null);
+});
+
+test("imageVerdict: a fresh picture is healthy, with or without a Last-Modified header", () => {
+  assert.deepStrictEqual(imageVerdict(img()), { ok: true });
+  assert.deepStrictEqual(imageVerdict(img({ lastModified: "Fri, 20 Nov 2026 15:31:04 GMT" })), { ok: true, ageDays: 0 });
+  assert.strictEqual(imageVerdict(img({ lastModified: "not a date" })).ok, true);
+  // A clock that runs ahead (Winter Park's Town cam sends times 6 h fast) is not stale.
+  assert.deepStrictEqual(imageVerdict(img({ lastModified: "Fri, 20 Nov 2026 22:00:00 GMT" })), { ok: true, ageDays: 0 });
+});
+
+test("imageVerdict: a frame older than the threshold fails with its age (A-Basin Summit, frozen since Oct 27)", () => {
+  const v = imageVerdict(img({ lastModified: "Tue, 27 Oct 2026 22:10:02 GMT" }));
+  assert.strictEqual(v.ok, false);
+  assert.strictEqual(v.kind, "stale");
+  assert.strictEqual(v.ageDays, 23);
+  assert.strictEqual(v.error, "image: frame 23 days old");
+});
+
+test("imageVerdict: the threshold is exclusive — exactly IMAGE_STALE_DAYS old still passes", () => {
+  assert.strictEqual(IMAGE_STALE_DAYS, 5);
+  const at = (days, hours = 0) => new Date(NOW.getTime() - days * 86_400_000 - hours * 3_600_000).toUTCString();
+  assert.strictEqual(imageVerdict(img({ lastModified: at(5, 23) })).ok, true);
+  assert.strictEqual(imageVerdict(img({ lastModified: at(6) })).ok, false);
+});
+
+test("imageVerdict: 200 text/html is not an image, however long the page (Loveland, three rows)", () => {
+  const v = imageVerdict(img({ contentType: "text/html; charset=UTF-8", head: HTML }));
+  assert.deepStrictEqual(v, { ok: false, kind: "not_image", error: "image: not an image (text/html)" });
+  // …and an HTML page mislabelled as a picture does not pass either.
+  assert.strictEqual(imageVerdict(img({ contentType: "image/jpeg", head: HTML })).kind, "not_image");
+  assert.strictEqual(imageVerdict(img({ contentType: "", head: HTML })).error, "image: not an image (no content type)");
+});
+
+test("imageVerdict: real image bytes pass under a generic content type; an image/* type passes without known magic", () => {
+  assert.strictEqual(imageVerdict(img({ contentType: "application/octet-stream" })).ok, true);
+  assert.strictEqual(imageVerdict(img({ contentType: "binary/octet-stream", head: PNG })).ok, true);
+  const avif = Uint8Array.from([0x00, 0x00, 0x00, 0x1c, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66]);
+  assert.strictEqual(imageVerdict(img({ contentType: "image/avif", head: avif })).ok, true);
+});
+
+test("imageVerdict: an HTTP failure stays an HTTP failure (no rule-specific reason)", () => {
+  assert.deepStrictEqual(imageVerdict(img({ ok: false, status: 404, contentType: "text/html", head: HTML })), { ok: false });
+});
+
+// ─── What counts toward auto-disable ────────────────────────────────────
+
+test("countsTowardDisable: seasonal darkness is not counted off-season; a dead YouTube id always is", () => {
+  const nov = new Date(2026, 10, 20);
+  const andes = -33.35; // off-season in November
+  const sierra = 37.63; // in season
+  const stale = { ok: false, staleImage: true };
+  const noStream = { ok: false, noStream: true };
+  const ytDead = { ok: false, youtubeDead: true };
+  const notImage = { ok: false, notImage: true };
+  const http404 = { ok: false, status: 404 };
+  assert.strictEqual(countsTowardDisable(stale, andes, nov), false);
+  assert.strictEqual(countsTowardDisable(noStream, andes, nov), false);
+  assert.strictEqual(countsTowardDisable(stale, sierra, nov), true);
+  assert.strictEqual(countsTowardDisable(noStream, sierra, nov), true);
+  for (const check of [ytDead, notImage, http404]) {
+    assert.strictEqual(countsTowardDisable(check, andes, nov), true);
+    assert.strictEqual(countsTowardDisable(check, sierra, nov), true);
+  }
+  // No latitude → in season → counted.
+  assert.strictEqual(countsTowardDisable(stale, undefined, nov), true);
+});
+
+test("recovery and manual switches are unchanged by the new rules", () => {
+  // An auto-disabled row whose probe turns healthy comes back…
+  const recovered = computeCamUpdate(cam({ is_active: false, auto_disabled: true, consecutive_failures: 3 }), true);
+  assert.strictEqual(recovered.transition, "recovered");
+  assert.strictEqual(recovered.body.is_active, true);
+  // …and a manually disabled row is never written beyond its timestamp, healthy or not.
+  for (const alive of [true, false]) {
+    const manual = computeCamUpdate(cam({ is_active: false, auto_disabled: false }), alive);
+    assert.deepStrictEqual(Object.keys(manual.body), ["last_checked_at"]);
+    assert.strictEqual(manual.transition, null);
+  }
 });

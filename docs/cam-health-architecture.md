@@ -6,6 +6,16 @@
 - HDRelay is the #1 failure point (17+ broken cams, possibly all 39 due to missing headers)
 - BrownRice is the most reliable provider (100% uptime)
 
+## What the job checks today (2026-11-20)
+
+This document is the March 2026 design. The job that actually runs is
+`scripts/cam-health-check.mjs`, once a day; what it judges each cam type on is in
+`docs/runbook.md` ("Cam health check: what each cam type is judged on"). In short: YouTube
+on the watch page's live state (not oEmbed), images on their bytes and `Last-Modified` age,
+camstreamer embeds on the YouTube stream behind them, ipcamlive on the provider's stream
+state, everything else on HTTP status. The frequencies, the `health_status` column, the
+image-hash check and auto-discovery below were not built.
+
 ## Check Frequency
 
 | Check Type | Frequency | Target |

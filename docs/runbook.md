@@ -216,6 +216,39 @@ a day-1 pair). Then the production smoke checks under "Public API" below. Cadenc
 changes: `StartInterval` in the plist for the sync; `THIN_AFTER_DAYS` / `DELETE_AFTER_DAYS` in
 `lib/forecast/retention.ts`.
 
+### Cam health check: what each cam type is judged on
+
+`scripts/cam-health-check.mjs` (daily 06:00 Central). Three consecutive failures auto-disable a
+row (`is_active=false`, `auto_disabled=true`); an auto-disabled row keeps being probed and comes
+back on its first healthy check; a manually disabled row (`is_active=false`,
+`auto_disabled=false`) is never written beyond `last_checked_at`.
+
+| Cam | Healthy when | Fails with |
+|---|---|---|
+| `youtube` | the watch page says playable, embeddable and live now | `youtube: stream ended`, `youtube: unavailable`, `youtube: login required`, `youtube: not embeddable`, `youtube: not a live stream` |
+| `image` | HTTP 2xx, the body starts with JPEG/PNG/GIF/WebP bytes (or is `image/*` and not markup), and `Last-Modified`, when sent, is at most 5 days old (`IMAGE_STALE_DAYS`) | `image: not an image (<content type>)`, `image: frame N days old`, or the HTTP/TLS error |
+| camstreamer `…/embed/<id>` | the YouTube stream the embed page currently serves is live | `camstreamer → youtube: …` |
+| ipcamlive player | the provider's stream-state endpoint reports a stream | `ipcamlive: no stream` |
+| other `iframe` / `link` | HTTP status below 400 | the HTTP/TLS error |
+
+- **A probe that cannot reach a verdict never counts.** If the YouTube watch page cannot be
+  fetched or read (network error, consent or "not a bot" page, missing fields), the row is judged
+  on oEmbed as before and logged "liveness unknown". Same for a camstreamer page with no YouTube
+  id in it (the `/embed/<a>/<b>` and `/live/stream/<n>` forms do not expose one) and for an image
+  with no `Last-Modified` header.
+- **Off-season.** At a resort that is out of season (`isOffSeasonAt`, the same months as
+  `lib/map-utils` `isOffSeason`), "no stream" and "frame N days old" are recorded but not counted:
+  operators switch cameras off for the summer. A dead YouTube id counts in any season, because
+  the id never returns; a restarted stream gets a new one.
+- **Why (2026-11-20).** oEmbed answers 200 for any video that still exists, so 92 of 264 active
+  YouTube rows were ended streams shown as live; 21 active image rows had a frame between 10
+  days and 11 months old; three returned an HTML page with status 200.
+- **Reading the log.** The last lines are `Done. N/M cams healthy.`, the disabled / recovered /
+  TLS / off-season counts, and `Dead by rule: …` with one count per rule above plus the number
+  of rows whose YouTube liveness was unknown. A run with a few hundred "liveness unknown" means
+  YouTube is turning the job away, not that the cams are fine.
+- YouTube rows are paced about one a second, so a run takes several minutes longer than before.
+
 ## Launchd Services (Studio)
 
 | Label | Purpose | Schedule | Status |

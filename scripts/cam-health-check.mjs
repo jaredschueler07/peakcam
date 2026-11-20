@@ -9,7 +9,19 @@
  *   node scripts/cam-health-check.mjs
  *
  * Reads:  .env.local (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
- * Writes: Supabase cams table (last_checked_at)
+ * Writes: Supabase cams table (last_checked_at, consecutive_failures,
+ *         is_active / auto_disabled on the third failure and on recovery)
+ *
+ * What each cam type is judged on (docs/runbook.md "Cam health check"):
+ *   youtube     the watch page: playable, embeddable and live right now
+ *   image       HTTP 2xx, image bytes, and a Last-Modified no older than
+ *               IMAGE_STALE_DAYS when the server sends one
+ *   camstreamer the YouTube stream its embed page currently serves
+ *   ipcamlive   the provider's stream-state endpoint
+ *   other       HTTP status of the embed page
+ * A probe that cannot reach a verdict (network trouble, an interstitial, a
+ * field that is not there) falls back to the older, weaker check and never
+ * counts as a failure on its own.
  */
 
 import fs from "node:fs";
@@ -185,6 +197,9 @@ function failureFromError(err) {
 
 export const DISABLE_THRESHOLD = 3;
 
+/** Pause after a check that loaded a YouTube watch page. */
+const YOUTUBE_PACE_MS = 1000;
+
 /**
  * Pure state transition for one cam's health check result.
  * Returns { body, transition } — body is the PATCH payload,
@@ -288,6 +303,198 @@ export function isOffSeasonAt(lat, date) {
   return !inSeason;
 }
 
+// ─── YouTube liveness ───────────────────────────────────────────────────
+//
+// oEmbed answers 200 for any video that still exists, including a live stream
+// that ended months ago and now shows "This live stream recording is not
+// available" (2026-11-20: 92 of 264 active YouTube cams). The watch page
+// carries the player's own verdict in ytInitialPlayerResponse, so read that.
+
+export const YOUTUBE_ENDED = "youtube: stream ended";
+export const YOUTUBE_UNAVAILABLE = "youtube: unavailable";
+export const YOUTUBE_LOGIN_REQUIRED = "youtube: login required";
+export const YOUTUBE_NOT_EMBEDDABLE = "youtube: not embeddable";
+export const YOUTUBE_NOT_LIVE = "youtube: not a live stream";
+
+/** Browser headers: YouTube serves the full player response only to a browser. */
+export const YOUTUBE_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+  "Accept": "text/html,application/xhtml+xml",
+  "Accept-Language": "en-US,en;q=0.9",
+};
+
+const YT_BOT_WALL_RE = /not a bot|unusual traffic|confirm you.{0,8}re not/i;
+
+function ytBool(html, key) {
+  const m = html.match(new RegExp(`"${key}":(true|false)`));
+  return m ? m[1] === "true" : null;
+}
+
+/**
+ * Pure. Reads a YouTube watch page and returns { verdict, reason }.
+ *   "live"    playable, embeddable and broadcasting now
+ *   "dead"    with a specific reason string (one of the YOUTUBE_* constants)
+ *   "unknown" the page did not carry a usable player response (consent or
+ *             bot interstitial, a truncated body, a layout change) — the
+ *             caller falls back to oEmbed and does not count a failure.
+ * A catalogue row is a webcam, so a playable video that is not broadcasting
+ * is dead too: an ended stream left up as a recording, or a plain upload.
+ */
+export function youtubeLiveness(html) {
+  if (typeof html !== "string" || !html) return { verdict: "unknown", reason: null };
+  const ps = html.match(/"playabilityStatus":\{"status":"([A-Z_]+)"(?:,"reason":"((?:[^"\\]|\\.)*)")?/);
+  if (!ps) return { verdict: "unknown", reason: null };
+  const status = ps[1];
+  const reason = ps[2] ?? "";
+  // "Sign in to confirm you're not a bot" arrives as LOGIN_REQUIRED (or
+  // UNPLAYABLE) for a perfectly healthy video: that is about us, not the cam.
+  if (YT_BOT_WALL_RE.test(reason)) return { verdict: "unknown", reason: null };
+
+  const isLiveNow = ytBool(html, "isLiveNow");
+  const isLiveContent = ytBool(html, "isLiveContent");
+  const playableInEmbed = ytBool(html, "playableInEmbed");
+
+  if (status === "LOGIN_REQUIRED") return { verdict: "dead", reason: YOUTUBE_LOGIN_REQUIRED };
+  if (status === "ERROR") return { verdict: "dead", reason: YOUTUBE_UNAVAILABLE };
+  if (status === "LIVE_STREAM_OFFLINE") return { verdict: "dead", reason: YOUTUBE_ENDED };
+  if (status === "UNPLAYABLE") {
+    const wasLive = isLiveContent === true || /live stream/i.test(reason);
+    return { verdict: "dead", reason: wasLive ? YOUTUBE_ENDED : YOUTUBE_UNAVAILABLE };
+  }
+  if (status !== "OK") return { verdict: "unknown", reason: null };
+
+  // status OK from here on.
+  if (playableInEmbed === false) return { verdict: "dead", reason: YOUTUBE_NOT_EMBEDDABLE };
+  if (isLiveNow === true) return { verdict: "live", reason: null };
+  if (isLiveNow === false) {
+    return { verdict: "dead", reason: isLiveContent === true ? YOUTUBE_ENDED : YOUTUBE_NOT_LIVE };
+  }
+  // OK but no liveBroadcastDetails at all: a plain upload when the page says
+  // so, otherwise a page we could not read properly.
+  if (isLiveContent === false) return { verdict: "dead", reason: YOUTUBE_NOT_LIVE };
+  return { verdict: "unknown", reason: null };
+}
+
+// ─── camstreamer embeds ─────────────────────────────────────────────────
+//
+// `https://camstreamer.com/embed/<id>` redirects to (or wraps) the YouTube
+// embed for whatever stream the camera is pushing right now. The address is
+// stable while the YouTube id behind it changes, so the page answers 200 for
+// a dead stream as well. Resolve the id and judge it like a YouTube cam.
+
+const YT_ID = "[A-Za-z0-9_-]{11}";
+
+/** Pure. True for a camstreamer.com embed or live-stream page URL. */
+export function isCamstreamerUrl(embedUrl) {
+  if (typeof embedUrl !== "string" || !embedUrl) return false;
+  try {
+    const url = new URL(embedUrl);
+    const host = url.hostname.toLowerCase();
+    return (host === "camstreamer.com" || host.endsWith(".camstreamer.com")) && /^\/(embed|live)\//.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Pure. The YouTube id a camstreamer page serves: from the URL the request
+ * ended on (a redirect to youtube.com/embed/<id>) or, failing that, from the
+ * first YouTube embed/watch reference in the body. null when there is none.
+ */
+export function youtubeIdFromEmbedPage(finalUrl, html) {
+  const fromUrl = typeof finalUrl === "string" ? finalUrl.match(new RegExp(`youtube(?:-nocookie)?\\.com/embed/(${YT_ID})(?![A-Za-z0-9_-])`)) : null;
+  if (fromUrl && fromUrl[1] !== "live_stream") return fromUrl[1];
+  if (typeof html !== "string" || !html) return null;
+  const patterns = [
+    new RegExp(`youtube(?:-nocookie)?\\.com/embed/(${YT_ID})(?![A-Za-z0-9_-])`),
+    new RegExp(`youtube\\.com/watch\\?v=(${YT_ID})(?![A-Za-z0-9_-])`),
+    new RegExp(`"videoId":"(${YT_ID})"`),
+  ];
+  for (const re of patterns) {
+    const m = html.match(re);
+    if (m && m[1] !== "live_stream") return m[1];
+  }
+  return null;
+}
+
+// ─── Image cams ─────────────────────────────────────────────────────────
+//
+// "200 and more than 1,000 bytes" passed an HTML error page (Loveland, three
+// rows) and a frame that last changed in April (Eldora). Judge the bytes, and
+// the age when the server states one.
+
+/** A still that has not changed for this many days is not a webcam any more. */
+export const IMAGE_STALE_DAYS = 5;
+
+/** Pure. "jpeg" | "png" | "gif" | "webp" | null from the first bytes of a body. */
+export function sniffImage(bytes) {
+  if (!bytes || bytes.length < 4) return null;
+  const b = bytes;
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "jpeg";
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return "png";
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) return "gif";
+  if (b.length >= 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return "webp";
+  return null;
+}
+
+function looksLikeMarkup(bytes) {
+  if (!bytes || bytes.length === 0) return false;
+  let i = 0;
+  if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) i = 3; // UTF-8 BOM
+  while (i < bytes.length && (bytes[i] === 0x20 || bytes[i] === 0x09 || bytes[i] === 0x0a || bytes[i] === 0x0d)) i++;
+  return bytes[i] === 0x3c || bytes[i] === 0x7b; // "<" (HTML/XML) or "{" (a JSON error)
+}
+
+/**
+ * Pure. Verdict for an image cam's response.
+ *   input  { ok, contentType, lastModified, head, now } — ok is resp.ok
+ *          head = the first bytes of the body (16 is enough)
+ *   output { ok, error?, kind?, ageDays? }
+ *          kind "not_image" — 2xx but the body is not a picture
+ *               "stale"     — Last-Modified older than IMAGE_STALE_DAYS
+ * No Last-Modified header, or one that does not parse, is no judgement: plenty
+ * of live cams send none.
+ */
+export function imageVerdict({ ok, contentType = "", lastModified = null, head = null, now = new Date() }) {
+  if (!ok) return { ok: false };
+  const type = String(contentType).split(";")[0].trim().toLowerCase();
+  const magic = sniffImage(head);
+  // Magic bytes settle it whatever the header says (some servers send images
+  // as application/octet-stream). Without them, trust an image/* header only
+  // when the body does not open like markup (covers svg/avif/bmp, rejects an
+  // HTML page mislabelled as a picture).
+  const isImage = magic !== null || (type.startsWith("image/") && !looksLikeMarkup(head));
+  if (!isImage) {
+    return { ok: false, kind: "not_image", error: `image: not an image (${type || "no content type"})` };
+  }
+  if (lastModified) {
+    const at = Date.parse(lastModified);
+    if (Number.isFinite(at)) {
+      const ageDays = Math.floor((now.getTime() - at) / 86_400_000);
+      if (ageDays > IMAGE_STALE_DAYS) {
+        return { ok: false, kind: "stale", ageDays, error: `image: frame ${ageDays} days old` };
+      }
+      return { ok: true, ageDays: Math.max(ageDays, 0) };
+    }
+  }
+  return { ok: true };
+}
+
+/**
+ * Pure. Whether a failed check moves the auto-disable counter.
+ * Seasonal darkness is not a fault: an ipcamlive stream with no signal or a
+ * still that stopped updating, at a resort that is out of season, is recorded
+ * and left alone. A dead YouTube id is dead in any season (the id never comes
+ * back; a new stream gets a new one), so it always counts — and so does a
+ * camstreamer embed, which is judged as YouTube.
+ */
+export function countsTowardDisable(check, lat, date) {
+  if (!check || check.ok) return true;
+  if (check.noStream || check.staleImage) return !isOffSeasonAt(lat, date);
+  return true;
+}
+
 // ─── Step 1: Fetch all cams ─────────────────────────────────────────────
 
 async function fetchAllCams() {
@@ -346,17 +553,23 @@ async function checkCam(cam) {
 }
 
 async function checkCamOnce(cam, timeout) {
-  // YouTube — oEmbed check
+  // YouTube — the watch page says whether the stream is live; oEmbed (does
+  // the video exist at all) is only the fallback when that cannot be read.
   if (cam.embed_type === "youtube" && cam.youtube_id) {
+    const live = await probeYoutubeLiveness(cam.youtube_id, timeout);
+    if (live.verdict === "live") return { ok: true, status: 200, youtubeProbed: true };
+    if (live.verdict === "dead") {
+      return { ok: false, status: 200, error: live.reason, retryable: false, youtubeDead: true, youtubeProbed: true };
+    }
     const oembedUrl = `https://www.youtube.com/oembed?url=https://youtube.com/watch?v=${cam.youtube_id}&format=json`;
     try {
       const resp = await fetch(oembedUrl, {
         headers: HEADERS,
         signal: AbortSignal.timeout(timeout),
       });
-      return { ok: resp.ok, status: resp.status };
+      return { ok: resp.ok, status: resp.status, livenessUnknown: true, youtubeProbed: true };
     } catch (err) {
-      return failureFromError(err);
+      return { ...failureFromError(err), livenessUnknown: true, youtubeProbed: true };
     }
   }
 
@@ -374,15 +587,19 @@ async function checkCamOnce(cam, timeout) {
       const contentType = resp.headers.get("content-type") || "";
       const contentLength = parseInt(resp.headers.get("content-length") || "0", 10);
       const lastModified = resp.headers.get("last-modified");
-      // Consume body to prevent memory leak
-      await resp.arrayBuffer();
-      const isImage = contentType.startsWith("image/") || contentLength > 1000;
+      // Read the body (also prevents a leak) and keep its first bytes: the
+      // verdict is on what was served, not on the headers alone.
+      const head = new Uint8Array(await resp.arrayBuffer()).subarray(0, 16);
+      const verdict = imageVerdict({ ok: resp.ok, contentType, lastModified, head });
       return {
-        ok: resp.ok && isImage,
+        ok: verdict.ok,
         status: resp.status,
         contentLength,
         lastModified,
         contentType,
+        ...(verdict.error ? { error: verdict.error, retryable: false } : {}),
+        ...(verdict.kind === "stale" ? { staleImage: true } : {}),
+        ...(verdict.kind === "not_image" ? { notImage: true } : {}),
       };
     } catch (err) {
       // Includes every TLS/certificate failure: fetch never returns a Response
@@ -416,19 +633,55 @@ async function checkCamOnce(cam, timeout) {
   }
 
   // iframe / link — GET request with proper headers
+  const camstreamer = isCamstreamerUrl(cam.embed_url);
   try {
     const resp = await fetch(cam.embed_url, {
       method: "GET",
-      headers: HEADERS,
+      headers: camstreamer ? { ...HEADERS, ...YOUTUBE_HEADERS, Referer: HEADERS.Referer } : HEADERS,
       redirect: "follow",
       signal: AbortSignal.timeout(timeout),
     });
-    // Consume body
-    await resp.text();
+    const body = await resp.text();
     const ok = resp.status >= 200 && resp.status < 400;
-    return { ok, status: resp.status };
+    if (!ok || !camstreamer) return { ok, status: resp.status };
+
+    // camstreamer: the page is up; is the YouTube stream behind it live? No id
+    // or no readable verdict keeps the HTTP result and counts nothing.
+    const videoId = youtubeIdFromEmbedPage(resp.url, body);
+    if (!videoId) return { ok, status: resp.status, livenessUnknown: true, youtubeProbed: true };
+    const live = await probeYoutubeLiveness(videoId, timeout);
+    if (live.verdict === "dead") {
+      return {
+        ok: false,
+        status: resp.status,
+        error: `camstreamer → ${live.reason} (${videoId})`,
+        retryable: false,
+        youtubeDead: true,
+        youtubeProbed: true,
+      };
+    }
+    return { ok, status: resp.status, youtubeProbed: true, ...(live.verdict === "unknown" ? { livenessUnknown: true } : {}) };
   } catch (err) {
     return failureFromError(err);
+  }
+}
+
+/**
+ * One GET of the watch page → youtubeLiveness(). Never throws and never
+ * reports a failure of its own: any trouble is { verdict: "unknown" }.
+ */
+async function probeYoutubeLiveness(videoId, timeout) {
+  try {
+    const resp = await fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, {
+      headers: YOUTUBE_HEADERS,
+      redirect: "follow",
+      signal: AbortSignal.timeout(timeout),
+    });
+    const html = await resp.text();
+    if (!resp.ok) return { verdict: "unknown", reason: null };
+    return youtubeLiveness(html);
+  } catch {
+    return { verdict: "unknown", reason: null };
   }
 }
 
@@ -479,6 +732,7 @@ async function main() {
   }
   const now = new Date();
   let offSeasonDark = 0;
+  const reasons = { youtubeDead: 0, staleImage: 0, notImage: 0, livenessUnknown: 0 };
 
   const results = { working: [], dead: [] };
   const deadDetail = new Map(); // cam.id → why, for the summary
@@ -496,19 +750,27 @@ async function main() {
     if (check.ok) {
       results.working.push(cam);
       byType[type].working++;
-      console.log(`  OK   [${type}] ${cam.name} (${check.status})`);
+      console.log(`  OK   [${type}] ${cam.name} (${check.status})${check.livenessUnknown ? " — liveness unknown, judged on HTTP status only" : ""}`);
     } else {
       results.dead.push(cam);
       byType[type].dead++;
       if (check.errorKind === "tls") tlsCount++;
-      const detail = check.error || `HTTP ${check.status}`;
+      const detail = (check.error || `HTTP ${check.status}`) + (check.livenessUnknown ? " (liveness unknown)" : "");
       deadDetail.set(cam.id, detail);
       console.log(`  DEAD [${type}] ${cam.name} — ${detail}`);
     }
 
-    // "No stream" at an off-season resort is expected: record the check but
-    // do not count it toward the auto-disable threshold.
-    const countFailure = !(check.noStream && isOffSeasonAt(latByResort.get(cam.resort_id), now));
+    if (check.livenessUnknown) reasons.livenessUnknown++;
+    if (!check.ok) {
+      if (check.youtubeDead) reasons.youtubeDead++;
+      if (check.staleImage) reasons.staleImage++;
+      if (check.notImage) reasons.notImage++;
+    }
+
+    // Seasonal darkness (no ipcamlive stream, a still that stopped updating)
+    // at an off-season resort is expected: record the check but do not count
+    // it toward the auto-disable threshold. See countsTowardDisable().
+    const countFailure = countsTowardDisable(check, latByResort.get(cam.resort_id), now);
     if (!check.ok && !countFailure) {
       offSeasonDark++;
       console.log(`  ....  off-season, not counted toward auto-disable: ${cam.name}`);
@@ -528,8 +790,9 @@ async function main() {
       console.error(`  WARN Could not update cam status for ${cam.name}: ${err.message}`);
     }
 
-    // Rate-limit courtesy
-    await sleep(150);
+    // Rate-limit courtesy. A check that loaded a YouTube watch page waits
+    // longer: a few hundred of those a run, about one a second.
+    await sleep(check.youtubeProbed ? YOUTUBE_PACE_MS : 150);
   }
 
   // ─── Summary ────────────────────────────────────────────────────────
@@ -558,6 +821,9 @@ async function main() {
   );
   console.log(
     `[cam-health] ${disabledCount} disabled this run, ${recoveredCount} recovered, ${tlsCount} failing TLS, ${offSeasonDark} off-season with no stream (not counted)`
+  );
+  console.log(
+    `[cam-health] Dead by rule: ${reasons.youtubeDead} YouTube stream ended/unavailable, ${reasons.staleImage} image frame older than ${IMAGE_STALE_DAYS} days, ${reasons.notImage} image URL not serving an image; ${reasons.livenessUnknown} YouTube liveness unknown (HTTP status only)`
   );
 }
 
