@@ -101,7 +101,7 @@ heavenly,Tram Summit,10067,iframe,https://player.brownrice.com/embed/heavenlytra
 heavenly,Hwy 50,6500,iframe,https://g1.ipcamlive.com/player/player.php?alias=663aa2e1bf523,,true
 kirkwood,Cornice,9800,iframe,https://player.brownrice.com/embed/kirkwoodcornice,,true
 kirkwood,Red Cliffs,8500,iframe,https://player.brownrice.com/embed/kirkwoodredcliffs,,true
-kirkwood,Snow Stake,7800,image,https://cache.snow.com/Mtncams/KWSnowStake.jpg,,true
+kirkwood,Snow Stake,7800,image,https://cache.snow.com/Mtncams/KWSnowStake.jpg,,false
 homewood,Ellis Lift,7000,iframe,https://player.livespotting.com/lsplayer.html?alias=7njvla68&ch=alta1aac,,true
 homewood,Snow Stake,7880,iframe,https://live4.brownrice.com/embed/homewood5,,true
 homewood,Lake Tahoe View,7000,iframe,https://explore.org/live-cams/player/lake-tahoe-homewood-mountain-resort-cam,,true
@@ -125,9 +125,9 @@ dodge-ridge,Summit,8200,youtube,https://www.youtube.com/embed/l1gateQVYr4,l1gate
 june-mountain,Chalet,7545,youtube,https://www.youtube.com/embed/Ewam1RD-Kgk,Ewam1RD-Kgk,true
 june-mountain,Ski Patrol,8600,youtube,https://www.youtube.com/embed/nFMWlayuWec,nFMWlayuWec,true
 june-mountain,J3,10100,youtube,https://www.youtube.com/embed/tTGH5oY23yU,tTGH5oY23yU,true
-china-peak,Summit,8700,iframe,https://g1.ipcamlive.com/player/player.php?alias=8h08e8bpagfd912,,true
-china-peak,Mid Mountain,7800,iframe,https://g1.ipcamlive.com/player/player.php?alias=6333584f5ea45,,true
-china-peak,Buckhorn,7100,iframe,https://g1.ipcamlive.com/player/player.php?alias=63335f1b76211,,true
+china-peak,Summit,8700,iframe,https://g1.ipcamlive.com/player/player.php?alias=8h08e8bpagfd912,,false
+china-peak,Mid Mountain,7800,iframe,https://g1.ipcamlive.com/player/player.php?alias=6333584f5ea45,,false
+china-peak,Buckhorn,7100,iframe,https://g1.ipcamlive.com/player/player.php?alias=63335f1b76211,,false
 mt-baldy,7800ft Cam,7800,youtube,https://www.youtube.com/embed/gxbO673T0No,gxbO673T0No,true
 snow-valley,Base Lodge,6800,youtube,https://www.youtube.com/embed/RBYyWnu8nhM,RBYyWnu8nhM,true
 snow-valley,Summit,7841,youtube,https://www.youtube.com/embed/1GyTQP4SNDk,1GyTQP4SNDk,true
@@ -549,8 +549,8 @@ snoqualmie,Summit West Base,,youtube,https://www.youtube.com/embed/vhO8nNqg9iw,v
 snoqualmie,Silver Fir Base,,youtube,https://www.youtube.com/embed/H7HwsNLqVC8,H7HwsNLqVC8,true,base,The Summit at Snoqualmie,
 snoqualmie,Summit Central Top,,youtube,https://www.youtube.com/embed/w4Sno8NIjmU,w4Sno8NIjmU,true,summit,The Summit at Snoqualmie,
 snoqualmie,Summit Central Base,,youtube,https://www.youtube.com/embed/GcIAQ5iD35o,GcIAQ5iD35o,true,base,The Summit at Snoqualmie,
-china-peak,Basecam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=633360d9d6c1c,,true,base,China Peak Mountain Resort,
-china-peak,Boathouse Cam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=672265473e7cf,,true,,China Peak Mountain Resort,
+china-peak,Basecam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=633360d9d6c1c,,false,base,China Peak Mountain Resort,
+china-peak,Boathouse Cam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=672265473e7cf,,false,,China Peak Mountain Resort,
 china-peak,Landing Cam,,iframe,https://g1.ipcamlive.com/player/player.php?alias=672266c33e268,,true,,China Peak Mountain Resort,
 steamboat,Mid-Mountain Snow Stake Cam,9080,youtube,https://www.youtube.com/embed/lKc9xwndUK4,lKc9xwndUK4,true,snow-stake,Steamboat Resort,https://www.alterramtnco.com/terms-of-use/
 steamboat,Champagne Powder Snow Cam,10384,youtube,https://www.youtube.com/embed/Vz_BJ5NJOM0,Vz_BJ5NJOM0,true,snow-stake,Steamboat Resort,https://www.alterramtnco.com/terms-of-use/
