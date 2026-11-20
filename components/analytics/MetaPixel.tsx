@@ -27,6 +27,15 @@ export function MetaPixel() {
     fireMetaPixelEvent("PageView");
   }, [pathname, ready]);
 
+  useEffect(() => {
+    // next/script runs onReady for an inline script before it appends the
+    // element, so on first load the fbq stub does not exist yet and the flush
+    // in onReady finds nothing to call. `ready` re-renders after the snippet
+    // has executed; replay here whatever fired during hydration (the signup
+    // CompleteRegistration on the confirmation landing), after the PageView.
+    if (ready) flushMetaPixelEvents();
+  }, [ready]);
+
   if (!id) return null;
 
   return (
