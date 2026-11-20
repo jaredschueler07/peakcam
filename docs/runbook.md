@@ -48,7 +48,7 @@ service-role key in that checkout's `.env.local`, and log to the path in the las
 | Label | Script (`ProgramArguments`) | Schedule | Writes | Log |
 |---|---|---|---|---|
 | `com.peakcam.agents` | `node agents/loop.mjs` | always-on (`KeepAlive`, `RunAtLoad`) | `agent_memory`, Slack | `agents/loop.log` |
-| `com.peakcam.snotel-sync` | `npx tsx scripts/snotel-sync.ts` | 00:15, 06:15, 12:15, 18:15 Central (`StartCalendarInterval` ×4) | `snowpack_daily`, `snow_reports` (source `snotel`), `resorts.cond_rating`; IndexNow ping when `INDEXNOW_ENABLED=1` | `scripts/snotel-sync.log` |
+| `com.peakcam.snotel-sync` | `npx tsx scripts/snotel-sync.ts` | 00:15, 05:15, 06:15, 12:15, 18:15 Central (`StartCalendarInterval` ×5; two morning runs because NRCS has the day's values from about 11:00 UTC and sometimes answers 5xx) | `snowpack_daily`, `snow_reports` (source `snotel`), `resorts.cond_rating`; IndexNow ping when `INDEXNOW_ENABLED=1` | `scripts/snotel-sync.log` |
 | `com.peakcam.model-sync` | `npx tsx scripts/model-sync.ts` | 00:45, 06:45, 12:45, 18:45 Central (`StartCalendarInterval` ×4) | `snow_reports` (source `open_meteo`) for the resorts without a station, `cond_rating` | `scripts/model-sync.log` |
 | `com.peakcam.stations-sync` | `npx tsx scripts/stations-sync.ts` | hourly (3,600) | `stations`, `resort_stations`, `station_observations` (migration 026); never `snow_reports` | `scripts/stations-sync.log` |
 | `com.peakcam.forecast-sync` | `npx tsx scripts/forecast-sync.ts` | 01:05, 09:05, 17:05 Central (`StartCalendarInterval` ×3, no `RunAtLoad`) | `forecast_runs`, `forecast_daily` (027); ~240 Open-Meteo calls a run; retention pass after 00:00 UTC | `scripts/forecast-sync.log` |
