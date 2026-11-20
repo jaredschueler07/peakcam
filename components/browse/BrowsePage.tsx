@@ -41,6 +41,8 @@ interface Props {
   radarFrames?: RadarFrame[];
   /** P7: today's Snow Score per resort id and the dated leaders sentence; the "Best right now" strip ranks on it when present. */
   featured?: FeaturedScores | null;
+  /** Server-rendered block shown under the "Best right now" strip from md up, and after the second resort card on phones (the homepage's feature showcase). */
+  afterFeatured?: React.ReactNode;
 }
 
 export interface FeaturedScores {
@@ -421,7 +423,7 @@ function SouthernSeasonBanner({
 
 // ── Main BrowsePage ──────────────────────────────────────────────────────────
 
-export function BrowsePage({ resorts, radarFrames = [], featured = null }: Props) {
+export function BrowsePage({ resorts, radarFrames = [], featured = null, afterFeatured = null }: Props) {
   const [search, setSearch] = useState("");
 
   // Header search on inner pages routes here as /?q=… (the resort list only
@@ -778,6 +780,9 @@ export function BrowsePage({ resorts, radarFrames = [], featured = null }: Props
           }}
         />
         <FeaturedRow resorts={resorts} scores={featured} />
+        {/* This block sits under the grid on phones (order-last), so the slot is
+            repeated inside the grid there; see the md:hidden copy below. */}
+        {afterFeatured ? <div className="hidden md:block">{afterFeatured}</div> : null}
         <PowderAlert resorts={resorts} />
 
         <div className="hidden md:block"><AlertSignupBanner resorts={resorts} /></div>
@@ -838,6 +843,7 @@ export function BrowsePage({ resorts, radarFrames = [], featured = null }: Props
                         animate={i < 12}
                       />
                     </div>
+                    {afterFeatured && i === Math.min(1, visibleResorts.length - 1) && <div className="md:hidden min-w-0">{afterFeatured}</div>}
                     {i === Math.min(3, visibleResorts.length - 1) && <div className="md:hidden"><AlertSignupBanner resorts={resorts} /></div>}
                     </Fragment>
                   ))}
