@@ -120,12 +120,12 @@ export function buildShowcaseCards(resort: Pick<ShowcaseResort, "slug" | "name">
       cta: "Browse by pass",
     },
     {
-      id: "connect",
-      eyebrow: "AI assistants",
-      title: "Ask in plain language",
-      body: "Connect PeakCam to Claude, ChatGPT or another assistant and ask for conditions, history or a forecast by resort name.",
-      href: "/connect",
-      cta: "Set it up",
+      id: "map",
+      eyebrow: "Map",
+      title: "Every resort on one map",
+      body: "All the resorts PeakCam tracks on one map, each with its live snow numbers, and weather radar on top.",
+      href: "/map",
+      cta: "Open the map",
     },
   ];
 }

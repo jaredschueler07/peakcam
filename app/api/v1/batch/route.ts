@@ -24,7 +24,7 @@ import { GET as getSnowReport } from "@/app/api/v1/snow-report/route";
 // in order with each route's own status and JSON body. The paths are run
 // in-process against the route handlers themselves (same code, same cached
 // catalogue), so a batch costs one function invocation and one request
-// against the edge rate limit (60/min per IP across /api/v1 and /api/mcp)
+// against the edge rate limit (60/min per IP on /api/v1)
 // instead of ten. Read-only by construction: only the allow-listed GET
 // routes dispatch. A bad path fails the whole batch with a 400 naming it.
 export const runtime = "nodejs";

@@ -104,3 +104,16 @@ export interface McpHistorySource {
   /** `season_stats(powder_in, season_start, week_start)` rows; null when the function is missing. */
   seasonAggregates?(seasonStart: string, weekStart: string): Promise<SeasonAggregateRow[] | null>;
 }
+
+/**
+ * What a tool handler returns: one markdown text block, the structured
+ * document that matches the tool's `outputSchema`, and `isError` for a
+ * refusal (unknown slug, nothing stored). The shape is the one the retired
+ * MCP server passed through; it is declared here so the tool layer needs no
+ * MCP SDK.
+ */
+export interface CallToolResult {
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent?: Record<string, unknown>;
+  isError?: boolean;
+}

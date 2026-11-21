@@ -210,9 +210,8 @@ export default function MethodologyPage() {
           document says so (<code className="font-mono text-[13px]">scoredBy: &quot;algorithmic&quot;</code>).
           Five components add up to it, and each one carries the points it earned, its maximum, a
           one-line basis you can quote and the source it rests on, so &ldquo;why 72&rdquo; is always
-          answerable on the resort page, in the API (
-          <code className="font-mono text-[13px]">/api/v1/resorts/&#123;slug&#125;/score-components</code>) and in the{" "}
-          <code className="font-mono text-[13px]">get_score</code> MCP tool.
+          answerable on the resort page and in the API (
+          <code className="font-mono text-[13px]">/api/v1/resorts/&#123;slug&#125;/score-components</code>).
         </p>
         <ul className="mb-4 list-disc space-y-2 pl-6">
           <li>
@@ -301,8 +300,7 @@ export default function MethodologyPage() {
           a resort has no measured series the accuracy page says so rather than scoring against a
           model. The whole thing is in the open API:{" "}
           <code className="font-mono text-[13px]">/api/v1/resorts/&#123;slug&#125;/forecast</code> and{" "}
-          <code className="font-mono text-[13px]">/forecast-accuracy</code>, and the{" "}
-          <code className="font-mono text-[13px]">compare_models</code> MCP tool. Weather data by{" "}
+          <code className="font-mono text-[13px]">/forecast-accuracy</code>. Weather data by{" "}
           <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-ink">
             Open-Meteo.com
           </a>{" "}

@@ -73,7 +73,7 @@ const SHARED_HEADERS = {
 /** The versioning and deprecation commitment, printed in info.description and carried as `x-deprecation-policy`. */
 export const DEPRECATION_POLICY = {
   noticeMonths: 12,
-  announcedAt: ["/llms-full.txt", "/connect", "/api/v1/openapi.json"],
+  announcedAt: ["/llms-full.txt", "/api/v1/openapi.json"],
   headers: ["Deprecation", "Sunset", "Link rel=sunset"],
   rfcs: ["RFC 9745 (Deprecation)", "RFC 8594 (Sunset)"],
 } as const;
@@ -81,10 +81,9 @@ export const DEPRECATION_POLICY = {
 export function deprecationPolicyText(baseUrl: string): string {
   return [
     `Versioning and deprecation: the base path carries the major version (/api/v1); within it, PeakCam only adds fields, enum values and operations, never renames or removes them without notice. `,
-    `A removal is announced at least ${DEPRECATION_POLICY.noticeMonths} months ahead: the affected operation starts answering with a \`Deprecation\` header (RFC 9745, the announcement date) and a \`Sunset\` header (RFC 8594, the earliest removal date) plus \`Link: <changelog>; rel="sunset"\`, its summary in this document gains "Deprecated:" with the replacement, and the same notice appears in ${baseUrl}/llms-full.txt and on ${baseUrl}/connect. `,
+    `A removal is announced at least ${DEPRECATION_POLICY.noticeMonths} months ahead: the affected operation starts answering with a \`Deprecation\` header (RFC 9745, the announcement date) and a \`Sunset\` header (RFC 8594, the earliest removal date) plus \`Link: <changelog>; rel="sunset"\`, its summary in this document gains "Deprecated:" with the replacement, and the same notice appears in ${baseUrl}/llms-full.txt. `,
     `Current operations carry neither header. A new major version is published at its own base path (/api/v2) and the previous one keeps answering for the full notice period after the new one is announced. `,
-    `The MCP server (${baseUrl}/api/mcp) follows the same rule for tool names and argument shapes: a renamed tool keeps its old name registered, marked deprecated in its description, for ${DEPRECATION_POLICY.noticeMonths} months.`,
-    ` Response schemas are open: a client must ignore properties it does not recognise, in REST responses and in MCP tool results alike, and must not validate against a stored copy of a schema as if it were closed.`,
+    `Response schemas are open: a client must ignore properties it does not recognise and must not validate against a stored copy of a schema as if it were closed.`,
   ].join("");
 }
 
@@ -102,11 +101,11 @@ const ERROR_404 = {
 };
 
 // The limit is a Vercel WAF rule in front of the app (60 requests per 60 s
-// per IP on /api/v1/ and /api/mcp, action Deny), so the blocked response is the
+// per IP on /api/v1/, action Deny), so the blocked response is the
 // edge's plain-text 403 with `x-vercel-mitigated: deny`, not a JSON 429.
 const ERROR_403 = {
   description:
-    "Rate limit exceeded: 60 requests per minute per IP across /api/v1 and /api/mcp. The edge answers a plain-text `Forbidden` with `x-vercel-mitigated: deny` and no Retry-After; the window resets within a minute.",
+    "Rate limit exceeded: 60 requests per minute per IP on /api/v1. The edge answers a plain-text `Forbidden` with `x-vercel-mitigated: deny` and no Retry-After; the window resets within a minute.",
   content: { "text/plain": { schema: { type: "string", example: "Forbidden" } } },
 };
 
@@ -137,9 +136,9 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
         "",
         "Every snow number carries its own `source` and `measuredAt`. `snotel` values are NRCS SNOTEL/SCAN station telemetry, quality-controlled by PeakCam and synced every six hours; `open_meteo` values are weather-model estimates for resorts without a station. A station sits at one elevation, so its numbers can differ from a resort's own marketing report.",
         "",
-        `No authentication. Rate limit: 60 requests per minute per IP across /api/v1 and /api/mcp, enforced at the edge (a plain-text 403, see each operation). Responses are cacheable for ${PUBLIC_API_REVALIDATE_SECONDS} s. When you quote a value, cite the resort's \`canonicalUrl\` and keep the attribution line.`,
+        `No authentication. Rate limit: 60 requests per minute per IP on /api/v1, enforced at the edge (a plain-text 403, see each operation). Responses are cacheable for ${PUBLIC_API_REVALIDATE_SECONDS} s. When you quote a value, cite the resort's \`canonicalUrl\` and keep the attribution line.`,
         "",
-        `Agents: \`GET /ask?q=\` answers a question deterministically (one tool call, a dated sentence, citations; never a guess); \`POST /batch\` runs up to ${BATCH_MAX_REQUESTS} reads in one request; \`GET /resorts/search-index\` is the name-to-slug table. The same data is an MCP server at ${baseUrl}/api/mcp (setup: ${baseUrl}/connect). An NLWeb-shaped form of the answer endpoint is at ${baseUrl}/ask (outside this server's base path).`,
+        `Agents: \`GET /ask?q=\` answers a question deterministically (one tool call, a dated sentence, citations; never a guess); \`POST /batch\` runs up to ${BATCH_MAX_REQUESTS} reads in one request; \`GET /resorts/search-index\` is the name-to-slug table. An NLWeb-shaped form of the answer endpoint is at ${baseUrl}/ask (outside this server's base path).`,
         "",
         `Methodology: ${baseUrl}/methodology. Short and long agent guides: ${baseUrl}/llms.txt, ${baseUrl}/llms-full.txt. Standalone JSON Schemas for every shape below: ${baseUrl}${SCHEMAS_PATH}.`,
         "",
@@ -148,11 +147,9 @@ export function buildOpenApiDocument(baseUrl: string = SITE_URL): JsonObject {
       contact: { name: "PeakCam", url: baseUrl },
       license: { name: "PeakCam Terms of Service", url: PUBLIC_API_LICENSE_URL },
       "x-attribution": PUBLIC_API_ATTRIBUTION,
-      "x-mcp-endpoint": `${baseUrl}/api/mcp`,
       "x-nlweb-endpoint": `${baseUrl}/ask`,
       "x-json-schemas": `${baseUrl}${SCHEMAS_PATH}`,
       "x-deprecation-policy": DEPRECATION_POLICY,
-      "x-stdio-package": "npx -y peakcam-mcp",
     },
     externalDocs: { description: "How the numbers are measured", url: `${baseUrl}/methodology` },
     servers: [{ url: `${baseUrl}/api/v1`, description: "Production" }],

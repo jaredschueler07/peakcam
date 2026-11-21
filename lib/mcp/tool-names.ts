@@ -1,8 +1,7 @@
 // ─────────────────────────────────────────────────────────────
-// MCP server — the tool name tuple, on its own so lib/ask/* and
-// components/connect/links.ts can depend on the names without importing the
-// tool definitions (tools.ts imports lib/ask/answer.ts for the `ask` tool).
-// Registration order on the server; the /connect table follows it.
+// Tool layer — the tool name tuple, on its own so lib/ask/* can depend on
+// the names without importing the tool definitions (tools.ts imports
+// lib/ask/answer.ts for the `ask` tool). The order buildTools() returns.
 // ─────────────────────────────────────────────────────────────
 
 export const PEAKCAM_TOOL_NAMES = [
