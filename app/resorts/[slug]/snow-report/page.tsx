@@ -153,7 +153,7 @@ export default async function ResortSnowReportPage({ params }: { params: Promise
           <FreshnessSentence segments={freshness.segments} />
           {conditions.contract.status.value && (
             <p className="mt-3 flex flex-wrap items-center gap-3">
-              <StatusChip status={conditions.contract.status.value} sentence={conditions.sentence} source={conditions.contract.status.source} />
+              <StatusChip status={conditions.contract.status.value} sentence={conditions.sentence} source={conditions.contract.status.source} liftDayState={conditions.contract.liftDay?.state} />
               <span className="text-sm text-bark-dk">{conditions.sentence}</span>
             </p>
           )}

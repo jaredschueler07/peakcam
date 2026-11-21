@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { ResortOpening } from "./openings";
+import { statusChipDisplay } from "./conditions-contract";
 import {
   BASE_CONFIDENCE,
   CONDITION_FIELD_NAMES,
@@ -132,7 +133,7 @@ test("status: a fresh operator feed with lifts open is OPEN; with lifts only sch
   assert.match(open.reasons[0], /7 of 11 lifts open/);
   const scheduled = deriveStatus({ ...base, opening: null, operator: operator({ liftsOpen: 0, liftsScheduled: 9, liftsClosed: 2 }) });
   assert.equal(scheduled.status, "OPEN");
-  assert.match(scheduled.reasons[0], /9 scheduled/);
+  assert.match(scheduled.reasons[0], /9 lifts set to run today, none confirmed turning yet/);
 });
 
 test("status: a fresh operator feed with every lift closed inside the season is CLOSED_TODAY; outside a known season it falls through", () => {
@@ -421,7 +422,17 @@ test("day status: lifts scheduled and none open is OPEN with a 'scheduled' reaso
   const morning = dayStatus([rd("06:05", 0, 5, 27)], mt("06:30"));
   assert.equal(morning.status, "OPEN");
   assert.equal(morning.liftDay?.state, "scheduled");
-  assert.match(morning.reasons[0], /5 scheduled to open today/);
+  assert.match(morning.reasons[0], /5 lifts set to run today/);
+  // A feed that flags its plan as open before first chair (A-Basin, 2026-11-21) reads the same way, never as lifts open.
+  const flagged = dayStatus([rd("06:05", 2, 0, 9), rd("07:35", 2, 0, 9)], mt("07:40"));
+  assert.equal(flagged.status, "OPEN");
+  assert.equal(flagged.liftDay?.state, "scheduled");
+  assert.equal(flagged.liftDay?.liftsScheduled, 2);
+  assert.match(flagged.reasons[0], /2 lifts set to run today, none confirmed turning yet/);
+  assert.doesNotMatch(flagged.reasons.join(" "), /lifts open/);
+  const running = dayStatus([rd("07:35", 2, 0, 9), rd("08:05", 2, 0, 9)], mt("08:10"));
+  assert.equal(running.liftDay?.state, "operated");
+  assert.match(running.reasons[0], /2 of 9 lifts open/);
   const late = dayStatus([rd("08:05", 0, 4, 34), rd("15:35", 0, 4, 34)], mt("16:30"));
   assert.equal(late.basis, "date");
   assert.doesNotMatch(late.reasons.join(" "), /scheduled to open today/);
@@ -445,4 +456,14 @@ test("day status: without attached readings the newest row is the day's only rea
   // 15:35 is outside core hours: not CLOSED_TODAY (the 19:45 Central score run reads this shape).
   assert.equal(s.status, "OPEN");
   assert.equal(s.basis, "date");
+});
+
+test("statusChipDisplay: an OPEN status on a scheduled lift day reads Opens today, everything else keeps its label", () => {
+  assert.deepEqual(statusChipDisplay("OPEN", "scheduled"), { label: "Opens today", variant: "opens-today" });
+  assert.deepEqual(statusChipDisplay("OPEN", "operated"), { label: "Open", variant: "status" });
+  assert.deepEqual(statusChipDisplay("OPEN", null), { label: "Open", variant: "status" });
+  assert.deepEqual(statusChipDisplay("OPEN"), { label: "Open", variant: "status" });
+  // The scheduled state never softens a status that is not OPEN.
+  assert.deepEqual(statusChipDisplay("CLOSED_TODAY", "scheduled"), { label: "Closed today", variant: "status" });
+  assert.deepEqual(statusChipDisplay("PRE_SEASON", "scheduled"), { label: "Pre-season", variant: "status" });
 });

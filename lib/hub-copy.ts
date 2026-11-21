@@ -193,6 +193,16 @@ function isPlayableYoutube(cam: Cam): boolean {
  * features Vail and Breckenridge rather than whoever sorts first
  * alphabetically. Resorts without a YouTube cam are skipped, not counted.
  */
+/**
+ * The caption over the featured tiles. It has to say "that have one": a
+ * resort whose cams are stills or iframes is skipped however well it is
+ * rated, so on 2026-11-21 Colorado's three tiles were all "poor" resorts
+ * while two "good" ones had no YouTube stream. "The best-rated resorts"
+ * alone claimed more than the selection does.
+ */
+export const FEATURED_HUB_CAMS_CAPTION =
+  "The first live YouTube cam from the best-rated resorts that have one. Nothing plays until you ask.";
+
 export function featuredHubCams(resorts: readonly ResortWithData[], limit = 3): FeaturedHubCam[] {
   const ranked = [...resorts].sort(
     (a, b) =>
@@ -416,7 +426,12 @@ function provenanceParagraph(hub: Hub, resorts: readonly ResortWithData[]): stri
   return `${sensor} of the ${n} have an assigned NRCS SNOTEL or SCAN station, so their base depth and new snow are sensor readings synced every six hours; the other ${model} ${model === 1 ? "has" : "have"} no station nearby and ${model === 1 ? "uses" : "use"} weather-model estimates (Open-Meteo) instead — each resort page says which.`;
 }
 
-/** The shallowest resort still reporting a base above zero, when it differs from the deepest. */
+/**
+ * The shallowest resort still reporting a base above zero, when it differs
+ * from the deepest. A measured 0 in. is a report too, so the sentence says
+ * "with snow on the ground" rather than "the shallowest reporting resort"
+ * (which was false whenever a neighbour read 0).
+ */
 function shallowestReporting(resorts: readonly ResortWithData[]): { name: string; value: number } | null {
   let best: { name: string; value: number } | null = null;
   for (const resort of resorts) {
@@ -452,7 +467,7 @@ function numbersParagraph(hub: Hub, resorts: readonly ResortWithData[], summary:
     const shallowest = shallowestReporting(resorts);
     const contrast =
       shallowest && shallowest.name !== deepest.name
-        ? `; the shallowest reporting resort is ${shallowest.name} at ${inches(shallowest.value)}.`
+        ? `; the shallowest with snow on the ground is ${shallowest.name} at ${inches(shallowest.value)}.`
         : ".";
     sentences.push(`Right now the deepest base ${inHub(hub)} is ${inches(deepest.value)} at ${deepest.name}${contrast}`);
   }

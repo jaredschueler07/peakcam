@@ -9,6 +9,7 @@ import {
   buildHubFaq,
   buildHubMetaDescription,
   buildHubParagraphs,
+  FEATURED_HUB_CAMS_CAPTION,
   featuredHubCams,
   hubCamStats,
   hubLatitude,
@@ -372,7 +373,7 @@ test("paragraphs: a state hub in season covers regions, cams, provenance and the
   const [p1, p2, p3] = buildHubParagraphs(COLORADO, coloradoResorts(), WINTER);
   assert.equal(p1, "PeakCam tracks 5 ski resorts in Colorado across 4 regions: Summit County (2), Colorado Rockies (1), Front Range (1) and San Juan Mountains (1). 4 of them have live webcams on PeakCam — 6 cams in all.");
   assert.equal(p2, "4 of the 5 have an assigned NRCS SNOTEL or SCAN station, so their base depth and new snow are sensor readings synced every six hours; the other 1 has no station nearby and uses weather-model estimates (Open-Meteo) instead — each resort page says which.");
-  assert.equal(p3, "Right now the deepest base in Colorado is 62 inches at Wolf Creek Ski Area; the shallowest reporting resort is Eldora Mountain Resort at 14 inches. Wolf Creek Ski Area also picked up 9 inches in the last 24 hours, the most in Colorado. Conditions rate great at 1 resort and good at 2 resorts.");
+  assert.equal(p3, "Right now the deepest base in Colorado is 62 inches at Wolf Creek Ski Area; the shallowest with snow on the ground is Eldora Mountain Resort at 14 inches. Wolf Creek Ski Area also picked up 9 inches in the last 24 hours, the most in Colorado. Conditions rate great at 1 resort and good at 2 resorts.");
 
   // More regions than the sentence shows: the list is truncated with "and others".
   const spread = coloradoResorts().map((resort, i) => ({ ...resort, region: `Region ${i}` }));
@@ -561,4 +562,17 @@ test("opening windows and editorial keys all point at real catalogue hubs", () =
     assert.doesNotMatch(intro, /\b20\d\d\b|″|inches of new/, `${slug} intro carries a date or snow number`);
     assert.ok(intro.length > 200, `${slug} intro is too short to be worth rendering`);
   }
+});
+
+test("the featured-cams caption says what the selection is when better-rated resorts have no YouTube cam", () => {
+  // Colorado on 2026-11-21: two "good" resorts without a YouTube stream, so
+  // the three tiles were "poor" resorts under a caption promising the best-rated.
+  const still = makeCam({ embed_type: "image", youtube_id: null, embed_url: "https://cams.example/a.jpg" });
+  const resorts = [
+    makeResort({ slug: "good-a", name: "Good A", cond_rating: "good", cams: [still] }),
+    makeResort({ slug: "good-b", name: "Good B", cond_rating: "good", cams: [] }),
+    makeResort({ slug: "poor-a", name: "Poor A", cond_rating: "poor", cams: [makeCam({ id: "p1" })] }),
+  ];
+  assert.deepEqual(featuredHubCams(resorts).map((item) => item.resort.slug), ["poor-a"]);
+  assert.match(FEATURED_HUB_CAMS_CAPTION, /best-rated resorts that have one/);
 });

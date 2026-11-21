@@ -274,7 +274,7 @@ export function deriveStatus(input: StatusInput): StatusResult {
         return { status: "OPEN", source: "operator", basis: "feed", observedAt: day.newestAt, reasons, liftDay: day };
       }
       if (day?.state === "scheduled") {
-        reasons.push(`operator feed${age}: no lift spinning yet, ${day.liftsScheduled} scheduled to open today`);
+        reasons.push(`operator feed${age}: ${day.liftsScheduled} ${day.liftsScheduled === 1 ? "lift" : "lifts"} set to run today, none confirmed turning yet`);
         return { status: "OPEN", source: "operator", basis: "feed", observedAt: day.newestAt, reasons, liftDay: day };
       }
       if (day?.state === "closed") {
@@ -631,3 +631,18 @@ export const STATUS_LABELS: Record<ResortStatus, string> = {
   OFF_SEASON: "Off season",
   UNKNOWN: "Status unknown",
 };
+
+/**
+ * What the status chip prints. `data.status` stays OPEN while the operator's
+ * feed only lists lifts as planned for today (liftDay.state "scheduled": no
+ * reading has shown one turning, lib/operator-day.ts); the chip then reads
+ * "Opens today" in the outlined style the hub tables use, so the resort page
+ * and its hub row say the same thing. Every other case is the plain label.
+ */
+export function statusChipDisplay(
+  status: ResortStatus,
+  liftDayState?: string | null,
+): { label: string; variant: "status" | "opens-today" } {
+  if (status === "OPEN" && liftDayState === "scheduled") return { label: "Opens today", variant: "opens-today" };
+  return { label: STATUS_LABELS[status], variant: "status" };
+}

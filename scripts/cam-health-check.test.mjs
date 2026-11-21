@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import {
+  CAMS_PAGE_SIZE,
+  fetchAllPaged,
   computeCamUpdate,
   DISABLE_THRESHOLD,
   classifyFetchError,
@@ -453,4 +455,28 @@ test("recovery and manual switches are unchanged by the new rules", () => {
     assert.deepStrictEqual(Object.keys(manual.body), ["last_checked_at"]);
     assert.strictEqual(manual.transition, null);
   }
+});
+
+// ─── cam read is paged (2026-11-21: 1,000 of 1,044 cams were read) ──────
+
+test("fetchAllPaged reads every cam past PostgREST's 1,000-row cap", async () => {
+  const all = Array.from({ length: 1044 }, (_, i) => ({ id: i }));
+  const calls = [];
+  const rows = await fetchAllPaged(async (offset, limit) => {
+    calls.push([offset, limit]);
+    return all.slice(offset, offset + Math.min(limit, 1000));
+  });
+  assert.strictEqual(CAMS_PAGE_SIZE, 1000);
+  assert.strictEqual(rows.length, 1044);
+  assert.strictEqual(rows[1043].id, 1043);
+  assert.deepStrictEqual(calls, [[0, 1000], [1000, 1000]]);
+});
+
+test("fetchAllPaged stops after one short page and rejects a non-array page", async () => {
+  let n = 0;
+  const rows = await fetchAllPaged(async () => { n++; return [{ id: 1 }]; });
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(n, 1);
+  await assert.rejects(fetchAllPaged(async () => ({ message: "error" })), /not an array/);
+  await assert.rejects(fetchAllPaged(async (o, l) => Array.from({ length: l }, () => ({})), 5, 2), /more than 2 pages/);
 });
