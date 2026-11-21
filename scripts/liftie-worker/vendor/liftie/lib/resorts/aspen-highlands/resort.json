@@ -1,0 +1,25 @@
+{
+  "name": "Aspen Highlands",
+  "url": {
+    "host": "https://www.aspensnowmass.com",
+    "pathname": "/our-mountains/aspen-highlands/lift-status"
+  },
+  "api": {
+    "host": "https://www.aspensnowmass.com",
+    "pathname": "/aspensnowmass/liftstatus/feed",
+    "query": {
+      "mountain": "AspenHighlands"
+    }
+  },
+  "tags": [
+    "Colorado",
+    "Aspen"
+  ],
+  "ll": [
+    -106.855904,
+    39.182522
+  ],
+  "twitter": "AspenSnowmass",
+  "opening": "2016-12-10",
+  "noaa": "GJT/155,102"
+}

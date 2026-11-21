@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAllResorts } from "@/lib/supabase";
+import { getAllResorts, getHubLiftsIndex } from "@/lib/supabase";
 import { HUB_BASE_PATH, hubPath, neighbouringStateHubs, regionHubsForState, stateHub } from "@/lib/hubs";
 import { buildSnowHub, listSnowHubs, snowHubDescription, snowHubMarkdownPath, snowHubPath, snowHubTitle } from "@/lib/snow-hubs";
 import { LEADERBOARD_COPY, LEADERBOARD_KINDS, leaderboardPath } from "@/lib/leaderboards";
@@ -49,7 +49,8 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 export default async function SnowHubPage({ params }: { params: Params }) {
   const { hub: slug } = await params;
   const resorts = await getAllResorts();
-  const page = buildSnowHub(slug, resorts);
+  const lifts = await getHubLiftsIndex(new Date(), resorts);
+  const page = buildSnowHub(slug, resorts, SITE_URL, lifts);
   if (!page) return notFound();
   const { hub } = page;
   const title = snowHubTitle(hub, page.count);

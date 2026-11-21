@@ -1,0 +1,20 @@
+{
+  "name": "Heavenly",
+  "url": {
+    "host": "https://www.skiheavenly.com",
+    "pathname": "/the-mountain/mountain-conditions/terrain-and-lift-status.aspx"
+  },
+  "tags": [
+    "California",
+    "Nevada",
+    "Lake Tahoe",
+    "Vail Epic"
+  ],
+  "opening": "2017-11-17",
+  "ll": [
+    -119.939629,
+    38.936611
+  ],
+  "twitter": "skiheavenly",
+  "noaa": "REV/36,81"
+}

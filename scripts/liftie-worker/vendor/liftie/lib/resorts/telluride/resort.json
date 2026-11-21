@@ -1,0 +1,17 @@
+{
+  "name": "Telluride",
+  "url": {
+    "host": "https://tellurideskiresort.com",
+    "pathname": "/snow-report"
+  },
+  "tags": [
+    "Colorado"
+  ],
+  "opening": "2017-11-23",
+  "ll": [
+    -107.850723,
+    37.932961
+  ],
+  "twitter": "Telluride",
+  "noaa": "GJT/115,49"
+}

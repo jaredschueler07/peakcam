@@ -17,7 +17,7 @@ import {
   registerPeakCam,
 } from "./server";
 import { createMcpHandler } from "mcp-handler";
-import { MAX_CAMS, PEAKCAM_TOOL_NAMES, buildTools, diceSimilarity, editDistance, matchResorts, normalizeText, scoreResort } from "./tools";
+import { MAX_CAMS, MCP_WITHHELD_CONDITIONS_KEYS, PEAKCAM_TOOL_NAMES, buildTools, mcpConditionsData, diceSimilarity, editDistance, matchResorts, normalizeText, scoreResort } from "./tools";
 import type { McpDataSource, SnowHistoryRow, UnmatchedQuestion } from "./types";
 import type { ResortHistoryData } from "@/lib/public-api/data";
 import type { SeasonAggregateRow } from "@/lib/leaderboards";
@@ -30,6 +30,9 @@ import { ALL_MODELS, parseModelRuns, type OpenMeteoMultiModelResponse } from "@/
 import type { StoredForecast } from "@/lib/forecast/store";
 import type { AccuracyInput } from "@/lib/public-api/forecast";
 import { AskAnswerSchema } from "@/lib/public-api/schema";
+import { closedObjectPaths, openResponseSchema } from "@/lib/public-api/open-schema";
+import { buildJsonSchemas } from "@/lib/public-api/json-schemas";
+import { buildOpenApiDocument } from "@/lib/public-api/openapi";
 
 // ── Fixtures ─────────────────────────────────────────────────
 
@@ -1284,4 +1287,57 @@ test("subscriptions/listen completes in one round trip: the static catalogue hon
   assert.match(text, /"method":"notifications\/subscriptions\/acknowledged"/);
   assert.match(text, /"notifications":\{\}/, "no notification type is honoured");
   assert.match(text, /"resultType":"complete"/, "the subscription completes immediately");
+});
+
+// ── Additive-safe output (2026-11-20 regression from #143) ───────────────
+
+/** The keys of the conditions `data` object as published before #143 (git show 66e40a0:lib/public-api/schema.ts). */
+const PRE_143_CONDITIONS_DATA_KEYS = [
+  "status", "recommendableToday", "reasons", "depthDisagreement", "seasonOpening", "seasonClosing", "baseDepthIn",
+  "operatorBaseDepthIn", "newSnow24hIn", "newSnow48hIn", "sweIn", "liftsOpen", "liftsTotal", "runsOpen", "runsTotal",
+  "surface", "snowQuality", "tempF", "windMph", "forecastNext48hCm", "percentOfNormal",
+];
+
+test("no tool's published outputSchema closes any object (a cached client must accept added fields)", async () => {
+  const { tools } = await client.listTools();
+  for (const tool of tools) {
+    assert.deepEqual(closedObjectPaths(tool.outputSchema), [], `${tool.name} outputSchema has additionalProperties: false`);
+  }
+  // Input schemas are untouched by the opening: the SDK still publishes them as it did.
+  const conditions = tools.find((t) => t.name === "get_resort_conditions")!;
+  const data = (conditions.outputSchema!.properties as Record<string, { properties?: Record<string, unknown> }>).data;
+  assert.ok(data.properties && "liftDay" in data.properties, "liftDay stays declared so it can come back without a schema change");
+});
+
+test("get_resort_conditions data carries only the keys a pre-#143 client knows", async () => {
+  assert.deepEqual([...MCP_WITHHELD_CONDITIONS_KEYS], ["liftDay"]);
+  const result = await client.callTool({ name: "get_resort_conditions", arguments: { slug: "vail" } });
+  const data = (result.structuredContent as { data: Record<string, unknown> }).data;
+  const extra = Object.keys(data).filter((k) => !PRE_143_CONDITIONS_DATA_KEYS.includes(k));
+  assert.deepEqual(extra, [], "a client validating against the previous closed schema would reject these keys");
+  for (const key of ["status", "reasons", "liftsOpen"]) assert.ok(key in data, `${key} still served`);
+  // The boundary helper removes the key even when the contract sets it.
+  const stripped = mcpConditionsData({ status: 1, liftDay: { state: "operated" } });
+  assert.deepEqual(Object.keys(stripped), ["status"]);
+});
+
+test("openResponseSchema removes every closed object and nothing else", () => {
+  const closed = { type: "object", additionalProperties: false, properties: { a: { type: "array", items: { type: "object", additionalProperties: false } }, b: { additionalProperties: { type: "string" } } } };
+  const open = openResponseSchema(closed);
+  assert.deepEqual(closedObjectPaths(open), []);
+  assert.deepEqual(open, { type: "object", properties: { a: { type: "array", items: { type: "object" } }, b: { additionalProperties: { type: "string" } } } });
+  assert.equal(closed.additionalProperties, false, "the input is not mutated");
+});
+
+test("published response schemas are open; the batch request body stays closed", () => {
+  const files = buildJsonSchemas("https://www.peakcam.io");
+  for (const [stem, schema] of Object.entries(files)) {
+    if (schema.title === "BatchRequest") continue;
+    assert.deepEqual(closedObjectPaths(schema), [], `/.well-known/schemas/${stem}.json`);
+  }
+  const components = (buildOpenApiDocument("https://www.peakcam.io") as { components: { schemas: Record<string, unknown> } }).components.schemas;
+  for (const [id, schema] of Object.entries(components)) {
+    if (id === "BatchRequest") continue;
+    assert.deepEqual(closedObjectPaths(schema), [], `components.schemas.${id}`);
+  }
 });

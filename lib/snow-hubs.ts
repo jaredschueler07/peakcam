@@ -13,6 +13,7 @@ import { formatMountainTime, inches, latestUpdatedAt, sourceLabel, type Quotable
 import { stationMeta } from "./stations";
 import { SITE_URL } from "./site";
 import { PUBLIC_API_ATTRIBUTION } from "./public-api/headers";
+import { liftsCellText, liftsFootnote, type HubLifts, type HubLiftsIndex } from "./hub-lifts";
 
 export const SNOW_HUB_BASE_PATH = "/snow-report";
 
@@ -60,9 +61,11 @@ export interface MeasuredRow {
   /** ISO instant of the report, null without one. */
   measuredAt: string | null;
   liveCams: number;
+  /** Lift count from a current operator feed (lib/hub-lifts.ts); null without one. */
+  lifts: HubLifts | null;
 }
 
-export function measuredRow(r: ResortWithData): MeasuredRow {
+export function measuredRow(r: ResortWithData, lifts: HubLiftsIndex = {}): MeasuredRow {
   const snow = r.snow_report;
   const stationId = snow?.source === "snotel" ? r.snotel_station_id : null;
   return {
@@ -80,6 +83,7 @@ export function measuredRow(r: ResortWithData): MeasuredRow {
     stationName: stationId ? (stationMeta(stationId)?.name ?? null) : null,
     measuredAt: snow?.updated_at ?? null,
     liveCams: (r.cams ?? []).filter((c) => c.is_active && !c.auto_disabled).length,
+    lifts: lifts[r.id] ?? null,
   };
 }
 
@@ -152,10 +156,10 @@ export function snowHubSentence(rows: readonly MeasuredRow[], wording: SentenceW
 }
 
 /** The hub behind a /snow-report/{slug} segment, or null for a 404. */
-export function buildSnowHub(slug: string, resorts: readonly ResortWithData[], baseUrl: string = SITE_URL): SnowHubPage | null {
+export function buildSnowHub(slug: string, resorts: readonly ResortWithData[], baseUrl: string = SITE_URL, lifts: HubLiftsIndex = {}): SnowHubPage | null {
   const resolved = resolveHub(slug, resorts);
   if (!resolved) return null;
-  const rows = rankByBase(resolved.resorts.map(measuredRow));
+  const rows = rankByBase(resolved.resorts.map((r) => measuredRow(r, lifts)));
   const reported = rows.filter((r) => r.source);
   const pageUrl = `${baseUrl}${snowHubPath(resolved.hub)}`;
   return {
@@ -188,6 +192,12 @@ function cell(v: number | null): string {
   return v == null ? "–" : inches(v);
 }
 
+/** "8 of 35 (10:00 a.m. MT Nov 20)" for the markdown tables; an en dash without open lifts. */
+export function liftsMarkdownCell(lifts: HubLifts | null): string {
+  const text = liftsCellText(lifts);
+  return text && lifts ? `${text} (${formatMountainTime(lifts.observedAt)})` : "–";
+}
+
 /** The hub as one markdown document for agents (the HTML page's rel=alternate). */
 export function snowHubMarkdown(page: SnowHubPage, baseUrl: string = SITE_URL): string {
   const lines: string[] = [
@@ -197,13 +207,15 @@ export function snowHubMarkdown(page: SnowHubPage, baseUrl: string = SITE_URL): 
     "",
     page.sentence.text,
     "",
-    "| # | Resort | Base | New 24 h | New 48 h | % of normal | Source | Dated | Live cams |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| # | Resort | Base | New 24 h | New 48 h | % of normal | Source | Dated | Live cams | Lifts open (operator feed) |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
   ];
   page.rows.forEach((r, i) => {
     const source = r.source ? `${sourceLabel(r.source)}${r.stationName ? ` (${r.stationName})` : ""}` : "no report yet";
-    lines.push(`| ${i + 1} | [${r.name}](${baseUrl}/resorts/${r.slug}) | ${cell(r.baseIn)} | ${cell(r.new24In)} | ${cell(r.new48In)} | ${r.pctOfNormal != null ? `${Math.round(r.pctOfNormal)}%` : "–"} | ${source} | ${r.measuredAt ? formatMountainTime(r.measuredAt) : "–"} | ${r.liveCams} |`);
+    lines.push(`| ${i + 1} | [${r.name}](${baseUrl}/resorts/${r.slug}) | ${cell(r.baseIn)} | ${cell(r.new24In)} | ${cell(r.new48In)} | ${r.pctOfNormal != null ? `${Math.round(r.pctOfNormal)}%` : "–"} | ${source} | ${r.measuredAt ? formatMountainTime(r.measuredAt) : "–"} | ${r.liveCams} | ${liftsMarkdownCell(r.lifts)} |`);
   });
+  const liftsNote = liftsFootnote(page.rows.map((r) => r.lifts));
+  if (liftsNote) lines.push("", liftsNote);
   lines.push(
     "",
     "Base and new snow are read at the resort's NRCS SNOTEL station (one fixed elevation, usually mid-mountain) or, without a station, estimated by a weather model; both are synced every 6 hours. Dates are Mountain time.",

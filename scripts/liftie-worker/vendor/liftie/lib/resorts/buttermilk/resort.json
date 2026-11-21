@@ -1,0 +1,25 @@
+{
+  "name": "Buttermilk",
+  "url": {
+    "host": "https://www.aspensnowmass.com",
+    "pathname": "/our-mountains/buttermilk/lift-status"
+  },
+  "api": {
+    "host": "https://www.aspensnowmass.com",
+    "pathname": "/aspensnowmass/liftstatus/feed",
+    "query": {
+      "mountain": "Buttermilk"
+    }
+  },
+  "tags": [
+    "Colorado",
+    "Aspen"
+  ],
+  "ll": [
+    -106.860474,
+    39.206944
+  ],
+  "twitter": "AspenSnowmass",
+  "opening": "2016-12-10",
+  "noaa": "GJT/155,103"
+}

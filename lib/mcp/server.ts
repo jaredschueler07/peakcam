@@ -12,6 +12,7 @@
 // fixtures. Nothing in here touches the network.
 // ─────────────────────────────────────────────────────────────
 
+import { withOpenOutputJsonSchema } from "@/lib/public-api/open-schema";
 import { McpServer, ResourceTemplate, type ServerOptions, type ToolAnnotations } from "@modelcontextprotocol/server";
 import pkg from "@/package.json";
 import { SITE_URL } from "@/lib/site";
@@ -81,7 +82,9 @@ export function registerPeakCam(server: McpServer, data: McpDataSource): void {
         title: tool.title,
         description: tool.description,
         inputSchema: tool.inputSchema,
-        outputSchema: tool.outputSchema,
+        // Published open (no `additionalProperties: false`), so a client holding
+        // an older tools/list accepts fields added later. lib/public-api/open-schema.ts.
+        outputSchema: withOpenOutputJsonSchema(tool.outputSchema),
         annotations: READ_ONLY_TOOL_ANNOTATIONS,
       },
       (args) => tool.handler(args),

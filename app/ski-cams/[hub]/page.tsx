@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getAllResorts } from "@/lib/supabase";
+import { getAllResorts, getHubLiftsIndex } from "@/lib/supabase";
 import { Header } from "@/components/layout/Header";
 import { PeakFooter } from "@/components/home/PeakFooter";
 import { HubBreadcrumb } from "@/components/hubs/HubBreadcrumb";
@@ -111,6 +111,8 @@ export default async function HubPage({ params }: { params: Params }) {
   // One clock read per render; the strip, the table pills, the prose and the
   // FAQ all derive from it, so they cannot disagree about the season.
   const now = new Date();
+  // Operator lift counts for the table (fails soft to none).
+  const lifts = await getHubLiftsIndex(now, resorts);
   const offSeason = hubOffSeason(resorts, now);
   const summary = hubSummary(resorts);
   const table = sortHubTable(resorts);
@@ -264,6 +266,7 @@ export default async function HubPage({ params }: { params: Params }) {
               placeColumn={hub.kind === "region" ? "state" : "region"}
               linkedRegionSlugs={linkedRegionSlugs}
               now={now}
+              lifts={lifts}
             />
           </div>
         </section>

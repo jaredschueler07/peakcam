@@ -1,0 +1,17 @@
+{
+  "name": "Taos Ski Valley",
+  "url": {
+    "host": "https://www.skitaos.com",
+    "pathname": "/ski-ride/lifts-trails"
+  },
+  "tags": [
+    "New Mexico"
+  ],
+  "ll": [
+    -105.450699,
+    36.596199
+  ],
+  "twitter": "TaosSkiValley",
+  "opening": "2017-11-23",
+  "noaa": "ABQ/147,185"
+}

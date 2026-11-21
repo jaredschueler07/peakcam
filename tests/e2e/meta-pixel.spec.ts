@@ -61,3 +61,18 @@ test('signup welcome queues one registration without counting URL cleanup as ano
   expect((await pixelCalls(page)).filter((call) => call[1] === 'PageView')).toHaveLength(1);
   expect((await pixelCalls(page)).filter((call) => call[0] === 'init')).toHaveLength(1);
 });
+
+test('a registration captured before the pixel component loads is replayed after its PageView', async ({ page }) => {
+  // SignupWelcomeTracker can run before the dynamically imported MetaPixel
+  // chunk arrives, which is the usual order on a heavy landing page. Hold that
+  // chunk back so the event has to take the pending-queue path.
+  await page.route(/\/_next\/static\/.+\.js(\?.*)?$/, async (route) => {
+    const response = await route.fetch();
+    const body = await response.text();
+    if (body.includes('ev=PageView&noscript=1')) await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.fulfill({ response, body });
+  });
+  await page.goto('/about?welcome=signup');
+  await expect(page).toHaveURL(/\/about$/);
+  await expect.poll(async () => (await pixelCalls(page)).map((call) => call[1])).toEqual([PIXEL_ID, 'PageView', 'CompleteRegistration']);
+});

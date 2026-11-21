@@ -1,0 +1,18 @@
+{
+  "name": "Mad River Glen",
+  "url": {
+    "host": "https://www.madriverglen.com",
+    "pathname": "/conditions/"
+  },
+  "tags": [
+    "Vermont",
+    "New England"
+  ],
+  "opening": "2017-12-09",
+  "ll": [
+    -72.919006,
+    44.201653
+  ],
+  "twitter": "madriverglen",
+  "noaa": "BTV/100,45"
+}

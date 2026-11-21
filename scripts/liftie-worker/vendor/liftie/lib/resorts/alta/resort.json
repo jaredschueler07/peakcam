@@ -1,0 +1,16 @@
+{
+  "name": "Alta",
+  "url": {
+    "host": "https://www.alta.com",
+    "pathname": "/lift-terrain-status"
+  },
+  "tags": [
+    "Utah"
+  ],
+  "ll": [
+    -111.63726,
+    40.583828
+  ],
+  "twitter": "AltaSkiArea",
+  "noaa": "SLC/108,166"
+}

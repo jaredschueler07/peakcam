@@ -1,0 +1,26 @@
+{
+  "name": "Bolton Valley",
+  "url": {
+    "host": "https://www.boltonvalley.com",
+    "pathname": "/winter/trail-maps-snow-reports/snow-reports/"
+  },
+  "api": {
+    "host": "https://www.boltonvalley.com",
+    "pathname": "/wp-admin/admin-ajax.php",
+    "query": {
+      "action": "get_prop_conditions"
+    },
+    "json": true
+  },
+  "tags": [
+    "Vermont",
+    "New England"
+  ],
+  "ll": [
+    -72.84948,
+    44.421673
+  ],
+  "twitter": "boltonvalley",
+  "opening": "2017-12-09",
+  "noaa": "BTV/101,56"
+}

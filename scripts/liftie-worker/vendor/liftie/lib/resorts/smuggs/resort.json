@@ -1,0 +1,18 @@
+{
+  "name": "Smugglers' Notch",
+  "url": {
+    "host": "https://www.smuggs.com",
+    "pathname": "/conditions/winter-report/"
+  },
+  "tags": [
+    "New England",
+    "Vermont"
+  ],
+  "opening": "2017-11-24",
+  "ll": [
+    -72.78833,
+    44.589092
+  ],
+  "twitter": "Smugglers_Notch",
+  "noaa": "BTV/102,64"
+}

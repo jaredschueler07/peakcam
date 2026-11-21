@@ -39,6 +39,8 @@ import { fileURLToPath } from "node:url";
 
 import { SCORED_BY, SCORE_VERSION, buildScoreInput, computeScore, type ScoreDailyRow, type ScoreReportRow, type ScoreResult } from "../lib/score.js";
 import { deriveStatus, type OperatorReport } from "../lib/conditions-contract.js";
+import type { OperatorReading } from "../lib/operator-day.js";
+import { resortTimeZone } from "../lib/resort-timezone.js";
 import type { ResortOpening } from "../lib/openings.js";
 import { blendRuns } from "../lib/forecast/blend.js";
 import { assembleStoredRuns, type ForecastDailyRow, type ForecastRunRow, type StoredRun } from "../lib/forecast/store.js";
@@ -200,6 +202,35 @@ async function fetchOperators(): Promise<Map<string, OperatorRow>> {
   return new Map(rows.map((r) => [r.resort_id, r]));
 }
 
+/**
+ * Every resort's lift readings from the last 30 h, so the status reads the
+ * resort's whole local day (lib/operator-day.ts) and not only the newest
+ * row: the 07:45 run falls before the first chair and the 19:45 run after
+ * the last. A failed read leaves the newest row as the only reading.
+ */
+async function fetchOperatorReadings(): Promise<Map<string, OperatorReading[]>> {
+  const out = new Map<string, OperatorReading[]>();
+  const since = new Date(Date.now() - 30 * 3_600_000).toISOString();
+  try {
+    for (let offset = 0; offset < 5000; offset += 1000) {
+      const rows =
+        (await getJsonSoft<{ resort_id: string; observed_at: string; lifts_open: number | null; lifts_scheduled: number | null; lifts_total: number | null }[]>(
+          `${SUPABASE_URL}/rest/v1/operator_status?select=resort_id,observed_at,lifts_open,lifts_scheduled,lifts_total&observed_at=gte.${encodeURIComponent(since)}&order=observed_at.desc,resort_id.asc&limit=1000&offset=${offset}`,
+        )) ?? [];
+      for (const r of rows) {
+        const list = out.get(r.resort_id) ?? [];
+        list.push({ observedAt: r.observed_at, liftsOpen: r.lifts_open, liftsScheduled: r.lifts_scheduled, liftsTotal: r.lifts_total });
+        out.set(r.resort_id, list);
+      }
+      if (rows.length < 1000) break;
+    }
+  } catch (err) {
+    console.warn(`[score-sync] operator readings not read (${err instanceof Error ? err.message : String(err)}); using the newest row only`);
+    return new Map();
+  }
+  return out;
+}
+
 async function fetchReports(resortId: string, since: string): Promise<ReportRow[]> {
   return getJson<ReportRow[]>(
     `${SUPABASE_URL}/rest/v1/snow_reports?resort_id=eq.${resortId}&updated_at=gte.${addDays(since, -REPORT_MAX_AGE_DAYS)}T00:00:00Z&select=source,updated_at,base_depth,new_snow_24h,new_snow_48h,swe_in,pct_of_normal,conditions&order=updated_at.asc&limit=2000`,
@@ -316,9 +347,10 @@ function forecastForDay(runs: readonly StoredRun[], day: string): { total7dCm: n
   return { total7dCm: blend.total7dCm, modelCount: blend.modelCount, tempMaxC: blend.days[0].tempMaxC };
 }
 
-function operatorReport(row: OperatorRow | undefined): OperatorReport | null {
+function operatorReport(row: OperatorRow | undefined, readings?: OperatorReading[]): OperatorReport | null {
   if (!row?.observed_at) return null;
   return {
+    readings: readings?.length ? readings : null,
     source: row.source,
     sourceId: row.source_id,
     observedAt: row.observed_at,
@@ -346,7 +378,7 @@ async function main(): Promise<void> {
   const since = days[0];
   console.log(`[score-sync] ${now.toISOString()} ${SCORE_VERSION} days ${since} → ${today} (${days.length})${dryRun ? " (DRY RUN)" : ""}${onlySlug ? ` resort=${onlySlug}` : ""}`);
 
-  const [resorts, openings, operators] = await Promise.all([fetchResorts(), fetchOpenings(), fetchOperators()]);
+  const [resorts, openings, operators, operatorReadings] = await Promise.all([fetchResorts(), fetchOpenings(), fetchOperators(), fetchOperatorReadings()]);
   console.log(`[score-sync] ${resorts.length} active resort(s), ${openings.size} opening rows, ${operators.size} operator rows`);
 
   let scored = 0;
@@ -363,7 +395,7 @@ async function main(): Promise<void> {
       const results: ScoreResult[] = [];
       for (const day of days) {
         // The operator feed is an observation of now, so only today's row reads it; past days rest on the dates.
-        const status = deriveStatus({ opening, hemisphere, localDate: day, operator: day === today ? operatorReport(operators.get(resort.id)) : null, now: day === today ? now : new Date(`${day}T23:59:59Z`) });
+        const status = deriveStatus({ opening, hemisphere, localDate: day, operator: day === today ? operatorReport(operators.get(resort.id), operatorReadings.get(resort.id)) : null, now: day === today ? now : new Date(`${day}T23:59:59Z`), timeZone: resortTimeZone(resort) });
         const input = buildScoreInput({
           date: day,
           hasStation,

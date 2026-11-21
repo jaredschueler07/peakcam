@@ -1,0 +1,23 @@
+{
+  "name": "Boreal",
+  "url": {
+    "host": "https://www.rideboreal.com",
+    "pathname": "/the-mountain/the-mountain/trail-lift-info/full-trail-report"
+  },
+  "api": {
+    "host": "https://api.rideboreal.com",
+    "pathname": "/api/v1/dor/drupal/lifts"
+  },
+  "tags": [
+    "California",
+    "Lake Tahoe",
+    "Powdr"
+  ],
+  "ll": [
+    -120.270203,
+    39.316502
+  ],
+  "twitter": "borealmtn",
+  "opening": "2017-11-09",
+  "noaa": "REV/27,100"
+}

@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
-import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition, PowderProbability, PowderProbabilityForecast, PowderProbabilityWindow, ResortStationJoined, StationObservation, StationRole, StationRow, OperatorStatusRow, ResortScoreRow } from "./types";
+import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition, PowderProbability, PowderProbabilityForecast, PowderProbabilityWindow, ResortStationJoined, StationObservation, StationRole, StationRow, OperatorStatusRow, OperatorRecentReading, ResortScoreRow } from "./types";
 import type { ResortOpening } from "./openings";
 import type { StationNormalsSummary } from "./resort-faq";
 import { withResolvedCamNames } from "./cam-name";
@@ -9,6 +9,7 @@ import { shapeTimelapses, type CamTimelapseRow, type CamTimelapses } from "./cam
 import { assembleStoredRuns, latestRunsPerModel, type ForecastDailyRow, type ForecastRunRow, type ForecastScoreRow, type StoredForecast } from "./forecast/store";
 import type { CumulativeNormalRow, DailyRow, MonthlyNormalRow, NormalWindow } from "./snow-history";
 import type { SeasonAggregateRow } from "./leaderboards";
+import { buildHubLiftsIndex, type HubLifts, type HubLiftsResort } from "./hub-lifts";
 
 // ─────────────────────────────────────────────────────────────
 // Client
@@ -629,15 +630,69 @@ async function fetchLatestOperatorStatusIndex(): Promise<Record<string, Operator
   for (const row of (data ?? []) as OperatorStatusRow[]) {
     if (row.resort_id) out[row.resort_id] = row;
   }
+  // The day rules (lib/operator-day.ts) read every reading of the resort's
+  // local day, not only the newest. Fail soft: without these the latest row
+  // is the day's only reading.
+  const recent = await fetchRecentOperatorReadings().catch(() => null);
+  if (recent) {
+    for (const [resortId, readings] of Object.entries(recent)) {
+      if (out[resortId]) out[resortId] = { ...out[resortId], recent: readings };
+    }
+  }
+  return out;
+}
+
+/** How far back the day rules can need a reading: a local day is at most 24 h old, plus slack for the zone spread. */
+const OPERATOR_RECENT_HOURS = 30;
+const OPERATOR_RECENT_PAGE = 1000;
+/** ~93 resorts × 20 runs a day is under 2,000 rows in the window; the cap bounds a runaway table. */
+const OPERATOR_RECENT_MAX_PAGES = 5;
+
+/**
+ * Every resort's readings from the last 30 h, newest first, slim columns,
+ * one filtered scan paged past PostgREST's 1,000-row cap. Served by
+ * `operator_status_observed_idx` (migration 033) when it exists; without it
+ * the planner scans the table, which is small (about 1,900 rows a day).
+ */
+async function fetchRecentOperatorReadings(): Promise<Record<string, OperatorRecentReading[]>> {
+  const since = new Date(Date.now() - OPERATOR_RECENT_HOURS * 3_600_000).toISOString();
+  const out: Record<string, OperatorRecentReading[]> = {};
+  for (let page = 0; page < OPERATOR_RECENT_MAX_PAGES; page++) {
+    const from = page * OPERATOR_RECENT_PAGE;
+    const { data, error } = await supabase
+      .from("operator_status")
+      .select("resort_id, observed_at, lifts_open, lifts_scheduled, lifts_total")
+      .gte("observed_at", since)
+      .order("observed_at", { ascending: false })
+      .order("resort_id", { ascending: true })
+      .range(from, from + OPERATOR_RECENT_PAGE - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as (OperatorRecentReading & { resort_id: string })[];
+    for (const { resort_id, ...reading } of rows) {
+      if (!resort_id) continue;
+      (out[resort_id] ??= []).push(reading);
+    }
+    if (rows.length < OPERATOR_RECENT_PAGE) break;
+  }
   return out;
 }
 
 /** The newest operator report per resort, keyed by resort id; `{}` before migration 032. */
 export const getLatestOperatorStatusIndex = unstable_cache(
   fetchLatestOperatorStatusIndex,
-  ["peakcam:operator-status:v1", supabaseUrl],
+  ["peakcam:operator-status:v2", supabaseUrl],
   { revalidate: PUBLIC_API_STATIONS_REVALIDATE_SECONDS, tags: ["peakcam-resort-catalog"] },
 );
+
+/**
+ * Current lift counts per resort id for the hub and pass tables
+ * (lib/hub-lifts.ts). Fails soft: a missing view or a failed read gives an
+ * empty index, so the tables render without the lift column's data.
+ */
+export async function getHubLiftsIndex(now: Date, resorts: readonly HubLiftsResort[] = []): Promise<Record<string, HubLifts>> {
+  const operatorIndex = await getLatestOperatorStatusIndex().catch(() => ({}));
+  return buildHubLiftsIndex(operatorIndex, now, resorts);
+}
 
 // ─────────────────────────────────────────────────────────────
 // Snow Score (migration 028; written by scripts/score-sync.ts, P7).

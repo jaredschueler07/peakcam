@@ -1,0 +1,17 @@
+{
+  "name": "49 Degrees North",
+  "url": {
+    "host": "https://new.ski49n.com",
+    "pathname": "/mountain-info/trail-status"
+  },
+  "tags": [
+    "Washington"
+  ],
+  "ll": [
+    -117.564011,
+    48.302353
+  ],
+  "twitter": "49DegreesNorth",
+  "opening": "2017-12-01",
+  "noaa": "OTX/141,121"
+}

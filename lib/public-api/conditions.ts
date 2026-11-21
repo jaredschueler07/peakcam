@@ -61,6 +61,9 @@ export function operatorReportFromRow(row: OperatorStatusRow | null | undefined)
     surface: row.surface ?? null,
     openingDate: row.opening_date ?? null,
     verified: Boolean(row.verified),
+    readings: row.recent?.length
+      ? row.recent.filter((r) => r.observed_at).map((r) => ({ observedAt: r.observed_at, liftsOpen: num(r.lifts_open), liftsScheduled: num(r.lifts_scheduled), liftsTotal: num(r.lifts_total) }))
+      : null,
   };
 }
 
@@ -105,6 +108,7 @@ export function buildResortConditions(resort: ResortWithData, options: Condition
     hasStation: Boolean(resort.snotel_station_id),
     opening: options.opening ?? null,
     operator: operatorReportFromRow(options.operator),
+    timeZone,
     profile: { liftsTotal: num(resort.lifts_total), runsTotal: num(resort.runs_total) },
     measured: measuredNow.map((m) => ({ role: m.role, source: m.source, observedAt: m.observedAt, snowDepthIn: m.snowDepthIn, tempF: m.tempF, windMph: m.windMph })),
     forecast: blended ? { next48hCm: blended.blend.next48hCm, issuedAt: blended.issuedAt } : null,

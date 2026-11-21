@@ -7,6 +7,7 @@
 // can write it to disk for `npx @redocly/cli lint`.
 // ─────────────────────────────────────────────────────────────
 
+import { openResponseSchema, REQUEST_SCHEMA_IDS } from "./open-schema";
 import { z } from "zod";
 import { SITE_URL } from "@/lib/site";
 import {
@@ -29,7 +30,8 @@ function componentSchemas(): Record<string, JsonObject> {
   });
   const out: Record<string, JsonObject> = {};
   for (const [id, schema] of Object.entries(schemas as Record<string, JsonObject>)) {
-    const rest = { ...schema };
+    // Response schemas are published open; request bodies stay closed (open-schema.ts).
+    const rest = { ...(REQUEST_SCHEMA_IDS.has(id) ? schema : openResponseSchema(schema)) };
     delete rest.$schema;
     delete rest.$id;
     out[id] = rest;
@@ -82,6 +84,7 @@ export function deprecationPolicyText(baseUrl: string): string {
     `A removal is announced at least ${DEPRECATION_POLICY.noticeMonths} months ahead: the affected operation starts answering with a \`Deprecation\` header (RFC 9745, the announcement date) and a \`Sunset\` header (RFC 8594, the earliest removal date) plus \`Link: <changelog>; rel="sunset"\`, its summary in this document gains "Deprecated:" with the replacement, and the same notice appears in ${baseUrl}/llms-full.txt and on ${baseUrl}/connect. `,
     `Current operations carry neither header. A new major version is published at its own base path (/api/v2) and the previous one keeps answering for the full notice period after the new one is announced. `,
     `The MCP server (${baseUrl}/api/mcp) follows the same rule for tool names and argument shapes: a renamed tool keeps its old name registered, marked deprecated in its description, for ${DEPRECATION_POLICY.noticeMonths} months.`,
+    ` Response schemas are open: a client must ignore properties it does not recognise, in REST responses and in MCP tool results alike, and must not validate against a stored copy of a schema as if it were closed.`,
   ].join("");
 }
 
