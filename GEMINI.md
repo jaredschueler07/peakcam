@@ -1,6 +1,6 @@
 # PeakCam — Agent Quick Reference
 
-PeakCam (`https://www.peakcam.io`) is a live mountain webcam, snow telemetry, and multi-model snow forecast aggregator for ski resorts across the Americas (318 active resorts across US/CA/CL/AR, 963 cam rows, 699 weather stations, 9-model 14-day forecast blend, 10-season SNOTEL history, Snow Score 0–100, 38 route handlers under `app/api/`, and 21 read-only MCP tools at `/api/mcp`).
+PeakCam (`https://www.peakcam.io`) is a live mountain webcam, snow telemetry, and multi-model snow forecast aggregator for ski resorts across the Americas (318 active resorts across US/CA/CL/AR, 1,040 cam rows, 699 weather stations, 9-model 14-day forecast blend, 10-season SNOTEL history, Snow Score 0–100, 37 route handlers under `app/api/`; the public MCP server was retired on 2026-11-21).
 
 ## Primary Tech Stack
 
@@ -52,7 +52,7 @@ npm run cam-timelapse               # Render 24h MP4 timelapses & storm reels
 
 - **Server + ISR Read Path:** Data-bearing pages are thin Server Components (`export const revalidate = 3600`) fetching via `lib/supabase.ts` and passing props to `"use client"` views. `dynamicParams = false` applies to `/resorts/[slug]`, `/resorts/[slug]/snow-report`, `/resorts/[slug]/webcams`, `/snow-report/[hub]`, `/ski-cams/[hub]`, `/passes/[pass]`, and `/.well-known/schemas/[file]` (while `/resorts/[slug]/snow-forecast` and `/resorts/[slug]/history` render on-demand with hourly ISR). `snow_reports` is append-only and queried through `latest_snow_reports` (keep index-friendly under the anon 3s `statement_timeout`).
 - **CSV → Supabase Split:** Merging edits to `data/*.csv` (`resorts.csv`, `cams.csv`, `resort-profiles.csv`, `resort-openings.csv`) does **not** update live Supabase on Vercel — run the corresponding owner-approved importer/seed script (`npm run import-resorts:standalone`, `npm run seed-openings`, `npx tsx scripts/import-profiles.ts`) and redeploy so `dynamicParams = false` routes pick up new slugs.
-- **Markdown & Agent Surface:** Resort pages, hubs, and `/` expose `…/index.md` markdown alternates, structured JSON-LD, `/api/v1/*` JSON endpoints (with provenance envelopes and Open-Meteo attribution), deterministic `/api/v1/ask` + `/ask`, and `/api/mcp` (`io.peakcam/snow` + stdio bridge in `packages/peakcam-mcp/`).
+- **Markdown & Agent Surface:** Resort pages, hubs, and `/` expose `…/index.md` markdown alternates, structured JSON-LD, `/api/v1/*` JSON endpoints (with provenance envelopes and Open-Meteo attribution), and the deterministic `/api/v1/ask` + `/ask`. `/api/mcp` answers 410 since 2026-11-21; `lib/mcp/` is the internal tool layer those answer endpoints call.
 - **Drop In (`lib/game/`):** Deterministic simulation lives in `lib/game/{core,physics,terrain,replay}` — `eslint.config.mjs` forbids React, DOM, `three`, network, audio, analytics, and browser globals there. `tests/drop-in-v1-parity.test.ts` guards v1 parity.
 
 ## Safety & Verification Guardrails
