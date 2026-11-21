@@ -45,6 +45,9 @@ class PhaseAndSlrTest(unittest.TestCase):
     def test_slr_table(self) -> None:
         tw = np.array([-20.0, -12.0, -5.0, 0.0, 1.2, 3.0])
         np.testing.assert_allclose(slr(tw), [22.0, 19.0, 14.0, 9.0, 5.0, 0.0])
+        nonfinite = slr(np.array([np.nan, np.inf, -np.inf, -5.0]))
+        self.assertTrue(np.all(np.isnan(nonfinite[:3])))
+        self.assertEqual(float(nonfinite[3]), 14.0)
 
     def test_wet_bulb_below_temp_when_unsaturated(self) -> None:
         tw = wet_bulb_c(np.array([0.0]), np.array([-5.0]))

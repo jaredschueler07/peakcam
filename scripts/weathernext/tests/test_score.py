@@ -50,6 +50,14 @@ class ScoreTest(unittest.TestCase):
             brier_score(np.array([1.2]), np.array([1.0]))
         with self.assertRaises(ValueError):
             brier_score(np.array([0.5]), np.array([2.0]))
+        with self.assertRaises(ValueError):
+            brier_score(np.array([np.nan]), np.array([1.0]))
+        with self.assertRaises(ValueError):
+            brier_score(np.array([np.inf]), np.array([1.0]))
+        with self.assertRaises(ValueError):
+            brier_score(np.array([0.5]), np.array([np.nan]))
+        with self.assertRaises(ValueError):
+            brier_skill_score(np.array([0.5, 0.5]), np.array([1.0, np.nan]))
 
 
 if __name__ == "__main__":
