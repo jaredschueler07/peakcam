@@ -6,6 +6,7 @@
 // disagree.
 // ─────────────────────────────────────────────────────────────
 
+import { openResponseSchema, REQUEST_SCHEMA_IDS } from "./open-schema";
 import { z } from "zod";
 import { SITE_URL } from "@/lib/site";
 import { PUBLIC_API_VERSION, publicApiRegistry } from "./schema";
@@ -57,7 +58,9 @@ export function buildJsonSchemas(baseUrl: string = SITE_URL): Record<string, Jso
   });
   const out: Record<string, JsonObject> = {};
   for (const [id, schema] of Object.entries(schemas as Record<string, JsonObject>)) {
-    out[schemaFileStem(id)] = { ...schema, title: id, "x-peakcam-api-version": PUBLIC_API_VERSION };
+    // Response schemas are published open; request bodies stay closed (open-schema.ts).
+    const body = REQUEST_SCHEMA_IDS.has(id) ? schema : openResponseSchema(schema);
+    out[schemaFileStem(id)] = { ...body, title: id, "x-peakcam-api-version": PUBLIC_API_VERSION };
   }
   return out;
 }
