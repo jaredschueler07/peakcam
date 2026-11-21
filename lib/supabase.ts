@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { readAllPages } from "@/lib/paged-read";
 import { unstable_cache } from "next/cache";
 import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition, PowderProbability, PowderProbabilityForecast, PowderProbabilityWindow, ResortStationJoined, StationObservation, StationRole, StationRow, OperatorStatusRow, OperatorRecentReading, ResortScoreRow } from "./types";
 import type { ResortOpening } from "./openings";
@@ -709,13 +710,22 @@ const SCORE_COLUMNS = "resort_id, date, score, rating, components, scored_by";
 
 async function fetchLatestScoresIndex(): Promise<Record<string, ResortScoreRow>> {
   const since = new Date(Date.now() - SCORE_CURRENT_MAX_AGE_DAYS * 86_400_000).toISOString().slice(0, 10);
-  const { data, error } = await supabase.from("resort_scores").select(SCORE_COLUMNS).gte("date", since).order("date", { ascending: false }).limit(2000);
-  if (error) {
-    if (MISSING_TABLE_CODES.has(error.code)) return {};
+  // Paged: the window holds a row per resort per day (about 1,270 at 318
+  // resorts) and PostgREST returns 1,000 at most, whatever `limit` says.
+  // `resort_id` ends the ORDER BY so pages neither repeat nor skip a row.
+  let data: ResortScoreRow[];
+  try {
+    data = await readAllPages<ResortScoreRow>(async (from, to) => {
+      const page = await supabase.from("resort_scores").select(SCORE_COLUMNS).gte("date", since).order("date", { ascending: false }).order("resort_id", { ascending: true }).range(from, to);
+      if (page.error) throw page.error;
+      return (page.data ?? []) as unknown as ResortScoreRow[];
+    });
+  } catch (error) {
+    if (MISSING_TABLE_CODES.has((error as { code?: string }).code ?? "")) return {};
     throw error;
   }
   const out: Record<string, ResortScoreRow> = {};
-  for (const row of (data ?? []) as ResortScoreRow[]) {
+  for (const row of data) {
     if (row.resort_id && !out[row.resort_id]) out[row.resort_id] = row;
   }
   return out;

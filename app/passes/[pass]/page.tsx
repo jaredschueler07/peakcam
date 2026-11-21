@@ -14,8 +14,9 @@ import { QuotableLine } from "@/components/snow-report/QuotableLine";
 // /passes/{pass} — the resorts whose profile names the pass, ranked by
 // measured base with today's numbers (parity plan P10). The five slugs are
 // the SEASON_PASSES enum, so the set is fixed and anything else is a router
-// 404. Hourly ISR like every data-bearing page.
-export const revalidate = 3600;
+// 404. 15-minute ISR (not the usual hour): the lift cells follow the
+// operator index, which refreshes every 15 minutes.
+export const revalidate = 900;
 export const dynamicParams = false;
 
 export function generateStaticParams() {

@@ -497,20 +497,42 @@ export function countsTowardDisable(check, lat, date) {
 
 // ─── Step 1: Fetch all cams ─────────────────────────────────────────────
 
+/** PostgREST returns at most this many rows per request, whatever `limit` asks for. */
+export const CAMS_PAGE_SIZE = 1000;
+
+/**
+ * Every row behind `fetchPage(offset, limit)`, which must return rows in a
+ * stable order. The run of 2026-11-21 read 1,000 of 1,044 cams in a single
+ * request: the last 44 by id (38 of them active) were never probed, so they
+ * kept an old `last_checked_at` and could neither fail nor recover.
+ */
+export async function fetchAllPaged(fetchPage, pageSize = CAMS_PAGE_SIZE, maxPages = 100) {
+  const out = [];
+  for (let page = 0; page < maxPages; page++) {
+    const rows = await fetchPage(page * pageSize, pageSize);
+    if (!Array.isArray(rows)) throw new Error("cams page was not an array");
+    out.push(...rows);
+    if (rows.length < pageSize) return out;
+  }
+  throw new Error(`more than ${maxPages} pages of ${pageSize} cams`);
+}
+
 async function fetchAllCams() {
   const url = `${SUPABASE_URL}/rest/v1/cams?select=id,name,resort_id,embed_type,embed_url,youtube_id,is_active,auto_disabled,consecutive_failures&order=id`;
   // Use the service role key (bypasses RLS) rather than the anon key: the
   // "Public cams read" RLS policy restricts anon reads to is_active=true,
   // which would hide auto-disabled cams from every future run and make
   // auto-recovery unreachable in practice.
-  const resp = await fetch(url, {
-    headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-    },
+  return fetchAllPaged(async (offset, limit) => {
+    const resp = await fetch(`${url}&limit=${limit}&offset=${offset}`, {
+      headers: {
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+      },
+    });
+    if (!resp.ok) throw new Error(`Supabase cams fetch failed: ${resp.status}`);
+    return resp.json();
   });
-  if (!resp.ok) throw new Error(`Supabase cams fetch failed: ${resp.status}`);
-  return resp.json();
 }
 
 /** resort id → latitude, for the off-season guard. Read-only. */

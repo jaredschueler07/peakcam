@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { ResortOpening } from "./openings";
+import { statusChipDisplay } from "./conditions-contract";
 import {
   BASE_CONFIDENCE,
   CONDITION_FIELD_NAMES,
@@ -455,4 +456,14 @@ test("day status: without attached readings the newest row is the day's only rea
   // 15:35 is outside core hours: not CLOSED_TODAY (the 19:45 Central score run reads this shape).
   assert.equal(s.status, "OPEN");
   assert.equal(s.basis, "date");
+});
+
+test("statusChipDisplay: an OPEN status on a scheduled lift day reads Opens today, everything else keeps its label", () => {
+  assert.deepEqual(statusChipDisplay("OPEN", "scheduled"), { label: "Opens today", variant: "opens-today" });
+  assert.deepEqual(statusChipDisplay("OPEN", "operated"), { label: "Open", variant: "status" });
+  assert.deepEqual(statusChipDisplay("OPEN", null), { label: "Open", variant: "status" });
+  assert.deepEqual(statusChipDisplay("OPEN"), { label: "Open", variant: "status" });
+  // The scheduled state never softens a status that is not OPEN.
+  assert.deepEqual(statusChipDisplay("CLOSED_TODAY", "scheduled"), { label: "Closed today", variant: "status" });
+  assert.deepEqual(statusChipDisplay("PRE_SEASON", "scheduled"), { label: "Pre-season", variant: "status" });
 });

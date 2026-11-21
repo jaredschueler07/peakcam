@@ -25,6 +25,7 @@ import {
   type Hub,
 } from "@/lib/hubs";
 import {
+  FEATURED_HUB_CAMS_CAPTION,
   HUB_EDITORIAL,
   buildHubFaq,
   buildHubMetaDescription,
@@ -39,7 +40,12 @@ import {
 } from "@/lib/hub-copy";
 import { SITE_URL } from "@/lib/site";
 
-export const revalidate = 3600;
+// 15 minutes, not the usual hour: the lift chips come from the operator index
+// (15-minute cache over a 30-minute sync) and an hourly page left the table
+// up to an hour behind the resort after first chair (2026-11-21). The page
+// makes no third-party request: getAllResorts() and getHubLiftsIndex() are
+// both cached Supabase reads.
+export const revalidate = 900;
 
 // Reject any slug not returned by generateStaticParams at the router layer,
 // before the page function runs — otherwise Next's full-route cache would
@@ -245,7 +251,7 @@ export default async function HubPage({ params }: { params: Params }) {
               <h2 id="hub-cams-heading" className="font-display text-2xl font-black tracking-[-0.01em] text-ink">
                 Featured cams
               </h2>
-              <p className="text-sm text-bark">The first live YouTube cam from the best-rated resorts. Nothing plays until you ask.</p>
+              <p className="text-sm text-bark">{FEATURED_HUB_CAMS_CAPTION}</p>
             </div>
             <div className="mt-4">
               <HubFeaturedCams featured={featured} />
