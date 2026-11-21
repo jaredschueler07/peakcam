@@ -1,0 +1,21 @@
+{
+  "name": "Deer Valley",
+  "url": {
+    "host": "https://www.deervalley.com",
+    "pathname": "/explore-the-mountain/mountain-report#/lifts"
+  },
+  "api": {
+    "host": "https://mtnpowder.com",
+    "pathname": "/feed/49/lifts"
+  },
+  "tags": [
+    "Utah"
+  ],
+  "opening": "2017-12-02",
+  "ll": [
+    -111.489555,
+    40.620499
+  ],
+  "twitter": "skideervalley",
+  "noaa": "SLC/113,167"
+}

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAllResorts } from "@/lib/supabase";
+import { getAllResorts, getHubLiftsIndex } from "@/lib/supabase";
 import { SEASON_PASSES } from "@/lib/resort-profile";
 import { PASS_BASE_PATH, PASS_INFO, buildPassPage, isSeasonPassSlug, passDescription, passMarkdownPath, passPath, passTitle } from "@/lib/passes";
 import { SITE_URL } from "@/lib/site";
@@ -14,8 +14,9 @@ import { QuotableLine } from "@/components/snow-report/QuotableLine";
 // /passes/{pass} — the resorts whose profile names the pass, ranked by
 // measured base with today's numbers (parity plan P10). The five slugs are
 // the SEASON_PASSES enum, so the set is fixed and anything else is a router
-// 404. Hourly ISR like every data-bearing page.
-export const revalidate = 3600;
+// 404. 15-minute ISR (not the usual hour): the lift cells follow the
+// operator index, which refreshes every 15 minutes.
+export const revalidate = 900;
 export const dynamicParams = false;
 
 export function generateStaticParams() {
@@ -43,7 +44,9 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 export default async function PassPage({ params }: { params: Params }) {
   const { pass } = await params;
   if (!isSeasonPassSlug(pass)) return notFound();
-  const page = buildPassPage(pass, await getAllResorts());
+  const resorts = await getAllResorts();
+  const lifts = await getHubLiftsIndex(new Date(), resorts);
+  const page = buildPassPage(pass, resorts, SITE_URL, lifts);
   const { info } = page;
   const title = passTitle(page);
   const description = passDescription(page);

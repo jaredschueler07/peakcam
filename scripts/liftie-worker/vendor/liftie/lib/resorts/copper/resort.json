@@ -1,0 +1,22 @@
+{
+  "name": "Copper Mountain",
+  "url": {
+    "host": "https://www.coppercolorado.com",
+    "pathname": "/the-mountain/trail-lift-info/winter-trail-report"
+  },
+  "api": {
+    "host": "https://api.coppercolorado.com",
+    "pathname": "/api/v1/dor/drupal/lifts"
+  },
+  "tags": [
+    "Colorado",
+    "Powdr"
+  ],
+  "opening": "2017-11-10",
+  "ll": [
+    -106.155998,
+    39.501125
+  ],
+  "twitter": "CopperMtn",
+  "noaa": "BOU/22,54"
+}

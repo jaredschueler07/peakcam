@@ -1,0 +1,18 @@
+{
+  "name": "Burke Mountain",
+  "url": {
+    "host": "https://www.skiburke.com",
+    "pathname": "/ski-ride/weather-conditions"
+  },
+  "tags": [
+    "Vermont",
+    "New England"
+  ],
+  "ll": [
+    -71.91745,
+    44.587898
+  ],
+  "twitter": "skiburke",
+  "opening": "2017-12-01",
+  "noaa": "BTV/130,69"
+}

@@ -1,6 +1,12 @@
 // ─────────────────────────────────────────────────────────────
 // Liftie (https://liftie.info) — operator lift status, parsed and normalised.
 //
+// Since 2026-11-20 the sync does not call liftie.info: it runs Liftie's
+// parsers itself (lib/operators/liftie-local.ts, scripts/liftie-worker/) and
+// uses this module for the report shape, the row and the slug mapping. The
+// API reader below stays for `operator-sync --liftie-api` and the dormant
+// pipeline adapter.
+//
 // Liftie is an open-source aggregator (github.com/pirxpilot/liftie, BSD-3)
 // that parses each resort's own lift-status page once a minute while anyone
 // is watching and publishes the result at
@@ -16,8 +22,7 @@
 // 2026-10-20 from the Air and the Mac mini: HTTP 403, `cf-mitigated:
 // challenge`, an HTML "Just a moment" body), so the fetcher names that case
 // as `blocked` rather than reporting a parse error, and the sync job counts
-// it. PeakCam never scrapes an operator's HTML itself; Liftie is the only
-// operator source in this block.
+// it.
 // ─────────────────────────────────────────────────────────────
 
 export const LIFTIE_API = "https://liftie.info/api/resort";
@@ -196,8 +201,11 @@ export interface OperatorStatusInsert {
   payload: Record<string, unknown>;
 }
 
-/** A report → the row to store. Lift counts are null, not zero, when the document listed no lifts at all. */
-export function operatorStatusRow(resortId: string, report: LiftieReport, fetchedAt: Date): OperatorStatusInsert {
+/**
+ * A report → the row to store. Lift counts are null, not zero, when the document listed no lifts at all.
+ * `via` names how the report was obtained (for example `liftie-parsers@4.4.2`) and is kept in the payload.
+ */
+export function operatorStatusRow(resortId: string, report: LiftieReport, fetchedAt: Date, via?: string): OperatorStatusInsert {
   const hasLifts = report.stats.total > 0;
   return {
     resort_id: resortId,
@@ -218,7 +226,7 @@ export function operatorStatusRow(resortId: string, report: LiftieReport, fetche
     opening_date: report.openingDate,
     source_url: report.sourceUrl,
     verified: false,
-    payload: { lifts: report.lifts, stats: report.stats, timestamped: report.timestamped, liftieName: report.name },
+    payload: { lifts: report.lifts, stats: report.stats, timestamped: report.timestamped, liftieName: report.name, ...(via ? { via } : {}) },
   };
 }
 

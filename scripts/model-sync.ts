@@ -21,6 +21,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { getOpenMeteoSnapshot } from "../lib/open-meteo.js";
+import { countFailure, emptyTally, formatFailureLine, formatRunWindow, formatTally, type OpenMeteoFailure } from "../lib/open-meteo-failure.js";
 import {
   computeConditions,
   type ConditionsInput,
@@ -219,7 +220,8 @@ async function updateResortRating(resortId: string, condRating: string): Promise
 const DEPTH_TREND_THRESHOLD_IN = 2.0; // vs. the 0.5in default tuned for SWE
 
 async function main(): Promise<void> {
-  console.log(`[model-sync] Starting model-based sync${dryRun ? " (DRY RUN)" : ""}...\n`);
+  const startedAt = new Date();
+  console.log(`[model-sync] ${startedAt.toISOString()} Starting model-based sync${dryRun ? " (DRY RUN)" : ""}...\n`);
 
   const resorts = await fetchResorts();
   console.log(`[model-sync] Found ${resorts.length} resorts without a SNOTEL station\n`);
@@ -227,13 +229,22 @@ async function main(): Promise<void> {
   let success = 0;
   let failed = 0;
   let noData = 0;
+  const failures = emptyTally();
 
   for (const resort of resorts) {
     try {
       const elevationFt = resortElevationFt(resort);
-      const snapshot = await getOpenMeteoSnapshot(resort.lat, resort.lng, elevationFt);
+      let failure: OpenMeteoFailure | null = null;
+      const snapshot = await getOpenMeteoSnapshot(resort.lat, resort.lng, elevationFt, (f) => {
+        failure = f;
+      });
 
       if (!snapshot) {
+        // One line per failed request, with the status, any Retry-After and
+        // rate-limit headers and Open-Meteo's reason (lib/open-meteo-failure.ts).
+        const seen = failure as OpenMeteoFailure | null;
+        countFailure(failures, seen);
+        console.error(`  ${seen ? formatFailureLine(seen, resort.name) : `${new Date().toISOString()} Open-Meteo FAIL ${resort.name} class=other status=200 reason="response could not be parsed into a snapshot"`}`);
         console.log(`  SKIP ${resort.name} — Open-Meteo unreachable`);
         noData++;
         await sleep(300);
@@ -323,7 +334,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `\n[model-sync] Done. ${success} synced, ${noData} no data, ${failed} failed (of ${resorts.length} total)`,
+    `\n[model-sync] Done. ${success} synced, ${noData} no data, ${failed} failed (of ${resorts.length} total). Open-Meteo failures by class: ${formatTally(failures)}. Run ${formatRunWindow(startedAt, new Date())}.`,
   );
 }
 

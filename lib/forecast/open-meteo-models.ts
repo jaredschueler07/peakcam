@@ -18,6 +18,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { feetToMeters } from "@/lib/open-meteo";
+import { describeHttpFailure, describeThrownFailure, readFailureBody, type OpenMeteoFailureHandler } from "@/lib/open-meteo-failure";
 
 export const OPEN_METEO_ATTRIBUTION = "Weather data by Open-Meteo.com";
 export const OPEN_METEO_LICENSE = "CC BY 4.0";
@@ -209,13 +210,22 @@ export function buildModelsUrl(req: PointRequest): string {
  * as "no runs this time" and keep the last stored ones. `init` lets Next
  * callers pass `next: { revalidate }`.
  */
-export async function fetchModelRuns(req: PointRequest, init: RequestInit & { next?: { revalidate?: number } } = {}): Promise<ModelRun[] | null> {
+export async function fetchModelRuns(
+  req: PointRequest,
+  init: RequestInit & { next?: { revalidate?: number } } = {},
+  // The sync script passes this to log why a point failed; the result is unchanged.
+  onFailure?: OpenMeteoFailureHandler,
+): Promise<ModelRun[] | null> {
   try {
     const res = await fetch(buildModelsUrl(req), { signal: AbortSignal.timeout(OPEN_METEO_TIMEOUT_MS), ...init });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (onFailure) onFailure(describeHttpFailure(res, await readFailureBody(res), new Date()));
+      return null;
+    }
     const data = (await res.json()) as OpenMeteoMultiModelResponse;
     return parseModelRuns(data, req.models);
-  } catch {
+  } catch (err) {
+    onFailure?.(describeThrownFailure(err, new Date()));
     return null;
   }
 }

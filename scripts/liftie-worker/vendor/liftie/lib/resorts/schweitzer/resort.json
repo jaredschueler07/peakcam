@@ -1,0 +1,17 @@
+{
+  "name": "Schweitzer",
+  "url": {
+    "host": "http://www.schweitzer.com",
+    "pathname": "/mountain/snow-report/"
+  },
+  "tags": [
+    "Idaho"
+  ],
+  "ll": [
+    -116.643562,
+    48.538433
+  ],
+  "twitter": "SchweitzerID",
+  "opening": "2017-12-01",
+  "noaa": "OTX/172,127"
+}

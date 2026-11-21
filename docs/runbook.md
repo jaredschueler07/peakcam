@@ -48,13 +48,13 @@ service-role key in that checkout's `.env.local`, and log to the path in the las
 | Label | Script (`ProgramArguments`) | Schedule | Writes | Log |
 |---|---|---|---|---|
 | `com.peakcam.agents` | `node agents/loop.mjs` | always-on (`KeepAlive`, `RunAtLoad`) | `agent_memory`, Slack | `agents/loop.log` |
-| `com.peakcam.snotel-sync` | `npx tsx scripts/snotel-sync.ts` | every 6 h (`StartInterval` 21,600) | `snowpack_daily`, `snow_reports` (source `snotel`), `resorts.cond_rating`; IndexNow ping when `INDEXNOW_ENABLED=1` | `scripts/snotel-sync.log` |
-| `com.peakcam.model-sync` | `npx tsx scripts/model-sync.ts` | every 6 h (21,600) | `snow_reports` (source `open_meteo`) for the resorts without a station, `cond_rating` | `scripts/model-sync.log` |
+| `com.peakcam.snotel-sync` | `npx tsx scripts/snotel-sync.ts` | 00:15, 05:15, 06:15, 12:15, 18:15 Central (`StartCalendarInterval` ×5; two morning runs because NRCS has the day's values from about 11:00 UTC and sometimes answers 5xx) | `snowpack_daily`, `snow_reports` (source `snotel`), `resorts.cond_rating`; IndexNow ping when `INDEXNOW_ENABLED=1` | `scripts/snotel-sync.log` |
+| `com.peakcam.model-sync` | `npx tsx scripts/model-sync.ts` | 00:45, 06:45, 12:45, 18:45 Central (`StartCalendarInterval` ×4) | `snow_reports` (source `open_meteo`) for the resorts without a station, `cond_rating` | `scripts/model-sync.log` |
 | `com.peakcam.stations-sync` | `npx tsx scripts/stations-sync.ts` | hourly (3,600) | `stations`, `resort_stations`, `station_observations` (migration 026); never `snow_reports` | `scripts/stations-sync.log` |
-| `com.peakcam.forecast-sync` | `npx tsx scripts/forecast-sync.ts` | every 6 h (21,600, `RunAtLoad`) | `forecast_runs`, `forecast_daily` (027); ~240 Open-Meteo calls a run; retention pass after 00:00 UTC | `scripts/forecast-sync.log` |
+| `com.peakcam.forecast-sync` | `npx tsx scripts/forecast-sync.ts` | 01:05, 09:05, 17:05 Central (`StartCalendarInterval` ×3, no `RunAtLoad`) | `forecast_runs`, `forecast_daily` (027); ~240 Open-Meteo calls a run; retention pass in the 01:05 Central run only (`isPruneRun`, starts before 12:00 UTC) | `scripts/forecast-sync.log` |
 | `com.peakcam.forecast-score` | `npx tsx scripts/forecast-score.ts` | daily 07:30 (`StartCalendarInterval`) | `forecast_scores` (027), graded against SNOTEL depth deltas over 90 days | `scripts/forecast-score.log` |
 | `com.peakcam.score-sync` | `npx tsx scripts/score-sync.ts` | 07:45 and 19:45 (`StartCalendarInterval` ×2, `RunAtLoad`) | `resort_scores` (028): one 0–100 Snow Score row per resort per day with five components (`lib/score.ts`), idempotent on `(resort_id, date)`; **to deploy** (P7, 2026-10-20, see "Snow Score") | `scripts/score-sync.log` |
-| `com.peakcam.operator-sync` | `npx tsx scripts/operator-sync.ts` | 06:00 and 11:00 (`StartCalendarInterval` ×2) | `operator_status` (032) via Liftie; writes nothing while Liftie's Cloudflare challenge stands (exit 2, see "Operator status") | `scripts/operator-sync.log` |
+| `com.peakcam.operator-sync` | `npx tsx scripts/operator-sync.ts` | every 30 minutes, 07:05 to 16:35 Central (`StartCalendarInterval` ×20) | `operator_status` (032), read from each operator's own lift-status page with Liftie's parsers (see "Operator status"); exit 1 only when every resort fails | `scripts/operator-sync.log` |
 | `com.peakcam.cam-stills` | `npx tsx scripts/cam-capture-stills.ts` | every 15 min (900, `RunAtLoad`) | bucket `cam-stills`, `cams.still_url`, `cam_stills` (archive_allowed cams; 48 h / 6-h buckets to 30 d / keepers a year) | `scripts/cam-capture-stills.log` |
 | `com.peakcam.cam-timelapse` | `npx tsx scripts/cam-timelapse.ts` | every 6 h (21,600, `RunAtLoad`) | bucket `cam-timelapses`, `cam_timelapses` (031): the 24 h MP4 + poster per archive-allowed cam, storm reels | `scripts/cam-timelapse.log` |
 | `com.peakcam.cam-health-check` | `node scripts/cam-health-check.mjs` | daily 06:00 (`StartCalendarInterval`) | `cams.last_checked_at`, `consecutive_failures`, auto-disables dead cams | `scripts/cam-health-check.log` |
@@ -80,11 +80,29 @@ ssh mini "tail -5 /Users/maestro_admin/peakcam/peakcam/scripts/$JOB.log"
 ```
 
 `launchctl list | grep peakcam` prints `PID  last-exit  label`; a `-` PID is a scheduled job
-between runs, a non-zero exit is the script's own (operator-sync exits 2 while Liftie is
-blocked; cam-stills exits 3 if its 30-min watchdog trips). A pull alone is enough for a script change (each run starts a fresh process); a plist
+between runs, a non-zero exit is the script's own (operator-sync exits 1 when every resort
+fails; cam-stills exits 3 if its 30-min watchdog trips). A pull alone is enough for a script change (each run starts a fresh process); a plist
 change needs the reload. The dependency order when restarting everything: `snotel-sync` and
 `model-sync` first (they feed `snow_reports`), then `stations-sync`, `forecast-sync` (and the
 scorer the next morning), `cam-stills` before `cam-timelapse`.
+
+**Why three jobs run at fixed clock times (2026-11-20).** `snotel-sync`, `model-sync` and
+`forecast-sync` used `StartInterval` 21,600. launchd counts an interval from the end of the
+previous run, so each start drifted later every day (about 17 minutes for `snotel-sync`).
+Two things broke:
+
+- The powder-alert cron runs at 13:00 UTC (`vercel.json`) and reads `latest_snow_reports`.
+  By 2026-11-19 the morning SNOTEL run had drifted past 13:00 UTC, so alerts went out on the
+  previous day's numbers. The 06:15 and 06:45 Central runs now finish before 13:00 UTC in
+  both standard and daylight time.
+- Open-Meteo allows 10,000 weighted calls per UTC day per address. A forecast run costs about
+  2,631 and a model run about 330. Most UTC days held four forecast runs (10,524 + 1,320),
+  which ran the allowance out mid-afternoon. Three forecast runs and four model runs cost
+  about 9,213 and leave roughly 790 for local builds. `forecast-sync` no longer has
+  `RunAtLoad`, so reloading the job does not spend a run.
+
+To run one now, kickstart it; a kickstart does not move the calendar times. Count an extra
+forecast or model run against the same daily allowance before starting it.
 
 First-time deploy notes for the individual jobs follow; they are kept because each carries
 its dry-run and verification commands.
@@ -111,23 +129,6 @@ with unthinned history: `npx tsx scripts/cam-capture-stills.ts --prune-only --pr
 After the first run `select count(*) from cam_stills` should grow by roughly the number
 of archive-allowed active cams (249 on 2026-10-18) per run. The Studio runs only
 `com.peakcam.cam-check` and has no peakcam clone (checked 2026-10-18).
-
-**Hang hardening & watchdog (2026-11-07):** a healthy `cam-stills` run over ~570 cams at
-concurrency 4 takes ~15–17 min. On 2026-11-07 the 04:56 UTC run wedged for 13 h 37 m: an
-`ffmpeg` child ignored the `SIGTERM` that `execFile`'s timeout sends while it was blocked in TLS
-I/O, and after it was killed by hand a Supabase `fetch` without an `AbortSignal` hung too; launchd
-never starts a second instance, so no run happened. Now every `ffmpeg`/`ffprobe` `execFile` passes
-`killSignal: "SIGKILL"` (plus `-max_reload 2 -m3u8_hold_counters 2` on `.m3u8` inputs only; ffmpeg
-rejects them on other URLs), every fetch carries `AbortSignal.timeout` (20 s cam pages and images,
-30 s Supabase REST, 60 s uploads), and an unref'd 30-min run watchdog (`RUN_WATCHDOG_MS`) logs
-`[cam-stills] watchdog: run exceeded 30 min, exiting (in flight: …)` and exits **3**; launchd
-starts the next run at the next 900 s tick. Exit 3 in the log means a run was cut short, not that
-the job is down; repeated exit 3s mean one step keeps reaching its timeout, and the in-flight list
-names the cams. `pruneArchive()` deletes storage objects first, then the `cam_stills` rows, each
-tried twice; a batch that fails either step keeps its rows and is re-selected next run, so neither
-orphan objects nor permanent dead rows can accumulate, and the readers' `filterRetained()` hides
-doomed rows in between. `/api/v1/status` reports `checks.camStills` (degraded past
-`thresholds.stillMaxAgeHours = 2`).
 
 **Loading `com.peakcam.stations-sync` for the first time (parity block P3):** on the
 Mac mini as `maestro_admin`, pull `main`, prove the fetchers against public APIs with a
@@ -214,6 +215,49 @@ group by 1` (≈ 145 summit + 148 base after the first run), `select count(*) fr
 a day-1 pair). Then the production smoke checks under "Public API" below. Cadence or retention
 changes: `StartInterval` in the plist for the sync; `THIN_AFTER_DAYS` / `DELETE_AFTER_DAYS` in
 `lib/forecast/retention.ts`.
+
+### Cam health check: what each cam type is judged on
+
+`scripts/cam-health-check.mjs` (daily 06:00 Central). Three consecutive failures auto-disable a
+row (`is_active=false`, `auto_disabled=true`); an auto-disabled row keeps being probed and comes
+back on its first healthy check; a manually disabled row (`is_active=false`,
+`auto_disabled=false`) is never written beyond `last_checked_at`.
+
+| Cam | Healthy when | Fails with |
+|---|---|---|
+| `youtube` | the watch page says playable, embeddable and live now | `youtube: stream ended`, `youtube: unavailable`, `youtube: login required`, `youtube: not embeddable`, `youtube: not a live stream` |
+| `image` | HTTP 2xx, the body starts with JPEG/PNG/GIF/WebP bytes (or is `image/*` and not markup), and `Last-Modified`, when sent, is at most 5 days old (`IMAGE_STALE_DAYS`) | `image: not an image (<content type>)`, `image: frame N days old`, or the HTTP/TLS error |
+| camstreamer `…/embed/<id>` | the YouTube stream the embed page currently serves is live | `camstreamer → youtube: …` |
+| ipcamlive player | the provider's stream-state endpoint reports a stream | `ipcamlive: no stream` |
+| other `iframe` / `link` | HTTP status below 400 | the HTTP/TLS error |
+
+- **A probe that cannot reach a verdict never counts.** If the YouTube watch page cannot be
+  fetched or read (network error, consent or "not a bot" page, missing fields), the row is judged
+  on oEmbed as before and logged "liveness unknown". Same for a camstreamer page with no YouTube
+  id in it (the `/embed/<a>/<b>` and `/live/stream/<n>` forms do not expose one) and for an image
+  with no `Last-Modified` header.
+- **Off-season.** At a resort that is out of season (`isOffSeasonAt`, the same months as
+  `lib/map-utils` `isOffSeason`), "no stream" and "frame N days old" are recorded but not counted:
+  operators switch cameras off for the summer. A dead YouTube id counts in any season, because
+  the id never returns; a restarted stream gets a new one.
+- **Why (2026-11-20).** oEmbed answers 200 for any video that still exists, so 92 of 264 active
+  YouTube rows were ended streams shown as live; 21 active image rows had a frame between 10
+  days and 11 months old; three returned an HTML page with status 200.
+- **Reading the log.** The last lines are `Done. N/M cams healthy.`, the disabled / recovered /
+  TLS / off-season counts, and `Dead by rule: …` with one count per rule above plus the number
+  of rows whose YouTube liveness was unknown. A run with a few hundred "liveness unknown" means
+  YouTube is turning the job away, not that the cams are fine.
+- YouTube rows are paced about one a second, so a run takes several minutes longer than before.
+
+### Reading an Open-Meteo failure in the sync logs
+
+Since 2026-11-21 `forecast-sync` and `model-sync` print one line per failed Open-Meteo request (`lib/open-meteo-failure.ts`):
+
+```
+2026-11-21T07:12:30.000Z Open-Meteo FAIL Alta summit class=429 status=429 limit=minutely retry-after=60 x-ratelimit-remaining=0 reason="Minutely API request limit exceeded. Please try again in one minute."
+```
+
+`class` is one of `429`, `5xx`, `timeout` (the client's own abort), `network` (no response) or `other`; a 429 also carries `limit=minutely|hourly|daily|unstated`, read from Open-Meteo's reason text. The run's last line adds `Open-Meteo failures by class: …` (the 429s split by limit), `Run started …, ended …, took …` and, for `forecast-sync`, `Retention: N old runs pruned` or why it did not prune. Nothing is retried; the lines are for telling an allowance refusal from an outage.
 
 ## Launchd Services (Studio)
 
@@ -308,7 +352,7 @@ See `docs/alerts-verification.md` for the E2E run log.
 | Model sync (mini) | `~/peakcam/peakcam/scripts/model-sync.log` |
 | Station layer (mini) | `~/peakcam/peakcam/scripts/stations-sync.log`; `select max(observed_at) from station_observations` |
 | Forecast runs and scores (mini) | `~/peakcam/peakcam/scripts/forecast-sync.log`, `forecast-score.log`; `select max(issued_at) from forecast_runs` |
-| Operator status (mini) | `~/peakcam/peakcam/scripts/operator-sync.log` (`blocked` lines while Liftie challenges) |
+| Operator status (mini) | `~/peakcam/peakcam/scripts/operator-sync.log` (`OK` / `FAIL <class>` per resort, failure classes counted on the `Done.` line) |
 | Still capture + archive (mini) | `~/peakcam/peakcam/scripts/cam-capture-stills.log`; `select count(*), max(captured_at) from cam_stills` |
 | Timelapse renders (mini) | `~/peakcam/peakcam/scripts/cam-timelapse.log`; `select "window", count(*), max(rendered_at) from cam_timelapses group by 1` |
 | Cam health check (mini) | `~/peakcam/peakcam/scripts/cam-health-check.log` |
@@ -445,7 +489,7 @@ cached catalogue (`getAllResorts()`, 1 h) plus `resort_openings` and
 | `GET /api/v1/openapi.json` | OpenAPI 3.1, generated from the zod registry in `lib/public-api/schema.ts` | static, 1 h / 24 h CDN |
 | `GET /.well-known/api-catalog` | RFC 9727 linkset pointing at the OpenAPI document | static, 1 h / 24 h CDN |
 | `GET /api/v1/resorts/search-index` | Slug, name, aliases (`lib/ask/aliases.ts`), state, country, lat/lon, page URL per resort (P9) | 1 h / 24 h CDN |
-| `GET /api/v1/status` | Report freshness (≤ 12 h), cam health (≥ 90 % live) and cam-still archive freshness (≤ 2 h) with thresholds; 200 `degraded`, 503 only when the read throws (P9) | 5 min CDN |
+| `GET /api/v1/status` | Report freshness (≤ 12 h) and cam health (≥ 90 % live) with thresholds; 200 `degraded`, 503 only when the read throws (P9) | 5 min CDN |
 | `GET\|POST /api/v1/ask` | Deterministic answer endpoint (`lib/ask/*`): `?q=` or `{"query"}`; `AskAnswer` with `answerable`, `sentence`, `data`, `citations`; 400 only for a missing/oversized question (P9) | 900 s; `no-store` when unanswerable |
 | `GET\|POST /ask` | NLWeb-shaped wrapper over the same router (`query_id`, `results[]`, `peakcam`); excluded from `proxy.ts` like `/api/v1` (P9) | same |
 | `POST /api/v1/batch` | ≤ 10 GET paths (`{"requests":[{"path"}]}` or a string array) dispatched in-process to the route handlers, results in order; 400 names a disallowed path (P9) | `no-store` |
@@ -524,7 +568,7 @@ curl -s 'https://www.peakcam.io/ask?query=compare+vail+and+keystone' | jq '{quer
 curl -s https://www.peakcam.io/api/v1/batch -H 'content-type: application/json' -d '{"requests":[{"path":"/api/v1/resorts/alta"},{"path":"/api/v1/resorts/vail/cams"},{"path":"/api/v1/powder?state=UT&limit=3"},{"path":"/api/v1/nope"}]}' | jq '{status: .status, error}'   # 400 disallowed_path
 curl -s https://www.peakcam.io/api/v1/batch -H 'content-type: application/json' -d '{"requests":[{"path":"/api/v1/resorts/alta"},{"path":"/api/v1/status"}]}' | jq '.results[] | {path, status}'
 curl -s https://www.peakcam.io/api/v1/resorts/search-index | jq '{count, breck: (.resorts[] | select(.slug=="breckenridge") | .aliases)}'
-curl -s https://www.peakcam.io/api/v1/status | jq '{status, age: .checks.snowReports.ageHours, live: .checks.cams.liveRatio, stills: .checks.camStills.ageHours, issues}'
+curl -s https://www.peakcam.io/api/v1/status | jq '{status, age: .checks.snowReports.ageHours, live: .checks.cams.liveRatio, issues}'
 curl -s https://www.peakcam.io/.well-known/schemas | jq '.count'
 curl -s https://www.peakcam.io/.well-known/schemas/resort.json | jq '."$id"'
 curl -s https://www.peakcam.io/llms-full.txt | grep -c '^### '          # 21 tools + 20 REST routes = 41 (P7: get_score, score-components, snow-report)
@@ -580,7 +624,7 @@ are optional until their block lands.
 | `forecast_runs`, `forecast_daily` | 027 | `scripts/forecast-sync.ts` (`com.peakcam.forecast-sync`, every 6 h; live since P4, 2026-10-20) | `Resort.forecast` summary, `/resorts/{slug}/forecast`, `get_forecast`, the resort page strip |
 | `forecast_scores` | 027 | `scripts/forecast-score.ts` (`com.peakcam.forecast-score`, daily 07:30; rewrites per resort/model/window, `blend` row included) | `Resort.forecastScores`, `/resorts/{slug}/forecast-accuracy`, `compare_models` |
 | `resort_scores` | 028 | `scripts/score-sync.ts` (`com.peakcam.score-sync`, 07:45 and 19:45; P7, 2026-10-20), `scored_by = 'algorithmic'`, `components` jsonb keyed by `lib/score.ts SCORE_COMPONENT_IDS` | `Resort.score` (and `ScoreLight` on list / powder / compare rows), `/resorts/{slug}/score-components`, `/snow-report?sort=score`, MCP `get_score`, the resort page `#snow-score` card, the homepage strip, the markdown alternate |
-| `operator_status` + view `latest_operator_status` | 032 (P6, 2026-10-20) | `scripts/operator-sync.ts` (`com.peakcam.operator-sync`, 06:00 and 11:00) via `lib/operators/liftie.ts`; one row per fetch, idempotent on `(resort_id, source, observed_at)`; public read, no write policies | `/api/v1/resorts/{slug}/conditions` (`data.liftsOpen` …), the resort page status chip, `get_resort_conditions`, the markdown "Status and freshness" section |
+| `operator_status` + view `latest_operator_status` | 032 (P6, 2026-10-20) | `scripts/operator-sync.ts` (`com.peakcam.operator-sync`, every 30 minutes 07:05 to 16:35 Central) via `lib/operators/liftie-local.ts` and `scripts/liftie-worker/`; one row per fetch, idempotent on `(resort_id, source, observed_at)`; public read, no write policies | `/api/v1/resorts/{slug}/conditions` (`data.liftsOpen` …), the resort page status chip, `get_resort_conditions`, the markdown "Status and freshness" section |
 
 Elevations: `resorts.elevation_base_ft/summit_ft` are the canonical home from
 025 on (backfilled from `resort_metadata` for 145 resorts); `getResortElevationIndex()`
@@ -696,6 +740,8 @@ API's `version` says which formula is live, not which one scored an old row.
 
 ## Operator status (P6, migration 032)
 
+**How the status reads a day (2026-11-20, `lib/operator-day.ts`).** The site does not judge a resort by the newest reading alone. Over the resort's own calendar day: a reading with a lift open makes it "operated" (OPEN and the hub "Open" chip stay after the last chair, quoting the day's latest open count with its time); else lifts scheduled in the newest reading show "Opens today" until 16:00 local; else a reading between 10:00 and 15:00 local with nothing open or scheduled is CLOSED_TODAY when the season is on; a 0/0 reading outside those hours decides nothing and the opening dates do. Between local midnight and the day's first reading the previous day's last open count is carried, dated as yesterday's. The read behind it (`fetchRecentOperatorReadings`, last 30 h, paged) works without an index; `supabase/migrations/033_operator_status_observed_idx.sql` adds one on `observed_at` and should be applied by hand, as a single statement, when the table has grown (about 1,900 rows a day). **First chair (2026-11-21).** A reading taken before 08:00 resort time (`FIRST_CHAIR_HOUR`) that says lifts are open is read as the day's plan, not as lifts turning: Arapahoe Basin, Copper, Loveland and Winter Park mark planned lifts open from 06:05. Such a day is `scheduled` ("Opens today", "N lifts set to run today") until a reading at or after 08:00 shows a lift open, and an early flag is never carried overnight. `data.liftsOpen` still carries the feed's raw number.
+
 Branch `feat/p6-conditions`, parity plan block P6. The conditions contract
 (`lib/conditions-contract.ts`, served by `/api/v1/resorts/{slug}/conditions`, inside
 `get_resort_conditions`, on the resort page as the status chip and freshness labels, and in
@@ -705,30 +751,62 @@ of those is new: `operator_status` (one row per fetch) and `latest_operator_stat
 
 | Job | What | When | Notes |
 | --- | --- | --- | --- |
-| `com.peakcam.operator-sync` (`npm run operator-sync`) | For each of the 88 resorts mapped in `data/operator-sources.json`, GET `https://liftie.info/api/resort/<id>` (Liftie, BSD-3, parses the operator's own lift-status page) → lifts open / hold / scheduled / closed, the provider's timestamp, the operator page URL, a published opening date | 06:00 and 11:00 local | `--dry-run --resort alta` needs no service key. Exit 2 when every fetch was challenged. ~90 requests, 400 ms apart, ≈ 40 s |
+| `com.peakcam.operator-sync` (`npm run operator-sync`) | For each of the 93 resorts mapped in `data/operator-sources.json`, read the operator's own lift-status page or feed and parse it with Liftie's open-source parser → lifts open / hold / scheduled / closed, the operator page URL, an opening date still ahead | 06:00 and 11:00 local | `--dry-run` needs no service key; `--resort alta`, `--state CO`, `--only vail,keystone`. Exit 1 only when every resort fails. 93 page reads, 500 ms apart, about 2 minutes |
 
-**Blocked upstream (2026-10-20).** liftie.info answers every non-browser request from the
-Air and from the mini with HTTP 403, `cf-mitigated: challenge` and a Cloudflare "Just a
-moment" page; the Liftie API is not open to scripts from these hosts today. The fetcher
-names that case `blocked`, the sync logs it and exits 2, and the contract falls back: `data.liftsOpen`
-carries `source: "none"` and `data.status` rests on the opening row (OPEN only after a
-resort-confirmed date). PeakCam does not scrape operator HTML itself. Options, in order:
-ask the Liftie maintainer (github.com/pirxpilot/liftie) for an allow-listed user agent or
-run a self-hosted Liftie (it is open source and runs with `node app` against the same resort
-parsers); otherwise the follow-up list of operator feeds with public JSON and terms that
-permit reuse: Vail Resorts (`*.com/api/…` lift status behind the EpicMix app, terms
-unclear), Alterra (per-resort), Powdr, Boyne, Arapahoe Basin's own JSON, Alta's
-`window.Alta` script block (the page Liftie parses), Perisher-style verified portals.
-Each needs a terms read before a fetcher is written; record `verified=true` only for an
-operator's own API.
+**How it reads lift status (since 2026-11-20).** liftie.info's API has answered every
+script with a Cloudflare challenge since 2026-10-20, so `operator_status` never received a
+row from it. Liftie's parsers are open source (github.com/pirxpilot/liftie, BSD-3-Clause),
+so the sync now runs them itself:
+
+- `scripts/liftie-worker/vendor/liftie/` holds the parser files, copied unmodified from the
+  npm package at the version, commit and tarball hash in `VERSION.json` (4.4.2 today).
+  Only the parse helpers, the shared parser families and the resort definitions that
+  `data/operator-sources.json` maps are copied; Liftie's server and build tooling are not.
+  `scripts/liftie-worker/NOTICE.md` carries the licence notice.
+- `scripts/liftie-worker/worker.mjs` fetches and parses. `scripts/operator-sync.ts` starts
+  it as a child process whose environment holds no secrets (`workerEnv` in
+  `lib/operators/liftie-local.ts`), because some parsers evaluate a script block from the
+  operator's page with `node:vm`. Only the parent holds the Supabase keys and writes rows.
+- The worker needs five small parsing libraries of its own:
+  `npm ci --prefix scripts/liftie-worker` (20 packages, about 3 MB, no install scripts). The
+  web app's `package.json` is untouched.
+- One request at a time, 500 ms apart, with a User-Agent that names PeakCam
+  (`OPERATOR_SYNC_USER_AGENT` overrides it). Each operator's `robots.txt` is read once per
+  host per day (cache in the system temp dir) and honoured for the path fetched.
+
+Failure classes on the `FAIL` lines and the `Done.` line:
+
+| Class | Meaning | What to do |
+| --- | --- | --- |
+| `parse_empty` | The page loaded but the parser found no lifts. Normal before a resort's season: the Vail Resorts pages list no lifts until then | Nothing pre-season. In season, the operator changed the page: check upstream for a newer Liftie and re-vendor |
+| `blocked` | 401/403/429, a bot challenge or a waiting room | Leave it. Do not work around a challenge |
+| `robots` | The operator's `robots.txt` disallows the path | Leave it; the resort has no lift status from this source |
+| `network` | No answer from the host, after one retry (DNS, TLS, timeout) | Usually the operator's side; recheck next run |
+| `http` | Any other non-2xx, typically a 404 after a site redesign | Check upstream for a newer Liftie and re-vendor |
+| `invalid` | The feed was not what the parser reads (for example not JSON) | As `http` |
+| `no_parser` | The mapped id has no vendored definition | `node scripts/liftie-worker/vendor.mjs` after editing the mapping |
+
+First full dry run (Studio, 2026-11-20 about 09:30 Mountain): 67 of 93 resorts returned
+lift status, including all 17 mapped Colorado resorts; 16 `parse_empty`, 4 `network`,
+2 `http`, 2 `blocked` (Gore, Whiteface), 1 `invalid`, 1 `robots` (Mountain High).
+
+Re-vendor when parsers break (`node scripts/liftie-worker/vendor.mjs <exact version>`, then
+the two test files named in `NOTICE.md` and a Colorado dry run). Liftie publishes lifts
+only, so trails, base depth and surface stay null; `verified` stays false because the
+status is parsed from a page, not taken from an operator API under an agreement. Each
+operator's website terms have not been reviewed; do that before raising the frequency.
+`npm run operator-sync -- --liftie-api` still takes the old liftie.info path.
+
+Seven Colorado resorts have no Liftie parser: Granby Ranch, Powderhorn, Purgatory,
+Silverton, Ski Cooper, Sunlight and Wolf Creek.
 
 Deploy on the Mini (`ssh mini`, user `maestro_admin`; `zsh -l -c` because npm is not on the
 non-login PATH):
 
 ```bash
 # 1. apply supabase/migrations/032_operator_status.sql by hand (SQL Editor / MCP apply_migration; not during a Vercel build), then:
-ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && git pull && npm ci --no-audit --no-fund"'
-ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && npx tsx scripts/operator-sync.ts --dry-run --resort alta | tail -4"'   # "OK Alta …" once Liftie answers; "FAIL … blocked 403" while the challenge stands
+ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && git pull && npm ci --prefix scripts/liftie-worker --no-audit --no-fund"'   # the worker's own 3 MB of libraries; the root install is unchanged
+ssh mini 'zsh -l -c "cd /Users/maestro_admin/peakcam/peakcam && npx tsx scripts/operator-sync.ts --dry-run --state CO | tail -22"'   # "OK <resort> — N open … of M" per resort
 ssh mini 'cd /Users/maestro_admin/peakcam/peakcam && cp com.peakcam.operator-sync.plist ~/Library/LaunchAgents/ && launchctl bootout gui/$(id -u)/com.peakcam.operator-sync 2>/dev/null; launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.peakcam.operator-sync.plist && launchctl list | grep com.peakcam.operator-sync'
 ssh mini 'launchctl kickstart -k gui/$(id -u)/com.peakcam.operator-sync && sleep 60 && tail -5 /Users/maestro_admin/peakcam/peakcam/scripts/operator-sync.log'
 ```

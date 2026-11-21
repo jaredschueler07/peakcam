@@ -1,0 +1,18 @@
+{
+  "name": "Homewood",
+  "url": {
+    "host": "http://www.skihomewood.com/",
+    "pathname": "/mountain/snow-report/"
+  },
+  "tags": [
+    "California",
+    "Lake Tahoe"
+  ],
+  "ll": [
+    -120.219498,
+    39.063099
+  ],
+  "twitter": "skihomewood",
+  "opening": "2017-12-08",
+  "noaa": "STO/89,81"
+}

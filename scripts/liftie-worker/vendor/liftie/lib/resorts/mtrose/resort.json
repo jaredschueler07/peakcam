@@ -1,0 +1,18 @@
+{
+  "name": "Mount Rose",
+  "url": {
+    "host": "https://skirose.com",
+    "pathname": "/snow-report/"
+  },
+  "tags": [
+    "Nevada",
+    "Lake Tahoe"
+  ],
+  "opening": "2017-10-27",
+  "ll": [
+    -119.878601,
+    39.3283
+  ],
+  "twitter": "MtRoseSkiTahoe",
+  "noaa": "REV/41,98"
+}

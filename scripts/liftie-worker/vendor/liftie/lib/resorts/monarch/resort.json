@@ -1,0 +1,17 @@
+{
+  "name": "Monarch Mountain",
+  "url": {
+    "host": "https://skimonarch.com",
+    "pathname": "/conditions/"
+  },
+  "tags": [
+    "Colorado"
+  ],
+  "ll": [
+    -106.331696,
+    38.512714
+  ],
+  "twitter": "MonarchMountain",
+  "opening": "2017-11-22",
+  "noaa": "PUB/36,81"
+}

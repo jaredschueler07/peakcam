@@ -321,6 +321,8 @@ export function resortSentence(
 export interface StatusSentenceInput {
   status: { value: string | null; source: string; observedAt: string | null; freshness: { tier: string; ageHours: number | null } };
   liftsOpen: { value: number | null };
+  /** The feed over the resort's local day (lib/operator-day.ts), when it decided the status. */
+  liftDay?: { state: "operated" | "scheduled" | "closed"; liftsOpen: number; liftsTotal: number | null; liftsScheduled: number | null; observedAt: string; current: boolean; carried?: boolean } | null;
   liftsTotal: { value: number | null; source: string };
   baseDepthIn: { value: number | null; source: string; freshness: { tier: string; ageHours: number | null } };
   operatorBaseDepthIn: { value: number | null };
@@ -368,7 +370,20 @@ export function conditionsStatusSentence(resortName: string, c: StatusSentenceIn
 
   const detail: string[] = [];
   if (status === "OPEN" || status === "CLOSED_TODAY") {
-    if (c.status.source === "operator" && c.liftsOpen.value != null) {
+    const day = c.liftDay ?? null;
+    if (c.status.source === "operator" && day?.state === "operated" && day.carried) {
+      // Before the day's first reading: yesterday's last open count, dated as such.
+      detail.push(`${day.liftsOpen} of ${day.liftsTotal ?? "?"} lifts were open at ${formatMountainTime(day.observedAt)}, the operator feed's last open reading; no reading yet this morning`);
+    } else if (c.status.source === "operator" && day?.state === "operated" && !day.current) {
+      // Lifts ran today and have stopped: quote the day's last open count with its own time, not "0 open".
+      detail.push(`lifts ran today, ${day.liftsOpen} of ${day.liftsTotal ?? "?"} open at ${formatMountainTime(day.observedAt)} (operator feed)`);
+    } else if (c.status.source === "operator" && day?.state === "scheduled") {
+      // Also the feed that flags lifts "open" before first chair (lib/operator-day.ts FIRST_CHAIR_HOUR): a plan, not a count of lifts turning.
+      detail.push(`${day.liftsScheduled} ${day.liftsScheduled === 1 ? "lift" : "lifts"} set to run today per the operator's feed, none confirmed turning yet${ageClause(c.status.freshness.ageHours) ? ` (feed${ageClause(c.status.freshness.ageHours)})` : ""}`);
+    } else if (c.status.source === "operator" && day?.state === "operated") {
+      detail.push(`${day.liftsOpen} of ${day.liftsTotal ?? "?"} lifts open (operator feed${ageClause(c.status.freshness.ageHours)})`);
+    } else if (c.status.source === "operator" && c.status.observedAt && c.liftsOpen.value != null) {
+      // observedAt is set only when the feed decided the status; a status that rests on the dates does not quote a lift count.
       detail.push(`${c.liftsOpen.value} of ${c.liftsTotal.value ?? "?"} lifts open (operator feed${ageClause(c.status.freshness.ageHours)})`);
     } else if (c.seasonOpening.value && c.seasonOpening.source === "operator") {
       detail.push(`confirmed opening ${formatOpeningDate(c.seasonOpening.value)}`);

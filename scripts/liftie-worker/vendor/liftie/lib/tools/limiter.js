@@ -1,0 +1,31 @@
+// Vendored from liftie@4.4.2 (github.com/pirxpilot/liftie, commit 05bbe05e39c6), BSD-3-Clause, Copyright (c) 2012 Damian Krzeminski. See ../../License.md. Unmodified below this line. Do not edit: re-run scripts/liftie-worker/vendor.mjs.
+import { RateLimiter } from 'limiter';
+
+export default function Limiter(...args) {
+  const items = argsToLimiters(args);
+  return limit;
+
+  function hasTokens() {
+    return items.every(l => l.getTokensRemaining() > 0);
+  }
+
+  function removeToken() {
+    return Promise.all(items.map(l => l.removeTokens(1)));
+  }
+
+  function limit(fn) {
+    return hasTokens() ? removeToken().then(() => fn(), fn) : process.nextTick(fn, { fetchLater: true });
+  }
+
+  function argsToLimiters(args) {
+    const rts = [];
+    for (let i = 0; i < args.length; i += 2) {
+      const rt = new RateLimiter({
+        tokensPerInterval: args[i],
+        interval: args[i + 1]
+      });
+      rts.push(rt);
+    }
+    return rts;
+  }
+}

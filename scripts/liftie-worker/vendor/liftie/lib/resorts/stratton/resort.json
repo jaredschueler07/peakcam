@@ -1,0 +1,22 @@
+{
+  "name": "Stratton",
+  "url": {
+    "host": "https://www.stratton.com",
+    "pathname": "/the-mountain/conditions-report#mountain-status"
+  },
+  "api": {
+    "host": "https://mtnpowder.com",
+    "pathname": "/feed/1/lifts"
+  },
+  "tags": [
+    "New England",
+    "Vermont"
+  ],
+  "ll": [
+    -72.906303,
+    43.114017
+  ],
+  "twitter": "StrattonResort",
+  "opening": "2017-11-22",
+  "noaa": "ALY/97,89"
+}

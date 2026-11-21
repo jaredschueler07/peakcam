@@ -49,7 +49,9 @@ const ROWS: Array<{ key: keyof ConditionsContract; label: string; unit: string }
 ];
 
 export function FreshnessLabels({ contract }: { contract: ConditionsContract }) {
-  const rows = ROWS.map((r) => ({ ...r, field: contract[r.key] as Field<number> })).filter((r) => r.field.value != null);
+  // Before first chair a feed's "open" count is the day's plan (lib/operator-day.ts FIRST_CHAIR_HOUR): label it so.
+  const planned = contract.liftDay?.state === "scheduled";
+  const rows = ROWS.map((r) => ({ ...r, label: r.key === "liftsOpen" && planned ? "Lifts planned" : r.label, field: contract[r.key] as Field<number> })).filter((r) => r.field.value != null);
   if (!rows.length) return null;
   return (
     <ul className="mt-3 flex flex-wrap gap-2" aria-label="Where each number comes from and how fresh it is" data-testid="freshness-labels">

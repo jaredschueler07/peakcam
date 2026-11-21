@@ -1,0 +1,18 @@
+{
+  "name": "Stevens Pass",
+  "url": {
+    "host": "https://www.stevenspass.com",
+    "pathname": "/the-mountain/mountain-conditions/lift-and-terrain-status.aspx"
+  },
+  "tags": [
+    "Washington",
+    "Vail Epic"
+  ],
+  "opening": "2017-11-29",
+  "ll": [
+    -121.421242,
+    47.76046
+  ],
+  "twitter": "StevensPass",
+  "noaa": "SEW/155,69"
+}

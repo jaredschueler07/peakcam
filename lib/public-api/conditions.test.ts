@@ -215,3 +215,51 @@ test("pre-season and closed-today sentences name the date or the lift count", ()
   assert.equal(closed.data.status.value, "CLOSED_TODAY");
   assert.match(closed.sentence, /Loveland Ski Area is closed today: 0 of 9 lifts open \(operator feed, 1 h old\)/);
 });
+
+// ── The feed over the resort's local day (lib/operator-day.ts) ──
+
+test("sentences over the lift day: scheduled, after the last chair, and the carried count before the first reading", () => {
+  // NOW is 11:00 Mountain on Dec 20. Loveland's opening row is confirmed and passed.
+  const recent = (rows: [string, number, number][]) => rows.map(([observed_at, lifts_open, lifts_scheduled]) => ({ observed_at, lifts_open, lifts_scheduled, lifts_total: 9 }));
+
+  // 07:30 Mountain, newest reading lists 3 scheduled and none open.
+  const morning = new Date("2026-12-20T14:30:00Z");
+  const scheduled = serializeConditions(LOVELAND, { now: morning, opening: OPENINGS["id-loveland"], observationStations: [], operator: operatorRow("id-loveland", { observed_at: "2026-12-20T14:05:00Z", lifts_open: 0, lifts_scheduled: 3, lifts_closed: 6, lifts_total: 9 }) });
+  assert.equal(scheduled.data.status.value, "OPEN");
+  assert.equal(scheduled.data.liftDay?.state, "scheduled");
+  assert.match(scheduled.sentence, /Loveland Ski Area is open: 3 lifts set to run today per the operator's feed, none confirmed turning yet \(feed/);
+  assert.doesNotMatch(scheduled.sentence, /0 of 9 lifts open/);
+
+  // Same hour, a feed that flags its plan as open (2 of 9 "open" at 07:05): the plan, never "2 of 9 lifts open".
+  const flagged = serializeConditions(LOVELAND, { now: morning, opening: OPENINGS["id-loveland"], observationStations: [], operator: operatorRow("id-loveland", { observed_at: "2026-12-20T14:05:00Z", lifts_open: 2, lifts_scheduled: 0, lifts_closed: 7, lifts_total: 9, recent: recent([["2026-12-20T14:05:00Z", 2, 0], ["2026-12-20T13:35:00Z", 2, 0]]) }) });
+  assert.equal(flagged.data.status.value, "OPEN");
+  assert.deepEqual([flagged.data.liftDay?.state, flagged.data.liftDay?.liftsScheduled, flagged.data.liftDay?.liftsOpen], ["scheduled", 2, 0]);
+  assert.equal(flagged.data.liftsOpen.value, 2); // the field stays what the feed's newest reading says
+  assert.match(flagged.sentence, /Loveland Ski Area is open: 2 lifts set to run today per the operator's feed, none confirmed turning yet/);
+  assert.doesNotMatch(flagged.sentence, /lifts open/);
+  assert.doesNotMatch(flagged.data.reasons.join(" "), /lifts open/);
+
+  // 17:00 Mountain: lifts ran until 15:35, the newest reading shows none.
+  const evening = new Date("2026-12-21T00:00:00Z");
+  const ranRows = recent([["2026-12-20T23:05:00Z", 0, 0], ["2026-12-20T22:35:00Z", 4, 0], ["2026-12-20T17:05:00Z", 3, 0]]);
+  const ran = serializeConditions(LOVELAND, { now: evening, opening: OPENINGS["id-loveland"], observationStations: [], operator: operatorRow("id-loveland", { observed_at: "2026-12-20T23:05:00Z", lifts_open: 0, lifts_scheduled: 0, lifts_closed: 9, lifts_total: 9, recent: ranRows }) });
+  assert.equal(ran.data.status.value, "OPEN");
+  assert.equal(ran.data.liftsOpen.value, 0); // the field stays the newest reading
+  assert.deepEqual([ran.data.liftDay?.state, ran.data.liftDay?.liftsOpen, ran.data.liftDay?.current], ["operated", 4, false]);
+  assert.match(ran.sentence, /Loveland Ski Area is open: lifts ran today, 4 of 9 open at 3:35 p\.m\. MT Dec 20 \(operator feed\)/);
+  assert.doesNotMatch(ran.sentence, /scheduled to open today|0 of 9/);
+
+  // 05:30 Mountain next morning, before the day's first reading: carried, dated yesterday, never "today".
+  const night = new Date("2026-12-21T12:30:00Z");
+  const carried = serializeConditions(LOVELAND, { now: night, opening: OPENINGS["id-loveland"], observationStations: [], operator: operatorRow("id-loveland", { observed_at: "2026-12-20T23:05:00Z", lifts_open: 0, lifts_scheduled: 0, lifts_closed: 9, lifts_total: 9, recent: ranRows }) });
+  assert.equal(carried.data.status.value, "OPEN");
+  assert.equal(carried.data.liftDay?.carried, true);
+  assert.match(carried.sentence, /4 of 9 lifts were open at 3:35 p\.m\. MT Dec 20, the operator feed's last open reading; no reading yet this morning/);
+  assert.doesNotMatch(carried.sentence, /today/);
+
+  // 06:40 Mountain on a feed with no scheduled state: not "closed today"; the confirmed date speaks.
+  const early = serializeConditions(LOVELAND, { now: new Date("2026-12-20T13:40:00Z"), opening: OPENINGS["id-loveland"], observationStations: [], operator: operatorRow("id-loveland", { observed_at: "2026-12-20T13:35:00Z", lifts_open: 0, lifts_scheduled: 0, lifts_closed: 9, lifts_total: 9 }) });
+  assert.equal(early.data.status.value, "OPEN");
+  assert.equal(early.data.liftDay, null);
+  assert.match(early.sentence, /is open: confirmed opening/);
+});

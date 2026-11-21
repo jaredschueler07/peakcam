@@ -361,7 +361,7 @@ and the footer link. Added 2026-10-20 (P9 part 2): `server.json` lists the npm s
 API deprecation policy (12 months notice, `Deprecation` and `Sunset` headers; the full text is in
 `/api/v1/openapi.json` `info.description` and `docs/runbook.md` "Public API"). The same policy
 applies to tool names: a renamed tool keeps its old name registered, marked deprecated in its
-description, for 12 months. The registry copy of `server.json` is behind until the owner
+description, for 12 months. Output schemas are open (no `additionalProperties: false`; `lib/public-api/open-schema.ts`): clients must ignore unknown properties, because a client validating against a cached `tools/list` rejected `get_resort_conditions` on 2026-11-20 when `data.liftDay` was added; MCP results withhold that one key until clients have refetched (`MCP_WITHHELD_CONDITIONS_KEYS` in `lib/mcp/tools.ts`). The registry copy of `server.json` is behind until the owner
 publishes the npm package and re-runs `mcp-publisher publish` (checklist in the runbook). Everything they need is exported
 from `lib/mcp/server.ts` (`PEAKCAM_MCP_NAME`, `PEAKCAM_MCP_TITLE`, `PEAKCAM_MCP_VERSION`,
 `PEAKCAM_MCP_ENDPOINT`, `PEAKCAM_MCP_INSTRUCTIONS`) and `lib/mcp/tools.ts`

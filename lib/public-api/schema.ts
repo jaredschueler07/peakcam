@@ -1125,6 +1125,21 @@ export const ConditionsContractSchema = z
     status: ConditionStatusFieldSchema,
     recommendableToday: z.boolean().describe("True only when the status is OPEN on a usable source, a current base depth is on file and the rating is not poor."),
     reasons: z.array(z.string()).describe("Why the status and the verdict came out as they did, in order; quote them."),
+    liftDay: z
+      .object({
+        state: z.enum(["operated", "scheduled", "closed"]).describe("`operated`: a reading today, taken at or after 08:00 resort time, showed a lift open, so the resort is open for the rest of its local day. `scheduled`: none confirmed open yet, some set to run today (a feed that marks lifts open before 08:00 resort time is read as its plan for the day). `closed`: a reading between 10:00 and 15:00 resort time showed none open and none scheduled."),
+        localDate: z.string().describe("YYYY-MM-DD at the resort."),
+        liftsOpen: z.number().describe("For `operated`, lifts open in the day's latest reading that showed any open; otherwise 0."),
+        liftsTotal: z.number().nullable(),
+        liftsScheduled: z.number().nullable().describe("For `scheduled`, lifts set to run today: the newest reading's scheduled count plus any it marks open before 08:00 resort time; otherwise null."),
+        observedAt: z.string().describe("The reading the count comes from (ISO)."),
+        newestAt: z.string().describe("The day's newest reading (ISO)."),
+        current: z.boolean().describe("True when the newest reading itself still shows lifts open."),
+        carried: z.boolean().describe("True between resort-local midnight and the day's first reading: the count is the previous day's last open reading and `localDate` is that previous day. Do not call it today's."),
+      })
+      .nullable()
+      .optional()
+      .describe("What the operator's lift feed said over the resort's local day, when the feed decided `status`; null when the season dates decided. `liftsOpen` (the field) is always the newest reading; after the last chair it reads 0 while this still records that lifts ran today."),
     depthDisagreement: DepthDisagreementSchema.nullable(),
     seasonOpening: ConditionTextFieldSchema.describe("YYYY-MM-DD. Source `operator` for a resort-confirmed date, `profile` for a third-party projection."),
     seasonClosing: ConditionTextFieldSchema.describe("YYYY-MM-DD, mainly Southern-hemisphere rows."),
@@ -1133,7 +1148,7 @@ export const ConditionsContractSchema = z
     newSnow24hIn: ConditionNumberFieldSchema,
     newSnow48hIn: ConditionNumberFieldSchema,
     sweIn: ConditionNumberFieldSchema.describe("Snow water equivalent, inches."),
-    liftsOpen: ConditionNumberFieldSchema.describe("Lifts open per the operator feed."),
+    liftsOpen: ConditionNumberFieldSchema.describe("Lifts open per the operator feed's newest reading, as the feed states it. Before 08:00 resort time some feeds mark the day's planned lifts as open; read `liftDay.state` and `sentence` for whether lifts are running."),
     liftsTotal: ConditionNumberFieldSchema.describe("From the operator feed when it lists lifts, else the profile total."),
     runsOpen: ConditionNumberFieldSchema,
     runsTotal: ConditionNumberFieldSchema,
