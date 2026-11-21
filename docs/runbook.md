@@ -249,6 +249,16 @@ back on its first healthy check; a manually disabled row (`is_active=false`,
   YouTube is turning the job away, not that the cams are fine.
 - YouTube rows are paced about one a second, so a run takes several minutes longer than before.
 
+### Reading an Open-Meteo failure in the sync logs
+
+Since 2026-11-21 `forecast-sync` and `model-sync` print one line per failed Open-Meteo request (`lib/open-meteo-failure.ts`):
+
+```
+2026-11-21T07:12:30.000Z Open-Meteo FAIL Alta summit class=429 status=429 retry-after=60 x-ratelimit-remaining=0 reason="Minutely API request limit exceeded. Please try again in one minute."
+```
+
+`class` is one of `429`, `5xx`, `timeout` (the client's own abort), `network` (no response) or `other`. The run's last line adds `Open-Meteo failures by class: …` and `Run started …, ended …, took …`. Nothing is retried; the lines are for telling an allowance refusal from an outage.
+
 ## Launchd Services (Studio)
 
 | Label | Purpose | Schedule | Status |
