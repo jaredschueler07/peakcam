@@ -378,7 +378,8 @@ export function conditionsStatusSentence(resortName: string, c: StatusSentenceIn
       // Lifts ran today and have stopped: quote the day's last open count with its own time, not "0 open".
       detail.push(`lifts ran today, ${day.liftsOpen} of ${day.liftsTotal ?? "?"} open at ${formatMountainTime(day.observedAt)} (operator feed)`);
     } else if (c.status.source === "operator" && day?.state === "scheduled") {
-      detail.push(`${day.liftsScheduled} ${day.liftsScheduled === 1 ? "lift" : "lifts"} scheduled to open today, none open yet (operator feed${ageClause(c.status.freshness.ageHours)})`);
+      // Also the feed that flags lifts "open" before first chair (lib/operator-day.ts FIRST_CHAIR_HOUR): a plan, not a count of lifts turning.
+      detail.push(`${day.liftsScheduled} ${day.liftsScheduled === 1 ? "lift" : "lifts"} set to run today per the operator's feed, none confirmed turning yet${ageClause(c.status.freshness.ageHours) ? ` (feed${ageClause(c.status.freshness.ageHours)})` : ""}`);
     } else if (c.status.source === "operator" && day?.state === "operated") {
       detail.push(`${day.liftsOpen} of ${day.liftsTotal ?? "?"} lifts open (operator feed${ageClause(c.status.freshness.ageHours)})`);
     } else if (c.status.source === "operator" && c.status.observedAt && c.liftsOpen.value != null) {

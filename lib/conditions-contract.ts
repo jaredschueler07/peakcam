@@ -274,7 +274,7 @@ export function deriveStatus(input: StatusInput): StatusResult {
         return { status: "OPEN", source: "operator", basis: "feed", observedAt: day.newestAt, reasons, liftDay: day };
       }
       if (day?.state === "scheduled") {
-        reasons.push(`operator feed${age}: no lift spinning yet, ${day.liftsScheduled} scheduled to open today`);
+        reasons.push(`operator feed${age}: ${day.liftsScheduled} ${day.liftsScheduled === 1 ? "lift" : "lifts"} set to run today, none confirmed turning yet`);
         return { status: "OPEN", source: "operator", basis: "feed", observedAt: day.newestAt, reasons, liftDay: day };
       }
       if (day?.state === "closed") {

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CORE_HOURS_END, CORE_HOURS_START, LIFT_DAY_END_HOUR, localClock, localHour, summarizeOperatorDay, type OperatorReading } from "./operator-day";
+import { CORE_HOURS_END, CORE_HOURS_START, FIRST_CHAIR_HOUR, LIFT_DAY_END_HOUR, localClock, localHour, summarizeOperatorDay, type OperatorReading } from "./operator-day";
 
 const MT = "America/Denver"; // UTC−7 on 2026-11-20 (standard time)
 const PT = "America/Los_Angeles"; // UTC−8
@@ -16,6 +16,7 @@ const when = (local: string, offsetHours = 7) => new Date(at(local, 0, 0, 0, off
 
 test("the constants are the owner's: core hours 10:00–15:00, lift day ends 16:00", () => {
   assert.deepEqual([CORE_HOURS_START, CORE_HOURS_END, LIFT_DAY_END_HOUR], [10, 15, 16]);
+  assert.equal(FIRST_CHAIR_HOUR, 8);
   assert.equal(localHour(new Date("2026-11-20T22:35:00Z"), MT), 15);
   assert.equal(localHour(new Date("2026-11-20T07:30:00Z"), MT), 0);
   assert.equal(localClock(new Date("2026-11-20T22:05:00Z"), MT), "15:05");
@@ -57,6 +58,20 @@ const CASES: Case[] = [
   { name: "Pacific resort at 07:00 Central, before its first reading → carried from its own yesterday", readings: [at("2026-11-20 14:35", 6, 0, 19, 8)], zone: PT, now: new Date("2026-11-21T13:00:00Z"), expect: { state: "operated", carried: true, localDate: "2026-11-20", liftsOpen: 6 } },
   // 23:30 Pacific on the 20th is 07:30Z on the 21st: still the 20th at the resort.
   { name: "Pacific resort late evening (UTC already tomorrow) → still today, operated", readings: [at("2026-11-20 14:35", 6, 0, 19, 8), at("2026-11-20 15:35", 0, 0, 19, 8)], zone: PT, now: new Date("2026-11-21T07:30:00Z"), expect: { state: "operated", carried: false, localDate: "2026-11-20", liftsOpen: 6 } },
+  // First-chair rule (2026-11-21): A-Basin, Copper, Loveland and Winter Park flag the day's plan as "open" from 06:05.
+  { name: "07:05 reading says 2 open → not believed before first chair: scheduled(2)", readings: [at("2026-11-21 07:05", 2, 0, 9)], zone: MT, now: when("2026-11-21 07:10"), expect: { state: "scheduled", liftsScheduled: 2, liftsOpen: 0, liftsTotal: 9, current: false, carried: false } },
+  { name: "06:05, 06:35, 07:05, 07:35 all say 2 open → still scheduled(2) at 07:40", readings: [at("2026-11-21 06:05", 2, 0, 9), at("2026-11-21 06:35", 2, 0, 9), at("2026-11-21 07:05", 2, 0, 9), at("2026-11-21 07:35", 2, 0, 9)], zone: MT, now: when("2026-11-21 07:40"), expect: { state: "scheduled", liftsScheduled: 2, observedAt: at("2026-11-21 07:35", 0, 0, 0).observedAt } },
+  { name: "08:05 reading says 2 open → operated", readings: [at("2026-11-21 07:35", 2, 0, 9), at("2026-11-21 08:05", 2, 0, 9)], zone: MT, now: when("2026-11-21 08:10"), expect: { state: "operated", liftsOpen: 2, liftsTotal: 9, current: true, observedAt: at("2026-11-21 08:05", 0, 0, 0).observedAt } },
+  { name: "Vail shape, 0 open / 4 scheduled at 07:05 → scheduled(4), unchanged", readings: [at("2026-11-21 07:05", 0, 4, 34)], zone: MT, now: when("2026-11-21 07:10"), expect: { state: "scheduled", liftsScheduled: 4, liftsOpen: 0 } },
+  { name: "2 flagged open + 3 scheduled at 07:05 → scheduled(5)", readings: [at("2026-11-21 07:05", 2, 3, 23)], zone: MT, now: when("2026-11-21 07:10"), expect: { state: "scheduled", liftsScheduled: 5 } },
+  { name: "the planned count never exceeds the total", readings: [at("2026-11-21 07:05", 6, 5, 9)], zone: MT, now: when("2026-11-21 07:10"), expect: { state: "scheduled", liftsScheduled: 9 } },
+  { name: "early flag, then 0/0 at 09:05 → the feed does not decide", readings: [at("2026-11-21 07:05", 2, 0, 9), at("2026-11-21 09:05", 0, 0, 9)], zone: MT, now: when("2026-11-21 09:10"), expect: null },
+  { name: "early flag, then operating, then evening → operated from the last open reading", readings: [at("2026-11-21 07:05", 2, 0, 9), at("2026-11-21 10:05", 3, 0, 9), at("2026-11-21 15:35", 0, 0, 9)], zone: MT, now: when("2026-11-21 17:00"), expect: { state: "operated", liftsOpen: 3, current: false, observedAt: at("2026-11-21 10:05", 0, 0, 0).observedAt } },
+  { name: "carry-over ignores a day whose only open readings were before first chair", readings: [at("2026-11-20 06:05", 2, 0, 9), at("2026-11-20 07:35", 2, 0, 9), at("2026-11-20 12:05", 0, 0, 9)], zone: MT, now: when("2026-11-21 00:30"), expect: null },
+  { name: "carry-over takes the last open reading at or after first chair, not a later-dated early flag", readings: [at("2026-11-20 07:35", 5, 0, 9), at("2026-11-20 14:05", 2, 0, 9), at("2026-11-20 15:35", 0, 0, 9)], zone: MT, now: when("2026-11-21 05:30"), expect: { state: "operated", carried: true, liftsOpen: 2, observedAt: at("2026-11-20 14:05", 0, 0, 0).observedAt } },
+  // 07:05 Pacific is 09:05 Central: the hour is the resort's, not the server's.
+  { name: "Pacific resort at 07:05 its own time (15:05Z) says 5 open → scheduled(5)", readings: [at("2026-11-21 07:05", 5, 0, 25, 8)], zone: PT, now: new Date("2026-11-21T15:10:00Z"), expect: { state: "scheduled", liftsScheduled: 5 } },
+  { name: "Eastern resort at 08:05 its own time (13:05Z, 06:05 Mountain) says 1 open → operated", readings: [at("2026-11-21 08:05", 1, 0, 17, 5)], zone: ET, now: new Date("2026-11-21T13:10:00Z"), expect: { state: "operated", liftsOpen: 1, current: true } },
   { name: "a reading stamped in the future is ignored", readings: [at("2026-11-20 14:00", 5, 0, 9)], zone: MT, now: when("2026-11-20 11:00"), expect: null },
 ];
 

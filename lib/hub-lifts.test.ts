@@ -18,7 +18,14 @@ function row(over: Partial<OperatorStatusRow> = {}): OperatorStatusRow {
 test("a current feed with counts gives the lift count, dated by the feed", () => {
   assert.deepEqual(hubLiftsFromRow(row(), NOW), { state: "operated", open: 8, total: 35, scheduled: null, observedAt: "2026-11-20T17:00:00.000Z", current: true, carried: false });
   // Earlier the same local day (over 3 h old) still counts: the contract's freshness rule, not a second threshold.
-  assert.equal(hubLiftsFromRow(row({ observed_at: "2026-11-20T14:30:00Z" }), NOW)?.open, 8);
+  assert.equal(hubLiftsFromRow(row({ observed_at: "2026-11-20T15:30:00Z" }), NOW)?.open, 8);
+  // …but a reading from before first chair (07:30 Mountain) that says "open" is the day's plan, not lifts turning.
+  const early = hubLiftsFromRow(row({ observed_at: "2026-11-20T14:30:00Z" }), new Date("2026-11-20T14:40:00Z"), "America/Denver")!;
+  assert.deepEqual([early.state, early.open, early.scheduled], ["scheduled", 0, 8]);
+  assert.equal(hasOpenLifts(early), false);
+  assert.equal(opensToday(early), true);
+  assert.equal(liftsMobileText(early), "8 lifts set to run today");
+  assert.doesNotMatch(liftsCellLabel(early, "Breckenridge"), /lifts open/);
 });
 
 test("a stale feed, a missing row and a row without counts show nothing", () => {
@@ -86,10 +93,10 @@ test("before the first chair with lifts scheduled: 'Opens today', not 'Open'", (
   assert.equal(lifts.state, "scheduled");
   assert.equal(hasOpenLifts(lifts), false);
   assert.equal(opensToday(lifts), true);
-  assert.equal(liftsCellText(lifts), "5 scheduled");
-  assert.equal(liftsMobileText(lifts), "5 lifts scheduled");
-  assert.match(liftsCellLabel(lifts, "Heavenly"), /no lift open yet today, 5 scheduled to open per the operator's feed/);
-  assert.match(liftsFootnote([lifts])!, /"Opens today" means the feed lists lifts as scheduled and none open yet/);
+  assert.equal(liftsCellText(lifts), "5 set to run");
+  assert.equal(liftsMobileText(lifts), "5 lifts set to run today");
+  assert.match(liftsCellLabel(lifts, "Heavenly"), /5 lifts set to run today per the operator's feed, none confirmed turning yet/);
+  assert.match(liftsFootnote([lifts])!, /"Opens today" means the feed lists lifts set to run today and none is confirmed turning yet/);
 });
 
 test("before the first chair on a feed with no scheduled state: nothing, and never 'closed'", () => {

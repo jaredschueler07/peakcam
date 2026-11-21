@@ -1121,11 +1121,11 @@ export const ConditionsContractSchema = z
     reasons: z.array(z.string()).describe("Why the status and the verdict came out as they did, in order; quote them."),
     liftDay: z
       .object({
-        state: z.enum(["operated", "scheduled", "closed"]).describe("`operated`: a reading today showed a lift open, so the resort is open for the rest of its local day. `scheduled`: none open yet, some scheduled to open today. `closed`: a reading between 10:00 and 15:00 resort time showed none open and none scheduled."),
+        state: z.enum(["operated", "scheduled", "closed"]).describe("`operated`: a reading today, taken at or after 08:00 resort time, showed a lift open, so the resort is open for the rest of its local day. `scheduled`: none confirmed open yet, some set to run today (a feed that marks lifts open before 08:00 resort time is read as its plan for the day). `closed`: a reading between 10:00 and 15:00 resort time showed none open and none scheduled."),
         localDate: z.string().describe("YYYY-MM-DD at the resort."),
         liftsOpen: z.number().describe("For `operated`, lifts open in the day's latest reading that showed any open; otherwise 0."),
         liftsTotal: z.number().nullable(),
-        liftsScheduled: z.number().nullable(),
+        liftsScheduled: z.number().nullable().describe("For `scheduled`, lifts set to run today: the newest reading's scheduled count plus any it marks open before 08:00 resort time; otherwise null."),
         observedAt: z.string().describe("The reading the count comes from (ISO)."),
         newestAt: z.string().describe("The day's newest reading (ISO)."),
         current: z.boolean().describe("True when the newest reading itself still shows lifts open."),
@@ -1142,7 +1142,7 @@ export const ConditionsContractSchema = z
     newSnow24hIn: ConditionNumberFieldSchema,
     newSnow48hIn: ConditionNumberFieldSchema,
     sweIn: ConditionNumberFieldSchema.describe("Snow water equivalent, inches."),
-    liftsOpen: ConditionNumberFieldSchema.describe("Lifts open per the operator feed."),
+    liftsOpen: ConditionNumberFieldSchema.describe("Lifts open per the operator feed's newest reading, as the feed states it. Before 08:00 resort time some feeds mark the day's planned lifts as open; read `liftDay.state` and `sentence` for whether lifts are running."),
     liftsTotal: ConditionNumberFieldSchema.describe("From the operator feed when it lists lifts, else the profile total."),
     runsOpen: ConditionNumberFieldSchema,
     runsTotal: ConditionNumberFieldSchema,
