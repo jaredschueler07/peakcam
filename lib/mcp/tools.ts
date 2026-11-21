@@ -194,6 +194,27 @@ function lightRow(index: number, r: ReturnType<typeof serializeResortLight>): st
   return `${index + 1}. **${r.name}** (\`${r.slug}\`, ${r.location.state}, ${r.location.country}) — ${snow} · season ${r.seasonStatus} · ${r.liveCamCount}/${r.camCount} cams live · ${r.canonicalUrl}`;
 }
 
+/**
+ * Keys of the conditions `data` object that MCP results leave out for now.
+ *
+ * 2026-11-20: `liftDay` (#143) reached MCP clients that still held the
+ * previous `tools/list`, whose `data` schema was closed, and they rejected
+ * the whole result. The REST route keeps the field. The output schemas are
+ * published open since this change (lib/public-api/open-schema.ts) and
+ * `liftDay` stays declared in them, so once clients have refetched the tool
+ * list (give it a few weeks: connectors cache it per connection) this set can
+ * be emptied. The day-aware status, `reasons` and `sentence` are existing
+ * fields and are unaffected.
+ */
+export const MCP_WITHHELD_CONDITIONS_KEYS: readonly string[] = ["liftDay"];
+
+/** The single MCP boundary for the conditions `data` object. */
+export function mcpConditionsData<T extends object>(data: T): T {
+  const out = { ...data } as Record<string, unknown>;
+  for (const key of MCP_WITHHELD_CONDITIONS_KEYS) delete out[key];
+  return out as T;
+}
+
 export function buildTools(data: McpDataSource): ToolDefinition[] {
   const searchResorts = defineTool({
     name: "search_resorts",
@@ -260,7 +281,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
       }
       const envelope = serializeConditions(hit.resort, { ...options, forecast: stored });
       const { measuredNow: layerRows, ...contract } = envelope;
-      const trimmed = { ...doc, measuredNow: doc.measuredNow ?? layerRows, cams: doc.cams.slice(0, MAX_CAMS), schemaVersion: contract.schemaVersion, schemaUrl: contract.schemaUrl, sentence: contract.sentence, meta: contract.meta, data: contract.data };
+      const trimmed = { ...doc, measuredNow: doc.measuredNow ?? layerRows, cams: doc.cams.slice(0, MAX_CAMS), schemaVersion: contract.schemaVersion, schemaUrl: contract.schemaUrl, sentence: contract.sentence, meta: contract.meta, data: mcpConditionsData(contract.data) };
       const c = envelope.data;
       const fieldLine = (label: string, f: { value: unknown; source: string; freshness: { tier: string; ageHours: number | null } }, unit = "") =>
         f.value == null ? null : `- ${label}: ${f.value}${unit} (${f.source}, ${f.freshness.tier}${f.freshness.ageHours != null ? `, ${f.freshness.ageHours} h old` : ""})`;
