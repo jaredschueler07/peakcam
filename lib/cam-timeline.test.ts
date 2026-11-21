@@ -4,13 +4,17 @@ import {
   archiveAllowedByDefault,
   archivePath,
   clampHours,
+  filterRetained,
+  filterRetainedFrames,
   isKeeper,
   pickResortTimeline,
   pruneWindow,
   publicStillUrl,
   selectPrune,
   shapeTimeline,
+  stormKeeper,
   thinBucket,
+  toFrame,
   type CamStillRow,
 } from "./cam-timeline";
 
@@ -237,4 +241,52 @@ test("resort pick: only a storm on tape still returns it; nothing → null", () 
   assert.equal(t?.frames.length, 0);
   assert.equal(t?.lastStorm?.snow24hAtCapture, 9);
   assert.equal(pickResortTimeline([], ["lead"], { hours: 24, now: NOW, supabaseUrl: SB }), null);
+});
+
+test("timeline: drops frames past retention and thinned-out frames in >48h buckets", () => {
+  // Expired keeper (> 365 d) and expired plain frame (> 30 d) are never served.
+  const expired = [
+    row("a", daysAgo(366), { keeper: true, snow_24h_at_capture: 10 }),
+    row("a", daysAgo(31)),
+  ];
+  assert.equal(shapeTimeline(expired, { camId: "a", hours: 24, now: NOW, supabaseUrl: SB }), null);
+  assert.deepEqual(filterRetained(expired, NOW), []);
+
+  // Multiple keepers in a 5-day-old 6 h bucket: selectPrune keeps the earliest
+  // keeper in the bucket and deletes the later ones from storage, so shapeTimeline
+  // and filterRetainedFrames must pick that earliest keeper as lastStorm.
+  const base = Math.floor((NOW.getTime() - 5 * 86_400_000) / 21_600_000) * 21_600_000;
+  const at = (m: number) => new Date(base + m * 60_000).toISOString();
+  const earlyKeeper = row("a", at(15), { keeper: true, snow_24h_at_capture: 8 });
+  const lateKeeper = row("a", at(345), { keeper: true, snow_24h_at_capture: 8 });
+  const t = shapeTimeline([earlyKeeper, lateKeeper], { camId: "a", hours: 24, now: NOW, supabaseUrl: SB });
+  assert.ok(t);
+  assert.equal(t.lastStorm?.id, earlyKeeper.id);
+  assert.equal(t.lastStorm?.capturedAt, earlyKeeper.captured_at);
+
+  const mapped = [earlyKeeper, lateKeeper, ...expired].map((r) => toFrame(r, SB));
+  assert.deepEqual(
+    filterRetainedFrames(mapped, NOW).map((f) => f.id),
+    [earlyKeeper.id],
+  );
+});
+
+test("lastStorm: the surviving keeper of the newest storm bucket, even inside 48 h", () => {
+  // Three keepers 3 h ago in one 6 h bucket: selectPrune will keep the first
+  // one for a year and delete the other two once the bucket ages past 48 h,
+  // so lastStorm links the first one now.
+  const base = Math.floor((NOW.getTime() - 3 * 3_600_000) / 21_600_000) * 21_600_000;
+  const at = (m: number) => new Date(base + m * 60_000).toISOString();
+  const first = row("a", at(0), { keeper: true, snow_24h_at_capture: 7 });
+  const later = row("a", at(15), { keeper: true, snow_24h_at_capture: 8 });
+  const latest = row("a", at(30), { keeper: true, snow_24h_at_capture: 9 });
+  const older = row("a", new Date(base - 21_600_000).toISOString(), { keeper: true, snow_24h_at_capture: 9 });
+  const t = shapeTimeline([older, latest, later, first], { camId: "a", hours: 24, now: NOW, supabaseUrl: SB });
+  assert.equal(t?.lastStorm?.id, first.id);
+  assert.equal(stormKeeper([older, latest, later, first], (r) => r.captured_at, (r) => r.keeper)?.id, first.id);
+  assert.equal(stormKeeper([row("a", at(0))], (r) => r.captured_at, (r) => r.keeper), null);
+  // The pick is one the pruner keeps.
+  const doomed = new Set(selectPrune([older, latest, later, first], new Date(NOW.getTime() + 3 * 86_400_000)).map((r) => r.id));
+  assert.equal(doomed.has(first.id), false);
+  assert.equal(doomed.has(latest.id), true);
 });

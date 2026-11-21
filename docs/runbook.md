@@ -81,7 +81,7 @@ ssh mini "tail -5 /Users/maestro_admin/peakcam/peakcam/scripts/$JOB.log"
 
 `launchctl list | grep peakcam` prints `PID  last-exit  label`; a `-` PID is a scheduled job
 between runs, a non-zero exit is the script's own (operator-sync exits 1 when every resort
-fails). A pull alone is enough for a script change (each run starts a fresh process); a plist
+fails; cam-stills exits 3 if its 30-min watchdog trips). A pull alone is enough for a script change (each run starts a fresh process); a plist
 change needs the reload. The dependency order when restarting everything: `snotel-sync` and
 `model-sync` first (they feed `snow_reports`), then `stations-sync`, `forecast-sync` (and the
 scorer the next morning), `cam-stills` before `cam-timelapse`.

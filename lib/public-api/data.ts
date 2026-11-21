@@ -9,7 +9,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { unstable_cache } from "next/cache";
-import { getAllResorts, getForecastRuns, getForecastScores, getLatestOperatorStatusIndex, getLatestScoresIndex, getResortElevationIndex, getResortOpenings, getResortScoreHistory, getResortStationsIndex, getResortTimelapses, getSnowDepthHistory } from "@/lib/supabase";
+import { getAllResorts, getForecastRuns, getForecastScores, getLatestOperatorStatusIndex, getLatestScoresIndex, getNewestCamStillCapturedAt, getResortElevationIndex, getResortOpenings, getResortScoreHistory, getResortStationsIndex, getResortTimelapses, getSnowDepthHistory } from "@/lib/supabase";
 import type { CamTimelapses } from "@/lib/cam-timelapse";
 import type { OperatorStatusRow, ResortScoreRow, ResortStationJoined, ResortWithData } from "@/lib/types";
 import { SCORE_HISTORY_DAYS } from "@/lib/score";
@@ -111,6 +111,8 @@ export interface PublicApiCatalog {
   operatorStatus?: Record<string, OperatorStatusRow> | null;
   /** Newest Snow Score row (≤ 3 days old, migration 028) by resort id; optional so fixture catalogues written before P7 still type-check. */
   scores?: Record<string, ResortScoreRow> | null;
+  /** Newest `cam_stills.captured_at` across the archive; optional so existing fixture catalogues still type-check. */
+  newestCamStillAt?: string | null;
   now: Date;
 }
 
@@ -123,13 +125,14 @@ const getOpeningsCached = unstable_cache(getResortOpenings, ["peakcam:public-api
 });
 
 export async function loadPublicApiCatalog(): Promise<PublicApiCatalog> {
-  const [resorts, openingRows, elevations, stations, operatorStatus, scores] = await Promise.all([
+  const [resorts, openingRows, elevations, stations, operatorStatus, scores, newestCamStillAt] = await Promise.all([
     getAllResorts(),
     getOpeningsCached(),
     getResortElevationIndex(),
     getResortStationsIndex(),
     getLatestOperatorStatusIndex(),
     getLatestScoresIndex(),
+    getNewestCamStillCapturedAt(),
   ]);
   return {
     resorts,
@@ -138,6 +141,7 @@ export async function loadPublicApiCatalog(): Promise<PublicApiCatalog> {
     stations,
     operatorStatus,
     scores,
+    newestCamStillAt,
     now: new Date(),
   };
 }

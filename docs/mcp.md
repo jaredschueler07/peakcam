@@ -240,8 +240,8 @@ shape (`query_id`, `results[]` with `schema_object`, full answer under `peakcam`
 `site`, `streaming` accepted and ignored). Alongside it: `POST /api/v1/batch` (≤ 10 GET paths
 dispatched in-process to the route handlers, results in order), `GET /api/v1/resorts/search-index`
 (slug, name, aliases from `lib/ask/aliases.ts`, state, country, lat/lon; 24 h cache) and
-`GET /api/v1/status` (report freshness and cam health with thresholds; 200 `degraded`, 503 only
-when the read fails). Discovery: `/llms-full.txt` (built from the tool definitions and
+`GET /api/v1/status` (report freshness, cam health and cam-still archive freshness with thresholds; 200 `degraded`, 503 only when
+the read fails). Discovery: `/llms-full.txt` (built from the tool definitions and
 `lib/mcp/examples.ts`), `/gpt-instructions.md`, `/.well-known/schemas` (+ `/{file}.json` per
 registered shape). All documented in `/api/v1/openapi.json`; smoke checks in `docs/runbook.md`.
 
