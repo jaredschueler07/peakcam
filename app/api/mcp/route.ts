@@ -2,6 +2,7 @@ import { createMcpHandler } from "mcp-handler";
 import { SITE_URL } from "@/lib/site";
 import { publicJson } from "@/lib/public-api/headers";
 import { productionDataSource } from "@/lib/mcp/data";
+import { withoutLegacyEnvelopeClaim } from "@/lib/mcp/legacy-envelope";
 import {
   PEAKCAM_MCP_ENDPOINT,
   PEAKCAM_MCP_NAME,
@@ -86,7 +87,7 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  return withCors(await handler(request));
+  return withCors(await handler(await withoutLegacyEnvelopeClaim(request)));
 }
 
 export async function DELETE(request: Request): Promise<Response> {
