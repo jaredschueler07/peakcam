@@ -50,6 +50,7 @@ import {
 import { blendRuns } from "../lib/forecast/blend.js";
 import { countFailure, emptyTally, formatFailureLine, formatRunWindow, formatTally, type OpenMeteoFailure } from "../lib/open-meteo-failure.js";
 import { issueHour, type ForecastRunRow } from "../lib/forecast/store.js";
+import { pageParams, readAllPages } from "../lib/paged-read.js";
 import { DELETE_AFTER_DAYS, PRUNE_BEFORE_UTC_HOUR, THIN_AFTER_DAYS, isPruneRun, selectRunsToDelete } from "../lib/forecast/retention.js";
 
 // ─── Load .env.local manually ────────────────────────────────────────────
@@ -182,19 +183,27 @@ async function insertRun(resortId: string, point: ResortPoint["point"], run: Mod
 async function pruneResort(resortId: string, now: Date): Promise<number> {
   const thinCutoff = new Date(now.getTime() - THIN_AFTER_DAYS * 86_400_000).toISOString();
   const deleteCutoff = new Date(now.getTime() - DELETE_AFTER_DAYS * 86_400_000).toISOString();
-  const oldResp = await fetch(
-    `${SUPABASE_URL}/rest/v1/forecast_runs?resort_id=eq.${resortId}&issued_at=lt.${encodeURIComponent(thinCutoff)}&select=id,resort_id,point,model,issued_at,horizon_days&order=issued_at.desc&limit=20000`,
-    { headers: writeHeaders },
-  );
-  if (!oldResp.ok) throw new Error(`prune read failed: ${oldResp.status}`);
-  const old = (await oldResp.json()) as ForecastRunRow[];
+  // Both reads are paged: PostgREST answers with 1,000 rows at most whatever
+  // `limit` asks for, and a resort passes that once it holds about two months
+  // of thinned runs. `id` ends each ORDER BY so the pages are stable.
+  const old = await readAllPages<ForecastRunRow>(async (from, to) => {
+    const resp = await fetch(
+      `${SUPABASE_URL}/rest/v1/forecast_runs?resort_id=eq.${resortId}&issued_at=lt.${encodeURIComponent(thinCutoff)}&select=id,resort_id,point,model,issued_at,horizon_days&order=issued_at.desc,id.asc&${pageParams(from, to)}`,
+      { headers: writeHeaders },
+    );
+    if (!resp.ok) throw new Error(`prune read failed: ${resp.status}`);
+    return (await resp.json()) as ForecastRunRow[];
+  });
   if (!old.length) return 0;
-  const recentResp = await fetch(
-    `${SUPABASE_URL}/rest/v1/forecast_runs?resort_id=eq.${resortId}&issued_at=gte.${encodeURIComponent(deleteCutoff)}&select=point,model`,
-    { headers: writeHeaders },
-  );
-  if (!recentResp.ok) throw new Error(`prune recent read failed: ${recentResp.status}`);
-  const recentKeys = new Set(((await recentResp.json()) as Array<{ point: string; model: string }>).map((r) => `${r.point}:${r.model}`));
+  const recent = await readAllPages<{ point: string; model: string }>(async (from, to) => {
+    const resp = await fetch(
+      `${SUPABASE_URL}/rest/v1/forecast_runs?resort_id=eq.${resortId}&issued_at=gte.${encodeURIComponent(deleteCutoff)}&select=point,model&order=id.asc&${pageParams(from, to)}`,
+      { headers: writeHeaders },
+    );
+    if (!resp.ok) throw new Error(`prune recent read failed: ${resp.status}`);
+    return (await resp.json()) as Array<{ point: string; model: string }>;
+  });
+  const recentKeys = new Set(recent.map((r) => `${r.point}:${r.model}`));
   const ids = selectRunsToDelete(old, recentKeys, now);
   for (let i = 0; i < ids.length; i += DELETE_CHUNK) {
     const chunk = ids.slice(i, i + DELETE_CHUNK);

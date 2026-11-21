@@ -19,7 +19,8 @@ import { QuotableLine } from "@/components/snow-report/QuotableLine";
 // rather than a cached notFound() render. Static siblings (the leaderboards,
 // percent-of-normal, the landing) win over this segment in Next's router and
 // lib/snow-hubs.test.ts checks no hub slug collides with them.
-export const revalidate = 3600;
+// 15-minute ISR so the lift cells keep up with the operator index (see /ski-cams/[hub]).
+export const revalidate = 900;
 export const dynamicParams = false;
 
 export async function generateStaticParams() {
