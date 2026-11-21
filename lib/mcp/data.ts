@@ -11,12 +11,27 @@
 // tests inject a fixture McpDataSource instead.
 // ─────────────────────────────────────────────────────────────
 
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
 import { loadPublicApiCatalog, loadResortAccuracy, loadResortForecast, loadResortHistory, loadResortScoreHistory, loadResortTimelapses, loadSeasonAggregates } from "@/lib/public-api/data";
 import { PUBLIC_API_REVALIDATE_SECONDS } from "@/lib/public-api/headers";
 import { getCamStillFrames, supabase } from "@/lib/supabase";
 import { getWeatherForecast } from "@/lib/weather";
 import type { McpDataSource, SnowHistoryRow, UnmatchedQuestion } from "./types";
+
+let serviceClient: SupabaseClient | null | undefined;
+
+function getServiceClient(): SupabaseClient | null {
+  if (serviceClient !== undefined) return serviceClient;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    serviceClient = null;
+    return null;
+  }
+  serviceClient = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  return serviceClient;
+}
 
 export const SNOW_HISTORY_COLUMNS = "date,station_id,snow_depth_in,swe_in,precip_accum_in,temp_max_f,temp_min_f,qc_flag";
 
@@ -53,8 +68,10 @@ export const UNMATCHED_QUESTION_ENTITY = "ask:unmatched";
 export const UNMATCHED_QUESTION_TTL_DAYS = 30;
 
 async function logUnmatchedQuestion(entry: UnmatchedQuestion): Promise<void> {
+  const client = getServiceClient();
+  if (!client) return;
   const expires = new Date(Date.now() + UNMATCHED_QUESTION_TTL_DAYS * 86_400_000).toISOString();
-  const { error } = await supabase.from("agent_memory").insert({
+  const { error } = await client.from("agent_memory").insert({
     entity: UNMATCHED_QUESTION_ENTITY,
     fact: entry.question,
     source_agent: `ask-${entry.via}`,

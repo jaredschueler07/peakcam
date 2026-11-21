@@ -51,7 +51,7 @@ const CLAUDE_MODEL = process.env.PEAKCAM_CLAUDE_MODEL || 'claude-sonnet-4-202505
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!ANTHROPIC_API_KEY) {
   console.error('Missing ANTHROPIC_API_KEY in .env.local');
@@ -131,11 +131,12 @@ async function recallMemories(messageText, agentKey) {
 
   if (keywords.length === 0) return '';
 
-  // Build OR filter for entity matching
-  const orFilter = keywords.map(k => `entity.ilike.*${k}*`).join(',');
+  // Build OR filter for entity matching and valid TTL
+  const orFilter = keywords.map(k => `entity.ilike.*${k.replace(/[(),*]/g, '')}*`).filter(Boolean).join(',');
+  if (!orFilter) return '';
+  const nowIso = encodeURIComponent(new Date().toISOString());
   const memories = await supabaseRPC('GET',
-    `agent_memory?or=(${orFilter})&order=created_at.desc&limit=10` +
-    `&expires_at=is.null,expires_at=gt.${new Date().toISOString()}`
+    `agent_memory?and=(or(${encodeURIComponent(orFilter)}),or(expires_at.is.null,expires_at.gt.${nowIso}))&order=created_at.desc&limit=10`
   );
 
   if (!memories || memories.length === 0) return '';

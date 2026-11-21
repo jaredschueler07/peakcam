@@ -4,6 +4,7 @@
 // Runs profanity check and sets is_flagged accordingly.
 // ─────────────────────────────────────────────────────────────
 
+import { createClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { containsProfanity } from "@/lib/profanity";
@@ -14,6 +15,7 @@ const SNOW_QUALITY_VALUES: UserSnowQuality[] = ["powder", "packed", "crud", "ice
 const VISIBILITY_VALUES: UserVisibility[] = ["clear", "foggy", "whiteout"];
 const WIND_VALUES: UserWind[] = ["calm", "breezy", "gusty", "high"];
 const TRAIL_CONDITIONS_VALUES: UserTrailConditions[] = ["groomed", "ungroomed", "moguls", "variable"];
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(request: NextRequest) {
   // 1. Parse body
@@ -34,8 +36,8 @@ export async function POST(request: NextRequest) {
   };
 
   // 2. Validate required fields
-  if (!resort_id || typeof resort_id !== "string") {
-    return NextResponse.json({ error: "resort_id is required" }, { status: 400 });
+  if (typeof resort_id !== "string" || !UUID_RE.test(resort_id)) {
+    return NextResponse.json({ error: "resort_id must be a valid UUID" }, { status: 400 });
   }
   if (!SNOW_QUALITY_VALUES.includes(snow_quality as UserSnowQuality)) {
     return NextResponse.json({ error: "Invalid snow_quality" }, { status: 400 });
@@ -85,8 +87,15 @@ export async function POST(request: NextRequest) {
   // 5. Profanity check
   const isFlagged = notesText ? containsProfanity(notesText) : false;
 
-  // 6. Insert
-  const { error: insertError } = await supabase
+  // 6. Insert via service-role after server-side profanity/rate checks when available
+  // (migration 035 restricts direct client inserts), falling back to RLS client in local setups.
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const writer =
+    supabaseUrl && serviceKey
+      ? createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
+      : supabase;
+  const { error: insertError } = await writer
     .from("user_conditions")
     .insert({
       resort_id,
