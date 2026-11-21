@@ -27,15 +27,16 @@ import { resortTimeZone, type TimeZoneResort } from "./resort-timezone";
  * uses):
  *   - `operated`: a reading today showed lifts open. The count is the day's
  *     latest reading that showed any open, and stays after the last chair.
- *   - `scheduled`: none open yet today, the newest reading lists lifts
- *     scheduled to open.
+ *   - `scheduled`: none confirmed open yet today; the newest reading lists
+ *     lifts set to run (its scheduled count, plus lifts it flags open before
+ *     first chair, lib/operator-day.ts FIRST_CHAIR_HOUR).
  * A resort the feed calls closed, or says nothing about today, is absent.
  */
 export interface HubLifts {
   state: "operated" | "scheduled";
   open: number;
   total: number;
-  /** `scheduled` only: lifts the feed lists as scheduled to open today. */
+  /** `scheduled` only: lifts the feed lists as set to run today. */
   scheduled: number | null;
   /** The reading the count comes from: the feed's own timestamp (ISO). */
   observedAt: string;
@@ -90,28 +91,28 @@ export function opensToday(lifts: HubLifts | null | undefined): boolean {
 }
 
 /**
- * The cell text: "8 of 35" when lifts ran today, "4 scheduled" before the
- * first chair on a feed that lists scheduled lifts, null (a dash) otherwise.
+ * The cell text: "8 of 35" when lifts ran today, "4 set to run" before the
+ * first chair on a feed that lists planned lifts, null (a dash) otherwise.
  * A feed that lists 0 open and none scheduled is a dash on purpose: before
  * opening day that number would label a pre-season resort "closed".
  */
 export function liftsCellText(lifts: HubLifts | null | undefined): string | null {
   if (lifts && hasOpenLifts(lifts)) return `${lifts.open} of ${lifts.total}`;
-  if (lifts && opensToday(lifts)) return `${lifts.scheduled} scheduled`;
+  if (lifts && opensToday(lifts)) return `${lifts.scheduled} set to run`;
   return null;
 }
 
 /** The phone line under the resort name. */
 export function liftsMobileText(lifts: HubLifts | null | undefined): string | null {
   if (lifts && hasOpenLifts(lifts)) return `${lifts.open} of ${lifts.total} lifts open`;
-  if (lifts && opensToday(lifts)) return `${lifts.scheduled} ${lifts.scheduled === 1 ? "lift" : "lifts"} scheduled`;
+  if (lifts && opensToday(lifts)) return `${lifts.scheduled} ${lifts.scheduled === 1 ? "lift" : "lifts"} set to run today`;
   return null;
 }
 
 /** Screen-reader and title text for one row. */
 export function liftsCellLabel(lifts: HubLifts, name: string): string {
   if (lifts.state === "scheduled") {
-    return `${name}: no lift open yet today, ${lifts.scheduled} scheduled to open per the operator's feed, read at ${formatMountainTime(lifts.observedAt)}`;
+    return `${name}: ${lifts.scheduled} ${lifts.scheduled === 1 ? "lift" : "lifts"} set to run today per the operator's feed, none confirmed turning yet, read at ${formatMountainTime(lifts.observedAt)}`;
   }
   return `${name}: ${lifts.open} of ${lifts.total} lifts open per the operator's feed, read at ${formatMountainTime(lifts.observedAt)}${lifts.carried ? ", the last open reading before today's first" : lifts.current ? "" : "; the feed has shown none open since"}`;
 }
@@ -128,7 +129,7 @@ export function liftsFootnote(lifts: readonly (HubLifts | null | undefined)[]): 
     `Lift counts are what each operator's own feed reported: for each resort, its latest reading that showed lifts open, the newest of them at ${formatMountainTime(newest)}. A count stays after the lifts stop, until the feed's first reading of the resort's next day.`,
     `"Open" here means open per that feed; it is not a confirmation that a lift is turning.`,
   ];
-  if (shown.some(opensToday)) parts.push(`"Opens today" means the feed lists lifts as scheduled and none open yet.`);
+  if (shown.some(opensToday)) parts.push(`"Opens today" means the feed lists lifts set to run today and none is confirmed turning yet; a feed that already marks lifts open before 8 a.m. resort time is read that way too.`);
   return parts.join(" ");
 }
 

@@ -227,8 +227,17 @@ test("sentences over the lift day: scheduled, after the last chair, and the carr
   const scheduled = serializeConditions(LOVELAND, { now: morning, opening: OPENINGS["id-loveland"], observationStations: [], operator: operatorRow("id-loveland", { observed_at: "2026-12-20T14:05:00Z", lifts_open: 0, lifts_scheduled: 3, lifts_closed: 6, lifts_total: 9 }) });
   assert.equal(scheduled.data.status.value, "OPEN");
   assert.equal(scheduled.data.liftDay?.state, "scheduled");
-  assert.match(scheduled.sentence, /Loveland Ski Area is open: 3 lifts scheduled to open today, none open yet \(operator feed/);
+  assert.match(scheduled.sentence, /Loveland Ski Area is open: 3 lifts set to run today per the operator's feed, none confirmed turning yet \(feed/);
   assert.doesNotMatch(scheduled.sentence, /0 of 9 lifts open/);
+
+  // Same hour, a feed that flags its plan as open (2 of 9 "open" at 07:05): the plan, never "2 of 9 lifts open".
+  const flagged = serializeConditions(LOVELAND, { now: morning, opening: OPENINGS["id-loveland"], observationStations: [], operator: operatorRow("id-loveland", { observed_at: "2026-12-20T14:05:00Z", lifts_open: 2, lifts_scheduled: 0, lifts_closed: 7, lifts_total: 9, recent: recent([["2026-12-20T14:05:00Z", 2, 0], ["2026-12-20T13:35:00Z", 2, 0]]) }) });
+  assert.equal(flagged.data.status.value, "OPEN");
+  assert.deepEqual([flagged.data.liftDay?.state, flagged.data.liftDay?.liftsScheduled, flagged.data.liftDay?.liftsOpen], ["scheduled", 2, 0]);
+  assert.equal(flagged.data.liftsOpen.value, 2); // the field stays what the feed's newest reading says
+  assert.match(flagged.sentence, /Loveland Ski Area is open: 2 lifts set to run today per the operator's feed, none confirmed turning yet/);
+  assert.doesNotMatch(flagged.sentence, /lifts open/);
+  assert.doesNotMatch(flagged.data.reasons.join(" "), /lifts open/);
 
   // 17:00 Mountain: lifts ran until 15:35, the newest reading shows none.
   const evening = new Date("2026-12-21T00:00:00Z");

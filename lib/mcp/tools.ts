@@ -289,7 +289,8 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
         `## Status: ${c.status.value} — ${envelope.sentence}`,
         "",
         ...[
-          fieldLine("Lifts open", c.liftsOpen),
+          // Before first chair a feed's "open" count is the day's plan (lib/operator-day.ts FIRST_CHAIR_HOUR); the status line above says so.
+          fieldLine(c.liftDay?.state === "scheduled" ? "Lifts marked open by the feed (before first chair, not confirmed turning)" : "Lifts open", c.liftsOpen),
           fieldLine("Lifts total", c.liftsTotal),
           fieldLine("Runs open", c.runsOpen),
           fieldLine("Base depth (measured)", c.baseDepthIn, " in"),
