@@ -21,7 +21,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { getOpenMeteoSnapshot } from "../lib/open-meteo.js";
-import { emptyTally, formatFailureLine, formatRunWindow, formatTally, type OpenMeteoFailure } from "../lib/open-meteo-failure.js";
+import { countFailure, emptyTally, formatFailureLine, formatRunWindow, formatTally, type OpenMeteoFailure } from "../lib/open-meteo-failure.js";
 import {
   computeConditions,
   type ConditionsInput,
@@ -243,7 +243,7 @@ async function main(): Promise<void> {
         // One line per failed request, with the status, any Retry-After and
         // rate-limit headers and Open-Meteo's reason (lib/open-meteo-failure.ts).
         const seen = failure as OpenMeteoFailure | null;
-        failures[seen?.kind ?? "other"]++;
+        countFailure(failures, seen);
         console.error(`  ${seen ? formatFailureLine(seen, resort.name) : `${new Date().toISOString()} Open-Meteo FAIL ${resort.name} class=other status=200 reason="response could not be parsed into a snapshot"`}`);
         console.log(`  SKIP ${resort.name} — Open-Meteo unreachable`);
         noData++;

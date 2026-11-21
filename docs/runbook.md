@@ -51,7 +51,7 @@ service-role key in that checkout's `.env.local`, and log to the path in the las
 | `com.peakcam.snotel-sync` | `npx tsx scripts/snotel-sync.ts` | 00:15, 05:15, 06:15, 12:15, 18:15 Central (`StartCalendarInterval` ×5; two morning runs because NRCS has the day's values from about 11:00 UTC and sometimes answers 5xx) | `snowpack_daily`, `snow_reports` (source `snotel`), `resorts.cond_rating`; IndexNow ping when `INDEXNOW_ENABLED=1` | `scripts/snotel-sync.log` |
 | `com.peakcam.model-sync` | `npx tsx scripts/model-sync.ts` | 00:45, 06:45, 12:45, 18:45 Central (`StartCalendarInterval` ×4) | `snow_reports` (source `open_meteo`) for the resorts without a station, `cond_rating` | `scripts/model-sync.log` |
 | `com.peakcam.stations-sync` | `npx tsx scripts/stations-sync.ts` | hourly (3,600) | `stations`, `resort_stations`, `station_observations` (migration 026); never `snow_reports` | `scripts/stations-sync.log` |
-| `com.peakcam.forecast-sync` | `npx tsx scripts/forecast-sync.ts` | 01:05, 09:05, 17:05 Central (`StartCalendarInterval` ×3, no `RunAtLoad`) | `forecast_runs`, `forecast_daily` (027); ~240 Open-Meteo calls a run; retention pass after 00:00 UTC | `scripts/forecast-sync.log` |
+| `com.peakcam.forecast-sync` | `npx tsx scripts/forecast-sync.ts` | 01:05, 09:05, 17:05 Central (`StartCalendarInterval` ×3, no `RunAtLoad`) | `forecast_runs`, `forecast_daily` (027); ~240 Open-Meteo calls a run; retention pass in the 01:05 Central run only (`isPruneRun`, starts before 12:00 UTC) | `scripts/forecast-sync.log` |
 | `com.peakcam.forecast-score` | `npx tsx scripts/forecast-score.ts` | daily 07:30 (`StartCalendarInterval`) | `forecast_scores` (027), graded against SNOTEL depth deltas over 90 days | `scripts/forecast-score.log` |
 | `com.peakcam.score-sync` | `npx tsx scripts/score-sync.ts` | 07:45 and 19:45 (`StartCalendarInterval` ×2, `RunAtLoad`) | `resort_scores` (028): one 0–100 Snow Score row per resort per day with five components (`lib/score.ts`), idempotent on `(resort_id, date)`; **to deploy** (P7, 2026-10-20, see "Snow Score") | `scripts/score-sync.log` |
 | `com.peakcam.operator-sync` | `npx tsx scripts/operator-sync.ts` | every 30 minutes, 07:05 to 16:35 Central (`StartCalendarInterval` ×20) | `operator_status` (032), read from each operator's own lift-status page with Liftie's parsers (see "Operator status"); exit 1 only when every resort fails | `scripts/operator-sync.log` |
@@ -254,10 +254,10 @@ back on its first healthy check; a manually disabled row (`is_active=false`,
 Since 2026-11-21 `forecast-sync` and `model-sync` print one line per failed Open-Meteo request (`lib/open-meteo-failure.ts`):
 
 ```
-2026-11-21T07:12:30.000Z Open-Meteo FAIL Alta summit class=429 status=429 retry-after=60 x-ratelimit-remaining=0 reason="Minutely API request limit exceeded. Please try again in one minute."
+2026-11-21T07:12:30.000Z Open-Meteo FAIL Alta summit class=429 status=429 limit=minutely retry-after=60 x-ratelimit-remaining=0 reason="Minutely API request limit exceeded. Please try again in one minute."
 ```
 
-`class` is one of `429`, `5xx`, `timeout` (the client's own abort), `network` (no response) or `other`. The run's last line adds `Open-Meteo failures by class: …` and `Run started …, ended …, took …`. Nothing is retried; the lines are for telling an allowance refusal from an outage.
+`class` is one of `429`, `5xx`, `timeout` (the client's own abort), `network` (no response) or `other`; a 429 also carries `limit=minutely|hourly|daily|unstated`, read from Open-Meteo's reason text. The run's last line adds `Open-Meteo failures by class: …` (the 429s split by limit), `Run started …, ended …, took …` and, for `forecast-sync`, `Retention: N old runs pruned` or why it did not prune. Nothing is retried; the lines are for telling an allowance refusal from an outage.
 
 ## Launchd Services (Studio)
 

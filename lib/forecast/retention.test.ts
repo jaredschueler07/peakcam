@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { selectRunsToDelete } from "./retention";
+import { PRUNE_BEFORE_UTC_HOUR, isPruneRun, selectRunsToDelete } from "./retention";
 import type { ForecastRunRow } from "./store";
 
 const NOW = new Date("2027-03-01T03:00:00Z");
@@ -33,4 +33,17 @@ test("selectRunsToDelete deletes runs older than 120 days but keeps a model's la
   const recent = new Set(["summit:gfs_seamless"]);
   assert.deepEqual(selectRunsToDelete(rows, recent, NOW).sort(), ["old1", "old2", "old3", "stale1"]);
   assert.deepEqual(selectRunsToDelete([], recent, NOW), []);
+});
+
+test("isPruneRun: exactly one of the three scheduled starts prunes, winter and summer", () => {
+  // 01:05, 09:05, 17:05 Central (com.peakcam.forecast-sync.plist).
+  const winter = ["2026-11-22T07:05:05Z", "2026-11-22T15:05:05Z", "2026-11-22T23:05:05Z"]; // CST = UTC-6
+  const summer = ["2026-07-15T06:05:05Z", "2026-07-15T14:05:05Z", "2026-07-15T22:05:05Z"]; // CDT = UTC-5
+  for (const day of [winter, summer]) {
+    assert.deepEqual(day.map((iso) => isPruneRun(new Date(iso))), [true, false, false]);
+  }
+  assert.equal(PRUNE_BEFORE_UTC_HOUR, 12);
+  // A run that starts late (the 01:05 job delayed by hours) still prunes before noon UTC and not after.
+  assert.equal(isPruneRun(new Date("2026-11-22T11:59:59Z")), true);
+  assert.equal(isPruneRun(new Date("2026-11-22T12:00:00Z")), false);
 });

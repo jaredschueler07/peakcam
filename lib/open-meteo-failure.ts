@@ -95,6 +95,7 @@ export function describeThrownFailure(err: unknown, now: Date): OpenMeteoFailure
 /** One log line. `label` names the resort and point, e.g. `Alta summit`. */
 export function formatFailureLine(failure: OpenMeteoFailure, label: string): string {
   const parts = [`${failure.at} Open-Meteo FAIL ${label}`, `class=${failure.kind}`, `status=${failure.status ?? "none"}`];
+  if (failure.kind === "429") parts.push(`limit=${rateLimitWindow(failure.reason)}`);
   if (failure.retryAfter) parts.push(`retry-after=${failure.retryAfter}`);
   for (const [name, value] of Object.entries(failure.rateLimit).sort(([a], [b]) => a.localeCompare(b))) parts.push(`${name}=${value}`);
   if (failure.reason) parts.push(`reason="${failure.reason}"`);
@@ -102,15 +103,44 @@ export function formatFailureLine(failure: OpenMeteoFailure, label: string): str
   return parts.join(" ");
 }
 
-export type OpenMeteoFailureTally = Record<OpenMeteoFailureClass, number>;
+/** Which of Open-Meteo's limits a refusal names: its reasons read "Minutely / Hourly / Daily API request limit exceeded". */
+export const RATE_LIMIT_WINDOWS = ["minutely", "hourly", "daily", "unstated"] as const;
+export type RateLimitWindow = (typeof RATE_LIMIT_WINDOWS)[number];
 
-export function emptyTally(): OpenMeteoFailureTally {
-  return { "429": 0, "5xx": 0, timeout: 0, network: 0, other: 0 };
+export function rateLimitWindow(reason: string | null | undefined): RateLimitWindow {
+  const text = (reason ?? "").toLowerCase();
+  if (/\bminutely\b|per minute|one minute/.test(text)) return "minutely";
+  if (/\bhourly\b|per hour|next hour/.test(text)) return "hourly";
+  if (/\bdaily\b|per day|tomorrow/.test(text)) return "daily";
+  return "unstated";
 }
 
-/** `429 12, 5xx 0, timeout 3, network 0, other 0` — every class, so a zero is visible. */
+export interface OpenMeteoFailureTally extends Record<OpenMeteoFailureClass, number> {
+  /** The 429s again, split by the limit their reason text names. */
+  limitWindows: Record<RateLimitWindow, number>;
+}
+
+export function emptyTally(): OpenMeteoFailureTally {
+  return { "429": 0, "5xx": 0, timeout: 0, network: 0, other: 0, limitWindows: { minutely: 0, hourly: 0, daily: 0, unstated: 0 } };
+}
+
+/** Count one failed request; `null` is a 200 whose body held nothing usable ("other"). */
+export function countFailure(tally: OpenMeteoFailureTally, failure: OpenMeteoFailure | null): void {
+  const kind = failure?.kind ?? "other";
+  tally[kind]++;
+  if (kind === "429") tally.limitWindows[rateLimitWindow(failure?.reason)]++;
+}
+
+/**
+ * `429 12 (minutely 10, hourly 0, daily 2, unstated 0), 5xx 0, timeout 3, network 0, other 0`
+ * — every class, so a zero is visible; the window split only when there were 429s.
+ */
 export function formatTally(tally: OpenMeteoFailureTally): string {
-  return OPEN_METEO_FAILURE_CLASSES.map((kind) => `${kind} ${tally[kind]}`).join(", ");
+  return OPEN_METEO_FAILURE_CLASSES.map((kind) => {
+    const base = `${kind} ${tally[kind]}`;
+    if (kind !== "429" || tally["429"] === 0) return base;
+    return `${base} (${RATE_LIMIT_WINDOWS.map((w) => `${w} ${tally.limitWindows[w]}`).join(", ")})`;
+  }).join(", ");
 }
 
 /** `started 2026-11-21T07:05:05.000Z, ended 2026-11-21T07:21:40.000Z, took 16m 35s`. */

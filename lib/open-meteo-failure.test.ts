@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   classifyStatus,
+  countFailure,
+  rateLimitWindow,
   describeHttpFailure,
   describeThrownFailure,
   emptyTally,
@@ -66,7 +68,7 @@ test("describeHttpFailure keeps Retry-After and rate-limit headers only", () => 
   const line = formatFailureLine(f, "Alta summit");
   assert.equal(
     line,
-    '2026-11-21T07:12:30.000Z Open-Meteo FAIL Alta summit class=429 status=429 retry-after=60 ratelimit-reset=38211 x-ratelimit-limit=10000 x-ratelimit-remaining=0 reason="Minutely API request limit exceeded. Please try again in one minute."',
+    '2026-11-21T07:12:30.000Z Open-Meteo FAIL Alta summit class=429 status=429 limit=minutely retry-after=60 ratelimit-reset=38211 x-ratelimit-limit=10000 x-ratelimit-remaining=0 reason="Minutely API request limit exceeded. Please try again in one minute."',
   );
   assert.ok(!line.includes("secret"));
   assert.ok(!line.includes("content-type"));
@@ -95,10 +97,17 @@ test("describeThrownFailure: timeout, network, unparseable body", () => {
 });
 
 test("tally and run window", () => {
+  assert.equal(formatTally(emptyTally()), "429 0, 5xx 0, timeout 0, network 0, other 0");
   const tally = emptyTally();
-  tally["429"] += 250;
-  tally.timeout += 4;
-  assert.equal(formatTally(tally), "429 250, 5xx 0, timeout 4, network 0, other 0");
+  const refusal = (reason: string | null) => describeHttpFailure({ status: 429, headers: new Headers() }, reason == null ? null : JSON.stringify({ error: true, reason }), NOW);
+  for (let i = 0; i < 234; i++) countFailure(tally, refusal("Minutely API request limit exceeded. Please try again in one minute."));
+  for (let i = 0; i < 3; i++) countFailure(tally, refusal("Hourly API request limit exceeded. Please try again in the next hour."));
+  countFailure(tally, refusal("Daily API request limit exceeded. Please try again tomorrow."));
+  countFailure(tally, refusal(null));
+  countFailure(tally, describeThrownFailure(new DOMException("timed out", "TimeoutError"), NOW));
+  countFailure(tally, describeHttpFailure({ status: 502, headers: new Headers() }, "", NOW));
+  countFailure(tally, null);
+  assert.equal(formatTally(tally), "429 239 (minutely 234, hourly 3, daily 1, unstated 1), 5xx 1, timeout 1, network 0, other 1");
   assert.equal(formatRunWindow(new Date("2026-11-21T07:05:05.000Z"), new Date("2026-11-21T07:21:40.400Z")), "started 2026-11-21T07:05:05.000Z, ended 2026-11-21T07:21:40.400Z, took 16m 35s");
   assert.equal(formatRunWindow(NOW, new Date(NOW.getTime() + 42_000)), "started 2026-11-21T07:12:30.000Z, ended 2026-11-21T07:13:12.000Z, took 42s");
 });
@@ -158,4 +167,14 @@ test("getOpenMeteoSnapshot reports a thrown timeout to onFailure and returns nul
   );
   assert.equal(result, null);
   assert.deepEqual(seen.map((f) => [f.kind, f.status]), [["timeout", null]]);
+});
+
+test("rateLimitWindow reads the limit from Open-Meteo's own wording; the reason itself is logged verbatim", () => {
+  assert.equal(rateLimitWindow("Minutely API request limit exceeded. Please try again in one minute."), "minutely");
+  assert.equal(rateLimitWindow("Hourly API request limit exceeded. Please try again in the next hour."), "hourly");
+  assert.equal(rateLimitWindow("Daily API request limit exceeded. Please try again tomorrow."), "daily");
+  assert.equal(rateLimitWindow("Too many requests"), "unstated");
+  assert.equal(rateLimitWindow(null), "unstated");
+  const f = describeHttpFailure({ status: 429, headers: new Headers() }, '{"error":true,"reason":"Hourly API request limit exceeded. Please try again in the next hour."}', new Date("2026-11-21T07:12:30.417Z"));
+  assert.equal(formatFailureLine(f, "Alyeska base"), '2026-11-21T07:12:30.417Z Open-Meteo FAIL Alyeska base class=429 status=429 limit=hourly reason="Hourly API request limit exceeded. Please try again in the next hour."');
 });

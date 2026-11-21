@@ -47,3 +47,20 @@ export function selectRunsToDelete(rows: readonly ForecastRunRow[], recentKeys: 
   }
   return out;
 }
+
+/**
+ * The daily retention pass runs in the one scheduled sync that starts before
+ * this UTC hour. The job starts at 01:05, 09:05 and 17:05 Central
+ * (com.peakcam.forecast-sync.plist): 07:05Z, 15:05Z and 23:05Z in winter,
+ * 06:05Z, 14:05Z and 22:05Z in summer, so only the 01:05 Central run is
+ * before 12:00 UTC in either season. The old cutoff of 6 predates the fixed
+ * schedule; under it no run pruned from 2026-11-20 to 2026-11-21. If the
+ * plist times change, change this with them (lib/forecast/retention.test.ts
+ * pins the three start hours).
+ */
+export const PRUNE_BEFORE_UTC_HOUR = 12;
+
+/** Whether a sync that started at `startedAt` is the day's pruning run. */
+export function isPruneRun(startedAt: Date): boolean {
+  return startedAt.getUTCHours() < PRUNE_BEFORE_UTC_HOUR;
+}

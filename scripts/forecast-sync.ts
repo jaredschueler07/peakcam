@@ -48,9 +48,9 @@ import {
   type ResortPoint,
 } from "../lib/forecast/open-meteo-models.js";
 import { blendRuns } from "../lib/forecast/blend.js";
-import { emptyTally, formatFailureLine, formatRunWindow, formatTally, type OpenMeteoFailure } from "../lib/open-meteo-failure.js";
+import { countFailure, emptyTally, formatFailureLine, formatRunWindow, formatTally, type OpenMeteoFailure } from "../lib/open-meteo-failure.js";
 import { issueHour, type ForecastRunRow } from "../lib/forecast/store.js";
-import { DELETE_AFTER_DAYS, THIN_AFTER_DAYS, selectRunsToDelete } from "../lib/forecast/retention.js";
+import { DELETE_AFTER_DAYS, PRUNE_BEFORE_UTC_HOUR, THIN_AFTER_DAYS, isPruneRun, selectRunsToDelete } from "../lib/forecast/retention.js";
 
 // ─── Load .env.local manually ────────────────────────────────────────────
 
@@ -250,7 +250,7 @@ async function main(): Promise<void> {
           // rate-limit headers and Open-Meteo's reason (lib/open-meteo-failure.ts).
           // A 200 whose body held no usable run has no failure object: "other".
           const seen = failure as OpenMeteoFailure | null;
-          failures[seen?.kind ?? "other"]++;
+          countFailure(failures, seen);
           const label = `${resort.name} ${pt.point}`;
           console.error(`  ${seen ? formatFailureLine(seen, label) : `${new Date().toISOString()} Open-Meteo FAIL ${label} class=other status=200 reason="response held no usable model run"`}`);
           perPoint.push(`${pt.point}: Open-Meteo failed (${seen ? `${seen.kind}${seen.status != null ? ` ${seen.status}` : ""}` : "empty response"})`);
@@ -281,21 +281,24 @@ async function main(): Promise<void> {
     }
   }
 
-  // Retention: once a day (the first run after 00:00 UTC) or on request.
-  const shouldPrune = !dryRun && !noPrune && (forcePrune || startedAt.getUTCHours() < 6);
+  // Retention: once a day, in the 01:05 Central run (isPruneRun,
+  // lib/forecast/retention.ts), or on request with --prune.
+  const shouldPrune = !dryRun && !noPrune && (forcePrune || isPruneRun(startedAt));
   let pruned = 0;
+  let pruneFailed = 0;
   if (shouldPrune) {
     for (const resort of resorts) {
       try {
         pruned += await pruneResort(resort.id, startedAt);
       } catch (err) {
+        pruneFailed++;
         console.error(`  PRUNE FAIL ${resort.name} — ${err instanceof Error ? err.message : String(err)}`);
       }
     }
   }
 
   console.log(
-    `\n[forecast-sync] Done. ${resorts.length} resorts, ${calls} Open-Meteo calls, ${runsWritten} runs ${dryRun ? "would be " : ""}written, ${runsSkipped} already present, ${pointsFailed} points failed, ${resortsFailed} resorts failed${shouldPrune ? `, ${pruned} old runs pruned` : ""}. Open-Meteo failures by class: ${formatTally(failures)}. Run ${formatRunWindow(startedAt, new Date())}. Weather data by Open-Meteo.com (CC BY 4.0).`,
+    `\n[forecast-sync] Done. ${resorts.length} resorts, ${calls} Open-Meteo calls, ${runsWritten} runs ${dryRun ? "would be " : ""}written, ${runsSkipped} already present, ${pointsFailed} points failed, ${resortsFailed} resorts failed. Retention: ${shouldPrune ? `${pruned} old runs pruned${pruneFailed ? `, ${pruneFailed} resorts failed to prune` : ""}` : `not this run (${dryRun ? "dry run" : noPrune ? "--no-prune" : `only the run that starts before ${PRUNE_BEFORE_UTC_HOUR}:00 UTC prunes`})`}. Open-Meteo failures by class: ${formatTally(failures)}. Run ${formatRunWindow(startedAt, new Date())}. Weather data by Open-Meteo.com (CC BY 4.0).`,
   );
   if (resortsFailed > 0 && resortsFailed === resorts.length) process.exit(1);
 }
