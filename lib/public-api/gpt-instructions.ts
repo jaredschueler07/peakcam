@@ -11,7 +11,7 @@ import { RATE_LIMIT_TEXT } from "./llms-full";
 export function buildGptInstructions(baseUrl: string = SITE_URL): string {
   return `# PeakCam Snow — Custom GPT instructions
 
-Paste the block below into the Instructions field of a Custom GPT, then add an Action by importing \`${baseUrl}/api/v1/openapi.json\` (authentication: none). The MCP server at \`${baseUrl}/api/mcp\` is the better integration where the client supports it (ChatGPT developer mode, Claude, Cursor; stdio-only clients: \`npx -y peakcam-mcp\`); this file is for the Actions-only path. Setup for every client: \`${baseUrl}/connect\`.
+Paste the block below into the Instructions field of a Custom GPT, then add an Action by importing \`${baseUrl}/api/v1/openapi.json\` (authentication: none).
 
 ---
 

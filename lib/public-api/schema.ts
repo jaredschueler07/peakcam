@@ -684,15 +684,21 @@ export const StatusSchema = z
         liveRatio: z.number().nullable().describe("live / (live + down); null when nothing has been checked. Below 0.9 is degraded."),
         newestCheckAt: z.string().nullable(),
       }),
+      camStills: z.object({
+        status: StatusLevelSchema,
+        newestCapturedAt: z.string().nullable().describe("Newest `cam_stills.captured_at` across the archive."),
+        ageHours: z.number().nullable().describe("Hours since `newestCapturedAt`. The capture job writes every 15 min, so above 2 h is degraded."),
+      }),
     }),
     thresholds: z.object({
       reportMaxAgeHours: z.number(),
       camLiveMinRatio: z.number(),
+      stillMaxAgeHours: z.number(),
     }),
     issues: z.array(z.string()).describe("One sentence per failing check; empty when `ok`."),
     attribution: z.string(),
   })
-  .register(publicApiRegistry, { id: "Status", description: "Service status derived from the data itself: snow-report freshness and cam health." });
+  .register(publicApiRegistry, { id: "Status", description: "Service status derived from the data itself: snow-report freshness, cam health and cam-still archive freshness." });
 
 export const BatchRequestSchema = z
   .object({
@@ -735,8 +741,8 @@ export const AskAnswerSchema = z
     question: z.string(),
     answerable: z.boolean().describe("False when the router found no resort or no intent it could serve; `data` is then null and `suggestions` says what to ask."),
     intent: AskIntentSchema,
-    tool: z.string().nullable().describe("The PeakCam MCP tool whose result is in `data`."),
-    arguments: z.record(z.string(), z.unknown()).nullable().describe("The arguments that tool was called with, so the call can be repeated over MCP."),
+    tool: z.string().nullable().describe("The internal PeakCam reader whose result is in `data` (for example `get_resort_conditions`, `find_powder`)."),
+    arguments: z.record(z.string(), z.unknown()).nullable().describe("The arguments that reader was called with (the resort slug, the state, the window)."),
     resort: AskResortRefSchema.nullable().describe("The resort the question named (the first, for a comparison)."),
     resorts: z.array(AskResortRefSchema).describe("Every resort the question named, in order."),
     place: z.object({ state: z.string().nullable(), country: z.string().nullable() }).nullable(),

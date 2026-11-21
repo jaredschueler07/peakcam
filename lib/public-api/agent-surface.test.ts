@@ -2,17 +2,16 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Cam, ResortWithData, SnowReport } from "@/lib/types";
 import type { PublicApiCatalog } from "./data";
-import { buildStatus, STATUS_REPORT_MAX_AGE_HOURS } from "./status";
+import { buildStatus, STATUS_REPORT_MAX_AGE_HOURS, STATUS_STILL_MAX_AGE_HOURS } from "./status";
 import { buildSearchIndex } from "./search-index";
 import { matchBatchPath, parseBatchBody, BATCH_MAX_REQUESTS } from "./batch";
 import { buildJsonSchemas, buildSchemaIndex, schemaFileStem, schemaUrl } from "./json-schemas";
 import { buildLlmsFull, RATE_LIMIT_TEXT } from "./llms-full";
 import { buildGptInstructions } from "./gpt-instructions";
 import { SearchIndexSchema, StatusSchema } from "./schema";
-import { buildTools } from "@/lib/mcp/tools";
-import { PEAKCAM_TOOL_NAMES } from "@/lib/mcp/tool-names";
-import { TOOL_EXAMPLES } from "@/lib/mcp/examples";
-import type { McpDataSource } from "@/lib/mcp/types";
+import { ASK_SUGGESTIONS } from "@/lib/ask/answer";
+import { ASK_INTENTS } from "@/lib/ask/intents";
+import { buildOpenApiDocument, deprecationPolicyText } from "./openapi";
 
 // P9 block 1: the pure builders behind /api/v1/status, /api/v1/resorts/
 // search-index, /api/v1/batch, /.well-known/schemas, /llms-full.txt and
@@ -44,8 +43,12 @@ function resort(slug: string, name: string, over: Partial<ResortWithData> = {}):
   };
 }
 
-function catalog(resorts: ResortWithData[], now = NOW): PublicApiCatalog {
-  return { resorts, openings: new Map(), elevations: {}, stations: null, now };
+function catalog(
+  resorts: ResortWithData[],
+  now = NOW,
+  newestCamStillAt: string | null = new Date(now.getTime() - 15 * 60_000).toISOString(),
+): PublicApiCatalog {
+  return { resorts, openings: new Map(), elevations: {}, stations: null, newestCamStillAt, now };
 }
 
 const HEALTHY = catalog([
@@ -63,6 +66,9 @@ test("status: ok when the newest report is fresh and most cams pass; cam ratio b
   assert.equal(fine.status, "ok");
   assert.deepEqual(fine.issues, []);
   assert.equal(fine.checks.cams.liveRatio, 1);
+  assert.equal(fine.checks.camStills.status, "ok");
+  assert.equal(fine.checks.camStills.ageHours, 0.3);
+  assert.equal(fine.thresholds.stillMaxAgeHours, STATUS_STILL_MAX_AGE_HOURS);
 
   const doc = StatusSchema.parse(buildStatus(HEALTHY));
   assert.equal(doc.checks.snowReports.status, "ok");
@@ -76,6 +82,7 @@ test("status: ok when the newest report is fresh and most cams pass; cam ratio b
   assert.equal(doc.checks.cams.unchecked, 1);
   assert.equal(doc.checks.cams.liveRatio, 0.667, "2 of 3 checked");
   assert.equal(doc.checks.cams.status, "degraded");
+  assert.equal(doc.checks.camStills.status, "ok");
   assert.equal(doc.status, "degraded");
 });
 
@@ -83,6 +90,7 @@ test("status: degraded when the newest report is older than the sync cadence all
   const late = catalog(HEALTHY.resorts.map((r) => ({ ...r, cams: [cam()] })), new Date("2026-12-21T12:00:00Z"));
   const doc = buildStatus(late);
   assert.equal(doc.checks.cams.status, "ok");
+  assert.equal(doc.checks.camStills.status, "ok");
   assert.equal(doc.checks.snowReports.status, "degraded");
   assert.equal(doc.checks.snowReports.ageHours, 24);
   assert.equal(doc.checks.snowReports.staleResorts, 0, "24 h is not yet over the 24 h stale line");
@@ -90,6 +98,26 @@ test("status: degraded when the newest report is older than the sync cadence all
   const empty = buildStatus(catalog([resort("x", "X", { snow_report: null, cams: [] })]));
   assert.equal(empty.status, "degraded");
   assert.match(empty.issues[0], /No resort has a snow report/);
+});
+
+test("status: degraded when cam stills are stale or missing", () => {
+  const liveResorts = HEALTHY.resorts.map((r) => ({ ...r, cams: r.cams.map((c) => cam({ id: c.id })) }));
+  const staleStillsAt = new Date(NOW.getTime() - 13.2 * 3_600_000).toISOString();
+  const staleDoc = StatusSchema.parse(buildStatus(catalog(liveResorts, NOW, staleStillsAt)));
+  assert.equal(staleDoc.status, "degraded");
+  assert.equal(staleDoc.checks.snowReports.status, "ok");
+  assert.equal(staleDoc.checks.cams.status, "ok");
+  assert.equal(staleDoc.checks.camStills.status, "degraded");
+  assert.equal(staleDoc.checks.camStills.newestCapturedAt, staleStillsAt);
+  assert.equal(staleDoc.checks.camStills.ageHours, 13.2);
+  assert.deepEqual(staleDoc.issues, ["The newest cam still is 13.2 h old; the capture job writes every 15 min."]);
+
+  const missingDoc = StatusSchema.parse(buildStatus(catalog(liveResorts, NOW, null)));
+  assert.equal(missingDoc.status, "degraded");
+  assert.equal(missingDoc.checks.camStills.status, "degraded");
+  assert.equal(missingDoc.checks.camStills.newestCapturedAt, null);
+  assert.equal(missingDoc.checks.camStills.ageHours, null);
+  assert.match(missingDoc.issues[0], /No cam still has been captured/);
 });
 
 // ── search index ─────────────────────────────────────────────
@@ -162,21 +190,10 @@ test("well-known schemas: every $ref points at a file the directory serves, with
 
 // ── llms-full.txt and gpt-instructions.md ────────────────────
 
-const never = async (): Promise<never> => {
-  throw new Error("not called");
-};
-const STUB: McpDataSource = { catalog: never, forecast: never, forecastRuns: never, forecastAccuracy: never, snowHistory: never, camStills: never };
-
-test("llms-full.txt documents every tool with an example that parses, every REST route, the attribution line and the real rate limit", () => {
+test("llms-full.txt documents every REST route, what the answer endpoint answers, the attribution line and the real rate limit", () => {
   const text = buildLlmsFull();
-  const tools = buildTools(STUB);
-  assert.equal(tools.length, PEAKCAM_TOOL_NAMES.length);
-  for (const tool of tools) {
-    assert.ok(text.includes(`### ${tool.name} — ${tool.title}`), `${tool.name} has a section`);
-    assert.ok(text.includes(`--tool-name ${tool.name}`), `${tool.name} has an inspector example`);
-    const example = TOOL_EXAMPLES[tool.name];
-    assert.doesNotThrow(() => tool.inputSchema.parse(example.args), `${tool.name} example parses against its inputSchema`);
-  }
+  for (const intent of ASK_INTENTS) assert.ok(text.includes(`\`${intent}\``), `intent ${intent} is listed`);
+  for (const question of ASK_SUGGESTIONS) assert.ok(text.includes(`"${question}"`), `example question: ${question}`);
   for (const route of ["GET /api/v1/resorts", "GET /api/v1/resorts/search-index", "GET /api/v1/resorts/{slug}", "GET /api/v1/resorts/{slug}/cams", "GET /api/v1/resorts/{slug}/conditions", "GET /api/v1/resorts/{slug}/score-components", "GET /api/v1/snow-report?sort=name|score|newSnow24h|baseDepth&state=", "GET /api/v1/powder", "GET /api/v1/status", "GET /api/v1/ask", "POST /api/v1/ask", "POST /api/v1/batch", "GET /ask"]) {
     assert.ok(text.includes(`### ${route}`), `${route} is documented`);
   }
@@ -186,7 +203,26 @@ test("llms-full.txt documents every tool with an example that parses, every REST
   assert.match(RATE_LIMIT_TEXT, /403/);
   assert.doesNotMatch(RATE_LIMIT_TEXT, /\b429\b(?! and)/, "the live limit is a 403, not a 429");
   assert.ok(text.includes("https://www.peakcam.io/.well-known/schemas"));
-  assert.ok(text.includes("https://www.peakcam.io/api/mcp"));
+  assert.doesNotMatch(RATE_LIMIT_TEXT, /mcp/i);
+});
+
+// The public MCP server was retired on 2026-11-21: nothing an agent reads may
+// still send it to the endpoint, the setup page, the server card or the npm bridge.
+const RETIRED_SURFACE = /\/api\/mcp|\/connect\b|server-card|peakcam-mcp|io\.peakcam\/snow|\bMCP\b|x-mcp-endpoint|x-stdio-package/;
+
+test("no agent document advertises the retired MCP server or its setup page", () => {
+  const openapi = buildOpenApiDocument();
+  const documents: Record<string, string> = {
+    "llms-full.txt": buildLlmsFull(),
+    "gpt-instructions.md": buildGptInstructions(),
+    "openapi.json": JSON.stringify(openapi),
+    "deprecation policy": deprecationPolicyText("https://www.peakcam.io"),
+  };
+  for (const [name, text] of Object.entries(documents)) assert.doesNotMatch(text, RETIRED_SURFACE, name);
+  const info = openapi.info as Record<string, unknown>;
+  assert.equal("x-mcp-endpoint" in info, false);
+  assert.equal("x-stdio-package" in info, false);
+  assert.deepEqual((info["x-deprecation-policy"] as { announcedAt: string[] }).announcedAt, ["/llms-full.txt", "/api/v1/openapi.json"]);
 });
 
 test("gpt-instructions.md names the OpenAPI Action, the ask-first workflow, the source rules and the limit", () => {

@@ -2,7 +2,7 @@
 // Ask — execute a router plan and phrase the result.
 //
 // `answerQuestion(ctx, question)` runs lib/ask/router.ts, calls the one
-// PeakCam tool the plan names (the same handlers the MCP server registers),
+// PeakCam tool the plan names (the handlers in lib/mcp/tools.ts),
 // and returns an AskAnswer: the tool's structured result, the resort(s),
 // citations, and a dated, source-labelled sentence. The sentences for
 // conditions, powder and percent-of-normal are lib/quotable.ts verbatim; the
@@ -12,7 +12,7 @@
 // it) a logged copy for review. No language model anywhere.
 // ─────────────────────────────────────────────────────────────
 
-import type { CallToolResult } from "@modelcontextprotocol/server";
+import type { CallToolResult } from "@/lib/mcp/types";
 import type { ResortWithData } from "@/lib/types";
 import type { PublicApiCatalog } from "@/lib/public-api/data";
 import { PUBLIC_API_ATTRIBUTION, PUBLIC_API_LICENSE_URL } from "@/lib/public-api/headers";
@@ -306,7 +306,7 @@ export async function answerQuestion(ctx: AskContext, rawQuestion: string, optio
       sentence,
       asOf: null,
       data: null,
-      citations: [`${SITE_URL}/connect`],
+      citations: [`${SITE_URL}/llms.txt`],
       suggestions: [...didYouMean, ...ASK_SUGGESTIONS],
     };
   }

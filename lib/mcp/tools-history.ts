@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { z } from "zod";
-import type { CallToolResult } from "@modelcontextprotocol/server";
+import type { CallToolResult } from "./types";
 import type { ResortWithData } from "@/lib/types";
 import { SITE_URL } from "@/lib/site";
 import { stateLabel } from "@/lib/hubs";

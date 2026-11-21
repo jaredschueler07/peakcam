@@ -152,7 +152,6 @@ export function buildSitemapFiles(input: SitemapInput): SitemapFile[] {
     // The Drop In hub only: the three playable routes are noindex on purpose.
     ...(input.dropInEnabled ? [{ url: `${baseUrl}/drop-in`, lastModified: buildTime, changeFrequency: "monthly" as const, priority: 0.5 }] : []),
     { url: `${baseUrl}/about`, lastModified: buildTime, changeFrequency: "monthly", priority: 0.4 },
-    { url: `${baseUrl}/connect`, lastModified: buildTime, changeFrequency: "monthly", priority: 0.5 },
     { url: `${baseUrl}/methodology`, lastModified: buildTime, changeFrequency: "monthly", priority: 0.5 },
     ...hubUrls,
   ];

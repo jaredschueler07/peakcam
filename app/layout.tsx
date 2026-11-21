@@ -111,12 +111,8 @@ const organizationLd = {
   url: BASE_URL,
   logo: `${BASE_URL}/icon.png`,
   // The profiles linked from the site footer (components/home/PeakFooter.tsx),
-  // the public source repository, and the agent-directory listings as they
-  // land (parity plan P10). Slots still empty, add when the page exists:
-  //   - the MCP Registry entry page for io.peakcam/snow (the registry has an
-  //     API at registry.modelcontextprotocol.io but no stable public page yet)
-  //   - the Claude connector directory listing (form submitted, pending)
-  //   - the ChatGPT app listing and Smithery page (user submissions pending)
+  // and the public source repository. Slot still empty, add when the page
+  // exists:
   //   - the PeakCam Wikidata item once created (needs the user's account)
   sameAs: [
     "https://instagram.com/peakcam.io",

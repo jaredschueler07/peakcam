@@ -32,7 +32,7 @@ function toNlweb(answer: AskAnswerPublic, queryId: string) {
   if (answer.answerable) {
     const primary = answer.resort;
     results.push({
-      url: answer.citations[0] ?? `${SITE_URL}/connect`,
+      url: answer.citations[0] ?? `${SITE_URL}/llms.txt`,
       name: primary ? `${primary.name} — PeakCam` : `PeakCam ${answer.intent.replace(/_/g, " ")}`,
       site: SITE,
       score: 100,

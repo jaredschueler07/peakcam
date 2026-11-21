@@ -1,7 +1,7 @@
 # PeakCam Runbook
 
 > Last updated: 2026-10-20 (parity plan P10: the job table below was rewritten from the plists loaded on the Mac mini that day).
-> Status: in production. Human-gated tasks (listing submissions, npm publish, keys on the mini) are under "Connect page and MCP listings" and "Where to look".
+> Status: in production. Human-gated tasks are under "Where to look"; the public MCP server and `/connect` were retired on 2026-11-21 (last section).
 
 ## Environments
 
@@ -81,7 +81,7 @@ ssh mini "tail -5 /Users/maestro_admin/peakcam/peakcam/scripts/$JOB.log"
 
 `launchctl list | grep peakcam` prints `PID  last-exit  label`; a `-` PID is a scheduled job
 between runs, a non-zero exit is the script's own (operator-sync exits 1 when every resort
-fails). A pull alone is enough for a script change (each run starts a fresh process); a plist
+fails; cam-stills exits 3 if its 30-min watchdog trips). A pull alone is enough for a script change (each run starts a fresh process); a plist
 change needs the reload. The dependency order when restarting everything: `snotel-sync` and
 `model-sync` first (they feed `snow_reports`), then `stations-sync`, `forecast-sync` (and the
 scorer the next morning), `cam-stills` before `cam-timelapse`.
@@ -155,7 +155,6 @@ Verify in production after the first run:
 ```bash
 curl -s https://www.peakcam.io/api/v1/resorts/alta | jq '.measuredNow[] | {role, source, sourceId, elevationFt, ageMinutes, snowDepthIn, tempF, windMph}'
 curl -s https://www.peakcam.io/resorts/alta/index.md | grep -A6 "What the instruments say"
-npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_stations --tool-arg slug=alta
 ```
 
 and in SQL: `select source, count(*) from stations group by 1;`
@@ -185,7 +184,6 @@ Verify in the database: `select "window", count(*), max(rendered_at), round(avg(
 15-minute API cache): `curl -s https://www.peakcam.io/api/v1/resorts/alta/timelapses | jq '{available, clipCount, lastStorm: .lastStorm.stormDate, cams: [.cams[] | {camName, clip: .current.url}]}'`,
 `curl -s https://www.peakcam.io/api/v1/resorts/alta/cams | jq '.cams[0].timelapses'`,
 `curl -s https://www.peakcam.io/resorts/alta/webcams/index.md | grep -i timelapse`,
-`npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_timelapses --tool-arg slug=alta`,
 and `curl -sI "$(curl -s https://www.peakcam.io/api/v1/resorts/alta/timelapses | jq -r '.cams[0].current.url')" | grep -i 'content-type\|content-length'`
 (video/mp4, under 3 MB). The webcams page shows the "Last 24 hours" strip after its hourly ISR window.
 Cadence: `StartInterval` in the plist; frame rate, size cap and storm rules: the constants at the
@@ -496,12 +494,11 @@ cached catalogue (`getAllResorts()`, 1 h) plus `resort_openings` and
 | `GET /api/v1/resorts/{slug}/history`, `/season-stats`, `/monthly` | P5: season curve vs the station's normal band + ten past seasons; season-to-date on two baselines with last year; monthly climatology (`lib/public-api/history.ts`, reads `snowpack_daily` paged + the migration-030 normals, 15-min Data Cache per resort) | 900 s |
 | `GET /api/v1/leaderboards/{kind}?state=&source=&limit=` | P5: `best-powder-this-week`, `season-powder-days`, `deepest-base`, `season-snowfall` over `season_stats(powder_in, …)` (migration 030); `unavailable: true` until it is applied | 900 s |
 | `GET /.well-known/schemas` + `/{file}.json` | Standalone JSON Schemas (draft 2020-12) per registered shape, `lib/public-api/json-schemas.ts` | static, 1 h / 24 h CDN |
-| `GET /llms-full.txt` | Long agent guide built from the tool definitions and `lib/mcp/examples.ts` (`lib/public-api/llms-full.ts`) | static, 1 h / 24 h CDN |
+| `GET /llms-full.txt` | Long agent guide: every REST route with curl, the answer endpoint's intents and example questions (`lib/public-api/llms-full.ts`) | static, 1 h / 24 h CDN |
 | `GET /gpt-instructions.md` | Custom GPT instructions (`lib/public-api/gpt-instructions.ts`) | static, 1 h / 24 h CDN |
 
-All routes answer `OPTIONS` with 204. The same data is the MCP server at `/api/mcp`
-(docs/mcp.md), also reachable from stdio-only clients through the npm bridge
-`npx -y peakcam-mcp` (`packages/peakcam-mcp`). Unknown slugs 404 with `Cache-Control:
+All routes answer `OPTIONS` with 204. (The MCP server that served the same data at
+`/api/mcp` was retired on 2026-11-21; the route answers 410, see the last section.) Unknown slugs 404 with `Cache-Control:
 no-store`; all other responses carry `public, s-maxage=900,
 stale-while-revalidate=3600`, so a bad deploy clears from the CDN within 15
 minutes and a Supabase outage keeps serving the last good document (the read
@@ -522,26 +519,27 @@ PeakCam only adds fields, enum values and operations. Removing or renaming anyth
 at least **12 months** ahead: the affected operation starts answering with `Deprecation:
 @<unix-seconds>` (RFC 9745, the announcement date) and `Sunset: <HTTP-date>` (RFC 8594, the
 earliest removal date, ≥ 12 months after the announcement) plus `Link: <changelog>; rel="sunset"`;
-its OpenAPI summary gains "Deprecated:" with the replacement; the same notice goes on `/connect`
-and in `llms-full.txt`. Current operations carry neither header (the shared header set documents
+its OpenAPI summary gains "Deprecated:" with the replacement; the same notice goes
+in `llms-full.txt`. Current operations carry neither header (the shared header set documents
 both as optional for that reason). A new major version is published at its own base path
 (`/api/v2`) and the previous one keeps answering for the full notice period after the new one is
-announced. The MCP server follows the same rule for tool names and argument shapes: a renamed
-tool keeps its old name registered, marked deprecated in its description, for 12 months. How to
+announced. (The policy covers `/api/v1`. The sentence that extended it to MCP tool names left
+with the MCP server on 2026-11-21, which the owner retired without that notice period.) How to
 execute a deprecation: add the two headers in `lib/public-api/headers.ts` behind a per-route
 option, set the summary, write the changelog entry the `Link` points at, and record the sunset
 date here.
 
 Code: `lib/public-api/{schema,serialize,headers,openapi,data}.ts`, routes under
 `app/api/v1/` and `app/.well-known/api-catalog/`. `proxy.ts` excludes
-`api/v1/` and `api/mcp` from the Supabase session refresh. Station names and
+`api/v1/` and `api/mcp` (now the 410 route) from the Supabase session refresh. Station names and
 elevations come from `lib/public-api/stations.json`, trimmed from
 `data/snotel_stations.json` to the triplets the catalogue references;
 regenerate it when a resort gets a new station.
 
 **Rate limit — enforced since 2026-10-18** by a Vercel WAF custom rule added in
 the dashboard (`Public API rate limit`: Request Path starts with `/api/v1/` or
-`/api/mcp`, 60 requests per 60 s per IP, exceed action Deny). The firewall API
+`/api/mcp`, 60 requests per 60 s per IP, exceed action Deny; the `/api/mcp` clause is left over
+from the retired MCP server and the public texts name `/api/v1` only). The firewall API
 still answers `404 Seawall Config not found` for this project, so the rule is
 only visible and editable at
 <https://vercel.com/jaredschuelerspotify-3622s-projects/peakcam/firewall>.
@@ -580,8 +578,6 @@ curl -s 'https://www.peakcam.io/api/v1/resorts/alta/forecast?point=base' | jq '{
 curl -s https://www.peakcam.io/api/v1/resorts/alta/forecast-accuracy | jq '{truthBasis, measuredDays, scoredPoint, best: .bestModel, computedAt, models: [.models[] | {model, rank, day1Mae, day3Mae, day7Mae, biasRatio, samples}]}'
 curl -s https://www.peakcam.io/api/v1/resorts/alta | jq '{forecast, scores: (.forecastScores|length)}'
 curl -s https://www.peakcam.io/api/v1/batch -H 'content-type: application/json' -d '{"requests":[{"path":"/api/v1/resorts/alta/forecast"},{"path":"/api/v1/resorts/alta/forecast-accuracy"}]}' | jq '.results[] | {path, status}'
-npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_forecast --tool-arg slug=alta | head -30
-npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name compare_models --tool-arg slug=alta | head -30
 curl -s 'https://www.peakcam.io/api/v1/ask?q=forecast+for+alta' | jq '{tool, sentence}'
 curl -s https://www.peakcam.io/resorts/alta | grep -o '14-day snow outlook[^<]*' | head -1   # the strip renders once a run is stored
 curl -sI https://www.peakcam.io/gpt-instructions.md | grep -i '^content-type'
@@ -592,7 +588,6 @@ curl -s https://www.peakcam.io/.well-known/schemas/resort-conditions-v1.json | j
 curl -s 'https://www.peakcam.io/api/v1/ask?q=is+alta+open+today' | jq '{tool, sentence, status: .data.data.status.value}'
 curl -s https://www.peakcam.io/resorts/alta/index.md | sed -n '/## Status and freshness/,/## What the instruments say/p' | head -20
 curl -s https://www.peakcam.io/resorts/alta | grep -o 'data-testid="resort-status" data-status="[A-Z_]*"'
-npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_resort_conditions --tool-arg slug=alta | head -20
 ```
 
 Unmatched `/ask` questions land in `agent_memory` (`entity = 'ask:unmatched'`, `source_agent`
@@ -618,12 +613,12 @@ are optional until their block lands.
 | --- | --- | --- | --- |
 | `resorts.runs_total, lifts_total, skiable_acres, vertical_ft, annual_snowfall_in, longest_run_mi, description, description_source, trail_map_url, wikidata_id, aliases[], passes[], elevation_base_ft, elevation_summit_ft` | 025 | `scripts/import-resorts-standalone.mjs` (optional CSV columns), later the P2 enrichment job | `/api/v1` `profile` + `location`, resort pages (P2) |
 | `cams.kind, credit, source_terms_url` | 025 | importer (optional `cams.csv` columns), `scripts/approach-cams-sync.ts` (kind=approach), P8 cam audit | `/api/v1` cams |
-| `cam_timelapses` (`"window"` is quoted in SQL: reserved word) + `poster_url`, `starts_at`, `ends_at`, `bytes` and view `cam_timelapse_current` (031) | 025, 031 | `scripts/cam-timelapse.ts` (`com.peakcam.cam-timelapse`, every 6 h; bucket `cam-timelapses`) | webcams subpage strip + overview tile, `/resorts/{slug}/timelapses`, `Cam.timelapses` on `/cams`, MCP `get_timelapses`, markdown alternates |
-| `stations`, `resort_stations` | 026 | `scripts/stations-sync.ts` (hourly, `com.peakcam.stations-sync`) | `Resort.stations`, resort page "What the instruments say", MCP `get_stations` |
+| `cam_timelapses` (`"window"` is quoted in SQL: reserved word) + `poster_url`, `starts_at`, `ends_at`, `bytes` and view `cam_timelapse_current` (031) | 025, 031 | `scripts/cam-timelapse.ts` (`com.peakcam.cam-timelapse`, every 6 h; bucket `cam-timelapses`) | webcams subpage strip + overview tile, `/resorts/{slug}/timelapses`, `Cam.timelapses` on `/cams`, markdown alternates |
+| `stations`, `resort_stations` | 026 | `scripts/stations-sync.ts` (hourly, `com.peakcam.stations-sync`) | `Resort.stations`, resort page "What the instruments say" |
 | `station_observations` (PK `(station_id, observed_at)` is the read index) | 026 | `scripts/stations-sync.ts` via `lib/stations/` (SNOTEL, GHCN, NWS, BC ASWS, ECCC) | `Resort.measuredNow` |
 | `forecast_runs`, `forecast_daily` | 027 | `scripts/forecast-sync.ts` (`com.peakcam.forecast-sync`, every 6 h; live since P4, 2026-10-20) | `Resort.forecast` summary, `/resorts/{slug}/forecast`, `get_forecast`, the resort page strip |
 | `forecast_scores` | 027 | `scripts/forecast-score.ts` (`com.peakcam.forecast-score`, daily 07:30; rewrites per resort/model/window, `blend` row included) | `Resort.forecastScores`, `/resorts/{slug}/forecast-accuracy`, `compare_models` |
-| `resort_scores` | 028 | `scripts/score-sync.ts` (`com.peakcam.score-sync`, 07:45 and 19:45; P7, 2026-10-20), `scored_by = 'algorithmic'`, `components` jsonb keyed by `lib/score.ts SCORE_COMPONENT_IDS` | `Resort.score` (and `ScoreLight` on list / powder / compare rows), `/resorts/{slug}/score-components`, `/snow-report?sort=score`, MCP `get_score`, the resort page `#snow-score` card, the homepage strip, the markdown alternate |
+| `resort_scores` | 028 | `scripts/score-sync.ts` (`com.peakcam.score-sync`, 07:45 and 19:45; P7, 2026-10-20), `scored_by = 'algorithmic'`, `components` jsonb keyed by `lib/score.ts SCORE_COMPONENT_IDS` | `Resort.score` (and `ScoreLight` on list / powder / compare rows), `/resorts/{slug}/score-components`, `/snow-report?sort=score`, the resort page `#snow-score` card, the homepage strip, the markdown alternate |
 | `operator_status` + view `latest_operator_status` | 032 (P6, 2026-10-20) | `scripts/operator-sync.ts` (`com.peakcam.operator-sync`, every 30 minutes 07:05 to 16:35 Central) via `lib/operators/liftie-local.ts` and `scripts/liftie-worker/`; one row per fetch, idempotent on `(resort_id, source, observed_at)`; public read, no write policies | `/api/v1/resorts/{slug}/conditions` (`data.liftsOpen` …), the resort page status chip, `get_resort_conditions`, the markdown "Status and freshness" section |
 
 Elevations: `resorts.elevation_base_ft/summit_ft` are the canonical home from
@@ -642,7 +637,7 @@ Supabase MCP or paste into the SQL Editor. Verify with
 
 Branch `feat/p5-history`, parity plan block P5. The history page
 (`/resorts/{slug}/history`, markdown at `/history/index.md`), the three per-resort routes,
-the four leaderboards under `/snow-report/` and the three MCP tools all read
+the four leaderboards under `/snow-report/` and the internal history tools (`lib/mcp/tools-history.ts`) all read
 `snowpack_daily` (one QC'd row per resort per day, now with `new_snow_in`) and the station
 normals. Two run-once jobs fill them; nothing is scheduled.
 
@@ -682,7 +677,6 @@ curl -s 'https://www.peakcam.io/api/v1/leaderboards/season-snowfall?limit=5' | j
 curl -sI https://www.peakcam.io/resorts/breckenridge/history | grep -i '^link'                # rel="alternate" → /resorts/breckenridge/history/index.md
 curl -s https://www.peakcam.io/resorts/breckenridge/history/index.md | head -12
 curl -s https://www.peakcam.io/snow-report/season-powder-days | grep -o 'data-testid="leaderboard-freshness"[^<]*<[^>]*>[^<]*' | head -1
-npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_season_stats --tool-arg slug=breckenridge
 ```
 
 Before the backfill runs the pages still render: the curve shows the rows the sync has
@@ -728,9 +722,6 @@ curl -s https://www.peakcam.io/api/v1/batch -H 'content-type: application/json' 
 curl -s https://www.peakcam.io/resorts/alta | grep -o 'data-testid="score-card" data-score="[0-9a-z]*" data-rating="[a-z]*"'
 curl -s https://www.peakcam.io/resorts/alta/index.md | grep '^Snow Score:'
 curl -s https://www.peakcam.io/ | grep -o 'data-testid="featured-score-sentence"'
-npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/list | grep -c '"name"'   # 21
-npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_score --tool-arg slug=alta | head -20
-npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name compare_resorts --tool-arg 'slugs=["alta","snowbird"]' | grep '| Score |'
 ```
 
 Re-scoring after a formula change: bump `SCORE_VERSION` in `lib/score.ts`, merge, then
@@ -889,113 +880,48 @@ How it was enabled on the Mac mini (repeat only if the checkout or `.env.local` 
 `scripts/model-sync.ts` (Open-Meteo resorts) does not ping yet; add the same
 three lines there when the SNOTEL path has run clean for a week.
 
-## Connect page and MCP listings (`/connect`, server card, `server.json`)
+## MCP server and /connect: retired 2026-11-21
 
-Added 2026-10-18 (branch `feat/connect-page`, execution plan Sprint 6). All
-static; nothing here reads the database.
+The public MCP server (`io.peakcam/snow` at `/api/mcp`), the `/connect` setup page, the two
+server-card routes, the registry manifest `server.json` and the unpublished npm stdio bridge
+`packages/peakcam-mcp/` were removed on 2026-11-21 by the owner's decision. `docs/mcp.md` is the
+short record. What is left in the repo:
 
-| Surface | Where | Cache |
+| Surface | Where | Behaviour |
 | --- | --- | --- |
-| `GET /connect` | `app/connect/page.tsx`, data in `components/connect/links.ts` (links, tools, prompts, client recipes) | static per deploy |
-| `GET /.well-known/mcp/server-card.json` | `app/.well-known/mcp/server-card.json/route.ts` → `components/connect/server-card.ts` | 1 day, ETag, CORS `*` |
-| `GET /api/mcp/server-card` | `app/api/mcp/server-card/route.ts`, re-exports the `.well-known` handlers (SEP-2127 reserved location `<streamable-http-url>/server-card`) | same, byte-identical |
-| `server.json` (repo root) | MCP Registry manifest, read by `mcp-publisher publish` from the repo root; not served. Lists the HTTP remote, the npm stdio package and every tool name | n/a |
-| `packages/peakcam-mcp/` | The npm stdio bridge `peakcam-mcp` (`npx -y peakcam-mcp` → `/api/mcp`); `bin/peakcam-mcp.mjs`, README, MIT LICENSE; `mcpName` = `io.peakcam/snow` for the registry's ownership check. Not published yet (user item below) | n/a |
-| Footer "Developers" column | `components/home/PeakFooter.tsx`: `/connect`, `/api/mcp`, `/api/v1/resorts`, `/api/v1/openapi.json`, `/llms.txt` | static |
-| `llms.txt` "For agents" MCP line | `app/llms.txt/route.ts` (tool list from `PEAKCAM_TOOL_NAMES`) | ISR 3600 s |
-| `GET /llms-full.txt` | `app/llms-full.txt/route.ts` → `lib/public-api/llms-full.ts` | static per deploy, 24 h CDN |
+| `GET`/`POST`/`DELETE /api/mcp` | `app/api/mcp/route.ts` (test: `tests/mcp-retired.test.ts`) | 410 with `{error: "gone", message, openapi, docs}`, CORS `*`, `Cache-Control: public, max-age=3600`; `OPTIONS` 204 |
+| `/connect` | `next.config.ts` `redirects()` | permanent redirect to `/` |
+| `/.well-known/mcp/server-card.json`, `/api/mcp/server-card` | removed | 404 |
+| `lib/mcp/` | internal tool layer | Behind `/ask`, `/api/v1/ask` and the markdown renderers; tests in `lib/mcp/tools.test.ts`. Not a public surface |
 
-The server card follows the SEP-2127 **v1** shape (schema
-`https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json`):
-`name`, `version` (package.json), `description` (≤ 100 chars), `title`,
-`websiteUrl`, `repository`, `remotes[{type, url, supportedProtocolVersions}]`.
-The card does not list tools or auth at the top level by design (runtime
-listing owns that); the human summary (tools, no-auth, licence, contact,
-documentation) is under `_meta["io.peakcam/connect"]`. The SEP's reserved
-location is `<streamable-http-url>/server-card`, i.e. `/api/mcp/server-card`,
-served since 2026-10-18 by re-exporting the same handlers, so the two documents
-cannot drift. An `/.well-known/ai-catalog.json` pointing at the card is the
-discovery entry the extension expects and is not shipped yet (the parity plan
-drops it: no consumer reads it).
+The agent surface that stays is the REST API (`/api/v1`, OpenAPI, `/.well-known/api-catalog`,
+the JSON Schemas), the answer endpoint (`/ask`, `/api/v1/ask`), `llms.txt`, `llms-full.txt`,
+`/gpt-instructions.md` and the markdown alternates. None of them mentions MCP;
+`lib/public-api/agent-surface.test.ts` fails if one does.
 
-MCP tool verification after a deploy (expect 20 names in `PEAKCAM_TOOL_NAMES` order, `get_timelapses`
-last; 21 once P7's `get_score` lands):
+Verify after the deploy:
 
 ```bash
-npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/list | jq -r '.tools[].name'
-npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name ask --tool-arg question="is Breck open"
-npx @modelcontextprotocol/inspector --cli https://www.peakcam.io/api/mcp --method tools/call --tool-name get_cam_timeline --tool-arg slug=breckenridge --tool-arg hours=24
-# the stdio bridge, end to end against production (exits when stdin closes):
-printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}' | node packages/peakcam-mcp/bin/peakcam-mcp.mjs | jq '.result.serverInfo'
+curl -s -o /dev/null -w '%{http_code}\n' https://www.peakcam.io/api/mcp                       # 410
+curl -s https://www.peakcam.io/api/mcp | jq '{error, openapi, docs}'
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' https://www.peakcam.io/connect        # 308 https://www.peakcam.io/
+curl -s -o /dev/null -w '%{http_code}\n' https://www.peakcam.io/.well-known/mcp/server-card.json   # 404
+curl -s https://www.peakcam.io/llms.txt https://www.peakcam.io/llms-full.txt | grep -ci 'mcp'  # 0
+curl -s https://www.peakcam.io/api/v1/openapi.json | jq '.info | has("x-mcp-endpoint")'        # false
+curl -s https://www.peakcam.io/sitemaps/pages.xml | grep -c '/connect<'                        # 0
 ```
 
-Guard rails: `tests/connect-links.test.ts` walks every internal href in
-`CONNECT_LINKS` and fails if it does not match a `page.tsx`/`route.ts` under
-`app/` (dynamic `[segment]`s match anything) or a file under `public/`; a link
-may be `pending: true` only while its route is absent, and the test fails the
-other way once the route exists. `tests/mcp-listings.test.ts` checks both
-documents parse, agree on name/version/endpoint, list every tool in `PEAKCAM_TOOL_NAMES`,
-carry the npm package entry with the bridge's own version and `mcpName`, and that `server.json`
-keeps the one `_meta` key the registry preserves. Bump `server.json` `version` when
-`package.json` moves and `packages[0].version` when `packages/peakcam-mcp/package.json` moves
-(the test enforces both).
+**Left for the owner** (each needs an account or a dashboard only the owner holds):
 
-Smoke check after a deploy:
-
-```bash
-curl -s -o /dev/null -w '%{http_code}\n' https://www.peakcam.io/connect
-curl -sI https://www.peakcam.io/.well-known/mcp/server-card.json | grep -iE '^(content-type|cache-control|etag|access-control-allow-origin)'
-curl -s https://www.peakcam.io/.well-known/mcp/server-card.json | jq '{name, version, remotes}'
-curl -s https://www.peakcam.io/llms.txt | grep -n 'MCP server'
-curl -s https://www.peakcam.io/sitemap.xml | grep -c '/connect<'
-```
-
-**Submissions: what is done and what the owner still has to do.** Every item below needs an
-account only the owner holds; the repo side is complete. Do them in this order, because the
-registry re-publish validates the npm package.
-
-1. **npm: publish `peakcam-mcp`** (not published; the name is free as of 2026-10-20).
-   ```bash
-   cd packages/peakcam-mcp && npm pack --dry-run        # 3 files, ~2.5 kB
-   npm login                                           # the owner's npm account
-   npm publish --access public
-   npx -y peakcam-mcp --help                           # from any other directory
-   ```
-   The registry reads `mcpName` (`io.peakcam/snow`) from the published package.json to prove
-   ownership. Bumping later: `version` in `packages/peakcam-mcp/package.json` and
-   `server.json` `packages[0].version` together, then `npm publish`, then step 2.
-2. **MCP Registry: re-publish `server.json`** (first published 2026-10-18 as `io.peakcam/snow`
-   0.1.0, remote only; this run added the `packages` entry and the tool list, so the registry
-   copy is behind until this is run). Namespace proof is the apex TXT
-   `peakcam.io. IN TXT "v=MCPv1; k=ed25519; p=…"` in Vercel DNS (record
-   `rec_82e1d6ea8c9f5198f4beef15`), already in place; the matching Ed25519 private key lives on
-   the Mac Studio at `~/.config/peakcam-mcp-registry-key.pem` (user `totcho_admin`, not in the
-   repo, not backed up anywhere else). On the Studio from the repo root on `main`:
-   ```bash
-   brew install mcp-publisher                           # once
-   OPENSSL=/opt/homebrew/opt/openssl@3/bin/openssl
-   PRIVATE_KEY="$($OPENSSL pkey -in ~/.config/peakcam-mcp-registry-key.pem -noout -text | grep -A3 'priv:' | tail -n +2 | tr -d ' :\n')"
-   mcp-publisher login dns --domain peakcam.io --private-key "$PRIVATE_KEY"
-   mcp-publisher validate && mcp-publisher publish
-   curl "https://registry.modelcontextprotocol.io/v0.1/servers?search=io.peakcam/snow" | jq '.servers[0] | {version, remotes, packages}'
-   ```
-   A lost key means a new key (`$OPENSSL genpkey -algorithm Ed25519 -out …`), a replaced TXT
-   record (`vercel dns add peakcam.io @ TXT "v=MCPv1; k=ed25519; p=<base64 of the last 32 DER bytes>"`)
-   and a fresh login, nothing else. If `publish` rejects the package entry, step 1 has not
-   propagated yet; wait a few minutes.
-3. **Claude Connectors Directory** (submitted by the owner 2026-10-18, awaiting the automated
-   scan; escalation mcp-review@anthropic.com). <https://claude.ai/directory/manage> → the
-   listing. Nothing to resubmit; if the reviewer asks for the tool list, it is 21 tools now (P7 added get_score)
-   (the submission text named eight). Connection URL `https://www.peakcam.io/api/mcp`, docs
-   `/connect`, privacy `/about#privacy`, support `hello@peakcam.io`, icon `app/icon.png`, no
-   authentication, read-only. Test text: "No account needed. Add the URL as a custom connector
-   and run the prompts on https://www.peakcam.io/connect#prompts."
-4. **Smithery** (optional, not done): <https://smithery.ai/new> → remote server, URL
-   `https://www.peakcam.io/api/mcp`, no auth, the one-liner from `server.json` `description`,
-   docs `/connect`. Smithery also reads `server.json`; point it at the repo.
-5. **ChatGPT**: a Custom GPT is a 10-minute owner task with the recipe on `/connect#custom-gpt`
-   (import `/api/v1/openapi.json` as the Action, paste `/gpt-instructions.md`); an Apps SDK
-   submission (the directory listing) needs the OpenAI developer account and their review and
-   is not started.
-6. **Verify after each**: `/connect` renders the stdio card; `curl -s https://www.peakcam.io/.well-known/mcp/server-card.json | jq '._meta["io.peakcam/connect"].packages'`
-   shows the npm entry; the registry search above shows `packages[0].identifier == "peakcam-mcp"`.
+1. **MCP Registry**: the entry `io.peakcam/snow` (published 2026-10-18, remote only) still
+   points at `/api/mcp` and has to be withdrawn. The namespace login is the DNS method: the
+   Ed25519 key is on the Mac Studio at `~/.config/peakcam-mcp-registry-key.pem` and the apex TXT
+   record `v=MCPv1; k=ed25519; p=…` is in Vercel DNS (`rec_82e1d6ea8c9f5198f4beef15`). The TXT
+   record and the key can go once the entry is withdrawn.
+2. **Claude Connectors Directory**: the listing submitted on 2026-10-18 names
+   `https://www.peakcam.io/api/mcp`; withdraw it at <https://claude.ai/directory/manage>. Any
+   custom connector that was added by URL (the owner's own claude.ai account has one) starts
+   failing with the 410 and should be removed.
+3. **Vercel WAF rule** `Public API rate limit`: the `/api/mcp` path clause now only covers the
+   410 route and can be dropped; the public texts already say the limit applies to `/api/v1`.
+4. **npm**: nothing to do. `peakcam-mcp` was never published.

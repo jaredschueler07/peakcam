@@ -4,8 +4,7 @@ import { publicJson, publicOptions } from "@/lib/public-api/headers";
 // GET /.well-known/api-catalog — RFC 9727 API catalog: a linkset
 // (RFC 9264) naming the APIs this origin publishes and where their
 // descriptions live. Agents and crawlers that know the convention find the
-// OpenAPI document from here without reading HTML. Sprint 6 adds the MCP
-// server entry alongside.
+// OpenAPI document from here without reading HTML.
 export const dynamic = "force-static";
 
 export function GET(): Response {

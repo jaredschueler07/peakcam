@@ -1,8 +1,10 @@
 // ─────────────────────────────────────────────────────────────
-// MCP server — the read-only tools (PEAKCAM_TOOL_NAMES is the count), as pure builders.
+// Tool layer — the read-only tools (PEAKCAM_TOOL_NAMES is the count), as pure
+// builders. Internal since the public MCP server was retired on 2026-11-21:
+// /ask and /api/v1/ask run them through lib/ask/answer.ts.
 //
 // `buildTools(data)` returns tool definitions over an injected McpDataSource
-// so lib/mcp/server.test.ts can run every tool against fixtures with no
+// so lib/mcp/tools.test.ts can run every tool against fixtures with no
 // network. Each handler returns both a short, dated, source-labelled
 // markdown `content` block and a `structuredContent` document built from
 // the Sprint 3 serializer (lib/public-api/serialize.ts) whose shape is the
@@ -11,12 +13,12 @@
 // ─────────────────────────────────────────────────────────────
 
 import { z } from "zod";
-import type { CallToolResult } from "@modelcontextprotocol/server";
+import type { CallToolResult } from "./types";
 import type { ResortWithData, WeatherPeriod } from "@/lib/types";
 import type { PublicApiCatalog } from "@/lib/public-api/data";
 import { SITE_URL } from "@/lib/site";
 import { stateHubPath, stateLabel } from "@/lib/hubs";
-import { KEEPER_MIN_SNOW_24H_IN, MAX_TIMELINE_HOURS, clampHours, type CamTimelineFrame } from "@/lib/cam-timeline";
+import { KEEPER_MIN_SNOW_24H_IN, MAX_TIMELINE_HOURS, clampHours, filterRetainedFrames, stormKeeper, type CamTimelineFrame } from "@/lib/cam-timeline";
 import { clipDurationSeconds, type CamTimelapses } from "@/lib/cam-timelapse";
 import { resortTabUrl } from "@/lib/resort-pages";
 import { PCT_OF_NORMAL_RULE, buildPctOfNormalPage } from "@/lib/percent-of-normal";
@@ -1193,7 +1195,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
           signature: "v1,<base64(HMAC-SHA256(secret, \"<id>.<timestamp>.<raw body>\"))> — the secret is the base64 part after whsec_; reject timestamps more than 5 minutes off.",
           payloadExample,
           retries: "Three attempts per event (1 s, then 5 s), 5 s timeout each; a destination is disabled after ten consecutive failed runs.",
-          docsUrl: `${SITE_URL}/connect#agents`,
+          docsUrl: `${SITE_URL}/llms-full.txt`,
         },
         writes: false as const,
         generatedAt: catalog.now.toISOString(),
@@ -1239,7 +1241,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
       camCount: z.number().int().describe("Cams with at least one frame in the result."),
       frameCount: z.number().int(),
       newestCapturedAt: z.string().nullable(),
-      lastStorm: TimelineFrameSchema.extend({ camId: z.string(), camName: z.string() }).nullable().describe("Newest storm frame across the resort, any age."),
+      lastStorm: TimelineFrameSchema.extend({ camId: z.string(), camName: z.string() }).nullable().describe("Most recent storm frame across the resort, any age: the surviving keeper of the newest 6 h storm bucket, so the link outlives thinning."),
       cams: z.array(
         z.object({
           camId: z.string(),
@@ -1270,8 +1272,9 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
       const canonicalUrl = resortCanonicalUrl(resort.slug);
       const since = catalog.now.getTime() - h * 3_600_000;
       const camOrder = resort.cams.map((c) => c.id);
+      const retained = filterRetainedFrames(frames ?? [], catalog.now);
       const byCam = new Map<string, CamTimelineFrame[]>();
-      for (const f of frames ?? []) {
+      for (const f of retained) {
         const list = byCam.get(f.camId) ?? [];
         list.push(f);
         byCam.set(f.camId, list);
@@ -1284,7 +1287,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
           const cam = resort.cams.find((c) => c.id === id);
           const newestFirst = [...list].sort((a, b) => Date.parse(b.capturedAt) - Date.parse(a.capturedAt));
           const inWindow = newestFirst.filter((f) => Date.parse(f.capturedAt) >= since);
-          const keeper = newestFirst.find((f) => f.keeper) ?? null;
+          const keeper = stormKeeper(list, (f) => f.capturedAt, (f) => f.keeper);
           return {
             camId: id,
             camName: cam?.name ?? id,
