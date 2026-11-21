@@ -275,6 +275,9 @@ const nextConfig: NextConfig = {
         destination: "https://www.peakcam.io/:path*",
         permanent: true,
       },
+      // /connect was the setup page for the public MCP server, retired
+      // 2026-11-21. Old links land on the homepage instead of a 404.
+      { source: "/connect", destination: "/", permanent: true },
     ];
   },
 };

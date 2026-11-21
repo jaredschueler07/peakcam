@@ -1,86 +1,25 @@
 // ─────────────────────────────────────────────────────────────
 // llms-full.txt — the long-form agent guide (https://llmstxt.org).
 //
-// Built from the same sources as the surfaces it describes: tool names,
-// titles, descriptions and input schemas from buildTools(), one example per
-// tool from lib/mcp/examples.ts, the header set and attribution line from
-// headers.ts, and the rate-limit truth as docs/runbook.md records it. Pure
-// (the stub data source is never called: buildTools only touches it inside
-// handlers), so the route is static and the test can diff it.
+// Built from the same sources as the surfaces it describes: the REST routes
+// below, the answer endpoint's intent tuple and suggestions, the header set
+// and attribution line from headers.ts, and the rate-limit truth as
+// docs/runbook.md records it. Pure, so the route is static and the test can
+// diff it. The MCP server sections left with the server on 2026-11-21.
 // ─────────────────────────────────────────────────────────────
 
-import { z } from "zod";
 import { SITE_URL } from "@/lib/site";
-import { PEAKCAM_MCP_ENDPOINT, PEAKCAM_MCP_NAME } from "@/lib/mcp/server";
-import { buildTools, type ToolDefinition } from "@/lib/mcp/tools";
-import { TOOL_EXAMPLES, inspectorArgs } from "@/lib/mcp/examples";
-import type { McpDataSource } from "@/lib/mcp/types";
+import { ASK_SUGGESTIONS } from "@/lib/ask/answer";
+import { ASK_INTENTS } from "@/lib/ask/intents";
 import { PUBLIC_API_ATTRIBUTION, PUBLIC_API_LICENSE_URL, PUBLIC_API_REVALIDATE_SECONDS } from "./headers";
 import { SCHEMAS_PATH } from "./json-schemas";
 import { deprecationPolicyText } from "./openapi";
 
 /** docs/runbook.md "Public API": the live limit and what exceeding it looks like. */
 export const RATE_LIMIT_TEXT =
-  "60 requests per minute per IP across /api/v1/* and /api/mcp, enforced at the Vercel edge (cache hits count). " +
+  "60 requests per minute per IP on /api/v1/*, enforced at the Vercel edge (cache hits count). " +
   "The 61st request inside a minute gets a plain-text 403 `Forbidden` with `x-vercel-mitigated: deny` and no Retry-After; the window resets within about a minute. " +
   "There is no 429 and no key that raises the limit. Use POST /api/v1/batch (up to 10 reads for one request) and respect Cache-Control.";
-
-const never = async (): Promise<never> => {
-  throw new Error("llms-full.txt never calls a tool");
-};
-const STUB: McpDataSource = { catalog: never, forecast: never, forecastRuns: never, forecastAccuracy: never, snowHistory: never, camStills: never };
-
-interface ParamDoc {
-  name: string;
-  required: boolean;
-  type: string;
-  description: string;
-}
-
-function paramsOf(tool: ToolDefinition): ParamDoc[] {
-  const schema = z.toJSONSchema(tool.inputSchema, { target: "draft-2020-12", io: "input" }) as {
-    properties?: Record<string, Record<string, unknown>>;
-    required?: string[];
-  };
-  const required = new Set(schema.required ?? []);
-  return Object.entries(schema.properties ?? {}).map(([name, p]) => {
-    const type = Array.isArray(p.enum)
-      ? (p.enum as unknown[]).map((v) => `\`${String(v)}\``).join(" | ")
-      : p.type === "array"
-        ? `array of ${((p.items as { type?: string } | undefined)?.type ?? "string")}`
-        : String(p.type ?? "string");
-    const dflt = p.default !== undefined ? ` Default ${JSON.stringify(p.default)}.` : "";
-    return { name, required: required.has(name), type, description: `${String(p.description ?? "")}${dflt}`.trim() };
-  });
-}
-
-function toolSection(tool: ToolDefinition, baseUrl: string): string {
-  const example = TOOL_EXAMPLES[tool.name];
-  const params = paramsOf(tool);
-  const lines = [
-    `### ${tool.name} — ${tool.title}`,
-    "",
-    tool.description,
-    "",
-    ...(params.length
-      ? ["Arguments:", ...params.map((p) => `- \`${p.name}\` (${p.type}${p.required ? ", required" : ""}): ${p.description}`)]
-      : ["Arguments: none."]),
-    "",
-    `Example — "${example.prompt}":`,
-    "",
-    "```bash",
-    `npx @modelcontextprotocol/inspector --cli ${baseUrl}/api/mcp --method tools/call --tool-name ${tool.name}${Object.keys(example.args).length ? ` ${inspectorArgs(example.args)}` : ""}`,
-    "```",
-    "",
-    "Or as one JSON-RPC POST:",
-    "",
-    "```bash",
-    `curl -s ${baseUrl}/api/mcp -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \\`,
-    `  -d '${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: tool.name, arguments: example.args } })}'`,
-    "```",
-  ];
-  return lines.join("\n");
-}
 
 interface RestDoc {
   method: "GET" | "POST";
@@ -117,22 +56,21 @@ function restDocs(baseUrl: string): RestDoc[] {
 }
 
 export function buildLlmsFull(baseUrl: string = SITE_URL): string {
-  const tools = buildTools(STUB);
   const rest = restDocs(baseUrl);
   const lines: string[] = [
     "# PeakCam — full guide for agents",
     "",
-    `> Live ski-resort snow reports, SNOTEL measurements, webcams, forecasts, season dates and powder rankings for about 300 resorts in the US, Canada, Chile and Argentina, as an MCP server, a REST API, an answer endpoint and markdown pages. Everything here is read-only, anonymous and free. Short form: ${baseUrl}/llms.txt. Human setup page: ${baseUrl}/connect.`,
+    `> Live ski-resort snow reports, SNOTEL measurements, webcams, forecasts, season dates and powder rankings for about 300 resorts in the US, Canada, Chile and Argentina, as a REST API, an answer endpoint and markdown pages. Everything here is read-only, anonymous and free. Short form: ${baseUrl}/llms.txt.`,
     "",
     "## What the data is",
     "",
     "- Every snow number carries a `source` and a `measuredAt`. `snotel` means measured at a USDA NRCS SNOTEL/SCAN station near the resort, quality-controlled by PeakCam and synced every 6 hours; the station sits at one elevation (`station.elevationFt`), not the summit. `open_meteo` means a weather-model estimate for resorts with no station (most of Canada, the East and the Andes). Say which it is when you quote a number.",
-    "- Forecasts are PeakCam's blend of up to nine weather models (ECMWF IFS, GFS, GEM, ICON, JMA, Météo-France, UKMO; NBM and HRRR for US points) fetched from Open-Meteo every 6 hours at the summit and base: per day the median snowfall, a 25th–75th percentile band, and `modelCount` (fewer models reach the far days — say so when you quote day 10). US resorts also get the National Weather Service narrative with its snow amounts replaced by the blend. Each model and the blend is graded against measured SNOTEL snow over 90 days (`compare_models`, `/forecast-accuracy`); quote `truthBasis` and `measuredDays` with any accuracy claim. Credit: Weather data by Open-Meteo.com (CC BY 4.0).",
+    "- Forecasts are PeakCam's blend of up to nine weather models (ECMWF IFS, GFS, GEM, ICON, JMA, Météo-France, UKMO; NBM and HRRR for US points) fetched from Open-Meteo every 6 hours at the summit and base: per day the median snowfall, a 25th–75th percentile band, and `modelCount` (fewer models reach the far days — say so when you quote day 10). US resorts also get the National Weather Service narrative with its snow amounts replaced by the blend. Each model and the blend is graded against measured SNOTEL snow over 90 days (`/api/v1/resorts/{slug}/forecast-accuracy`); quote `truthBasis` and `measuredDays` with any accuracy claim. Credit: Weather data by Open-Meteo.com (CC BY 4.0).",
     "- Webcams are returned as links (PeakCam page, operator stream, still URL with its capture time). Never describe a frame you have not fetched. Archived stills exist only for cams whose operator allows it.",
     "- Season status comes from `resort_openings`: `open` once a resort-confirmed date has passed, `closed` before it, `unknown` when PeakCam has only a projection or no date. Never report a resort as open without a confirmed source.",
-    "- The conditions contract (`/api/v1/resorts/{slug}/conditions`, also inside `get_resort_conditions`) wraps every field as `{value, source, observedAt, confidence, freshness: {tier, ageHours}}`. Sources: `snotel`, `station:<network>`, `operator` (the resort's own lift feed or confirmed date), `model`, `profile` (static catalogue fact), `derived`, `none`. Tiers: `live` (≤ 3 h, hourly source), `recent` (≤ 30 h), `estimated` (model), `stale` (> 30 h), `unknown`. `data.status` is OPEN only on a fresh operator feed or a confirmed opening date; otherwise CLOSED_TODAY, PRE_SEASON, OFF_SEASON or UNKNOWN, with `reasons`. When `depthDisagreement` is set, quote the measured base and name the operator's figure as theirs.",
+    "- The conditions contract (`/api/v1/resorts/{slug}/conditions`) wraps every field as `{value, source, observedAt, confidence, freshness: {tier, ageHours}}`. Sources: `snotel`, `station:<network>`, `operator` (the resort's own lift feed or confirmed date), `model`, `profile` (static catalogue fact), `derived`, `none`. Tiers: `live` (≤ 3 h, hourly source), `recent` (≤ 30 h), `estimated` (model), `stale` (> 30 h), `unknown`. `data.status` is OPEN only on a fresh operator feed or a confirmed opening date; otherwise CLOSED_TODAY, PRE_SEASON, OFF_SEASON or UNKNOWN, with `reasons`. When `depthDisagreement` is set, quote the measured base and name the operator's figure as theirs.",
     "- Percent of normal is SWE against the station's 1991–2020 median for the day of the water year, published only inside 10–300 % and above 2 in of SWE.",
-    "- The Snow Score (`score` on every resort row, `get_score`, `/api/v1/resorts/{slug}/score-components`) is a 0–100 number scored once a day from five weighted components: depth vs the station's normal (30), new snow over 7 days (25), the blended 7-day forecast (20), snow quality from freshness, temperature and the surface tags (15), and the operating status (10). Every component carries its points, maximum, a one-line basis and its source; the four-tier `rating` (great ≥ 75, good ≥ 55, fair ≥ 35, else poor) uses the same words as the conditions rating. `scoredBy` is always `algorithmic`: no editorial input. Quote the `tagline` with its date; rank with `/api/v1/snow-report?sort=score`.",
+    "- The Snow Score (`score` on every resort row, `/api/v1/resorts/{slug}/score-components`) is a 0–100 number scored once a day from five weighted components: depth vs the station's normal (30), new snow over 7 days (25), the blended 7-day forecast (20), snow quality from freshness, temperature and the surface tags (15), and the operating status (10). Every component carries its points, maximum, a one-line basis and its source; the four-tier `rating` (great ≥ 75, good ≥ 55, fair ≥ 35, else poor) uses the same words as the conditions rating. `scoredBy` is always `algorithmic`: no editorial input. Quote the `tagline` with its date; rank with `/api/v1/snow-report?sort=score`.",
     `- Methodology: ${baseUrl}/methodology. Freshness guarantees: ${baseUrl}/methodology#freshness.`,
     "",
     "## Attribution and terms",
@@ -152,19 +90,6 @@ export function buildLlmsFull(baseUrl: string = SITE_URL): string {
     `- ${deprecationPolicyText(baseUrl)}`,
     "- Check for the `Deprecation` and `Sunset` headers on the operations you call; while neither is present the operation is current. The OpenAPI document carries the same commitment as `info.x-deprecation-policy`.",
     "",
-    "## MCP server",
-    "",
-    `- Name \`${PEAKCAM_MCP_NAME}\`, endpoint \`${PEAKCAM_MCP_ENDPOINT}\`, stateless Streamable HTTP, no auth, no SSE mount. Protocol 2026-07-28 natively; 2025-11-25 and 2025-06-18 through the SDK fallback.`,
-    `- Server card: ${baseUrl}/.well-known/mcp/server-card.json (also ${baseUrl}/api/mcp/server-card). Client recipes (Claude, ChatGPT, Cursor, Claude Code, Claude Desktop, Custom GPT): ${baseUrl}/connect#clients.`,
-    "- stdio-only clients: `npx -y peakcam-mcp` (npm package `peakcam-mcp`, a stateless bridge to the endpoint; `--url` or `PEAKCAM_MCP_URL` for a preview deployment). Listed in server.json and the server card beside the HTTP remote.",
-    "- Workflow: `search_resorts` (or `ask`) turns a name into a slug; the `get_*` tools take the slug; `find_powder`, `get_opening_dates`, `get_percent_of_normal` and `get_leaderboard` take an optional `state` whose valid values `list_regions` returns. Season questions: `get_season_stats` (summary), `get_snow_history` with `season` (daily rows), `get_monthly_climatology` (what a month usually brings).",
-    "- Every tool is annotated read-only and idempotent, validates its input, and returns a dated markdown `content` block plus `structuredContent` matching its `outputSchema` (the same shapes as the REST API).",
-    "- Resource: `peakcam://resorts/{slug}` (text/markdown), the same document as `/resorts/{slug}/index.md`.",
-    "",
-    `## Tools (${tools.length})`,
-    "",
-    ...tools.map((t) => toolSection(t, baseUrl)),
-    "",
     "## REST API (`/api/v1`)",
     "",
     `OpenAPI 3.1: ${baseUrl}/api/v1/openapi.json. Standalone JSON Schemas: ${baseUrl}${SCHEMAS_PATH} (one file per shape, e.g. \`resort.json\`, \`cams.json\`, \`powder.json\`, \`status.json\`, \`ask.json\`). API catalog (RFC 9727): ${baseUrl}/.well-known/api-catalog.`,
@@ -181,14 +106,16 @@ export function buildLlmsFull(baseUrl: string = SITE_URL): string {
     ]),
     "## Answer endpoint rules",
     "",
-    "- `/api/v1/ask` and `/ask` are deterministic: a resort is resolved from its name, slug or nickname (one typo of slack), an intent from keywords (snow, open/closed, forecast, cams, cam timeline, history, compare, where did it snow, percent of normal, profile, regions, alerts), and exactly one tool runs. No language model.",
+    "- `/api/v1/ask` and `/ask` are deterministic: a resort is resolved from its name, slug or nickname (one typo of slack), an intent from keywords (snow, open/closed, forecast, cams, cam timeline, history, compare, where did it snow, percent of normal, profile, regions, alerts), and exactly one internal reader runs. No language model.",
+    `- \`intent\` is one of ${ASK_INTENTS.map((i) => `\`${i}\``).join(", ")}. \`tool\` names the reader that ran (for example \`get_resort_conditions\`, \`find_powder\`, \`compare_resorts\`) and \`data\` is its document, in the same shapes as the REST routes above; the readers are not callable on their own.`,
+    `- Questions it answers, as examples: ${ASK_SUGGESTIONS.map((q) => `"${q}"`).join(" ")}`,
     "- When nothing matches, the answer is `answerable: false` with `suggestions`. Relay that; do not substitute a similarly named resort.",
     "- `sentence` is quotable as is: it is dated in Mountain time with the report's own timestamp and names the source. `citations[0]` is the page to link.",
     "",
     "## Markdown, feeds and other alternates",
     "",
     `- Markdown: ${baseUrl}/index.md (every resort) and ${baseUrl}/resorts/{slug}/index.md (one resort); each HTML page advertises its alternate in a \`Link\` header.`,
-    `- Atom per resort: ${baseUrl}/resorts/{slug}/powder.xml. Subscriber Atom and iCal, e-mail and signed webhooks (Standard Webhooks): ${baseUrl}/alerts/manage; the \`get_alert_options\` tool explains them without writing anything.`,
+    `- Atom per resort: ${baseUrl}/resorts/{slug}/powder.xml. Subscriber Atom and iCal, e-mail and signed webhooks (Standard Webhooks): ${baseUrl}/alerts/manage; asking the answer endpoint "how do powder alerts work" explains them without writing anything.`,
     `- Custom GPT instructions: ${baseUrl}/gpt-instructions.md (import ${baseUrl}/api/v1/openapi.json as the Action).`,
     `- robots.txt carries \`Content-Signal: search=yes, ai-input=yes, ai-train=yes\`.`,
     "",
@@ -196,7 +123,7 @@ export function buildLlmsFull(baseUrl: string = SITE_URL): string {
     "",
     "- Lifts open come from the operator's own status page via Liftie for about 90 resorts (`data.liftsOpen.source` = `operator`); where the field's source is `none`, PeakCam has no lift feed for that resort. Say so rather than estimating. Trails open and surface arrive only with a feed that carries them.",
     "- Season history is PeakCam's own daily station record (ten seasons, from the backfill) and daily new snow is the positive change in station depth, a measured floor: do not present a season total as the resort's marketing snowfall figure. Resorts without a station have model-estimated daily values and no normal band or monthly climatology.",
-    "- Resorts outside the catalogue: `search_resorts` or `/api/v1/resorts/search-index` is the authority on what is tracked.",
+    "- Resorts outside the catalogue: `/api/v1/resorts/search-index` is the authority on what is tracked.",
     "",
   ];
   return `${lines.join("\n")}\n`;

@@ -1,8 +1,10 @@
 // ─────────────────────────────────────────────────────────────
-// MCP server — the read-only tools (PEAKCAM_TOOL_NAMES is the count), as pure builders.
+// Tool layer — the read-only tools (PEAKCAM_TOOL_NAMES is the count), as pure
+// builders. Internal since the public MCP server was retired on 2026-11-21:
+// /ask and /api/v1/ask run them through lib/ask/answer.ts.
 //
 // `buildTools(data)` returns tool definitions over an injected McpDataSource
-// so lib/mcp/server.test.ts can run every tool against fixtures with no
+// so lib/mcp/tools.test.ts can run every tool against fixtures with no
 // network. Each handler returns both a short, dated, source-labelled
 // markdown `content` block and a `structuredContent` document built from
 // the Sprint 3 serializer (lib/public-api/serialize.ts) whose shape is the
@@ -11,7 +13,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { z } from "zod";
-import type { CallToolResult } from "@modelcontextprotocol/server";
+import type { CallToolResult } from "./types";
 import type { ResortWithData, WeatherPeriod } from "@/lib/types";
 import type { PublicApiCatalog } from "@/lib/public-api/data";
 import { SITE_URL } from "@/lib/site";
@@ -1193,7 +1195,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
           signature: "v1,<base64(HMAC-SHA256(secret, \"<id>.<timestamp>.<raw body>\"))> — the secret is the base64 part after whsec_; reject timestamps more than 5 minutes off.",
           payloadExample,
           retries: "Three attempts per event (1 s, then 5 s), 5 s timeout each; a destination is disabled after ten consecutive failed runs.",
-          docsUrl: `${SITE_URL}/connect#agents`,
+          docsUrl: `${SITE_URL}/llms-full.txt`,
         },
         writes: false as const,
         generatedAt: catalog.now.toISOString(),

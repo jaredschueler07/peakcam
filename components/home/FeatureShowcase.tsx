@@ -3,7 +3,7 @@ import { buildShowcaseCards, type ShowcaseResort } from "@/lib/home-showcase";
 
 // Homepage "More than cams" section: one card per deeper feature (season
 // history, the 14-day blend, leaderboards, percent of normal, compare, opening
-// dates, passes, the AI connection), each linking to the page that has it.
+// dates, passes, the map), each linking to the page that has it.
 // No hooks and no fetching: app/page.tsx picks the resort from data it already
 // has and passes this in as a slot, so nothing here adds a homepage query.
 

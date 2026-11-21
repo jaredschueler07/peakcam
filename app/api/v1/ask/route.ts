@@ -4,7 +4,7 @@ import { PUBLIC_API_POST_METHODS, publicError, publicJson, publicOptions } from 
 // GET /api/v1/ask?q=is+alta+open  ·  POST /api/v1/ask {"query": "..."}
 //
 // The deterministic answer endpoint: lib/ask/router.ts picks a resort and an
-// intent from the wording and lib/ask/answer.ts runs the one MCP tool that
+// intent from the wording and lib/ask/answer.ts runs the one internal tool that
 // serves it, returning the tool's structured result plus a dated sentence.
 // No language model. Unanswerable questions come back 200 with
 // `answerable: false` and suggestions; only a missing or oversized question

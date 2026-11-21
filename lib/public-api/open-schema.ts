@@ -9,9 +9,10 @@
 // server does not advertise `listChanged`, so those clients never refetch.
 //
 // `openResponseSchema` removes every `additionalProperties: false` from an
-// emitted JSON Schema. It is applied to what we PUBLISH for responses (MCP
-// `outputSchema`, /.well-known/schemas, OpenAPI components); it never touches
-// the zod schemas that validate input.
+// emitted JSON Schema. It is applied to what we PUBLISH for responses
+// (/.well-known/schemas, OpenAPI components; the MCP server it was written
+// for was retired on 2026-11-21); it never touches the zod schemas that
+// validate input.
 
 type Json = unknown;
 
@@ -41,22 +42,3 @@ export function closedObjectPaths(schema: Json, path = "$"): string[] {
 
 /** Request-body schemas in the registry: these stay closed, they describe what we accept. */
 export const REQUEST_SCHEMA_IDS: ReadonlySet<string> = new Set(["BatchRequest"]);
-
-type JsonSchemaFn = (options: unknown) => unknown;
-
-/**
- * The same schema for validation, but its published JSON Schema (what the MCP
- * SDK puts in `tools/list` as `outputSchema`) is open. Validation is untouched:
- * `z.object` already ignores unknown keys when parsing.
- */
-export function withOpenOutputJsonSchema<S extends object>(schema: S): S {
-  const std = (schema as { "~standard"?: { jsonSchema?: { input: JsonSchemaFn; output: JsonSchemaFn } } })["~standard"];
-  const js = std?.jsonSchema;
-  if (!std || !js) return schema;
-  const opened = { ...std, jsonSchema: { input: (o: unknown) => js.input(o), output: (o: unknown) => openResponseSchema(js.output(o)) } };
-  return new Proxy(schema, {
-    get(target, prop, receiver) {
-      return prop === "~standard" ? opened : Reflect.get(target, prop, receiver);
-    },
-  });
-}

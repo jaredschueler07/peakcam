@@ -4,8 +4,8 @@
 // Reads the question from `q`, `query` or `question` (GET) or a JSON body
 // with any of those keys (POST), hashes the caller's IP the way
 // /api/cam-reports/submit does (salted, day-scoped, no salt → no hash), and
-// runs the router against the production data source with the same tool
-// handlers the MCP server registers. Importing this module imports the anon
+// runs the router against the production data source with the tool
+// handlers from lib/mcp/tools.ts. Importing this module imports the anon
 // Supabase client, so only routes import it.
 // ─────────────────────────────────────────────────────────────
 

@@ -1,24 +1,11 @@
-import { test, before, after } from "node:test";
+import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import type { Cam, OperatorStatusRow, ResortScoreRow, ResortStationJoined, ResortWithData, SnowReport, WeatherPeriod } from "@/lib/types";
 import type { ResortOpening } from "@/lib/openings";
 import type { PublicApiCatalog } from "@/lib/public-api/data";
 import { CamListSchema, PowderListSchema, ResortConditionsSchema, ResortSchema } from "@/lib/public-api/schema";
-import pkg from "@/package.json";
-import {
-  PEAKCAM_MCP_INSTRUCTIONS,
-  PEAKCAM_MCP_NAME,
-  PEAKCAM_RESOURCE_TEMPLATE,
-  READ_ONLY_TOOL_ANNOTATIONS,
-  createPeakCamServer,
-  peakCamServerInfo,
-  peakCamServerOptions,
-  registerPeakCam,
-} from "./server";
-import { createMcpHandler } from "mcp-handler";
 import { MAX_CAMS, MCP_WITHHELD_CONDITIONS_KEYS, PEAKCAM_TOOL_NAMES, buildTools, mcpConditionsData, diceSimilarity, editDistance, matchResorts, normalizeText, scoreResort } from "./tools";
-import type { McpDataSource, SnowHistoryRow, UnmatchedQuestion } from "./types";
+import type { CallToolResult, McpDataSource, SnowHistoryRow, UnmatchedQuestion } from "./types";
 import type { ResortHistoryData } from "@/lib/public-api/data";
 import type { SeasonAggregateRow } from "@/lib/leaderboards";
 import { addDays, deriveNewSnow, type CumulativeNormalRow, type DailyRow, type MonthlyNormalRow } from "@/lib/snow-history";
@@ -351,78 +338,53 @@ function fixtureData(over: Partial<McpDataSource> = {}): McpDataSource {
   };
 }
 
-// ── In-memory client ─────────────────────────────────────────
+// ── Direct harness ───────────────────────────────────────────
+//
+// The tools are internal since the public MCP server was retired on
+// 2026-11-21 (lib/ask/answer.ts is their caller), so the tests run each
+// handler the way that caller does: parse the arguments with the tool's
+// inputSchema, then call the handler. A result that is not an error must
+// also satisfy the tool's outputSchema.
 
-type TextBlock = { type: "text"; text: string };
-
-function text(result: { content: unknown }): string {
-  const blocks = result.content as TextBlock[];
+function text(result: CallToolResult): string {
+  const blocks = result.content;
   assert.ok(blocks.length >= 1 && blocks[0].type === "text", "first content block is text");
   return blocks[0].text;
 }
 
-async function connect(data: McpDataSource = fixtureData()) {
-  const server = createPeakCamServer(data);
-  const client = new Client({ name: "peakcam-test-client", version: "0.0.0" });
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
-  return { client, server };
+async function callWith(data: McpDataSource, name: string, args: Record<string, unknown> = {}): Promise<CallToolResult> {
+  const tool = buildTools(data).find((t) => t.name === name);
+  assert.ok(tool, `tool ${name} exists`);
+  const parsed = tool.inputSchema.safeParse(args);
+  if (!parsed.success) return { content: [{ type: "text", text: `Invalid arguments for ${name}: ${parsed.error.message}` }], isError: true };
+  const result = await tool.handler(parsed.data as never);
+  if (result.isError !== true) tool.outputSchema.parse(result.structuredContent);
+  return result;
 }
 
-let client: Client;
-let server: Awaited<ReturnType<typeof connect>>["server"];
+const DATA = fixtureData();
 
-before(async () => {
-  ({ client, server } = await connect());
-});
-
-after(async () => {
-  await client.close();
-  await server.close();
-});
-
-async function call(name: string, args: Record<string, unknown> = {}) {
-  return client.callTool({ name, arguments: args });
+async function call(name: string, args: Record<string, unknown> = {}): Promise<CallToolResult> {
+  return callWith(DATA, name, args);
 }
 
-// ── Handshake ────────────────────────────────────────────────
+// ── The tool set ─────────────────────────────────────────────
 
-test("initialize reports io.peakcam/snow, the package version and instructions", () => {
-  const info = client.getServerVersion();
-  assert.equal(info?.name, PEAKCAM_MCP_NAME);
-  assert.equal(info?.version, pkg.version);
-  assert.equal(info?.title, "PeakCam Snow");
-  assert.equal(client.getInstructions(), PEAKCAM_MCP_INSTRUCTIONS);
-  assert.match(PEAKCAM_MCP_INSTRUCTIONS, /SNOTEL/);
-  assert.match(PEAKCAM_MCP_INSTRUCTIONS, /canonicalUrl/);
-  const version = client.getNegotiatedProtocolVersion();
-  assert.ok(typeof version === "string" && /^\d{4}-\d{2}-\d{2}$/.test(version), `negotiated protocol version: ${version}`);
-  console.log(`negotiated protocol version ${version} (${client.getProtocolEra()} era)`);
-  // The catalogue never changes within a deploy, so no list-changed
-  // subscription is offered (see peakCamServerOptions for the Vercel reason).
-  const capabilities = client.getServerCapabilities();
-  assert.equal(capabilities?.tools?.listChanged, false);
-  assert.equal(capabilities?.resources?.listChanged, false);
-});
-
-test("tools/list returns every tool in the name tuple, each read-only with input and output schemas", async () => {
-  const { tools } = await client.listTools();
+test("buildTools returns every tool in the name tuple, each with a title, a description and object schemas", () => {
+  const tools = buildTools(DATA);
   assert.deepEqual(
     tools.map((t) => t.name),
     [...PEAKCAM_TOOL_NAMES],
   );
-  assert.equal(tools.length, PEAKCAM_TOOL_NAMES.length);
   for (const tool of tools) {
-    assert.deepEqual(tool.annotations, READ_ONLY_TOOL_ANNOTATIONS, `${tool.name} annotations`);
     assert.ok(tool.title, `${tool.name} has a title`);
     assert.ok(tool.description && tool.description.length > 40, `${tool.name} has a description`);
-    assert.equal(tool.inputSchema.type, "object", `${tool.name} input schema is an object`);
-    assert.ok(tool.outputSchema && tool.outputSchema.type === "object", `${tool.name} has an object output schema`);
+    assert.equal(typeof tool.inputSchema.shape, "object", `${tool.name} input schema is an object`);
+    assert.equal(typeof tool.outputSchema.shape, "object", `${tool.name} output schema is an object`);
   }
   const powder = tools.find((t) => t.name === "find_powder")!;
-  const props = powder.inputSchema.properties as Record<string, { description?: string }>;
-  assert.deepEqual(Object.keys(props).sort(), ["limit", "minInches", "sourceOnly", "state", "window"]);
-  assert.ok(props.sourceOnly.description?.includes("snotel"));
+  assert.deepEqual(Object.keys(powder.inputSchema.shape).sort(), ["limit", "minInches", "sourceOnly", "state", "window"]);
+  assert.ok(powder.inputSchema.shape.sourceOnly.description?.includes("snotel"));
 });
 
 // ── get_stations ─────────────────────────────────────────────
@@ -788,17 +750,11 @@ test("get_forecast: no stored run → NWS narrative with keyword amounts for a U
 });
 
 test("get_forecast degrades to available=false when nothing is stored and NWS does not answer", async () => {
-  const { client: c, server: s } = await connect(fixtureData({ forecast: async () => null, forecastRuns: async () => ({ runs: [] }) }));
-  try {
-    const res = await c.callTool({ name: "get_forecast", arguments: { slug: "vail" } });
-    const doc = res.structuredContent as { available: boolean; note: string | null };
-    assert.equal(doc.available, false);
-    assert.match(doc.note ?? "", /did not answer/);
-    assert.notEqual(res.isError, true);
-  } finally {
-    await c.close();
-    await s.close();
-  }
+  const res = await callWith(fixtureData({ forecast: async () => null, forecastRuns: async () => ({ runs: [] }) }), "get_forecast", { slug: "vail" });
+  const doc = res.structuredContent as { available: boolean; note: string | null };
+  assert.equal(doc.available, false);
+  assert.match(doc.note ?? "", /did not answer/);
+  assert.notEqual(res.isError, true);
 });
 
 // ── compare_models ───────────────────────────────────────────
@@ -895,45 +851,6 @@ test("get_opening_dates lists season status soonest first and filters by state",
   assert.equal(co.count, 1);
   assert.equal(co.totalMatching, 2);
   assert.equal(co.resorts[0].slug, "breckenridge");
-});
-
-// ── Resources ────────────────────────────────────────────────
-
-test("the peakcam://resorts/{slug} resource lists every resort and reads as markdown", async () => {
-  const { resourceTemplates } = await client.listResourceTemplates();
-  assert.deepEqual(
-    resourceTemplates.map((t) => t.uriTemplate),
-    [PEAKCAM_RESOURCE_TEMPLATE],
-  );
-  assert.equal(resourceTemplates[0].mimeType, "text/markdown");
-
-  const { resources } = await client.listResources();
-  assert.equal(resources.length, RESORTS.length);
-  assert.ok(resources.some((r) => r.uri === "peakcam://resorts/alta" && r.title === "Alta"));
-
-  const read = await client.readResource({ uri: "peakcam://resorts/breckenridge" });
-  assert.equal(read.contents.length, 1);
-  const content = read.contents[0] as { uri: string; mimeType?: string; text?: string };
-  assert.equal(content.uri, "peakcam://resorts/breckenridge");
-  assert.equal(content.mimeType, "text/markdown");
-  // The resource is the Sprint 4 /resorts/{slug}/index.md document, so a
-  // client that already fetched the page alternate sees the same text.
-  const { resortMarkdown: pageMarkdown } = await import("@/lib/public-api/markdown-page");
-  const { serializeResort } = await import("@/lib/public-api/serialize");
-  const { serializeOptionsFor } = await import("./tools");
-  const { resortConditionsView } = await import("@/lib/public-api/conditions");
-  const cat = catalog();
-  const options = serializeOptionsFor(cat, RESORTS[0]);
-  // P6: the resource carries the "Status and freshness" section the page alternate carries.
-  const expected = pageMarkdown(serializeResort(RESORTS[0], options), { now: cat.now, conditions: resortConditionsView(RESORTS[0], { ...options, forecast: { runs: [] } }) });
-  assert.equal(content.text, expected);
-  assert.match(content.text ?? "", /## Status and freshness\n\n\*\*OPEN\*\* — /);
-  assert.match(content.text ?? "", /^# Breckenridge, .*: snow report and webcams/);
-  assert.match(content.text ?? "", /## Webcams \(1\)/);
-  assert.match(content.text ?? "", /- Page: https:\/\/www\.peakcam\.io\/resorts\/breckenridge/);
-  assert.match(content.text ?? "", /Data: PeakCam \(https:\/\/www\.peakcam\.io\)/);
-
-  await assert.rejects(client.readResource({ uri: "peakcam://resorts/breckenrige" }), /No active resort with slug "breckenrige".*peakcam:\/\/resorts\/breckenridge/);
 });
 
 test("every tool's structuredContent parses against its own outputSchema", async () => {
@@ -1165,14 +1082,12 @@ test("get_season_stats for a resort with no rows answers zeros, not an error; a 
   assert.equal(doc.asOf, null);
   assert.match(text(res), /No daily measurements yet this season for Alta/);
 
-  const { client: old, server: oldServer } = await connect(fixtureData({ resortHistory: undefined, seasonAggregates: undefined }));
-  const legacy = await old.callTool({ name: "get_season_stats", arguments: { slug: "breckenridge" } });
+  const old = fixtureData({ resortHistory: undefined, seasonAggregates: undefined });
+  const legacy = await callWith(old, "get_season_stats", { slug: "breckenridge" });
   assert.notEqual(legacy.isError, true);
   assert.equal((legacy.structuredContent as Record<string, unknown>).available, false);
-  const board = await old.callTool({ name: "get_leaderboard", arguments: { kind: "season-snowfall" } });
+  const board = await callWith(old, "get_leaderboard", { kind: "season-snowfall" });
   assert.equal((board.structuredContent as Record<string, unknown>).unavailable, true);
-  await old.close();
-  await oldServer.close();
 });
 
 test("get_monthly_climatology: months in season order, both baselines, the January note", async () => {
@@ -1266,46 +1181,6 @@ test("get_score on a data source without scoreHistory answers available: false w
   assert.deepEqual(doc.history, []);
 });
 
-// ── Streamable HTTP: subscriptions/listen must not hold a stream open ──
-
-test("subscriptions/listen completes in one round trip: the static catalogue honours no listChanged subscription", async () => {
-  const handler = createMcpHandler((server) => registerPeakCam(server, fixtureData()), {
-    ...peakCamServerOptions,
-    serverInfo: peakCamServerInfo,
-  });
-  const envelope = {
-    "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-    "io.modelcontextprotocol/clientInfo": { name: "peakcam-test-client", version: "0.0.0" },
-    "io.modelcontextprotocol/clientCapabilities": {},
-  };
-  const response = await handler(
-    new Request("http://peakcam.test/api/mcp", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        accept: "application/json, text/event-stream",
-        "mcp-protocol-version": "2026-07-28",
-        "mcp-method": "subscriptions/listen",
-      },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: "listen-1",
-        method: "subscriptions/listen",
-        params: { notifications: { toolsListChanged: true, resourcesListChanged: true }, _meta: envelope },
-      }),
-    }),
-  );
-  assert.equal(response.status, 200);
-  // A held-open stream never resolves `text()`; the deadline is the failure.
-  const text = await Promise.race([
-    response.text(),
-    new Promise<string>((_, reject) => setTimeout(() => reject(new Error("subscriptions/listen stream stayed open")), 3000)),
-  ]);
-  assert.match(text, /"method":"notifications\/subscriptions\/acknowledged"/);
-  assert.match(text, /"notifications":\{\}/, "no notification type is honoured");
-  assert.match(text, /"resultType":"complete"/, "the subscription completes immediately");
-});
-
 // ── Additive-safe output (2026-11-20 regression from #143) ───────────────
 
 /** The keys of the conditions `data` object as published before #143 (git show 66e40a0:lib/public-api/schema.ts). */
@@ -1315,20 +1190,15 @@ const PRE_143_CONDITIONS_DATA_KEYS = [
   "surface", "snowQuality", "tempF", "windMph", "forecastNext48hCm", "percentOfNormal",
 ];
 
-test("no tool's published outputSchema closes any object (a cached client must accept added fields)", async () => {
-  const { tools } = await client.listTools();
-  for (const tool of tools) {
-    assert.deepEqual(closedObjectPaths(tool.outputSchema), [], `${tool.name} outputSchema has additionalProperties: false`);
-  }
-  // Input schemas are untouched by the opening: the SDK still publishes them as it did.
-  const conditions = tools.find((t) => t.name === "get_resort_conditions")!;
-  const data = (conditions.outputSchema!.properties as Record<string, { properties?: Record<string, unknown> }>).data;
-  assert.ok(data.properties && "liftDay" in data.properties, "liftDay stays declared so it can come back without a schema change");
+test("the conditions output schema still declares liftDay, so it can come back without a schema change", () => {
+  const conditions = buildTools(DATA).find((t) => t.name === "get_resort_conditions")!;
+  const data = (conditions.outputSchema.shape as unknown as { data: { shape: Record<string, unknown> } }).data;
+  assert.ok("liftDay" in data.shape, "liftDay stays declared");
 });
 
 test("get_resort_conditions data carries only the keys a pre-#143 client knows", async () => {
   assert.deepEqual([...MCP_WITHHELD_CONDITIONS_KEYS], ["liftDay"]);
-  const result = await client.callTool({ name: "get_resort_conditions", arguments: { slug: "vail" } });
+  const result = await call("get_resort_conditions", { slug: "vail" });
   const data = (result.structuredContent as { data: Record<string, unknown> }).data;
   const extra = Object.keys(data).filter((k) => !PRE_143_CONDITIONS_DATA_KEYS.includes(k));
   assert.deepEqual(extra, [], "a client validating against the previous closed schema would reject these keys");
