@@ -1,6 +1,7 @@
 import type { WeatherPeriod, HourlyWeather } from "./types";
 import { windChill } from "./weather";
 import { hasCurrentSnowForecast } from "./snow-forecast";
+import { describeHttpFailure, describeThrownFailure, readFailureBody, type OpenMeteoFailureHandler } from "./open-meteo-failure";
 
 // ─────────────────────────────────────────────────────────────
 // Open-Meteo API helpers — free, keyless, global weather model.
@@ -132,6 +133,8 @@ async function fetchOpenMeteo(
   lat: number,
   lng: number,
   elevationFt?: number | null,
+  // model-sync passes this to log why a resort failed; the result is unchanged.
+  onFailure?: OpenMeteoFailureHandler,
 ): Promise<OpenMeteoResponse | null> {
   const params = new URLSearchParams({
     latitude: lat.toFixed(4),
@@ -153,9 +156,13 @@ async function fetchOpenMeteo(
       next: { revalidate: 3600 },
       signal: AbortSignal.timeout(OPEN_METEO_TIMEOUT_MS),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (onFailure) onFailure(describeHttpFailure(res, await readFailureBody(res), new Date()));
+      return null;
+    }
     return await res.json();
-  } catch {
+  } catch (err) {
+    onFailure?.(describeThrownFailure(err, new Date()));
     return null;
   }
 }
@@ -341,8 +348,9 @@ export async function getOpenMeteoSnapshot(
   lat: number,
   lng: number,
   elevationFt?: number | null,
+  onFailure?: OpenMeteoFailureHandler,
 ): Promise<OpenMeteoSnapshot | null> {
-  const data = await fetchOpenMeteo(lat, lng, elevationFt);
+  const data = await fetchOpenMeteo(lat, lng, elevationFt, onFailure);
   return data ? parseSnapshot(data) : null;
 }
 
