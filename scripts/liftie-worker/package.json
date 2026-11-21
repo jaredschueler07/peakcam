@@ -1,0 +1,20 @@
+{
+  "name": "peakcam-liftie-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Libraries for the vendored Liftie lift-status parsers that scripts/operator-sync.ts runs. Installed on the ops machine only (npm ci --prefix scripts/liftie-worker); the web app never depends on it.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "dependencies": {
+    "css-select": "7.0.0",
+    "debug": "4.4.3",
+    "domelementtype": "3.0.0",
+    "domhandler": "6.0.1",
+    "htmlparser2": "12.0.0",
+    "limiter": "4.1.0",
+    "to-title-case": "1.0.0"
+  }
+}

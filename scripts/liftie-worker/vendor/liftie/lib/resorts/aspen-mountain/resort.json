@@ -1,0 +1,25 @@
+{
+  "name": "Aspen Mountain",
+  "url": {
+    "host": "https://www.aspensnowmass.com",
+    "pathname": "/our-mountains/aspen-mountain/lift-status"
+  },
+  "api": {
+    "host": "https://www.aspensnowmass.com",
+    "pathname": "/aspensnowmass/liftstatus/feed",
+    "query": {
+      "mountain": "AspenMountain"
+    }
+  },
+  "tags": [
+    "Colorado",
+    "Aspen"
+  ],
+  "ll": [
+    -106.819275,
+    39.186714
+  ],
+  "twitter": "AspenSnowmass",
+  "opening": "2017-11-23",
+  "noaa": "GJT/156,102"
+}

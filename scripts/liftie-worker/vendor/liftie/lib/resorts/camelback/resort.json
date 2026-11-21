@@ -1,0 +1,20 @@
+{
+  "name": "Camelback Mountain",
+  "url": {
+    "host": "https://www.camelbackresort.com",
+    "pathname": "/ski-tube/poconos-snow-report-conditions/"
+  },
+  "dataUrl": {
+    "host": "https://conditions.camelbackresort.com",
+    "pathname": "/map/propmap/interactive-trail-map/"
+  },
+  "tags": [
+    "Pennsylvania"
+  ],
+  "ll": [
+    -75.355,
+    41.051389
+  ],
+  "twitter": "skicamelback",
+  "noaa": "PHI/36,127"
+}

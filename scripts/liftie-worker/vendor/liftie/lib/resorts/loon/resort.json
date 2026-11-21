@@ -1,0 +1,22 @@
+{
+  "name": "Loon Mountain",
+  "url": {
+    "host": "https://www.loonmtn.com",
+    "pathname": "/mountain-report"
+  },
+  "api": {
+    "host": "https://apim-marketing-001.azure-api.net",
+    "pathname": "/FeedService/v1/Feed/Facilities/Areas/Lifts/All?resortName=lm"
+  },
+  "tags": [
+    "New England",
+    "New Hampshire"
+  ],
+  "ll": [
+    -71.625809,
+    44.056583
+  ],
+  "twitter": "loonmtn",
+  "opening": "2017-11-22",
+  "noaa": "GYX/24,68"
+}

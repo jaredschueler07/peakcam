@@ -1,0 +1,16 @@
+{
+  "name": "Mount Hood",
+  "url": {
+    "host": "https://www.skihood.com",
+    "pathname": "/the-mountain/conditions"
+  },
+  "tags": [
+    "Oregon"
+  ],
+  "ll": [
+    -121.665688,
+    45.331936
+  ],
+  "twitter": "MHMLifts",
+  "noaa": "PQR/144,88"
+}

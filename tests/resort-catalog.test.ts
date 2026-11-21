@@ -36,6 +36,9 @@ const NO_CAM_NO_STATION_ALLOWED: Record<string, string> = {
   "cerro-mirador": "Andes: no public cam, no station network; model snow report",
   "batea-mahuida": "Andes: no public cam, no station network; model snow report",
   "cerro-perito-moreno": "Andes: no public cam, no station network; model snow report",
+  // 2026-11-20: its assigned NRCS site (2227:MO:SCAN) is a soil-climate station with no
+  // snow-depth sensor (no depth row in 400 days), so the station id was blanked.
+  "hidden-valley": "no cam row; SCAN site had no depth sensor; model snow report",
   // P1 batch 2 (2026-10-20): east of the Rockies the AWDB rule rarely matches, so the P3
   // station layer (GHCN-Daily snow stations, NWS observations) is the measured source.
   // The nearest ones within 25 km are recorded here from the import-day check.

@@ -111,16 +111,27 @@ test("stream keeps complete geometry and contact live until an atomic swap, with
   const original = stream.geometry, originalBounds = stream.bounds.clone();
   const oldHeight = stream.sampleRenderedHeight(200.25, -195);
   const observed = new Set<THREE.BufferGeometry>([original]);
-  stream.update(211, -195);
-  assert.equal(stream.geometry, original, "a partial build is never presented");
-  assert.deepEqual(stream.bounds, originalBounds);
-  assert.equal(stream.sampleRenderedHeight(200.25, -195), oldHeight);
-  for (const x of [211, 243, 195, -201, 201]) {
-    for (let i = 0; i < 200; i++) { stream.update(x, -195); observed.add(stream.geometry); }
-    assert.equal(stream.mesh.geometry, stream.geometry);
-    assert.equal(stream.rebuilding, false);
-    assert.equal(stream.bounds.x, (Math.floor(x / 200) - 2) * 200);
-    assert.ok(Math.abs(stream.sampleRenderedHeight(x + 0.25, -195) - triangleHeight(source.height, x + 0.25, -195, 1)) < 1e-9);
+  // Use a synthetic clock so the first 2ms slice deterministically stops after one
+  // coarse cell (even when V8 JIT finishes a full mobile rebuild in <2ms of wall time)
+  // and the 200-step loop always completes regardless of runner CPU load.
+  const realNow = performance.now.bind(performance);
+  let fakeNow = 0, stepMs = 1;
+  performance.now = () => (fakeNow += stepMs);
+  try {
+    stream.update(211, -195);
+    assert.equal(stream.geometry === original, true, "a partial build is never presented");
+    assert.deepEqual(stream.bounds, originalBounds);
+    assert.equal(stream.sampleRenderedHeight(200.25, -195), oldHeight);
+    stepMs = 0.05;
+    for (const x of [211, 243, 195, -201, 201]) {
+      for (let i = 0; i < 200; i++) { stream.update(x, -195); observed.add(stream.geometry); }
+      assert.equal(stream.mesh.geometry === stream.geometry, true);
+      assert.equal(stream.rebuilding, false);
+      assert.equal(stream.bounds.x, (Math.floor(x / 200) - 2) * 200);
+      assert.ok(Math.abs(stream.sampleRenderedHeight(x + 0.25, -195) - triangleHeight(source.height, x + 0.25, -195, 1)) < 1e-9);
+    }
+  } finally {
+    performance.now = realNow;
   }
   assert.equal(observed.size, 2, "only the two constructor-reserved geometries are used");
   let disposed = 0; for (const g of observed) g.addEventListener("dispose", () => disposed++);

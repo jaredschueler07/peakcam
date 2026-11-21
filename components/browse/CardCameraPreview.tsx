@@ -13,7 +13,10 @@ import { useHydrated } from "@/lib/use-hydrated";
  * HTML agree), else the provider label with no inferred capture time.
  */
 function previewCaption(preview: CameraPreview, hydrated: boolean): string {
-  if (!preview.capturedAt) return `${preview.label} · Capture time unavailable`;
+  // No stored frame, so no capture time we can vouch for: say what the
+  // picture is and stop. Announcing "capture time unavailable" over an
+  // operator still that prints its own clock read as a fault.
+  if (!preview.capturedAt) return preview.label;
   const when = hydrated ? formatLocalDateTime(preview.capturedAt) : formatUtcDate(preview.capturedAt);
   return when ? `Still from ${when}` : preview.label;
 }

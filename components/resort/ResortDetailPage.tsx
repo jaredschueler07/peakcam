@@ -346,7 +346,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-3">
               {conditions && conditions.contract.status.value && (
-                <StatusChip status={conditions.contract.status.value} sentence={conditions.sentence} source={conditions.contract.status.source} />
+                <StatusChip status={conditions.contract.status.value} sentence={conditions.sentence} source={conditions.contract.status.source} liftDayState={conditions.contract.liftDay?.state} />
               )}
               {resort.cond_rating && (
                 <ConditionBadge

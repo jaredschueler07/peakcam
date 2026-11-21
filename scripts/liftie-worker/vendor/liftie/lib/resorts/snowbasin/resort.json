@@ -1,0 +1,17 @@
+{
+  "name": "Snowbasin",
+  "url": {
+    "host": "https://www.snowbasin.com",
+    "pathname": "/the-mountain/conditions"
+  },
+  "tags": [
+    "Utah"
+  ],
+  "ll": [
+    -111.859703,
+    41.214596
+  ],
+  "twitter": "snowbasinresort",
+  "opening": "2017-11-22",
+  "noaa": "SLC/104,196"
+}

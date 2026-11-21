@@ -1,0 +1,18 @@
+{
+  "name": "Stowe",
+  "url": {
+    "host": "https://www.stowe.com",
+    "pathname": "/the-mountain/mountain-conditions/terrain-and-lift-status.aspx"
+  },
+  "tags": [
+    "New England",
+    "Vermont"
+  ],
+  "opening": "2017-11-17",
+  "ll": [
+    -72.786873,
+    44.530502
+  ],
+  "twitter": "StoweMtResort",
+  "noaa": "BTV/102,61"
+}

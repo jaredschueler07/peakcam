@@ -1,0 +1,16 @@
+{
+  "name": "Sun Peaks",
+  "url": {
+    "host": "http://www.sunpeaksresort.com",
+    "pathname": "/ski-ride/weather-conditions-cams/lifts-trail-status"
+  },
+  "tags": [
+    "British Columbia"
+  ],
+  "ll": [
+    -119.9132,
+    50.877369
+  ],
+  "twitter": "SunPeaksResort",
+  "opening": "2017-11-18"
+}

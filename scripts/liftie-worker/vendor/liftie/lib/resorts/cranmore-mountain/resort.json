@@ -1,0 +1,18 @@
+{
+  "name": "Cranmore",
+  "url": {
+    "host": "https://cranmore.com",
+    "pathname": "/snow-report"
+  },
+  "tags": [
+    "New Hampshire",
+    "New England"
+  ],
+  "ll": [
+    -71.116783,
+    44.055382
+  ],
+  "twitter": "CranmoreMtn",
+  "opening": "2017-12-02",
+  "noaa": "GYX/41,71"
+}

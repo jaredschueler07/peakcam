@@ -231,7 +231,9 @@ export function conditionsSection(view: ResortConditionsView, apiUrl: string, ba
   for (const name of CONDITION_FIELD_NAMES) {
     const f = c[name] as Field<unknown>;
     if (f.value == null) continue;
-    const { label, unit } = FIELD_LABELS[name];
+    const { label: baseLabel, unit } = FIELD_LABELS[name];
+    // Before first chair a feed's "open" count is the day's plan, not lifts turning (lib/operator-day.ts).
+    const label = name === "liftsOpen" && c.liftDay?.state === "scheduled" ? "Lifts marked open by the feed (before first chair; see status)" : baseLabel;
     lines.push(`| ${label} | ${String(f.value)}${unit} | ${f.source} | ${f.observedAt ?? "static"} | ${tierCell(f)} |`);
   }
   lines.push("", `Recommendable today: ${c.recommendableToday ? "yes" : "no"}. ${c.reasons.join("; ")}.`);

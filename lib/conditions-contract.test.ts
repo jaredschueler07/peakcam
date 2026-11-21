@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { ResortOpening } from "./openings";
+import { statusChipDisplay } from "./conditions-contract";
 import {
   BASE_CONFIDENCE,
   CONDITION_FIELD_NAMES,
@@ -132,7 +133,7 @@ test("status: a fresh operator feed with lifts open is OPEN; with lifts only sch
   assert.match(open.reasons[0], /7 of 11 lifts open/);
   const scheduled = deriveStatus({ ...base, opening: null, operator: operator({ liftsOpen: 0, liftsScheduled: 9, liftsClosed: 2 }) });
   assert.equal(scheduled.status, "OPEN");
-  assert.match(scheduled.reasons[0], /9 scheduled/);
+  assert.match(scheduled.reasons[0], /9 lifts set to run today, none confirmed turning yet/);
 });
 
 test("status: a fresh operator feed with every lift closed inside the season is CLOSED_TODAY; outside a known season it falls through", () => {
@@ -365,4 +366,104 @@ test("buildConditions: a stale snow report makes the verdict false even when the
   assert.equal(c.baseDepthIn.confidence, 0.45);
   assert.equal(c.recommendableToday, false);
   assert.ok(c.reasons.includes("base depth is stale"));
+});
+
+// ── Status over the resort's local day (lib/operator-day.ts) ──
+
+const DAY_ZONE = "America/Denver"; // UTC−7 in November
+const mt = (clock: string, day = "2026-11-20") => new Date(Date.parse(`${day}T${clock}:00Z`) + 7 * 3_600_000);
+const rd = (clock: string, open: number, scheduled: number, total: number, day = "2026-11-20") => ({ observedAt: mt(clock, day).toISOString(), liftsOpen: open, liftsScheduled: scheduled, liftsTotal: total });
+const seasonOn = () => opening({ confirmed_open: "2026-11-13" });
+function dayStatus(readings: ReturnType<typeof rd>[], now: Date, open: ReturnType<typeof opening> | null = seasonOn()) {
+  const newest = [...readings].sort((a, b) => b.observedAt.localeCompare(a.observedAt))[0];
+  return deriveStatus({
+    hemisphere: "north",
+    localDate: new Date(now.getTime() - 7 * 3_600_000).toISOString().slice(0, 10),
+    now,
+    timeZone: DAY_ZONE,
+    opening: open,
+    operator: operator({ observedAt: newest.observedAt, liftsOpen: newest.liftsOpen, liftsScheduled: newest.liftsScheduled, liftsTotal: newest.liftsTotal, readings }),
+  });
+}
+const VAIL_DAY = [rd("09:56", 2, 0, 34), rd("15:05", 2, 0, 34), rd("15:35", 0, 4, 34)];
+
+test("day status: Vail at 17:00 after its lifts stopped stays OPEN on the day's last open count", () => {
+  const s = dayStatus(VAIL_DAY, mt("17:00"));
+  assert.equal(s.status, "OPEN");
+  assert.equal(s.basis, "feed");
+  assert.equal(s.liftDay?.state, "operated");
+  assert.equal(s.liftDay?.liftsOpen, 2);
+  assert.equal(s.liftDay?.current, false);
+  assert.match(s.reasons[0], /lifts ran today, 2 of 34 open at 15:05 resort time/);
+  assert.doesNotMatch(s.reasons.join(" "), /scheduled to open today/);
+});
+
+test("day status: 0 open / 0 scheduled before core hours is not CLOSED_TODAY; the confirmed date decides", () => {
+  const s = dayStatus([rd("06:05", 0, 0, 21), rd("06:35", 0, 0, 21)], mt("06:40"));
+  assert.equal(s.status, "OPEN");
+  assert.equal(s.basis, "date");
+  assert.equal(s.liftDay ?? null, null);
+  assert.match(s.reasons[0], /outside core hours that does not mean closed/);
+  // Same reading with no opening row: UNKNOWN, never closed.
+  assert.equal(dayStatus([rd("06:05", 0, 0, 21)], mt("06:40"), null).status, "UNKNOWN");
+});
+
+test("day status: 0/0 in core hours with nothing earlier is CLOSED_TODAY in season; after an open reading it is not", () => {
+  const closed = dayStatus([rd("06:05", 0, 0, 9), rd("10:35", 0, 0, 9)], mt("10:40"));
+  assert.equal(closed.status, "CLOSED_TODAY");
+  assert.equal(closed.liftDay?.state, "closed");
+  // Mount Snow's shape: one lift until midday, then 0/0.
+  const ran = dayStatus([rd("09:56", 1, 0, 17), rd("12:35", 0, 0, 17), rd("14:05", 0, 0, 17)], mt("14:10"));
+  assert.equal(ran.status, "OPEN");
+  assert.equal(ran.liftDay?.state, "operated");
+});
+
+test("day status: lifts scheduled and none open is OPEN with a 'scheduled' reason before 16:00, and falls to the dates after", () => {
+  const morning = dayStatus([rd("06:05", 0, 5, 27)], mt("06:30"));
+  assert.equal(morning.status, "OPEN");
+  assert.equal(morning.liftDay?.state, "scheduled");
+  assert.match(morning.reasons[0], /5 lifts set to run today/);
+  // A feed that flags its plan as open before first chair (A-Basin, 2026-11-21) reads the same way, never as lifts open.
+  const flagged = dayStatus([rd("06:05", 2, 0, 9), rd("07:35", 2, 0, 9)], mt("07:40"));
+  assert.equal(flagged.status, "OPEN");
+  assert.equal(flagged.liftDay?.state, "scheduled");
+  assert.equal(flagged.liftDay?.liftsScheduled, 2);
+  assert.match(flagged.reasons[0], /2 lifts set to run today, none confirmed turning yet/);
+  assert.doesNotMatch(flagged.reasons.join(" "), /lifts open/);
+  const running = dayStatus([rd("07:35", 2, 0, 9), rd("08:05", 2, 0, 9)], mt("08:10"));
+  assert.equal(running.liftDay?.state, "operated");
+  assert.match(running.reasons[0], /2 of 9 lifts open/);
+  const late = dayStatus([rd("08:05", 0, 4, 34), rd("15:35", 0, 4, 34)], mt("16:30"));
+  assert.equal(late.basis, "date");
+  assert.doesNotMatch(late.reasons.join(" "), /scheduled to open today/);
+});
+
+test("day status: before the next day's first reading the previous day's count is carried and dated; two days back is not", () => {
+  const night = dayStatus(VAIL_DAY, mt("05:30", "2026-11-21"));
+  assert.equal(night.status, "OPEN");
+  assert.equal(night.basis, "feed");
+  assert.equal(night.liftDay?.carried, true);
+  assert.equal(night.liftDay?.localDate, "2026-11-20");
+  assert.match(night.reasons[0], /no reading yet on 2026-11-21; lifts ran on 2026-11-20, 2 of 34 open at 15:05/);
+  assert.doesNotMatch(night.reasons[0], /today/);
+  // Yesterday never had a lift open: nothing carried, the dates decide.
+  const dry = dayStatus([rd("08:05", 0, 4, 34), rd("12:05", 0, 0, 34)], mt("00:30", "2026-11-21"));
+  assert.equal(dry.basis, "date");
+});
+
+test("day status: without attached readings the newest row is the day's only reading", () => {
+  const s = deriveStatus({ hemisphere: "north", localDate: "2026-11-20", now: mt("18:45"), timeZone: DAY_ZONE, opening: seasonOn(), operator: operator({ observedAt: mt("15:35").toISOString(), liftsOpen: 0, liftsScheduled: 0, liftsTotal: 21 }) });
+  // 15:35 is outside core hours: not CLOSED_TODAY (the 19:45 Central score run reads this shape).
+  assert.equal(s.status, "OPEN");
+  assert.equal(s.basis, "date");
+});
+
+test("statusChipDisplay: an OPEN status on a scheduled lift day reads Opens today, everything else keeps its label", () => {
+  assert.deepEqual(statusChipDisplay("OPEN", "scheduled"), { label: "Opens today", variant: "opens-today" });
+  assert.deepEqual(statusChipDisplay("OPEN", "operated"), { label: "Open", variant: "status" });
+  assert.deepEqual(statusChipDisplay("OPEN", null), { label: "Open", variant: "status" });
+  assert.deepEqual(statusChipDisplay("OPEN"), { label: "Open", variant: "status" });
+  // The scheduled state never softens a status that is not OPEN.
+  assert.deepEqual(statusChipDisplay("CLOSED_TODAY", "scheduled"), { label: "Closed today", variant: "status" });
+  assert.deepEqual(statusChipDisplay("PRE_SEASON", "scheduled"), { label: "Pre-season", variant: "status" });
 });

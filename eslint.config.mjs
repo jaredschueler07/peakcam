@@ -18,6 +18,8 @@ const eslintConfig = defineConfig([
     "public/drop-in/three.module.js",
     "public/game/basis/basis_transcoder.js",
     "dashboard/**",
+    // Liftie parser files, vendored unmodified (scripts/liftie-worker/vendor.mjs).
+    "scripts/liftie-worker/vendor/**",
   ]),
   // Existing legacy UI/script debt is intentionally scoped rather than
   // weakening these rules for new code.

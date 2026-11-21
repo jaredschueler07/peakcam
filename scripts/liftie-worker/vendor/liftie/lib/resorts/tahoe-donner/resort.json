@@ -1,0 +1,18 @@
+{
+  "name": "Tahoe Donner",
+  "url": {
+    "host": "http://www.tahoedonner.com",
+    "pathname": "/amenities/amenities/downhill-ski/trails-conditions/conditions/"
+  },
+  "tags": [
+    "California",
+    "Lake Tahoe"
+  ],
+  "ll": [
+    -120.257957,
+    39.354725
+  ],
+  "twitter": "tahoedonner",
+  "opening": "2017-12-08",
+  "noaa": "REV/28,101"
+}

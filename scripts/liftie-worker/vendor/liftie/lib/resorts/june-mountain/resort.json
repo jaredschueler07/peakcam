@@ -1,0 +1,21 @@
+{
+  "name": "June Mountain",
+  "url": {
+    "host": "https://www.junemountain.com",
+    "pathname": "/mountain-information/mountain-report#/"
+  },
+  "api": {
+    "host": "https://mtnpowder.com",
+    "pathname": "/feed/59/lifts"
+  },
+  "tags": [
+    "California"
+  ],
+  "ll": [
+    -119.090721,
+    37.767796
+  ],
+  "twitter": "JuneMountain",
+  "opening": "2017-12-15",
+  "noaa": "REV/56,24"
+}

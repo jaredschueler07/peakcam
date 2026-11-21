@@ -1,0 +1,17 @@
+{
+  "name": "Hoodoo",
+  "url": {
+    "host": "https://skihoodoo.com",
+    "pathname": "/the-mountain/mountain-lift-status/"
+  },
+  "tags": [
+    "Oregon"
+  ],
+  "ll": [
+    -121.871513,
+    44.408646
+  ],
+  "twitter": "HoodooSki",
+  "opening": "2017-12-08",
+  "noaa": "PQR/128,47"
+}

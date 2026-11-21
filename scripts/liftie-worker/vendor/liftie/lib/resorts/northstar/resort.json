@@ -1,0 +1,19 @@
+{
+  "name": "Northstar",
+  "url": {
+    "host": "https://www.northstarcalifornia.com",
+    "pathname": "/the-mountain/mountain-conditions/terrain-and-lift-status.aspx"
+  },
+  "tags": [
+    "California",
+    "Lake Tahoe",
+    "Vail Epic"
+  ],
+  "opening": "2017-11-17",
+  "ll": [
+    -120.122086,
+    39.275173
+  ],
+  "twitter": "Northstar_CA",
+  "noaa": "REV/32,97"
+}

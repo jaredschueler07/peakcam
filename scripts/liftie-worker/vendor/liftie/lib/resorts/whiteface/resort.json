@@ -1,0 +1,17 @@
+{
+  "name": "Whiteface",
+  "url": {
+    "host": "https://www.whiteface.com",
+    "pathname": "/mountain/conditions"
+  },
+  "tags": [
+    "New York"
+  ],
+  "opening": "2017-11-24",
+  "ll": [
+    -73.870613,
+    44.356506
+  ],
+  "twitter": "SkiWhiteface",
+  "noaa": "BTV/68,47"
+}

@@ -7,7 +7,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { ResortStatus } from "@/lib/conditions-contract";
-import { STATUS_LABELS } from "@/lib/conditions-contract";
+import { statusChipDisplay } from "@/lib/conditions-contract";
 
 const STYLES: Record<ResortStatus, string> = {
   OPEN: "bg-great text-cream-50 border-forest-dk",
@@ -31,22 +31,31 @@ export interface StatusChipProps {
   sentence?: string;
   /** Where the status rests (`operator`, `profile`, `none`), shown as a suffix when not an operator source. */
   source?: string;
+  /**
+   * `contract.liftDay?.state`. "scheduled" (lifts planned, none seen turning
+   * yet) turns an OPEN chip into the outlined "Opens today" one, matching
+   * components/hubs/OpenPerFeedChip.tsx.
+   */
+  liftDayState?: string | null;
   size?: "sm" | "md";
 }
 
-export function StatusChip({ status, sentence, source, size = "md" }: StatusChipProps) {
+export function StatusChip({ status, sentence, source, liftDayState, size = "md" }: StatusChipProps) {
   const suffix = source === "profile" ? " (projected)" : "";
+  const display = statusChipDisplay(status, liftDayState);
+  const opensToday = display.variant === "opens-today";
   return (
     <span
       data-testid="resort-status"
       data-status={status}
+      data-lift-day={opensToday ? "scheduled" : undefined}
       title={sentence}
       className={`inline-flex items-center gap-1.5 rounded-full border font-mono font-bold uppercase tracking-[0.1em] ${
         size === "sm" ? "px-2 py-0.5 text-[10.5px]" : "px-2.5 py-1 text-[11.5px]"
-      } ${STYLES[status]}`}
+      } ${opensToday ? "border-forest-dk bg-transparent text-forest-dk" : STYLES[status]}`}
     >
-      <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${DOT[status]}`} aria-hidden="true" />
-      {STATUS_LABELS[status]}
+      {!opensToday && <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${DOT[status]}`} aria-hidden="true" />}
+      {display.label}
       {suffix}
       {sentence ? <span className="sr-only">. {sentence}</span> : null}
     </span>

@@ -1,0 +1,17 @@
+{
+  "name": "Mountain High",
+  "url": {
+    "host": "http://www.mthigh.com",
+    "pathname": "/site/trails-and-conditions/conditions/alpine-grooming/@@alpine-grooming"
+  },
+  "tags": [
+    "California"
+  ],
+  "ll": [
+    -117.691544,
+    34.376888
+  ],
+  "twitter": "mthigh",
+  "opening": "2017-11-17",
+  "noaa": "LOX/177,56"
+}

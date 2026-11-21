@@ -48,8 +48,10 @@ import {
   type ResortPoint,
 } from "../lib/forecast/open-meteo-models.js";
 import { blendRuns } from "../lib/forecast/blend.js";
+import { countFailure, emptyTally, formatFailureLine, formatRunWindow, formatTally, type OpenMeteoFailure } from "../lib/open-meteo-failure.js";
 import { issueHour, type ForecastRunRow } from "../lib/forecast/store.js";
-import { DELETE_AFTER_DAYS, THIN_AFTER_DAYS, selectRunsToDelete } from "../lib/forecast/retention.js";
+import { pageParams, readAllPages } from "../lib/paged-read.js";
+import { DELETE_AFTER_DAYS, PRUNE_BEFORE_UTC_HOUR, THIN_AFTER_DAYS, isPruneRun, selectRunsToDelete } from "../lib/forecast/retention.js";
 
 // ─── Load .env.local manually ────────────────────────────────────────────
 
@@ -181,19 +183,27 @@ async function insertRun(resortId: string, point: ResortPoint["point"], run: Mod
 async function pruneResort(resortId: string, now: Date): Promise<number> {
   const thinCutoff = new Date(now.getTime() - THIN_AFTER_DAYS * 86_400_000).toISOString();
   const deleteCutoff = new Date(now.getTime() - DELETE_AFTER_DAYS * 86_400_000).toISOString();
-  const oldResp = await fetch(
-    `${SUPABASE_URL}/rest/v1/forecast_runs?resort_id=eq.${resortId}&issued_at=lt.${encodeURIComponent(thinCutoff)}&select=id,resort_id,point,model,issued_at,horizon_days&order=issued_at.desc&limit=20000`,
-    { headers: writeHeaders },
-  );
-  if (!oldResp.ok) throw new Error(`prune read failed: ${oldResp.status}`);
-  const old = (await oldResp.json()) as ForecastRunRow[];
+  // Both reads are paged: PostgREST answers with 1,000 rows at most whatever
+  // `limit` asks for, and a resort passes that once it holds about two months
+  // of thinned runs. `id` ends each ORDER BY so the pages are stable.
+  const old = await readAllPages<ForecastRunRow>(async (from, to) => {
+    const resp = await fetch(
+      `${SUPABASE_URL}/rest/v1/forecast_runs?resort_id=eq.${resortId}&issued_at=lt.${encodeURIComponent(thinCutoff)}&select=id,resort_id,point,model,issued_at,horizon_days&order=issued_at.desc,id.asc&${pageParams(from, to)}`,
+      { headers: writeHeaders },
+    );
+    if (!resp.ok) throw new Error(`prune read failed: ${resp.status}`);
+    return (await resp.json()) as ForecastRunRow[];
+  });
   if (!old.length) return 0;
-  const recentResp = await fetch(
-    `${SUPABASE_URL}/rest/v1/forecast_runs?resort_id=eq.${resortId}&issued_at=gte.${encodeURIComponent(deleteCutoff)}&select=point,model`,
-    { headers: writeHeaders },
-  );
-  if (!recentResp.ok) throw new Error(`prune recent read failed: ${recentResp.status}`);
-  const recentKeys = new Set(((await recentResp.json()) as Array<{ point: string; model: string }>).map((r) => `${r.point}:${r.model}`));
+  const recent = await readAllPages<{ point: string; model: string }>(async (from, to) => {
+    const resp = await fetch(
+      `${SUPABASE_URL}/rest/v1/forecast_runs?resort_id=eq.${resortId}&issued_at=gte.${encodeURIComponent(deleteCutoff)}&select=point,model&order=id.asc&${pageParams(from, to)}`,
+      { headers: writeHeaders },
+    );
+    if (!resp.ok) throw new Error(`prune recent read failed: ${resp.status}`);
+    return (await resp.json()) as Array<{ point: string; model: string }>;
+  });
+  const recentKeys = new Set(recent.map((r) => `${r.point}:${r.model}`));
   const ids = selectRunsToDelete(old, recentKeys, now);
   for (let i = 0; i < ids.length; i += DELETE_CHUNK) {
     const chunk = ids.slice(i, i + DELETE_CHUNK);
@@ -222,6 +232,7 @@ async function main(): Promise<void> {
   let runsSkipped = 0;
   let pointsFailed = 0;
   let resortsFailed = 0;
+  const failures = emptyTally();
 
   for (const resort of resorts) {
     try {
@@ -237,11 +248,21 @@ async function main(): Promise<void> {
           continue;
         }
         calls++;
-        const runs = await fetchModelRuns({ lat: resort.lat, lng: resort.lng, elevationFt: pt.elevationFt, models: wanted });
+        let failure: OpenMeteoFailure | null = null;
+        const runs = await fetchModelRuns({ lat: resort.lat, lng: resort.lng, elevationFt: pt.elevationFt, models: wanted }, {}, (f) => {
+          failure = f;
+        });
         await sleep(CALL_GAP_MS);
         if (!runs) {
           pointsFailed++;
-          perPoint.push(`${pt.point}: Open-Meteo failed`);
+          // One line per failed request, with the status, any Retry-After and
+          // rate-limit headers and Open-Meteo's reason (lib/open-meteo-failure.ts).
+          // A 200 whose body held no usable run has no failure object: "other".
+          const seen = failure as OpenMeteoFailure | null;
+          countFailure(failures, seen);
+          const label = `${resort.name} ${pt.point}`;
+          console.error(`  ${seen ? formatFailureLine(seen, label) : `${new Date().toISOString()} Open-Meteo FAIL ${label} class=other status=200 reason="response held no usable model run"`}`);
+          perPoint.push(`${pt.point}: Open-Meteo failed (${seen ? `${seen.kind}${seen.status != null ? ` ${seen.status}` : ""}` : "empty response"})`);
           continue;
         }
         if (!dryRun) {
@@ -269,21 +290,24 @@ async function main(): Promise<void> {
     }
   }
 
-  // Retention: once a day (the first run after 00:00 UTC) or on request.
-  const shouldPrune = !dryRun && !noPrune && (forcePrune || startedAt.getUTCHours() < 6);
+  // Retention: once a day, in the 01:05 Central run (isPruneRun,
+  // lib/forecast/retention.ts), or on request with --prune.
+  const shouldPrune = !dryRun && !noPrune && (forcePrune || isPruneRun(startedAt));
   let pruned = 0;
+  let pruneFailed = 0;
   if (shouldPrune) {
     for (const resort of resorts) {
       try {
         pruned += await pruneResort(resort.id, startedAt);
       } catch (err) {
+        pruneFailed++;
         console.error(`  PRUNE FAIL ${resort.name} — ${err instanceof Error ? err.message : String(err)}`);
       }
     }
   }
 
   console.log(
-    `\n[forecast-sync] Done. ${resorts.length} resorts, ${calls} Open-Meteo calls, ${runsWritten} runs ${dryRun ? "would be " : ""}written, ${runsSkipped} already present, ${pointsFailed} points failed, ${resortsFailed} resorts failed${shouldPrune ? `, ${pruned} old runs pruned` : ""}. Weather data by Open-Meteo.com (CC BY 4.0).`,
+    `\n[forecast-sync] Done. ${resorts.length} resorts, ${calls} Open-Meteo calls, ${runsWritten} runs ${dryRun ? "would be " : ""}written, ${runsSkipped} already present, ${pointsFailed} points failed, ${resortsFailed} resorts failed. Retention: ${shouldPrune ? `${pruned} old runs pruned${pruneFailed ? `, ${pruneFailed} resorts failed to prune` : ""}` : `not this run (${dryRun ? "dry run" : noPrune ? "--no-prune" : `only the run that starts before ${PRUNE_BEFORE_UTC_HOUR}:00 UTC prunes`})`}. Open-Meteo failures by class: ${formatTally(failures)}. Run ${formatRunWindow(startedAt, new Date())}. Weather data by Open-Meteo.com (CC BY 4.0).`,
   );
   if (resortsFailed > 0 && resortsFailed === resorts.length) process.exit(1);
 }

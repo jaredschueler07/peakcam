@@ -38,14 +38,24 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
+  // Runs only where a server reads the Supabase session: the signed-in pages
+  // and the route handlers that act for a user. Every public page (home,
+  // resorts, hubs, snow reports, sitemaps, OG images) reads the session in the
+  // browser only (FavoriteButton, UserConditionsForm, lib/favorites through
+  // lib/supabase-browser, which refreshes its own token), so running this
+  // proxy there cost one function invocation and one Supabase getUser()
+  // round-trip per page hit, bots included, and refreshed nothing a server
+  // used. tests/proxy-matcher.test.ts pins which paths it covers.
+  //
+  // `api/v1/` and `api/mcp` stay out: the anonymous public API and MCP
+  // endpoint never read a session.
   matcher: [
-    // `drop-in` is excluded because the game's static assets (a ~100KB HTML file
-    // and the three.js bundle) otherwise get a full Supabase getUser() round-trip
-    // ahead of the filesystem check on every single game load.
-    // `api/v1/` and `api/mcp` are the anonymous public API and MCP endpoint:
-    // they never read a session, and the getUser() round-trip would otherwise
-    // sit in front of every cached JSON response (and every agent tool call).
-    // `ask` is the NLWeb answer endpoint: anonymous like /api/v1/ask.
-    "/((?!_next/static|_next/image|favicon.ico|drop-in/|api/v1/|api/mcp(?:/|$)|ask(?:/|$)|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/account/:path*",
+    "/auth/:path*",
+    "/dashboard/:path*",
+    "/favorites/:path*",
+    "/alerts/:path*",
+    "/admin/:path*",
+    "/api/((?!v1/|mcp(?:/|$)).*)",
   ],
 };
