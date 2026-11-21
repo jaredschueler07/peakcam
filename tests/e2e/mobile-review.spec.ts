@@ -69,6 +69,7 @@ test.describe("mobile layout and navigation", () => {
   });
 
   test("game start scrolls into reach and control preferences survive reload", async ({ page }) => {
+    test.skip(process.env.NEXT_PUBLIC_DROP_IN_ENABLED !== "true", "Drop In is disabled");
     await page.goto("/resorts/breckenridge/drop-in?gfx=webgl");
     await page.getByText("Control preferences", { exact: true }).click();
     await page.getByLabel("Steering hand", { exact: true }).selectOption("right");
@@ -85,6 +86,7 @@ test.describe("mobile layout and navigation", () => {
 });
 
 test("landscape phones retain touch buttons with the selected handedness", async ({ browser }) => {
+  test.skip(process.env.NEXT_PUBLIC_DROP_IN_ENABLED !== "true", "Drop In is disabled");
   test.setTimeout(120_000);
   const context = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();

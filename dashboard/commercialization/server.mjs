@@ -24,7 +24,17 @@ function localRequest(req, tailnetOrigin = '') {
   const expectedOrigin = external ? tailnetOrigin : `http://${rawHost}`;
   return !req.headers.origin || req.headers.origin === expectedOrigin;
 }
-async function body(req) { let s = ''; for await (const c of req) { s += c; if (s.length > 1_000_000) throw Error('body too large'); } return JSON.parse(s || '{}'); }
+async function body(req) {
+  const chunks = [];
+  let bytes = 0;
+  for await (const c of req) {
+    const buf = Buffer.isBuffer(c) ? c : Buffer.from(c);
+    bytes += buf.byteLength;
+    if (bytes > 1_000_000) throw Error('body too large');
+    chunks.push(buf);
+  }
+  return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+}
 function validateTracking(t, editable, source) {
   if (!t || typeof t !== 'object' || Array.isArray(t)) throw Error('tracking must be an object');
   for (const k of Object.keys(t)) if (!['status', 'owner', 'due', 'notes', 'evidence', 'fields'].includes(k)) throw Error(`unknown tracking field: ${k}`);

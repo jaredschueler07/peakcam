@@ -21,6 +21,8 @@ def _paired(p: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         raise ValueError("probabilities and outcomes must have the same shape")
     if p.size == 0:
         raise ValueError("no forecast/outcome pairs to score")
+    if not (np.all(np.isfinite(p)) and np.all(np.isfinite(y))):
+        raise ValueError("probabilities and outcomes must be finite")
     if np.any((p < 0) | (p > 1)):
         raise ValueError("probabilities must lie in [0, 1]")
     if np.any((y != 0) & (y != 1)):
@@ -38,6 +40,8 @@ def climatology_brier(y: np.ndarray) -> float:
     y = np.asarray(y, dtype=np.float64)
     if y.size == 0:
         raise ValueError("no outcomes")
+    if not np.all(np.isfinite(y)) or np.any((y != 0) & (y != 1)):
+        raise ValueError("outcomes must be 0 or 1")
     return float(np.mean((y.mean() - y) ** 2))
 
 

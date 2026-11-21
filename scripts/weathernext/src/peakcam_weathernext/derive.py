@@ -51,10 +51,12 @@ def snow_fraction(tw_c: np.ndarray) -> np.ndarray:
 
 
 def slr(tw_c: np.ndarray) -> np.ndarray:
-    """Snow:liquid ratio from the v1 wet-bulb table."""
+    """Snow:liquid ratio from the v1 wet-bulb table (non-finite inputs stay NaN)."""
+    tw = np.asarray(tw_c, dtype=np.float64)
     bounds = np.array([b for b, _ in SLR_BANDS])
     values = np.array([v for _, v in SLR_BANDS] + [0.0])
-    return values[np.searchsorted(bounds, tw_c, side="left")]
+    out = values[np.searchsorted(bounds, tw, side="left")]
+    return np.where(np.isfinite(tw), out, np.nan)
 
 
 def lapse_adjust(

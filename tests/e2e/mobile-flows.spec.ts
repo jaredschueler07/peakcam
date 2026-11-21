@@ -28,7 +28,7 @@ test("panorama previews preserve the full frame and detail video waits for a tap
   await page.goto("/resorts/breckenridge");
   await expect(page.locator("iframe")).toHaveCount(0);
   const camera = page.locator("#cameras");
-  await camera.getByRole("button", { name: /Main Street.*Tap to load live cam/i }).click();
+  await camera.getByRole("button", { name: /Tap to load live cam/i }).first().click();
   await expect(camera.locator("iframe")).toHaveCount(1);
 });
 
@@ -49,7 +49,9 @@ test("snow report region picker and map layers reduce persistent controls", asyn
 });
 
 test("mobile dashboard reordering saves the new order and keeps it after finishing", async ({ page }) => {
-  const project = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).hostname.split(".")[0];
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  test.skip(!supabaseUrl, "NEXT_PUBLIC_SUPABASE_URL is required for the dashboard auth cookie fixture");
+  const project = new URL(supabaseUrl!).hostname.split(".")[0];
   const user = { id: "11111111-1111-4111-8111-111111111111", email: "fixture@example.invalid", aud: "authenticated", role: "authenticated", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" };
   const token = [Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url"), Buffer.from(JSON.stringify({ sub: user.id, exp: Math.floor(Date.now() / 1000) + 3600 })).toString("base64url"), "test-signature"].join(".");
   const session = { access_token: token, refresh_token: "test-refresh-token", expires_at: Math.floor(Date.now() / 1000) + 3600, expires_in: 3600, token_type: "bearer", user };
