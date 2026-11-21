@@ -1,8 +1,10 @@
 const express = require('express');
+const crypto = require('node:crypto');
 const fs = require('fs');
 const path = require('path');
 const { execSync, spawn } = require('child_process');
 const os = require('os');
+const { checkDashboardRequest, isAllowedCwd } = require('./auth-guard');
 
 // ── Load .env.local ───────────────────────────────────────────────────────────
 function loadEnvFile(filePath) {
@@ -32,6 +34,13 @@ const sessionSSEClients = new Map(); // pid → Set of SSE response objects
 
 const app = express();
 const PORT = process.env.PORT || 3333;
+const DASHBOARD_TOKEN = process.env.PEAKCAM_DASHBOARD_TOKEN || crypto.randomBytes(32).toString('hex');
+const ALLOWED_CWD_ROOTS = [
+  path.resolve(__dirname, '..'),
+  '/Users/maestro_admin/peakcam/peakcam',
+  '/Users/totcho_admin/peakcam',
+  '/Users/totcho_admin/peakcam-wt',
+];
 
 const LOG_PATH = path.join(__dirname, '../agents/loop.log');
 const AGENTS_JSON = path.join(__dirname, '../agents/agents.json');
@@ -57,6 +66,22 @@ try {
   console.warn('Could not load agents.json:', e.message);
 }
 
+app.use((req, res, next) => {
+  const check = checkDashboardRequest({
+    method: req.method,
+    path: req.path,
+    headers: req.headers,
+    token: DASHBOARD_TOKEN,
+    port: PORT,
+  });
+  if (!check.ok) {
+    return res.status(check.status).json({ error: check.error });
+  }
+  if (req.method === 'GET' && (req.path === '/' || req.path === '/index.html')) {
+    res.cookie('peakcam_dash', DASHBOARD_TOKEN, { httpOnly: true, sameSite: 'strict', path: '/' });
+  }
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
@@ -260,7 +285,6 @@ app.get('/api/events', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
-  res.setHeader('Access-Control-Allow-Origin', '*');
   res.flushHeaders();
 
   // Send initial full state
@@ -364,11 +388,13 @@ app.post('/api/slack/post', async (req, res) => {
 // ── Claude Session Management ──────────────────────────────────────────────────
 
 app.post('/api/claude/start', (req, res) => {
-  const { prompt, cwd: cwdParam = '/Users/maestro_admin/peakcam/peakcam' } = req.body;
-  if (!prompt) return res.status(400).json({ error: 'prompt required' });
+  const { prompt, cwd: cwdParam = path.resolve(__dirname, '..') } = req.body || {};
+  if (typeof prompt !== 'string' || !prompt.trim()) return res.status(400).json({ error: 'prompt required' });
+  const safeCwd = isAllowedCwd(cwdParam, ALLOWED_CWD_ROOTS);
+  if (!safeCwd) return res.status(400).json({ error: 'cwd must be an allowlisted workspace directory' });
 
   const child = spawn('claude', ['--dangerously-skip-permissions', '-p', prompt], {
-    cwd: cwdParam,
+    cwd: safeCwd,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
@@ -485,7 +511,6 @@ app.get('/api/claude/session/:pid/stream', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
-  res.setHeader('Access-Control-Allow-Origin', '*');
   res.flushHeaders();
 
   // Send full history first
@@ -507,8 +532,8 @@ app.post('/api/claude/session/:pid/input', (req, res) => {
   const child = children.get(pid);
   if (!child) return res.status(404).json({ error: 'session not found or not interactive' });
 
-  const { text } = req.body;
-  if (!text) return res.status(400).json({ error: 'text required' });
+  const { text } = req.body || {};
+  if (typeof text !== 'string' || !text.length) return res.status(400).json({ error: 'text required' });
 
   try {
     child.stdin.write(text + '\n');
@@ -609,15 +634,17 @@ app.get('/api/dispatch/sessions', (req, res) => {
 
 // Send a message to a session via claude --resume -p
 app.post('/api/dispatch/message', (req, res) => {
-  const { session_id, message } = req.body;
-  if (!session_id || !message) return res.status(400).json({ error: 'session_id and message required' });
+  const { session_id, message } = req.body || {};
+  if (typeof session_id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(session_id) || typeof message !== 'string' || !message.trim()) {
+    return res.status(400).json({ error: 'valid session_id and message required' });
+  }
 
   const child = spawn('claude', [
     '--resume', session_id,
     '--dangerously-skip-permissions',
     '-p', message,
   ], {
-    cwd: '/Users/maestro_admin/peakcam/peakcam',
+    cwd: path.resolve(__dirname, '..'),
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   child.stdin.end();
@@ -989,5 +1016,6 @@ app.listen(PORT, '127.0.0.1', () => {
   console.log('  ║   PeakCam Ops Dashboard              ║');
   console.log('  ╚══════════════════════════════════════╝');
   console.log(`\n  Local:   http://localhost:${PORT}`);
-  console.log('  (bound to 127.0.0.1 — not reachable from the LAN)\n');
+  console.log('  (bound to 127.0.0.1; Host/Origin/SameSite+Bearer auth enforced)');
+  console.log(`  CLI API Bearer Token: ${DASHBOARD_TOKEN}\n`);
 });

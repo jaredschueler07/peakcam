@@ -231,3 +231,37 @@ test('configured tailnet origin supports saves and rejects other origins', async
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
+
+test('PATCH preserves multi-byte UTF-8 split across request chunks', async () => {
+  const snapshot = await data();
+  const note = `Powder note ${'❄️'.repeat(300)}`;
+  const bodyJson = JSON.stringify({ revision: snapshot.revision, tracking: { notes: note } });
+  const payload = Buffer.from(bodyJson, 'utf8');
+  const target = new URL(baseUrl);
+  const res = await new Promise((resolve, reject) => {
+    const req = http.request({
+      hostname: '127.0.0.1',
+      port: target.port,
+      path: '/api/records/actions/R02',
+      method: 'PATCH',
+      headers: {
+        Host: target.host,
+        Origin: baseUrl,
+        'content-type': 'application/json',
+        'content-length': payload.byteLength,
+      },
+    }, (response) => {
+      let text = '';
+      response.on('data', (c) => { text += c; });
+      response.on('end', () => resolve({ status: response.statusCode, body: JSON.parse(text) }));
+    });
+    req.on('error', reject);
+    // Split directly through a 3-byte/variation-selector sequence inside the payload
+    const cut = payload.indexOf(0xe2, 50) + 1;
+    req.write(payload.subarray(0, cut));
+    setTimeout(() => { req.write(payload.subarray(cut)); req.end(); }, 5);
+  });
+  assert.equal(res.status, 200);
+  const refreshed = await data();
+  assert.equal(refreshed.datasets.find((d) => d.key === 'actions').rows.find((r) => r.id === 'R02').tracking.notes, note);
+});

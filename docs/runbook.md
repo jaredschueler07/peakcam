@@ -26,6 +26,8 @@ Full inventory: see memory file `reference_env_keys.md` (not reproduced here to 
 
 ## Deploy & Rollback
 
+**PR checks:** `.github/workflows/ci.yml` runs `npm run lint`, `npx tsc --noEmit` and the unit tests on every pull request and push to `main` (the same globs as `npm test`, minus the Drop In bit-for-bit replay tests, which only pass on Apple Silicon); the Vercel preview build remains the deploy check.
+
 **Deploy:** `git push origin main` triggers Vercel auto-deploy.
 
 **Rollback:** Vercel dashboard → Deployments → find last known good → "Promote to Production".
