@@ -744,7 +744,7 @@ of those is new: `operator_status` (one row per fetch) and `latest_operator_stat
 
 | Job | What | When | Notes |
 | --- | --- | --- | --- |
-| `com.peakcam.operator-sync` (`npm run operator-sync`) | For each of the 93 resorts mapped in `data/operator-sources.json`, read the operator's own lift-status page or feed and parse it with Liftie's open-source parser → lifts open / hold / scheduled / closed, the operator page URL, an opening date still ahead | 06:00 and 11:00 local | `--dry-run` needs no service key; `--resort alta`, `--state CO`, `--only vail,keystone`. Exit 1 only when every resort fails. 93 page reads, 500 ms apart, about 2 minutes |
+| `com.peakcam.operator-sync` (`npm run operator-sync`) | For each of the 92 resorts mapped in `data/operator-sources.json`, read the operator's own lift-status page or feed and parse it with Liftie's open-source parser → lifts open / hold / scheduled / closed, the operator page URL, an opening date still ahead | 06:00 and 11:00 local | `--dry-run` needs no service key; `--resort alta`, `--state CO`, `--only vail,keystone`. Exit 1 only when every resort fails. 93 page reads, 500 ms apart, about 2 minutes |
 
 **How it reads lift status (since 2026-11-20).** liftie.info's API has answered every
 script with a Cloudflare challenge since 2026-10-20, so `operator_status` never received a
