@@ -355,8 +355,8 @@ export interface WeatherPeriod {
   date?: string;                  // ISO calendar date when available
   dow: string;                    // "Today", "Mon", "Tue" … (up to 7 days)
   condition: string;              // "clear" | "partly-cloudy" | "heavy-snow" etc.
-  high: number;                   // °F
-  low: number | null;             // °F — null on overnight periods
+  high: number | null;            // °F — null on a leading night period ("Tonight"), which carries only a low
+  low: number | null;             // °F — null when the following night is not in the forecast
   snowInches: number;             // estimated snow inches (0 if none)
   shortForecast: string;          // "Heavy Snow", "Sunny" etc.
   windSpeed: number | null;       // mph

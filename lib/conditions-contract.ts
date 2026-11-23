@@ -518,12 +518,24 @@ export function recommendToday(input: RecommendInput): { value: boolean; reasons
     reasons.push(`status is ${status.value ?? "UNKNOWN"}`);
     return { value: false, reasons };
   }
-  const base = isCurrent(input.baseDepthIn) ? input.baseDepthIn : isCurrent(input.operatorBaseDepthIn) ? input.operatorBaseDepthIn : null;
+  const base =
+    isCurrent(input.baseDepthIn) && (input.baseDepthIn.value ?? 0) > 0
+      ? input.baseDepthIn
+      : isCurrent(input.operatorBaseDepthIn) && (input.operatorBaseDepthIn.value ?? 0) > 0
+        ? input.operatorBaseDepthIn
+        : null;
   if (!base) {
+    const primaryEmpty = input.baseDepthIn.value == null || input.baseDepthIn.value <= 0;
+    const operatorEmpty = input.operatorBaseDepthIn.value == null || input.operatorBaseDepthIn.value <= 0;
+    const staleField = input.baseDepthIn.value != null && input.baseDepthIn.value > 0
+      ? input.baseDepthIn
+      : input.operatorBaseDepthIn.value != null && input.operatorBaseDepthIn.value > 0
+        ? input.operatorBaseDepthIn
+        : null;
     reasons.push(
-      input.baseDepthIn.value == null && input.operatorBaseDepthIn.value == null
+      primaryEmpty && operatorEmpty
         ? "no base depth on file"
-        : `base depth is ${input.baseDepthIn.freshness.tier}`,
+        : `base depth is ${staleField!.freshness.tier}`,
     );
     return { value: false, reasons };
   }

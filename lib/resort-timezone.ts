@@ -18,6 +18,8 @@ export interface TimeZoneResort {
 }
 
 const BY_STATE: Record<string, string> = {
+  // US Alaska
+  AK: "America/Anchorage",
   // US Mountain
   CO: "America/Denver",
   UT: "America/Denver",
@@ -34,6 +36,7 @@ const BY_STATE: Record<string, string> = {
   // US Central
   WI: "America/Chicago",
   MN: "America/Chicago",
+  MO: "America/Chicago",
   // US Eastern
   VT: "America/New_York",
   NH: "America/New_York",
@@ -41,11 +44,14 @@ const BY_STATE: Record<string, string> = {
   NY: "America/New_York",
   MA: "America/New_York",
   PA: "America/New_York",
+  NJ: "America/New_York",
+  OH: "America/New_York",
   VA: "America/New_York",
   MD: "America/New_York",
   WV: "America/New_York",
   MI: "America/New_York",
   NC: "America/New_York",
+  IN: "America/Indiana/Indianapolis",
   // Canada
   BC: "America/Vancouver",
   AB: "America/Edmonton",
@@ -73,6 +79,9 @@ const IDAHO_PACIFIC_NORTH_OF_LAT = 45.5;
 /** Without a latitude: the old longitude split, which is wrong for south-west Idaho. */
 const IDAHO_PACIFIC_WEST_OF_LNG = -115.5;
 
+/** South Dakota west of -100.5 longitude (Terry Peak / Black Hills) is Mountain; the rest is Central. */
+const SD_MOUNTAIN_WEST_OF_LNG = -100.5;
+
 /** A longitude-only fallback for a code the table does not know. */
 function byLongitude(lng: number): string {
   if (lng < -114) return "America/Los_Angeles";
@@ -87,6 +96,7 @@ export function resortTimeZone(resort: TimeZoneResort): string {
     const pacific = resort.lat != null && Number.isFinite(resort.lat) ? resort.lat > IDAHO_PACIFIC_NORTH_OF_LAT : resort.lng < IDAHO_PACIFIC_WEST_OF_LNG;
     return pacific ? "America/Los_Angeles" : "America/Denver";
   }
+  if (state === "SD") return resort.lng < SD_MOUNTAIN_WEST_OF_LNG ? "America/Denver" : "America/Chicago";
   if (BY_STATE[state]) return BY_STATE[state];
   if (BY_COUNTRY[resort.country]) return BY_COUNTRY[resort.country];
   return byLongitude(resort.lng);

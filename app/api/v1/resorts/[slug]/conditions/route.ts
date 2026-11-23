@@ -16,8 +16,18 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
   const catalog = await loadPublicApiCatalog();
   const resort = findResort(catalog, slug);
   if (!resort) return publicError(404, "resort_not_found", `No active resort with slug "${slug}". List them at /api/v1/resorts.`);
-  const stored = await loadResortForecast(resort.id).catch(() => ({ runs: [] }));
-  return publicJson(serializeConditions(resort, { ...optionsFor(catalog, resort), forecast: stored }));
+  // The stored runs feed one field (`forecastNext48hCm`). A failed read must not
+  // take the status and lift fields down with it, and must not be pinned at the
+  // edge either: serve the document without the forecast, uncached.
+  let forecastFailed = false;
+  const stored = await loadResortForecast(resort.id).catch(() => {
+    forecastFailed = true;
+    return { runs: [] };
+  });
+  return publicJson(
+    serializeConditions(resort, { ...optionsFor(catalog, resort), forecast: stored }),
+    forecastFailed ? { cacheControl: "no-store" } : {},
+  );
 }
 
 export function OPTIONS(): Response {

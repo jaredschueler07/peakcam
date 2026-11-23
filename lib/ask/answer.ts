@@ -161,10 +161,10 @@ function forecastSentence(doc: {
   generatedAt: string;
   issuedAt: string | null;
   summary: { total7dIn: number; total14dIn: number; modelCount: number; models: string[]; peak: { date: string; in: number } | null } | null;
-  periods: Array<{ dow: string; shortForecast: string; highF: number; snowInches: number }>;
+  periods: Array<{ dow: string; shortForecast: string; highF: number | null; lowF?: number | null; snowInches: number }>;
 }): string {
   if (!doc.available) return `No forecast for ${doc.name}: ${doc.note ?? "no model run is stored yet."}`;
-  const days = doc.periods.slice(0, 3).map((p) => `${p.dow} ${p.shortForecast.toLowerCase()}, high ${p.highF} °F`);
+  const days = doc.periods.slice(0, 3).map((p) => `${p.dow} ${p.shortForecast.toLowerCase()}${p.highF != null ? `, high ${p.highF} °F` : p.lowF != null ? `, low ${p.lowF} °F` : ""}`);
   const narrative = days.length ? ` NWS: ${days.join("; ")}.` : "";
   if (doc.provider === "blend" && doc.summary) {
     const s = doc.summary;

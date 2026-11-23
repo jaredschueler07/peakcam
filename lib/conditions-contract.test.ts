@@ -212,8 +212,15 @@ test("resort time zones by state, with Idaho split by longitude and the Andes by
   assert.equal(resortTimeZone({ state: "CO", country: "US", lng: -106 }), "America/Denver");
   assert.equal(resortTimeZone({ state: "CA", country: "US", lng: -119 }), "America/Los_Angeles");
   assert.equal(resortTimeZone({ state: "AZ", country: "US", lng: -111.7 }), "America/Phoenix");
+  assert.equal(resortTimeZone({ state: "AK", country: "US", lng: -149.1 }), "America/Anchorage");
   assert.equal(resortTimeZone({ state: "VT", country: "US", lng: -72.8 }), "America/New_York");
+  assert.equal(resortTimeZone({ state: "NJ", country: "US", lng: -74.5 }), "America/New_York");
+  assert.equal(resortTimeZone({ state: "OH", country: "US", lng: -81.6 }), "America/New_York");
+  assert.equal(resortTimeZone({ state: "IN", country: "US", lng: -86.1 }), "America/Indiana/Indianapolis");
   assert.equal(resortTimeZone({ state: "MN", country: "US", lng: -90.7 }), "America/Chicago");
+  assert.equal(resortTimeZone({ state: "MO", country: "US", lng: -94.6 }), "America/Chicago");
+  assert.equal(resortTimeZone({ state: "SD", country: "US", lng: -103.8 }), "America/Denver"); // Terry Peak
+  assert.equal(resortTimeZone({ state: "SD", country: "US", lng: -96.7 }), "America/Chicago"); // Sioux Falls
   assert.equal(resortTimeZone({ state: "ID", country: "US", lng: -116.6 }), "America/Los_Angeles"); // Schweitzer
   assert.equal(resortTimeZone({ state: "ID", country: "US", lng: -114.4 }), "America/Denver"); // Sun Valley
   assert.equal(resortTimeZone({ state: "BC", country: "CA", lng: -122.9 }), "America/Vancouver");
@@ -257,6 +264,10 @@ test("recommendToday needs OPEN on a usable source and a current base, and withh
   const operatorBase = recommendToday({ status: open, baseDepthIn: noneField(), operatorBaseDepthIn: field(30, "operator", hoursAgo(1), NOW), newSnow24hIn: noneField(), rating: null });
   assert.equal(operatorBase.value, true);
   assert.match(operatorBase.reasons[0], /operator, live/);
+  const staleOperatorBase = recommendToday({ status: open, baseDepthIn: noneField(), operatorBaseDepthIn: field(30, "operator", hoursAgo(80), NOW), newSnow24hIn: noneField(), rating: null });
+  assert.deepEqual(staleOperatorBase, { value: false, reasons: ["base depth is stale"] });
+  const zeroBase = recommendToday({ status: open, baseDepthIn: field(0, "snotel", hoursAgo(5), NOW), operatorBaseDepthIn: noneField(), newSnow24hIn: noneField(), rating: null });
+  assert.deepEqual(zeroBase, { value: false, reasons: ["no base depth on file"] });
 });
 
 // ── The whole contract ───────────────────────────────────────

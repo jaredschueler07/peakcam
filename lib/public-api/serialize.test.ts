@@ -313,11 +313,20 @@ test("season status collapses the openings helper to open / closed / unknown", (
   assert.equal(serializeSeason(south, { now: new Date("2026-08-01T18:00:00Z"), opening: opening({ closing_date: "2026-10-05" }) }).status, "open");
 });
 
-test("the day is read in US Pacific, so a resort does not read open before its own midnight", () => {
-  // 03:00 UTC on Nov 13 is still Nov 12 in Pacific — a Nov 13 confirmed date is not open yet.
-  const s = serializeSeason(resort(), { now: new Date("2026-11-13T03:00:00Z"), opening: opening({ confirmed_open: "2026-11-13" }) });
-  assert.equal(s.asOf, "2026-11-12");
-  assert.equal(s.status, "closed");
+test("the day is read in the resort's own calendar day, so a resort does not read open before its own midnight", () => {
+  // 03:00 UTC on Nov 13 is still Nov 12 in Mountain — a Nov 13 confirmed date is not open yet.
+  const co = serializeSeason(resort(), { now: new Date("2026-11-13T03:00:00Z"), opening: opening({ confirmed_open: "2026-11-13" }) });
+  assert.equal(co.asOf, "2026-11-12");
+  assert.equal(co.status, "closed");
+
+  // 05:30 UTC on Nov 13 is 00:30 EST in Vermont (already open) vs 21:30 PST Nov 12 in California (still closed).
+  const morningEast = new Date("2026-11-13T05:30:00Z");
+  const vt = serializeSeason(resort({ state: "VT", lng: -72.8 }), { now: morningEast, opening: opening({ confirmed_open: "2026-11-13" }) });
+  assert.equal(vt.asOf, "2026-11-13");
+  assert.equal(vt.status, "open");
+  const ca = serializeSeason(resort({ state: "CA", lng: -119.0 }), { now: morningEast, opening: opening({ confirmed_open: "2026-11-13" }) });
+  assert.equal(ca.asOf, "2026-11-12");
+  assert.equal(ca.status, "closed");
 });
 
 // ── List ─────────────────────────────────────────────────────

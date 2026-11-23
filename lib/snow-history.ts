@@ -126,21 +126,26 @@ export function hemisphereOf(lat: number): Hemisphere {
   return lat < 0 ? "south" : "north";
 }
 
+function seasonFromKey(key: number, hemisphere: Hemisphere = "north"): SeasonRef {
+  if (hemisphere === "south") {
+    return { key, label: String(key), startDate: `${key}-04-01` };
+  }
+  return { key, label: `${key - 1}-${String(key).slice(-2).padStart(2, "0")}`, startDate: `${key - 1}-10-01` };
+}
+
 /** The season a day belongs to. */
 export function seasonOf(ymd: string, hemisphere: Hemisphere = "north"): SeasonRef {
   const year = Number(ymd.slice(0, 4));
   const month = Number(ymd.slice(5, 7));
   if (hemisphere === "south") {
-    const key = month >= 4 ? year : year - 1;
-    return { key, label: String(key), startDate: `${key}-04-01` };
+    return seasonFromKey(month >= 4 ? year : year - 1, "south");
   }
-  const key = month >= 10 ? year + 1 : year;
-  return { key, label: `${key - 1}-${String(key).slice(2)}`, startDate: `${key - 1}-10-01` };
+  return seasonFromKey(month >= 10 ? year + 1 : year, "north");
 }
 
 /** The season `offset` seasons before `season` (1 = last season). */
 export function previousSeason(season: SeasonRef, offset = 1, hemisphere: Hemisphere = "north"): SeasonRef {
-  return seasonOf(addDays(season.startDate, -365 * offset + 10), hemisphere);
+  return seasonFromKey(season.key - offset, hemisphere);
 }
 
 /** 1-based day of season (day of water year for the North). */

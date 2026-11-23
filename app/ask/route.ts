@@ -66,15 +66,23 @@ function toNlweb(answer: AskAnswerPublic, queryId: string) {
   };
 }
 
+const QUERY_ID_RE = /^[A-Za-z0-9._-]{1,128}$/;
+
 async function handle(request: Request): Promise<Response> {
   const read = await readQuestion(request);
   if (!read.ok) return publicError(read.status, read.error, read.detail);
   const url = new URL(request.url);
-  const queryId = url.searchParams.get("query_id") ?? randomUUID();
+  const rawQueryId = url.searchParams.get("query_id");
+  if (rawQueryId !== null && !QUERY_ID_RE.test(rawQueryId)) {
+    return publicError(400, "invalid_query_id", "query_id must be 1–128 URL-safe characters ([A-Za-z0-9._-]).");
+  }
+  const hasExplicitQueryId = rawQueryId !== null;
+  const queryId = rawQueryId ?? randomUUID();
   const answer = await answerHttp(request, read.question);
+  const cacheable = request.method === "GET" && answer.answerable && hasExplicitQueryId;
   return publicJson(toNlweb(answer, queryId), {
     allowMethods: PUBLIC_API_POST_METHODS,
-    cacheControl: answer.answerable ? undefined : "no-store",
+    cacheControl: cacheable ? undefined : "no-store",
   });
 }
 

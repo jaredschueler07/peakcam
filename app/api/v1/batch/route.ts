@@ -1,4 +1,4 @@
-import { PUBLIC_API_ATTRIBUTION, PUBLIC_API_LICENSE_URL, publicError, publicJson, publicOptions } from "@/lib/public-api/headers";
+import { PUBLIC_API_ATTRIBUTION, PUBLIC_API_FORECAST_ATTRIBUTION, PUBLIC_API_LICENSE_URL, publicError, publicJson, publicOptions } from "@/lib/public-api/headers";
 import { parseBatchBody, type BatchPath } from "@/lib/public-api/batch";
 import type { BatchResponsePublic } from "@/lib/public-api/schema";
 import { SITE_URL } from "@/lib/site";
@@ -35,8 +35,13 @@ const ALLOW = "POST, OPTIONS";
 
 type SlugContext = { params: Promise<{ slug: string }> };
 
-async function dispatch(item: BatchPath): Promise<Response> {
-  const request = new Request(`${SITE_URL}${item.path}`, { method: "GET", headers: { accept: "application/json" } });
+async function dispatch(item: BatchPath, callerRequest: Request): Promise<Response> {
+  const headers = new Headers({ accept: "application/json" });
+  for (const h of ["x-forwarded-for", "x-real-ip"]) {
+    const val = callerRequest.headers.get(h);
+    if (val) headers.set(h, val);
+  }
+  const request = new Request(`${SITE_URL}${item.path}`, { method: "GET", headers });
   const ctx: SlugContext = { params: Promise.resolve({ slug: item.slug ?? "" }) };
   switch (item.route) {
     case "resorts":
@@ -76,18 +81,19 @@ async function dispatch(item: BatchPath): Promise<Response> {
   }
 }
 
-async function run(item: BatchPath): Promise<BatchResponsePublic["results"][number]> {
+async function run(item: BatchPath, callerRequest: Request): Promise<{ result: BatchResponsePublic["results"][number]; hasForecastCredit: boolean }> {
   try {
-    const response = await dispatch(item);
+    const response = await dispatch(item, callerRequest);
+    const hasForecastCredit = response.headers.get("x-attribution")?.includes("Open-Meteo.com") ?? false;
     let body: unknown;
     try {
       body = await response.json();
     } catch {
       body = { error: "non_json_response", status: response.status };
     }
-    return { path: item.path, status: response.status, body };
+    return { result: { path: item.path, status: response.status, body }, hasForecastCredit };
   } catch (error) {
-    return { path: item.path, status: 500, body: { error: "handler_failed", detail: error instanceof Error ? error.message : String(error), status: 500 } };
+    return { result: { path: item.path, status: 500, body: { error: "handler_failed", detail: error instanceof Error ? error.message : String(error), status: 500 } }, hasForecastCredit: false };
   }
 }
 
@@ -100,16 +106,18 @@ export async function POST(request: Request): Promise<Response> {
   }
   const parsed = parseBatchBody(body);
   if (!parsed.ok) return publicError(400, parsed.error, parsed.detail);
-  const results = await Promise.all(parsed.paths.map(run));
+  const outcomes = await Promise.all(parsed.paths.map((item) => run(item, request)));
+  const results = outcomes.map((o) => o.result);
+  const attribution = outcomes.some((o) => o.hasForecastCredit) ? PUBLIC_API_FORECAST_ATTRIBUTION : PUBLIC_API_ATTRIBUTION;
   const out: BatchResponsePublic = {
     count: results.length,
     results,
-    attribution: PUBLIC_API_ATTRIBUTION,
+    attribution,
     license: PUBLIC_API_LICENSE_URL,
     generatedAt: new Date().toISOString(),
   };
   // A POST is never edge-cached; the per-path routes keep their own windows.
-  return publicJson(out, { cacheControl: "no-store", allowMethods: ALLOW });
+  return publicJson(out, { cacheControl: "no-store", allowMethods: ALLOW, attribution });
 }
 
 export function OPTIONS(): Response {

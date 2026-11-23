@@ -120,6 +120,46 @@ test("status: degraded when cam stills are stale or missing", () => {
   assert.match(missingDoc.issues[0], /No cam still has been captured/);
 });
 
+test("status: degraded when one snow-report source stalls while another stays fresh", () => {
+  const partialStale = catalog([
+    resort("breckenridge", "Breckenridge", { snow_report: report({ source: "snotel", updated_at: "2026-12-19T18:00:00Z" }), cams: [cam()] }),
+    resort("ski-portillo", "Ski Portillo", { state: "Chile", country: "CL", snotel_station_id: null, snow_report: report({ source: "open_meteo", updated_at: "2026-12-20T16:00:00Z" }), cams: [cam()] }),
+  ]);
+  const doc = StatusSchema.parse(buildStatus(partialStale));
+  assert.equal(doc.status, "degraded");
+  assert.equal(doc.checks.snowReports.status, "degraded");
+  assert.equal(doc.checks.snowReports.ageHours, 2);
+  assert.equal(doc.checks.snowReports.bySourceAgeHours?.snotel, 24);
+  assert.equal(doc.checks.snowReports.bySourceAgeHours?.open_meteo, 2);
+  assert.match(doc.issues[0], /newest snotel snow report is 24 h old/);
+
+  const staleOpenMeteo = catalog([
+    resort("breckenridge", "Breckenridge", { snow_report: report({ source: "snotel", updated_at: "2026-12-20T16:00:00Z" }), cams: [cam()] }),
+    resort("ski-portillo", "Ski Portillo", { state: "Chile", country: "CL", snotel_station_id: null, snow_report: report({ source: "open_meteo", updated_at: "2026-12-19T18:00:00Z" }), cams: [cam()] }),
+  ]);
+  const openMeteoDoc = StatusSchema.parse(buildStatus(staleOpenMeteo));
+  assert.equal(openMeteoDoc.status, "degraded");
+  assert.equal(openMeteoDoc.checks.snowReports.status, "degraded");
+  assert.match(openMeteoDoc.issues[0], /newest open_meteo snow report is 24 h old/);
+});
+
+test("status: stale legacy pipeline, manual, or resort rows do not degrade per-source freshness", () => {
+  const withLegacyRows = catalog([
+    resort("breckenridge", "Breckenridge", { snow_report: report({ source: "snotel", updated_at: "2026-12-20T16:00:00Z" }), cams: [cam()] }),
+    resort("ski-portillo", "Ski Portillo", { state: "Chile", country: "CL", snotel_station_id: null, snow_report: report({ source: "open_meteo", updated_at: "2026-12-20T15:00:00Z" }), cams: [cam()] }),
+    resort("legacy-pipeline", "Legacy Pipeline", { snow_report: report({ source: "pipeline", updated_at: "2026-01-01T00:00:00Z" }), cams: [cam()] }),
+    resort("legacy-manual", "Legacy Manual", { snow_report: report({ source: "manual", updated_at: "2026-01-01T00:00:00Z" }), cams: [cam()] }),
+    resort("legacy-resort", "Legacy Resort", { snow_report: report({ source: "resort", updated_at: "2026-01-01T00:00:00Z" }), cams: [cam()] }),
+  ]);
+  const doc = StatusSchema.parse(buildStatus(withLegacyRows));
+  assert.equal(doc.status, "ok");
+  assert.equal(doc.checks.snowReports.status, "ok");
+  assert.deepEqual(doc.issues, []);
+  assert.deepEqual(doc.checks.snowReports.bySource, { snotel: 1, open_meteo: 1, pipeline: 1, manual: 1, resort: 1 });
+  assert.deepEqual(Object.keys(doc.checks.snowReports.bySourceNewestAt ?? {}), ["snotel", "open_meteo"]);
+  assert.deepEqual(Object.keys(doc.checks.snowReports.bySourceAgeHours ?? {}), ["snotel", "open_meteo"]);
+});
+
 // ── search index ─────────────────────────────────────────────
 
 test("search index: alphabetical, with aliases, coordinates and canonical URLs", () => {

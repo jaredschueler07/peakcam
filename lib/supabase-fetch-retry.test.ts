@@ -29,12 +29,26 @@ test("a GET that gets 503 twice then 200 returns the 200", async () => {
   assert.strictEqual(calls.length, 3);
 });
 
-test("a GET that keeps failing returns the last 503 after the retry budget", async () => {
+test("a GET that keeps failing cancels intermediate bodies and returns the last 503 after the retry budget", async () => {
   const calls: Call[] = [];
-  const f = await retry(fakeFetch([503], calls), NO_DELAY);
+  const cancelled: boolean[] = [];
+  const baseFetch = fakeFetch([503], calls);
+  const trackingFetch: typeof fetch = async (input, init) => {
+    const res = await baseFetch(input, init);
+    if (res.status === 503 && res.body) {
+      const origCancel = res.body.cancel.bind(res.body);
+      res.body.cancel = async (...args) => {
+        cancelled.push(true);
+        return origCancel(...args);
+      };
+    }
+    return res;
+  };
+  const f = await retry(trackingFetch, NO_DELAY);
   const res = await f("http://x/rest/v1/resorts");
   assert.strictEqual(res.status, 503);
   assert.strictEqual(calls.length, 4); // first attempt + 3 retries
+  assert.strictEqual(cancelled.length, 3); // 3 intermediate retries cancelled; final 503 returned intact
 });
 
 test("a transient abort on a GET is retried", async () => {

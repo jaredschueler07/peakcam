@@ -4,8 +4,8 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import type {
   supabase as SupabaseClient,
   getAllResorts as GetAllResorts,
-  getResortBySlug as GetResortBySlug,
   getPowderProbabilities as GetPowderProbabilities,
+  getResortBySlug as GetResortBySlug,
   withFetchTimeout as WithFetchTimeout,
 } from "./supabase";
 
@@ -28,7 +28,13 @@ before(async () => {
   // Next normally supplies this runtime global. Unit tests run outside the
   // Next server, so provide Node's equivalent before importing next/cache.
   (globalThis as typeof globalThis & { AsyncLocalStorage?: typeof AsyncLocalStorage }).AsyncLocalStorage ??= AsyncLocalStorage;
-  ({ supabase, getAllResorts, getResortBySlug, getPowderProbabilities, withFetchTimeout } = await import("./supabase"));
+  ({
+    supabase,
+    getAllResorts,
+    getResortBySlug,
+    getPowderProbabilities,
+    withFetchTimeout,
+  } = await import("./supabase"));
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -105,15 +111,58 @@ type Result = { data: unknown; error: unknown };
  * (mirrors how `lib/supabase.ts` sometimes awaits the builder directly, e.g.
  * for the `cams` query, and sometimes calls `.maybeSingle()` first).
  */
+interface RecordedQuery {
+  table: string;
+  eqs: Array<[string, unknown]>;
+  limitValue: number | null;
+  usedRange: boolean;
+}
+
 class FakeQuery implements PromiseLike<Result> {
-  constructor(private readonly result: Result, private readonly delayMs = 0) {}
+  private sliceRange: [number, number] | null = null;
+  private limitValue: number | null = null;
+  private readonly eqs: Array<[string, unknown]> = [];
+  constructor(
+    private readonly table: string,
+    private readonly result: Result | ((q: RecordedQuery) => Result),
+    private readonly delayMs = 0,
+    private readonly onResolve?: (q: RecordedQuery) => void,
+  ) {}
   select() { return this; }
-  eq() { return this; }
+  eq(col: string, val: unknown) {
+    this.eqs.push([col, val]);
+    return this;
+  }
+  gte() { return this; }
+  lt() { return this; }
   order() { return this; }
   in() { return this; }
+  limit(n: number) {
+    this.limitValue = n;
+    return this;
+  }
+  range(from: number, to: number) {
+    this.sliceRange = [from, to];
+    return this;
+  }
   private async resolve() {
     if (this.delayMs > 0) await new Promise((resolve) => setTimeout(resolve, this.delayMs));
-    return this.result;
+    const recorded: RecordedQuery = {
+      table: this.table,
+      eqs: this.eqs,
+      limitValue: this.limitValue,
+      usedRange: this.sliceRange !== null,
+    };
+    this.onResolve?.(recorded);
+    const res = typeof this.result === "function" ? this.result(recorded) : this.result;
+    if (this.sliceRange && Array.isArray(res.data)) {
+      const [from, to] = this.sliceRange;
+      return { data: res.data.slice(from, to + 1), error: res.error };
+    }
+    if (this.limitValue !== null && Array.isArray(res.data)) {
+      return { data: res.data.slice(0, this.limitValue), error: res.error };
+    }
+    return res;
   }
   maybeSingle() { return this.resolve(); }
   then<T1 = Result, T2 = never>(
@@ -125,13 +174,14 @@ class FakeQuery implements PromiseLike<Result> {
 }
 
 type CatalogTable = "resorts" | "latest_snow_reports" | "cams";
-type FakeTable = CatalogTable | "latest_powder_probabilities";
+type FakeTable = CatalogTable | "latest_powder_probabilities" | "cam_still_timeline";
+type TableStub = Result | ((q: RecordedQuery) => Result);
 
 /** Stub `supabase.from` for the duration of `fn`, then restore it. */
 async function withFakeFrom(
-  byTable: Partial<Record<FakeTable, Result>>,
+  byTable: Partial<Record<FakeTable, TableStub>>,
   fn: () => Promise<void>,
-  options: { delayMs?: number; onQuery?: (table: CatalogTable) => void } = {},
+  options: { delayMs?: number; onQuery?: (table: CatalogTable) => void; onResolve?: (q: RecordedQuery) => void } = {},
 ) {
   const original = supabase.from;
   // @ts-expect-error — test seam: `supabase.from` is a mutable object
@@ -141,7 +191,7 @@ async function withFakeFrom(
     const result = byTable[table as keyof typeof byTable];
     if (!result) throw new Error(`unexpected table in test: ${table}`);
     options.onQuery?.(table as CatalogTable);
-    return new FakeQuery(result, options.delayMs);
+    return new FakeQuery(table, result, options.delayMs, options.onResolve);
   };
   try {
     await fn();
@@ -439,4 +489,32 @@ test("getResortBySlug returns the stitched resort when every query succeeds", as
       assert.strictEqual(result?.cams.length, 1);
     }
   );
+});
+
+test("getAllResorts paginates cams past PostgREST's 1,000-row ceiling", async () => {
+  const incrementalCache = new FakeIncrementalCache();
+  const manyCams = Array.from({ length: 1005 }, (_, i) => ({
+    id: `cam-${String(i).padStart(4, "0")}`,
+    resort_id: "r1",
+    name: `Cam ${i}`,
+    embed_type: "image",
+    embed_url: `https://cams.example/${i}.jpg`,
+    is_active: true,
+  }));
+  const rows: Record<CatalogTable, Result> = {
+    resorts: {
+      data: [{ id: "r1", name: "Breckenridge", slug: "breckenridge", state: "CO", country: "US", region: "Colorado Rockies", lat: 39.48, lng: -106.07, cond_rating: "good", is_active: true }],
+      error: null,
+    },
+    latest_snow_reports: { data: [{ resort_id: "r1", base_depth: 40, updated_at: "2026-10-02T12:00:00Z" }], error: null },
+    cams: { data: manyCams, error: null },
+  };
+  let camQueries = 0;
+  await withIncrementalCache(incrementalCache, async () => {
+    await withFakeFrom(rows, async () => {
+      const list = await getAllResorts();
+      assert.strictEqual(list[0]?.cams.length, 1005);
+      assert.strictEqual(camQueries, 2);
+    }, { onQuery: (t) => { if (t === "cams") camQueries += 1; } });
+  });
 });

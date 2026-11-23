@@ -329,6 +329,17 @@ test("snowReportMarkdown: today's table, dated history, forecast with its caveat
   assert.match(empty, /No daily station history stored for this resort yet\./);
   assert.match(empty, /Forecast unavailable at render time\./);
   assert.match(empty, /No user-submitted conditions reports in the last 48 hours\./);
+
+  const nonUs = snowReportMarkdown(resort({ location: { ...resort().location, country: "CA" } }), {
+    now: new Date(AT),
+    history: [],
+    forecast: [
+      { dow: "Today", condition: "snow", high: 20, low: 10, snowInches: 4, shortForecast: "Snow | Gusts", windSpeed: 12, windDirection: "W", windGust: null, precipProbability: 80, feelsLike: 12 },
+    ],
+    userReportCount48h: 0,
+  });
+  assert.match(nonUs, /\| Today \| Snow \\\| Gusts \|/);
+  assert.match(nonUs, /Weather data by Open-Meteo\.com \(CC BY 4\.0/);
 });
 
 test("webcamsMarkdown: counts by health, one line per cam, frames on tape only where they exist", () => {

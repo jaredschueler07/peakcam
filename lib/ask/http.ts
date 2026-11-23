@@ -23,6 +23,34 @@ const TOOLS: readonly AskTool[] = buildTools(productionDataSource).filter((t) =>
 
 export type QuestionRead = { ok: true; question: string } | { ok: false; status: number; error: string; detail: string };
 
+const MAX_ASK_BODY_BYTES = 16_384;
+
+class BodyTooLargeError extends Error {}
+
+async function readBoundedText(request: Request, maxBytes: number): Promise<string> {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        total += value.byteLength;
+        if (total > maxBytes) {
+          await reader.cancel().catch(() => {});
+          throw new BodyTooLargeError();
+        }
+        chunks.push(value);
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 /** Pull the question out of a GET query string or a POST body (JSON or form). */
 export async function readQuestion(request: Request): Promise<QuestionRead> {
   const url = new URL(request.url);
@@ -35,10 +63,11 @@ export async function readQuestion(request: Request): Promise<QuestionRead> {
     }
   }
   if (request.method === "POST" && question === null) {
-    const type = request.headers.get("content-type") ?? "";
+    const type = (request.headers.get("content-type") ?? "").toLowerCase();
     try {
+      const raw = await readBoundedText(request, MAX_ASK_BODY_BYTES);
       if (type.includes("application/json")) {
-        const body = (await request.json()) as Record<string, unknown>;
+        const body = JSON.parse(raw || "{}") as Record<string, unknown>;
         for (const key of QUESTION_KEYS) {
           const v = body?.[key];
           if (typeof v === "string" && v.trim()) {
@@ -47,7 +76,7 @@ export async function readQuestion(request: Request): Promise<QuestionRead> {
           }
         }
       } else if (type.includes("application/x-www-form-urlencoded")) {
-        const form = new URLSearchParams(await request.text());
+        const form = new URLSearchParams(raw);
         for (const key of QUESTION_KEYS) {
           const v = form.get(key);
           if (v && v.trim()) {
@@ -56,10 +85,12 @@ export async function readQuestion(request: Request): Promise<QuestionRead> {
           }
         }
       } else if (type.startsWith("text/plain")) {
-        const text = await request.text();
-        if (text.trim()) question = text;
+        if (raw.trim()) question = raw;
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof BodyTooLargeError) {
+        return { ok: false, status: 413, error: "body_too_large", detail: `Request body must not exceed ${MAX_ASK_BODY_BYTES} bytes.` };
+      }
       return { ok: false, status: 400, error: "invalid_body", detail: "The body could not be parsed. Send JSON like {\"query\":\"is alta open\"}." };
     }
   }

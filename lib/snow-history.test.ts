@@ -70,6 +70,9 @@ test("dayOfSeason and previousSeason", () => {
   assert.equal(dayOfSeason("2027-06-30", season), SEASON_CURVE_DAYS);
   assert.deepEqual(previousSeason(season), seasonOf("2025-12-01"));
   assert.deepEqual(previousSeason(season, 10), { key: 2017, label: "2016-17", startDate: "2016-10-01" });
+  // Deep offset across many leap years does not drift across Oct 1 / Apr 1 boundary.
+  assert.deepEqual(previousSeason(season, 50), { key: 1977, label: "1976-77", startDate: "1976-10-01" });
+  assert.deepEqual(previousSeason(seasonOf("2026-08-10", "south"), 50, "south"), { key: 1976, label: "1976", startDate: "1976-04-01" });
   assert.equal(daysBetween("2026-02-28", "2026-03-01"), 1);
   assert.equal(addDays("2027-02-28", 1), "2027-03-01");
   assert.deepEqual(seasonMonths().slice(0, 4), [10, 11, 12, 1]);
