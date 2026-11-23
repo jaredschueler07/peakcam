@@ -134,3 +134,44 @@ export function validateReading(
     notes,
   };
 }
+
+// ── New snow over 24 h and 48 h ───────────────────────────────
+
+/**
+ * New snow over the last 24 h and 48 h from daily snow depths, oldest first
+ * (the last entry is the newest day).
+ *
+ * The 48 h figure is the sum of the two daily gains, each clipped at zero. It
+ * is not the net depth change over two days: a pack that settles on the middle
+ * day and then takes new snow would otherwise report less snow in 48 h than in
+ * 24 h (Tamarack, 2026-11-22: depths 10, 8, 12 in gave 4 in / 2 in). Summing
+ * the gains is also how `snowpack_daily.new_snow_in` adds up to the 7-day
+ * figure, so 48 h is never below 24 h and never above the 7-day sum.
+ *
+ * When the middle day has no depth the two-day net change is the best
+ * available figure; when the oldest day is missing, 48 h equals 24 h.
+ */
+export function newSnowWindows(depthsIn: ReadonlyArray<number | null>): {
+  newSnow24h: number;
+  newSnow48h: number;
+} {
+  const n = depthsIn.length;
+  const d0 = n >= 1 ? depthsIn[n - 1] : null;
+  const d1 = n >= 2 ? depthsIn[n - 2] : null;
+  const d2 = n >= 3 ? depthsIn[n - 3] : null;
+  if (d0 == null) return { newSnow24h: 0, newSnow48h: 0 };
+
+  const gain = (later: number, earlier: number) => Math.max(0, later - earlier);
+
+  if (d1 == null) {
+    // No reading yesterday: nothing can be said about 24 h.
+    return { newSnow24h: 0, newSnow48h: d2 == null ? 0 : Math.round(gain(d0, d2)) };
+  }
+
+  const last24 = gain(d0, d1);
+  const prior24 = d2 == null ? 0 : gain(d1, d2);
+  return {
+    newSnow24h: Math.round(last24),
+    newSnow48h: Math.round(last24 + prior24),
+  };
+}
