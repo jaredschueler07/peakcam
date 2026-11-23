@@ -440,7 +440,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
     date: z.string().nullable(),
     shortForecast: z.string(),
     condition: z.string(),
-    highF: z.number(),
+    highF: z.number().nullable().describe("Null on a leading night period (Tonight), which carries only lowF."),
     lowF: z.number().nullable(),
     snowInches: z.number().describe("From the blend when one is stored for that date, else the keyword estimate (see snowSource)."),
     snowSource: z.enum(["blend", "nws_keyword", "open_meteo"]),
@@ -557,7 +557,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
         lines.push(
           `NWS narrative${blended ? " (snow amounts from the blend)" : " (snow amounts are keyword estimates)"}:`,
           "",
-          ...narrative.map((p) => `- ${p.dow}${p.date ? ` ${p.date}` : ""}: ${p.shortForecast}, high ${p.highF}${p.lowF != null ? ` / low ${p.lowF}` : ""} °F${p.snowInches ? `, ~${p.snowInches} in` : ""}`),
+          ...narrative.map((p) => `- ${p.dow}${p.date ? ` ${p.date}` : ""}: ${p.shortForecast}, ${[p.highF != null ? `high ${p.highF}` : null, p.lowF != null ? `low ${p.lowF}` : null].filter(Boolean).join(" / ")} °F${p.snowInches ? `, ~${p.snowInches} in` : ""}`),
           "",
         );
       }

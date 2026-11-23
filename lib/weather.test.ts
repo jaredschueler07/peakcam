@@ -298,8 +298,9 @@ test("parseNwsForecastPeriods keeps leading Tonight and resolves holiday names f
   const out = parseNwsForecastPeriods(periods);
   assert.equal(out.length, 2);
   assert.equal(out[0].dow, "Tonight");
-  assert.equal(out[0].high, 14);
-  assert.equal(out[0].low, null);
+  // A night period carries a low, never a high.
+  assert.equal(out[0].high, null);
+  assert.equal(out[0].low, 14);
   assert.equal(out[0].snowInches, 3);
   assert.equal(out[1].dow, "Thu");
   assert.equal(out[1].high, 28);

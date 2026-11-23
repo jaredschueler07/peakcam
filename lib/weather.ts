@@ -146,8 +146,9 @@ export function parseNwsForecastPeriods(
         date,
         dow,
         condition: forecastToCondition(p.shortForecast),
-        high: temp,
-        low: null,
+        // A night period has a low, not a high.
+        high: null,
+        low: temp,
         snowInches: blended != null ? blended : estimateSnow(p.shortForecast),
         snowSource: blended != null ? "blend" : "nws_keyword",
         shortForecast: p.shortForecast,
