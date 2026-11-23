@@ -44,14 +44,15 @@ loadEnv(path.join(ROOT, ".env"));
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
+const writeLegacySnowReports = args.includes("--legacy-snow-reports");
 
 // ─── Run ─────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  console.log("[pipeline-sync] PeakCam Multi-Source Pipeline");
-  console.log(`[pipeline-sync] Mode: ${dryRun ? "DRY RUN" : "LIVE"}\n`);
+  console.log("[pipeline-sync] PeakCam Multi-Source Pipeline (deprecated entrypoint)");
+  console.log(`[pipeline-sync] Mode: ${dryRun ? "DRY RUN" : "LIVE"}, legacySnowReports=${writeLegacySnowReports}\n`);
 
-  await runPipelineSync({ dryRun });
+  await runPipelineSync({ dryRun, writeLegacySnowReports });
 
   console.log("\n[pipeline-sync] Complete.");
 }

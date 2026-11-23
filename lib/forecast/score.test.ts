@@ -98,3 +98,13 @@ test("scoreModels: MAE per lead, bias ratio, samples as distinct dates, rank by 
   assert.equal(scoreModels([{ model: "x", lead: 1, date: "d", forecastCm: 3, measuredCm: 0 }])[0].biasRatio, null, "no measured snow → no ratio");
   assert.deepEqual(scoreModels([]), []);
 });
+
+test("pairForecasts groups run issue days in the resort's timeZone when provided", () => {
+  const measured = new Map([["2026-12-01", 10]]);
+  // Issued 2026-11-30 20:00 MST (2026-12-01T03:00:00Z): UTC day is Dec 1 (lead 0), local MST day is Nov 30 (lead 1).
+  const runs = [storedRun("gfs", "2026-12-01T03:00:00Z", { "2026-12-01": 12 })];
+  assert.equal(pairForecasts(measured, runs, [1]).length, 0);
+  const zoned = pairForecasts(measured, runs, [1], "America/Denver");
+  assert.equal(zoned.length, 1);
+  assert.equal(zoned[0].forecastCm, 12);
+});

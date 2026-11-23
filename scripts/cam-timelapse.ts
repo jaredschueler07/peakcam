@@ -68,6 +68,8 @@ import {
   type TimelapseWindow,
 } from "../lib/cam-timelapse.js";
 import { STORAGE_BUCKET as STILLS_BUCKET, THIN_BUCKET_HOURS, filterRetained, thinBucket } from "../lib/cam-timeline.js";
+import { resortLocalDay } from "../lib/resort-timezone.js";
+import { chunkArray, fetchPagedRest } from "./rest-helpers.mjs";
 
 const exec = promisify(execFile);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -103,7 +105,12 @@ const CACHE_DIR = opt("--cache-dir") ?? path.join(os.homedir(), ".cache", "peakc
 const CACHE_MAX_AGE_MS = 80 * 3_600_000;
 const FFMPEG = process.env.FFMPEG ?? "ffmpeg";
 
-type CamRow = { id: string; name: string; resort_id: string; resorts: { slug: string } | null };
+type CamRow = {
+  id: string;
+  name: string;
+  resort_id: string;
+  resorts: { slug: string; state: string; country: string; lng: number } | null;
+};
 type StillRow = { id: number; cam_id: string; path: string; captured_at: string; keeper: boolean };
 type ExistingRow = Pick<CamTimelapseRow, "id" | "cam_id" | "window" | "rendered_at" | "storm_date" | "url">;
 
@@ -190,11 +197,28 @@ function pruneCache(now: number): number {
 // ─── render ──────────────────────────────────────────────────────────────
 type Rendered = { video: string; poster: string; bytes: number; frames: number; attempt: number; width: number; height: number };
 
+const FFPROBE = process.env.FFPROBE ?? "ffprobe";
+
+async function probeFrameSize(file: string): Promise<{ width: number; height: number } | null> {
+  try {
+    const { stdout } = await exec(
+      FFPROBE,
+      ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", file],
+      { timeout: 15_000, killSignal: "SIGKILL" },
+    );
+    const [w, h] = stdout.trim().split(",").map(Number);
+    return Number.isFinite(w) && w > 0 && Number.isFinite(h) && h > 0 ? { width: w, height: h } : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Image sequence → MP4 + poster in `workDir`, walking the size ladder until
  * the clip is at or under MAX_CLIP_BYTES. Frames that fail to download are
  * dropped (a gap, like the archive's own gaps); the clip still needs the
- * minimum after that.
+ * minimum after that. Every frame is letterboxed to the first frame's even box
+ * so dimension changes across a cam's archive never fail ffmpeg's image2 demuxer.
  */
 async function render(frames: FrameRef[], workDir: string, minFrames: number): Promise<Rendered | { error: string }> {
   const seqDir = path.join(workDir, "seq");
@@ -208,23 +232,23 @@ async function render(frames: FrameRef[], workDir: string, minFrames: number): P
     } catch { missing++; }
   }
   if (i < minFrames) return { error: `${i} usable frames (${missing} failed to download), need ${minFrames}` };
+  const frameSize = await probeFrameSize(path.join(seqDir, frameFileName(0)));
   const video = path.join(workDir, "clip.mp4");
   const poster = path.join(workDir, "poster.jpg");
   for (let attempt = 0; ; attempt++) {
     const a = encodeAttempt(attempt);
     if (!a) return { error: `clip still over ${MAX_CLIP_BYTES} B after the whole encode ladder` };
     try {
-      await exec(FFMPEG, clipFfmpegArgs({ frameDir: seqDir, out: video, attempt: a }), { timeout: 300_000 });
+      await exec(FFMPEG, clipFfmpegArgs({ frameDir: seqDir, out: video, attempt: a, frameSize }), { timeout: 300_000, killSignal: "SIGKILL" });
     } catch (e) {
       const msg = (e as { stderr?: string; message?: string }).stderr || (e as Error).message || String(e);
       return { error: `ffmpeg: ${msg.replace(/\s+/g, " ").slice(0, 200)}` };
     }
     const bytes = fs.statSync(video).size;
     if (bytes > MAX_CLIP_BYTES) continue;
-    await exec(FFMPEG, posterFfmpegArgs({ input: path.join(seqDir, frameFileName(i - 1)), out: poster, attempt: a }), { timeout: 60_000 });
-    const { stdout } = await exec(process.env.FFPROBE ?? "ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", video], { timeout: 15_000 });
-    const [width, height] = stdout.trim().split(",").map(Number);
-    return { video, poster, bytes, frames: i, attempt, width, height };
+    await exec(FFMPEG, posterFfmpegArgs({ input: path.join(seqDir, frameFileName(i - 1)), out: poster, attempt: a, frameSize }), { timeout: 60_000, killSignal: "SIGKILL" });
+    const probed = await probeFrameSize(video);
+    return { video, poster, bytes, frames: i, attempt, width: probed?.width ?? frameSize?.width ?? 0, height: probed?.height ?? frameSize?.height ?? 0 };
   }
 }
 
@@ -250,7 +274,11 @@ async function main() {
   const summary = { cams: 0, rendered24h: 0, renderedStorm: 0, fresh: 0, sparse: 0, failed: 0, bytes: 0, pruned: 0 };
 
   if (!PRUNE_ONLY) {
-    const camsAll = await rest<CamRow[]>(`cams?select=id,name,resort_id,resorts(slug)&archive_allowed=eq.true&is_active=eq.true&auto_disabled=eq.false&embed_type=neq.link&order=resort_id,name`);
+    const camsAll = await fetchPagedRest<CamRow>(
+      SUPABASE_URL!,
+      "cams?select=id,name,resort_id,resorts(slug,state,country,lng)&archive_allowed=eq.true&is_active=eq.true&auto_disabled=eq.false&embed_type=neq.link&order=resort_id,name,id",
+      sb,
+    );
     const cams = camsAll
       .filter((c) => c.resorts?.slug)
       .filter((c) => (!ONLY_RESORT || c.resorts!.slug === ONLY_RESORT) && (!ONLY_CAM || c.id === ONLY_CAM))
@@ -264,11 +292,11 @@ async function main() {
     const dailyByResort = new Map<string, DailyNewSnow[]>();
     if (!NO_STORMS) {
       try {
-        for (const r of await rest<{ resort_id: string; new_snow_24h: number | null }[]>("latest_snow_reports?select=resort_id,new_snow_24h")) snow24h.set(r.resort_id, r.new_snow_24h);
+        for (const r of await fetchPagedRest<{ resort_id: string; new_snow_24h: number | null }>(SUPABASE_URL!, "latest_snow_reports?select=resort_id,new_snow_24h&order=resort_id", sb)) snow24h.set(r.resort_id, r.new_snow_24h);
       } catch (e) { console.log(`  ! latest_snow_reports: ${(e as Error).message} — storm detection from daily rows only`); }
       try {
         const since = new Date(now.getTime() - STORM_LOOKBACK_DAYS * 86_400_000).toISOString().slice(0, 10);
-        for (const r of await rest<{ resort_id: string; date: string; new_snow_in: number | null }[]>(`snowpack_daily?select=resort_id,date,new_snow_in&date=gte.${since}&order=date.asc&limit=5000`)) {
+        for (const r of await fetchPagedRest<{ resort_id: string; date: string; new_snow_in: number | null }>(SUPABASE_URL!, `snowpack_daily?select=resort_id,date,new_snow_in&date=gte.${since}&order=date.asc,resort_id.asc`, sb)) {
           const list = dailyByResort.get(r.resort_id) ?? [];
           list.push({ date: r.date, newSnowIn: r.new_snow_in == null ? null : Number(r.new_snow_in) });
           dailyByResort.set(r.resort_id, list);
@@ -323,14 +351,19 @@ async function main() {
         const cam = cams[i++];
         const tag = `${cam.resorts!.slug}/${cam.name}`;
         try {
-          const storm = NO_STORMS ? null : stormWindow({ now, daily: dailyByResort.get(cam.resort_id) ?? [], latest24hIn: snow24h.get(cam.resort_id) });
+          const today = resortLocalDay(cam.resorts!, now);
+          const storm = NO_STORMS ? null : stormWindow({ now, daily: dailyByResort.get(cam.resort_id) ?? [], latest24hIn: snow24h.get(cam.resort_id), today });
           const from24 = new Date(now.getTime() - WINDOW_24H_HOURS * 3_600_000);
           // Snapped down to a 6 h bucket edge so filterRetained() sees whole
           // buckets (storm windows reach 72 h back, past the 48 h thinning
           // edge); selectFrames still clips each clip to its own window.
           const rawFrom = storm && storm.from < from24 ? storm.from : from24;
           const from = new Date(thinBucket(rawFrom.getTime()) * THIN_BUCKET_HOURS * 3_600_000);
-          const stills = await rest<StillRow[]>(`cam_stills?select=id,cam_id,path,captured_at,keeper&cam_id=eq.${cam.id}&captured_at=gte.${from.toISOString()}&order=captured_at.asc&limit=1000`);
+          const stills = await fetchPagedRest<StillRow>(
+            SUPABASE_URL!,
+            `cam_stills?select=id,cam_id,path,captured_at,keeper&cam_id=eq.${cam.id}&captured_at=gte.${from.toISOString()}&order=captured_at.asc,id.asc`,
+            sb,
+          );
           const refs: FrameRef[] = filterRetained(stills, now).map((s) => ({ path: s.path, capturedAt: s.captured_at }));
           const newest = refs.length ? refs[refs.length - 1].capturedAt : null;
 
@@ -351,17 +384,22 @@ async function main() {
         }
       }
     }
-    await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-    fs.rmSync(tmpRoot, { recursive: true, force: true });
+    try {
+      await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+    } finally {
+      fs.rmSync(tmpRoot, { recursive: true, force: true });
+    }
   }
 
-  // Retention: storm clips past a year, objects first, then rows.
+  // Retention: storm clips past a year, objects first, then rows, chunked in batches of <= 100.
   const expired = selectExpiredStorms(existing, now);
   if (expired.length && !DRY) {
-    const paths = expired.flatMap((r) => { const p = objectPathFromUrl(r.url); return p ? [p, p.replace(/\.mp4$/, ".jpg")] : []; });
-    if (await deleteObjects(paths)) {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/cam_timelapses?id=in.(${expired.map((r) => r.id).join(",")})`, { method: "DELETE", headers: { ...sb, Prefer: "return=minimal" } });
-      if (res.ok) summary.pruned = expired.length; else console.log(`  ! cam_timelapses DELETE ${res.status}`);
+    for (const batch of chunkArray(expired, 100)) {
+      const paths = batch.flatMap((r) => { const p = objectPathFromUrl(r.url); return p ? [p, p.replace(/\.mp4$/, ".jpg")] : []; });
+      if (await deleteObjects(paths)) {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/cam_timelapses?id=in.(${batch.map((r) => r.id).join(",")})`, { method: "DELETE", headers: { ...sb, Prefer: "return=minimal" } });
+        if (res.ok) summary.pruned += batch.length; else console.log(`  ! cam_timelapses DELETE ${res.status}`);
+      }
     }
   }
   const cacheRemoved = pruneCache(Date.now());

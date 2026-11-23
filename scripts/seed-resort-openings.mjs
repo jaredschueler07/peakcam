@@ -73,14 +73,19 @@ export function parseCsv(raw) {
 }
 
 function splitCsvLine(line) {
-  // Handle quoted fields with commas inside
+  // Handle quoted fields with commas and RFC-4180 doubled quotes inside
   const result = [];
   let current = "";
   let inQuotes = false;
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
     if (ch === '"') {
-      inQuotes = !inQuotes;
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
     } else if (ch === "," && !inQuotes) {
       result.push(current);
       current = "";
@@ -97,10 +102,14 @@ function splitCsvLine(line) {
 const ISO_DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DATE_COLUMNS = ["projected_open", "confirmed_open", "closing_date"];
 
-/** "" → null; a well-formed YYYY-MM-DD passes; anything else is an error. */
+/** "" → null; a valid YYYY-MM-DD calendar day passes (rejects Feb 30 / month 13); anything else throws. */
 export function toDateOrNull(value, column, slug) {
   if (value === "" || value === undefined) return null;
-  if (!ISO_DAY_RE.test(value) || Number.isNaN(Date.parse(`${value}T00:00:00Z`))) {
+  if (!ISO_DAY_RE.test(value)) {
+    throw new Error(`${slug}: ${column} "${value}" is not a YYYY-MM-DD date`);
+  }
+  const d = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== value) {
     throw new Error(`${slug}: ${column} "${value}" is not a YYYY-MM-DD date`);
   }
   return value;
@@ -151,14 +160,18 @@ function serviceHeaders(extra = {}) {
 async function fetchResortIds(slugs) {
   // Same quoting as lib/alerts/service-fetch.ts inList: each value quoted and
   // encoded on its own, commas left raw for PostgREST's in.(…) operand.
-  const inList = slugs.map((s) => encodeURIComponent(`"${s.replace(/["\\]/g, "")}"`)).join(",");
-  const url = `${SUPABASE_URL}/rest/v1/resorts?slug=in.(${inList})&select=id,slug`;
-  const res = await fetch(url, { headers: serviceHeaders() });
-  if (!res.ok) {
-    throw new Error(`Supabase resorts lookup failed (${res.status}): ${await res.text()}`);
+  const out = new Map();
+  for (let i = 0; i < slugs.length; i += 100) {
+    const chunk = slugs.slice(i, i + 100);
+    const inList = chunk.map((s) => encodeURIComponent(`"${s.replace(/["\\]/g, "")}"`)).join(",");
+    const url = `${SUPABASE_URL}/rest/v1/resorts?slug=in.(${inList})&select=id,slug`;
+    const res = await fetch(url, { headers: serviceHeaders(), signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) {
+      throw new Error(`Supabase resorts lookup failed (${res.status}): ${await res.text()}`);
+    }
+    for (const r of await res.json()) out.set(r.slug, r.id);
   }
-  const rows = await res.json();
-  return new Map(rows.map((r) => [r.slug, r.id]));
+  return out;
 }
 
 async function upsertOpenings(records) {

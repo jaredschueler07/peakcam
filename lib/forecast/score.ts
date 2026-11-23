@@ -126,16 +126,37 @@ function utcDay(iso: string): string {
   return new Date(iso).toISOString().slice(0, 10);
 }
 
+function issueDay(iso: string, timeZone?: string): string {
+  if (!timeZone) return utcDay(iso);
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date(iso));
+  } catch {
+    return utcDay(iso);
+  }
+}
+
 /**
  * Pair every measured date with the day-1/3/7 forecasts for it. For each
  * (model, issue day) the newest run of that day is used; dates with no run
- * for a lead are simply absent from that lead.
+ * for a lead are simply absent from that lead. When `timeZone` is provided,
+ * issue days are grouped in the resort's local calendar day (matching SNOTEL
+ * and daily forecast dates) rather than UTC.
  */
-export function pairForecasts(measured: MeasuredSeries, runs: readonly StoredRun[], leads: readonly ScoreLead[] = SCORE_LEADS): ScorePair[] {
-  // Newest run per (model, issue UTC day).
+export function pairForecasts(
+  measured: MeasuredSeries,
+  runs: readonly StoredRun[],
+  leads: readonly ScoreLead[] = SCORE_LEADS,
+  timeZone?: string,
+): ScorePair[] {
+  // Newest run per (model, issue day).
   const newest = new Map<string, StoredRun>();
   for (const run of runs) {
-    const key = `${run.model}|${utcDay(run.issuedAt)}`;
+    const key = `${run.model}|${issueDay(run.issuedAt, timeZone)}`;
     const cur = newest.get(key);
     if (!cur || Date.parse(run.issuedAt) > Date.parse(cur.issuedAt)) newest.set(key, run);
   }

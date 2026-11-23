@@ -7,6 +7,7 @@ import {
   camIdentity,
   partitionCamRecords,
   hasElevationData,
+  parseCsvString,
   parseList,
   parsePasses,
   toCamRecord,
@@ -273,4 +274,16 @@ test("groupByKeys splits a batch into same-key groups so PostgREST bulk upserts 
   assert.deepStrictEqual(groups[0], [a, c]);
   assert.deepStrictEqual(groups[1], [b]);
   assert.deepStrictEqual(groupByKeys([]), []);
+});
+
+test("import-resorts-standalone: supports semicolon-separated passes, strict integers, and escaped RFC-4180 CSV fields", () => {
+  assert.deepStrictEqual(parsePasses("ikon;epic", quiet), ["ikon", "epic"]);
+  const bad = toResortRecord(legacyRow({ runs_total: "5.5", skiable_acres: "1000abc" }), quiet);
+  assert.strictEqual(bad.runs_total, null);
+  assert.strictEqual(bad.skiable_acres, null);
+  assert.strictEqual(hasElevationData({ elevation_base_ft: "8000 ft", elevation_summit_ft: "10000" }), false);
+
+  const parsed = parseCsvString('slug,notes\nalta,"He said ""powder""\nis good"\n');
+  assert.strictEqual(parsed.length, 1);
+  assert.strictEqual(parsed[0].notes, 'He said "powder"\nis good');
 });

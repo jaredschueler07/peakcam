@@ -11,6 +11,8 @@ test("toDateOrNull: blank is null, a real day passes, anything else throws with 
   assert.equal(toDateOrNull("2026-11-13", "confirmed_open", "mammoth"), "2026-11-13");
   assert.throws(() => toDateOrNull("11/13/2026", "confirmed_open", "mammoth"), /mammoth: confirmed_open "11\/13\/2026"/);
   assert.throws(() => toDateOrNull("2026-11-13T00:00:00Z", "projected_open", "vail"), /vail: projected_open/);
+  assert.throws(() => toDateOrNull("2026-02-30", "projected_open", "vail"), /vail: projected_open/);
+  assert.throws(() => toDateOrNull("2025-02-29", "confirmed_open", "alta"), /alta: confirmed_open/);
 });
 
 test("toOpeningRecord maps a CSV line to a resort_openings row and rejects a dateless one", () => {

@@ -18,6 +18,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { parse } from "csv-parse/sync";
+import { fetchPagedRest } from "./rest-helpers.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -56,42 +58,20 @@ function requireEnv() {
   }
 }
 
-// ─── CSV parser (no csv-parse package) ───────────────────────────────────────
+// ─── CSV parser (RFC-4180 via csv-parse/sync) ──────────────────────────────
 
-function parseCsv(filePath) {
-  const raw = fs.readFileSync(filePath, "utf-8");
-  const lines = raw.split(/\r?\n/).filter((l) => l.trim());
-  if (lines.length < 2) return [];
-
-  const headers = splitCsvLine(lines[0]);
-  return lines.slice(1).map((line) => {
-    const values = splitCsvLine(line);
-    const obj = {};
-    headers.forEach((h, i) => {
-      obj[h.trim()] = (values[i] ?? "").trim();
-    });
-    return obj;
+export function parseCsvString(raw) {
+  return parse(raw, {
+    columns: true,
+    skip_empty_lines: true,
+    trim: true,
+    bom: true,
+    relax_column_count: true,
   });
 }
 
-function splitCsvLine(line) {
-  // Handle quoted fields with commas inside
-  const result = [];
-  let current = "";
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') {
-      inQuotes = !inQuotes;
-    } else if (ch === "," && !inQuotes) {
-      result.push(current);
-      current = "";
-    } else {
-      current += ch;
-    }
-  }
-  result.push(current);
-  return result;
+function parseCsv(filePath) {
+  return parseCsvString(fs.readFileSync(filePath, "utf-8"));
 }
 
 // ─── Supabase REST helper ─────────────────────────────────────────────────────
@@ -123,32 +103,20 @@ async function supabaseUpsert(table, records, onConflict) {
  * Paged: PostgREST caps a response at 1,000 rows and the table is past 600.
  */
 async function fetchExistingCams() {
-  const out = [];
-  for (let offset = 0; ; offset += 1000) {
-    const url = `${SUPABASE_URL}/rest/v1/cams?select=resort_id,name,embed_url,youtube_id&order=id&limit=1000&offset=${offset}`;
-    const res = await fetch(url, { headers: { "apikey": SERVICE_KEY, "Authorization": `Bearer ${SERVICE_KEY}` } });
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Supabase cams select failed (${res.status}): ${err}`);
-    }
-    const page = await res.json();
-    out.push(...page);
-    if (page.length < 1000) break;
-  }
-  return out;
+  return fetchPagedRest(
+    SUPABASE_URL,
+    "cams?select=resort_id,name,embed_url,youtube_id&order=id",
+    { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+  );
 }
 
 /** slug → id for every resort already in the table (cams-only runs). */
 async function fetchSlugToId() {
-  const url = `${SUPABASE_URL}/rest/v1/resorts?select=id,slug`;
-  const res = await fetch(url, {
-    headers: { "apikey": SERVICE_KEY, "Authorization": `Bearer ${SERVICE_KEY}` },
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Supabase resorts select failed (${res.status}): ${err}`);
-  }
-  const data = await res.json();
+  const data = await fetchPagedRest(
+    SUPABASE_URL,
+    "resorts?select=id,slug&order=id",
+    { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+  );
   return new Map(data.map((d) => [d.slug, d.id]));
 }
 
@@ -156,18 +124,28 @@ async function fetchSlugToId() {
 
 const blankToNull = (v) => (v === "" ? null : v);
 const toBool = (v) => v.toLowerCase() === "true";
-const toNullInt = (v) => { const n = parseInt(v, 10); return isNaN(n) ? null : n; };
-const toNullFloat = (v) => { const n = parseFloat(v); return isNaN(n) ? null : n; };
+const toNullInt = (v) => {
+  const s = String(v ?? "").trim();
+  if (!/^-?\d+$/.test(s)) return null;
+  const n = Number(s);
+  return Number.isSafeInteger(n) ? n : null;
+};
+const toNullFloat = (v) => {
+  const s = String(v ?? "").trim();
+  if (!s) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+};
 
 export function hasElevationData(row) {
-  return Boolean(row.elevation_base_ft) && Boolean(row.elevation_summit_ft);
+  return toNullInt(row.elevation_base_ft) != null && toNullInt(row.elevation_summit_ft) != null;
 }
 
 export function toResortMetadataRecord(resortId, row) {
   return {
     resort_id: resortId,
-    elevation_base_ft: parseInt(row.elevation_base_ft, 10),
-    elevation_summit_ft: parseInt(row.elevation_summit_ft, 10),
+    elevation_base_ft: toNullInt(row.elevation_base_ft),
+    elevation_summit_ft: toNullInt(row.elevation_summit_ft),
   };
 }
 
@@ -191,10 +169,10 @@ export const DESCRIPTION_SOURCES = ["operator", "generated", "editor"];
 /** Allowed `cams.kind` values (CHECK cams_kind_check). */
 export const CAM_KINDS = ["summit", "mid", "base", "snow-stake", "village", "approach"];
 
-/** `"A-Basin|Arapahoe Basin"` → `["A-Basin", "Arapahoe Basin"]`; blank → `[]`. */
+/** `"A-Basin|Arapahoe Basin"` or `"A-Basin;Arapahoe Basin"` → `["A-Basin", "Arapahoe Basin"]`; blank → `[]`. */
 export function parseList(value) {
   if (!value) return [];
-  return value.split("|").map((s) => s.trim()).filter(Boolean);
+  return String(value).split(/[|;]/).map((s) => s.trim()).filter(Boolean);
 }
 
 /**

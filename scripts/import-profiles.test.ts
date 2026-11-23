@@ -46,11 +46,14 @@ test("toProfileRecord maps a CSV line to the resorts PATCH body, blanks become N
     wikidata_id: "Q2840279",
   });
   assert.equal(record.source_url, "https://www.alta.com/Ikon");
-  // An all-blank row still patches: every column to NULL, passes to [].
+  // An all-blank row still patches profile columns to NULL/[], while omitting blank elevations so DB elevations are never wiped.
   const blank = toProfileRecord(row({ runs_total: "", lifts_total: "", skiable_acres: "", vertical_ft: "", annual_snowfall_in: "", elevation_base_ft: "", elevation_summit_ft: "", passes: "", trail_map_url: "", wikidata_id: "", source_url: "" }));
   assert.equal(blank.patch.runs_total, null);
+  assert.equal("elevation_base_ft" in blank.patch, false);
+  assert.equal("elevation_summit_ft" in blank.patch, false);
   assert.deepEqual(blank.patch.passes, []);
   assert.equal(blank.source_url, null);
+  assert.equal(summarize([blank]).elevation_base_ft, 0);
 });
 
 test("validation rejects bad numbers, impossible elevations, bad passes, bad URLs and bad Q-ids", () => {

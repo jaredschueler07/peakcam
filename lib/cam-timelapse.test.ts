@@ -10,6 +10,7 @@ import {
   clipDurationSeconds,
   clipFfmpegArgs,
   clipPaths,
+  clipScaleFilter,
   encodeAttempt,
   frameFileName,
   needsRender,
@@ -21,6 +22,7 @@ import {
   selectFrames,
   shapeTimelapses,
   stormWindow,
+  targetDimensions,
   type CamTimelapseRow,
 } from "./cam-timelapse";
 
@@ -210,4 +212,34 @@ test("selectExpiredStorms keeps 24 h rows and young storms, drops storms older t
     row({ id: "nodate", window: "storm", storm_date: null, rendered_at: "2025-11-01T00:00:00Z" }),
   ];
   assert.deepEqual(selectExpiredStorms(rows, NOW).map((r) => r.id), ["old", "nodate"]);
+});
+
+test("stormWindow honors resort-local today override and prevents from > to ahead of UTC", () => {
+  // 2026-12-20 19:00 PT = 2026-12-21T03:00Z: resort-local today is still 2026-12-20.
+  const usEvening = stormWindow({
+    now: new Date("2026-12-21T03:00:00Z"),
+    daily: [{ date: "2026-12-19", newSnowIn: 10 }],
+    latest24hIn: null,
+    today: "2026-12-20",
+  });
+  assert.equal(usEvening?.stormDate, "2026-12-19");
+
+  // Positive-offset resort (e.g. Japan): 2026-12-21 07:00 JST = 2026-12-20T22:00Z.
+  const asiaMorning = stormWindow({
+    now: new Date("2026-12-20T22:00:00Z"),
+    daily: [{ date: "2026-12-21", newSnowIn: 9 }],
+    latest24hIn: null,
+    today: "2026-12-21",
+  });
+  assert.ok(asiaMorning && asiaMorning.from.getTime() < asiaMorning.to.getTime());
+  assert.equal(asiaMorning?.stormDate, "2026-12-21");
+});
+
+test("clipScaleFilter pads frames to uniform even target box when frameSize is given", () => {
+  assert.deepEqual(targetDimensions({ width: 1920, height: 1080 }), { width: 1280, height: 720 });
+  assert.deepEqual(targetDimensions({ width: 641, height: 481 }), { width: 640, height: 480 });
+  const vf = clipScaleFilter(1280, 720, { width: 1920, height: 1080 });
+  assert.equal(vf, "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:black,setsar=1");
+  const args = clipFfmpegArgs({ frameDir: "/tmp/x", out: "/tmp/x/out.mp4", frameSize: { width: 1920, height: 1080 } });
+  assert.equal(args[args.indexOf("-vf") + 1], `${vf},format=yuv420p`);
 });

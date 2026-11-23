@@ -234,11 +234,54 @@ test("bc-asws: WFS stations + element CSVs → an observation in inches and °F"
   assert.equal(bcAswsObservation({ ...callaghan, sourceId: "9Z99P" }, maps), null, "a station absent from every file has no observation");
 });
 
-test("bc-asws: parseAswsCsv takes the newest non-blank cell per station, skips negatives", () => {
-  const csv = ["DATE(UTC),1X01P One,1X02P Two", "2026-10-18 20:00,10,5", "2026-10-18 21:00,,-1", "2026-10-18 22:00,12,"].join("\n");
+test("bc-asws: parseAswsCsv takes the newest non-blank cell per station, skips negatives by default and preserves negative TA", () => {
+  const csv = ["DATE(UTC),1X01P One,1X02P Two", "2026-10-18 20:00,10,5", "2026-10-18 21:00,,-1", "2026-10-18 22:00,12,-5.2"].join("\n");
   const m = parseAswsCsv(csv);
   assert.deepEqual(m.get("1X01P"), { observedAt: "2026-10-18T22:00:00.000Z", value: 12 });
   assert.deepEqual(m.get("1X02P"), { observedAt: "2026-10-18T20:00:00.000Z", value: 5 });
+
+  const ta = parseAswsCsv(csv, { minValue: -60, maxValue: 50 });
+  assert.deepEqual(ta.get("1X02P"), { observedAt: "2026-10-18T22:00:00.000Z", value: -5.2 });
+});
+
+test("snotel: snotelObservation keeps 0.1in delta and returns null across date gaps", () => {
+  const meta = stationMetaFromAwdb(json<never[]>("awdb-station-alta.json")[0]);
+  const base = { sweIn: 1, precipAccumIn: 5, tempObsF: 20, tempMaxF: 25, tempMinF: 10 };
+  const tenths = snotelObservation(meta, [
+    { date: "2026-12-01", snowDepthIn: 20, ...base },
+    { date: "2026-12-02", snowDepthIn: 21.4, ...base },
+  ]);
+  assert.equal(tenths?.newSnowIn, 1.4);
+
+  const gapped = snotelObservation(meta, [
+    { date: "2026-11-29", snowDepthIn: 20, ...base },
+    { date: "2026-12-02", snowDepthIn: 28, ...base },
+  ]);
+  assert.equal(gapped?.newSnowIn, null);
+});
+
+test("nws: fetchNwsStationsByState keeps paging when a 500-feature page has unparseable entries", async () => {
+  const good = (id: string) => ({
+    geometry: { coordinates: [-111.6, 40.5] },
+    properties: { stationIdentifier: id, name: id, elevation: { unitCode: "wmoUnit:m", value: 2500 } },
+  });
+  const bad = { geometry: null, properties: { stationIdentifier: "BAD" } };
+  const page1 = {
+    features: [...Array.from({ length: 499 }, (_, i) => good(`S${i}`)), bad],
+    pagination: { next: "https://api.weather.gov/stations?state=UT&cursor=p2" },
+  };
+  const page2 = {
+    features: [good("FINAL")],
+    pagination: {},
+  };
+  const { impl, calls } = fakeFetch([
+    ["cursor=p2", page2],
+    ["/stations?state=UT", page1],
+  ]);
+  const rows = await fetchNwsStationsByState("ut", { fetchImpl: impl });
+  assert.equal(calls.length, 2);
+  assert.equal(rows.length, 500);
+  assert.equal(rows.at(-1)?.sourceId, "FINAL");
 });
 
 // ── ECCC ─────────────────────────────────────────────────────

@@ -46,6 +46,7 @@ import { blendRuns } from "../lib/forecast/blend.js";
 import { assembleStoredRuns, type ForecastDailyRow, type ForecastRunRow, type StoredRun } from "../lib/forecast/store.js";
 import { addDays } from "../lib/snow-history.js";
 import { PCT_OF_NORMAL_MAX, PCT_OF_NORMAL_MIN, PCT_OF_NORMAL_MIN_SWE_IN } from "../lib/resort-copy.js";
+import { fetchPagedRest } from "./rest-helpers.mjs";
 
 // ─── Load .env.local manually ────────────────────────────────────────────
 
@@ -175,7 +176,7 @@ async function getJson<T>(url: string): Promise<T> {
   return resp.json() as Promise<T>;
 }
 
-/** Null (not a throw) for a table or view that is not there yet. */
+/** Null (not a throw) for a table or view that is not there yet. Used by the reads that page themselves. */
 async function getJsonSoft<T>(url: string): Promise<T | null> {
   try {
     return await getJson<T>(url);
@@ -186,19 +187,30 @@ async function getJsonSoft<T>(url: string): Promise<T | null> {
   }
 }
 
+/** Null (not a throw) for a table or view that is not there yet. */
+async function fetchPagedSoft<T>(pathAndQuery: string): Promise<T[] | null> {
+  try {
+    return await fetchPagedRest<T>(SUPABASE_URL!, pathAndQuery, supaHeaders);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/\(404\)|PGRST205|42P01/.test(msg)) return null;
+    throw err;
+  }
+}
+
 async function fetchResorts(): Promise<ScoreResort[]> {
-  let url = `${SUPABASE_URL}/rest/v1/resorts?select=id,slug,name,state,country,lat,lng,snotel_station_id&is_active=eq.true&order=slug`;
-  if (onlySlug) url += `&slug=eq.${encodeURIComponent(onlySlug)}`;
-  return getJson<ScoreResort[]>(url);
+  let q = "resorts?select=id,slug,name,state,country,lat,lng,snotel_station_id&is_active=eq.true&order=slug";
+  if (onlySlug) q += `&slug=eq.${encodeURIComponent(onlySlug)}`;
+  return fetchPagedRest<ScoreResort>(SUPABASE_URL!, q, supaHeaders);
 }
 
 async function fetchOpenings(): Promise<Map<string, ResortOpening>> {
-  const rows = (await getJsonSoft<ResortOpening[]>(`${SUPABASE_URL}/rest/v1/resort_openings?select=*`)) ?? [];
+  const rows = (await fetchPagedSoft<ResortOpening>("resort_openings?select=*&order=resort_id")) ?? [];
   return new Map(rows.map((r) => [r.resort_id, r]));
 }
 
 async function fetchOperators(): Promise<Map<string, OperatorRow>> {
-  const rows = (await getJsonSoft<OperatorRow[]>(`${SUPABASE_URL}/rest/v1/latest_operator_status?select=*`)) ?? [];
+  const rows = (await fetchPagedSoft<OperatorRow>("latest_operator_status?select=*&order=resort_id")) ?? [];
   return new Map(rows.map((r) => [r.resort_id, r]));
 }
 
@@ -232,22 +244,26 @@ async function fetchOperatorReadings(): Promise<Map<string, OperatorReading[]>> 
 }
 
 async function fetchReports(resortId: string, since: string): Promise<ReportRow[]> {
-  return getJson<ReportRow[]>(
-    `${SUPABASE_URL}/rest/v1/snow_reports?resort_id=eq.${resortId}&updated_at=gte.${addDays(since, -REPORT_MAX_AGE_DAYS)}T00:00:00Z&select=source,updated_at,base_depth,new_snow_24h,new_snow_48h,swe_in,pct_of_normal,conditions&order=updated_at.asc&limit=2000`,
+  return fetchPagedRest<ReportRow>(
+    SUPABASE_URL!,
+    `snow_reports?resort_id=eq.${resortId}&updated_at=gte.${addDays(since, -REPORT_MAX_AGE_DAYS)}T00:00:00Z&select=source,updated_at,base_depth,new_snow_24h,new_snow_48h,swe_in,pct_of_normal,conditions&order=updated_at.asc,id.asc`,
+    supaHeaders,
   );
 }
 
 async function fetchDaily(resort: ScoreResort, since: string): Promise<DailyRowRaw[]> {
   const station = resort.snotel_station_id ? "&station_id=neq.open-meteo" : "";
-  return getJson<DailyRowRaw[]>(
-    `${SUPABASE_URL}/rest/v1/snowpack_daily?resort_id=eq.${resort.id}${station}&date=gte.${addDays(since, -DAILY_LOOKBACK_DAYS)}&select=date,station_id,snow_depth_in,swe_in,new_snow_in,temp_max_f,qc_flag&order=date.asc&limit=1000`,
+  return fetchPagedRest<DailyRowRaw>(
+    SUPABASE_URL!,
+    `snowpack_daily?resort_id=eq.${resort.id}${station}&date=gte.${addDays(since, -DAILY_LOOKBACK_DAYS)}&select=date,station_id,snow_depth_in,swe_in,new_snow_in,temp_max_f,qc_flag&order=date.asc,station_id.asc`,
+    supaHeaders,
   );
 }
 
 /** Every run issued inside the window (plus the day before it) at the summit point, or the base point when no summit run exists, with its daily rows from `since` on. */
 async function fetchRuns(resortId: string, since: string): Promise<StoredRun[]> {
-  const runs = (await getJsonSoft<ForecastRunRow[]>(
-    `${SUPABASE_URL}/rest/v1/forecast_runs?resort_id=eq.${resortId}&issued_at=gte.${addDays(since, -1)}T00:00:00Z&select=id,resort_id,point,model,issued_at,horizon_days&order=issued_at.desc&limit=5000`,
+  const runs = (await fetchPagedSoft<ForecastRunRow>(
+    `forecast_runs?resort_id=eq.${resortId}&issued_at=gte.${addDays(since, -1)}T00:00:00Z&select=id,resort_id,point,model,issued_at,horizon_days&order=issued_at.desc,id.asc`,
   )) ?? [];
   if (!runs.length) return [];
   const point = runs.some((r) => r.point === "summit") ? "summit" : "base";
@@ -256,8 +272,10 @@ async function fetchRuns(resortId: string, since: string): Promise<StoredRun[]> 
   for (let i = 0; i < picked.length; i += IN_CHUNK) {
     const ids = picked.slice(i, i + IN_CHUNK).map((r) => r.id);
     daily.push(
-      ...(await getJson<ForecastDailyRow[]>(
-        `${SUPABASE_URL}/rest/v1/forecast_daily?run_id=in.(${ids.join(",")})&date=gte.${since}&select=run_id,date,snowfall_cm,snowfall_lo,snowfall_hi,temp_max,temp_min,precip_prob,wind_gust,weather_code&limit=20000`,
+      ...(await fetchPagedRest<ForecastDailyRow>(
+        SUPABASE_URL!,
+        `forecast_daily?run_id=in.(${ids.join(",")})&date=gte.${since}&select=run_id,date,snowfall_cm,snowfall_lo,snowfall_hi,temp_max,temp_min,precip_prob,wind_gust,weather_code&order=run_id.asc,date.asc`,
+        supaHeaders,
       )),
     );
   }

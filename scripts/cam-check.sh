@@ -52,7 +52,34 @@ STATE="$STATE_DIR/state.json"
 mkdir -p "$RUN"
 [ -f "$STATE" ] || echo '{}' > "$STATE"
 log() { printf '[cam-check %s] %s\n' "$(date +%H:%M:%S)" "$*"; }
-with_timeout() { perl -e 'alarm shift; exec @ARGV' "$@"; }
+with_timeout() {
+  perl -e '
+    my $secs = shift @ARGV;
+    my $pid = fork();
+    die "fork: $!" unless defined $pid;
+    if ($pid == 0) {
+      setpgrp(0, 0);
+      exec @ARGV or die "exec: $!";
+    }
+    my $kill_group = sub {
+      kill "TERM", -$pid;
+      for (1..20) {
+        last if waitpid($pid, 1) != 0;
+        select(undef, undef, undef, 0.1);
+      }
+      kill "KILL", -$pid;
+      waitpid($pid, 0);
+    };
+    local $SIG{ALRM} = sub { $kill_group->(); exit 124; };
+    local $SIG{TERM} = sub { $kill_group->(); exit 143; };
+    local $SIG{INT}  = sub { $kill_group->(); exit 130; };
+    alarm($secs);
+    waitpid($pid, 0);
+    alarm(0);
+    if ($? & 127) { exit(128 + ($? & 127)); }
+    exit($? >> 8);
+  ' "$@"
+}
 jget() { python3 -c 'import json,sys
 d=json.load(open(sys.argv[1]))
 for k in sys.argv[2].split("."):

@@ -50,15 +50,16 @@ loadEnv(path.join(ROOT, ".env"));
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
+const writeLegacySnowReports = args.includes("--legacy-snow-reports");
 
 // ── Run (dynamic import so env is set before orchestrator load) ──
 
 async function main(): Promise<void> {
   const started = new Date().toISOString();
-  console.log(`[pipeline-backfill] start=${started} dryRun=${dryRun}`);
+  console.log(`[pipeline-backfill] start=${started} dryRun=${dryRun} legacySnowReports=${writeLegacySnowReports}`);
 
   const { runPipelineSync } = await import("../lib/pipeline/orchestrator");
-  await runPipelineSync({ dryRun });
+  await runPipelineSync({ dryRun, writeLegacySnowReports });
 
   const finished = new Date().toISOString();
   console.log(`[pipeline-backfill] done=${finished}`);

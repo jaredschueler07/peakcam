@@ -48,7 +48,9 @@ import {
 } from "../lib/forecast/score.js";
 import { assembleStoredRuns, type ForecastDailyRow, type ForecastRunRow, type StoredRun } from "../lib/forecast/store.js";
 import { modelLabel, type ForecastPoint } from "../lib/forecast/open-meteo-models.js";
+import { resortTimeZone } from "../lib/resort-timezone.js";
 import { STATION_INDEX } from "../lib/stations.js";
+import { fetchPagedRest } from "./rest-helpers.mjs";
 
 // ─── Load .env.local manually ────────────────────────────────────────────
 
@@ -103,6 +105,10 @@ interface ScoreResort {
   id: string;
   slug: string;
   name: string;
+  state: string;
+  country: string;
+  lat: number;
+  lng: number;
   snotel_station_id: string | null;
   elevation_summit_ft: number | null;
   elevation_base_ft: number | null;
@@ -113,21 +119,23 @@ type TruthBasis = "snotel" | "ghcn";
 // ─── Supabase I/O (PostgREST) ─────────────────────────────────────────────
 
 async function getJson<T>(url: string): Promise<T> {
-  const resp = await fetch(url, { headers: supaHeaders });
+  const resp = await fetch(url, { headers: supaHeaders, signal: AbortSignal.timeout(30_000) });
   if (!resp.ok) throw new Error(`${resp.status} ${await resp.text()} — ${url.slice(0, 120)}`);
   return resp.json() as Promise<T>;
 }
 
 async function fetchResorts(): Promise<ScoreResort[]> {
-  let url = `${SUPABASE_URL}/rest/v1/resorts?select=id,slug,name,snotel_station_id,elevation_summit_ft,elevation_base_ft&is_active=eq.true&order=slug`;
-  if (onlySlug) url += `&slug=eq.${encodeURIComponent(onlySlug)}`;
-  return getJson<ScoreResort[]>(url);
+  let q = "resorts?select=id,slug,name,state,country,lat,lng,snotel_station_id,elevation_summit_ft,elevation_base_ft&is_active=eq.true&order=slug";
+  if (onlySlug) q += `&slug=eq.${encodeURIComponent(onlySlug)}`;
+  return fetchPagedRest<ScoreResort>(SUPABASE_URL!, q, supaHeaders);
 }
 
 /** SNOTEL depth rows for the window plus one day before it (the first delta needs a previous day). */
 async function fetchDepthRows(resortId: string, since: string): Promise<Array<{ date: string; snow_depth_in: number | null; qc_flag: string }>> {
-  return getJson(
-    `${SUPABASE_URL}/rest/v1/snowpack_daily?resort_id=eq.${resortId}&station_id=neq.open-meteo&date=gte.${addDays(since, -1)}&select=date,snow_depth_in,qc_flag&order=date`,
+  return fetchPagedRest(
+    SUPABASE_URL!,
+    `snowpack_daily?resort_id=eq.${resortId}&station_id=neq.open-meteo&date=gte.${addDays(since, -1)}&select=date,snow_depth_in,qc_flag&order=date.asc,station_id.asc`,
+    supaHeaders,
   );
 }
 
@@ -139,8 +147,10 @@ async function fetchGhcnSeries(resortId: string, since: string): Promise<{ serie
     );
     const ghcn = links.find((l) => l.stations?.kind === "ghcn");
     if (!ghcn) return null;
-    const rows = await getJson<Array<{ observed_at: string; new_snow_in: number | null }>>(
-      `${SUPABASE_URL}/rest/v1/station_observations?station_id=eq.${ghcn.station_id}&observed_at=gte.${since}T00:00:00Z&select=observed_at,new_snow_in&order=observed_at`,
+    const rows = await fetchPagedRest<{ observed_at: string; new_snow_in: number | null }>(
+      SUPABASE_URL!,
+      `station_observations?station_id=eq.${ghcn.station_id}&observed_at=gte.${since}T00:00:00Z&select=observed_at,new_snow_in&order=observed_at.asc`,
+      supaHeaders,
     );
     const series = measuredFromNewSnow(rows.map((r) => ({ date: r.observed_at.slice(0, 10), new_snow_in: r.new_snow_in })));
     return series.size ? { series, stationElevationFt: ghcn.stations?.elevation_ft ?? null } : null;
@@ -150,15 +160,19 @@ async function fetchGhcnSeries(resortId: string, since: string): Promise<{ serie
 }
 
 async function fetchRuns(resortId: string, point: ForecastPoint, since: string): Promise<StoredRun[]> {
-  const runs = await getJson<ForecastRunRow[]>(
-    `${SUPABASE_URL}/rest/v1/forecast_runs?resort_id=eq.${resortId}&point=eq.${point}&issued_at=gte.${addDays(since, -MAX_LEAD_DAYS)}T00:00:00Z&select=id,resort_id,point,model,issued_at,horizon_days&order=issued_at.desc&limit=20000`,
+  const runs = await fetchPagedRest<ForecastRunRow>(
+    SUPABASE_URL!,
+    `forecast_runs?resort_id=eq.${resortId}&point=eq.${point}&issued_at=gte.${addDays(since, -MAX_LEAD_DAYS)}T00:00:00Z&select=id,resort_id,point,model,issued_at,horizon_days&order=issued_at.desc,id.asc`,
+    supaHeaders,
   );
   const daily: ForecastDailyRow[] = [];
   for (let i = 0; i < runs.length; i += IN_CHUNK) {
     const ids = runs.slice(i, i + IN_CHUNK).map((r) => r.id);
     daily.push(
-      ...(await getJson<ForecastDailyRow[]>(
-        `${SUPABASE_URL}/rest/v1/forecast_daily?run_id=in.(${ids.join(",")})&date=gte.${since}&select=run_id,date,snowfall_cm,snowfall_lo,snowfall_hi,temp_max,temp_min,precip_prob,wind_gust,weather_code`,
+      ...(await fetchPagedRest<ForecastDailyRow>(
+        SUPABASE_URL!,
+        `forecast_daily?run_id=in.(${ids.join(",")})&date=gte.${since}&select=run_id,date,snowfall_cm,snowfall_lo,snowfall_hi,temp_max,temp_min,precip_prob,wind_gust,weather_code&order=run_id.asc,date.asc`,
+        supaHeaders,
       )),
     );
   }
@@ -166,8 +180,14 @@ async function fetchRuns(resortId: string, point: ForecastPoint, since: string):
 }
 
 async function availablePoints(resortId: string): Promise<ForecastPoint[]> {
-  const rows = await getJson<Array<{ point: ForecastPoint }>>(`${SUPABASE_URL}/rest/v1/forecast_runs?resort_id=eq.${resortId}&select=point&limit=200`);
-  return [...new Set(rows.map((r) => r.point))].sort() as ForecastPoint[];
+  const found: ForecastPoint[] = [];
+  for (const pt of ["base", "summit"] as const) {
+    const rows = await getJson<Array<{ point: ForecastPoint }>>(
+      `${SUPABASE_URL}/rest/v1/forecast_runs?resort_id=eq.${resortId}&point=eq.${pt}&select=point&limit=1`,
+    );
+    if (rows.length > 0) found.push(pt);
+  }
+  return found;
 }
 
 async function writeScores(resortId: string, scores: ModelScore[]): Promise<void> {
@@ -249,8 +269,8 @@ async function main(): Promise<void> {
       const point = scoredPointFor(resort, stationElevationFt, points);
       const runs = await fetchRuns(resort.id, point, since);
 
-      // 3. Pair, score, write.
-      const pairs = withBlendPairs(pairForecasts(series, runs));
+      // 3. Pair (grouping run issue days in resort-local timezone), score, write.
+      const pairs = withBlendPairs(pairForecasts(series, runs, undefined, resortTimeZone(resort)));
       const scores = scoreModels(pairs);
       if (!dryRun) await writeScores(resort.id, scores);
       scored++;

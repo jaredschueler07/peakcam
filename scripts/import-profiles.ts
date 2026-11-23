@@ -30,6 +30,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { parse } from "csv-parse/sync";
 import type { SeasonPass } from "../lib/types.js";
 import { SEASON_PASSES } from "../lib/resort-profile.js";
+import { fetchPagedRest } from "./rest-helpers.mjs";
 
 // ─── Load .env.local manually (same as scripts/snotel-sync.ts) ──────────────
 
@@ -70,7 +71,13 @@ export const PROFILE_CSV_COLUMNS = [
 
 export type ProfileCsvRow = Record<(typeof PROFILE_CSV_COLUMNS)[number], string>;
 
-/** The `resorts` columns a row patches; every key is always present so a blank cell writes NULL. */
+/**
+ * The `resorts` columns a row patches. Profile columns become null/empty when
+ * blank in the CSV, EXCEPT `elevation_base_ft` and `elevation_summit_ft`:
+ * many operator stats pages omit one or both elevations even though `resorts`
+ * already carries canonical values (from `resorts.csv` / migration 025), so
+ * blank elevation cells are omitted rather than nulling out existing DB data.
+ */
 export interface ProfilePatch {
   runs_total: number | null;
   lifts_total: number | null;
@@ -78,12 +85,26 @@ export interface ProfilePatch {
   vertical_ft: number | null;
   annual_snowfall_in: number | null;
   longest_run_mi: number | null;
-  elevation_base_ft: number | null;
-  elevation_summit_ft: number | null;
+  elevation_base_ft?: number;
+  elevation_summit_ft?: number;
   passes: SeasonPass[];
   trail_map_url: string | null;
   wikidata_id: string | null;
 }
+
+const PROFILE_PATCH_KEYS: ReadonlyArray<keyof ProfilePatch> = [
+  "runs_total",
+  "lifts_total",
+  "skiable_acres",
+  "vertical_ft",
+  "annual_snowfall_in",
+  "longest_run_mi",
+  "elevation_base_ft",
+  "elevation_summit_ft",
+  "passes",
+  "trail_map_url",
+  "wikidata_id",
+];
 
 export interface ProfileRecord {
   slug: string;
@@ -164,8 +185,8 @@ export function toProfileRecord(row: ProfileCsvRow): ProfileRecord {
       vertical_ft: vertical,
       annual_snowfall_in: numberOrNull(row.annual_snowfall_in, "annual_snowfall_in", slug, { max: 1_200 }),
       longest_run_mi: numberOrNull(row.longest_run_mi, "longest_run_mi", slug, { max: 20 }),
-      elevation_base_ft: base,
-      elevation_summit_ft: summit,
+      ...(base != null ? { elevation_base_ft: base } : {}),
+      ...(summit != null ? { elevation_summit_ft: summit } : {}),
       passes: parsePasses(row.passes ?? "", slug),
       trail_map_url: urlOrNull(row.trail_map_url, "trail_map_url", slug),
       wikidata_id: wikidata || null,
@@ -188,9 +209,8 @@ export function toProfileRecords(rows: ProfileCsvRow[]): ProfileRecord[] {
 
 /** Counts for the run summary: how many rows carry each column. */
 export function summarize(records: ProfileRecord[]): Record<keyof ProfilePatch, number> {
-  const keys = Object.keys(records[0]?.patch ?? {}) as Array<keyof ProfilePatch>;
   const out = {} as Record<keyof ProfilePatch, number>;
-  for (const key of keys) {
+  for (const key of PROFILE_PATCH_KEYS) {
     out[key] = records.filter((r) => {
       const v = r.patch[key];
       return Array.isArray(v) ? v.length > 0 : v != null;
@@ -206,9 +226,7 @@ function serviceHeaders(key: string, extra: Record<string, string> = {}): Record
 }
 
 async function fetchKnownSlugs(url: string, key: string): Promise<Set<string>> {
-  const res = await fetch(`${url}/rest/v1/resorts?select=slug&limit=2000`, { headers: serviceHeaders(key) });
-  if (!res.ok) throw new Error(`resorts lookup failed (${res.status}): ${await res.text()}`);
-  const rows = (await res.json()) as Array<{ slug: string }>;
+  const rows = await fetchPagedRest<{ slug: string }>(url, "resorts?select=slug&order=slug", serviceHeaders(key));
   return new Set(rows.map((r) => r.slug));
 }
 
@@ -216,6 +234,7 @@ async function patchProfile(url: string, key: string, record: ProfileRecord): Pr
   const res = await fetch(`${url}/rest/v1/resorts?slug=eq.${encodeURIComponent(record.slug)}`, {
     method: "PATCH",
     headers: serviceHeaders(key, { Prefer: "return=minimal" }),
+    signal: AbortSignal.timeout(30_000),
     body: JSON.stringify(record.patch),
   });
   if (!res.ok) {
