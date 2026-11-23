@@ -177,7 +177,7 @@ willamette-pass,Base,,youtube,https://www.youtube.com/embed/9wA71jnfNx0,9wA71jnf
 mt-ashland,Webcams,,link,https://mtashland.com/webcams/,,true
 jackson-hole,Rendezvous,,image,https://backend.roundshot.com/cams/6f7dc91857e22fe329e8bdeef5ee5750/default,,true
 jackson-hole,Summit,,image,https://backend.roundshot.com/cams/12a4b2c24cd515e0a115d4a0f59ef7f8/default,,true
-big-sky,Ramcharger,,iframe,https://camstreamer.com/embed/4caf8cbab6999c9/S-16675,,true
+big-sky,Ramcharger,,iframe,https://camstreamer.com/embed/4caf8cbab6999c9/S-16675,,false
 big-sky,Moonlight,,iframe,https://lonemountainland.roundshot.com/moonlightbasin/,,true
 big-sky,Town,,iframe,https://lonemountainland.roundshot.com/,,true
 sun-valley,Snow Stake,,image,https://b9.hdrelay.com/camera/9d9a56b7-bf9e-4162-be9c-06c42ca208ff/snapshot,,true
@@ -373,7 +373,7 @@ ski-cooper,Snow Stake,,iframe,https://skicooper.com:8443/stake/,,true
 monarch-mountain,Pano Flats,,iframe,https://player.brownrice.com/embed/skimonarchpanoflats,,true
 monarch-mountain,Sundeck,,iframe,https://player.brownrice.com/embed/skimonarchsundeck,,true
 mt-ashland,Lodge,,iframe,https://player.brownrice.com/embed/mtashlandlodge,,true
-lookout-pass,Summit,,iframe,https://g1.ipcamlive.com/player/player.php?alias=6345e54d48886,,true
+lookout-pass,Chair 1 Patrol Hut,,iframe,https://g1.ipcamlive.com/player/player.php?alias=6345e54d48886,,true
 lookout-pass,Chair 1 Base,,iframe,https://g1.ipcamlive.com/player/player.php?alias=6345e3cb46ea4,,true
 lookout-pass,Bottom of Chair 4,,iframe,https://g1.ipcamlive.com/player/player.php?alias=63485bb43c85b,,true
 jiminy-peak,Express Cam,,image,https://b15.hdrelay.com/camera/6901323e2fc3303fedc9199e/snapshot,,true
@@ -426,12 +426,14 @@ mt-bachelor,Outback Lift Line,,image,https://api.mtbachelor.com/api/v1/cams/mtn/
 mt-bachelor,Tumalo Mountain & Top of Pine Marten,,image,https://api.mtbachelor.com/api/v1/cams/mtn/12,,false
 mt-bachelor,Nordic Center,,image,https://api.mtbachelor.com/api/v1/cams/mtn/16,,false
 mt-bachelor,Top of Sunrise Lift,,youtube,,pXHMtXbmo7k,false
-mt-bachelor,Mid-Mountain Pine Marten Lodge,,youtube,,lyN2JG7zowo,true
+mt-bachelor,Mid-Mountain Pine Marten Lodge,,youtube,,lyN2JG7zowo,false
 loveland,Basin Deck,,image,https://cams.skiloveland.com/lsacams/basindeck/basindeck.jpg,,false
 loveland,Chet's Top,,image,https://cams.skiloveland.com/lsacams/chetstop/chetstop.jpg,,true
 loveland,Valley Deck,,image,https://cams.skiloveland.com/lsacams/valleydeck/valleydeck.jpg,,true
 bogus-basin,J.R. Simplot Base Area,,youtube,,t1cm2D-1TLY,false
 bogus-basin,"Snow Marker (6,230 ft)",,youtube,,g714uvR8Rjg,true
+bogus-basin,J.R. Simplot Base Area Live Camera,,youtube,,_wkw4iZ5x1c,true
+bogus-basin,Parking Lot #1,,youtube,,uxy-00OXo2Y,true
 granby-ranch,Granby Base Cam,,iframe,https://player.brownrice.com/embed/granby2,,true
 cranmore,Meister Cam (Mount Washington Observatory),,youtube,,TMwZInXDfvI,false
 la-parva,Escuela de Ski,,youtube,,LYq7Zt-O81Y,true
@@ -621,11 +623,11 @@ whitefish,Lift Plaza,,image,https://skiwhitefish.com/inbound/cams/hellroaring_ch
 la-parva,Parva Chica,,youtube,https://www.youtube.com/embed/IXJ24EBzO_s,IXJ24EBzO_s,false,,La Parva,https://laparva.cl/en/terms-and-conditions/
 la-parva,Base Manzanito,,youtube,https://www.youtube.com/embed/85IzX2kG90o,85IzX2kG90o,true,base,La Parva,https://laparva.cl/en/terms-and-conditions/
 la-parva,Cima Tórtolas,,youtube,https://www.youtube.com/embed/Dkx-_pSWjZw,Dkx-_pSWjZw,false,summit,La Parva,https://laparva.cl/en/terms-and-conditions/
-taos,Kachina Peak Cam,,iframe,https://player.brownrice.com/embed/tsvlonestar,,true,summit,Taos Ski Valley,
+taos,Kachina Peak Cam,,iframe,https://player.brownrice.com/embed/tsvlonestar,,false,summit,Taos Ski Valley,
 taos,Lower Plaza,,iframe,https://player.brownrice.com/embed/tsvconstruction,,true,base,Taos Ski Valley,
 brundage,Bear Cam,6490,iframe,https://camstreamer.com/embed/hLQhJ6VOnufDjJbksOH7bBBWpjqZrWxZ8P8EIf32,,true,,Brundage Mountain Resort,
 brundage,Activity Barn Cam,5250,iframe,https://camstreamer.com/embed/omZyNHylJx9Ttu2G5s7UYb8zZhIPfEyrI5IEb4wf,,true,,Brundage Mountain Resort,
-brundage,May Marina Cam,,image,https://brundage.com/webcam/marina.jpg,,true,approach,Brundage Mountain Resort,
+brundage,May Marina Cam,,image,https://brundage.com/webcam/marina.jpg,,false,approach,Brundage Mountain Resort,
 la-hoya,Plateau,,image,https://varitech.ar/cameras/cam032/latest.jpg,,true,mid,La Hoya,
 ski-santa-fe,Quad Cam,,iframe,https://player.brownrice.com/embed/quadtop,,true,summit,Ski Santa Fe,https://www.skisantafe.com/terms-of-service
 valle-nevado,La Góndola,,youtube,https://www.youtube.com/embed/qd2Zr8gE8Sw,qd2Zr8gE8Sw,false,,Valle Nevado,https://www.vallenevado.com/en/legal/
@@ -661,6 +663,10 @@ kelly-canyon,Lost Treasure,,youtube,https://www.youtube.com/embed/mZa2DuN9NdY,mZ
 kelly-canyon,Learners Carpet,,youtube,https://www.youtube.com/embed/hVYOSEtRJZs,hVYOSEtRJZs,false,base,Kelly Canyon Resort,https://kellycanyonresort.com/terms-and-conditions
 pomerelle,Pomerelle Mountain Ski Resort Webcam,,youtube,https://www.youtube.com/embed/uM-oftYVFGA,uM-oftYVFGA,true,,ATC Communications,
 silver-mountain,KREM 2 Camera,,iframe,https://api.wetmet.net/widgets/stream/frame.php?ruc=162-04-01,,true,,KREM 2,https://silvermt.com/terms
+silver-mountain,Mountain House at 5700 ft.,5700,image,https://pub-7925c8bdc8ac4f9ab378e230f5700977.r2.dev/flags.jpg,,true,,Silver Mountain Resort,https://silvermt.com/terms
+silver-mountain,Kellogg Snow Stake,,image,https://pub-7925c8bdc8ac4f9ab378e230f5700977.r2.dev/snow_depth_gauge.jpg,,true,snow-stake,Silver Mountain Resort,https://silvermt.com/terms
+silver-mountain,Kellogg Peak,,image,https://pub-7925c8bdc8ac4f9ab378e230f5700977.r2.dev/kellogg_peak.jpg,,true,summit,Silver Mountain Resort,https://silvermt.com/terms
+silver-mountain,Snow Tubing Park,,image,https://pub-7925c8bdc8ac4f9ab378e230f5700977.r2.dev/tubing.jpg,,true,,Silver Mountain Resort,https://silvermt.com/terms
 pajarito,View from the top of Pajarito Lodge,,iframe,https://player.brownrice.com/embed/pajarito1,,true,base,Pajarito Mountain Ski Area,https://www.pajarito.ski/website-terms-of-use/
 sandia-peak,East Mountain View,,image,https://webcams.sandiapeak.com/images/cams/ski-cam.jpg,,true,,Sandia Peak Tramway,https://www.sandia.ski/website-terms-of-use
 sandia-peak,Tram Cam,,image,https://webcams.sandiapeak.com/images/cams/tram-cam.jpg,,true,,Sandia Peak Tramway,https://www.sandia.ski/website-terms-of-use
@@ -694,6 +700,7 @@ mt-spokane,"Parkway Express, Chair 3",,youtube,https://www.youtube.com/embed/KSI
 mt-spokane,"Mt. Spokane Web Cam, Hourglass, Lodge 1",,youtube,https://www.youtube.com/embed/rvY2pHYzMlE,rvY2pHYzMlE,true,base,Mt. Spokane Ski & Snowboard Park,https://www.mtspokane.com/policies
 mt-spokane,"Mt. Spokane Web Cam, Vista Cruiser",,youtube,https://www.youtube.com/embed/r1N4CmHq0RA,r1N4CmHq0RA,true,,Mt. Spokane Ski & Snowboard Park,https://www.mtspokane.com/policies
 mt-spokane,"Mt. Spokane Webcam, Hidden Treasure, Chair 4",,youtube,https://www.youtube.com/embed/rQnOjOnHrpw,rQnOjOnHrpw,true,,Mt. Spokane Ski & Snowboard Park,https://www.mtspokane.com/policies
+mt-spokane,"Mt. Spokane Web Cam, Half Hitch Terrain Park",,youtube,https://www.youtube.com/embed/itPwz9u27K4,itPwz9u27K4,true,,Mt. Spokane Ski & Snowboard Park,https://www.mtspokane.com/policies
 bristol-mountain,Morning Star Webcam,,image,https://www.bristolmountain.com/webcams/morningstarcurrent.jpg,,true,,Bristol Mountain,
 bristol-mountain,Launching Pad Webcam,,image,https://www.bristolmountain.com/webcams/roselandcurrent.jpg,,true,base,Bristol Mountain,
 bristol-mountain,Launching Pad Live Feed,,iframe,https://player.brownrice.com/embed/bristolmountain2,,false,base,Bristol Mountain,
@@ -986,7 +993,7 @@ kicking-horse,Snow Plot,6759,youtube,https://www.youtube.com/embed/p5qvGfbqwHQ,p
 kicking-horse,Stairway to Heaven,7920,youtube,https://www.youtube.com/embed/mCfxn0_ijJw,mCfxn0_ijJw,true,,Kicking Horse Mountain Resort,
 kicking-horse,Terminator,7900,youtube,https://www.youtube.com/embed/wfYpIsfzapw,wfYpIsfzapw,true,,Kicking Horse Mountain Resort,
 mt-bachelor,Cloudchaser,,iframe,https://camstreamer.com/embed/7WfyGuaHvti06WYRCx5L1XdgpKWyxHqN0iaDpKR4,,true,,Mt. Bachelor,
-mt-bachelor,Snow Stake,,iframe,https://camstreamer.com/embed/yjcHJseJyObWi2YvoWLlmU8inSaI5aY19Jq6Hcoz,,true,,Mt. Bachelor,
+mt-bachelor,Snow Stake,,iframe,https://camstreamer.com/embed/yjcHJseJyObWi2YvoWLlmU8inSaI5aY19Jq6Hcoz,,false,,Mt. Bachelor,
 solitude,Eagle Express Lift Line,,youtube,https://www.youtube.com/embed/oWaG8txpW1c,oWaG8txpW1c,true,,Solitude Mountain Resort,
 solitude,Moonbeam Parking Lot,,youtube,https://www.youtube.com/embed/jZ09h9qo-Vs,jZ09h9qo-Vs,true,,Solitude Mountain Resort,
 solitude,Summit Express Lift Line,,youtube,https://www.youtube.com/embed/Yblyfl97Mhc,Yblyfl97Mhc,true,,Solitude Mountain Resort,
