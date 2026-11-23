@@ -75,14 +75,19 @@ function timelapseLines(cams: readonly CamTimelapses[] | null | undefined, camId
  * attribution, author/license Link) plus the canonical Link and a noindex so
  * the HTML page, not this document, is what search engines rank.
  */
-export function markdownPageHeaders(canonicalUrl: string): Record<string, string> {
+export function markdownPageHeaders(canonicalUrl: string, options: { attribution?: string } = {}): Record<string, string> {
   return {
     ...publicApiHeaders({
       contentType: MARKDOWN_CONTENT_TYPE,
       extraLinks: [`<${canonicalUrl}>; rel="canonical"`],
+      attribution: options.attribution,
     }),
     "X-Robots-Tag": "noindex",
   };
+}
+
+function mdCell(value: unknown): string {
+  return String(value).replace(/\|/g, "\\|").replace(/[\r\n]+/g, " ").trim();
 }
 
 // ── Formatting helpers ───────────────────────────────────────
@@ -234,7 +239,7 @@ export function conditionsSection(view: ResortConditionsView, apiUrl: string, ba
     const { label: baseLabel, unit } = FIELD_LABELS[name];
     // Before first chair a feed's "open" count is the day's plan, not lifts turning (lib/operator-day.ts).
     const label = name === "liftsOpen" && c.liftDay?.state === "scheduled" ? "Lifts marked open by the feed (before first chair; see status)" : baseLabel;
-    lines.push(`| ${label} | ${String(f.value)}${unit} | ${f.source} | ${f.observedAt ?? "static"} | ${tierCell(f)} |`);
+    lines.push(`| ${mdCell(label)} | ${mdCell(`${String(f.value)}${unit}`)} | ${mdCell(f.source)} | ${mdCell(f.observedAt ?? "static")} | ${mdCell(tierCell(f))} |`);
   }
   lines.push("", `Recommendable today: ${c.recommendableToday ? "yes" : "no"}. ${c.reasons.join("; ")}.`);
   if (c.depthDisagreement) lines.push("", c.depthDisagreement.note);
@@ -281,7 +286,7 @@ export function resortSummarySentence(resort: ResortPublic, opts: MarkdownPageOp
 
 function snowTable(snow: NonNullable<ResortPublic["snow"]>): string {
   const row = (label: string, m: Measurement, fmt: (v: number | null) => string) =>
-    `| ${label} | ${fmt(m.value)} | ${sourceLabel(m)} | ${m.measuredAt ?? "n/a"} |`;
+    `| ${mdCell(label)} | ${mdCell(fmt(m.value))} | ${mdCell(sourceLabel(m))} | ${mdCell(m.measuredAt ?? "n/a")} |`;
   return [
     "| Measure | Value | Source | Measured at (UTC) |",
     "| --- | --- | --- | --- |",
@@ -405,13 +410,13 @@ function forecastTable(periods: readonly WeatherPeriod[] | null, country: string
   const out = ["| Day | Forecast | High / low | Est. snow | Precip chance |", "| --- | --- | --- | --- | --- |"];
   for (const p of periods) {
     const chance = p.precipProbability == null ? "n/a" : `${Math.round(p.precipProbability)}%`;
-    out.push(`| ${p.dow} | ${p.shortForecast} | ${degrees(p.high)} / ${degrees(p.low)} | ${inches(p.snowInches)} | ${chance} |`);
+    out.push(`| ${mdCell(p.dow)} | ${mdCell(p.shortForecast)} | ${mdCell(`${degrees(p.high)} / ${degrees(p.low)}`)} | ${mdCell(inches(p.snowInches))} | ${mdCell(chance)} |`);
   }
   out.push(
     "",
     country === "US"
       ? "Source: National Weather Service point forecast. Snow amounts are keyword estimates from the forecast text, not a quantitative precipitation forecast."
-      : "Source: Open-Meteo model forecast for the resort's coordinates. Snow amounts are model estimates.",
+      : "Source: Open-Meteo model forecast for the resort's coordinates. Snow amounts are model estimates. Weather data by Open-Meteo.com (CC BY 4.0, https://open-meteo.com).",
   );
   return out;
 }

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { HourlyWeather } from "./types";
-import { SNOW_KEYWORDS, bucketIntoPeriods, estimateSnow, forecastToCondition, parseLocalParts, windChill } from "./weather";
+import { SNOW_KEYWORDS, applyBlendToPeriods, bucketIntoPeriods, estimateSnow, forecastToCondition, parseLocalParts, parseNwsForecastPeriods, windChill } from "./weather";
 
 // ── parseLocalParts ───────────────────────────────────────────
 // The whole point: read the wall clock the string was written in, never the
@@ -242,4 +242,76 @@ test("applyBlendToPeriods rescales a day's periods to the blended total, in prop
   const out = applyBlendToPeriods(periods, { "2026-12-01": 8, "2026-12-02": 5 });
   assert.deepEqual(out.map((p) => p.snowInches), [6, 2, 2.5, 2.5, 2], "proportional on day 1, even split on a day the wording named no snow, untouched when the blend has no date");
   assert.deepEqual(applyBlendToPeriods(periods, null).map((p) => p.snowInches), [3, 1, 0, 0, 2]);
+});
+
+test("applyBlendToPeriods preserves fractional tenths via largest-remainder rounding", () => {
+  const p = (period: "morning" | "afternoon" | "evening") => ({
+    day: "Mon", date: "2026-12-01", period, condition: "light-snow" as const,
+    highTemp: 20, lowTemp: 10, feelsLike: 5, windSpeed: 10, windGust: 15,
+    windDirection: "W", snowInches: 0, precipProbability: 60, shortForecast: "Snow",
+  });
+  const tiny = applyBlendToPeriods([p("morning"), p("afternoon"), p("evening")], { "2026-12-01": 0.1 });
+  assert.deepEqual(tiny.map((x) => x.snowInches), [0.1, 0, 0]);
+  const half = applyBlendToPeriods([p("morning"), p("afternoon"), p("evening")], { "2026-12-01": 0.5 });
+  assert.deepEqual(half.map((x) => x.snowInches), [0.2, 0.2, 0.1]);
+});
+
+test("parseNwsForecastPeriods keeps leading Tonight and resolves holiday names from startTime", () => {
+  const periods = [
+    {
+      name: "Tonight",
+      startTime: "2026-11-25T18:00:00-07:00",
+      isDaytime: false,
+      temperature: 14,
+      temperatureUnit: "F",
+      windSpeed: "10 mph",
+      windDirection: "W",
+      shortForecast: "Snow Showers",
+      detailedForecast: "2 inches possible.",
+      probabilityOfPrecipitation: { value: 70 },
+    },
+    {
+      name: "Thanksgiving Day",
+      startTime: "2026-11-26T06:00:00-07:00",
+      isDaytime: true,
+      temperature: 28,
+      temperatureUnit: "F",
+      windSpeed: "12 mph",
+      windDirection: "NW",
+      shortForecast: "Sunny",
+      detailedForecast: "Sunny and cold.",
+      probabilityOfPrecipitation: { value: null },
+    },
+    {
+      name: "Thursday Night",
+      startTime: "2026-11-26T18:00:00-07:00",
+      isDaytime: false,
+      temperature: 11,
+      temperatureUnit: "F",
+      windSpeed: "8 mph",
+      windDirection: "NW",
+      shortForecast: "Clear",
+      detailedForecast: "Clear.",
+      probabilityOfPrecipitation: { value: 0 },
+    },
+  ];
+  const out = parseNwsForecastPeriods(periods);
+  assert.equal(out.length, 2);
+  assert.equal(out[0].dow, "Tonight");
+  assert.equal(out[0].high, 14);
+  assert.equal(out[0].low, null);
+  assert.equal(out[0].snowInches, 3);
+  assert.equal(out[1].dow, "Thu");
+  assert.equal(out[1].high, 28);
+  assert.equal(out[1].low, 11);
+  assert.equal(out[1].precipProbability, null);
+});
+
+test("bucketIntoPeriods leaves precipProbability null when all bucket hours are null", () => {
+  const out = bucketIntoPeriods([
+    hour("2026-07-12T09:00:00-06:00", { precipProbability: null as unknown as number }),
+    hour("2026-07-12T10:00:00-06:00", { precipProbability: null as unknown as number }),
+  ]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].precipProbability, null);
 });

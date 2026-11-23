@@ -121,6 +121,82 @@ export async function resolveGridPoint(lat: number, lng: number) {
 export type SnowByDateInches = Record<string, number>;
 
 /**
+ * Collapse NWS day/night periods into daily forecast cards.
+ * Preserves a leading nighttime period ("Tonight") so overnight snow/lows are
+ * not lost after ~6pm local, and derives weekday abbreviations from
+ * `startTime` instead of truncating NWS holiday names ("Thanksgiving Day").
+ */
+export function parseNwsForecastPeriods(
+  periods: readonly NWSPeriod[],
+  blendByDate?: SnowByDateInches | null,
+): WeatherPeriod[] {
+  const days: WeatherPeriod[] = [];
+  let i = 0;
+  while (i < periods.length && days.length < 5) {
+    const p = periods[i];
+    const next = periods[i + 1];
+
+    if (i === 0 && !p.isDaytime) {
+      const ws = p.windSpeed ? parseWindSpeed(p.windSpeed) : null;
+      const temp = p.temperature;
+      const date = p.startTime ? parseLocalParts(p.startTime)?.dateKey : undefined;
+      const blended = date != null ? blendByDate?.[date] : undefined;
+      const dow = p.name.toLowerCase().includes("overnight") ? "Overnight" : "Tonight";
+      days.push({
+        date,
+        dow,
+        condition: forecastToCondition(p.shortForecast),
+        high: temp,
+        low: null,
+        snowInches: blended != null ? blended : estimateSnow(p.shortForecast),
+        snowSource: blended != null ? "blend" : "nws_keyword",
+        shortForecast: p.shortForecast,
+        windSpeed: ws,
+        windDirection: p.windDirection ?? null,
+        windGust: null,
+        precipProbability: p.probabilityOfPrecipitation?.value ?? null,
+        feelsLike: ws != null ? windChill(temp, ws) : null,
+      });
+      i++;
+      continue;
+    }
+
+    if (p.isDaytime) {
+      const low = next && !next.isDaytime ? next.temperature : null;
+      const ws = p.windSpeed ? parseWindSpeed(p.windSpeed) : null;
+      const high = p.temperature;
+      const parts = p.startTime ? parseLocalParts(p.startTime) : null;
+      const date = parts?.dateKey;
+      const blended = date != null ? blendByDate?.[date] : undefined;
+      const keyword = Math.max(
+        estimateSnow(p.shortForecast),
+        low != null ? estimateSnow(next?.shortForecast ?? "") : 0
+      );
+      const dow = days.length === 0 ? "Today" : parts ? DAY_NAMES[parts.weekday] : p.name.substring(0, 3);
+      days.push({
+        date,
+        dow,
+        condition: forecastToCondition(p.shortForecast),
+        high,
+        low,
+        snowInches: blended != null ? blended : keyword,
+        snowSource: blended != null ? "blend" : "nws_keyword",
+        shortForecast: p.shortForecast,
+        windSpeed: ws,
+        windDirection: p.windDirection ?? null,
+        windGust: null, // Not available in basic forecast
+        precipProbability: p.probabilityOfPrecipitation?.value ?? null,
+        feelsLike: ws != null ? windChill(high, ws) : null,
+      });
+      i += next && !next.isDaytime ? 2 : 1;
+    } else {
+      i++;
+    }
+  }
+  return days;
+}
+
+/**
  * Fetch 5-day forecast for a given lat/lng from the NWS API.
  * Returns null if NWS is unreachable — always handle gracefully.
  */
@@ -141,49 +217,7 @@ export async function getWeatherForecast(
     if (!forecastRes.ok) return null;
     const forecastData = await forecastRes.json();
     const periods: NWSPeriod[] = forecastData?.properties?.periods ?? [];
-
-    // Collapse daytime/nighttime pairs into days
-    const days: WeatherPeriod[] = [];
-    // After about 6 pm local NWS leads with a nighttime period ("Tonight"),
-    // which is skipped like every other unpaired night; the first collapsed
-    // day is then tomorrow and must carry its weekday, not "Today".
-    let leadingNightSkipped = false;
-    let i = 0;
-    while (i < periods.length && days.length < 5) {
-      const p = periods[i];
-      const next = periods[i + 1];
-
-      if (p.isDaytime) {
-        const low = next && !next.isDaytime ? next.temperature : null;
-        const ws = p.windSpeed ? parseWindSpeed(p.windSpeed) : null;
-        const high = p.temperature;
-        const date = p.startTime ? parseLocalParts(p.startTime)?.dateKey : undefined;
-        const blended = date != null ? blendByDate?.[date] : undefined;
-        const keyword = Math.max(
-          estimateSnow(p.shortForecast),
-          low != null ? estimateSnow(next?.shortForecast ?? "") : 0
-        );
-        days.push({
-          date,
-          dow: days.length === 0 && !leadingNightSkipped ? "Today" : p.name.substring(0, 3),
-          condition: forecastToCondition(p.shortForecast),
-          high,
-          low,
-          snowInches: blended != null ? blended : keyword,
-          snowSource: blended != null ? "blend" : "nws_keyword",
-          shortForecast: p.shortForecast,
-          windSpeed: ws,
-          windDirection: p.windDirection ?? null,
-          windGust: null, // Not available in basic forecast
-          precipProbability: p.probabilityOfPrecipitation?.value ?? null,
-          feelsLike: ws != null ? windChill(high, ws) : null,
-        });
-        i += next && !next.isDaytime ? 2 : 1;
-      } else {
-        if (days.length === 0) leadingNightSkipped = true;
-        i++;
-      }
-    }
+    const days = parseNwsForecastPeriods(periods, blendByDate);
 
     return days.length > 0 ? days : null;
   } catch {
@@ -240,7 +274,7 @@ export async function getHourlyForecast(
           shortForecast: p.shortForecast,
           condition: forecastToCondition(p.shortForecast),
           snowInches: Math.round((estimateSnow(p.shortForecast) / NWS_KEYWORD_PERIOD_HOURS) * 10) / 10,
-          precipProbability: p.probabilityOfPrecipitation?.value ?? 0,
+          precipProbability: (p.probabilityOfPrecipitation?.value ?? null) as unknown as number,
           feelsLike: windChill(temp, ws),
         };
       }
@@ -362,7 +396,10 @@ export function bucketIntoPeriods(hourly: HourlyWeather[]): ForecastPeriod[] {
     // Most representative shortForecast: from the item with dominant condition
     const representative = items.find((it) => it.condition === dominantCondition) ?? items[0];
 
-    results.push({
+      const pops = items
+        .map((it) => it.precipProbability)
+        .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+      results.push({
       day,
       date,
       period,
@@ -377,7 +414,7 @@ export function bucketIntoPeriods(hourly: HourlyWeather[]): ForecastPeriod[] {
       // adding them accumulates binary float error (0.3+0.3+0.3 renders as
       // "0.8999999999999999" without this).
       snowInches: Math.round(items.reduce((sum, it) => sum + it.snowInches, 0) * 10) / 10,
-      precipProbability: Math.max(...items.map((it) => it.precipProbability)),
+      precipProbability: pops.length ? Math.max(...pops) : (null as unknown as number),
       shortForecast: representative.shortForecast,
     });
   }
@@ -405,10 +442,22 @@ export function applyBlendToPeriods(periods: ForecastPeriod[], blendByDate: Snow
     const target = blendByDate[date];
     if (target == null || !Number.isFinite(target)) continue;
     const keywordTotal = group.reduce((s, p) => s + p.snowInches, 0);
-    for (const p of group) {
+    const targetTenths = Math.round(target * 10);
+    const exactTenths = group.map((p) => {
       const share = keywordTotal > 0 ? p.snowInches / keywordTotal : 1 / group.length;
-      scaled.set(p, Math.round(target * share * 10) / 10);
+      return targetTenths * share;
+    });
+    const tenths = exactTenths.map((v) => Math.floor(v + 1e-9));
+    let remainder = targetTenths - tenths.reduce((a, b) => a + b, 0);
+    if (remainder > 0) {
+      const order = exactTenths
+        .map((v, idx) => ({ idx, frac: v - tenths[idx] }))
+        .sort((a, b) => b.frac - a.frac || a.idx - b.idx);
+      for (let k = 0; k < order.length && remainder > 0; k++, remainder--) {
+        tenths[order[k].idx] += 1;
+      }
     }
+    group.forEach((p, idx) => scaled.set(p, tenths[idx] / 10));
   }
   return periods.map((p) => (scaled.has(p) ? { ...p, snowInches: scaled.get(p)! } : p));
 }

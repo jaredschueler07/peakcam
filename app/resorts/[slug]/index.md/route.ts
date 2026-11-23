@@ -26,11 +26,28 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
   if (!resort) return notFound(slug);
   const options = optionsFor(catalog, resort);
   const doc = serializeResort(resort, options);
-  // P6: the same contract /api/v1/resorts/{slug}/conditions serves, as a section; P8 clips are listed under each cam.
-  const [stored, timelapses] = await Promise.all([loadResortForecast(resort.id).catch(() => ({ runs: [] })), loadResortTimelapses(resort.id)]);
+  // A failed forecast read costs one field of the conditions section, so the
+  // document is still served, but uncached so the gap is not pinned at the edge.
+  let forecastFailed = false;
+  let stored;
+  let timelapses;
+  try {
+    [stored, timelapses] = await Promise.all([
+      loadResortForecast(resort.id).catch(() => {
+        forecastFailed = true;
+        return { runs: [] };
+      }),
+      loadResortTimelapses(resort.id),
+    ]);
+  } catch {
+    return new Response("Resort timelapse archive temporarily unavailable.\n", {
+      status: 503,
+      headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+    });
+  }
   const conditions = resortConditionsView(resort, { ...options, forecast: stored });
   // The stored description (P2 plumbing) travels with its provenance label.
   return new Response(resortMarkdown(doc, { now: catalog.now, description: profileDescription(resort), timelapses, conditions }), {
-    headers: markdownPageHeaders(doc.canonicalUrl),
+    headers: { ...markdownPageHeaders(doc.canonicalUrl), ...(forecastFailed ? { "Cache-Control": "no-store" } : {}) },
   });
 }

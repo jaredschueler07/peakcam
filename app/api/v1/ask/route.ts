@@ -19,8 +19,8 @@ async function handle(request: Request): Promise<Response> {
   const answer = await answerHttp(request, read.question);
   return publicJson(answer, {
     allowMethods: PUBLIC_API_POST_METHODS,
-    // Unanswerable questions are not pinned at the edge; a typo should not be cached for 15 minutes.
-    cacheControl: answer.answerable ? undefined : "no-store",
+    // Never cache POST responses or unanswerable questions at the edge.
+    cacheControl: request.method === "GET" && answer.answerable ? undefined : "no-store",
   });
 }
 

@@ -15,7 +15,8 @@ import { scoreSentence } from "@/lib/quotable";
 import { cameraPreview } from "@/lib/cam-preview";
 import { camDisplayName } from "@/lib/cam-name";
 import { conditionsNarrative } from "@/lib/resort-copy";
-import { openingStatus, toPacificDay, type ResortOpening } from "@/lib/openings";
+import { openingStatus, type ResortOpening } from "@/lib/openings";
+import { resortLocalDay } from "@/lib/resort-timezone";
 import { PUBLIC_API_ATTRIBUTION, PUBLIC_API_LICENSE_URL } from "./headers";
 import { resortTabUrl } from "@/lib/resort-pages";
 import type { CamTimelapses } from "@/lib/cam-timelapse";
@@ -233,7 +234,7 @@ export function serializeSnow(resort: ResortWithData, options: SerializeOptions 
 
 export function serializeSeason(resort: ResortWithData, options: SerializeOptions = {}): SeasonPublic {
   const now = options.now ?? new Date();
-  const asOf = toPacificDay(now);
+  const asOf = resortLocalDay(resort, now);
   const row = options.opening ?? null;
   const raw = openingStatus(row, asOf);
 

@@ -246,8 +246,7 @@ export function pastSeasons(
     const ref = previousSeason(current, offset, hemisphere);
     const season = bySeason.get(ref.key);
     if (!season || !season.rows.length) continue;
-    const curve = cumulativeByDay(season);
-    const totalIn = curve[curve.length - 1];
+    const totalIn = Math.round(season.rows.reduce((s, r) => s + (r.newSnowIn != null && Number.isFinite(r.newSnowIn) ? r.newSnowIn : 0), 0) * 10) / 10;
     const top = storms(season.rows)[0] ?? null;
     out.push({
       season: ref,

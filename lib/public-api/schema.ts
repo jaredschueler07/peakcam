@@ -674,6 +674,8 @@ export const StatusSchema = z
         ageHours: z.number().nullable().describe("Hours since `newestReportAt`. The sync jobs run every 6 h, so above 12 h is degraded."),
         staleResorts: z.number().int().describe("Reporting resorts whose latest report is older than 24 h."),
         bySource: z.record(z.string(), z.number().int()).describe("Reporting resorts per `source` (`snotel`, `open_meteo`, …)."),
+        bySourceNewestAt: z.record(z.string(), z.string()).optional().describe("Newest `updated_at` per monitored sync source (`snotel`, `open_meteo`)."),
+        bySourceAgeHours: z.record(z.string(), z.number()).optional().describe("Age in hours of the newest report per monitored sync source (`snotel`, `open_meteo`)."),
       }),
       cams: z.object({
         status: StatusLevelSchema,
@@ -689,6 +691,22 @@ export const StatusSchema = z
         newestCapturedAt: z.string().nullable().describe("Newest `cam_stills.captured_at` across the archive."),
         ageHours: z.number().nullable().describe("Hours since `newestCapturedAt`. The capture job writes every 15 min, so above 2 h is degraded."),
       }),
+      stations: z
+        .object({
+          status: StatusLevelSchema,
+          resorts: z.number().int().describe("Resorts with at least one station in the catalogue."),
+          newestObservedAt: z.string().nullable().describe("Newest station observation timestamp across the catalogue."),
+          ageHours: z.number().nullable().describe("Hours since `newestObservedAt`. Above 24 h is degraded."),
+        })
+        .optional(),
+      scores: z
+        .object({
+          status: StatusLevelSchema,
+          resorts: z.number().int().describe("Resorts with a current Snow Score row."),
+          newestScoreDate: z.string().nullable().describe("Newest `resort_scores.date` (YYYY-MM-DD)."),
+          ageDays: z.number().int().nullable().describe("Calendar days since `newestScoreDate`. Above 2 days is degraded."),
+        })
+        .optional(),
     }),
     thresholds: z.object({
       reportMaxAgeHours: z.number(),
