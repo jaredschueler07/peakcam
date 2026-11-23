@@ -124,16 +124,24 @@ test("snow quality is read off the engine's tags", () => {
 
 const base = { hemisphere: "north" as const, localDate: "2026-12-20", now: NOW };
 
-test("status: a fresh operator feed with lifts open is OPEN; with lifts only scheduled it is still OPEN", () => {
+test("status: a fresh operator feed with lifts open is OPEN; lifts only scheduled open it only after a confirmed opening", () => {
   const open = deriveStatus({ ...base, opening: opening({ confirmed_open: "2026-11-20" }), operator: operator() });
   assert.equal(open.status, "OPEN");
   assert.equal(open.source, "operator");
   assert.equal(open.basis, "feed");
   assert.equal(open.observedAt, hoursAgo(1));
   assert.match(open.reasons[0], /7 of 11 lifts open/);
-  const scheduled = deriveStatus({ ...base, opening: null, operator: operator({ liftsOpen: 0, liftsScheduled: 9, liftsClosed: 2 }) });
+  const scheduled = deriveStatus({ ...base, opening: opening({ confirmed_open: "2026-11-20" }), operator: operator({ liftsOpen: 0, liftsScheduled: 9, liftsClosed: 2 }) });
   assert.equal(scheduled.status, "OPEN");
   assert.match(scheduled.reasons[0], /9 lifts set to run today, none confirmed turning yet/);
+  // Sun Valley, 2026-11-23: all 17 lifts "scheduled" three days before opening day, no date on file.
+  const standing = deriveStatus({ ...base, opening: null, operator: operator({ liftsOpen: 0, liftsScheduled: 17, liftsClosed: 0, liftsTotal: 17 }) });
+  assert.equal(standing.status, "UNKNOWN");
+  assert.equal(standing.liftDay ?? null, null);
+  assert.match(standing.reasons[0], /17 lifts listed as scheduled and none open/);
+  // With the opening still ahead the date decides: pre-season, not open.
+  const ahead = deriveStatus({ ...base, opening: opening({ confirmed_open: "2026-12-24" }), operator: operator({ liftsOpen: 0, liftsScheduled: 17, liftsClosed: 0, liftsTotal: 17 }) });
+  assert.equal(ahead.status, "PRE_SEASON");
 });
 
 test("status: a fresh operator feed with every lift closed inside the season is CLOSED_TODAY; outside a known season it falls through", () => {

@@ -124,3 +124,18 @@ test("the index uses each resort's own zone", () => {
   assert.equal(index.p1?.carried, true);
   assert.equal(index.p1?.open, 6);
 });
+
+test("a feed that only lists lifts as scheduled is shown only for a resort whose confirmed opening has passed", () => {
+  // Sun Valley, 2026-11-23: 17 of 17 "scheduled" every day before its opening.
+  const standing = row({ resort_id: "sv", observed_at: "2026-11-20T16:35:00Z", lifts_open: 0, lifts_scheduled: 17, lifts_closed: 0, lifts_total: 17 });
+  assert.equal(hubLiftsFromRow(standing, NOW, "America/Denver", false), null);
+  assert.equal(hubLiftsFromRow(standing, NOW, "America/Denver", true)?.state, "scheduled");
+  // A lift actually open is believed with or without a date on file.
+  assert.equal(hubLiftsFromRow(row(), NOW, "America/Denver", false)?.state, "operated");
+
+  const resorts = [{ id: "sv", state: "ID", country: "US", lat: 43.6877, lng: -114.351 }];
+  assert.deepEqual(buildHubLiftsIndex({ sv: standing }, NOW, resorts, new Set()), {});
+  assert.equal(buildHubLiftsIndex({ sv: standing }, NOW, resorts, new Set(["sv"])).sv.state, "scheduled");
+  // No season set passed: the earlier behaviour.
+  assert.equal(buildHubLiftsIndex({ sv: standing }, NOW, resorts).sv.state, "scheduled");
+});

@@ -53,7 +53,13 @@ export type HubLiftsIndex = Readonly<Record<string, HubLifts | undefined>>;
 export type HubLiftsResort = TimeZoneResort & { id: string };
 
 /** Today's lift status from the row and its attached readings; null when the feed is stale, carries no counts, or does not say open or scheduled today. */
-export function hubLiftsFromRow(row: OperatorStatusRow | null | undefined, now: Date, timeZone: string = DEFAULT_OPERATOR_TIME_ZONE): HubLifts | null {
+export function hubLiftsFromRow(
+  row: OperatorStatusRow | null | undefined,
+  now: Date,
+  timeZone: string = DEFAULT_OPERATOR_TIME_ZONE,
+  /** False when the resort has no confirmed opening date that has passed: a feed that only lists lifts as scheduled is then not shown (deriveStatus applies the same rule). */
+  seasonOn: boolean = true,
+): HubLifts | null {
   const report = operatorReportFromRow(row);
   if (!report) return null;
   const tier = freshnessFor("operator", report.observedAt, now).tier;
@@ -63,6 +69,7 @@ export function hubLiftsFromRow(row: OperatorStatusRow | null | undefined, now: 
     : [{ observedAt: report.observedAt, liftsOpen: report.liftsOpen, liftsScheduled: report.liftsScheduled, liftsTotal: report.liftsTotal }];
   const day = summarizeOperatorDay(readings, timeZone, now);
   if (!day || day.state === "closed" || day.liftsTotal == null) return null;
+  if (day.state === "scheduled" && !seasonOn) return null;
   return { state: day.state, open: day.liftsOpen, total: day.liftsTotal, scheduled: day.liftsScheduled, observedAt: day.observedAt, current: day.current, carried: day.carried };
 }
 
@@ -70,11 +77,13 @@ export function buildHubLiftsIndex(
   operatorIndex: Readonly<Record<string, OperatorStatusRow>> | null | undefined,
   now: Date,
   resorts: readonly HubLiftsResort[] = [],
+  /** Resort ids whose confirmed opening date has passed. Omitted: every resort is treated as in season (the behaviour before this parameter). */
+  inSeason?: ReadonlySet<string> | null,
 ): Record<string, HubLifts> {
   const zones = new Map(resorts.map((r) => [r.id, resortTimeZone(r)]));
   const out: Record<string, HubLifts> = {};
   for (const [resortId, row] of Object.entries(operatorIndex ?? {})) {
-    const lifts = hubLiftsFromRow(row, now, zones.get(resortId));
+    const lifts = hubLiftsFromRow(row, now, zones.get(resortId), inSeason ? inSeason.has(resortId) : true);
     if (lifts) out[resortId] = lifts;
   }
   return out;

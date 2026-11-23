@@ -2,7 +2,8 @@ import { createClient } from "@supabase/supabase-js";
 import { readAllPages } from "@/lib/paged-read";
 import { unstable_cache } from "next/cache";
 import type { Resort, Cam, SnowReport, ResortWithData, LiveConditions, SnowQuality, ComfortLevel, UserCondition, PowderProbability, PowderProbabilityForecast, PowderProbabilityWindow, ResortStationJoined, StationObservation, StationRole, StationRow, OperatorStatusRow, OperatorRecentReading, ResortScoreRow } from "./types";
-import type { ResortOpening } from "./openings";
+import { openingStatus, type ResortOpening } from "./openings";
+import { localDay, resortTimeZone } from "./resort-timezone";
 import type { StationNormalsSummary } from "./resort-faq";
 import { withResolvedCamNames } from "./cam-name";
 import { CAPTURE_INTERVAL_S, clampHours, filterRetained, KEEPER_RETENTION_DAYS, MAX_TIMELINE_HOURS, pickResortTimeline, shapeTimeline, THIN_BUCKET_HOURS, toFrame, type CamStillRow, type CamTimeline, type CamTimelineFrame } from "./cam-timeline";
@@ -692,7 +693,17 @@ export const getLatestOperatorStatusIndex = unstable_cache(
  */
 export async function getHubLiftsIndex(now: Date, resorts: readonly HubLiftsResort[] = []): Promise<Record<string, HubLifts>> {
   const operatorIndex = await getLatestOperatorStatusIndex().catch(() => ({}));
-  return buildHubLiftsIndex(operatorIndex, now, resorts);
+  // Which resorts have a confirmed opening behind them: a feed that only
+  // lists lifts as scheduled shows "Opens today" for those alone. A failed
+  // read hides the scheduled chips rather than showing unconfirmed ones.
+  const openings = await getResortOpenings().catch(() => [] as ResortOpening[]);
+  const zones = new Map(resorts.map((r) => [r.id, resortTimeZone(r)]));
+  const inSeason = new Set(
+    openings
+      .filter((o) => openingStatus(o, localDay(now, zones.get(o.resort_id) ?? "America/Denver")) === "open")
+      .map((o) => o.resort_id),
+  );
+  return buildHubLiftsIndex(operatorIndex, now, resorts, inSeason);
 }
 
 // ─────────────────────────────────────────────────────────────

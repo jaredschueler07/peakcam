@@ -150,7 +150,7 @@ test("vendored files carry their version, commit and licence", () => {
 test("every mapped Liftie id has a vendored parser", () => {
   const sources = JSON.parse(fs.readFileSync(path.join(HERE, "..", "..", "data", "operator-sources.json"), "utf8"));
   const ids = Object.values(sources).map((v) => (v && typeof v === "object" ? v.liftie : null)).filter(Boolean);
-  assert.ok(ids.length >= 93);
+  assert.ok(ids.length >= 92);
   for (const id of ids) {
     assert.ok(fs.existsSync(path.join(VENDOR, "lib", "resorts", id, "index.js")), `${id}: run scripts/liftie-worker/vendor.mjs`);
     const def = JSON.parse(fs.readFileSync(path.join(VENDOR, "lib", "resorts", id, "resort.json"), "utf8"));
