@@ -134,3 +134,26 @@ test("data/operator-sources.json: every entry names a Liftie id in Liftie's id f
   const ids = pairs.map((p) => p.liftieId);
   assert.equal(new Set(ids).size, ids.length, "a Liftie id maps to one PeakCam resort");
 });
+
+test("parseLiftieResort: rows that are not lifts are left out of the counts", () => {
+  // Bogus Basin on a closed Monday (2026-11-23): ten lifts closed, two standing "scheduled" rows that are not lifts.
+  const report = parseLiftieResort(
+    {
+      id: "bogusbasin",
+      name: "Bogus Basin",
+      lifts: {
+        status: {
+          "Terrain Parks": "scheduled",
+          "Uphill Access Routes": "scheduled",
+          "Deer Point Express": "closed",
+          "Coach Chairlift": "closed",
+          "Easy Rider Carpet": "closed",
+        },
+      },
+    },
+    new Date("2026-11-23T16:05:00Z"),
+  );
+  assert.ok(report);
+  assert.deepEqual(report.stats, { open: 0, hold: 0, scheduled: 0, closed: 3, total: 3 });
+  assert.deepEqual(Object.keys(report.lifts).sort(), ["Coach Chairlift", "Deer Point Express", "Easy Rider Carpet"]);
+});

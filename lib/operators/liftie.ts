@@ -74,6 +74,13 @@ function isLiftState(value: unknown): value is LiftState {
   return typeof value === "string" && (LIFT_STATES as readonly string[]).includes(value);
 }
 
+/**
+ * Rows an operator lists beside its lifts that are not lifts. Bogus Basin's
+ * page carries "Terrain Parks" and "Uphill Access Routes", both "scheduled"
+ * on days the mountain is closed, which read as two lifts set to run.
+ */
+export const NOT_A_LIFT_RE = /\b(terrain parks?|uphill)\b/i;
+
 /** Per-lift map → counts, the same rule as Liftie's own lib/lifts/stats.js. */
 export function statsFromLifts(lifts: Record<string, LiftState>): LiftieStats {
   const stats: LiftieStats = { open: 0, hold: 0, scheduled: 0, closed: 0, total: 0 };
@@ -99,7 +106,7 @@ export function parseLiftieResort(doc: unknown, fetchedAt: Date): LiftieReport |
 
   const lifts: Record<string, LiftState> = {};
   const status = liftsBlock.status && typeof liftsBlock.status === "object" ? (liftsBlock.status as Record<string, unknown>) : {};
-  for (const [name, state] of Object.entries(status)) if (isLiftState(state)) lifts[name] = state;
+  for (const [name, state] of Object.entries(status)) if (isLiftState(state) && !NOT_A_LIFT_RE.test(name)) lifts[name] = state;
 
   let stats = statsFromLifts(lifts);
   const raw = liftsBlock.stats && typeof liftsBlock.stats === "object" ? (liftsBlock.stats as Record<string, unknown>) : null;
