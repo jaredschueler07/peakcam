@@ -163,6 +163,12 @@ function startOfUtcDay(day: string): Date {
   return new Date(`${day}T00:00:00Z`);
 }
 
+function isIsoDay(day: string | undefined): day is string {
+  if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
+  const d = startOfUtcDay(day);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === day;
+}
+
 /**
  * Is a storm on, and which window does its clip cover?
  *
@@ -173,12 +179,13 @@ function startOfUtcDay(day: string): Date {
  * of new snow; the clip starts at the first frame after the last dry day
  * (00:00 UTC of the first snowy day) and ends now, capped at STORM_MAX_HOURS
  * back from now. Without daily rows the window is the last 24 h.
- * Returns null when nothing qualifies. Pure.
+ * Pass `today` in the resort's local calendar day so midnight UTC doesn't shift
+ * late-afternoon US storms prematurely. Returns null when nothing qualifies. Pure.
  */
-export function stormWindow(opts: { now: Date; daily: readonly DailyNewSnow[]; latest24hIn: number | null | undefined }): StormWindow | null {
+export function stormWindow(opts: { now: Date; daily: readonly DailyNewSnow[]; latest24hIn: number | null | undefined; today?: string }): StormWindow | null {
   const now = opts.now;
-  const today = utcDay(now);
-  const yesterday = utcDay(new Date(now.getTime() - DAY_MS));
+  const today = isIsoDay(opts.today) ? opts.today : utcDay(now);
+  const yesterday = utcDay(new Date(startOfUtcDay(today).getTime() - DAY_MS));
   const byDate = new Map<string, number>();
   for (const row of opts.daily) {
     if (typeof row.newSnowIn === "number" && Number.isFinite(row.newSnowIn) && /^\d{4}-\d{2}-\d{2}$/.test(row.date)) byDate.set(row.date, row.newSnowIn);
@@ -203,7 +210,9 @@ export function stormWindow(opts: { now: Date; daily: readonly DailyNewSnow[]; l
     firstSnowy = day;
   }
   const cap = now.getTime() - STORM_MAX_HOURS * HOUR_MS;
-  const start = basis === "report" && !byDate.has(stormDate) ? now.getTime() - WINDOW_24H_HOURS * HOUR_MS : startOfUtcDay(firstSnowy).getTime();
+  const rawStart = basis === "report" && !byDate.has(stormDate) ? now.getTime() - WINDOW_24H_HOURS * HOUR_MS : startOfUtcDay(firstSnowy).getTime();
+  // Positive-offset timezones (e.g. Asia/Tokyo) can enter a new local calendar day before 00:00Z of that date; never emit from > to.
+  const start = rawStart > now.getTime() ? now.getTime() - WINDOW_24H_HOURS * HOUR_MS : rawStart;
   return { from: new Date(Math.max(start, cap)), to: now, stormDate, basis };
 }
 
@@ -236,11 +245,36 @@ export function encodeAttempt(attempt: number): EncodeAttempt | null {
  * The scale filter every clip and poster goes through: fit inside
  * maxWidth × maxHeight without upscaling, then round to even dimensions
  * (yuv420p needs them). Frames in one archive can differ in size when an
- * operator changes a feed, so every frame is also fitted to the first
- * frame's box by padding, keeping the stream a single size.
+ * operator changes a feed; use `clipScaleFilter` with the first frame's
+ * dimensions to pad every frame onto one fixed box.
  */
 export function scaleFilter(maxWidth = MAX_WIDTH, maxHeight = MAX_HEIGHT): string {
   return `scale='min(${maxWidth},iw)':'min(${maxHeight},ih)':force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2`;
+}
+
+export interface FrameSize {
+  width: number;
+  height: number;
+}
+
+/** Even output box fitting `size` inside `maxWidth × maxHeight` without upscaling. */
+export function targetDimensions(size: FrameSize, maxWidth = MAX_WIDTH, maxHeight = MAX_HEIGHT): FrameSize {
+  const ratio = Math.min(1, maxWidth / size.width, maxHeight / size.height);
+  const even = (n: number) => Math.max(2, Math.floor(n / 2) * 2);
+  return { width: even(size.width * ratio), height: even(size.height * ratio) };
+}
+
+/**
+ * Filter chain for clips: when `frameSize` is given, every frame is scaled
+ * and black-letterboxed to the exact even target dimensions so variable-size
+ * archive frames never fail ffmpeg's image2 demuxer.
+ */
+export function clipScaleFilter(maxWidth = MAX_WIDTH, maxHeight = MAX_HEIGHT, frameSize?: FrameSize | null): string {
+  if (!frameSize || !(frameSize.width > 0) || !(frameSize.height > 0)) {
+    return scaleFilter(maxWidth, maxHeight);
+  }
+  const { width, height } = targetDimensions(frameSize, maxWidth, maxHeight);
+  return `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black,setsar=1`;
 }
 
 /**
@@ -249,7 +283,7 @@ export function scaleFilter(maxWidth = MAX_WIDTH, maxHeight = MAX_HEIGHT): strin
  * browser can play while downloading, no audio. The renderer writes the
  * selected frames into `frameDir` under those names first.
  */
-export function clipFfmpegArgs(opts: { frameDir: string; out: string; attempt?: EncodeAttempt; fps?: number }): string[] {
+export function clipFfmpegArgs(opts: { frameDir: string; out: string; attempt?: EncodeAttempt; fps?: number; frameSize?: FrameSize | null }): string[] {
   const a = opts.attempt ?? encodeAttempt(0)!;
   const fps = opts.fps ?? FPS;
   return [
@@ -258,7 +292,7 @@ export function clipFfmpegArgs(opts: { frameDir: string; out: string; attempt?: 
     "-nostdin",
     "-framerate", String(fps),
     "-i", `${opts.frameDir}/f%05d.jpg`,
-    "-vf", `${scaleFilter(a.maxWidth, a.maxHeight)},format=yuv420p`,
+    "-vf", `${clipScaleFilter(a.maxWidth, a.maxHeight, opts.frameSize)},format=yuv420p`,
     "-r", String(fps),
     "-c:v", "libx264",
     "-preset", "medium",
@@ -271,9 +305,9 @@ export function clipFfmpegArgs(opts: { frameDir: string; out: string; attempt?: 
 }
 
 /** ffmpeg arguments for the poster: one frame scaled like the clip, JPEG quality 5 (about 60–90 KB at 720p). */
-export function posterFfmpegArgs(opts: { input: string; out: string; attempt?: EncodeAttempt }): string[] {
+export function posterFfmpegArgs(opts: { input: string; out: string; attempt?: EncodeAttempt; frameSize?: FrameSize | null }): string[] {
   const a = opts.attempt ?? encodeAttempt(0)!;
-  return ["-y", "-loglevel", "error", "-nostdin", "-i", opts.input, "-frames:v", "1", "-vf", scaleFilter(a.maxWidth, a.maxHeight), "-q:v", "5", opts.out];
+  return ["-y", "-loglevel", "error", "-nostdin", "-i", opts.input, "-frames:v", "1", "-vf", clipScaleFilter(a.maxWidth, a.maxHeight, opts.frameSize), "-q:v", "5", opts.out];
 }
 
 /** Sequential frame file name for index `i` (zero-based), matching the `f%05d.jpg` pattern. */

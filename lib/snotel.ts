@@ -6,6 +6,8 @@
 // from automated sensors across western US mountain ranges.
 // ─────────────────────────────────────────────────────────────
 
+import { daysBetween } from "./snow-history";
+
 const REPORT_BASE = "https://wcc.sc.egov.usda.gov/reportGenerator/view_csv";
 
 /** SNOTEL data elements we care about. */
@@ -60,8 +62,9 @@ function buildReportUrl(
     "TMIN::value",
   ]
 ): string {
+  const triplet = stationId.includes(":") ? stationId : `${stationId}:US:SNTL`;
   const params = new URLSearchParams({
-    stationTriplets: `${stationId}:US:SNTL`,
+    stationTriplets: triplet,
     report:          "custom",
     timeseries:      "Daily",
     format:          "csv",
@@ -128,6 +131,7 @@ export async function getSnotelReadings(
     const url = buildReportUrl(stationId, days);
     const res = await fetch(url, {
       next: { revalidate: 1800 }, // cache 30 min
+      signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) return null;
 
@@ -160,7 +164,7 @@ export async function getSnotelSnapshot(
 
   if (readings.length >= 2 && current.snowDepthIn != null) {
     const prev1 = readings[readings.length - 2];
-    if (prev1.snowDepthIn != null) {
+    if (prev1.snowDepthIn != null && daysBetween(prev1.date, current.date) === 1) {
       const delta = current.snowDepthIn - prev1.snowDepthIn;
       newSnow24h = delta > 0 ? delta : 0;
     }
@@ -168,7 +172,7 @@ export async function getSnotelSnapshot(
 
   if (readings.length >= 3 && current.snowDepthIn != null) {
     const prev2 = readings[readings.length - 3];
-    if (prev2.snowDepthIn != null) {
+    if (prev2.snowDepthIn != null && daysBetween(prev2.date, current.date) === 2) {
       const delta = current.snowDepthIn - prev2.snowDepthIn;
       newSnow48h = delta > 0 ? delta : 0;
     }

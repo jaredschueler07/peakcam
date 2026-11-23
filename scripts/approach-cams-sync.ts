@@ -39,6 +39,7 @@ import {
   type ResortForMatching,
   type RoadCam,
 } from "../lib/stations/road-cams.js";
+import { chunkArray, fetchPagedRest } from "./rest-helpers.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -81,11 +82,9 @@ interface ResortRow extends ResortForMatching {
 async function fetchResorts(): Promise<ResortRow[]> {
   const key = SERVICE_KEY ?? ANON_KEY;
   if (SUPABASE_URL && key) {
-    let url = `${SUPABASE_URL}/rest/v1/resorts?select=id,slug,name,state,country,lat,lng&is_active=eq.true&order=slug`;
-    if (ONLY_SLUG) url += `&slug=eq.${encodeURIComponent(ONLY_SLUG)}`;
-    const res = await fetch(url, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
-    if (!res.ok) throw new Error(`Supabase resorts fetch failed: ${res.status}`);
-    return (await res.json()) as ResortRow[];
+    let q = "resorts?select=id,slug,name,state,country,lat,lng&is_active=eq.true&order=slug";
+    if (ONLY_SLUG) q += `&slug=eq.${encodeURIComponent(ONLY_SLUG)}`;
+    return fetchPagedRest<ResortRow>(SUPABASE_URL, q, { apikey: key, Authorization: `Bearer ${key}` });
   }
   const rows = parseCsv(fs.readFileSync(path.join(ROOT, "data", "resorts.csv"), "utf-8"), { columns: true, skip_empty_lines: true, relax_column_count: true }) as Record<string, string>[];
   return rows
@@ -102,21 +101,37 @@ interface ExistingCam {
 
 async function fetchExistingApproachCams(): Promise<ExistingCam[]> {
   if (!SUPABASE_URL || !SERVICE_KEY) return [];
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/cams?select=id,resort_id,embed_url,is_active&kind=eq.approach`, { headers: writeHeaders });
-  if (!res.ok) throw new Error(`cams fetch failed: ${res.status}`);
-  return (await res.json()) as ExistingCam[];
+  return fetchPagedRest<ExistingCam>(
+    SUPABASE_URL,
+    "cams?select=id,resort_id,embed_url,is_active&kind=eq.approach&order=id",
+    writeHeaders,
+  );
 }
 
 async function insertCams(rows: ApproachCamRow[]): Promise<void> {
   if (!rows.length) return;
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/cams`, { method: "POST", headers: { ...writeHeaders, Prefer: "resolution=ignore-duplicates" }, body: JSON.stringify(rows) });
-  if (!res.ok) throw new Error(`cams insert failed (${res.status}): ${await res.text()}`);
+  for (const batch of chunkArray(rows, 200)) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/cams`, {
+      method: "POST",
+      headers: { ...writeHeaders, Prefer: "resolution=ignore-duplicates" },
+      signal: AbortSignal.timeout(30_000),
+      body: JSON.stringify(batch),
+    });
+    if (!res.ok) throw new Error(`cams insert failed (${res.status}): ${await res.text()}`);
+  }
 }
 
 async function setActive(ids: string[], active: boolean): Promise<void> {
   if (!ids.length) return;
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/cams?id=in.(${ids.join(",")})`, { method: "PATCH", headers: writeHeaders, body: JSON.stringify({ is_active: active }) });
-  if (!res.ok) throw new Error(`cams update failed (${res.status}): ${await res.text()}`);
+  for (const batch of chunkArray(ids, 100)) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/cams?id=in.(${batch.join(",")})`, {
+      method: "PATCH",
+      headers: writeHeaders,
+      signal: AbortSignal.timeout(30_000),
+      body: JSON.stringify({ is_active: active }),
+    });
+    if (!res.ok) throw new Error(`cams update failed (${res.status}): ${await res.text()}`);
+  }
 }
 
 async function main(): Promise<void> {

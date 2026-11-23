@@ -186,7 +186,9 @@ export async function fetchNwsStationsByState(state: string, options: NwsFetchOp
     if (!json) break;
     const rows = parseNwsStations(json);
     out.push(...rows);
-    url = rows.length === 500 ? json.pagination?.next : undefined;
+    url = (json.features?.length ?? 0) >= 500 && json.pagination?.next && json.pagination.next !== url
+      ? json.pagination.next
+      : undefined;
   }
   return out;
 }

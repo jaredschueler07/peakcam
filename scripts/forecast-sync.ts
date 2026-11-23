@@ -152,6 +152,7 @@ async function insertRun(resortId: string, point: ResortPoint["point"], run: Mod
   const resp = await fetch(`${SUPABASE_URL}/rest/v1/forecast_runs`, {
     method: "POST",
     headers: { ...writeHeaders, Prefer: "return=representation" },
+    signal: AbortSignal.timeout(30_000),
     body: JSON.stringify({ resort_id: resortId, point, model: run.model, issued_at: issuedAt, horizon_days: run.horizonDays }),
   });
   if (!resp.ok) throw new Error(`forecast_runs insert failed: ${resp.status} ${await resp.text()}`);
@@ -171,9 +172,19 @@ async function insertRun(resortId: string, point: ResortPoint["point"], run: Mod
   const dailyResp = await fetch(`${SUPABASE_URL}/rest/v1/forecast_daily`, {
     method: "POST",
     headers: { ...writeHeaders, Prefer: "resolution=merge-duplicates" },
+    signal: AbortSignal.timeout(30_000),
     body: JSON.stringify(daily),
   });
-  if (!dailyResp.ok) throw new Error(`forecast_daily insert failed: ${dailyResp.status} ${await dailyResp.text()}`);
+  if (!dailyResp.ok) {
+    const errText = await dailyResp.text().catch(() => "");
+    // Clean up orphan forecast_runs header so re-runs don't mistake an empty run for complete.
+    await fetch(`${SUPABASE_URL}/rest/v1/forecast_runs?id=eq.${encodeURIComponent(row.id)}`, {
+      method: "DELETE",
+      headers: writeHeaders,
+      signal: AbortSignal.timeout(15_000),
+    }).catch(() => {});
+    throw new Error(`forecast_daily insert failed: ${dailyResp.status} ${errText}`);
+  }
 }
 
 // ─── Retention ────────────────────────────────────────────────────────────

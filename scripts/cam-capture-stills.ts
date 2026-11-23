@@ -46,14 +46,18 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import {
+  execFile,
+  type ChildProcess,
+  type ExecFileOptionsWithBufferEncoding,
+  type ExecFileOptionsWithStringEncoding,
+} from "node:child_process";
 import { fileURLToPath } from "node:url";
 import type { Cam } from "../lib/types.js";
 import { providerStill } from "../lib/cam-preview.js";
 import { ARCHIVE_RETENTION_DAYS, PRUNE_LOOKBACK_DAYS, archivePath, isKeeper, pruneWindow, selectPrune, type PruneRow } from "../lib/cam-timeline.js";
+import { fetchPagedRest, readTextCapped } from "./rest-helpers.mjs";
 
-const exec = promisify(execFile);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 // ─── env ─────────────────────────────────────────────────────────────────
@@ -97,6 +101,76 @@ const FFPROBE = process.env.FFPROBE ?? "ffprobe";
 const MAX_WIDTH = 1280;
 const SB_REST_TIMEOUT_MS = 30_000;
 const SB_UPLOAD_TIMEOUT_MS = 60_000;
+const MAX_HTML_BYTES = 2 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+
+export const activeChildren = new Set<ChildProcess>();
+
+export function killActiveChildren(children: Iterable<Pick<ChildProcess, "kill">> = activeChildren): number {
+  let killed = 0;
+  for (const child of children) {
+    try {
+      if (child.kill("SIGKILL")) killed++;
+    } catch {
+      // Child already exited.
+    }
+  }
+  return killed;
+}
+
+function execTracked(
+  file: string,
+  args: readonly string[],
+  options: ExecFileOptionsWithBufferEncoding,
+): Promise<{ stdout: Buffer; stderr: Buffer }>;
+function execTracked(
+  file: string,
+  args: readonly string[],
+  options: ExecFileOptionsWithStringEncoding | Record<string, unknown>,
+): Promise<{ stdout: string; stderr: string }>;
+function execTracked(
+  file: string,
+  args: readonly string[],
+  options: ExecFileOptionsWithBufferEncoding | ExecFileOptionsWithStringEncoding | Record<string, unknown>,
+): Promise<{ stdout: string | Buffer; stderr: string | Buffer }> {
+  return new Promise((resolve, reject) => {
+    const child = execFile(file, args, options as ExecFileOptionsWithStringEncoding, (err, stdout, stderr) => {
+      activeChildren.delete(child);
+      if (err) {
+        const enriched = err as Error & { stdout?: string | Buffer; stderr?: string | Buffer };
+        if (!enriched.stderr && stderr) enriched.stderr = stderr;
+        reject(enriched);
+      } else {
+        resolve({ stdout, stderr });
+      }
+    });
+    activeChildren.add(child);
+  });
+}
+
+async function readBufferCapped(res: Response, maxBytes = MAX_IMAGE_BYTES): Promise<Buffer> {
+  if (!res.body) {
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.byteLength > maxBytes) throw new Error(`image exceeded ${maxBytes} byte cap`);
+    return buf;
+  }
+  const reader = res.body.getReader();
+  const chunks: Buffer[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value || value.byteLength === 0) continue;
+      total += value.byteLength;
+      if (total > maxBytes) throw new Error(`image exceeded ${maxBytes} byte cap`);
+      chunks.push(Buffer.from(value.buffer, value.byteOffset, value.byteLength));
+    }
+  } finally {
+    await reader.cancel().catch(() => {});
+  }
+  return Buffer.concat(chunks, total);
+}
 /**
  * Hard wall-clock deadline for one run. launchd triggers every 900 s (15 min)
  * and never starts a second instance while one is alive; a healthy run over
@@ -154,13 +228,17 @@ export function ffmpegFrameArgs(input: string, out: string, referer?: string): s
   return ["-y", "-loglevel", "error", "-nostdin", ...net, ...hls, "-i", input, "-frames:v", "1", "-vf", `scale='min(${MAX_WIDTH},iw)':-2`, "-q:v", "4", out];
 }
 async function ffmpegFrame(input: string, out: string, referer?: string) {
-  await exec(FFMPEG, ffmpegFrameArgs(input, out, referer), { timeout: 60_000, killSignal: "SIGKILL" });
+  await execTracked(FFMPEG, ffmpegFrameArgs(input, out, referer), { timeout: 60_000, killSignal: "SIGKILL" });
 }
 async function downloadImage(url: string, out: string, referer?: string) {
   const res = await get(url, { referer });
-  const buf = Buffer.from(await res.arrayBuffer());
+  if (!res.ok) {
+    await res.body?.cancel().catch(() => {});
+    throw new Error(`HTTP ${res.status}`);
+  }
+  const buf = await readBufferCapped(res, MAX_IMAGE_BYTES);
   const jpeg = buf[0] === 0xff && buf[1] === 0xd8, png = buf[0] === 0x89 && buf[1] === 0x50;
-  if (!res.ok || buf.length < 2_000 || !(jpeg || png || (res.headers.get("content-type") ?? "").startsWith("image/"))) throw new Error(`not an image: ${res.status} ${res.headers.get("content-type")} ${buf.length}B`);
+  if (buf.length < 2_000 || !(jpeg || png || (res.headers.get("content-type") ?? "").startsWith("image/"))) throw new Error(`not an image: ${res.status} ${res.headers.get("content-type")} ${buf.length}B`);
   const raw = `${out}.raw`; fs.writeFileSync(raw, buf);
   try { await ffmpegFrame(raw, out); } finally { fs.rmSync(raw, { force: true }); }
 }
@@ -171,18 +249,26 @@ async function capture(cam: CamRow, out: string): Promise<Capture> {
   const viaStream = async (src: string, source: string, referer?: string): Promise<Capture> => { await ffmpegFrame(src, out, referer); return { file: out, source }; };
   try {
     if (host === "api.wetmet.net") {
-      const html = await (await get(url)).text(); const v = html.match(/vurl\s*=\s*['"]([^'"]+)['"]/)?.[1];
+      const res = await get(url);
+      if (!res.ok) { await res.body?.cancel().catch(() => {}); return { error: `wetmet HTTP ${res.status}`, source: "hls" }; }
+      const html = await readTextCapped(res, { maxBytes: MAX_HTML_BYTES }); const v = html.match(/vurl\s*=\s*['"]([^'"]+)['"]/)?.[1];
       return v ? await viaStream(v, "hls") : { error: "no vurl in frame.php", source: "hls" };
     }
     if (host === "skicooper.com") return await viaStream(`https://skicooper.com:8443${new URL(url).pathname.replace(/\/$/, "")}/index.m3u8`, "hls");
     if (host === "tv.streamcasthd.com") {
-      const html = await (await get(url)).text();
+      const res = await get(url);
+      if (!res.ok) { await res.body?.cancel().catch(() => {}); return { error: `streamcasthd HTTP ${res.status}`, source: "hls" }; }
+      const html = await readTextCapped(res, { maxBytes: MAX_HTML_BYTES });
       return await viaStream(m3u8In(html) ?? `https://tv.streamcasthd.com:3895/live/${url.split("/").filter(Boolean).pop()}live.m3u8`, "hls");
     }
     if (host === "rtsp.me") {
       const id = url.split("/").filter(Boolean).pop(); const ref = `https://rtsp.me/embed/${id}/`;
-      const tok = await (await get(`https://rtsp.me/api/embed/${id}/token`, { referer: ref })).json() as { url: string; token: string };
-      const d = await (await get(`${tok.url}/token/${tok.token}`, { referer: ref })).json() as { poster?: string; hls?: string };
+      const tokRes = await get(`https://rtsp.me/api/embed/${id}/token`, { referer: ref });
+      if (!tokRes.ok) { await tokRes.body?.cancel().catch(() => {}); return { error: `rtsp.me token HTTP ${tokRes.status}`, source: "poster" }; }
+      const tok = JSON.parse(await readTextCapped(tokRes, { maxBytes: MAX_HTML_BYTES, throwOnOverflow: true })) as { url: string; token: string };
+      const dRes = await get(`${tok.url}/token/${tok.token}`, { referer: ref });
+      if (!dRes.ok) { await dRes.body?.cancel().catch(() => {}); return { error: `rtsp.me stream HTTP ${dRes.status}`, source: "poster" }; }
+      const d = JSON.parse(await readTextCapped(dRes, { maxBytes: MAX_HTML_BYTES, throwOnOverflow: true })) as { poster?: string; hls?: string };
       if (d.poster) { await downloadImage(d.poster, out); return { file: out, source: "poster" }; }
       return d.hls ? await viaStream(d.hls, "hls") : { error: "no poster/hls", source: "poster" };
     }
@@ -197,7 +283,9 @@ async function capture(cam: CamRow, out: string): Promise<Capture> {
       return { error: `camstreamer not fronted by youtube (${res.status})`, source: "youtube-poster" };
     }
     // Generic player page: og:image, else the first HLS manifest it references.
-    const page = await get(url); const html = await page.text();
+    const page = await get(url);
+    if (!page.ok) { await page.body?.cancel().catch(() => {}); return { error: `page HTTP ${page.status}`, source: "none" }; }
+    const html = await readTextCapped(page, { maxBytes: MAX_HTML_BYTES });
     const og = ogImage(html);
     if (og) { try { await downloadImage(new URL(og, url).href, out, url); return { file: out, source: "og:image" }; } catch { /* fall through */ } }
     const m = m3u8In(html);
@@ -225,9 +313,9 @@ export function isBlankFrame(stats: { mean: number; spread: number }): boolean {
   return stats.spread < 3 || stats.mean < 10;
 }
 async function checkFrame(file: string) {
-  const { stdout } = await exec(FFMPEG, ["-loglevel", "error", "-nostdin", "-i", file, "-vf", "scale=32:18,format=gray", "-f", "rawvideo", "-"], { encoding: "buffer", timeout: 20_000, killSignal: "SIGKILL", maxBuffer: 1 << 20 }) as unknown as { stdout: Buffer };
+  const { stdout } = await execTracked(FFMPEG, ["-loglevel", "error", "-nostdin", "-i", file, "-vf", "scale=32:18,format=gray", "-f", "rawvideo", "-"], { encoding: "buffer", timeout: 20_000, killSignal: "SIGKILL", maxBuffer: 1 << 20 });
   const stats = frameStats(new Uint8Array(stdout));
-  const { stdout: dims } = await exec(FFPROBE, ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", file], { timeout: 15_000, killSignal: "SIGKILL" });
+  const { stdout: dims } = await execTracked(FFPROBE, ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", file], { timeout: 15_000, killSignal: "SIGKILL" });
   const [width, height] = dims.trim().split(",").map(Number);
   return { ...stats, width, height, blank: isBlankFrame(stats) };
 }
@@ -259,9 +347,13 @@ type ArchiveRow = { cam_id: string; captured_at: string; path: string; source: s
 /** resort_id → latest 24 h number, read once per run so every frame in the run is stamped against the same report set. */
 async function latestSnow24h(): Promise<Map<string, number | null>> {
   try {
-    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/latest_snow_reports?select=resort_id,new_snow_24h`);
-    if (!res.ok) { console.log(`  ! latest_snow_reports GET ${res.status}: frames this run get no 24 h number`); return new Map(); }
-    return new Map(((await res.json()) as { resort_id: string; new_snow_24h: number | null }[]).map(r => [r.resort_id, r.new_snow_24h]));
+    const rows = await fetchPagedRest<{ resort_id: string; new_snow_24h: number | null }>(
+      SUPABASE_URL!,
+      "latest_snow_reports?select=resort_id,new_snow_24h&order=resort_id",
+      sb,
+      { timeoutMs: SB_REST_TIMEOUT_MS },
+    );
+    return new Map(rows.map(r => [r.resort_id, r.new_snow_24h]));
   } catch (e) { console.log(`  ! latest_snow_reports GET: ${(e as Error).message}: frames this run get no 24 h number`); return new Map(); }
 }
 async function insertArchiveRow(row: ArchiveRow) {
@@ -337,13 +429,17 @@ async function main() {
   if (!SUPABASE_URL || !SERVICE_KEY) { console.error("Missing NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY"); process.exit(1); }
   const inFlight = new Set<string>();
   const watchdog = setTimeout(() => {
+    killActiveChildren();
     console.error(formatWatchdogMessage(inFlight, RUN_WATCHDOG_MS));
     process.exit(3);
   }, RUN_WATCHDOG_MS);
   watchdog.unref();
+  const onSigTerm = () => { killActiveChildren(); process.exit(143); };
+  const onSigInt = () => { killActiveChildren(); process.exit(130); };
+  process.on("SIGTERM", onSigTerm);
+  process.on("SIGINT", onSigInt);
+  let tmp: string | null = null;
   try {
-    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/cams?select=*,resorts(slug)&is_active=eq.true&auto_disabled=eq.false&embed_type=neq.link&order=resort_id,name`);
-    if (!res.ok) throw new Error(`cams GET ${res.status}`);
     // Two target sets, one pass: cams that need a latest frame (no provider
     // still) and cams whose history we may keep (archive_allowed). A cam can be
     // both; it is captured once and stored twice.
@@ -352,16 +448,24 @@ async function main() {
     // while their still is fresh. Archive cams are captured every run.
     const latestFresh = (c: CamRow) => !FORCE_LATEST && !wantsArchive(c) && !!c.still_captured_at && Date.now() - Date.parse(c.still_captured_at) < LATEST_INTERVAL_MS;
     const wantsLatest = (c: CamRow) => providerStill(c) === null && !latestFresh(c);
-    const cams = PRUNE_ONLY ? [] : ((await res.json()) as CamRow[]).filter(c => wantsLatest(c) || wantsArchive(c)).filter(c => !ONLY || c.id === ONLY || c.resorts?.slug === ONLY);
+    const allCams = PRUNE_ONLY
+      ? []
+      : await fetchPagedRest<CamRow>(
+          SUPABASE_URL,
+          "cams?select=*,resorts(slug)&is_active=eq.true&auto_disabled=eq.false&embed_type=neq.link&order=resort_id,name,id",
+          sb,
+          { timeoutMs: SB_REST_TIMEOUT_MS },
+        );
+    const cams = allCams.filter(c => wantsLatest(c) || wantsArchive(c)).filter(c => !ONLY || c.id === ONLY || c.resorts?.slug === ONLY);
     const nLatest = cams.filter(wantsLatest).length, nArchive = cams.filter(wantsArchive).length;
     console.log(`[cam-stills] ${new Date().toISOString()} ${cams.length} cams: ${nLatest} need a latest frame, ${nArchive} archive-allowed, watchdog ${RUN_WATCHDOG_MS / 60_000} min${DRY ? " (dry run)" : ""}`);
     const snow24h = nArchive ? await latestSnow24h() : new Map<string, number | null>();
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "cam-stills-"));
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), "cam-stills-"));
     const summary = { stored: 0, archived: 0, keepers: 0, blank: 0, failed: 0 };
     let i = 0;
     async function processCam(cam: CamRow, tag: string) {
       const latest = wantsLatest(cam), archive = wantsArchive(cam);
-      const out = path.join(tmp, `${cam.id}.jpg`);
+      const out = path.join(tmp!, `${cam.id}.jpg`);
       // Archive-only cams have a provider still by definition; fetch that
       // snapshot directly instead of resolving a player page.
       const provider = latest ? null : providerStill(cam);
@@ -411,10 +515,14 @@ async function main() {
     }
     await Promise.all(Array.from({ length: CONCURRENCY }, worker));
     fs.rmSync(tmp, { recursive: true, force: true });
+    tmp = null;
     const prune = NO_ARCHIVE || ONLY ? { candidates: 0, selected: 0, removed: 0 } : await pruneArchive();
     const pruneNote = DRY ? `${prune.selected} of ${prune.candidates} candidate frames would be pruned` : `${prune.removed} archive frames pruned (${prune.selected} selected of ${prune.candidates} candidates, ${lookbackLabel()})`;
     console.log(`[cam-stills] done: ${summary.stored} latest stored, ${summary.archived} archived (${summary.keepers} keepers), ${summary.blank} blank, ${summary.failed} failed, ${pruneNote}`);
   } finally {
+    if (tmp) fs.rmSync(tmp, { recursive: true, force: true });
+    process.off("SIGTERM", onSigTerm);
+    process.off("SIGINT", onSigInt);
     clearTimeout(watchdog);
   }
 }

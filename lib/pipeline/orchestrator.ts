@@ -93,31 +93,45 @@ interface MetadataRow {
   snodas_grid_y: number | null;
 }
 
+async function fetchPaged<T>(url: string, headers: Record<string, string>, label: string, required = true): Promise<T[]> {
+  const PAGE = 1000;
+  const rows: T[] = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const sep = url.includes("?") ? "&" : "?";
+    const resp = await fetch(`${url}${sep}limit=${PAGE}&offset=${offset}`, {
+      headers,
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!resp.ok) {
+      if (!required) return [];
+      throw new Error(`Failed to fetch ${label}: ${resp.status}`);
+    }
+    const page: T[] = await resp.json();
+    rows.push(...page);
+    if (page.length < PAGE) break;
+  }
+  return rows;
+}
+
 async function fetchActiveResorts(): Promise<ResortContext[]> {
   const { url } = getEnv();
   const headers = supaHeaders();
 
-  // Fetch resorts
-  const resortResp = await fetch(
-    `${url}/rest/v1/resorts?is_active=eq.true&select=id,slug,name,lat,lng,snotel_station_id`,
-    { headers },
+  const resorts = await fetchPaged<ResortRow>(
+    `${url}/rest/v1/resorts?is_active=eq.true&select=id,slug,name,lat,lng,snotel_station_id&order=id`,
+    headers,
+    "resorts",
   );
-  if (!resortResp.ok) {
-    throw new Error(`Failed to fetch resorts: ${resortResp.status}`);
-  }
-  const resorts: ResortRow[] = await resortResp.json();
 
-  // Fetch metadata
-  const metaResp = await fetch(
-    `${url}/rest/v1/resort_metadata?select=resort_id,liftie_slug,weather_unlocked_id,elevation_base_ft,elevation_summit_ft,vertical_drop_ft,run_count,lift_count,openskistats_id,snodas_grid_x,snodas_grid_y`,
-    { headers },
+  const metaRows = await fetchPaged<MetadataRow>(
+    `${url}/rest/v1/resort_metadata?select=resort_id,liftie_slug,weather_unlocked_id,elevation_base_ft,elevation_summit_ft,vertical_drop_ft,run_count,lift_count,openskistats_id,snodas_grid_x,snodas_grid_y&order=resort_id`,
+    headers,
+    "resort_metadata",
+    false,
   );
   const metaByResort = new Map<string, MetadataRow>();
-  if (metaResp.ok) {
-    const rows: MetadataRow[] = await metaResp.json();
-    for (const row of rows) {
-      metaByResort.set(row.resort_id, row);
-    }
+  for (const row of metaRows) {
+    metaByResort.set(row.resort_id, row);
   }
 
   return resorts.map((r) => {
@@ -241,8 +255,15 @@ async function updateResortRating(
 
 // ── Orchestrator ────────────────────────────────────────────
 
-interface PipelineSyncOptions {
+export interface PipelineSyncOptions {
   dryRun?: boolean;
+  /**
+   * Retired dual-writer guard: `snow_reports` and `resorts.cond_rating` are
+   * owned by `snotel-sync` / `model-sync` so the pipeline does not overwrite
+   * canonical SNOTEL/model telemetry. Set true (or PIPELINE_WRITE_LEGACY_SNOW_REPORTS=1)
+   * only when running an explicit backfill that needs legacy dual-writes.
+   */
+  writeLegacySnowReports?: boolean;
 }
 
 interface PipelineStats {
@@ -255,7 +276,10 @@ interface PipelineStats {
 export async function runPipelineSync(
   options: PipelineSyncOptions = {},
 ): Promise<void> {
-  const { dryRun = false } = options;
+  const {
+    dryRun = false,
+    writeLegacySnowReports = process.env.PIPELINE_WRITE_LEGACY_SNOW_REPORTS === "1",
+  } = options;
   const startTime = Date.now();
 
   console.log(
@@ -395,9 +419,11 @@ export async function runPipelineSync(
       // Write blended results
       if (!dryRun) {
         await upsertConditionsSummary(blended);
-        await insertSnowReport(resort.id, blended);
-        if (blended.cond_rating) {
-          await updateResortRating(resort.id, blended.cond_rating);
+        if (writeLegacySnowReports) {
+          await insertSnowReport(resort.id, blended);
+          if (blended.cond_rating) {
+            await updateResortRating(resort.id, blended.cond_rating);
+          }
         }
       }
 

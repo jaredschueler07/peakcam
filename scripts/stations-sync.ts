@@ -43,6 +43,7 @@ import { fetchNwsLatestObservation, fetchNwsStationsByState, fetchNwsStationsFor
 import { GHCND_INVENTORY_URL, GHCND_STATIONS_URL, fetchGhcnObservation, nearestGhcnStations, parseGhcndInventory, parseGhcndStations, type GhcnStation } from "../lib/stations/ghcn.js";
 import { bcAswsObservation, fetchBcAswsElements, fetchBcAswsStations, nearestBcAswsStations, type AswsElementMaps, type BcAswsStation } from "../lib/stations/bc-asws.js";
 import { fetchEcccObservations } from "../lib/stations/eccc.js";
+import { fetchPagedRest } from "./rest-helpers.mjs";
 
 // ─── Env ──────────────────────────────────────────────────────────────────
 
@@ -107,19 +108,22 @@ interface ResortRow {
 async function fetchResorts(): Promise<ResortRow[]> {
   const key = SERVICE_KEY ?? ANON_KEY;
   if (SUPABASE_URL && key) {
+    const headers = { apikey: key, Authorization: `Bearer ${key}` };
     const select = "id,slug,name,state,country,lat,lng,snotel_station_id,elevation_base_ft,elevation_summit_ft";
-    let url = `${SUPABASE_URL}/rest/v1/resorts?select=${select}&is_active=eq.true&order=slug`;
-    if (ONLY_SLUG) url += `&slug=eq.${encodeURIComponent(ONLY_SLUG)}`;
-    const res = await fetch(url, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
-    if (res.ok) return (await res.json()) as ResortRow[];
-    // Migration 025 not applied yet: the elevation columns are missing; fall back to the legacy table.
-    console.warn(`[stations-sync] resorts query ${res.status}; retrying without the 025 elevation columns`);
-    const legacy = await fetch(url.replace(",elevation_base_ft,elevation_summit_ft", ",resort_metadata(elevation_base_ft,elevation_summit_ft)"), {
-      headers: { apikey: key, Authorization: `Bearer ${key}` },
-    });
-    if (!legacy.ok) throw new Error(`Supabase resorts fetch failed: ${legacy.status}`);
-    const rows = (await legacy.json()) as Array<ResortRow & { resort_metadata: { elevation_base_ft: number | null; elevation_summit_ft: number | null } | null }>;
-    return rows.map((r) => ({ ...r, elevation_base_ft: r.resort_metadata?.elevation_base_ft ?? null, elevation_summit_ft: r.resort_metadata?.elevation_summit_ft ?? null }));
+    let q = `resorts?select=${select}&is_active=eq.true&order=slug`;
+    if (ONLY_SLUG) q += `&slug=eq.${encodeURIComponent(ONLY_SLUG)}`;
+    try {
+      return await fetchPagedRest<ResortRow>(SUPABASE_URL, q, headers);
+    } catch (err) {
+      // Migration 025 not applied yet: the elevation columns are missing; fall back to the legacy table.
+      console.warn(`[stations-sync] resorts query failed (${err instanceof Error ? err.message : err}); retrying without the 025 elevation columns`);
+      const rows = await fetchPagedRest<ResortRow & { resort_metadata: { elevation_base_ft: number | null; elevation_summit_ft: number | null } | null }>(
+        SUPABASE_URL,
+        q.replace(",elevation_base_ft,elevation_summit_ft", ",resort_metadata(elevation_base_ft,elevation_summit_ft)"),
+        headers,
+      );
+      return rows.map((r) => ({ ...r, elevation_base_ft: r.resort_metadata?.elevation_base_ft ?? null, elevation_summit_ft: r.resort_metadata?.elevation_summit_ft ?? null }));
+    }
   }
   // No keys at all (a dev box): the seed CSV has everything but ids.
   const csv = fs.readFileSync(path.join(ROOT, "data", "resorts.csv"), "utf-8");

@@ -29,6 +29,7 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import type { Cam } from "../lib/types.js";
 import { cameraPreviews } from "../lib/cam-preview.js";
+import { fetchPagedRest, readTextCapped } from "./rest-helpers.mjs";
 
 const exec = promisify(execFile);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -56,7 +57,9 @@ const NO_SITE = args.includes("--no-site");
 const SITE = process.env.CAM_CHECK_SITE ?? "https://www.peakcam.io";
 const MINI_HOST = process.env.CAM_CHECK_MINI_HOST ?? "mini";
 const MINI_REPO = process.env.CAM_CHECK_MINI_REPO ?? "/Users/maestro_admin/peakcam/peakcam";
-const CAPTURE_INTERVAL_H = 2;          // com.peakcam.cam-stills StartInterval
+const CAPTURE_INTERVAL_MIN = 15;       // com.peakcam.cam-stills StartInterval (900 s)
+const CAPTURE_LOG_STALE_H = 2;         // alert if log untouched for > 2 h (8 missed 15-min runs)
+const STILL_STALE_H = 5;               // alert if newest DB still > 5 h old (latest-only is 6 h, archive 15 min)
 const HEALTH_INTERVAL_H = 24;          // com.peakcam.cam-health-check daily 06:00
 
 // ─── types ───────────────────────────────────────────────────────────────
@@ -74,7 +77,8 @@ export interface MiniJob { label: string; pid: number | null; status: number | n
 export interface MiniFacts {
   ok: boolean; error?: string; now: number | null; git: string | null;
   jobs: MiniJob[];
-  stillsLogAgeH: number | null; stillsLastRunAt: string | null; stillsLastRun: { stored: number; blank: number; failed: number } | null;
+  stillsLogAgeH: number | null; stillsLastRunAt: string | null;
+  stillsLastRun: { stored: number; archived?: number; keepers?: number; blank: number; failed: number } | null;
   stillsFailed: string[]; stillsTail: string[];
   healthLogAgeH: number | null; healthLast: string[];
 }
@@ -93,14 +97,17 @@ async function dbFacts(): Promise<DbFacts> {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return { ...empty, error: "missing NEXT_PUBLIC_SUPABASE_URL / key in .env.local" };
   const H = { apikey: key, Authorization: `Bearer ${key}` };
-  const get = async (q: string) => {
-    const r = await fetch(`${url}/rest/v1/${q}`, { headers: H, signal: AbortSignal.timeout(30_000) });
-    if (!r.ok) throw new Error(`${q.split("?")[0]} ${r.status}`);
-    return r.json();
-  };
   try {
-    const resorts: { id: string; slug: string }[] = await get("resorts?select=id,slug&is_active=eq.true&order=slug");
-    const cams: (Cam & { resort_id: string })[] = await get("cams?select=*&is_active=eq.true");
+    const resorts = await fetchPagedRest<{ id: string; slug: string }>(
+      url,
+      "resorts?select=id,slug&is_active=eq.true&order=slug",
+      H,
+    );
+    const cams = await fetchPagedRest<Cam & { resort_id: string }>(
+      url,
+      "cams?select=*&is_active=eq.true&order=id",
+      H,
+    );
     const now = Date.now();
     const withStill = cams.filter((c) => c.still_url && c.still_captured_at);
     const newest = withStill.map((c) => Date.parse(c.still_captured_at!)).reduce((a, b) => Math.max(a, b), 0);
@@ -174,8 +181,20 @@ export function parseMini(out: string, nowFallback = Date.now() / 1000): MiniFac
   const head = stills.find((l) => l.startsWith("[cam-stills] "));
   const at = head?.match(/^\[cam-stills\] (\S+)/)?.[1];
   f.stillsLastRunAt = at && !Number.isNaN(Date.parse(at)) ? at : null;
-  const done = [...stills].reverse().find((l) => l.includes("done:"))?.match(/(\d+) stored, (\d+) blank, (\d+) failed/);
-  if (done) f.stillsLastRun = { stored: +done[1], blank: +done[2], failed: +done[3] };
+  const doneLine = [...stills].reverse().find((l) => l.includes("done:")) ?? "";
+  const archiveDone = doneLine.match(/(\d+) latest stored,\s*(\d+) archived\s*\((\d+) keepers?\),\s*(\d+) blank,\s*(\d+) failed/);
+  const legacyDone = archiveDone ? null : doneLine.match(/(\d+) stored,\s*(\d+) blank,\s*(\d+) failed/);
+  if (archiveDone) {
+    f.stillsLastRun = {
+      stored: +archiveDone[1],
+      archived: +archiveDone[2],
+      keepers: +archiveDone[3],
+      blank: +archiveDone[4],
+      failed: +archiveDone[5],
+    };
+  } else if (legacyDone) {
+    f.stillsLastRun = { stored: +legacyDone[1], blank: +legacyDone[2], failed: +legacyDone[3] };
+  }
   f.stillsFailed = stills.filter((l) => l.trim().startsWith("✗")).map((l) => l.trim().slice(1).trim());
   f.healthLast = (sections.HEALTH_LAST ?? []).filter((l) => l.trim());
   return f;
@@ -200,14 +219,14 @@ async function siteFacts(db: DbFacts): Promise<SiteFacts> {
   try {
     const t0 = Date.now();
     const home = await fetch(`${SITE}/`, { headers: { "user-agent": UA }, redirect: "follow", signal: AbortSignal.timeout(20_000) });
-    await home.arrayBuffer();
+    await home.body?.cancel().catch(() => {});
     f.home = { status: home.status, ms: Date.now() - t0 };
   } catch (e) { f.ok = false; f.error = `home: ${String((e as Error).message ?? e)}`; }
   const slug = db.capturedFronted[0];
   if (slug) {
     try {
       const r = await fetch(`${SITE}/resorts/${slug}`, { headers: { "user-agent": UA }, redirect: "follow", signal: AbortSignal.timeout(20_000) });
-      const html = await r.text();
+      const html = await readTextCapped(r, { maxBytes: 2 * 1024 * 1024 });
       f.resortPage = { slug, status: r.status, stillRefs: (html.match(/cam-stills\//g) ?? []).length };
     } catch (e) { f.ok = false; f.error = `${f.error ? f.error + "; " : ""}resort page: ${String((e as Error).message ?? e)}`; }
   }
@@ -228,7 +247,7 @@ export function evaluate(f: Facts): Alert[] {
   if (!f.db.ok) add("critical", "db_unreachable", `Supabase query failed: ${f.db.error}`);
   else {
     if (f.db.newestStillAgeH === null) add("critical", "no_stills", "No captured stills in the cams table at all");
-    else if (f.db.newestStillAgeH > CAPTURE_INTERVAL_H * 2.5) add("critical", "stills_stale", `Newest captured still is ${f.db.newestStillAgeH} h old (job runs every ${CAPTURE_INTERVAL_H} h)`);
+    else if (f.db.newestStillAgeH > STILL_STALE_H) add("critical", "stills_stale", `Newest captured still is ${f.db.newestStillAgeH} h old (archive runs every ${CAPTURE_INTERVAL_MIN} min)`);
     if (f.baseline && f.db.coverage < f.baseline) add("warn", "coverage_drop", `Cards with a preview fell to ${f.db.coverage} of ${f.db.resorts} (baseline ${f.baseline}); without: ${f.db.noPreview.join(", ")}`);
     if (f.db.stillsOlder48h > 0) add("info", "stills_old", `${f.db.stillsOlder48h} cam(s) still showing a frame older than 48 h`);
     if (f.db.failing3plus >= 10) add("warn", "many_failing", `${f.db.failing3plus} active cams have 3+ consecutive health-check failures`);
@@ -242,11 +261,12 @@ export function evaluate(f: Facts): Alert[] {
       if (!j) { add("critical", "job_missing", `${label} is not loaded in launchd on the mini`); continue; }
       if (j.pid === null && j.status !== null && j.status !== 0) add("warn", "job_exit", `${label} last exited with status ${j.status}${j.lastExitReason ? ` (${j.lastExitReason})` : ""}`);
     }
-    if (f.mini.stillsLogAgeH !== null && f.mini.stillsLogAgeH > CAPTURE_INTERVAL_H * 2.5) add("critical", "capture_not_running", `cam-capture-stills.log last written ${f.mini.stillsLogAgeH} h ago`);
+    if (f.mini.stillsLogAgeH !== null && f.mini.stillsLogAgeH > CAPTURE_LOG_STALE_H) add("critical", "capture_not_running", `cam-capture-stills.log last written ${f.mini.stillsLogAgeH} h ago`);
     if (f.mini.stillsLastRun) {
-      const { stored, failed } = f.mini.stillsLastRun;
-      const total = stored + failed + f.mini.stillsLastRun.blank;
-      if (total && stored === 0) add("critical", "capture_all_failed", `Last capture run stored nothing (${failed} failed of ${total})`);
+      const { stored, archived = 0, failed, blank } = f.mini.stillsLastRun;
+      const captured = stored + archived;
+      const total = captured + failed + blank;
+      if (total && captured === 0) add("critical", "capture_all_failed", `Last capture run stored nothing (${failed} failed of ${total})`);
       else if (total && failed / total > 0.4) add("warn", "capture_many_failed", `Last capture run: ${failed} of ${total} targets failed`);
     } else if (f.mini.stillsTail.length === 0) add("warn", "capture_log_empty", "No capture run found in cam-capture-stills.log");
     if (f.mini.healthLogAgeH !== null && f.mini.healthLogAgeH > HEALTH_INTERVAL_H * 1.3) add("warn", "health_check_stale", `cam-health-check.log last written ${f.mini.healthLogAgeH} h ago (job is daily)`);
@@ -289,7 +309,7 @@ export function toMarkdown(f: Facts, alerts: Alert[]): string {
   else {
     L.push(`- repo at ${f.mini.git ?? "?"}`);
     for (const j of f.mini.jobs) L.push(`- ${j.label}: ${j.pid !== null ? `running pid ${j.pid}` : `idle, last status ${j.status ?? "?"}`}${j.lastExitReason ? `, last exit reason ${j.lastExitReason}` : ""}`);
-    L.push(`- capture log written ${f.mini.stillsLogAgeH ?? "?"} h ago; last run ${f.mini.stillsLastRunAt ?? "?"}: ${f.mini.stillsLastRun ? `${f.mini.stillsLastRun.stored} stored, ${f.mini.stillsLastRun.blank} blank, ${f.mini.stillsLastRun.failed} failed` : "no summary line"}`);
+    L.push(`- capture log written ${f.mini.stillsLogAgeH ?? "?"} h ago; last run ${f.mini.stillsLastRunAt ?? "?"}: ${f.mini.stillsLastRun ? `${f.mini.stillsLastRun.stored} stored${f.mini.stillsLastRun.archived != null ? `, ${f.mini.stillsLastRun.archived} archived` : ""}, ${f.mini.stillsLastRun.blank} blank, ${f.mini.stillsLastRun.failed} failed` : "no summary line"}`);
     for (const s of f.mini.stillsFailed) L.push(`  - failed: ${s.slice(0, 200)}`);
     L.push(`- health-check log written ${f.mini.healthLogAgeH ?? "?"} h ago`);
     for (const s of f.mini.healthLast) L.push(`  - ${s}`);

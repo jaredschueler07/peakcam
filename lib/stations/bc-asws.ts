@@ -91,13 +91,21 @@ function aswsInstant(cell: string): string | null {
   return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:00.000Z`;
 }
 
+export interface AswsParseOptions {
+  minValue?: number;
+  maxValue?: number;
+}
+
 /**
  * One element CSV → the newest non-blank reading per station id. Reads the
  * whole file (the current water year, a few hundred KB in October, a few MB
  * by spring) once; callers pass the three parsed maps to `bcAswsObservation`.
- * Sentinel negatives (an unplugged depth sensor reports -1 cm) are blanks.
+ * Out-of-bounds readings (e.g. sentinel -1 cm depth on unplugged sensors)
+ * are skipped; air temperature passes negative bounds so sub-freezing Celsius
+ * readings are preserved.
  */
-export function parseAswsCsv(text: string): Map<string, AswsLatest> {
+export function parseAswsCsv(text: string, options: AswsParseOptions = {}): Map<string, AswsLatest> {
+  const { minValue = 0, maxValue = Infinity } = options;
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length < 2) return new Map();
   const header = lines[0].split(",");
@@ -110,7 +118,7 @@ export function parseAswsCsv(text: string): Map<string, AswsLatest> {
     for (let c = 1; c < cells.length && c < ids.length; c++) {
       if (latest.has(ids[c])) continue;
       const v = num(cells[c]);
-      if (v == null || v < 0) continue;
+      if (v == null || v < minValue || v > maxValue) continue;
       latest.set(ids[c], { observedAt: at, value: v });
     }
     if (latest.size >= ids.length - 1) break;
@@ -184,5 +192,9 @@ export async function fetchBcAswsElements(options: BcAswsFetchOptions = {}): Pro
     getText(`${BC_ASWS_DATA_BASE}/SW.csv`, options),
     getText(`${BC_ASWS_DATA_BASE}/TA.csv`, options),
   ]);
-  return { depthCm: parseAswsCsv(sd), sweMm: parseAswsCsv(sw), tempC: parseAswsCsv(ta) };
+  return {
+    depthCm: parseAswsCsv(sd),
+    sweMm: parseAswsCsv(sw),
+    tempC: parseAswsCsv(ta, { minValue: -60, maxValue: 50 }),
+  };
 }

@@ -97,3 +97,14 @@ test("an unreachable mini is a warning and an unreachable database is critical",
   const noDb = facts({ db: { ...facts().db, ok: false, error: "cams 500" } });
   assert.equal(overallStatus(evaluate(noDb)), "CRITICAL");
 });
+
+test("parseMini reads archive-enabled stills summary and archived-only runs are not capture_all_failed", () => {
+  const archiveOnly = MINI_OUT.replace(
+    "[cam-stills] done: 25 stored, 0 blank, 3 failed",
+    "[cam-stills] done: 0 latest stored, 240 archived (12 keepers), 0 blank, 3 failed, 10 archive frames pruned (10 selected of 120 candidates, 3 d lookback)",
+  );
+  const m = parseMini(archiveOnly);
+  assert.deepEqual(m.stillsLastRun, { stored: 0, archived: 240, keepers: 12, blank: 0, failed: 3 });
+  const alerts = evaluate(facts({ mini: m }));
+  assert.equal(alerts.some((a) => a.code === "capture_all_failed"), false);
+});

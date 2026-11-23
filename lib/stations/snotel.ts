@@ -12,6 +12,7 @@
 // domain, no key. Attribution: "USDA NRCS SNOTEL".
 // ─────────────────────────────────────────────────────────────
 
+import { daysBetween } from "../snow-history";
 import { validateReading, type PreviousDay, type RawSnotelReading } from "../snow-quality";
 import { endOfDayUtc, isoDay, num, round1, type StationMeta, type StationObservation } from "./types";
 
@@ -115,7 +116,8 @@ export function parseAwdbDaily(json: unknown): SnotelDay[] | null {
 export function snotelObservation(meta: StationMeta, days: SnotelDay[]): StationObservation | null {
   if (!days.length) return null;
   const latest = days[days.length - 1];
-  const prev = days.length >= 2 ? days[days.length - 2] : null;
+  const candidatePrev = days.length >= 2 ? days[days.length - 2] : null;
+  const prev = candidatePrev && daysBetween(candidatePrev.date, latest.date) === 1 ? candidatePrev : null;
   const previous: PreviousDay | null = prev
     ? { snowDepthIn: prev.snowDepthIn, sweIn: prev.sweIn, precipAccumIn: prev.precipAccumIn }
     : null;
@@ -129,7 +131,7 @@ export function snotelObservation(meta: StationMeta, days: SnotelDay[]): Station
   };
   const qc = validateReading(raw, previous);
   const newSnow =
-    qc.snowDepthIn != null && prev?.snowDepthIn != null ? Math.max(0, Math.round(qc.snowDepthIn - prev.snowDepthIn)) : null;
+    qc.snowDepthIn != null && prev?.snowDepthIn != null ? round1(Math.max(0, qc.snowDepthIn - prev.snowDepthIn)) : null;
   return {
     ...meta,
     observedAt: endOfDayUtc(latest.date),

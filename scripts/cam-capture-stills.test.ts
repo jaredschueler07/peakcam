@@ -2,10 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   RUN_WATCHDOG_MS,
+  activeChildren,
   ffmpegFrameArgs,
   formatWatchdogMessage,
   frameStats,
   isBlankFrame,
+  killActiveChildren,
   m3u8In,
   ogImage,
 } from "./cam-capture-stills";
@@ -82,4 +84,23 @@ test("formatWatchdogMessage names the deadline and any cams still in flight", ()
     formatWatchdogMessage(new Set()),
     "[cam-stills] watchdog: run exceeded 30 min, exiting (no cams in flight)",
   );
+});
+
+test("killActiveChildren sends SIGKILL to tracked ffmpeg/ffprobe children", () => {
+  assert.ok(activeChildren instanceof Set);
+  const signals: string[] = [];
+  const fakeChild = {
+    kill: (sig: string) => {
+      signals.push(sig);
+      return true;
+    },
+  };
+  const throwingChild = {
+    kill: () => {
+      throw new Error("ESRCH");
+    },
+  };
+  const count = killActiveChildren([fakeChild as never, throwingChild as never]);
+  assert.equal(count, 1);
+  assert.deepEqual(signals, ["SIGKILL"]);
 });
