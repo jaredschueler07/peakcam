@@ -148,3 +148,13 @@ test("seasonSentence is dated by the newest reading and drops what it does not k
   assert.equal(empty.asOfDay, null);
   assert.equal(formatDayLabel("2025-10-20", 2026), "Oct 20, 2025");
 });
+
+test("pastSeasons totalIn sums every row in season.rows even past day 273", () => {
+  const lateRows: DailyRow[] = [
+    ...winterFrom(2026, [0, 4, 0, 6]),
+    { date: "2026-08-15", snowDepthIn: 15, sweIn: null, newSnowIn: 5, qcFlag: "valid" }, // day 319 (> 273)
+  ];
+  const past = pastSeasons(lateRows, [], { key: 2027, label: "2026-27", startDate: "2026-10-01" });
+  assert.equal(past.length, 1);
+  assert.equal(past[0].totalIn, 15);
+});

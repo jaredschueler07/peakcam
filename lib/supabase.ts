@@ -86,6 +86,8 @@ export function withFetchRetry(fetchImpl: typeof fetch, delays: readonly number[
       try {
         const res = await fetchImpl(input, init);
         if (!idempotent || !RETRYABLE_STATUS.has(res.status) || attempt >= delays.length) return res;
+        // Release the failed response stream before waiting to retry so sockets aren't held open.
+        await res.body?.cancel().catch(() => {});
       } catch (err) {
         if (!idempotent || attempt >= delays.length || init?.signal?.aborted) throw err;
       }
@@ -102,6 +104,38 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 // ─────────────────────────────────────────────────────────────
 // Queries
 // ─────────────────────────────────────────────────────────────
+
+const POSTGREST_PAGE_SIZE = 1000;
+const POSTGREST_IN_CHUNK_SIZE = 100;
+
+type PagedQuery<T> = {
+  range(from: number, to: number): PromiseLike<{ data: T[] | null; error: { code?: string; message: string } | null }>;
+};
+
+/**
+ * Drain every page past PostgREST's 1,000-row `db-max-rows` ceiling. Callers
+ * must supply a deterministic `.order(...)` ending in a unique column/PK so
+ * offsets cannot skip or duplicate tied rows across pages.
+ */
+async function fetchAllPages<T>(
+  buildQuery: () => PagedQuery<T>,
+  pageSize = POSTGREST_PAGE_SIZE,
+): Promise<{ data: T[]; error: { code?: string; message: string } | null }> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await buildQuery().range(from, from + pageSize - 1);
+    if (error) return { data: rows, error };
+    const page = data ?? [];
+    rows.push(...page);
+    if (page.length < pageSize) return { data: rows, error: null };
+  }
+}
+
+function chunkArray<T>(items: readonly T[], size = POSTGREST_IN_CHUNK_SIZE): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+  return chunks;
+}
 
 /**
  * Share a cold catalog load between overlapping requests in this runtime.
@@ -126,38 +160,51 @@ function singleFlight<T>(load: () => Promise<T>): () => Promise<T> {
 
 /** Fetch all active resorts with their latest snow report. */
 async function fetchAllResorts(): Promise<ResortWithData[]> {
-  const { data: resorts, error: resortError } = await supabase
-    .from("resorts")
-    .select("*")
-    .eq("is_active", true)
-    .order("name");
+  const { data: resorts, error: resortError } = await fetchAllPages<Resort>(() =>
+    supabase
+      .from("resorts")
+      .select("*")
+      .eq("is_active", true)
+      .order("name")
+      .order("id"),
+  );
 
   if (resortError) throw resortError;
-  if (!resorts?.length) return [];
+  if (!resorts.length) return [];
 
   const resortIds = resorts.map((r) => r.id);
+  const resortIdSet = new Set(resortIds);
 
-  // Fetch snow reports and cams in parallel
-  const [snowResult, camResult] = await Promise.all([
-    // Use the latest_snow_reports view — DB-side DISTINCT ON (resort_id)
-    supabase
-      .from("latest_snow_reports")
-      .select("*")
-      .in("resort_id", resortIds),
-    // Active cams only
-    supabase
-      .from("cams")
-      .select("*")
-      .in("resort_id", resortIds)
-      .eq("is_active", true),
+  // Fetch snow reports (chunked IN list so URLs stay small) and all active
+  // cams (paged past PostgREST's 1,000-row ceiling) in parallel.
+  const [snowResults, camResult] = await Promise.all([
+    Promise.all(
+      chunkArray(resortIds).map((chunk) =>
+        supabase
+          .from("latest_snow_reports")
+          .select("*")
+          .in("resort_id", chunk),
+      ),
+    ),
+    fetchAllPages<Cam>(() =>
+      supabase
+        .from("cams")
+        .select("*")
+        .eq("is_active", true)
+        .order("id"),
+    ),
   ]);
 
-  if (snowResult.error) throw snowResult.error;
+  const snowData: SnowReport[] = [];
+  for (const res of snowResults) {
+    if (res.error) throw res.error;
+    for (const s of res.data ?? []) snowData.push(s);
+  }
   if (camResult.error) throw camResult.error;
 
   // Index snow reports by resort (view already returns one per resort)
   const snowByResort = new Map<string, SnowReport>();
-  for (const s of snowResult.data ?? []) {
+  for (const s of snowData) {
     snowByResort.set(s.resort_id, s);
   }
 
@@ -165,7 +212,8 @@ async function fetchAllResorts(): Promise<ResortWithData[]> {
   // resolved here so every consumer gets the same non-blank label without each
   // one re-parsing cam URLs at render time.
   const camsByResort = new Map<string, Cam[]>();
-  for (const c of withResolvedCamNames<Cam>(camResult.data ?? [])) {
+  const activeResortCams = camResult.data.filter((c) => resortIdSet.has(c.resort_id));
+  for (const c of withResolvedCamNames<Cam>(activeResortCams)) {
     if (!camsByResort.has(c.resort_id)) {
       camsByResort.set(c.resort_id, []);
     }
@@ -405,9 +453,9 @@ export async function submitConditionVote(
   snowQuality: SnowQuality | null,
   comfort: ComfortLevel | null,
   comment?: string
-): Promise<{ ok: boolean; error?: string }> {
-  // Rate limit: max 1 vote per resort per session per hour
-  const { data: recent } = await supabase
+): Promise<{ ok: boolean; code?: "rate_limited" | "unavailable"; error?: string }> {
+  // Rate limit: max 1 vote per resort per session per hour (fail closed on DB errors).
+  const { data: recent, error: recentError } = await supabase
     .from("condition_votes")
     .select("id")
     .eq("resort_id", resortId)
@@ -415,8 +463,13 @@ export async function submitConditionVote(
     .gte("created_at", new Date(Date.now() - 3600_000).toISOString())
     .limit(1);
 
+  if (recentError) {
+    console.error("[PeakCam] condition_votes rate-limit read failed:", recentError.code);
+    return { ok: false, code: "unavailable", error: "Conditions voting is temporarily unavailable." };
+  }
+
   if (recent && recent.length > 0) {
-    return { ok: false, error: "You've already reported conditions here recently. Try again in an hour." };
+    return { ok: false, code: "rate_limited", error: "You've already reported conditions here recently. Try again in an hour." };
   }
 
   const { error } = await supabase
@@ -429,7 +482,10 @@ export async function submitConditionVote(
       comment: comment?.slice(0, 280) ?? null,
     });
 
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    console.error("[PeakCam] condition_votes insert failed:", error.code);
+    return { ok: false, code: "unavailable", error: "Could not save your conditions vote." };
+  }
   return { ok: true };
 }
 
@@ -568,19 +624,25 @@ interface ResortStationQueryRow {
 }
 
 async function fetchResortStationsIndex(): Promise<Record<string, ResortStationJoined[]>> {
-  const { data, error } = await supabase
-    .from("resort_stations")
-    .select(RESORT_STATIONS_SELECT)
-    .neq("role", "approach")
-    .order("rank", { ascending: true })
-    .order("observed_at", { referencedTable: "stations.station_observations", ascending: false })
-    .limit(1, { referencedTable: "stations.station_observations" });
+  // Paginate deterministically by composite PK (resort_id, station_id) so rows
+  // never skip past 1,000, then restore each resort's rank order in memory.
+  const { data, error } = await fetchAllPages<ResortStationQueryRow>(
+    () =>
+      supabase
+        .from("resort_stations")
+        .select(RESORT_STATIONS_SELECT)
+        .neq("role", "approach")
+        .order("resort_id", { ascending: true })
+        .order("station_id", { ascending: true })
+        .order("observed_at", { referencedTable: "stations.station_observations", ascending: false })
+        .limit(1, { referencedTable: "stations.station_observations" }) as unknown as PagedQuery<ResortStationQueryRow>,
+  );
   if (error) {
-    if (MISSING_TABLE_CODES.has(error.code)) return {};
+    if (error.code && MISSING_TABLE_CODES.has(error.code)) return {};
     throw error;
   }
   const out: Record<string, ResortStationJoined[]> = {};
-  for (const row of (data ?? []) as unknown as ResortStationQueryRow[]) {
+  for (const row of data) {
     if (!row.station) continue;
     const { station_observations, ...station } = row.station;
     const latest = station_observations?.[0] ?? null;
@@ -603,6 +665,9 @@ async function fetchResortStationsIndex(): Promise<Record<string, ResortStationJ
           }
         : null,
     });
+  }
+  for (const list of Object.values(out)) {
+    list.sort((a, b) => a.rank - b.rank);
   }
   return out;
 }
@@ -868,16 +933,20 @@ export interface ResortSitemapEntry {
  */
 export async function getResortSitemapEntries(): Promise<ResortSitemapEntry[]> {
   const [resortsRes, reportsRes] = await Promise.all([
-    supabase.from("resorts").select("id, slug, name, state, region, country").eq("is_active", true),
-    supabase.from("latest_snow_reports").select("resort_id, updated_at"),
+    fetchAllPages<{ id: string; slug: string; name: string; state: string; region: string; country: string }>(() =>
+      supabase.from("resorts").select("id, slug, name, state, region, country").eq("is_active", true).order("id"),
+    ),
+    fetchAllPages<{ resort_id: string; updated_at: string }>(() =>
+      supabase.from("latest_snow_reports").select("resort_id, updated_at").order("resort_id"),
+    ),
   ]);
   if (resortsRes.error) throw resortsRes.error;
   if (reportsRes.error) throw reportsRes.error;
 
   const lastByResort = new Map<string, string>(
-    (reportsRes.data ?? []).map((r) => [r.resort_id, r.updated_at]),
+    reportsRes.data.map((r) => [r.resort_id, r.updated_at]),
   );
-  return (resortsRes.data ?? []).map((r) => ({
+  return resortsRes.data.map((r) => ({
     slug: r.slug,
     name: r.name,
     state: r.state,
@@ -888,13 +957,16 @@ export async function getResortSitemapEntries(): Promise<ResortSitemapEntry[]> {
 }
 
 async function fetchAllResortSlugs(): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("resorts")
-    .select("slug")
-    .eq("is_active", true);
+  const { data, error } = await fetchAllPages<{ slug: string }>(() =>
+    supabase
+      .from("resorts")
+      .select("slug")
+      .eq("is_active", true)
+      .order("id"),
+  );
 
   if (error) throw error;
-  return data?.map((r) => r.slug) ?? [];
+  return data.map((r) => r.slug);
 }
 
 // Single-flight: the resort page family (overview, snow-report, webcams) runs
@@ -943,7 +1015,7 @@ async function fetchCamStillRows(filter: { camId?: string; resortId?: string }, 
   ]);
   const error = win.error ?? keep.error;
   if (error) {
-    if (MISSING_TABLE_CODES.has(error.code)) {
+    if (error.code && MISSING_TABLE_CODES.has(error.code)) {
       console.warn("[PeakCam] cam_still_timeline missing — apply migration 024; cam history unavailable");
     } else {
       console.warn("[PeakCam] Could not fetch cam still timeline:", error.message);
@@ -952,7 +1024,7 @@ async function fetchCamStillRows(filter: { camId?: string; resortId?: string }, 
   }
   const seen = new Set<number>();
   const rows: CamStillRow[] = [];
-  for (const row of [...(win.data ?? []), ...(keep.data ?? [])] as CamStillRow[]) {
+  for (const row of [...((win.data ?? []) as CamStillRow[]), ...((keep.data ?? []) as CamStillRow[])]) {
     if (seen.has(row.id)) continue;
     seen.add(row.id);
     rows.push(row);
@@ -962,9 +1034,9 @@ async function fetchCamStillRows(filter: { camId?: string; resortId?: string }, 
 
 /**
  * Archived frames for one cam or one resort as public-URL frames, for the MCP
- * `get_cam_timeline` tool and the ask router: every in-window frame plus the
- * newest keeper per query, deduplicated, any order (the tool shapes them with
- * lib/cam-timeline shapeTimeline). Null when the view is unavailable.
+ * `get_cam_timeline` tool and the ask router: every in-window frame plus
+ * surviving keepers, deduplicated and filtered against pruner retention. Null when
+ * the view is unavailable.
  */
 export async function getCamStillFrames(filter: { camId?: string; resortId?: string }, hours = 24): Promise<CamTimelineFrame[] | null> {
   const rows = await fetchCamStillRows(filter, clampHours(hours), new Date());

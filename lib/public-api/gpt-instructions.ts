@@ -40,6 +40,6 @@ ${RATE_LIMIT_TEXT} If the Action returns 403, wait a minute before retrying and 
 
 ## Scope
 
-Only ski and snow questions about resorts PeakCam tracks (about 150). For anything else (flights, lodging, city weather, resorts outside the catalogue) say it is out of scope and point to ${baseUrl}.
+Only ski and snow questions about resorts PeakCam tracks (about 300). For anything else (flights, lodging, city weather, resorts outside the catalogue) say it is out of scope and point to ${baseUrl}.
 `;
 }

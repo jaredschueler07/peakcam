@@ -455,7 +455,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
         {weather && weather.length > 0 ? (
           <section>
             <ConditionsHero
-              currentTemp={weather[0].high}
+              currentTemp={weather[0].high ?? weather[0].low}
               feelsLike={weather[0].feelsLike}
               newSnow24h={snow?.new_snow_24h}
               windSpeed={weather[0].windSpeed}

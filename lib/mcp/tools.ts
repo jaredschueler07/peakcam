@@ -21,6 +21,7 @@ import { stateHubPath, stateLabel } from "@/lib/hubs";
 import { KEEPER_MIN_SNOW_24H_IN, MAX_TIMELINE_HOURS, clampHours, filterRetainedFrames, stormKeeper, type CamTimelineFrame } from "@/lib/cam-timeline";
 import { clipDurationSeconds, type CamTimelapses } from "@/lib/cam-timelapse";
 import { resortTabUrl } from "@/lib/resort-pages";
+import { resortLocalDay } from "@/lib/resort-timezone";
 import { PCT_OF_NORMAL_RULE, buildPctOfNormalPage } from "@/lib/percent-of-normal";
 import { answerQuestion } from "@/lib/ask/answer";
 import { MAX_QUESTION_LENGTH } from "@/lib/ask/router";
@@ -439,7 +440,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
     date: z.string().nullable(),
     shortForecast: z.string(),
     condition: z.string(),
-    highF: z.number(),
+    highF: z.number().nullable().describe("Null on a leading night period (Tonight), which carries only lowF."),
     lowF: z.number().nullable(),
     snowInches: z.number().describe("From the blend when one is stored for that date, else the keyword estimate (see snowSource)."),
     snowSource: z.enum(["blend", "nws_keyword", "open_meteo"]),
@@ -556,7 +557,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
         lines.push(
           `NWS narrative${blended ? " (snow amounts from the blend)" : " (snow amounts are keyword estimates)"}:`,
           "",
-          ...narrative.map((p) => `- ${p.dow}${p.date ? ` ${p.date}` : ""}: ${p.shortForecast}, high ${p.highF}${p.lowF != null ? ` / low ${p.lowF}` : ""} °F${p.snowInches ? `, ~${p.snowInches} in` : ""}`),
+          ...narrative.map((p) => `- ${p.dow}${p.date ? ` ${p.date}` : ""}: ${p.shortForecast}, ${[p.highF != null ? `high ${p.highF}` : null, p.lowF != null ? `low ${p.lowF}` : null].filter(Boolean).join(" / ")} °F${p.snowInches ? `, ~${p.snowInches} in` : ""}`),
           "",
         );
       }
@@ -740,7 +741,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
       let raw: Awaited<ReturnType<typeof data.snowHistory>> = [];
       if (season) {
         const hemisphere = hemisphereOf(resort.lat);
-        const today = catalog.now.toISOString().slice(0, 10);
+        const today = resortLocalDay(resort, catalog.now);
         seasonRef = season === "current" ? seasonOf(today, hemisphere) : seasonOf(hemisphere === "south" ? `${season.slice(0, 4)}-06-01` : `${season.slice(0, 4)}-12-01`, hemisphere);
         const history = await readHistory(data, resort);
         if (!history) return err("Season history is not available right now (the daily archive could not be read). Try days instead of season.");
