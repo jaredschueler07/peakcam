@@ -182,3 +182,20 @@ test("resort-profiles.csv and resort-openings.csv reference resorts that exist",
     }
   }
 });
+
+test("resorts.csv and resort-profiles.csv agree on elevations where both are populated", () => {
+  const bySlug = new Map(resorts.map((r) => [r.slug, r]));
+  for (const r of resorts) {
+    assert.ok(r.country === "US" || r.country === "CA" || r.country === "CL" || r.country === "AR", `${r.slug} missing country`);
+  }
+  for (const p of profiles) {
+    const r = bySlug.get(p.slug);
+    assert.ok(r, p.slug);
+    if (r.elevation_base_ft && p.elevation_base_ft) {
+      assert.equal(p.elevation_base_ft, r.elevation_base_ft, `${p.slug} elevation_base_ft mismatch`);
+    }
+    if (r.elevation_summit_ft && p.elevation_summit_ft) {
+      assert.equal(p.elevation_summit_ft, r.elevation_summit_ft, `${p.slug} elevation_summit_ft mismatch`);
+    }
+  }
+});
