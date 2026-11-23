@@ -25,6 +25,7 @@ import {
   dayOfWaterYear,
   type RawSnotelReading,
   type PreviousDay,
+  newSnowWindows,
 } from "../lib/snow-quality.js";
 
 import {
@@ -274,27 +275,9 @@ async function upsertSnowpackDaily(
 // ─── Step 5: Compute new snow deltas ──────────────────────────────────────
 
 function computeDeltas(days: ParsedDay[]): { newSnow24h: number; newSnow48h: number } {
-  if (days.length < 2) return { newSnow24h: 0, newSnow48h: 0 };
-
-  const latest = days[days.length - 1];
-  const prev = days[days.length - 2];
-
-  let newSnow24h = 0;
-  if (latest.snowDepthIn != null && prev.snowDepthIn != null) {
-    const delta = latest.snowDepthIn - prev.snowDepthIn;
-    newSnow24h = delta > 0 ? Math.round(delta) : 0;
-  }
-
-  let newSnow48h = 0;
-  if (days.length >= 3) {
-    const twoDaysAgo = days[days.length - 3];
-    if (latest.snowDepthIn != null && twoDaysAgo.snowDepthIn != null) {
-      const delta = latest.snowDepthIn - twoDaysAgo.snowDepthIn;
-      newSnow48h = delta > 0 ? Math.round(delta) : 0;
-    }
-  }
-
-  return { newSnow24h, newSnow48h };
+  // 48 h is the sum of the two daily gains, not the net two-day depth change:
+  // see newSnowWindows in lib/snow-quality.ts.
+  return newSnowWindows(days.map((d) => d.snowDepthIn));
 }
 
 // ─── Step 6: Lookup normals ───────────────────────────────────────────────

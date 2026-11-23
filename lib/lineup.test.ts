@@ -27,7 +27,10 @@ import {
   type LineupStorage,
 } from "./lineup";
 
-const NOW = Date.UTC(2026, 9, 24, 15, 0, 0);
+// The run's own clock, not a fixed date: releaseLineupIntentClaim and
+// completeLineupIntent read the intent against Date.now(), so a hard-coded day
+// made these tests fail once it was more than LINEUP_INTENT_TTL_MS (30 days) old.
+const NOW = Date.now();
 const USER_A = "11111111-1111-4111-8111-111111111111";
 const USER_B = "22222222-2222-4222-8222-222222222222";
 
