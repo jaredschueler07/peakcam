@@ -13,6 +13,8 @@ export interface TimeZoneResort {
   state: string;
   country: string;
   lng: number;
+  /** Needed to split Idaho; optional so older callers still compile. */
+  lat?: number | null;
 }
 
 const BY_STATE: Record<string, string> = {
@@ -62,7 +64,13 @@ const BY_COUNTRY: Record<string, string> = {
   AR: "America/Argentina/Buenos_Aires",
 };
 
-/** Idaho west of this longitude (the panhandle: Schweitzer, Lookout Pass) is on Pacific time. */
+/**
+ * Idaho north of this latitude (the panhandle, north of the Salmon River:
+ * Schweitzer, Silver Mountain, Lookout Pass) is on Pacific time; the rest,
+ * including Brundage, Tamarack and Bogus Basin in the west, is on Mountain time.
+ */
+const IDAHO_PACIFIC_NORTH_OF_LAT = 45.5;
+/** Without a latitude: the old longitude split, which is wrong for south-west Idaho. */
 const IDAHO_PACIFIC_WEST_OF_LNG = -115.5;
 
 /** A longitude-only fallback for a code the table does not know. */
@@ -75,7 +83,10 @@ function byLongitude(lng: number): string {
 
 export function resortTimeZone(resort: TimeZoneResort): string {
   const state = (resort.state ?? "").trim();
-  if (state === "ID") return resort.lng < IDAHO_PACIFIC_WEST_OF_LNG ? "America/Los_Angeles" : "America/Denver";
+  if (state === "ID") {
+    const pacific = resort.lat != null && Number.isFinite(resort.lat) ? resort.lat > IDAHO_PACIFIC_NORTH_OF_LAT : resort.lng < IDAHO_PACIFIC_WEST_OF_LNG;
+    return pacific ? "America/Los_Angeles" : "America/Denver";
+  }
   if (BY_STATE[state]) return BY_STATE[state];
   if (BY_COUNTRY[resort.country]) return BY_COUNTRY[resort.country];
   return byLongitude(resort.lng);
