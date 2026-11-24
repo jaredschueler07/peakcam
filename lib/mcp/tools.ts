@@ -22,6 +22,7 @@ import { KEEPER_MIN_SNOW_24H_IN, MAX_TIMELINE_HOURS, clampHours, filterRetainedF
 import { clipDurationSeconds, type CamTimelapses } from "@/lib/cam-timelapse";
 import { resortTabUrl } from "@/lib/resort-pages";
 import { resortLocalDay } from "@/lib/resort-timezone";
+import { baseDepthLabel, type FieldSource } from "@/lib/conditions-contract";
 import { PCT_OF_NORMAL_RULE, buildPctOfNormalPage } from "@/lib/percent-of-normal";
 import { answerQuestion } from "@/lib/ask/answer";
 import { MAX_QUESTION_LENGTH } from "@/lib/ask/router";
@@ -296,7 +297,7 @@ export function buildTools(data: McpDataSource): ToolDefinition[] {
           fieldLine(c.liftDay?.state === "scheduled" ? "Lifts marked open by the feed (before first chair, not confirmed turning)" : "Lifts open", c.liftsOpen),
           fieldLine("Lifts total", c.liftsTotal),
           fieldLine("Runs open", c.runsOpen),
-          fieldLine("Base depth (measured)", c.baseDepthIn, " in"),
+          fieldLine(baseDepthLabel(c.baseDepthIn.source as FieldSource), c.baseDepthIn, " in"),
           fieldLine("Base depth (operator)", c.operatorBaseDepthIn, " in"),
           fieldLine("Blended forecast next 48 h", c.forecastNext48hCm, " cm"),
           fieldLine("Temperature", c.tempF, " °F"),

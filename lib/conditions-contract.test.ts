@@ -16,6 +16,7 @@ import {
   recommendToday,
   reportFieldSource,
   snowQualityFromTags,
+  baseDepthLabel,
   type ConditionsInput,
   type OperatorReport,
 } from "./conditions-contract";
@@ -457,13 +458,13 @@ test("day status: lifts scheduled and none open is OPEN with a 'scheduled' reaso
   assert.doesNotMatch(late.reasons.join(" "), /scheduled to open today/);
 });
 
-test("day status: before the next day's first reading the previous day's count is carried and dated; two days back is not", () => {
+test("day status: before the next day's first chair the previous day's count is carried and dated; two days back is not", () => {
   const night = dayStatus(VAIL_DAY, mt("05:30", "2026-11-21"));
   assert.equal(night.status, "OPEN");
   assert.equal(night.basis, "feed");
   assert.equal(night.liftDay?.carried, true);
   assert.equal(night.liftDay?.localDate, "2026-11-20");
-  assert.match(night.reasons[0], /no reading yet on 2026-11-21; lifts ran on 2026-11-20, 2 of 34 open at 15:05/);
+  assert.match(night.reasons[0], /nothing yet on 2026-11-21 before first chair; lifts ran on 2026-11-20, 2 of 34 open at 15:05/);
   assert.doesNotMatch(night.reasons[0], /today/);
   // Yesterday never had a lift open: nothing carried, the dates decide.
   const dry = dayStatus([rd("08:05", 0, 4, 34), rd("12:05", 0, 0, 34)], mt("00:30", "2026-11-21"));
@@ -485,4 +486,74 @@ test("statusChipDisplay: an OPEN status on a scheduled lift day reads Opens toda
   // The scheduled state never softens a status that is not OPEN.
   assert.deepEqual(statusChipDisplay("CLOSED_TODAY", "scheduled"), { label: "Closed today", variant: "status" });
   assert.deepEqual(statusChipDisplay("PRE_SEASON", "scheduled"), { label: "Pre-season", variant: "status" });
+});
+
+// ── Root causes found on 2026-11-24 (big-resort conditions check) ──
+
+test("temperature: a fresh hourly station wins over a stale summit reading (Lake Louise: a GHCN summit 206 h old vs ECCC this hour)", () => {
+  const c = buildConditions(
+    input({
+      measured: [
+        { role: "summit", source: "ghcn", observedAt: hoursAgo(206), snowDepthIn: null, tempF: 28, windMph: null },
+        { role: "base", source: "eccc", observedAt: hoursAgo(1), snowDepthIn: null, tempF: 14.4, windMph: 9 },
+      ],
+    }),
+  );
+  assert.equal(c.tempF.value, 14.4);
+  assert.equal(c.tempF.source, "station:eccc");
+  assert.equal(c.tempF.freshness.tier, "live");
+});
+
+test("temperature: a daily SNOTEL value stamped 23:59Z and 15 h old is not shown as the temperature now (Vail, Breckenridge)", () => {
+  const c = buildConditions(input({ measured: [{ role: "base", source: "snotel", observedAt: hoursAgo(15), snowDepthIn: 4, tempF: 31, windMph: null }] }));
+  assert.equal(c.tempF.value, null);
+  assert.equal(c.tempF.source, "none");
+});
+
+test("temperature: among live readings the higher role still wins; with none live the youngest within 6 h is used", () => {
+  const both = buildConditions(
+    input({
+      measured: [
+        { role: "base", source: "nws", observedAt: hoursAgo(0.5), snowDepthIn: null, tempF: 20, windMph: 5 },
+        { role: "summit", source: "nws", observedAt: hoursAgo(2), snowDepthIn: null, tempF: 11, windMph: 30 },
+      ],
+    }),
+  );
+  assert.equal(both.tempF.value, 11);
+  const older = buildConditions(
+    input({
+      measured: [
+        { role: "summit", source: "snotel", observedAt: hoursAgo(5), snowDepthIn: null, tempF: 9, windMph: null },
+        { role: "base", source: "snotel", observedAt: hoursAgo(4), snowDepthIn: null, tempF: 17, windMph: null },
+      ],
+    }),
+  );
+  assert.equal(older.tempF.value, 17);
+});
+
+test("day status: a near-full lift count before a projected opening is not believed (Beaver Creek, 25 of 25 on 2026-11-23, opening 2026-11-25)", () => {
+  const bc = [rd("14:05", 24, 0, 25, "2026-11-23"), rd("15:05", 25, 0, 25, "2026-11-23")];
+  const s = dayStatus(bc, mt("15:10", "2026-11-23"), opening({ projected_open: "2026-11-25" }));
+  assert.notEqual(s.status, "OPEN");
+  assert.equal(s.basis, "date");
+  assert.match(s.reasons.join(" "), /25 of 25 lifts open at 15:05 resort time while the opening date is still ahead/);
+  // A partial early opening (a few lifts) is still believed.
+  const early = dayStatus([rd("10:05", 3, 0, 25, "2026-11-23")], mt("10:10", "2026-11-23"), opening({ projected_open: "2026-11-25" }));
+  assert.equal(early.status, "OPEN");
+  // Once the season is confirmed open, a full count is just a good day.
+  const inSeason = dayStatus(bc, mt("15:10", "2026-11-23"), opening({ confirmed_open: "2026-11-14" }));
+  assert.equal(inSeason.status, "OPEN");
+});
+
+test("base depth: a model 0 in at an open resort is not shown (Killington, Whistler, Lake Louise on 2026-11-24)", () => {
+  const c = buildConditions(input({ hasStation: false, report: { ...input().report!, source: "open_meteo", base_depth: 0 } }));
+  assert.equal(c.status.value, "OPEN");
+  assert.equal(c.baseDepthIn.value, null);
+  assert.equal(c.baseDepthIn.source, "none");
+  assert.ok(c.reasons.some((r) => /valley-level snowpack, not the resort's base/.test(r)));
+  // A non-zero model value is kept and labelled an estimate, never "measured".
+  const est = buildConditions(input({ hasStation: false, report: { ...input().report!, source: "open_meteo", base_depth: 20 } }));
+  assert.equal(est.baseDepthIn.value, 20);
+  assert.equal(baseDepthLabel(est.baseDepthIn.source), "Base depth (model estimate)");
+  assert.equal(baseDepthLabel("snotel"), "Base depth (measured)");
 });

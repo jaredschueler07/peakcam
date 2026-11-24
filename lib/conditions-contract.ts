@@ -248,6 +248,23 @@ function count(n: number | null | undefined): number {
  *    that has come and gone without confirmation → UNKNOWN.
  * 3. Nothing on file → UNKNOWN. The calendar alone never opens a resort.
  */
+/**
+ * Share of a resort's lifts above which an "open" reading taken before its
+ * opening date is treated as a feed glitch rather than an early opening.
+ * Early openings run a handful of lifts (Vail 5 of 34, Breckenridge 8 of 35
+ * in their first weeks of 2026-27); a page that flips every lift to "open"
+ * ahead of opening day is being staged or tested.
+ */
+export const PRE_SEASON_IMPLAUSIBLE_OPEN_SHARE = 0.8;
+
+/** True when the feed says most lifts ran today but the calendar still puts opening day ahead. */
+function implausiblePreSeasonOpen(day: OperatorDay, opening: ResortOpening | null, openingState: ReturnType<typeof openingStatus>, localDate: string): boolean {
+  const ahead = openingState === "confirmed" || (openingState === "projected" && opening?.projected_open != null && opening.projected_open > localDate);
+  if (!ahead) return false;
+  const total = day.liftsTotal ?? 0;
+  return total > 0 && day.liftsOpen / total >= PRE_SEASON_IMPLAUSIBLE_OPEN_SHARE;
+}
+
 export function deriveStatus(input: StatusInput): StatusResult {
   const { opening, localDate, operator, now } = input;
   const reasons: string[] = [];
@@ -264,11 +281,22 @@ export function deriveStatus(input: StatusInput): StatusResult {
       const readings: readonly OperatorReading[] = operator.readings?.length
         ? operator.readings
         : [{ observedAt: operator.observedAt, liftsOpen: operator.liftsOpen, liftsScheduled: operator.liftsScheduled, liftsTotal: operator.liftsTotal }];
-      const day = summarizeOperatorDay(readings, timeZone, now);
+      let day = summarizeOperatorDay(readings, timeZone, now);
+      if (day?.state === "operated" && implausiblePreSeasonOpen(day, opening, openingState, localDate)) {
+        // Beaver Creek, 2026-11-23: two days before its Nov 25 opening, its
+        // lift page flipped 24 then 25 of 25 lifts to "open" for an hour
+        // (14:05–15:05 MT) and back to closed. No resort opens with most of
+        // its lifts on day one, so a near-full count while the calendar says
+        // the season is still ahead is a page glitch, not an opening.
+        reasons.push(
+          `operator feed showed ${day.liftsOpen} of ${day.liftsTotal} lifts open at ${localClock(new Date(day.observedAt), timeZone)} resort time while the opening date is still ahead; a near-full count before opening day is not believed, so the dates decide`,
+        );
+        day = null;
+      }
       if (day?.state === "operated") {
         reasons.push(
           day.carried
-            ? `operator feed${age}: no reading yet on ${localDate}; lifts ran on ${day.localDate}, ${day.liftsOpen} of ${day.liftsTotal ?? "?"} open at ${localClock(new Date(day.observedAt), timeZone)} resort time that day`
+            ? `operator feed${age}: nothing yet on ${localDate} before first chair; lifts ran on ${day.localDate}, ${day.liftsOpen} of ${day.liftsTotal ?? "?"} open at ${localClock(new Date(day.observedAt), timeZone)} resort time that day`
             : day.current
             ? `operator feed${age}: ${day.liftsOpen} of ${day.liftsTotal ?? "?"} lifts open`
             : `operator feed: lifts ran today, ${day.liftsOpen} of ${day.liftsTotal ?? "?"} open at ${localClock(new Date(day.observedAt), timeZone)} resort time; the newest reading${age} shows none open`,
@@ -490,10 +518,42 @@ export function snowQualityFromTags(tags: readonly string[]): SnowQuality | null
 
 const ROLE_ORDER: MeasuredInput["role"][] = ["summit", "mid", "base", "approach"];
 
-/** The highest station with a value for `key`, as a field sourced to its network. */
+/**
+ * A temperature or wind reading older than this is not "now": it is left out
+ * rather than shown as the current value. SNOTEL publishes temperature as a
+ * daily value stamped 23:59:59 UTC, so by mid-morning Mountain time it is
+ * about 15 hours old and must not stand in for the current reading.
+ */
+/**
+ * Label for the baseDepthIn field. Only a station reading is "measured"; a
+ * weather-model value is an estimate and must say so (Killington, 2026-11-24,
+ * showed a model 0 in as "Base depth (measured)").
+ */
+export function baseDepthLabel(source: FieldSource): string {
+  if (source === "model") return "Base depth (model estimate)";
+  if (source === "snotel" || source.startsWith("station:")) return "Base depth (measured)";
+  return "Base depth";
+}
+
+export const STATION_NOW_MAX_HOURS = 6;
+
+/**
+ * The current reading for `key`, as a field sourced to its network.
+ *
+ * Freshness decides before elevation: among readings inside the live window
+ * (FRESHNESS_LIVE_MAX_HOURS) the highest station wins; with none that fresh,
+ * the newest reading inside STATION_NOW_MAX_HOURS; older readings never.
+ * Sorting by role alone (the earlier rule) let a summit SNOTEL daily value
+ * 15 h old, or a GHCN reading nine days old (Lake Louise, 2026-11-24), beat a
+ * base station read an hour ago.
+ */
 function stationField(measured: readonly MeasuredInput[], key: "tempF" | "windMph", now: Date): Field<number> {
-  const rows = [...measured].filter((m) => m[key] != null).sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role));
-  const pick = rows[0];
+  const rows = [...measured]
+    .filter((m) => m[key] != null)
+    .map((m) => ({ m, age: ageHoursOf(m.observedAt, now) }))
+    .filter((r): r is { m: MeasuredInput; age: number } => r.age != null && r.age <= STATION_NOW_MAX_HOURS);
+  const live = rows.filter((r) => r.age <= FRESHNESS_LIVE_MAX_HOURS).sort((a, b) => ROLE_ORDER.indexOf(a.m.role) - ROLE_ORDER.indexOf(b.m.role) || a.age - b.age);
+  const pick = live[0]?.m ?? [...rows].sort((a, b) => a.age - b.age || ROLE_ORDER.indexOf(a.m.role) - ROLE_ORDER.indexOf(b.m.role))[0]?.m;
   if (!pick) return noneField<number>();
   return field(pick[key], `station:${pick.source}` as FieldSource, pick.observedAt, now);
 }
@@ -574,7 +634,13 @@ export function buildConditions(input: ConditionsInput): ConditionsContract {
       : noneField<string>();
   const seasonClosing: Field<string> = opening?.closing_date ? field(opening.closing_date, "operator", openingAt, now) : noneField<string>();
 
-  const baseDepthIn = rf<number>(report?.base_depth);
+  // A weather model's snow depth is the natural snowpack of a grid cell whose
+  // mean elevation is often far below the runs, so at a resort that is open it
+  // reads 0 while the operator reports a base (Lake Louise 22–27 cm,
+  // Killington and Whistler running lifts, 2026-11-24). An open resort cannot
+  // have no snow: a model zero there is no measurement, not a measured 0.
+  const modelZeroWhileOpen = reportSource === "model" && report?.base_depth != null && report.base_depth <= 0 && statusResult.status === "OPEN";
+  const baseDepthIn = modelZeroWhileOpen ? noneField<number>() : rf<number>(report?.base_depth);
   const operatorBaseDepthIn = of<number>(operator?.baseDepthIn);
   const newSnow24hIn = rf<number>(report?.new_snow_24h);
   const newSnow48hIn = rf<number>(report?.new_snow_48h);
@@ -597,6 +663,7 @@ export function buildConditions(input: ConditionsInput): ConditionsContract {
   const disagreement = depthDisagreement(baseDepthIn.source === "snotel" ? baseDepthIn.value : null, operatorBaseDepthIn.value);
   const verdict = recommendToday({ status, baseDepthIn, operatorBaseDepthIn, newSnow24hIn, rating: report?.auto_cond_rating ?? null });
   const reasons = [...statusResult.reasons, ...verdict.reasons];
+  if (modelZeroWhileOpen) reasons.push("the weather model shows 0 in of snow at an open resort; that is the model's valley-level snowpack, not the resort's base, so no base depth is shown");
   if (disagreement) reasons.push(`station and operator base depths disagree by ${disagreement.differencePct} %; the measured value leads`);
 
   return {
