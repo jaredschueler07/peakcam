@@ -6,6 +6,7 @@ import { StreamFeed } from "./StreamFeed";
 import { RefreshCw } from "lucide-react";
 import type { Cam } from "@/lib/types";
 import { camDisplayName } from "@/lib/cam-name";
+import { camEmbedSrc } from "@/lib/cam-url";
 import { trackCamPlayed } from "@/lib/posthog";
 
 const REFRESH_MS = { tile: 30_000, lightbox: 15_000 } as const;
@@ -47,8 +48,12 @@ function ImageFeed({ url, name, refreshMs, allowFill, onLoaded }: { url: string;
   // callback ref rather than an effect because it is the element, not a
   // render, that tells us whether the frame is there.
   const attachImg = (img: HTMLImageElement | null) => {
-    if (!img || sawFirstFrame.current) return;
-    if (img.complete && img.naturalWidth > 0) markLoaded();
+    if (!img || sawFirstFrame.current || !img.complete) return;
+    if (img.naturalWidth > 0) {
+      markLoaded();
+    } else if (!failed) {
+      setFailed(true);
+    }
   };
 
   // While a frame has failed the feed keeps retrying, more slowly (no 5 s
@@ -169,20 +174,21 @@ export function CamEmbed({
     return () => media.removeEventListener("change", update);
   }, []);
 
-  if (cam.embed_type === "youtube" && cam.youtube_id) {
-    return <StreamFeed id={cam.id} url={`https://www.youtube.com/embed/${cam.youtube_id}?autoplay=1&mute=1`} name={name} resortUrl={resortUrl} onLoad={handlePlayed} />;
+  const embedUrl = camEmbedSrc(cam);
+  if (cam.embed_type === "youtube" && embedUrl) {
+    return <StreamFeed id={cam.id} url={embedUrl} name={name} resortUrl={resortUrl} onLoad={handlePlayed} />;
   }
-  if (cam.embed_type === "iframe" && cam.embed_url) {
+  if (cam.embed_type === "iframe" && embedUrl) {
     // Palisades' Roundshot viewer is unusable on small screens; serve the still instead.
-    const isPalisadesRoundshot = /palisadestahoe\.roundshot\.com\/silverado/i.test(cam.embed_url);
+    const isPalisadesRoundshot = /palisadestahoe\.roundshot\.com\/silverado/i.test(embedUrl);
     if (isPalisadesRoundshot && !isDesktop) {
-      return <ImageFeed url="https://palisadestahoe.roundshot.com/cams/249" name={name} refreshMs={REFRESH_MS[variant]} allowFill={variant === "lightbox"} onLoaded={handlePlayed} />;
+      return <ImageFeed url="https://palisadestahoe.roundshot.com/cams/249/thumbnail" name={name} refreshMs={REFRESH_MS[variant]} allowFill={variant === "lightbox"} onLoaded={handlePlayed} />;
     }
-    return <StreamFeed id={cam.id} url={cam.embed_url} name={name} resortUrl={resortUrl} onLoad={handlePlayed} />;
+    return <StreamFeed id={cam.id} url={embedUrl} name={name} resortUrl={resortUrl} onLoad={handlePlayed} />;
   }
 
-  if (cam.embed_type === "image" && cam.embed_url) {
-    return <ImageFeed url={cam.embed_url} name={name} refreshMs={REFRESH_MS[variant]} allowFill={variant === "lightbox"} onLoaded={handlePlayed} />;
+  if (cam.embed_type === "image" && embedUrl) {
+    return <ImageFeed url={embedUrl} name={name} refreshMs={REFRESH_MS[variant]} allowFill={variant === "lightbox"} onLoaded={handlePlayed} />;
   }
   return null;
 }

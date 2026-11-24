@@ -39,11 +39,13 @@ export const metadata: Metadata = {
     url: PAGE_URL,
     type: "website",
     siteName: "PeakCam",
+    images: [{ url: `${SITE_URL}/opengraph-image`, width: 1200, height: 630, alt: SHARE_TITLE }],
   },
   twitter: {
     card: "summary_large_image",
     title: SHARE_TITLE,
     description: `When does your mountain open? Projected and confirmed ${SEASON_LABEL} dates with live cams and opening-day alerts.`,
+    images: [`${SITE_URL}/opengraph-image`],
   },
 };
 

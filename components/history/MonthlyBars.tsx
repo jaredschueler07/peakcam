@@ -18,8 +18,8 @@ export function MonthlyBars({ months }: { months: MonthClimatologyPublic[] }) {
   const innerH = H - PAD.top - PAD.bottom;
   const slot = innerW / Math.max(1, shown.length);
   const barW = slot * 0.56;
-  const y = (v: number) => PAD.top + innerH - (v / max) * innerH;
   const yMax = Math.ceil(max / 10) * 10 || 10;
+  const y = (v: number) => PAD.top + innerH - (v / yMax) * innerH;
   const ticks = [0, Math.round(yMax / 2), yMax];
 
   return (
@@ -30,8 +30,8 @@ export function MonthlyBars({ months }: { months: MonthClimatologyPublic[] }) {
             <title id="monthly-bars-title">Average monthly snowfall, 30 winters, with the last ten winters marked</title>
             {ticks.map((t) => (
               <g key={t}>
-                <line x1={PAD.left} x2={W - PAD.right} y1={y((t / yMax) * max)} y2={y((t / yMax) * max)} stroke="#2a1f14" strokeOpacity={t === 0 ? 0.6 : 0.12} />
-                <text x={PAD.left - 8} y={y((t / yMax) * max) + 4} textAnchor="end" fontSize={11} fontFamily="ui-monospace, monospace" fill="#5a4330">
+                <line x1={PAD.left} x2={W - PAD.right} y1={y(t)} y2={y(t)} stroke="#2a1f14" strokeOpacity={t === 0 ? 0.6 : 0.12} />
+                <text x={PAD.left - 8} y={y(t) + 4} textAnchor="end" fontSize={11} fontFamily="ui-monospace, monospace" fill="#5a4330">
                   {t}
                 </text>
               </g>

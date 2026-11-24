@@ -127,7 +127,7 @@ const websiteLd = {
   name: "PeakCam",
   url: BASE_URL,
   description:
-    "Live webcams and sensor-measured snow reports for ski resorts across North and South America",
+    "Live webcams, sensor-measured snow reports, and weather-model snow forecasts for ski resorts across North and South America",
   potentialAction: {
     "@type": "SearchAction",
     target: {

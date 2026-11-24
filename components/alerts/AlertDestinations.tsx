@@ -118,17 +118,17 @@ export function AlertDestinations({ token, initialDestinations, feeds }: Props) 
   };
 
   const inputClass =
-    "w-full px-4 py-2.5 bg-surface border border-border rounded-lg text-text-base placeholder:text-text-muted outline-none focus:border-cyan/50 text-[16px] md:text-sm";
+    "w-full px-4 py-2.5 bg-cream-50 border-[1.5px] border-ink rounded-full text-ink placeholder:text-bark outline-none focus:border-alpen-dk text-[16px] md:text-sm";
 
   return (
     <section className="mb-8 space-y-6" aria-labelledby="alert-destinations-heading">
       {/* Webhooks */}
-      <div className="rounded-lg border border-border bg-surface px-4 py-4">
+      <div className="rounded-[18px] border-[1.5px] border-ink bg-cream-50 px-4 py-4 shadow-stamp-sm">
         <div className="flex items-center gap-2 mb-1">
-          <Webhook size={16} className="text-cyan" />
-          <h2 id="alert-destinations-heading" className="text-sm font-semibold text-text-base">Webhooks</h2>
+          <Webhook size={16} className="text-forest" />
+          <h2 id="alert-destinations-heading" className="text-sm font-semibold text-ink">Webhooks</h2>
         </div>
-        <p className="text-xs text-text-muted mb-4">
+        <p className="text-xs text-bark mb-4">
           Every powder alert is also POSTed as JSON to each URL below, signed with the Standard Webhooks
           headers (<code className="font-mono">webhook-id</code>, <code className="font-mono">webhook-timestamp</code>,{" "}
           <code className="font-mono">webhook-signature</code>). Three attempts per alert; a URL that fails ten
@@ -140,11 +140,11 @@ export function AlertDestinations({ token, initialDestinations, feeds }: Props) 
             {webhooks.map((d) => {
               const disabled = d.disabled_at !== null;
               return (
-                <li key={d.id} className="rounded-lg border border-border bg-surface2 px-3 py-2.5">
+                <li key={d.id} className="rounded-[12px] border border-ink/20 bg-cream px-3 py-2.5">
                   <div className="flex items-start gap-3">
                     <div className="flex-1 min-w-0">
-                      <p className="font-mono text-xs text-text-base break-all">{d.target}</p>
-                      <p className="text-[11px] text-text-muted mt-1">
+                      <p className="font-mono text-xs text-ink break-all">{d.target}</p>
+                      <p className="text-[11px] text-bark mt-1">
                         {disabled
                           ? `Disabled after ${d.failures} failed runs — remove it and add it again to re-enable.`
                           : d.last_delivered_at
@@ -154,7 +154,7 @@ export function AlertDestinations({ token, initialDestinations, feeds }: Props) 
                               : "No deliveries yet"}
                       </p>
                       {testResult?.id === d.id && (
-                        <p className={`text-[11px] mt-1 ${testResult.ok ? "text-green-500" : "text-red-400"}`}>{testResult.detail}</p>
+                        <p className={`text-[11px] mt-1 font-medium ${testResult.ok ? "text-forest" : "text-alpen-dk"}`}>{testResult.detail}</p>
                       )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
@@ -163,10 +163,10 @@ export function AlertDestinations({ token, initialDestinations, feeds }: Props) 
                           type="button"
                           onClick={() => testWebhook(d.id)}
                           disabled={busyId === d.id}
-                          className="flex items-center gap-1 text-xs text-text-subtle hover:text-cyan px-2 py-1.5 pointer-coarse:min-h-11 rounded transition-colors disabled:opacity-50"
+                          className="flex items-center gap-1 text-xs text-bark-dk hover:text-forest px-2 py-1.5 pointer-coarse:min-h-11 rounded transition-colors disabled:opacity-50"
                           aria-label={`Send a test delivery to ${d.target}`}
                         >
-                          {busyId === d.id ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                          {busyId === d.id ? <Loader2 size={13} className="motion-safe:animate-spin" /> : <Send size={13} />}
                           Test
                         </button>
                       )}
@@ -174,7 +174,7 @@ export function AlertDestinations({ token, initialDestinations, feeds }: Props) 
                         type="button"
                         onClick={() => removeWebhook(d.id)}
                         disabled={busyId === d.id}
-                        className="flex items-center gap-1 text-xs text-text-muted hover:text-red-400 px-2 py-1.5 pointer-coarse:min-h-11 rounded transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1 text-xs text-bark hover:text-alpen-dk px-2 py-1.5 pointer-coarse:min-h-11 rounded transition-colors disabled:opacity-50"
                         aria-label={`Remove webhook ${d.target}`}
                       >
                         <Trash2 size={13} />
@@ -184,18 +184,18 @@ export function AlertDestinations({ token, initialDestinations, feeds }: Props) 
                   </div>
 
                   {newSecret?.destinationId === d.id && (
-                    <div className="mt-3 rounded-md border border-cyan/40 bg-cyan/5 px-3 py-2.5">
-                      <p className="text-xs font-semibold text-text-base mb-1">Signing secret — shown once</p>
-                      <p className="text-[11px] text-text-muted mb-2">
+                    <div className="mt-3 rounded-[10px] border border-forest/40 bg-forest/10 px-3 py-2.5">
+                      <p className="text-xs font-semibold text-ink mb-1">Signing secret — shown once</p>
+                      <p className="text-[11px] text-bark mb-2">
                         Copy it now and store it with your receiver. PeakCam cannot show it again; if you lose it,
                         remove the webhook and add it back for a new one.
                       </p>
                       <div className="flex items-center gap-2">
-                        <code className="flex-1 font-mono text-xs text-text-base break-all select-all">{newSecret.secret}</code>
+                        <code className="flex-1 font-mono text-xs text-ink break-all select-all">{newSecret.secret}</code>
                         <button
                           type="button"
                           onClick={() => copy(`secret-${d.id}`, newSecret.secret)}
-                          className="flex items-center gap-1 text-xs text-cyan px-2 py-1.5 pointer-coarse:min-h-11 rounded hover:bg-cyan/10 shrink-0"
+                          className="flex items-center gap-1 text-xs text-forest font-semibold px-2 py-1.5 pointer-coarse:min-h-11 rounded hover:bg-forest/10 shrink-0"
                           aria-label="Copy signing secret"
                         >
                           {copied === `secret-${d.id}` ? <Check size={13} /> : <Copy size={13} />}
@@ -231,9 +231,9 @@ export function AlertDestinations({ token, initialDestinations, feeds }: Props) 
           <button
             type="submit"
             disabled={adding || !url.trim()}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 pointer-coarse:min-h-11 rounded-lg text-sm font-semibold bg-cyan text-bg hover:bg-cyan/90 transition-colors disabled:opacity-60 shrink-0"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 min-h-11 rounded-full border-[1.5px] border-ink text-sm font-bold bg-forest text-cream-50 hover:bg-forest-dk shadow-stamp-sm transition-colors disabled:opacity-60 shrink-0"
           >
-            {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            {adding ? <Loader2 size={14} className="motion-safe:animate-spin" /> : <Plus size={14} />}
             Add webhook URL
           </button>
         </form>
@@ -241,12 +241,12 @@ export function AlertDestinations({ token, initialDestinations, feeds }: Props) 
 
       {/* Feeds */}
       {feeds && (
-        <div className="rounded-lg border border-border bg-surface px-4 py-4">
+        <div className="rounded-[18px] border-[1.5px] border-ink bg-cream-50 px-4 py-4 shadow-stamp-sm">
           <div className="flex items-center gap-2 mb-1">
-            <Rss size={16} className="text-cyan" />
-            <h2 className="text-sm font-semibold text-text-base">Your feeds</h2>
+            <Rss size={16} className="text-forest" />
+            <h2 className="text-sm font-semibold text-ink">Your feeds</h2>
           </div>
-          <p className="text-xs text-text-muted mb-3">
+          <p className="text-xs text-bark mb-3">
             The same alerts as a feed: Atom for a reader or an agent that polls, iCal for a calendar of forecast
             storm windows. These links act as your login for this page — don&apos;t post them publicly.
           </p>
@@ -256,13 +256,13 @@ export function AlertDestinations({ token, initialDestinations, feeds }: Props) 
               { key: "ics", label: "Calendar (iCal)", value: feeds.ics },
             ].map((feed) => (
               <div key={feed.key} className="flex items-center gap-2">
-                <dt className="text-xs text-text-subtle w-28 shrink-0">{feed.label}</dt>
+                <dt className="text-xs text-bark-dk w-28 shrink-0">{feed.label}</dt>
                 <dd className="flex-1 min-w-0 flex items-center gap-2">
-                  <code className="flex-1 font-mono text-[11px] text-text-base truncate select-all" title={feed.value}>{feed.value}</code>
+                  <code className="flex-1 font-mono text-[11px] text-ink truncate select-all" title={feed.value}>{feed.value}</code>
                   <button
                     type="button"
                     onClick={() => copy(feed.key, feed.value)}
-                    className="flex items-center gap-1 text-xs text-cyan px-2 py-1.5 pointer-coarse:min-h-11 rounded hover:bg-cyan/10 shrink-0"
+                    className="flex items-center gap-1 text-xs text-forest font-semibold px-2 py-1.5 pointer-coarse:min-h-11 rounded hover:bg-forest/10 shrink-0"
                     aria-label={`Copy ${feed.label} URL`}
                   >
                     {copied === feed.key ? <Check size={13} /> : <Copy size={13} />}
@@ -275,7 +275,7 @@ export function AlertDestinations({ token, initialDestinations, feeds }: Props) 
         </div>
       )}
 
-      {error && <p className="text-red-400 text-sm">{error}</p>}
+      {error && <p className="text-alpen-dk font-medium text-sm">{error}</p>}
     </section>
   );
 }

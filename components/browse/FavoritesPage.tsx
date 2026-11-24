@@ -29,16 +29,16 @@ export function FavoritesPage({ resorts }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-bg">
+    <div className="min-h-screen pc-paper">
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} redirectTo="/favorites" source="favorites_page" heading="Save your mountains." />}
       <Header showSearch={false} />
 
       <main id="main-content" className="max-w-screen-2xl mx-auto px-4 py-8 md:px-8">
         <div className="mb-8">
-          <h1 className="font-display text-5xl md:text-6xl text-text-base mb-2">
+          <h1 className="font-display text-5xl md:text-6xl text-ink mb-2">
             MY FAVORITES
           </h1>
-          <p className="text-text-subtle text-lg">
+          <p className="text-bark-dk text-lg">
             Quick access to your saved resorts
           </p>
         </div>
@@ -46,39 +46,39 @@ export function FavoritesPage({ resorts }: Props) {
         {!loaded ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-80 bg-surface border border-border rounded-lg animate-pulse" />
+              <div key={i} className="h-80 bg-cream-50 border border-ink/20 rounded-[18px] motion-safe:animate-pulse" />
             ))}
           </div>
         ) : !user ? (
           <div className="flex flex-col items-center justify-center py-24 gap-6 text-center">
-            <div className="w-16 h-16 rounded-full bg-alpenglow/10 border border-alpenglow/30 flex items-center justify-center">
-              <Heart size={28} className="text-alpenglow" />
+            <div className="w-16 h-16 rounded-full bg-alpen/10 border border-alpen/30 flex items-center justify-center">
+              <Heart size={28} className="text-alpen-dk" />
             </div>
             <div>
-              <p className="text-text-base font-semibold text-lg mb-1">Sign in to save favorites</p>
-              <p className="text-text-muted text-sm max-w-sm">
+              <p className="text-ink font-semibold text-lg mb-1">Sign in to save favorites</p>
+              <p className="text-bark text-sm max-w-sm">
                 Bookmark your go-to resorts and check conditions at a glance.
               </p>
             </div>
             <Link
               href="/auth?next=/favorites"
-              className="px-6 py-3 rounded-lg border border-cyan/30 bg-cyan/10 text-cyan font-semibold text-sm hover:bg-cyan/20 transition-all duration-200"
+              className="px-6 py-3 rounded-full border-[1.5px] border-ink bg-forest text-cream-50 font-semibold text-sm shadow-stamp-sm hover:shadow-stamp transition-all duration-200"
             >
               Sign in
             </Link>
           </div>
         ) : favoriteResorts.length === 0 ? (
-          <div className="bg-surface border border-border rounded-xl p-12 text-center">
-            <div className="w-16 h-16 rounded-full bg-surface2 border border-border flex items-center justify-center mx-auto mb-4">
-              <Heart size={28} className="text-text-muted" />
+          <div className="bg-cream-50 border-[1.5px] border-ink rounded-[18px] shadow-stamp-sm p-12 text-center">
+            <div className="w-16 h-16 rounded-full bg-cream border border-ink/20 flex items-center justify-center mx-auto mb-4">
+              <Heart size={28} className="text-bark" />
             </div>
-            <h2 className="text-text-base font-semibold text-lg mb-2">No favorites yet</h2>
-            <p className="text-text-muted text-sm mb-4 max-w-md mx-auto">
+            <h2 className="text-ink font-semibold text-lg mb-2">No favorites yet</h2>
+            <p className="text-bark text-sm mb-4 max-w-md mx-auto">
               Tap the heart icon on any resort card to save it here for quick access.
             </p>
             <Link
               href="/"
-              className="text-cyan text-sm hover:underline"
+              className="text-alpen-dk font-semibold text-sm hover:underline"
             >
               Browse resorts
             </Link>

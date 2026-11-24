@@ -22,7 +22,12 @@ const UUID_RE =
 // Matches the secure-context fallback pattern from ConditionVoter.
 function getOrCreateSessionId(): string {
   if (typeof window === "undefined") return "";
-  let id = window.localStorage.getItem(SESSION_KEY);
+  let id: string | null = null;
+  try {
+    id = window.localStorage.getItem(SESSION_KEY);
+  } catch {
+    id = null;
+  }
   if (id && UUID_RE.test(id)) return id;
   id =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"

@@ -42,8 +42,15 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     description,
     keywords: [`${page.hub.label} snow report`, `${page.hub.label} ski conditions`, `${page.hub.label} base depth`, `${page.hub.label} new snow`, "ski resort snow report by state"],
     alternates: { canonical: page.pageUrl, types: { "text/markdown": page.markdownUrl } },
-    openGraph: { type: "website", url: page.pageUrl, title, description, siteName: "PeakCam" },
-    twitter: { card: "summary_large_image", title, description },
+    openGraph: {
+      type: "website",
+      url: page.pageUrl,
+      title,
+      description,
+      siteName: "PeakCam",
+      images: [{ url: `${SITE_URL}/opengraph-image`, width: 1200, height: 630, alt: title }],
+    },
+    twitter: { card: "summary_large_image", title, description, images: [`${SITE_URL}/opengraph-image`] },
   };
 }
 

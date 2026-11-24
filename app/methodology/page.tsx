@@ -16,6 +16,14 @@ export const metadata: Metadata = {
     description:
       "SNOTEL telemetry, quality control, 30-year normals, and honest limits — the full data pipeline behind every snow number on PeakCam.",
     siteName: "PeakCam",
+    images: [{ url: `${SITE_URL}/opengraph-image`, width: 1200, height: 630, alt: "How PeakCam Measures Snow" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "How PeakCam Measures Snow",
+    description:
+      "SNOTEL telemetry, quality control, 30-year normals, and honest limits — the full data pipeline behind every snow number on PeakCam.",
+    images: [`${SITE_URL}/opengraph-image`],
   },
 };
 

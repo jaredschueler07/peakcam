@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Compass, Map, Snowflake, Columns2, Mountain } from "lucide-react";
 import { POPULAR_RESORTS } from "@/lib/popular-resorts";
-import { isDropInEnabled } from "@/lib/drop-in";
+import { isDropInEnabled } from "@/lib/drop-in-flag";
 
 /**
  * Global 404.

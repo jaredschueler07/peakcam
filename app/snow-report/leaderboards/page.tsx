@@ -24,8 +24,15 @@ export const metadata: Metadata = {
   description: DESCRIPTION,
   alternates: { canonical: PAGE_URL },
   keywords: ["ski resort snow rankings", "which ski resort has the most snow", "deepest base ski resort", "most powder days", "snowpack percent of normal"],
-  openGraph: { type: "website", url: PAGE_URL, title: TITLE, description: DESCRIPTION, siteName: "PeakCam" },
-  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
+  openGraph: {
+    type: "website",
+    url: PAGE_URL,
+    title: TITLE,
+    description: DESCRIPTION,
+    siteName: "PeakCam",
+    images: [{ url: `${SITE_URL}/opengraph-image`, width: 1200, height: 630, alt: TITLE }],
+  },
+  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: [`${SITE_URL}/opengraph-image`] },
 };
 
 interface Board {

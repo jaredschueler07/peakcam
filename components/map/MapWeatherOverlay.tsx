@@ -33,6 +33,7 @@ export default function MapWeatherOverlay({
           tiles={[frame.tileUrl]}
           tileSize={256}
           maxzoom={7}
+          attribution='Radar: <a href="https://www.rainviewer.com/">RainViewer</a>'
         >
           <Layer
             id={`weather-radar-layer-${frame.time}`}

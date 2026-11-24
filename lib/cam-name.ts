@@ -74,7 +74,9 @@ export function withResolvedCamNames<T extends NameableCam>(cams: T[]): T[] {
 export function camElevationFt(elevation: Cam["elevation"]): string | null {
   const raw = elevation?.trim();
   if (!raw) return null;
-  const feet = Number(raw);
+  const cleaned = raw.replace(/,/g, "").replace(/\s*(?:ft|′|')$/i, "").trim();
+  if (!cleaned) return null;
+  const feet = Number(cleaned);
   if (!Number.isFinite(feet) || feet <= 0) return null;
-  return `${feet.toLocaleString("en-US")}′`;
+  return `${Math.round(feet).toLocaleString("en-US")}′`;
 }

@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { reconcileDashboardWidgets } from "../hooks/useDashboard";
+import { AuthApiError, AuthRetryableFetchError, AuthSessionMissingError } from "@supabase/supabase-js";
+import { executeDashboardSync, isSignedOutAuthError, reconcileDashboardWidgets, type DashboardSyncStore } from "../hooks/useDashboard";
+import {
+  clampRglLayout,
+  colsForViewportWidth,
+  mergeBreakpointLayoutChange,
+  reconcileEditExitLayout,
+  widgetLayoutsEqual,
+} from "./dashboard-layout";
 import { selectDashboardCams } from "../components/dashboard/DashboardWidget";
 import type { Cam, UserFavorite, WidgetConfig } from "./types";
 
@@ -112,4 +120,122 @@ test("selectDashboardCams leaves card_preview=false cams out unless they are all
 
   assert.deepEqual(selectDashboardCams([flagged, editorial, flaggedIframe]).map((c) => c.id), ["editorial"]);
   assert.deepEqual(selectDashboardCams([flagged, flaggedIframe]).map((c) => c.id), ["wrong-view", "flagged-iframe"]);
+});
+
+test("a missing or rejected session is signed out, not a load error", () => {
+  // What supabase.auth.getUser() returns for a visitor who is not signed in.
+  assert.equal(isSignedOutAuthError(new AuthSessionMissingError()), true);
+  assert.equal(isSignedOutAuthError(new AuthApiError("invalid JWT", 403, "bad_jwt")), true);
+  assert.equal(isSignedOutAuthError(new AuthApiError("upstream", 503, undefined)), false);
+  assert.equal(isSignedOutAuthError(new AuthRetryableFetchError("Failed to fetch", 0)), false);
+  assert.equal(isSignedOutAuthError(null), false);
+});
+
+test("executeDashboardSync aborts without upserting when favorites or layout read errors", async () => {
+  let upsertCalls = 0;
+  const makeStore = (over: Partial<DashboardSyncStore>): DashboardSyncStore => ({
+    getUser: async () => ({ user: { id: "u1" } }),
+    fetchFavoritesAndLayout: async () => ({
+      favorites: [],
+      favoritesError: null,
+      layout: null,
+      layoutError: null,
+    }),
+    upsertLayout: async () => {
+      upsertCalls += 1;
+      return {};
+    },
+    resolveWidgets: async () => new Map(),
+    ...over,
+  });
+
+  const favErrRes = await executeDashboardSync(
+    makeStore({
+      fetchFavoritesAndLayout: async () => ({
+        favorites: [],
+        favoritesError: new Error("timeout"),
+        layout: { id: "layout-1", user_id: "u1", config: { widgets: [{ id: "alta", type: "resort", x: 0, y: 0, w: 4, h: 3 }] }, updated_at: "2026-01-01T00:00:00Z" },
+        layoutError: null,
+      }),
+    }),
+  );
+  assert.equal(favErrRes.status, "error");
+  assert.equal(upsertCalls, 0);
+
+  const layoutErrRes = await executeDashboardSync(
+    makeStore({
+      fetchFavoritesAndLayout: async () => ({
+        favorites: [{ id: "f1", user_id: "u1", item_type: "resort", item_id: "alta", created_at: "2026-01-01T00:00:00Z" }],
+        favoritesError: null,
+        layout: null,
+        layoutError: new Error("timeout"),
+      }),
+    }),
+  );
+  assert.equal(layoutErrRes.status, "error");
+  assert.equal(upsertCalls, 0);
+
+  const signedOutRes = await executeDashboardSync(
+    makeStore({ getUser: async () => ({ user: null }) }),
+  );
+  assert.equal(signedOutRes.status, "signed_out");
+
+  const okRes = await executeDashboardSync(
+    makeStore({
+      fetchFavoritesAndLayout: async () => ({
+        favorites: [{ id: "f1", user_id: "u1", item_type: "resort", item_id: "alta", created_at: "2026-01-01T00:00:00Z" }],
+        favoritesError: null,
+        layout: null,
+        layoutError: null,
+      }),
+    }),
+  );
+  assert.equal(okRes.status, "ok");
+  assert.equal(upsertCalls, 1);
+});
+
+test("dashboard-layout breakpoint helpers preserve wider desktop widths across smaller breakpoints", () => {
+  assert.equal(colsForViewportWidth(1400), 12);
+  assert.equal(colsForViewportWidth(1000), 10);
+  assert.equal(colsForViewportWidth(800), 6);
+  assert.equal(colsForViewportWidth(500), 4);
+  assert.equal(colsForViewportWidth(320), 2);
+
+  const clamped = clampRglLayout([{ i: "alta", x: 5, y: 0, w: 8, h: 3 }], 6);
+  assert.deepEqual(clamped, [{ i: "alta", x: 0, y: 0, w: 6, h: 3 }]);
+
+  const desktopWidgets: WidgetConfig[] = [
+    { id: "alta", type: "resort", x: 2, y: 0, w: 8, h: 4 },
+  ];
+  const mergedFromSm = mergeBreakpointLayoutChange(
+    desktopWidgets,
+    [{ i: "alta", x: 0, y: 2, w: 6, h: 4 }],
+    6,
+  );
+  assert.equal(mergedFromSm[0].w, 8);
+  assert.equal(mergedFromSm[0].x, 2);
+  assert.equal(mergedFromSm[0].y, 2);
+
+  // Explicit shrink below activeCols IS honored
+  const explicitShrink = mergeBreakpointLayoutChange(
+    desktopWidgets,
+    [{ i: "alta", x: 0, y: 2, w: 4, h: 4 }],
+    6,
+  );
+  assert.equal(explicitShrink[0].w, 4);
+
+  const reconciledExit = reconcileEditExitLayout(
+    [{ id: "alta", type: "resort", x: 0, y: 0, w: 6, h: 4 }],
+    [
+      { id: "alta", type: "resort", x: 0, y: 0, w: 4, h: 3 },
+      { id: "vail", type: "resort", x: 4, y: 0, w: 4, h: 3 },
+    ],
+    true,
+  );
+  assert.deepEqual(reconciledExit, [
+    { id: "alta", type: "resort", x: 0, y: 0, w: 6, h: 4 },
+    { id: "vail", type: "resort", x: 4, y: 0, w: 4, h: 3 },
+  ]);
+  assert.equal(widgetLayoutsEqual(desktopWidgets, [{ id: "alta", type: "resort", x: 2, y: 0, w: 8, h: 4 }]), true);
+  assert.equal(widgetLayoutsEqual(desktopWidgets, explicitShrink), false);
 });

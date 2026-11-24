@@ -57,6 +57,85 @@ export function reconcileDashboardWidgets(
   return syncedWidgets;
 }
 
+/**
+ * `auth.getUser()` reports "nobody is signed in" as an error
+ * (`AuthSessionMissingError`), and a revoked or expired session as a 4xx from
+ * the auth server. Both mean signed out, which shows the sign-in prompt; only
+ * a transport failure or a 5xx is a real "could not verify" error.
+ */
+export function isSignedOutAuthError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const e = error as { name?: unknown; status?: unknown };
+  if (e.name === "AuthSessionMissingError") return true;
+  return e.name === "AuthApiError" && (e.status === 400 || e.status === 401 || e.status === 403);
+}
+
+export interface DashboardSyncStore {
+  getUser(): Promise<{ user: { id: string } | null; error?: unknown }>;
+  fetchFavoritesAndLayout(userId: string): Promise<{
+    favorites: UserFavorite[] | null;
+    favoritesError: unknown;
+    layout: DashboardLayout | null;
+    layoutError: unknown;
+  }>;
+  upsertLayout(userId: string, widgets: WidgetConfig[]): Promise<{ error?: unknown }>;
+  resolveWidgets(widgets: WidgetConfig[]): Promise<Map<string, ResolvedWidget>>;
+}
+
+export type DashboardSyncResult =
+  | { status: "signed_out" }
+  | { status: "error"; message: string }
+  | { status: "ok"; userId: string; widgets: WidgetConfig[]; resolved: Map<string, ResolvedWidget>; persisted: boolean };
+
+/**
+ * Pure orchestration for `useDashboard` syncs. Aborts before reconciling or
+ * upserting when either Supabase read fails so transient outages can never
+ * overwrite a user's saved `dashboard_layouts` row with `[]`.
+ */
+export async function executeDashboardSync(store: DashboardSyncStore): Promise<DashboardSyncResult> {
+  let user: { id: string } | null = null;
+  try {
+    const auth = await store.getUser();
+    if (auth.error) {
+      return { status: "error", message: "Could not verify your session right now." };
+    }
+    user = auth.user;
+  } catch {
+    return { status: "error", message: "Could not verify your session right now." };
+  }
+
+  if (!user) {
+    return { status: "signed_out" };
+  }
+
+  const { favorites, favoritesError, layout, layoutError } = await store.fetchFavoritesAndLayout(user.id);
+  if (favoritesError || layoutError || !Array.isArray(favorites)) {
+    return {
+      status: "error",
+      message: "Couldn’t refresh your dashboard right now — your saved layout was left untouched.",
+    };
+  }
+
+  const rawWidgets = layout?.config?.widgets;
+  const existingWidgets = Array.isArray(rawWidgets) ? rawWidgets : [];
+  const syncedWidgets = reconcileDashboardWidgets(existingWidgets, favorites);
+  const resolved = await store.resolveWidgets(syncedWidgets);
+
+  let persisted = false;
+  if (JSON.stringify(syncedWidgets) !== JSON.stringify(existingWidgets)) {
+    const { error } = await store.upsertLayout(user.id, syncedWidgets);
+    persisted = !error;
+  }
+
+  return {
+    status: "ok",
+    userId: user.id,
+    widgets: syncedWidgets,
+    resolved,
+    persisted,
+  };
+}
+
 async function resolveWidgets(
   supabase: BrowserClient,
   widgets: WidgetConfig[],
@@ -167,56 +246,76 @@ export function useDashboard() {
   const [resolved, setResolved] = useState<Map<string, ResolvedWidget>>(() => new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const supabase = createSupabaseBrowserClient();
   // The user the dashboard was last synced for (null = signed out, undefined =
   // never synced). Auth events for the same user are no-ops; see below.
   const syncedUserId = useRef<string | null | undefined>(undefined);
+  const syncGenRef = useRef(0);
 
   const syncDashboard = useCallback(async () => {
+    const gen = ++syncGenRef.current;
     // Only the first load shows the page-level spinner. Later syncs (favorites
     // changed, refresh, account change) update the grid in place, because the
     // spinner unmounts DashboardGrid and with it the edit mode, list/grid
     // choice, cam switcher positions and any unsaved drag.
     if (syncedUserId.current === undefined) setIsLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    syncedUserId.current = user?.id ?? null;
-    if (!user) {
+
+    const result = await executeDashboardSync({
+      async getUser() {
+        const { data, error } = await supabase.auth.getUser();
+        if (!data.user && isSignedOutAuthError(error)) return { user: null };
+        return { user: data.user ? { id: data.user.id } : null, error };
+      },
+      async fetchFavoritesAndLayout(userId) {
+        const [favsResult, layoutResult] = await Promise.all([
+          supabase.from("user_favorites").select("*").eq("user_id", userId),
+          supabase.from("dashboard_layouts").select("*").eq("user_id", userId).maybeSingle(),
+        ]);
+        return {
+          favorites: (favsResult.data as UserFavorite[] | null) ?? null,
+          favoritesError: favsResult.error,
+          layout: (layoutResult.data as DashboardLayout | null) ?? null,
+          layoutError: layoutResult.error,
+        };
+      },
+      async upsertLayout(userId, nextWidgets) {
+        const { error } = await supabase
+          .from("dashboard_layouts")
+          .upsert({
+            user_id: userId,
+            config: { widgets: nextWidgets },
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "user_id" });
+        return { error };
+      },
+      resolveWidgets: (nextWidgets) => resolveWidgets(supabase, nextWidgets),
+    });
+
+    if (gen !== syncGenRef.current) return;
+
+    if (result.status === "signed_out") {
+      syncedUserId.current = null;
       setIsAuthenticated(false);
+      setLoadError(null);
       setWidgets([]);
       setResolved(new Map());
       setIsLoading(false);
       return;
     }
-    setIsAuthenticated(true);
 
-    // 1. Fetch favorites and current layout in parallel
-    const [favsResult, layoutResult] = await Promise.all([
-      supabase.from("user_favorites").select("*").eq("user_id", user.id),
-      supabase.from("dashboard_layouts").select("*").eq("user_id", user.id).maybeSingle(),
-    ]);
-
-    const favorites: UserFavorite[] = favsResult.data || [];
-    const layout: DashboardLayout | null = layoutResult.data;
-    const existingWidgets = layout?.config.widgets || [];
-
-    // 2. Reconcile while preserving the user's saved widget order
-    const syncedWidgets = reconcileDashboardWidgets(existingWidgets, favorites);
-
-    const resolvedMap = await resolveWidgets(supabase, syncedWidgets);
-    setWidgets(syncedWidgets);
-    setResolved(resolvedMap);
-    setIsLoading(false);
-
-    // 3. If reconciliation changed the widget list, save it back
-    if (JSON.stringify(syncedWidgets) !== JSON.stringify(existingWidgets)) {
-      await supabase
-        .from("dashboard_layouts")
-        .upsert({
-          user_id: user.id,
-          config: { widgets: syncedWidgets },
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "user_id" });
+    if (result.status === "error") {
+      setLoadError(result.message);
+      setIsLoading(false);
+      return;
     }
+
+    syncedUserId.current = result.userId;
+    setIsAuthenticated(true);
+    setLoadError(null);
+    setWidgets(result.widgets);
+    setResolved(result.resolved);
+    setIsLoading(false);
   }, [supabase]);
 
   useEffect(() => {
@@ -238,10 +337,11 @@ export function useDashboard() {
       void syncDashboard();
     });
     return () => {
+      syncGenRef.current += 1;
       subscription.unsubscribe();
       unsubscribeFavs();
     };
   }, [supabase, syncDashboard]);
 
-  return { widgets, resolved, isLoading, isAuthenticated, refresh: syncDashboard };
+  return { widgets, resolved, isLoading, isAuthenticated, loadError, refresh: syncDashboard };
 }

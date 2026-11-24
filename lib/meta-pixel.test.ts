@@ -110,3 +110,28 @@ test("pre-stub conversions replay exactly once after initialization", () => {
     ["track", "Lead", { content_name: "powder_alert_subscription" }],
   ]);
 });
+
+test("pixel snippet tolerates throwing fbq('init') and caps pre-stub queue at 50", () => {
+  const context = {
+    window: {} as Record<string, unknown>,
+    fbq: () => { throw new Error("blocked"); },
+    document: {
+      createElement: () => ({}),
+      getElementsByTagName: () => [{ parentNode: { insertBefore: () => {} } }],
+    },
+  };
+  context.window.fbq = context.fbq;
+  assert.doesNotThrow(() => runInNewContext(buildMetaPixelSnippet(FIXTURE_ID), context));
+
+  const calls: unknown[][] = [];
+  withPixelId(FIXTURE_ID, () => withPixel(undefined, () => {
+    for (let i = 0; i < 65; i++) {
+      fireMetaPixelEvent("ViewContent", { i });
+    }
+    window.fbq = (...args: unknown[]) => { calls.push(args); };
+    flushMetaPixelEvents();
+  }));
+  assert.equal(calls.length, 50);
+  assert.deepEqual(calls[0], ["track", "ViewContent", { i: 0 }]);
+  assert.deepEqual(calls[49], ["track", "ViewContent", { i: 49 }]);
+});

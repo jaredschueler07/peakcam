@@ -68,7 +68,7 @@ function OptionRow<T extends string>({
 }) {
   return (
     <div className="mb-3">
-      <p className="text-text-muted text-xs font-medium mb-2">{label}</p>
+      <p className="text-bark text-xs font-medium mb-2">{label}</p>
       <div className="flex flex-wrap gap-1.5">
         {options.map((opt) => {
           const Icon = opt.icon;
@@ -82,8 +82,8 @@ function OptionRow<T extends string>({
                 text-sm font-semibold border cursor-pointer select-none
                 transition-all duration-[220ms] whitespace-nowrap
                 ${selected === opt.value
-                  ? "border-cyan/30 bg-cyan-dim text-cyan"
-                  : "border-border bg-surface2 text-text-muted hover:border-border-hi hover:text-text-subtle"}
+                  ? "border-forest/40 bg-forest/10 text-forest"
+                  : "border-ink/20 bg-cream-dk text-bark hover:border-ink/40 hover:text-ink"}
               `}
             >
               <Icon size={16} />
@@ -196,31 +196,31 @@ export function UserConditionsForm({ resortId, resortSlug, onSubmitted }: Props)
         />
       )}
 
-      <div className="bg-surface border border-border rounded-xl p-5">
+      <div className="bg-cream-50 border border-ink/20 rounded-xl p-5">
         {/* Header */}
         <div className="flex items-center justify-between mb-1">
-          <h3 className="font-heading text-lg font-semibold uppercase tracking-wider text-text-base">
+          <h3 className="font-heading text-lg font-semibold uppercase tracking-wider text-ink">
             Detailed Conditions Report
           </h3>
           {!loadingUser && user && (
             <div className="flex items-center gap-2">
-              <span className="text-text-muted text-[11px] truncate max-w-[140px]">{user.email}</span>
+              <span className="text-bark text-[11px] truncate max-w-[140px]">{user.email}</span>
               <button
                 onClick={handleSignOut}
-                className="text-text-muted hover:text-text-subtle text-[11px] transition-colors underline"
+                className="text-bark hover:text-ink text-[11px] transition-colors underline"
               >
                 Sign out
               </button>
             </div>
           )}
         </div>
-        <p className="text-text-muted text-xs mb-4">Sign in for a full report with visibility, wind, and trail conditions.</p>
+        <p className="text-bark text-xs mb-4">Sign in for a full report with visibility, wind, and trail conditions.</p>
 
         {submitted ? (
           // Success
-          <div className="flex items-center gap-2 bg-cyan-dim border border-cyan/20 rounded-lg px-4 py-3">
-            <span className="w-2 h-2 rounded-full bg-cyan flex-shrink-0" />
-            <span className="text-cyan text-sm font-medium">Thanks! Your report has been submitted.</span>
+          <div className="flex items-center gap-2 bg-forest/10 border border-forest/25 rounded-lg px-4 py-3">
+            <span className="w-2 h-2 rounded-full bg-forest flex-shrink-0" />
+            <span className="text-forest text-sm font-medium">Thanks! Your report has been submitted.</span>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-0">
@@ -231,24 +231,24 @@ export function UserConditionsForm({ resortId, resortSlug, onSubmitted }: Props)
 
             {/* Notes */}
             <div className="mb-4 mt-1">
-              <p className="text-text-muted text-xs font-medium mb-2">Notes <span className="text-text-muted/60">(optional)</span></p>
+              <p className="text-bark text-xs font-medium mb-2">Notes <span className="text-bark/75">(optional)</span></p>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value.slice(0, 500))}
                 placeholder="Anything else riders should know? (e.g. grooming quality, hazards, lift lines)"
                 rows={2}
-                className="w-full bg-surface2 border border-border rounded-lg
-                  px-3 py-2.5 text-[16px] md:text-sm text-text-base placeholder:text-text-muted
+                className="w-full bg-cream border border-ink/25 rounded-lg
+                  px-3 py-2.5 text-[16px] md:text-sm text-ink placeholder:text-bark
                   outline-none resize-none transition-all duration-[220ms]
-                  focus:border-cyan focus:bg-surface3"
+                  focus:border-forest focus:bg-snow"
               />
               {notes.length > 400 && (
-                <p className="text-text-muted text-[11px] mt-1 text-right">{500 - notes.length} chars left</p>
+                <p className="text-bark text-[11px] mt-1 text-right">{500 - notes.length} chars left</p>
               )}
             </div>
 
             {error && (
-              <p className="text-poor text-xs font-medium mb-3">{error}</p>
+              <p className="text-alpen-dk text-xs font-medium mb-3">{error}</p>
             )}
 
             {/* CTA — prompts auth if not signed in */}
@@ -257,7 +257,7 @@ export function UserConditionsForm({ resortId, resortSlug, onSubmitted }: Props)
                 type="button"
                 onClick={event => { event.currentTarget.focus(); setShowAuthModal(true); }}
                 className="w-full rounded-lg px-4 py-3 min-h-[44px] text-sm font-semibold
-                  bg-cyan-dim border border-cyan/30 text-cyan hover:bg-cyan/20 cursor-pointer
+                  bg-forest/10 border border-forest/35 text-forest hover:bg-forest/20 cursor-pointer
                   transition-all duration-[220ms]"
               >
                 Sign in to Submit Report
@@ -270,8 +270,8 @@ export function UserConditionsForm({ resortId, resortSlug, onSubmitted }: Props)
                   w-full rounded-lg px-4 py-3 min-h-[44px] text-sm font-semibold
                   border transition-all duration-[220ms]
                   ${isReady && !submitting
-                    ? "bg-cyan-dim border-cyan/30 text-cyan hover:bg-cyan/20 cursor-pointer"
-                    : "bg-surface2 border-border text-text-muted cursor-not-allowed"}
+                    ? "bg-forest/10 border-forest/35 text-forest hover:bg-forest/20 cursor-pointer"
+                    : "bg-cream-dk border-ink/20 text-bark cursor-not-allowed"}
                 `}
               >
                 {submitting ? "Submitting…" : "Submit Report"}

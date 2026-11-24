@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAllResorts, getHubLiftsIndex } from "@/lib/supabase";
 import { Header } from "@/components/layout/Header";
@@ -102,8 +103,20 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
       "live ski cams",
     ],
     alternates: { canonical: pageUrl },
-    openGraph: { type: "website", url: pageUrl, title: shareTitle, description, siteName: "PeakCam" },
-    twitter: { card: "summary_large_image", title: shareTitle, description },
+    openGraph: {
+      type: "website",
+      url: pageUrl,
+      title: shareTitle,
+      description,
+      siteName: "PeakCam",
+      images: [{ url: `${pageUrl}/opengraph-image`, width: 1200, height: 630, alt: shareTitle }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: shareTitle,
+      description,
+      images: [`${pageUrl}/opengraph-image`],
+    },
   };
 }
 
@@ -122,6 +135,9 @@ export default async function HubPage({ params }: { params: Params }) {
   const offSeason = hubOffSeason(resorts, now);
   const summary = hubSummary(resorts);
   const table = sortHubTable(resorts);
+  const stormResorts = offSeason
+    ? []
+    : table.filter((r) => (r.snow_report?.new_snow_24h ?? 0) >= 6).slice(0, 4);
   const featured = featuredHubCams(resorts);
   // Only the fields the chooser renders cross to the browser: real snow and
   // cam counts, no emails, no cam URLs and no second copy of the catalog.
@@ -240,6 +256,26 @@ export default async function HubPage({ params }: { params: Params }) {
         <div className="mt-6">
           <HubSummaryStrip summary={summary} syncLabel={hubSyncLabel(resorts)} offSeason={offSeason} />
         </div>
+
+        {stormResorts.length > 0 && (
+          <div className="pc-on-ink mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[14px] border-[1.5px] border-ink bg-alpen px-4 py-3 text-cream-50 shadow-stamp-sm">
+            <span className="font-mono text-[11px] font-bold uppercase tracking-[0.14em]">
+              Storm watch
+            </span>
+            {stormResorts.map((r) => (
+              <Link
+                key={r.slug}
+                href={`/resorts/${r.slug}`}
+                className="text-sm font-semibold text-cream-50 underline-offset-2 hover:underline"
+              >
+                {r.name}{" "}
+                <span className="font-mono font-bold tabular-nums">
+                  +{r.snow_report!.new_snow_24h}&quot;
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
 
         <div className="mt-6">
           <HubAlertCta hub={hub} resorts={resorts} offSeason={offSeason} />

@@ -1,7 +1,24 @@
 /** App-facing compatibility facade for the Drop In pilot. */
 
 import { DROP_IN_GAME_PROFILES } from "./game/config/profiles";
-import type { DropInResortSlug } from "./game/config/schema";
+import {
+  DROP_IN_RESORT_SLUGS,
+  dropInDisabledResponse,
+  getDropInGameUrl,
+  getDropInHref,
+  isDropInEnabled,
+  isDropInResort,
+  type DropInResortSlug,
+} from "./drop-in-flag";
+
+export {
+  DROP_IN_RESORT_SLUGS,
+  dropInDisabledResponse,
+  getDropInGameUrl,
+  getDropInHref,
+  isDropInEnabled,
+  isDropInResort,
+};
 
 export interface DropInProfile {
   slug: string;
@@ -13,29 +30,6 @@ export interface DropInProfile {
   accent: string;
   trailNames: readonly string[];
 }
-
-/**
- * Production kill switch. Drop In is parked while the core product gets
- * focus (2026-09-17); the game code stays in the tree so the v3 engine branch
- * can keep merging cleanly. Set NEXT_PUBLIC_DROP_IN_ENABLED=true to bring back
- * every entry point (nav, resort/map buttons, hub, game pages, API routes,
- * sitemap) in one flip. Read at call time so tests can toggle it.
- */
-export function isDropInEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_DROP_IN_ENABLED === "true";
-}
-
-/** Uniform 404 for the Drop In API routes while the feature is parked. */
-export function dropInDisabledResponse(): Response {
-  return Response.json({ error: "Drop In is not available" }, { status: 404 });
-}
-
-/** The pilot roster. Order is intentional — Portillo shipped first. */
-export const DROP_IN_RESORT_SLUGS: readonly DropInResortSlug[] = [
-  "ski-portillo",
-  "breckenridge",
-  "heavenly",
-];
 
 function toPublicProfile(slug: DropInResortSlug): DropInProfile {
   const gameProfile = DROP_IN_GAME_PROFILES[slug];
@@ -75,19 +69,4 @@ export function getDropInProfile(slug: string): DropInProfile | null {
 export function getDropInRoster(): DropInProfile[] {
   if (!isDropInEnabled()) return [];
   return DROP_IN_RESORT_SLUGS.map((slug) => PROFILES[slug]).filter(Boolean);
-}
-
-/** Whether a resort is part of the Drop In pilot. */
-export function isDropInResort(slug: string): boolean {
-  return getDropInProfile(slug) !== null;
-}
-
-export function getDropInGameUrl(slug: string): string | null {
-  if (!isDropInResort(slug)) return null;
-  return getDropInHref(slug);
-}
-
-export function getDropInHref(slug: string): string | null {
-  if (!isDropInResort(slug)) return null;
-  return `/resorts/${slug}/drop-in`;
 }

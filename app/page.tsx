@@ -1,4 +1,5 @@
 import { hasFreshSnowForecast } from "@/lib/snow-forecast";
+import { availableCameras } from "@/lib/cam-preview";
 import { SITE_URL } from "@/lib/site";
 import { Suspense } from "react";
 import { getAllResorts, getLatestScoresIndex, getResortOpenings } from "@/lib/supabase";
@@ -49,11 +50,14 @@ export const metadata = {
       "Browse live webcams, real-time snow reports, and powder alerts for 300+ ski resorts across North & South America.",
     url: SITE_URL,
     type: "website" as const,
+    siteName: "PeakCam",
+    images: [{ url: `${SITE_URL}/opengraph-image`, width: 1200, height: 630, alt: "PeakCam — live ski resort webcams and snow reports" }],
   },
   twitter: {
     card: "summary_large_image" as const,
     title: "PeakCam — Live Ski Webcams & Snow Reports",
     description: "Real-time powder alerts, base depths, and live cams for 300+ ski resorts from the Rockies to the Andes.",
+    images: [`${SITE_URL}/opengraph-image`],
   },
 };
 
@@ -105,17 +109,17 @@ export default async function Home() {
     .slice(0, 8)
     .map((r) => ({ name: r.name.toUpperCase(), snow24h: r.snow_report!.new_snow_24h! }));
 
-  // Collect featured cams for the webcams section (first 4 active cams across top resorts)
+  // Collect featured cams for the webcams section (first 4 embeddable healthy cams)
   const featuredCams = resorts
-    .flatMap((r) => r.cams.filter((c) => c.is_active))
+    .flatMap((r) => availableCameras(r.cams).filter((c) => c.embed_type !== "link"))
     .slice(0, 4);
 
-  // Snow cams — resorts with a fresh hourly snow forecast, pick best cam per resort
+  // Snow cams — resorts with a fresh hourly snow forecast, pick best embeddable cam per resort
   const snowCams = resorts
     .filter((r) => hasFreshSnowForecast(r.snow_report))
     .map((r) => {
       // Prefer YouTube > iframe > image for best live experience
-      const activeCams = r.cams.filter((c) => c.is_active);
+      const activeCams = availableCameras(r.cams).filter((c) => c.embed_type !== "link");
       const best =
         activeCams.find((c) => c.embed_type === "youtube") ??
         activeCams.find((c) => c.embed_type === "iframe") ??
@@ -142,28 +146,30 @@ export default async function Home() {
   };
 
   return (
-    <main>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(resortListJsonLd) }}
-      />
-      <PeakHero resortCount={resorts.length} freshness={{ segments: freshness.segments }} />
-      <PowderTicker alerts={powderAlerts} />
-      <BrowsePage
-        resorts={resorts}
-        radarFrames={radarFrames}
-        featured={featured}
-        afterFeatured={<FeatureShowcase resort={pickShowcaseResort(resorts, scoreIndex, new Date())} />}
-      />
-      {snowCams.length > 0 && (
-        <Suspense fallback={<div className="h-96 animate-pulse bg-surface rounded-lg" />}>
-          <SnowCams snowCams={snowCams} />
+    <>
+      <main>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(resortListJsonLd) }}
+        />
+        <PeakHero resortCount={resorts.length} freshness={{ segments: freshness.segments }} />
+        <PowderTicker alerts={powderAlerts} />
+        <BrowsePage
+          resorts={resorts}
+          radarFrames={radarFrames}
+          featured={featured}
+          afterFeatured={<FeatureShowcase resort={pickShowcaseResort(resorts, scoreIndex, new Date())} />}
+        />
+        {snowCams.length > 0 && (
+          <Suspense fallback={<div className="h-96 motion-safe:animate-pulse bg-cream-50 rounded-lg" />}>
+            <SnowCams snowCams={snowCams} />
+          </Suspense>
+        )}
+        <Suspense fallback={<div className="h-96 motion-safe:animate-pulse bg-cream-50 rounded-lg" />}>
+          <LiveWebcams cams={featuredCams} resortCount={resorts.length} />
         </Suspense>
-      )}
-      <Suspense fallback={<div className="h-96 animate-pulse bg-surface rounded-lg" />}>
-        <LiveWebcams cams={featuredCams} resortCount={resorts.length} />
-      </Suspense>
+      </main>
       <PeakFooter />
-    </main>
+    </>
   );
 }

@@ -204,3 +204,14 @@ test("only completed accounts reach the Google signup conversion, without user p
     else process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL = previousLabel;
   }
 });
+
+test("track() ignores events without scheduling pending drain when NEXT_PUBLIC_POSTHOG_KEY is unset", async () => {
+  await withBrowserPostHog(async (calls) => {
+    Reflect.deleteProperty(process.env, "NEXT_PUBLIC_POSTHOG_KEY");
+    ph.__loaded = false;
+    track(EVENTS.RESORT_VIEWED, { resort_slug: "alta" });
+    ph.__loaded = true;
+    await sleep(250);
+    assert.equal(calls.length, 0);
+  });
+});

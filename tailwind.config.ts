@@ -83,27 +83,6 @@ const config: Config = {
         success: "#3c5a3a",
         warning: "#e2a740",
         danger:  "#a93f20",
-
-        // ── Legacy/back-compat surfaces remapped to paper ──
-        bg:          "#f1e7cf",   // cream
-        surface:     "#faf4e6",   // cream-50
-        surface2:    "#e3d5b2",   // cream-dk
-        surface3:    "#c9b896",   // deeper cream
-        border:      "rgba(42, 31, 20, 0.15)",
-        "border-hi": "rgba(42, 31, 20, 0.3)",
-
-        // Text hierarchy — ink → bark → bark-50
-        // (`text-muted` tracks bark/--pc-bark; darkened for WCAG AA.)
-        "text-base":   "#2a1f14",
-        "text-subtle": "#4a3620",
-        "text-muted":  "#63482d",
-
-        // ── Legacy cyan remapped to forest for any stragglers ──
-        cyan: {
-          DEFAULT: "#3c5a3a",
-          dim:     "rgba(60, 90, 58, 0.1)",
-          mid:     "rgba(60, 90, 58, 0.2)",
-        },
       },
       borderRadius: {
         sm:      "4px",

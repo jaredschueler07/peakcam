@@ -5,7 +5,26 @@ import { Responsive, WidthProvider } from "react-grid-layout/legacy";
 import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { type WidgetConfig, type ResolvedWidget } from "@/lib/types";
+import {
+  BREAKPOINTS,
+  COLS,
+  clampRglLayout,
+  colsForViewportWidth,
+  mergeBreakpointLayoutChange,
+  reconcileEditExitLayout,
+  widgetLayoutsEqual,
+  type RglLayoutItem,
+} from "@/lib/dashboard-layout";
 import { DashboardWidget } from "./DashboardWidget";
+
+export {
+  clampRglLayout,
+  colsForViewportWidth,
+  mergeBreakpointLayoutChange,
+  reconcileEditExitLayout,
+  widgetLayoutsEqual,
+  type RglLayoutItem,
+};
 
 // Import styles (standard for react-grid-layout)
 import "react-grid-layout/css/styles.css";
@@ -34,63 +53,23 @@ export function DashboardGrid({
   const [saveError, setSaveError] = useState<string | null>(null);
   const saveQueue = useRef(Promise.resolve());
   const [isEditMode, setIsEditMode] = useState(false);
+  const activeColsRef = useRef<number>(COLS.lg);
+  const editedDuringSession = useRef(false);
   const supabase = createSupabaseBrowserClient();
 
   useEffect(() => {
     const query = window.matchMedia("(max-width: 767px)");
-    const sync = () => setCompact(query.matches);
-    sync(); query.addEventListener("change", sync);
+    const sync = () => {
+      setCompact(query.matches);
+      activeColsRef.current = colsForViewportWidth(window.innerWidth);
+    };
+    sync();
+    query.addEventListener("change", sync);
     return () => query.removeEventListener("change", sync);
   }, []);
+
   const ordered = [...layout].sort((a, b) => a.y - b.y || a.x - b.x);
   const useList = compact || listView;
-  const move = (id: string, step: number) => {
-    const from = ordered.findIndex(widget => widget.id === id), to = from + step;
-    if (to < 0 || to >= ordered.length) return;
-    const next = [...ordered];
-    [next[from], next[to]] = [next[to], next[from]];
-    let y = 0;
-    const placed = next.map(widget => { const result = { ...widget, x: 0, y }; y += widget.h; return result; });
-    setLayout(placed); saveLayout(placed);
-  };
-
-  const appliedLayout = useRef(initialLayout);
-  // refresh() replaces initialLayout; skip during edit so in-progress drags are not clobbered.
-  useEffect(() => {
-    if (isEditMode || appliedLayout.current === initialLayout) return;
-    appliedLayout.current = initialLayout;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync from parent, not an external store
-    setLayout(initialLayout);
-  }, [initialLayout, isEditMode]);
-
-  // Map our WidgetConfig to RGL Layout format
-  const rglLayout = useMemo(() => {
-    return layout.map(w => ({
-      i: w.id,
-      x: w.x,
-      y: w.y,
-      w: w.w,
-      h: w.h,
-    }));
-  }, [layout]);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const onLayoutChange = (currentLayout: any) => {
-    // Only update if we're in edit mode to prevent accidental shifts during load
-    if (!isEditMode) return;
-
-    const updatedWidgets = layout.map(w => {
-      const match = (currentLayout as Array<{ i: string; x: number; y: number; w: number; h: number }>)
-        .find(l => l.i === w.id);
-      if (match) {
-        return { ...w, x: match.x, y: match.y, w: match.w, h: match.h };
-      }
-      return w;
-    });
-
-    setLayout(updatedWidgets);
-    saveLayout(updatedWidgets);
-  };
 
   const saveLayout = (updatedWidgets: WidgetConfig[]) => {
     // Serialize writes so fast reorder taps cannot save an older order last.
@@ -104,9 +83,72 @@ export function DashboardGrid({
     }).catch(() => setSaveError("Couldn’t save your layout. Check your connection and try again."));
   };
 
+  const move = (id: string, step: number) => {
+    const from = ordered.findIndex(widget => widget.id === id), to = from + step;
+    if (to < 0 || to >= ordered.length) return;
+    const next = [...ordered];
+    [next[from], next[to]] = [next[to], next[from]];
+    let y = 0;
+    const placed = next.map(widget => { const result = { ...widget, x: 0, y }; y += widget.h; return result; });
+    editedDuringSession.current = true;
+    setLayout(placed);
+    saveLayout(placed);
+  };
+
+  const appliedLayout = useRef(initialLayout);
+  // refresh() replaces initialLayout; skip during edit so in-progress drags are not clobbered.
+  useEffect(() => {
+    if (isEditMode || appliedLayout.current === initialLayout) return;
+    appliedLayout.current = initialLayout;
+    const next = reconcileEditExitLayout(layout, initialLayout, editedDuringSession.current);
+    editedDuringSession.current = false;
+    setLayout(next);
+  }, [initialLayout, isEditMode, layout]);
+
+  // Map our WidgetConfig to RGL Layout format across all breakpoints
+  const rglLayouts = useMemo(() => {
+    const lg: RglLayoutItem[] = layout.map(w => ({
+      i: w.id,
+      x: w.x,
+      y: w.y,
+      w: w.w,
+      h: w.h,
+    }));
+    return {
+      lg,
+      md: clampRglLayout(lg, COLS.md),
+      sm: clampRglLayout(lg, COLS.sm),
+      xs: clampRglLayout(lg, COLS.xs),
+      xxs: clampRglLayout(lg, COLS.xxs),
+    };
+  }, [layout]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const onLayoutChange = (currentLayout: any) => {
+    // Only update if we're in edit mode to prevent accidental shifts during load
+    if (!isEditMode) return;
+    const updatedWidgets = mergeBreakpointLayoutChange(
+      layout,
+      currentLayout as RglLayoutItem[],
+      activeColsRef.current,
+    );
+    if (widgetLayoutsEqual(layout, updatedWidgets)) return;
+
+    editedDuringSession.current = true;
+    setLayout(updatedWidgets);
+    saveLayout(updatedWidgets);
+  };
+
+  const toggleEditMode = () => {
+    setIsEditMode((wasEditing) => {
+      if (!wasEditing) editedDuringSession.current = false;
+      return !wasEditing;
+    });
+  };
+
   return (
     <div className="relative min-h-[600px] w-full">
-      <div className="sticky top-[64px] z-30 -mx-2 px-2 py-2 mb-3 bg-bg/95 backdrop-blur-sm flex flex-wrap justify-end gap-2">
+      <div className="sticky top-[64px] z-30 -mx-2 px-2 py-2 mb-3 bg-cream/95 backdrop-blur-sm flex flex-wrap justify-end gap-2">
         {!compact && (
           <button
             className="min-h-11 rounded-full border-[1.5px] border-ink bg-cream-50 text-ink px-4 text-sm font-bold shadow-stamp-sm hover:shadow-stamp transition-shadow"
@@ -117,7 +159,7 @@ export function DashboardGrid({
           </button>
         )}
         <button
-          onClick={() => setIsEditMode(!isEditMode)}
+          onClick={toggleEditMode}
           className={`px-4 py-2 min-h-11 rounded-full text-[13px] font-semibold border-[1.5px] transition-[transform,box-shadow] duration-100 ${
             isEditMode
               ? "bg-alpen-dk text-cream-50 border-ink shadow-stamp hover:shadow-stamp-hover"
@@ -138,12 +180,15 @@ export function DashboardGrid({
         <div className="h-72" inert={isEditMode || undefined}><DashboardWidget widget={widget} resolved={resolved.get(widget.id)} isListView /></div>
       </section>)}</div> : <ResponsiveGridLayout
         className="layout"
-        layouts={{ lg: rglLayout }}
-        breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
-        cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
+        layouts={rglLayouts}
+        breakpoints={BREAKPOINTS}
+        cols={COLS}
         rowHeight={100}
         isDraggable={isEditMode}
         isResizable={isEditMode}
+        onBreakpointChange={(_bp, cols) => {
+          activeColsRef.current = cols;
+        }}
         onLayoutChange={onLayoutChange}
         draggableHandle=".drag-handle"
       >
@@ -175,7 +220,7 @@ export function DashboardGrid({
           </p>
           <p className="text-bark text-sm max-w-xs text-center">
             {isAuthenticated
-              ? "Tap the heart on a resort or camera to add it here."
+              ? "Tap the heart on a resort card or the star on a camera to add it here."
               : "Sign in to load your saved mountains and cameras, or tap the heart on any resort to start your dashboard."}
           </p>
           {!isAuthenticated && (

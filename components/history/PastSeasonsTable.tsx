@@ -5,6 +5,7 @@ const num = "font-mono text-[13px] font-bold tabular-nums";
 
 /** A 52-point weekly cumulative sparkline, scaled to the table's largest season. */
 function Sparkline({ values, max }: { values: number[]; max: number }) {
+  if (values.length <= 1) return null;
   const w = 104;
   const h = 24;
   const pts = values.map((v, i) => `${((i / (values.length - 1)) * w).toFixed(1)},${(h - (v / (max || 1)) * h).toFixed(1)}`);

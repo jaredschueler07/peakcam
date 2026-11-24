@@ -23,8 +23,15 @@ export const metadata: Metadata = {
   description: DESCRIPTION,
   alternates: { canonical: PAGE_URL },
   keywords: ["ikon pass snow report", "epic pass snow report", "mountain collective resorts snow", "indy pass resorts snow report", "which pass resort has the most snow"],
-  openGraph: { type: "website", url: PAGE_URL, title: TITLE, description: DESCRIPTION, siteName: "PeakCam" },
-  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
+  openGraph: {
+    type: "website",
+    url: PAGE_URL,
+    title: TITLE,
+    description: DESCRIPTION,
+    siteName: "PeakCam",
+    images: [{ url: `${SITE_URL}/opengraph-image`, width: 1200, height: 630, alt: TITLE }],
+  },
+  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: [`${SITE_URL}/opengraph-image`] },
 };
 
 export default async function PassesIndexPage() {

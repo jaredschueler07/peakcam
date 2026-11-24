@@ -1,4 +1,4 @@
-import { breadcrumbSchema, HISTORY_MS, MAX_BREADCRUMBS, type Breadcrumb, type BugAction } from "./schema";
+import { HISTORY_MS, MAX_BREADCRUMBS, parseBreadcrumb, type Breadcrumb, type BugAction } from "./diagnostics";
 
 /** Session-local bounded history. No timers, persistence, network, or per-frame hooks. */
 export class BugHistory {
@@ -11,9 +11,9 @@ export class BugHistory {
 
   record(action: BugAction, path: string, now: number, detail: Partial<Breadcrumb> = {}): void {
     if (action === this.lastAction && path === this.lastPath && now - this.lastAt < 1000) return;
-    const parsed = breadcrumbSchema.safeParse({ ...detail, ageMs: 0, action, path });
-    if (!parsed.success) return;
-    this.slots[this.cursor] = { at: now, crumb: parsed.data };
+    const parsed = parseBreadcrumb({ ...detail, ageMs: 0, action, path });
+    if (!parsed) return;
+    this.slots[this.cursor] = { at: now, crumb: parsed };
     this.cursor = (this.cursor + 1) % MAX_BREADCRUMBS;
     this.count = Math.min(this.count + 1, MAX_BREADCRUMBS);
     this.lastAt = now; this.lastAction = action; this.lastPath = path;

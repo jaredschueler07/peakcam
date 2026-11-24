@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { getResortBySlug, getLatestArchivedStill } from "@/lib/supabase";
+import { isOffSeason, OFF_SEASON_COLOR, parseConditionsString } from "@/lib/map-utils";
 import type { CamTimelineFrame } from "@/lib/cam-timeline";
 
 export const runtime = "nodejs";
@@ -35,14 +36,16 @@ export default async function OgImage({
     } catch {}
   }
 
+  const offSeason = resort ? isOffSeason(resort.lat, new Date()) : false;
   const condColor = resort
-    ? (COND_COLOR[resort.cond_rating] ?? "#60C8FF")
+    ? offSeason
+      ? OFF_SEASON_COLOR
+      : (COND_COLOR[resort.cond_rating] ?? "#60C8FF")
     : "#60C8FF";
   const snow = resort?.snow_report;
 
-  const conditionsNarrative = snow?.conditions 
-    ? (snow.conditions.includes("||") ? snow.conditions.split("||")[1] : snow.conditions) 
-    : null;
+  const { tags, narrative } = parseConditionsString(snow?.conditions);
+  const conditionsNarrative = narrative || (tags.length > 0 ? tags.join(" · ") : null);
 
   return new ImageResponse(
     (
@@ -258,7 +261,7 @@ export default async function OgImage({
               letterSpacing: "0.15em",
             }}
           >
-            {resort ? resort.cond_rating.toUpperCase() : "LIVE CAMS"}
+            {resort ? (offSeason ? "OFF-SEASON" : resort.cond_rating.toUpperCase()) : "LIVE CAMS"}
           </div>
 
           {/* Base depth */}

@@ -44,7 +44,12 @@ const comfortOptions: { value: ComfortLevel; label: string; icon: any }[] = [
 
 function getSessionId(): string {
   if (typeof window === "undefined") return "";
-  let id = localStorage.getItem("peakcam_session");
+  let id: string | null = null;
+  try {
+    id = localStorage.getItem("peakcam_session");
+  } catch {
+    id = null;
+  }
   if (!id) {
     // crypto.randomUUID() is only available in secure contexts (HTTPS or localhost).
     // Fall back to a Math.random-based UUIDv4 for LAN IP testing — this is just
@@ -56,7 +61,11 @@ function getSessionId(): string {
           const v = c === "x" ? r : (r & 0x3) | 0x8;
           return v.toString(16);
         });
-    localStorage.setItem("peakcam_session", id);
+    try {
+      localStorage.setItem("peakcam_session", id);
+    } catch {
+      /* private browsing / disabled storage — keep in-memory session id */
+    }
   }
   return id;
 }
@@ -69,10 +78,10 @@ function freshnessLabel(votes: number): string {
 }
 
 function freshnessColor(votes: number): string {
-  if (votes >= 20) return "bg-cyan";
+  if (votes >= 20) return "bg-forest";
   if (votes >= 10) return "bg-good";
   if (votes >= 3) return "bg-fair";
-  return "bg-text-muted";
+  return "bg-bark";
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -134,22 +143,22 @@ export function ConditionVoter({ resortId, resortSlug, liveConditions }: Props) 
   const hasSelection = snow !== null || comfort !== null;
 
   return (
-    <div className="bg-surface border border-border rounded-xl p-5">
+    <div className="bg-cream-50 border border-ink/20 rounded-xl p-5">
       {/* Header */}
-      <h3 className="font-heading text-lg font-semibold uppercase tracking-wider text-text-base mb-0.5">
+      <h3 className="font-heading text-lg font-semibold uppercase tracking-wider text-ink mb-0.5">
         Quick Conditions Vote
       </h3>
-      <p className="text-text-muted text-xs mb-3">Anonymous — no sign-in required.</p>
+      <p className="text-bark text-xs mb-3">Anonymous — no sign-in required.</p>
 
       {/* Live aggregated conditions */}
       {liveConditions && liveConditions.total_votes_12h > 0 && (
         <div className="flex items-center gap-2 mb-4">
           <span className={`w-2 h-2 rounded-full flex-shrink-0 ${freshnessColor(liveConditions.total_votes_12h)}`} />
-          <span className="text-text-subtle text-xs">
+          <span className="text-bark-dk text-xs">
             {liveConditions.total_votes_12h} skier{liveConditions.total_votes_12h !== 1 ? "s" : ""} report
             {liveConditions.total_votes_12h === 1 ? "s" : ""}:
             {liveConditions.top_snow_quality && (
-              <span className="text-cyan font-semibold ml-1 inline-flex items-center gap-1">
+              <span className="text-forest font-semibold ml-1 inline-flex items-center gap-1">
                 {(() => {
                   const Icon = snowOptions.find((o) => o.value === liveConditions.top_snow_quality)?.icon;
                   return Icon ? <Icon size={14} /> : null;
@@ -159,7 +168,7 @@ export function ConditionVoter({ resortId, resortSlug, liveConditions }: Props) 
             )}
             {liveConditions.top_snow_quality && liveConditions.top_comfort && " · "}
             {liveConditions.top_comfort && (
-              <span className="text-powder font-semibold inline-flex items-center gap-1">
+              <span className="text-forest font-semibold inline-flex items-center gap-1">
                 {(() => {
                   const Icon = comfortOptions.find((o) => o.value === liveConditions.top_comfort)?.icon;
                   return Icon ? <Icon size={14} /> : null;
@@ -168,7 +177,7 @@ export function ConditionVoter({ resortId, resortSlug, liveConditions }: Props) 
               </span>
             )}
           </span>
-          <span className="text-text-muted text-[10px] ml-auto whitespace-nowrap">
+          <span className="text-bark text-[10px] ml-auto whitespace-nowrap">
             {freshnessLabel(liveConditions.total_votes_12h)}
           </span>
         </div>
@@ -176,15 +185,15 @@ export function ConditionVoter({ resortId, resortSlug, liveConditions }: Props) 
 
       {/* Success state */}
       {submitted ? (
-        <div className="flex items-center gap-2 bg-cyan-dim border border-cyan/20 rounded-lg px-4 py-3 mt-2">
-          <span className="w-2 h-2 rounded-full bg-cyan flex-shrink-0" />
-          <span className="text-cyan text-sm font-medium">Thanks! Your report has been submitted.</span>
+        <div className="flex items-center gap-2 bg-forest/10 border border-forest/25 rounded-lg px-4 py-3 mt-2">
+          <span className="w-2 h-2 rounded-full bg-forest flex-shrink-0" />
+          <span className="text-forest text-sm font-medium">Thanks! Your report has been submitted.</span>
         </div>
       ) : (
         <>
           {/* Snow quality row */}
           <div className="mb-3">
-            <p className="text-text-muted text-xs font-medium mb-2">Snow Quality</p>
+            <p className="text-bark text-xs font-medium mb-2">Snow Quality</p>
             <div className="flex flex-wrap gap-1.5">
               {snowOptions.map((opt) => {
                 const Icon = opt.icon;
@@ -197,8 +206,8 @@ export function ConditionVoter({ resortId, resortSlug, liveConditions }: Props) 
                       text-sm font-semibold border cursor-pointer select-none
                       transition-all duration-[220ms] whitespace-nowrap
                       ${snow === opt.value
-                        ? "border-cyan/30 bg-cyan-dim text-cyan"
-                        : "border-border bg-surface2 text-text-muted hover:border-border-hi hover:text-text-subtle"}
+                        ? "border-forest/40 bg-forest/10 text-forest"
+                        : "border-ink/20 bg-cream-dk text-bark hover:border-ink/40 hover:text-ink"}
                     `}
                   >
                     <Icon size={16} />
@@ -211,7 +220,7 @@ export function ConditionVoter({ resortId, resortSlug, liveConditions }: Props) 
 
           {/* Comfort row */}
           <div className="mb-4">
-            <p className="text-text-muted text-xs font-medium mb-2">Comfort</p>
+            <p className="text-bark text-xs font-medium mb-2">Comfort</p>
             <div className="flex flex-wrap gap-1.5">
               {comfortOptions.map((opt) => {
                 const Icon = opt.icon;
@@ -224,8 +233,8 @@ export function ConditionVoter({ resortId, resortSlug, liveConditions }: Props) 
                       text-sm font-semibold border cursor-pointer select-none
                       transition-all duration-[220ms] whitespace-nowrap
                       ${comfort === opt.value
-                        ? "border-cyan/30 bg-cyan-dim text-cyan"
-                        : "border-border bg-surface2 text-text-muted hover:border-border-hi hover:text-text-subtle"}
+                        ? "border-forest/40 bg-forest/10 text-forest"
+                        : "border-ink/20 bg-cream-dk text-bark hover:border-ink/40 hover:text-ink"}
                     `}
                   >
                     <Icon size={16} />
@@ -238,7 +247,7 @@ export function ConditionVoter({ resortId, resortSlug, liveConditions }: Props) 
 
           {/* Error */}
           {error && (
-            <p className="text-poor text-xs font-medium mb-3">{error}</p>
+            <p className="text-alpen-dk text-xs font-medium mb-3">{error}</p>
           )}
 
           {/* Submit */}
@@ -249,8 +258,8 @@ export function ConditionVoter({ resortId, resortSlug, liveConditions }: Props) 
               w-full rounded-lg px-4 py-3 min-h-[44px] text-sm font-semibold
               border transition-all duration-[220ms]
               ${hasSelection && !submitting
-                ? "bg-cyan-dim border-cyan/30 text-cyan hover:bg-cyan/20 cursor-pointer"
-                : "bg-surface2 border-border text-text-muted cursor-not-allowed"}
+                ? "bg-forest/10 border-forest/35 text-forest hover:bg-forest/20 cursor-pointer"
+                : "bg-cream-dk border-ink/20 text-bark cursor-not-allowed"}
             `}
           >
             {submitting ? "Submitting..." : "Submit Report"}

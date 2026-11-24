@@ -6,6 +6,7 @@ import type { Cam } from "@/lib/types";
 import { CamReportButton } from "@/components/cam/CamReportButton";
 import { CamEmbed } from "@/components/cam/CamEmbed";
 import { camDisplayName, camElevationFt } from "@/lib/cam-name";
+import { camEmbedSrc, safeCamUrl } from "@/lib/cam-url";
 import { cameraPreview } from "@/lib/cam-preview";
 import { trackCamClick } from "@/lib/posthog";
 import { FavoriteButton } from "@/components/ui/FavoriteButton";
@@ -65,9 +66,9 @@ export function CamPlayer({
   const [stillFailed, setStillFailed] = useState(false);
   const onStill = still !== null && !stillFailed;
   const stillAlt = `${label} webcam at ${resortName}${elevation ? `, ${elevation}` : ""}`;
-  const titleClass = onStill ? "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]" : "text-text-subtle";
-  const subClass = onStill ? "text-white/85 drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]" : "text-bark";
-  const pillClass = onStill ? "border-white/80 bg-black/35 text-white" : "border-forest text-forest";
+  const titleClass = onStill ? "text-cream-50 drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]" : "text-ink";
+  const subClass = onStill ? "text-cream-50/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]" : "text-bark";
+  const pillClass = onStill ? "border-cream-50/80 bg-ink/50 text-cream-50" : "border-forest text-forest";
   const stillLayer = onStill ? (
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -83,41 +84,54 @@ export function CamPlayer({
     </>
   ) : null;
 
-  // Link-out cams — no embed available
-  if (cam.embed_type === "link") {
+  const externalUrl = safeCamUrl(cam.embed_url);
+  const embedSrc = camEmbedSrc(cam);
+
+  // Link-out cams — or iframe/image/youtube cams lacking a safe embeddable URL
+  if (cam.embed_type === "link" || !embedSrc) {
     return (
       <div className="relative group">
         <CamReportButton cam={cam} resortName={resortName} />
-        <a
-          href={cam.embed_url ?? "#"}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => trackCamClick(resortSlug, cam.name, cam.embed_type)}
-          className="flex flex-col items-center justify-center gap-3 bg-surface2 rounded-xl
-                     border border-border hover:border-border-hi aspect-video
-                     transition-all duration-220 hover:shadow-card-hover"
-        >
-          <div className="w-12 h-12 rounded-full bg-bg border border-border flex items-center justify-center
-                          group-hover:border-cyan group-hover:text-cyan text-text-muted transition-all duration-220">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
+        {externalUrl ? (
+          <a
+            href={externalUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => trackCamClick(resortSlug, cam.name, cam.embed_type)}
+            className="flex flex-col items-center justify-center gap-3 bg-cream-50 rounded-xl
+                       border border-ink/20 hover:border-ink/40 aspect-video
+                       transition-all duration-220 hover:shadow-stamp-sm"
+          >
+            <div className="w-12 h-12 rounded-full bg-cream border border-ink/20 flex items-center justify-center
+                            group-hover:border-forest group-hover:text-forest text-bark transition-all duration-220">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </div>
+            <div className="text-center px-4">
+              <p className="text-ink text-sm font-medium group-hover:text-forest transition-colors">
+                {label}
+              </p>
+              <p className="text-bark text-xs mt-0.5">Opens on resort website</p>
+            </div>
+          </a>
+        ) : (
+          <div
+            className="flex flex-col items-center justify-center gap-2 bg-cream-50 rounded-xl
+                       border border-ink/20 aspect-video px-4 text-center"
+          >
+            <p className="text-ink text-sm font-medium">{label}</p>
+            <p className="text-bark text-xs">Camera stream unavailable</p>
           </div>
-          <div className="text-center px-4">
-            <p className="text-text-subtle text-sm font-medium group-hover:text-cyan transition-colors">
-              {label}
-            </p>
-            <p className="text-text-muted text-xs mt-0.5">Opens on resort website</p>
-          </div>
-        </a>
+        )}
         <div className="absolute top-2 right-2 z-20">
           <FavoriteButton
             itemId={cam.id}
             itemType="cam"
             label={cam.name}
             variant="ghost"
-            className="bg-surface/50 backdrop-blur-sm"
+            className="bg-cream-50/75 backdrop-blur-sm"
             source="cam_save"
             authHeading={`Save ${label}.`}
             authNote="A free account keeps your saved cameras and mountains on every device."
@@ -130,7 +144,7 @@ export function CamPlayer({
   // Image cams — auto-refreshing snapshot
   if (cam.embed_type === "image") {
     return (
-      <div className="relative aspect-video bg-surface2 rounded-xl overflow-hidden border border-border group">
+      <div className="relative aspect-video bg-cream-50 rounded-xl overflow-hidden border border-ink/20 group">
         <CamReportButton cam={cam} resortName={resortName} />
         {!loaded ? (
           <>
@@ -138,11 +152,10 @@ export function CamPlayer({
             <button
               onClick={() => { setLoaded(true); trackCamClick(resortSlug, cam.name, cam.embed_type); }}
               className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-3
-                         hover:bg-white/5 transition-colors"
+                         hover:bg-ink/5 transition-colors"
             >
-              <div className="w-14 h-14 rounded-full bg-cyan/10 border border-cyan/30 flex items-center justify-center
-                              group-hover:bg-cyan/20 group-hover:border-cyan transition-all duration-220">
-                <svg className={`w-6 h-6 ${onStill ? "text-white" : "text-cyan"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-220 ${onStill ? "bg-ink/40 border border-cream-50/50 group-hover:bg-ink/60 group-hover:border-cream-50" : "bg-forest/10 border border-forest/30 group-hover:bg-forest/20 group-hover:border-forest"}`}>
+                <svg className={`w-6 h-6 ${onStill ? "text-cream-50" : "text-forest"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                     d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.91M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
                 </svg>
@@ -161,7 +174,7 @@ export function CamPlayer({
           </>
         ) : (
           <>
-            <CamEmbed cam={cam} resortSlug={resortSlug} variant="tile" resortUrl={resortUrl} />
+            <CamEmbed key={cam.id} cam={cam} resortSlug={resortSlug} variant="tile" resortUrl={resortUrl} />
             {onExpand && (
               <button
                 onClick={event => { event.currentTarget.focus(); onExpand(); }}
@@ -179,7 +192,7 @@ export function CamPlayer({
             itemType="cam"
             label={cam.name}
             variant="ghost"
-            className="bg-surface/50 backdrop-blur-sm"
+            className="bg-cream-50/75 backdrop-blur-sm"
             source="cam_save"
             authHeading={`Save ${label}.`}
             authNote="A free account keeps your saved cameras and mountains on every device."
@@ -191,7 +204,7 @@ export function CamPlayer({
 
   // YouTube + iframe — click-to-play
   return (
-    <div className="relative aspect-video bg-surface2 rounded-xl overflow-hidden border border-border group">
+    <div className="relative aspect-video bg-cream-50 rounded-xl overflow-hidden border border-ink/20 group">
       <CamReportButton cam={cam} resortName={resortName} />
       {/* Placeholder until user clicks */}
       {!loaded && (
@@ -200,11 +213,10 @@ export function CamPlayer({
           <button
             onClick={() => { setLoaded(true); trackCamClick(resortSlug, cam.name, cam.embed_type); }}
             className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-3
-                       hover:bg-white/5 transition-colors"
+                       hover:bg-ink/5 transition-colors"
           >
-            <div className="w-14 h-14 rounded-full bg-cyan/10 border border-cyan/30 flex items-center justify-center
-                            group-hover:bg-cyan/20 group-hover:border-cyan transition-all duration-220">
-              <svg className={`w-6 h-6 ml-0.5 ${onStill ? "text-white" : "text-cyan"}`} fill="currentColor" viewBox="0 0 24 24">
+            <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-220 ${onStill ? "bg-ink/40 border border-cream-50/50 group-hover:bg-ink/60 group-hover:border-cream-50" : "bg-forest/10 border border-forest/30 group-hover:bg-forest/20 group-hover:border-forest"}`}>
+              <svg className={`w-6 h-6 ml-0.5 ${onStill ? "text-cream-50" : "text-forest"}`} fill="currentColor" viewBox="0 0 24 24">
                 <path d="M8 5v14l11-7z" />
               </svg>
             </div>
@@ -215,7 +227,7 @@ export function CamPlayer({
               )}
               <span className={`mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
                                border-[1.5px] ${pillClass} text-[11px] font-semibold uppercase tracking-wider`}>
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-[livePulse_2s_ease-in-out_infinite]" />
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-alpen motion-safe:animate-[livePulse_2s_ease-in-out_infinite]" />
                 Tap to load live cam
               </span>
             </div>
@@ -224,7 +236,7 @@ export function CamPlayer({
       )}
 
       {/* Actual embed */}
-      {loaded && <CamEmbed cam={cam} resortSlug={resortSlug} variant="tile" resortUrl={resortUrl} />}
+      {loaded && <CamEmbed key={cam.id} cam={cam} resortSlug={resortSlug} variant="tile" resortUrl={resortUrl} />}
 
       {/* Expand to fullscreen (overlay) */}
       {loaded && onExpand && (
@@ -244,7 +256,7 @@ export function CamPlayer({
           itemType="cam"
           label={cam.name}
           variant="ghost"
-          className="bg-surface/50 backdrop-blur-sm"
+          className="bg-cream-50/75 backdrop-blur-sm"
           source="cam_save"
           authHeading={`Save ${label}.`}
           authNote="A free account keeps your saved cameras and mountains on every device."

@@ -85,16 +85,16 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
   const [cameraIndex, setCameraIndex] = useState<number | null>(null);
   const closeCamera = useCallback(() => setCameraIndex(null), []);
   const openCamera = (id?: string) => { if (cams.length) setCameraIndex(Math.max(0, cams.findIndex(cam => cam.id === id))); };
-  const isFresh = snow24h >= 8;
+  // Off-season (display heuristic, matches the map): the rating engine's
+  // "poor" is meaningless in the local summer — show a neutral chip instead,
+  // and suppress fresh/snowing/trend/outlook/pctNormal badges. Lazy-initialized
+  // so the impure new Date() runs once per mount, not on every grid re-render.
+  const [offSeason] = useState(() => isOffSeason(resort.lat, new Date()));
+  const isFresh = !offSeason && snow24h >= 8;
   const cond = resort.cond_rating ? conditionColors[resort.cond_rating] : null;
   const pctNormal = snow?.pct_of_normal;
   const trend = snow?.trend_7d as SnowTrend | null;
   const outlook = snow?.outlook as SnowOutlook | null;
-  // Off-season (display heuristic, matches the map): the rating engine's
-  // "poor" is meaningless in the local summer — show a neutral chip instead,
-  // and suppress the snowing badge. Lazy-initialized so the impure new Date()
-  // runs once per mount, not on every hover-triggered grid re-render.
-  const [offSeason] = useState(() => isOffSeason(resort.lat, new Date()));
   const hasSnowForecast = hasFreshSnowForecast(snow, forecastTime ?? NaN) && !offSeason;
 
   return (
@@ -189,20 +189,28 @@ export function SummitResortCard({ resort, favorited, onToggleFavorite, animate 
                 ) : (
                   <span className="text-bark text-xs">&mdash;</span>
                 )}
-                {trend && <TrendBadge trend={trend} />}
+                {!offSeason && trend && <TrendBadge trend={trend} />}
                 {/* mustard-dk, not mustard: raw mustard is 1.74:1 on the cream
                     card — unreadable for an 11px readout. */}
-                {pctNormal != null && (
+                {!offSeason && pctNormal != null && (
                   <span className={`font-mono font-bold text-[11px] tabular-nums ${pctNormal >= 110 ? "text-forest" : pctNormal >= 90 ? "text-bark-dk" : pctNormal >= 70 ? "text-mustard-dk" : "text-alpen-dk"}`}>
                     {pctNormal}%
                   </span>
                 )}
-                {outlook && outlook !== "stable" && (
+                {!offSeason && outlook && outlook !== "stable" && (
                   <span title={outlookConfig[outlook].label} style={{ color: outlookConfig[outlook].color }} role="img" aria-label={outlookConfig[outlook].label}>
                     {(() => { const Icon = outlookConfig[outlook].icon; return <Icon size={13} strokeWidth={2.5} />; })()}
                   </span>
                 )}
               </div>
+              {snow?.source === "open_meteo" && (
+                <span
+                  className="font-mono text-[10px] uppercase tracking-[0.08em] text-bark"
+                  title="Weather-model estimate (no nearby station)"
+                >
+                  Model
+                </span>
+              )}
             </div>
           </div>
         </Link>

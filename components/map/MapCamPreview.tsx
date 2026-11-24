@@ -1,34 +1,36 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { Cam } from "@/lib/types";
 import { camDisplayName } from "@/lib/cam-name";
-import { cameraPreview } from "@/lib/cam-preview";
+import { cameraPreviews } from "@/lib/cam-preview";
 
 // Small live-cam thumbnail for the map's popup card and bottom sheet — the
-// "conditions + map + webcam in one view" piece. Previewable cams:
-//   image / live provider snapshot → cache-busted once on mount, badged "Live"
-//   youtube / captured still       → static preview frame, badged "Preview"
+// "conditions + map + webcam in one view" piece. Previewable cams honor
+// cameraPreviews ordering (`card_preview !== false`, `preview_rank`, health,
+// HTTPS, validated `youtube_id`), cache-busting direct image feeds once per mount.
+export function pickPreviewCandidates(
+  cams: Cam[],
+  cacheBust: number = Date.now(),
+): { cam: Cam; src: string; kind: "live" | "preview" }[] {
+  return cameraPreviews(cams).map((p) => {
+    if (p.cam.embed_type === "image" && p.label === "Camera still") {
+      const sep = p.src.includes("?") ? "&" : "?";
+      return { cam: p.cam, src: `${p.src}${sep}_t=${cacheBust}`, kind: "live" as const };
+    }
+    return {
+      cam: p.cam,
+      src: p.src,
+      kind: p.label === "Camera still" ? ("live" as const) : ("preview" as const),
+    };
+  });
+}
+
 export function pickPreview(
   cams: Cam[],
+  cacheBust: number = Date.now(),
 ): { cam: Cam; src: string; kind: "live" | "preview" } | null {
-  const active = cams.filter((c) => c.is_active && !c.auto_disabled);
-  const image = active.find((c) => c.embed_type === "image" && c.embed_url);
-  if (image) {
-    const sep = image.embed_url!.includes("?") ? "&" : "?";
-    return { cam: image, src: `${image.embed_url}${sep}_t=${Date.now()}`, kind: "live" };
-  }
-  for (const cam of active) {
-    const preview = cameraPreview(cam);
-    if (!preview) continue;
-    const isLiveStill = preview.label === "Camera still";
-    return {
-      cam,
-      src: preview.src,
-      kind: isLiveStill ? "live" : "preview",
-    };
-  }
-  return null;
+  return pickPreviewCandidates(cams, cacheBust)[0] ?? null;
 }
 
 interface MapCamPreviewProps {
@@ -46,10 +48,37 @@ export default function MapCamPreview({
   className = "",
 }: MapCamPreviewProps) {
   // Chosen once per mount — this is a glance, not a live player.
-  const preview = useMemo(() => pickPreview(cams), [cams]);
-  const [failed, setFailed] = useState(false);
+  const [cacheBust] = useState(() => Date.now());
+  const candidates = useMemo(
+    () => pickPreviewCandidates(cams, cacheBust),
+    [cams, cacheBust],
+  );
+  const [failedSrcs, setFailedSrcs] = useState<Set<string>>(() => new Set());
+  const preview = useMemo(
+    () => candidates.find((c) => !failedSrcs.has(c.src)) ?? null,
+    [candidates, failedSrcs],
+  );
 
-  if (!preview || failed) return null;
+  const markFailed = useCallback((src: string) => {
+    setFailedSrcs((prev) => {
+      if (prev.has(src)) return prev;
+      const next = new Set(prev);
+      next.add(src);
+      return next;
+    });
+  }, []);
+
+  const previewSrc = preview?.src ?? "";
+  const attachImg = useCallback(
+    (img: HTMLImageElement | null) => {
+      if (img && img.complete && img.naturalWidth === 0 && previewSrc) {
+        markFailed(previewSrc);
+      }
+    },
+    [markFailed, previewSrc],
+  );
+
+  if (!preview) return null;
 
   const camName = camDisplayName(preview.cam);
 
@@ -63,17 +92,19 @@ export default function MapCamPreview({
       {/* Plain <img>: cam hosts are arbitrary external domains (matches CamEmbed). */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
+        ref={attachImg}
+        key={preview.src}
         src={preview.src}
         alt={`${camName} webcam at ${resortName}`}
         className="h-24 w-full object-cover transition-transform duration-200 group-hover/cam:scale-[1.03]"
         loading="lazy"
-        onError={() => setFailed(true)}
+        onError={() => markFailed(preview.src)}
       />
       {/* Freshness badge — pulsing LIVE only for genuinely-fresh image
           snapshots; static YouTube thumbnails say "Preview". */}
       <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-ink/85 px-2 py-0.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.14em] text-cream-50">
         {preview.kind === "live" && (
-          <span className="h-1.5 w-1.5 rounded-full bg-alpen animate-livePulse" aria-hidden />
+          <span className="h-1.5 w-1.5 rounded-full bg-alpen motion-safe:animate-livePulse" aria-hidden />
         )}
         {preview.kind === "live" ? "Live" : "Preview"}
       </span>

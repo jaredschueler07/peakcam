@@ -49,12 +49,16 @@ export function CamReportButton({ cam, resortName }: Props) {
   useEffect(() => {
     const map = readReportedMap();
     const iso = map[cam.id];
-    if (!iso) return;
-    const t = Date.parse(iso);
-    if (!Number.isFinite(t)) return;
-    if (Date.now() - t < REPORT_COOLDOWN_MS) {
-      setStatus("alreadyReported");
+    if (!iso) {
+      setStatus("idle");
+      return;
     }
+    const t = Date.parse(iso);
+    if (!Number.isFinite(t) || Date.now() - t >= REPORT_COOLDOWN_MS) {
+      setStatus("idle");
+      return;
+    }
+    setStatus("alreadyReported");
   }, [cam.id]);
 
   const handleSubmitted = useCallback(() => {
