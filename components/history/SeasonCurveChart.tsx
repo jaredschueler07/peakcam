@@ -77,7 +77,7 @@ export function SeasonCurveChart({ season, points, band, lastSeason, normalYears
   return (
     <figure className="rounded-[18px] border-[1.5px] border-ink bg-cream-50 p-3 shadow-stamp sm:p-4">
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-labelledby="season-curve-title season-curve-desc" className="h-auto w-full">
-        <title id="season-curve-title">Season snowfall curve, {season.label}</title>
+        <title id="season-curve-title">{`Season snowfall curve, ${season.label}`}</title>
         <desc id="season-curve-desc">{desc}</desc>
         {yTicks.map((t) => (
           <g key={t}>
