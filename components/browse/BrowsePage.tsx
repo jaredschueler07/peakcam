@@ -21,13 +21,14 @@ import type { Quotable } from "@/lib/quotable";
 // on brand recognition / skier visits; SA heroes featured for Andes season.
 // Shared with the 404 page, so it can't live in this "use client" module.
 import { POPULAR_RANK } from "@/lib/popular-resorts";
+import { isOffSeason } from "@/lib/map-utils";
 import { trackSearch, trackFilter } from "@/lib/posthog";
 
 // MapLibre map — dynamic import, no SSR (requires window)
 const MapView = dynamic(() => import("@/components/map/MapView"), {
   ssr: false,
   loading: () => (
-    <div className="pc-topo h-full w-full animate-pulse rounded-[18px] border-[1.5px] border-ink flex items-center justify-center">
+    <div className="pc-topo h-full w-full motion-safe:animate-pulse rounded-[18px] border-[1.5px] border-ink flex items-center justify-center">
       <span className="font-mono text-bark text-xs uppercase tracking-[0.14em]">Loading map…</span>
     </div>
   ),
@@ -230,9 +231,9 @@ function AlertSignupBanner({ resorts }: { resorts: ResortWithData[] }) {
                         border-[1.5px] border-ink rounded-[18px] shadow-stamp mb-8">
           <div>
             <p className="font-display font-black text-lg leading-tight">
-              Never miss a <em className="text-mustard italic">pow day</em>.
+              Never miss a <em className="text-mustard italic">storm day</em>.
             </p>
-            <p className="text-cream-50/80 text-sm mt-1">Email alerts when your resorts hit your snow threshold.</p>
+            <p className="text-cream-50/80 text-sm mt-1">Free email alerts when fresh snow meets your threshold — no account required.</p>
           </div>
           <PowderAlertSignup resorts={resorts} />
         </div>
@@ -365,7 +366,7 @@ function PowderAlert({ resorts }: { resorts: ResortWithData[] }) {
        1.3:1 against it, so links inside get the cream ring (3.6:1) instead. */
     <div className="pc-on-ink flex items-center gap-3 px-5 py-3 bg-alpen text-cream-50 border-[1.5px] border-ink rounded-full shadow-stamp mb-8">
       <span className="relative flex h-3 w-3 shrink-0">
-        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cream-50 opacity-75" />
+        <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-cream-50 opacity-75" />
         <span className="relative inline-flex rounded-full h-3 w-3 bg-cream-50" />
       </span>
       <div className="flex items-center gap-3 flex-wrap">
@@ -391,16 +392,18 @@ function PowderAlert({ resorts }: { resorts: ResortWithData[] }) {
 
 function SouthernSeasonBanner({
   saCount,
+  offSeason,
   stateFilter,
   onFilterChile,
   onFilterArgentina,
 }: {
   saCount: number;
+  offSeason: boolean;
   stateFilter: string;
   onFilterChile: () => void;
   onFilterArgentina: () => void;
 }) {
-  if (saCount === 0) return null;
+  if (saCount === 0 || offSeason) return null;
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-4 mb-8
@@ -425,6 +428,7 @@ function SouthernSeasonBanner({
 
 export function BrowsePage({ resorts, radarFrames = [], featured = null, afterFeatured = null }: Props) {
   const [search, setSearch] = useState("");
+  const [southOffSeason] = useState(() => isOffSeason(-33, new Date()));
 
   // Header search on inner pages routes here as /?q=… (the resort list only
   // exists on this page). Read it from window.location on mount rather than
@@ -769,6 +773,7 @@ export function BrowsePage({ resorts, radarFrames = [], featured = null, afterFe
         <div className="order-last mt-8 md:order-first md:mt-0">
         <SouthernSeasonBanner
           saCount={saCount}
+          offSeason={southOffSeason}
           stateFilter={stateFilter}
           onFilterChile={() => {
             setStateFilter((s) => (s === "Chile" ? "All" : "Chile"));
@@ -809,7 +814,7 @@ export function BrowsePage({ resorts, radarFrames = [], featured = null, afterFe
                 <p className="font-display font-black text-2xl text-ink">No resorts found.</p>
                 <p className="text-sm mt-1 text-bark">Try a different search or clear your filters.</p>
                 <button
-                  onClick={() => { setSearch(""); setStateFilter("All"); setCondFilter("all"); setHasLiveCams(false); setFreshSnow(false); }}
+                  onClick={() => { setSearch(""); setStateFilter("All"); setCondFilter("all"); setHasLiveCams(false); setFreshSnow(false); setShowFavoritesOnly(false); }}
                   className="mt-4 inline-flex items-center gap-2 font-semibold text-[13px]
                              bg-ink text-cream-50 border-[1.5px] border-ink rounded-full px-4 py-2
                              shadow-stamp-sm hover:shadow-stamp hover:-translate-x-[1px] hover:-translate-y-[1px]

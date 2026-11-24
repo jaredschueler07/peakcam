@@ -47,6 +47,7 @@ function getMapStyle(apiKey: string | undefined): maplibregl.StyleSpecification 
   return {
     version: 8 as const,
     name: "carto-voyager",
+    glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
     sources: {
       "carto-voyager": {
         type: "raster" as const,
@@ -122,6 +123,10 @@ export default function MapView({
   className = "",
 }: MapViewProps) {
   const mapRef = useRef<MapRef>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => () => {
+    mountedRef.current = false;
+  }, []);
   const maptilerKey = process.env.NEXT_PUBLIC_MAPTILER_KEY;
   const mapStyle = useMemo(() => getMapStyle(maptilerKey), [maptilerKey]);
 
@@ -161,6 +166,10 @@ export default function MapView({
     setPrevNowIdx(nowFrameIdx);
     setRadarIdx(nowFrameIdx);
   }
+  const safeRadarIdx =
+    radarFrames.length > 0
+      ? Math.min(Math.max(radarIdx, 0), radarFrames.length - 1)
+      : 0;
 
   useEffect(() => {
     if (!radarPlaying || weatherLayer !== "radar" || radarFrames.length < 2) return;
@@ -173,13 +182,13 @@ export default function MapView({
 
   // "-40m" / "Now" / "+10m" label — active frame relative to the "now" frame.
   const radarLabel = useMemo(() => {
-    const frame = radarFrames[radarIdx];
+    const frame = radarFrames[safeRadarIdx];
     const nowFrame = radarFrames[nowFrameIdx];
     if (!frame || !nowFrame) return "";
     const diffMin = Math.round((frame.time - nowFrame.time) / 60);
     if (diffMin === 0) return "Now";
     return diffMin < 0 ? `${diffMin}m` : `+${diffMin}m`;
-  }, [radarFrames, radarIdx, nowFrameIdx]);
+  }, [radarFrames, safeRadarIdx, nowFrameIdx]);
   const [cursor, setCursor] = useState<string>("grab");
 
   // The in-map popup card is a desktop affordance; on smaller screens the
@@ -405,15 +414,20 @@ export default function MapView({
         const map = mapRef.current;
         if (!map) return;
 
-        const source = map.getSource("resorts") as maplibregl.GeoJSONSource;
-        source.getClusterExpansionZoom(clusterId).then((zoom: number) => {
-          const coords = (feature.geometry as GeoJSON.Point).coordinates;
-          map.flyTo({
-            center: [coords[0], coords[1]],
-            zoom,
-            duration: 800,
-          });
-        });
+        const source = map.getSource("resorts") as maplibregl.GeoJSONSource | undefined;
+        if (!source) return;
+        source
+          .getClusterExpansionZoom(clusterId)
+          .then((zoom: number) => {
+            if (!mountedRef.current || mapRef.current !== map) return;
+            const coords = (feature.geometry as GeoJSON.Point).coordinates;
+            map.flyTo({
+              center: [coords[0], coords[1]],
+              zoom,
+              duration: 800,
+            });
+          })
+          .catch(() => {});
         return;
       }
 
@@ -508,10 +522,10 @@ export default function MapView({
           /* Aggregate a per-rating count into each cluster so the bubble can
              show the dominant condition of the region, not just a headcount. */
           clusterProperties={{
-            great: ["+", ["case", ["==", ["get", "condRating"], "great"], 1, 0]],
-            good: ["+", ["case", ["==", ["get", "condRating"], "good"], 1, 0]],
-            fair: ["+", ["case", ["==", ["get", "condRating"], "fair"], 1, 0]],
-            poor: ["+", ["case", ["==", ["get", "condRating"], "poor"], 1, 0]],
+            great: ["+", ["case", ["all", ["!", ["get", "offSeason"]], ["==", ["get", "condRating"], "great"]], 1, 0]],
+            good: ["+", ["case", ["all", ["!", ["get", "offSeason"]], ["==", ["get", "condRating"], "good"]], 1, 0]],
+            fair: ["+", ["case", ["all", ["!", ["get", "offSeason"]], ["==", ["get", "condRating"], "fair"]], 1, 0]],
+            poor: ["+", ["case", ["all", ["!", ["get", "offSeason"]], ["==", ["get", "condRating"], "poor"]], 1, 0]],
           }}
         >
           {/* Cluster circles — filled with the DOMINANT condition color
@@ -535,6 +549,11 @@ export default function MapView({
                 "p", ["to-number", ["get", "poor"], 0],
                 [
                   "case",
+                  ["all",
+                    ["==", ["var", "g"], 0],
+                    ["==", ["var", "o"], 0],
+                    ["==", ["var", "f"], 0],
+                    ["==", ["var", "p"], 0]], PC_BARK,            /* all off-season → neutral bark */
                   ["all",
                     [">=", ["var", "g"], ["var", "o"]],
                     [">=", ["var", "g"], ["var", "f"]],
@@ -561,7 +580,7 @@ export default function MapView({
             layout={{
               "text-field": ["get", "point_count_abbreviated"],
               "text-size": 12,
-              "text-font": ["Noto Sans Bold", "Arial Unicode MS Bold"],
+              "text-font": ["Noto Sans Bold"],
             }}
             paint={{
               "text-color": [
@@ -572,6 +591,11 @@ export default function MapView({
                 "p", ["to-number", ["get", "poor"], 0],
                 [
                   "case",
+                  ["all",
+                    ["==", ["var", "g"], 0],
+                    ["==", ["var", "o"], 0],
+                    ["==", ["var", "f"], 0],
+                    ["==", ["var", "p"], 0]], "#faf4e6",           /* all off-season → cream */
                   ["all",
                     [">=", ["var", "g"], ["var", "o"]],
                     [">=", ["var", "g"], ["var", "f"]],
@@ -639,7 +663,7 @@ export default function MapView({
               "text-size": 10,
               "text-allow-overlap": true,
               "text-ignore-placement": true,
-              "text-font": ["Noto Sans Bold", "Arial Unicode MS Bold"],
+              "text-font": ["Noto Sans Bold"],
             }}
             paint={{
               /* Ink on light fills (mustard / low ramp / no-data), cream on
@@ -660,7 +684,7 @@ export default function MapView({
               "text-offset": [0, -2.2],
               "text-anchor": "bottom",
               "text-allow-overlap": false,
-              "text-font": ["Noto Sans Bold", "Arial Unicode MS Bold"],
+              "text-font": ["Noto Sans Bold"],
             }}
             paint={{
               "text-color": "#2a1f14",             /* pc-ink */
@@ -682,7 +706,7 @@ export default function MapView({
               "text-anchor": "top",
               "text-allow-overlap": false,
               "text-max-width": 10,
-              "text-font": ["Noto Sans Regular", "Arial Unicode MS Regular"],
+              "text-font": ["Noto Sans Regular"],
             }}
             paint={{
               "text-color": PC_BARK_DK,
@@ -698,7 +722,7 @@ export default function MapView({
         {weatherLayer === "radar" && radarFrames.length > 0 && (
           <MapWeatherOverlay
             frames={radarFrames}
-            activeIndex={radarIdx}
+            activeIndex={safeRadarIdx}
             beforeId="clusters"
           />
         )}
@@ -763,7 +787,7 @@ export default function MapView({
           weatherLayer === "radar" && radarFrames.length > 1
             ? {
                 count: radarFrames.length,
-                index: radarIdx,
+                index: safeRadarIdx,
                 playing: radarPlaying,
                 label: radarLabel,
                 onScrub: (i) => {

@@ -58,6 +58,9 @@ test("with the kill switch off, every Drop In lookup denies and the roster is em
     assert.strictEqual(mod.getDropInGameUrl("ski-portillo"), null);
     assert.deepStrictEqual(mod.getDropInRoster(), []);
     assert.strictEqual(mod.dropInDisabledResponse().status, 404);
+    const flag = await import("./drop-in-flag");
+    assert.strictEqual(flag.isDropInEnabled(), false);
+    assert.strictEqual(flag.isDropInResort("heavenly"), false);
   } finally {
     process.env.NEXT_PUBLIC_DROP_IN_ENABLED = prev;
   }

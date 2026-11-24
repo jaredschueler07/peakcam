@@ -17,7 +17,7 @@ export function AlertsIntro({ offSeason }: { offSeason: boolean }) {
   return (
     <>
       <h1 className="font-display text-4xl font-black text-ink">
-        {offSeason ? "First snow is coming. Hear about it first." : "Never miss a powder day."}
+        {offSeason ? "First snow is coming. Hear about it first." : "Never miss a storm day."}
       </h1>
       <p className="my-5 text-lg text-bark">
         {offSeason

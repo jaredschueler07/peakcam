@@ -25,13 +25,21 @@ const num = "font-mono text-[13px] font-bold tabular-nums";
 export function leaderboardMetadata(kind: LeaderboardKind): Metadata {
   const copy = LEADERBOARD_COPY[kind];
   const url = `${SITE_URL}${leaderboardPath(kind)}`;
+  const ogImage = `${SITE_URL}/opengraph-image`;
   return {
     title: copy.title,
     description: copy.description,
     alternates: { canonical: url },
     keywords: [copy.eyebrow.toLowerCase(), "ski resort snowfall ranking", "which ski resort has the most snow", "powder days by resort", "deepest base ski resort", "season snowfall by resort"],
-    openGraph: { title: copy.title, description: copy.description, url, type: "website", siteName: "PeakCam" },
-    twitter: { card: "summary_large_image", title: copy.title, description: copy.description },
+    openGraph: {
+      title: copy.title,
+      description: copy.description,
+      url,
+      type: "website",
+      siteName: "PeakCam",
+      images: [{ url: ogImage, width: 1200, height: 630, alt: copy.title }],
+    },
+    twitter: { card: "summary_large_image", title: copy.title, description: copy.description, images: [ogImage] },
   };
 }
 
@@ -201,7 +209,32 @@ export async function LeaderboardPage({ kind }: { kind: LeaderboardKind }) {
           </div>
         </section>
 
-        <nav aria-label="Related pages" className="mt-12 flex flex-wrap gap-3 text-sm">
+        <section className="pc-on-ink mt-10 flex flex-wrap items-center justify-between gap-4 rounded-[18px] border-[1.5px] border-ink bg-forest px-5 py-4 text-cream-50 shadow-stamp">
+          <div>
+            <p className="font-display text-lg font-black leading-tight">
+              Get morning snow alerts when your mountains hit.
+            </p>
+            <p className="mt-1 text-sm text-cream-50/85">
+              Free email alerts for any resort — or create an account to build your own dashboard.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Link
+              href="/alerts"
+              className="inline-flex min-h-11 items-center rounded-full border-[1.5px] border-ink bg-cream-50 px-4 py-2 text-xs font-bold uppercase tracking-[0.06em] text-ink shadow-stamp-sm hover:bg-cream"
+            >
+              Set storm alerts &rarr;
+            </Link>
+            <Link
+              href="/auth"
+              className="inline-flex min-h-11 items-center rounded-full border-[1.5px] border-cream-50/60 px-4 py-2 text-xs font-bold uppercase tracking-[0.06em] text-cream-50 hover:bg-cream-50/10"
+            >
+              Create account
+            </Link>
+          </div>
+        </section>
+
+        <nav aria-label="Related pages" className="mt-10 flex flex-wrap gap-3 text-sm">
           {others.map((k) => (
             <Link key={k} href={leaderboardPath(k)} className="rounded-full border-[1.5px] border-ink bg-cream-50 px-4 py-2 font-bold text-ink shadow-stamp-sm hover:bg-cream">
               {LEADERBOARD_COPY[k].eyebrow}

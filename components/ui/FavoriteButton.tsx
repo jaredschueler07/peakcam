@@ -191,13 +191,13 @@ export function FavoriteButton({
         aria-label={accessibleName}
       >
         {isProcessing ? (
-          <Loader2 className="w-4 h-4 animate-spin text-cyan" />
+          <Loader2 className="w-4 h-4 motion-safe:animate-spin text-forest" />
         ) : (
           <Star
             className={`w-4 h-4 transition-all duration-200 ${starOpacity} ${
               isFavorited
-                ? "fill-cyan text-cyan"
-                : "text-text-muted group-hover:text-text-subtle"
+                ? "fill-forest text-forest"
+                : "text-bark group-hover:text-ink"
             }`}
           />
         )}

@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { ConditionBadge } from "@/components/ui/Badge";
+import { isOffSeason, OFF_SEASON_COLOR } from "@/lib/map-utils";
 import { matchesResortSearch } from "@/lib/resort-search";
 import { recordBugAction } from "@/lib/bug-reports/client";
 import type { ResortWithData } from "@/lib/types";
@@ -16,6 +17,7 @@ const CONDITION_ORDER: Record<string, number> = {
   };
 
 export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
+  const [now] = useState(() => new Date());
   const [sortKey, setSortKey] = useState<SortKey>("base");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [stateFilter, setStateFilter] = useState("All");
@@ -70,7 +72,7 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
       <button
         onClick={() => handleSort(field)}
         className={`flex items-center gap-1 py-2 pointer-coarse:min-h-11 text-xs uppercase tracking-wider font-semibold transition-colors
-          ${active ? "text-cyan" : "text-text-muted hover:text-text-subtle"}`}
+          ${active ? "text-alpen-dk" : "text-bark hover:text-ink"}`}
       >
         {label}
         {active && (
@@ -83,35 +85,35 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
   const resortsWithoutData = resorts.filter((r) => !r.snow_report).length;
 
   return (
-    <div className="min-h-screen bg-bg">
+    <div className="min-h-screen pc-paper">
       <Header onSearch={setQuery} searchValue={query} />
 
       <div className="max-w-screen-2xl mx-auto px-4 py-6 md:px-8">
         <div className="flex items-end justify-between mb-6">
           <div>
-            <h1 className="text-2xl md:text-3xl font-heading font-bold text-text-base uppercase tracking-wider">
+            <h1 className="text-2xl md:text-3xl font-heading font-bold text-ink uppercase tracking-wider">
               Snow Report
             </h1>
-            <p role="status" className="text-text-muted text-sm mt-0.5">
+            <p role="status" className="text-bark text-sm mt-0.5">
               {sorted.length} {sorted.length === 1 ? "resort" : "resorts"} with snow data
               {resortsWithoutData > 0 && ` · ${resortsWithoutData} awaiting data`}
             </p>
           </div>
-          <Link href="/" className="text-text-muted hover:text-cyan text-sm py-2 px-1 pointer-coarse:min-h-11 inline-flex items-center transition-colors">
+          <Link href="/" className="text-bark hover:text-alpen-dk text-sm py-2 px-1 pointer-coarse:min-h-11 inline-flex items-center transition-colors">
             ← Browse
           </Link>
         </div>
 
-        <label className="mb-4 block text-sm font-bold sm:hidden" htmlFor="snow-search">Search snow reports
-          <input id="snow-search" type="search" value={query} onChange={event => { setQuery(event.target.value); recordBugAction("search-edited"); }} placeholder="Resort, state or region" className="mt-2 min-h-11 w-full rounded-lg border border-ink bg-cream-50 px-3 text-base font-normal" />
+        <label className="mb-4 block text-sm font-bold text-ink sm:hidden" htmlFor="snow-search">Search snow reports
+          <input id="snow-search" type="search" value={query} onChange={event => { setQuery(event.target.value); recordBugAction("search-edited"); }} placeholder="Resort, state or region" className="mt-2 min-h-11 w-full rounded-lg border border-ink bg-cream-50 px-3 text-base font-normal text-ink placeholder:text-bark" />
         </label>
-        <label className="mb-4 block text-sm font-bold md:hidden">State or country
-          <select value={stateFilter} onChange={e => setStateFilter(e.target.value)} className="mt-2 min-h-11 w-full rounded-lg border border-ink bg-cream-50 px-3 text-base">
+        <label className="mb-4 block text-sm font-bold text-ink md:hidden">State or country
+          <select value={stateFilter} onChange={e => setStateFilter(e.target.value)} className="mt-2 min-h-11 w-full rounded-lg border border-ink bg-cream-50 px-3 text-base text-ink">
             <option value="All">All states and countries</option>{states.map(state => <option key={state}>{state}</option>)}
           </select>
         </label>
-        <label className="mb-4 block text-sm font-bold md:hidden">Sort reports
-          <select value={sortKey} onChange={event => { const key = event.target.value as SortKey; setSortKey(key); setSortDir(key === "name" || key === "conditions" ? "asc" : "desc"); }} className="mt-2 min-h-11 w-full rounded-lg border border-ink bg-cream-50 px-3 text-base">
+        <label className="mb-4 block text-sm font-bold text-ink md:hidden">Sort reports
+          <select value={sortKey} onChange={event => { const key = event.target.value as SortKey; setSortKey(key); setSortDir(key === "name" || key === "conditions" ? "asc" : "desc"); }} className="mt-2 min-h-11 w-full rounded-lg border border-ink bg-cream-50 px-3 text-base text-ink">
             <option value="base">Base depth</option><option value="24h">New snow: 24 hours</option><option value="48h">New snow: 48 hours</option><option value="conditions">Conditions</option><option value="name">Resort name</option>{hasTrails && <option value="trails">Open trails</option>}{hasLifts && <option value="lifts">Open lifts</option>}{hasPctNormal && <option value="pctNormal">Percent of normal</option>}{hasTrend && <option value="trend">Snow trend</option>}
           </select>
         </label>
@@ -119,10 +121,10 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
         <div className="hidden md:flex items-center gap-2 flex-wrap mb-4">
           <button
             onClick={() => setStateFilter("All")}
-            className={`text-xs px-2.5 py-1 pointer-coarse:min-h-11 pointer-coarse:px-3.5 rounded-lg border transition-colors duration-150 ${
+            className={`text-xs font-semibold px-3 py-1 pointer-coarse:min-h-11 pointer-coarse:px-3.5 rounded-full border-[1.5px] transition-colors duration-150 ${
               stateFilter === "All"
-                ? "bg-cyan/10 border-cyan/40 text-cyan"
-                : "border-border text-text-muted hover:text-text-base"
+                ? "bg-ink border-ink text-cream-50"
+                : "bg-cream-50 border-bark text-ink hover:border-ink"
             }`}
           >
             All States
@@ -131,10 +133,10 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
             <button
               key={s}
               onClick={() => setStateFilter(stateFilter === s ? "All" : s)}
-              className={`text-xs px-2.5 py-1 pointer-coarse:min-h-11 pointer-coarse:px-3.5 rounded-lg border transition-colors duration-150 ${
+              className={`text-xs font-semibold px-3 py-1 pointer-coarse:min-h-11 pointer-coarse:px-3.5 rounded-full border-[1.5px] transition-colors duration-150 ${
                 stateFilter === s
-                  ? "bg-cyan/10 border-cyan/40 text-cyan"
-                  : "border-border text-text-muted hover:text-text-base"
+                  ? "bg-ink border-ink text-cream-50"
+                  : "bg-cream-50 border-bark text-ink hover:border-ink"
               }`}
             >
               {s}
@@ -143,12 +145,12 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto rounded-xl border border-border">
+        <div className="overflow-x-auto rounded-[18px] border-[1.5px] border-ink shadow-stamp-sm bg-cream-50">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-surface border-b border-border">
+              <tr className="bg-cream border-b-[1.5px] border-ink">
                 <th scope="col" className="text-left px-4 py-3"><SortHeader label="Resort" field="name" /></th>
-                <th scope="col" className="text-left px-3 py-3 hidden sm:table-cell"><span className="text-xs uppercase tracking-wider text-text-muted font-semibold">State</span></th>
+                <th scope="col" className="text-left px-3 py-3 hidden sm:table-cell"><span className="text-xs uppercase tracking-wider text-bark font-semibold">State</span></th>
                 <th scope="col" className="text-right px-3 py-3"><SortHeader label="Base" field="base" /></th>
                 <th scope="col" className="text-right px-3 py-3"><SortHeader label="24h" field="24h" /></th>
                 <th scope="col" className="text-right px-3 py-3 hidden md:table-cell"><SortHeader label="48h" field="48h" /></th>
@@ -162,40 +164,62 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
             <tbody>
               {sorted.map((resort, i) => {
                 const snow = resort.snow_report!;
+                const offSeason = isOffSeason(resort.lat, now);
+                const ratingChip = offSeason ? (
+                  <span
+                    className="inline-flex items-center rounded-full border border-ink px-2.5 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink"
+                    style={{ backgroundColor: OFF_SEASON_COLOR }}
+                  >
+                    Off-season
+                  </span>
+                ) : (
+                  <ConditionBadge
+                    rating={resort.cond_rating}
+                    label={resort.cond_rating.charAt(0).toUpperCase() + resort.cond_rating.slice(1)}
+                  />
+                );
                 return (
                   <tr
                     key={resort.id}
-                    className={`border-b border-border/50 hover:bg-surface transition-colors
-                      ${i % 2 === 0 ? "bg-bg" : "bg-surface/30"}`}
+                    className={`border-b border-dashed border-bark/35 last:border-b-0 hover:bg-cream transition-colors
+                      ${i % 2 === 0 ? "bg-cream-50" : "bg-cream/40"}`}
                   >
                     <td className="px-4 py-3">
                       <Link
                         href={`/resorts/${resort.slug}`}
-                        className="text-text-base font-medium hover:text-cyan transition-colors inline-block py-1.5"
+                        className="text-ink font-semibold hover:text-alpen-dk transition-colors inline-block py-1.5"
                       >
                         {resort.name}
                       </Link>
-                      <div className="mt-1 md:hidden"><ConditionBadge rating={resort.cond_rating} label={resort.cond_rating.charAt(0).toUpperCase() + resort.cond_rating.slice(1)} /></div>
+                      {snow.source === "open_meteo" && (
+                        <span
+                          className="ml-1.5 font-mono text-[10px] uppercase tracking-[0.08em] text-bark"
+                          title="Weather-model estimate (no nearby station)"
+                        >
+                          Model
+                        </span>
+                      )}
+                      <div className="mt-1 md:hidden">{ratingChip}</div>
                     </td>
-                    <td className="px-3 py-3 text-text-muted hidden sm:table-cell">{resort.state}</td>
+                    <td className="px-3 py-3 text-bark hidden sm:table-cell">{resort.state}</td>
                     <td className="px-3 py-3 text-right">
-                      <span className="text-powder font-bold tabular-nums">
+                      <span className="text-ink font-bold tabular-nums">
                         {snow.base_depth != null ? `${snow.base_depth}″` : "—"}
                       </span>
                     </td>
                     <td className="px-3 py-3 text-right">
-                      <span className={`font-bold tabular-nums ${(snow.new_snow_24h ?? 0) >= 8 ? "text-cyan" : "text-text-subtle"}`}>
+                      <span className={`font-bold tabular-nums ${(snow.new_snow_24h ?? 0) >= 8 ? "text-alpen-dk" : "text-bark-dk"}`}>
                         {snow.new_snow_24h != null ? `${snow.new_snow_24h}″` : "—"}
                       </span>
                     </td>
                     <td className="px-3 py-3 text-right hidden md:table-cell">
-                      <span className="text-text-subtle tabular-nums">
+                      <span className="text-bark-dk tabular-nums">
                         {snow.new_snow_48h != null ? `${snow.new_snow_48h}″` : "—"}
                       </span>
                     </td>
                     {hasTrails && (
                     <td className="px-3 py-3 text-right hidden md:table-cell">
-                      <span className="text-text-base tabular-nums">
+                      <span className="text-ink tabular-nums">
                         {snow.trails_open != null && snow.trails_total != null
                           ? `${snow.trails_open}/${snow.trails_total}` : "—"}
                       </span>
@@ -203,7 +227,7 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
                     )}
                     {hasLifts && (
                     <td className="px-3 py-3 text-right hidden lg:table-cell">
-                      <span className="text-text-base tabular-nums">
+                      <span className="text-ink tabular-nums">
                         {snow.lifts_open != null && snow.lifts_total != null
                           ? `${snow.lifts_open}/${snow.lifts_total}` : "—"}
                       </span>
@@ -211,38 +235,35 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
                     )}
                     {hasPctNormal && (
                     <td className="px-3 py-3 text-right hidden lg:table-cell">
-                      {snow.pct_of_normal != null ? (
+                      {!offSeason && snow.pct_of_normal != null ? (
                         <span className={`font-bold tabular-nums ${
-                          snow.pct_of_normal >= 110 ? "text-[#2ECC8F]" :
-                          snow.pct_of_normal >= 90 ? "text-text-base" :
-                          snow.pct_of_normal >= 70 ? "text-yellow-400" : "text-red-400"
+                          snow.pct_of_normal >= 110 ? "text-forest" :
+                          snow.pct_of_normal >= 90 ? "text-ink" :
+                          snow.pct_of_normal >= 70 ? "text-mustard-dk" : "text-alpen-dk"
                         }`}>
                           {snow.pct_of_normal}%
                         </span>
                       ) : (
-                        <span className="text-text-muted">—</span>
+                        <span className="text-bark">—</span>
                       )}
                     </td>
                     )}
                     {hasTrend && (
                     <td className="px-3 py-3 text-center hidden lg:table-cell">
-                      {snow.trend_7d ? (
-                        <span className={`text-sm ${
-                          snow.trend_7d === "rising" ? "text-[#2ECC8F]" :
-                          snow.trend_7d === "falling" ? "text-red-400" : "text-text-subtle"
+                      {!offSeason && snow.trend_7d ? (
+                        <span className={`text-sm font-bold ${
+                          snow.trend_7d === "rising" ? "text-forest" :
+                          snow.trend_7d === "falling" ? "text-alpen-dk" : "text-bark-dk"
                         }`}>
                           {snow.trend_7d === "rising" ? "↑" : snow.trend_7d === "falling" ? "↓" : "→"}
                         </span>
                       ) : (
-                        <span className="text-text-muted">—</span>
+                        <span className="text-bark">—</span>
                       )}
                     </td>
                     )}
                     <td className="hidden md:table-cell px-3 py-3 text-center">
-                      <ConditionBadge
-                        rating={resort.cond_rating}
-                        label={resort.cond_rating.charAt(0).toUpperCase() + resort.cond_rating.slice(1)}
-                      />
+                      {ratingChip}
                     </td>
                   </tr>
                 );
@@ -252,9 +273,9 @@ export function SnowReportPage({ resorts }: { resorts: ResortWithData[] }) {
         </div>
 
         {sorted.length === 0 && (
-          <div className="text-center py-20 text-text-muted">
+          <div className="text-center py-20 text-bark">
             <div className="text-4xl mb-3">❄️</div>
-            <p className="text-lg font-medium text-text-subtle">{query.trim() || stateFilter !== "All" ? "No matching snow reports" : "No snow data available"}</p>
+            <p className="text-lg font-medium text-bark-dk">{query.trim() || stateFilter !== "All" ? "No matching snow reports" : "No snow data available"}</p>
             <p className="text-sm mt-1">{query.trim() || stateFilter !== "All" ? "Try another search or clear your filters." : "Snow reports will appear once data starts flowing in."}</p>
             {(query.trim() || stateFilter !== "All") && <button type="button" onClick={() => { setQuery(""); setStateFilter("All"); }} className="mt-4 min-h-11 rounded-full border border-ink bg-cream-50 px-5 font-bold text-ink">Clear filters</button>}
           </div>

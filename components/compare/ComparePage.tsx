@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Fuse from "fuse.js";
 import { X, Plus, Share2, Camera, ArrowLeft, AlertTriangle } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { MAX_COMPARE_RESORTS, buildCompareHref } from "@/lib/compare-params";
+import { isOffSeason, OFF_SEASON_COLOR, parseConditionsString } from "@/lib/map-utils";
 import type { ResortWithData, ConditionRating } from "@/lib/types";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -174,13 +174,16 @@ function ResortPicker({
 
 function ResortColumnHeader({
   resort,
+  offSeason,
   onRemove,
 }: {
   resort: ResortWithData;
+  offSeason: boolean;
   onRemove: () => void;
 }) {
   const chipCls = resort.cond_rating ? conditionChip[resort.cond_rating] : null;
   const thumb = getFirstCamThumbnail(resort);
+  const [thumbFailed, setThumbFailed] = useState(false);
   const activeCamCount = camsOf(resort).filter((c) => c.is_active).length;
 
   return (
@@ -194,7 +197,7 @@ function ResortColumnHeader({
         the placeholder and the loaded image occupy identical space.
       */}
       <div className="relative w-full aspect-video shrink-0 min-h-0 rounded-[14px] overflow-hidden bg-cream border-[1.5px] border-ink shadow-stamp-sm">
-        {thumb ? (
+        {thumb && !thumbFailed ? (
           <Link href={`/resorts/${resort.slug}`} tabIndex={-1} className="absolute inset-0 block">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -204,6 +207,7 @@ function ResortColumnHeader({
               width={320}
               height={180}
               decoding="async"
+              onError={() => setThumbFailed(true)}
               className="absolute inset-0 w-full h-full object-contain"
             />
             <div className="absolute inset-0 bg-ink/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
@@ -240,7 +244,14 @@ function ResortColumnHeader({
         <p className="font-mono text-[10.5px] text-bark uppercase tracking-[0.12em] mt-1">
           {resort.region} · {resort.state}
         </p>
-        {chipCls && (
+        {offSeason ? (
+          <span
+            className="inline-flex mt-2 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold uppercase tracking-[0.08em] border-[1.5px] border-ink text-ink"
+            style={{ backgroundColor: OFF_SEASON_COLOR }}
+          >
+            Off-season
+          </span>
+        ) : chipCls && (
           <span
             className={`inline-flex mt-2 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold uppercase tracking-[0.08em] border-[1.5px] ${chipCls}`}
           >
@@ -294,8 +305,14 @@ export function ComparePage({
   missingSlugs = [],
   loadFailed = false,
 }: Props) {
-  const router = useRouter();
+  const [now] = useState(() => new Date());
+  const initialKey = initialResorts.map((r) => r.slug).join(",");
+  const [prevInitialKey, setPrevInitialKey] = useState(initialKey);
   const [resorts, setResorts] = useState<ResortWithData[]>(initialResorts);
+  if (prevInitialKey !== initialKey) {
+    setPrevInitialKey(initialKey);
+    setResorts(initialResorts);
+  }
   const [copied, setCopied] = useState(false);
   const [dismissedNotice, setDismissedNotice] = useState(false);
   const isFirstRender = useRef(true);
@@ -306,11 +323,12 @@ export function ComparePage({
       isFirstRender.current = false;
       return;
     }
-    router.replace(buildCompareHref(resorts.map((r) => r.slug)), { scroll: false });
-  }, [resorts, router]);
+    const href = buildCompareHref(resorts.map((r) => r.slug));
+    window.history.replaceState(null, "", href);
+  }, [resorts]);
 
   function addResort(resort: ResortWithData) {
-    if (resorts.length >= MAX_RESORTS) return;
+    if (resorts.length >= MAX_RESORTS || resorts.some((r) => r.slug === resort.slug)) return;
     setResorts((prev) => [...prev, resort]);
   }
 
@@ -343,9 +361,10 @@ export function ComparePage({
     return o != null && t != null && t > 0 ? o / t : null;
   });
   const showNotice = !dismissedNotice && (loadFailed || missingSlugs.length > 0);
+  const offSeasonFlags = resorts.map((r) => isOffSeason(r.lat, now));
 
-  const condRanks = resorts.map((r) =>
-    r.cond_rating != null ? CONDITION_ORDER[r.cond_rating] : null
+  const condRanks = resorts.map((r, i) =>
+    !offSeasonFlags[i] && r.cond_rating != null ? CONDITION_ORDER[r.cond_rating] : null
   );
 
   type StatRow = {
@@ -401,13 +420,9 @@ export function ComparePage({
       label: "CONDITIONS",
       values: resorts.map((r, i) => ({
         display: (() => {
-          const raw = r.snow_report?.conditions;
-          if (!raw) return r.cond_rating?.toUpperCase() ?? "—";
-          if (raw.includes("||")) {
-            const [, narrative] = raw.split("||");
-            return narrative || raw;
-          }
-          return raw;
+          if (offSeasonFlags[i]) return "Off-season";
+          const { tags, narrative } = parseConditionsString(r.snow_report?.conditions);
+          return narrative || tags.join(", ") || r.cond_rating?.toUpperCase() || "—";
         })(),
         isBest: isBestLow(condRanks[i], condRanks),
       })),
@@ -590,7 +605,11 @@ export function ComparePage({
                     i < resorts.length - 1 ? "border-r-[1.5px]" : ""
                   }`}
                 >
-                  <ResortColumnHeader resort={resort} onRemove={() => removeResort(resort.slug)} />
+                  <ResortColumnHeader
+                    resort={resort}
+                    offSeason={offSeasonFlags[i]}
+                    onRemove={() => removeResort(resort.slug)}
+                  />
                 </div>
               ))}
 

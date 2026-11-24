@@ -7,7 +7,7 @@ import { useState, useRef, useEffect } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import type { User } from "@supabase/supabase-js";
 import { Menu, X, Search } from "lucide-react";
-import { isDropInEnabled } from "@/lib/drop-in";
+import { isDropInEnabled } from "@/lib/drop-in-flag";
 import { EVENTS, track } from "@/lib/analytics-events";
 
 interface HeaderProps {

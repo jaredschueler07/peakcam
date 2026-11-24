@@ -176,6 +176,9 @@ export function track(event: EventName, properties?: EventProperties) {
   const metaEvent = META_EVENT_MAP[event];
   if (metaEvent) fireMetaPixelEvent(metaEvent);
   if (event === EVENTS.AUTH_SIGNUP_COMPLETED) trackGoogleSignup();
+  // Without NEXT_PUBLIC_POSTHOG_KEY the provider never calls posthog.init(), so
+  // don't queue events or schedule four-second polling timers.
+  if (!process.env.NEXT_PUBLIC_POSTHOG_KEY) return;
   if (!isLoaded()) {
     pending.push([event, properties]);
     drain();

@@ -85,3 +85,11 @@ test("card order honours preview_rank and card_preview before health and provide
   assert.deepEqual(cameraPreviews(cams).map(p=>p.cam.id),["rank1-youtube","rank2","unranked-healthy","unranked-failing"]);
   assert.equal(availableCameras(cams).length,5,"card_preview=false still counts as an available camera on the resort page");
 });
+
+test("providerStill and cameraPreview reject malformed or missing YouTube IDs", () => {
+  for (const youtube_id of [null, "", "short", "bad/../../id", "too-long-youtube-id"]) {
+    const c = cam({ embed_type: "youtube", embed_url: null, youtube_id });
+    assert.equal(providerStill(c), null);
+    assert.equal(cameraPreview(c), null);
+  }
+});

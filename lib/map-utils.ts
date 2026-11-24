@@ -38,7 +38,7 @@ export interface ResortFeatureProperties {
 // the shoulders (an early-Nov opening or summer glacier skiing may misclassify);
 // the tradeoff is zero new data and full reversibility.
 export function isOffSeason(lat: number, date: Date): boolean {
-  const month = date.getMonth() + 1; // 1–12
+  const month = date.getUTCMonth() + 1; // 1–12
   const northern = lat >= 0;
   const inSeason = northern
     ? month >= 11 || month <= 4 // Nov–Apr
@@ -218,7 +218,25 @@ export const ANDES_VIEW_STATE = {
  * explicit GeolocateControl already covers "near me".
  */
 export function seasonalDefaultViewState(date: Date) {
-  const month = date.getMonth() + 1;
+  const month = date.getUTCMonth() + 1;
   const southernSeason = month >= 5 && month <= 10; // NH summer = Andes winter
   return southernSeason ? ANDES_VIEW_STATE : DEFAULT_VIEW_STATE;
+}
+
+/**
+ * Split a raw `snow_report.conditions` string stored as `"tag1,tag2||narrative"`
+ * without ever leaking raw `"||"` or empty trailing tags to the UI.
+ */
+export function parseConditionsString(
+  raw: string | null | undefined,
+): { tags: string[]; narrative: string } {
+  if (!raw) return { tags: [], narrative: "" };
+  if (!raw.includes("||")) return { tags: [], narrative: raw.trim() };
+  const [tagsPart, ...rest] = raw.split("||");
+  const tags = tagsPart
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const narrative = rest.join("||").trim();
+  return { tags, narrative };
 }

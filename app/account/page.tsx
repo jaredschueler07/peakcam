@@ -8,7 +8,7 @@ import { UpdatePassword } from "@/components/auth/UpdatePassword";
 import { AccountSignOut } from "@/components/auth/AccountSignOut";
 import { GoogleMark } from "@/components/auth/GoogleSignInButton";
 
-export const metadata = { title: "Your account | PeakCam", robots: { index: false, follow: false } };
+export const metadata = { title: "Your account", robots: { index: false, follow: false } };
 
 export default async function AccountPage() {
   const client = await createSupabaseServerClient();

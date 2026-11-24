@@ -49,16 +49,16 @@ export function MeasuredNow({ rows, resortName }: MeasuredNowProps) {
   return (
     <section id="instruments" className="scroll-mt-20" aria-labelledby="instruments-heading">
       <div className="flex items-baseline justify-between mb-4 gap-4">
-        <h2 id="instruments-heading" className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">
+        <h2 id="instruments-heading" className="font-heading text-xl font-semibold uppercase tracking-wider text-ink">
           What the instruments say
         </h2>
-        <span className="text-text-muted text-xs">by elevation band</span>
+        <span className="text-bark text-xs">by elevation band</span>
       </div>
-      <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+      <div className="overflow-x-auto rounded-xl border border-ink/20 bg-cream-50">
         <table className="w-full text-sm">
           <caption className="sr-only">Latest station observations near {resortName}, by elevation band</caption>
           <thead>
-            <tr className="text-left text-xs uppercase tracking-wider text-text-muted">
+            <tr className="text-left text-xs uppercase tracking-wider text-bark">
               <th scope="col" className="px-4 py-3 font-medium">Band</th>
               <th scope="col" className="px-4 py-3 font-medium">Station</th>
               {hasSnow && (
@@ -74,13 +74,13 @@ export function MeasuredNow({ rows, resortName }: MeasuredNowProps) {
           </thead>
           <tbody>
             {sorted.map((r) => (
-              <tr key={r.stationId} className="border-t border-border/60">
-                <th scope="row" className="px-4 py-3 font-medium text-text-base whitespace-nowrap">
+              <tr key={r.stationId} className="border-t border-ink/10">
+                <th scope="row" className="px-4 py-3 font-medium text-ink whitespace-nowrap">
                   {ROLE_LABEL[r.role]}
                 </th>
-                <td className="px-4 py-3 text-text-base">
+                <td className="px-4 py-3 text-ink">
                   <span className="block">{r.name ?? r.sourceId}</span>
-                  <span className="block text-xs text-text-muted">
+                  <span className="block text-xs text-bark">
                     {STATION_SOURCES[r.source].label}
                     {r.elevationFt != null ? ` · ${r.elevationFt.toLocaleString("en-US")} ft` : ""}
                     {r.distanceKm != null ? ` · ${r.distanceKm.toFixed(1)} km` : ""}
@@ -90,7 +90,7 @@ export function MeasuredNow({ rows, resortName }: MeasuredNowProps) {
                 {hasSnow && <td className="px-4 py-3 text-right font-mono tabular-nums">{fmt(r.newSnowIn, "″")}</td>}
                 <td className="px-4 py-3 text-right font-mono tabular-nums">{fmt(r.tempF, "°F")}</td>
                 <td className="px-4 py-3 text-right font-mono tabular-nums">{fmt(r.windMph, " mph")}</td>
-                <td className="px-4 py-3 text-right text-xs text-text-muted whitespace-nowrap">
+                <td className="px-4 py-3 text-right text-xs text-bark whitespace-nowrap">
                   <time dateTime={r.observedAt}>{formatAge(r.ageMinutes)}</time>
                 </td>
               </tr>
@@ -98,7 +98,7 @@ export function MeasuredNow({ rows, resortName }: MeasuredNowProps) {
           </tbody>
         </table>
       </div>
-      <p className="text-text-muted text-xs mt-2">
+      <p className="text-bark text-xs mt-2">
         Each row is one sensor at its own elevation, not a mountain average. Daily networks (SNOTEL, GHCN) read once a day; hourly ones
         (NWS, ECCC, BC ASWS) carry temperature and wind but no depth. Sources: {sources.map((s) => STATION_SOURCES[s].attribution).join("; ")}.
       </p>

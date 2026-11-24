@@ -52,8 +52,8 @@ export function FavoriteButton({
       className={`
         p-1.5 rounded-lg border transition-all duration-[220ms]
         ${favorited
-          ? "bg-alpenglow/15 border-alpenglow/40 text-alpenglow hover:bg-alpenglow/25"
-          : "bg-surface2/50 border-border text-text-muted hover:text-alpenglow hover:border-alpenglow/30 hover:bg-alpenglow/10"}
+          ? "bg-alpen/15 border-alpen/40 text-alpen-dk hover:bg-alpen/25"
+          : "bg-cream-50 border-ink/20 text-bark hover:text-alpen-dk hover:border-alpen/40 hover:bg-alpen/10"}
         ${loading ? "opacity-50 cursor-wait" : "cursor-pointer"}
       `}
       aria-label={favorited ? "Remove from favorites" : "Add to favorites"}

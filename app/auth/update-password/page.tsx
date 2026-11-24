@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { UpdatePassword } from "@/components/auth/UpdatePassword";
 
-export const metadata = { title: "Set your password | PeakCam", robots: { index: false } };
+export const metadata = { title: "Set your password", robots: { index: false } };
 export default async function UpdatePasswordPage() {
   const client = await createSupabaseServerClient();
   const { data: { user } } = await client.auth.getUser();

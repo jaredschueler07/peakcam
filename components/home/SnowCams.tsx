@@ -8,6 +8,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { Snowflake, Play } from "lucide-react";
 import type { Cam, ResortWithData } from "@/lib/types";
 import { camDisplayName } from "@/lib/cam-name";
+import { camEmbedSrc, safeCamUrl } from "@/lib/cam-url";
 import { cameraPreview } from "@/lib/cam-preview";
 import { entranceMotionProps } from "@/lib/motion-entrance";
 import { trackCamPlayed } from "@/lib/posthog";
@@ -54,7 +55,7 @@ export function SnowCams({ snowCams: candidates }: SnowCamsProps) {
           </div>
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full
                           bg-ink text-cream-50 border-[1.5px] border-ink shadow-stamp-sm">
-            <span className="w-2 h-2 bg-alpen rounded-full animate-pulse-live" />
+            <span className="w-2 h-2 bg-alpen rounded-full motion-safe:animate-pulse-live" />
             <span className="font-mono font-bold text-[11px] uppercase tracking-[0.14em]">
               {snowCams.length} {snowCams.length === 1 ? "resort" : "resorts"}
             </span>
@@ -103,6 +104,7 @@ function SnowCamCard({
   const snow = resort.snow_report;
   const name = camDisplayName(cam);
   const [posterFailed, setPosterFailed] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   // Entrance fade honours Reduce Motion by becoming instant, never by being
   // skipped — see lib/motion-entrance.ts.
   const entrance = entranceMotionProps(true, useReducedMotion());
@@ -110,14 +112,12 @@ function SnowCamCard({
   const preview = cameraPreview(cam);
   const showPoster = Boolean(preview && !posterFailed);
 
-  const embedSrc =
-    cam.embed_type === "youtube" && cam.youtube_id
-      ? `https://www.youtube.com/embed/${cam.youtube_id}?autoplay=1&mute=1`
-      : cam.embed_type === "image"
-        ? cam.embed_url
-        : cam.embed_url;
-
+  const embedSrc = camEmbedSrc(cam);
+  const externalLink = safeCamUrl(cam.embed_url);
   const isImage = cam.embed_type === "image";
+  const showLiveBadge = Boolean(
+    isLoaded && !imageFailed && cam.embed_type !== "link" && embedSrc,
+  );
 
   // The feed actually showing (still or player document loaded), as opposed
   // to the "Load cam" click. Once per card.
@@ -142,25 +142,42 @@ function SnowCamCard({
       {/* Cam embed */}
       <div className="relative aspect-video bg-cream border-b-[1.5px] border-ink overflow-hidden">
         {isLoaded ? (
-          isImage ? (
+          isImage && embedSrc && !imageFailed ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={cam.embed_url ?? ""}
+              src={embedSrc}
               alt={`${name} webcam`}
               className="w-full h-full object-cover"
               loading="lazy"
               decoding="async"
               onLoad={handlePlayed}
+              onError={() => setImageFailed(true)}
             />
-          ) : cam.embed_type === "link" ? null : (
+          ) : cam.embed_type !== "link" && !imageFailed && embedSrc ? (
             <iframe
-              src={embedSrc ?? ""}
+              src={embedSrc}
               className="w-full h-full border-0"
               allow="autoplay; encrypted-media"
               allowFullScreen
               title={name}
               onLoad={handlePlayed}
             />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-2 px-4 text-center bg-cream">
+              <span className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-bark">
+                {imageFailed ? "Feed unavailable" : "Opens on resort website"}
+              </span>
+              {externalLink && (
+                <a
+                  href={externalLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-11 items-center rounded-full border-[1.5px] border-ink bg-cream-50 px-4 py-1.5 text-xs font-bold text-ink shadow-stamp-sm hover:shadow-stamp transition-shadow"
+                >
+                  Open webcam &rarr;
+                </a>
+              )}
+            </div>
           )
         ) : (
           <button
@@ -205,10 +222,10 @@ function SnowCamCard({
         </div>
 
         {/* Live indicator */}
-        {isLoaded && (
+        {showLiveBadge && (
           <div className="absolute top-3 right-3 inline-flex items-center gap-1 px-2 py-0.5
                           bg-ink text-cream-50 border-[1.5px] border-ink rounded-full">
-            <span className="w-1.5 h-1.5 bg-alpen rounded-full animate-pulse-live" />
+            <span className="w-1.5 h-1.5 bg-alpen rounded-full motion-safe:animate-pulse-live" />
             <span className="font-mono font-bold text-[10px] uppercase tracking-[0.14em]">Live</span>
           </div>
         )}

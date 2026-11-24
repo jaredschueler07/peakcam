@@ -5,6 +5,7 @@ import { Camera, Play } from "lucide-react";
 import { useRef, useState } from "react";
 import type { Cam } from "@/lib/types";
 import { camDisplayName } from "@/lib/cam-name";
+import { camEmbedSrc, safeCamUrl } from "@/lib/cam-url";
 import { cameraPreview } from "@/lib/cam-preview";
 import { entranceMotionProps } from "@/lib/motion-entrance";
 import { trackCamPlayed } from "@/lib/posthog";
@@ -88,6 +89,7 @@ function WebcamTile({
 }) {
   const name = camDisplayName(cam);
   const [posterFailed, setPosterFailed] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   // Entrance fade honours Reduce Motion by becoming instant, never by being
   // skipped — see lib/motion-entrance.ts.
   const reducedMotion = useReducedMotion();
@@ -96,12 +98,12 @@ function WebcamTile({
   const preview = cameraPreview(cam);
   const showPoster = Boolean(preview && !posterFailed);
 
-  const embedSrc =
-    cam.embed_type === "youtube" && cam.youtube_id
-      ? `https://www.youtube.com/embed/${cam.youtube_id}?autoplay=1&mute=1`
-      : cam.embed_url;
-
+  const embedSrc = camEmbedSrc(cam);
+  const externalLink = safeCamUrl(cam.embed_url);
   const isImage = cam.embed_type === "image";
+  const showLiveBadge = Boolean(
+    isLoaded && !imageFailed && cam.embed_type !== "link" && embedSrc,
+  );
 
   // The feed actually showing (player document loaded), as opposed to the
   // "Load live feed" click. Once per tile: a player that navigates internally
@@ -115,7 +117,7 @@ function WebcamTile({
 
   return (
     <motion.div
-      className="group relative aspect-video rounded-[18px] overflow-hidden cursor-pointer
+      className="group relative aspect-video rounded-[18px] overflow-hidden
                  bg-cream-50 border-[1.5px] border-ink shadow-stamp
                  hover:shadow-stamp-hover transition-shadow duration-150"
       initial={entrance.initial}
@@ -125,8 +127,8 @@ function WebcamTile({
       whileHover={reducedMotion ? undefined : { y: -2, x: -1 }}
     >
       {/* Loaded state: actual embed */}
-      {isLoaded && embedSrc && (
-        isImage ? (
+      {isLoaded && (
+        isImage && embedSrc && !imageFailed ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={embedSrc}
@@ -135,8 +137,9 @@ function WebcamTile({
             loading="lazy"
             decoding="async"
             onLoad={handlePlayed}
+            onError={() => setImageFailed(true)}
           />
-        ) : (
+        ) : cam.embed_type !== "link" && !imageFailed && embedSrc ? (
           <iframe
             src={embedSrc}
             className="w-full h-full border-0"
@@ -145,6 +148,22 @@ function WebcamTile({
             title={name}
             onLoad={handlePlayed}
           />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-3 px-4 text-center bg-cream">
+            <span className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-bark">
+              {imageFailed ? "Feed unavailable" : "Opens on resort website"}
+            </span>
+            {externalLink && (
+              <a
+                href={externalLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-11 items-center rounded-full border-[1.5px] border-ink bg-cream-50 px-5 py-2 text-xs font-bold text-ink shadow-stamp-sm hover:shadow-stamp transition-shadow"
+              >
+                Open {name} &rarr;
+              </a>
+            )}
+          </div>
         )
       )}
 
@@ -203,11 +222,11 @@ function WebcamTile({
       )}
 
       {/* Live indicator on loaded cams — alpen stamp pill */}
-      {isLoaded && (
+      {showLiveBadge && (
         <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-0.5
                         bg-alpen text-cream-50 border-[1.5px] border-ink rounded-full
                         shadow-[2px_2px_0_#2a1f14] font-bold text-[11px] uppercase tracking-[0.14em]">
-          <span className="w-1.5 h-1.5 bg-cream-50 rounded-full animate-pulse-live" />
+          <span className="w-1.5 h-1.5 bg-cream-50 rounded-full motion-safe:animate-pulse-live" />
           Live
         </div>
       )}

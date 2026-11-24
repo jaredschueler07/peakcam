@@ -1,6 +1,15 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Script from "next/script";
+import {
+  flushRedditPixelEvents,
+  readRedditPixelId,
+  redditTrack,
+  trackRedditSignUp,
+} from "./reddit-pixel-helpers";
+
+export { flushRedditPixelEvents, readRedditPixelId, redditTrack, trackRedditSignUp };
 
 // ─────────────────────────────────────────────────────────────
 // Reddit Pixel — env-gated, no-op without NEXT_PUBLIC_REDDIT_PIXEL_ID.
@@ -9,41 +18,29 @@ import Script from "next/script";
 // here for conversion attribution (SignUp), not pageview analytics.
 // ─────────────────────────────────────────────────────────────
 
-// Interpolated into an inline <script>; Reddit ids look like `t2_abc123`.
-function readPixelId(): string | undefined {
-  const raw = process.env.NEXT_PUBLIC_REDDIT_PIXEL_ID;
-  return raw && /^[A-Za-z0-9_]+$/.test(raw) ? raw : undefined;
-}
-
-const PIXEL_ID = readPixelId();
-
-declare global {
-  interface Window {
-    rdt?: (...args: unknown[]) => void;
-  }
-}
-
 export function RedditPixel() {
-  if (!PIXEL_ID) return null;
+  const [ready, setReady] = useState(false);
+  const pixelId = readRedditPixelId();
+
+  useEffect(() => {
+    if (ready) flushRedditPixelEvents();
+  }, [ready]);
+
+  if (!pixelId) return null;
 
   return (
-    <Script id="reddit-pixel" strategy="afterInteractive">
+    <Script
+      id="reddit-pixel"
+      strategy="afterInteractive"
+      onReady={() => {
+        flushRedditPixelEvents();
+        setReady(true);
+      }}
+    >
       {`
         !function(w,d){if(!w.rdt){var p=w.rdt=function(){p.sendEvent?p.sendEvent.apply(p,arguments):p.callQueue.push(arguments)};p.callQueue=[];var t=d.createElement("script");t.src="https://www.redditstatic.com/ads/pixel.js",t.async=!0;var s=d.getElementsByTagName("script")[0];s.parentNode.insertBefore(t,s)}}(window,document);
-        rdt('init', '${PIXEL_ID}');
-        rdt('track', 'PageVisit');
+        try{rdt('init', '${pixelId}');rdt('track', 'PageVisit');}catch(e){}
       `}
     </Script>
   );
-}
-
-function redditTrack(event: string, params?: Record<string, unknown>) {
-  if (!PIXEL_ID) return;
-  if (typeof window === "undefined" || typeof window.rdt !== "function") return;
-  window.rdt("track", event, params);
-}
-
-/** Powder-alert subscription accepted by the API. */
-export function trackRedditSignUp() {
-  redditTrack("SignUp");
 }

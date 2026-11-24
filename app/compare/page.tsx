@@ -54,11 +54,13 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
       title: "Compare Ski Resorts Side by Side",
       description,
       siteName: "PeakCam",
+      images: [{ url: `${BASE_URL}/opengraph-image`, width: 1200, height: 630, alt: "Compare Ski Resorts Side by Side" }],
     },
     twitter: {
       card: "summary_large_image",
       title: "Compare Ski Resorts Side by Side",
       description,
+      images: [`${BASE_URL}/opengraph-image`],
     },
   };
 }

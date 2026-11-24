@@ -1,11 +1,14 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import { X } from "lucide-react";
 import { useForecastTime } from "@/lib/use-forecast-time";
 import { hasFreshSnowForecast } from "@/lib/snow-forecast";
 import type { ResortWithData, ConditionRating } from "@/lib/types";
 import { isOffSeason, timeAgo, OFF_SEASON_COLOR } from "@/lib/map-utils";
-import { isDropInResort } from "@/lib/drop-in";
-import DropInLink from "@/components/drop-in/DropInLink";
+import { isDropInEnabled, isDropInResort } from "@/lib/drop-in-flag";
+const DropInLink = dynamic(() => import("@/components/drop-in/DropInLink"));
 import MapCamPreview from "./MapCamPreview";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 
@@ -32,7 +35,42 @@ export default function MapBottomSheet({
   onClose,
   onViewResort,
 }: MapBottomSheetProps) {
-  useBodyScrollLock(true);
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia("(min-width: 1024px)").matches
+      : false,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  useBodyScrollLock(!isDesktop);
+
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    const prevFocus =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeButtonRef.current?.focus();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onCloseRef.current();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      prevFocus?.focus();
+    };
+  }, []);
+
   const snow = resort.snow_report;
   const forecastTime = useForecastTime();
   const camCount = resort.cams.length;
@@ -49,8 +87,8 @@ export default function MapBottomSheet({
     {
       label: "Trails",
       value:
-        snow?.trails_open != null
-          ? `${snow.trails_open}/${snow?.trails_total ?? "?"}`
+        snow?.trails_open != null && snow?.trails_total != null
+          ? `${snow.trails_open}/${snow.trails_total}`
           : "—",
     },
   ];
@@ -67,12 +105,22 @@ export default function MapBottomSheet({
       <div
         className="fixed bottom-0 left-0 right-0 z-50 lg:hidden animate-slide-up"
         role="dialog"
+        aria-modal="true"
         aria-label={`${resort.name} conditions`}
       >
         <div className="bg-cream-50 border-t-[1.5px] border-ink rounded-t-[18px] px-5 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] max-h-[80dvh] overflow-y-auto shadow-[0_-6px_20px_-8px_rgba(42,31,20,0.35)]">
-          {/* Drag handle */}
-          <div className="flex justify-center mb-3">
+          {/* Drag handle + Close */}
+          <div className="relative flex justify-center items-center mb-2 min-h-8">
             <div className="w-10 h-1 bg-bark/40 rounded-full" />
+            <button
+              ref={closeButtonRef}
+              type="button"
+              onClick={onClose}
+              aria-label="Close resort details"
+              className="absolute right-0 top-1/2 -translate-y-1/2 min-h-11 min-w-11 -mr-2 inline-flex items-center justify-center rounded-full text-bark hover:text-ink transition-colors"
+            >
+              <X className="w-4 h-4" aria-hidden />
+            </button>
           </div>
 
           {/* Header */}
@@ -139,7 +187,7 @@ export default function MapBottomSheet({
 
           {/* Drop In — pilot resorts only, above the standard actions so the
               existing View resort / Cams pair keeps its familiar shape. */}
-          {isDropInResort(resort.slug) && (
+          {isDropInEnabled() && isDropInResort(resort.slug) && (
             <DropInLink slug={resort.slug} variant="block" className="mb-3" />
           )}
 

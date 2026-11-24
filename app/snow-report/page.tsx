@@ -32,11 +32,13 @@ export const metadata = {
     url: `${SITE_URL}/snow-report`,
     type: "website" as const,
     siteName: "PeakCam",
+    images: [{ url: `${SITE_URL}/opengraph-image`, width: 1200, height: 630, alt: "Ski Resort Snow Report" }],
   },
   twitter: {
     card: "summary_large_image" as const,
     title: "Live Ski Snow Report",
     description: "Base depth, fresh snow, and lift status for 300+ ski resorts. Updated hourly.",
+    images: [`${SITE_URL}/opengraph-image`],
   },
 };
 

@@ -124,8 +124,6 @@ function withTimeout<T>(promise: Promise<T>, label: string, ms = FAVORITE_STORE_
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
-    // Node's unit test runner must not be kept alive by a resolved call's timer.
-    (timer as { unref?: () => void }).unref?.();
   });
   return Promise.race([promise, timeout]).finally(() => {
     if (timer !== undefined) clearTimeout(timer);

@@ -31,17 +31,18 @@ declare global {
  * page load can never double-count.
  */
 export function buildMetaPixelSnippet(id: string): string {
-  return `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${id}');`;
+  return `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');try{fbq('init','${id}');}catch(e){}`;
 }
 
 /** Snippet for the build-time id. Kept for existing importers. */
 export const META_PIXEL_SNIPPET = buildMetaPixelSnippet(META_PIXEL_ID);
 
+const MAX_PENDING_META_EVENTS = 50;
 const pendingEvents: Array<[string, Record<string, unknown> | undefined]> = [];
 
 /** Replay events captured during hydration before the inline stub existed. */
 export function flushMetaPixelEvents() {
-  if (typeof window === "undefined" || !window.fbq) return;
+  if (typeof window === "undefined" || typeof window.fbq !== "function") return;
   for (const [eventName, params] of pendingEvents.splice(0)) {
     fireMetaPixelEvent(eventName, params);
   }
@@ -57,8 +58,10 @@ export function flushMetaPixelEvents() {
 export function fireMetaPixelEvent(eventName: string, params?: Record<string, unknown>) {
   if (typeof window === "undefined" || !metaPixelId()) return;
   try {
-    if (!window.fbq) {
-      pendingEvents.push([eventName, params]);
+    if (typeof window.fbq !== "function") {
+      if (pendingEvents.length < MAX_PENDING_META_EVENTS) {
+        pendingEvents.push([eventName, params]);
+      }
       return;
     }
     window.fbq("track", eventName, params);

@@ -27,8 +27,8 @@ export function UpdatePassword({ embedded = false }: { embedded?: boolean }) {
     <Heading className="mb-5 font-display text-3xl font-black">{done ? "Password updated." : "Set your password."}</Heading>
     {done ? <p role="status">Your new password is ready to use.</p> : <form onSubmit={submit} className="space-y-4">
       <p className="text-sm text-bark">Use at least 8 characters.</p>
-      <label className="block text-sm font-bold">New password<input type="password" autoComplete="new-password" minLength={8} required value={password} onChange={e => setPassword(e.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-bark px-3 text-base" /></label>
-      <label className="block text-sm font-bold">Confirm new password<input type="password" autoComplete="new-password" required value={confirm} onChange={e => setConfirm(e.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-bark px-3 text-base" /></label>
+      <label className="block text-sm font-bold">New password<input type="password" autoComplete="new-password" minLength={8} required value={password} onChange={e => setPassword(e.target.value)} className="pc-auth-input mt-1 min-h-11 w-full rounded-lg border border-bark bg-cream-50 px-3 text-base text-ink" /></label>
+      <label className="block text-sm font-bold">Confirm new password<input type="password" autoComplete="new-password" required value={confirm} onChange={e => setConfirm(e.target.value)} className="pc-auth-input mt-1 min-h-11 w-full rounded-lg border border-bark bg-cream-50 px-3 text-base text-ink" /></label>
       {error && <p role="alert" className="text-sm text-poor">{error}</p>}
       <button disabled={busy} className="min-h-11 w-full rounded-full bg-alpen-dk px-4 text-sm font-bold text-cream-50">{busy ? "Saving…" : "Save password"}</button>
     </form>}

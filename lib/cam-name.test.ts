@@ -55,6 +55,8 @@ test("the data edge resolves derivable names but never invents a generic one", (
 test("camElevationFt formats a numeric elevation with its unit and drops everything else", () => {
   assert.strictEqual(camElevationFt("9000"), "9,000′");
   assert.strictEqual(camElevationFt(" 11450 "), "11,450′", "surrounding whitespace is trimmed");
+  assert.strictEqual(camElevationFt("6,225 ft"), "6,225′", "approach cam format parses cleanly");
+  assert.strictEqual(camElevationFt("8,500′"), "8,500′");
   assert.strictEqual(camElevationFt("850"), "850′");
   assert.strictEqual(camElevationFt(""), null, "a blank cell is not 0′");
   assert.strictEqual(camElevationFt("   "), null, "whitespace is not an elevation, even though it is truthy");

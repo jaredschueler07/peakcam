@@ -32,7 +32,7 @@ function slippyTileUrl(lat: number | undefined, lng: number | undefined, zoom = 
   }
   const clampedLat = Math.max(-85, Math.min(85, lat));
   const n = 2 ** zoom;
-  const x = Math.floor(((lng + 180) / 360) * n);
+  const x = Math.min(n - 1, Math.max(0, Math.floor(((lng + 180) / 360) * n)));
   const latRad = (clampedLat * Math.PI) / 180;
   const y = Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n);
   return `https://a.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${x}/${y}@2x.png`;
@@ -344,8 +344,7 @@ function ResortBody({
     return isOffSeason(resort.lat, new Date());
   }, [resort.lat]);
 
-  const hasEarlySeasonSnow = (snow?.new_snow_24h ?? 0) >= 2 || (snow?.base_depth ?? 0) >= 20;
-  const showOffSeasonBadge = offSeason && !hasEarlySeasonSnow;
+  const showOffSeasonBadge = offSeason;
   const cond = resort.cond_rating ? conditionColors[resort.cond_rating] : null;
   const camCount = cams.length;
 
@@ -419,6 +418,7 @@ function ResortBody({
           ) : primaryCam ? (
             <div className="relative w-full h-full rounded-xl overflow-hidden border border-ink/20">
               <AutoCamFeed
+                key={primaryCam.id}
                 cam={primaryCam}
                 resortName={resort.name}
                 active={active}
@@ -431,7 +431,7 @@ function ResortBody({
                     type="button"
                     aria-label="Previous camera"
                     onClick={() => setSelectedIdx((i) => (i - 1 + usableCams.length) % usableCams.length)}
-                    className="p-1 hover:text-alpen transition-colors rounded-full"
+                    className="inline-flex items-center justify-center min-h-6 min-w-6 pointer-coarse:min-h-11 pointer-coarse:min-w-11 p-1.5 hover:text-alpen transition-colors rounded-full"
                   >
                     <ChevronLeft size={12} strokeWidth={2.5} />
                   </button>
@@ -442,7 +442,7 @@ function ResortBody({
                     type="button"
                     aria-label="Next camera"
                     onClick={() => setSelectedIdx((i) => (i + 1) % usableCams.length)}
-                    className="p-1 hover:text-alpen transition-colors rounded-full"
+                    className="inline-flex items-center justify-center min-h-6 min-w-6 pointer-coarse:min-h-11 pointer-coarse:min-w-11 p-1.5 hover:text-alpen transition-colors rounded-full"
                   >
                     <ChevronRight size={12} strokeWidth={2.5} />
                   </button>

@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Bug, X } from "lucide-react";
-import { browserDetails, diagnosticsSchema, reportPath, type ReportDiagnostics } from "@/lib/bug-reports/schema";
+import { buildClientDiagnostics, newClientUuid, reportPath, type ReportDiagnostics } from "@/lib/bug-reports/diagnostics";
 import { bugHistory, gameReport, installBugHistory, recordBugAction } from "@/lib/bug-reports/client";
 
 const OpenReport = createContext<(() => void) | null>(null);
@@ -27,14 +27,19 @@ export function BugReportProvider({ children, release }: { children: React.React
   const open = () => {
     returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     recordBugAction("report-opened");
-    sessionId.current ??= crypto.randomUUID();
+    sessionId.current ??= newClientUuid();
     const game = gameReport();
-    const diagnostics = diagnosticsSchema.parse({ version: 1, release: /^(?:[a-f0-9]{7,40}|local)$/.test(release) ? release : "unknown",
-      ...browserDetails(navigator.userAgent),
-      viewport: { width: Math.min(20_000, window.innerWidth), height: Math.min(20_000, window.innerHeight), dpr: Math.min(10, window.devicePixelRatio) },
-      online: navigator.onLine, breadcrumbs: bugHistory(), ...(game ? { game } : {}),
+    const diagnostics = buildClientDiagnostics({
+      release,
+      userAgent: navigator.userAgent,
+      width: window.innerWidth,
+      height: window.innerHeight,
+      dpr: window.devicePixelRatio,
+      online: navigator.onLine,
+      breadcrumbs: bugHistory(),
+      ...(game ? { game } : {}),
     });
-    setDraft({ id: crypto.randomUUID(), pagePath: reportPath(window.location.pathname), diagnostics });
+    setDraft({ id: newClientUuid(), pagePath: reportPath(window.location.pathname), diagnostics });
   };
   return <OpenReport.Provider value={open}>
     {children}
@@ -73,7 +78,7 @@ function BugReportDialog({ draft, sessionId, onClose }: { draft: Draft; sessionI
     const controller = new AbortController(); pending.current = controller;
     const timer = window.setTimeout(() => controller.abort(), 15_000);
     const payload = JSON.stringify({ sessionId, description, pagePath: draft.pagePath, diagnostics: includeDiagnostics ? draft.diagnostics : null });
-    if (previousPayload.current && previousPayload.current !== payload) submissionId.current = crypto.randomUUID();
+    if (previousPayload.current && previousPayload.current !== payload) submissionId.current = newClientUuid();
     previousPayload.current = payload;
     try {
       const response = await fetch("/api/bug-reports", { method: "POST", headers: { "Content-Type": "application/json" },

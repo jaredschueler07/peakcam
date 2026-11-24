@@ -43,8 +43,15 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     description,
     alternates: { canonical: pageUrl(slug) },
     keywords: [`${resort.name} snow history`, `${resort.name} season snowfall`, `${resort.name} snowfall by month`, `${resort.name} powder days`, "ski resort snow history", "season snowfall vs normal"],
-    openGraph: { type: "website", url: pageUrl(slug), title, description, siteName: "PeakCam" },
-    twitter: { card: "summary_large_image", title, description },
+    openGraph: {
+      type: "website",
+      url: pageUrl(slug),
+      title,
+      description,
+      siteName: "PeakCam",
+      images: [{ url: `${SITE_URL}/resorts/${slug}/opengraph-image`, width: 1200, height: 630, alt: title }],
+    },
+    twitter: { card: "summary_large_image", title, description, images: [`${SITE_URL}/resorts/${slug}/opengraph-image`] },
   };
 }
 

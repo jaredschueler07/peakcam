@@ -8,10 +8,10 @@ import { PeakFooter } from "@/components/home/PeakFooter";
 import { Heart, Layout, Loader2 } from "lucide-react";
 
 export default function DashboardPage() {
-  const { widgets, resolved, isLoading, isAuthenticated } = useDashboard();
+  const { widgets, resolved, isLoading, isAuthenticated, loadError } = useDashboard();
 
   return (
-    <div className="min-h-screen bg-bg pc-paper flex flex-col">
+    <div className="min-h-screen bg-cream pc-paper flex flex-col">
       <Header />
 
       <main id="main-content" className="flex-grow container mx-auto px-4 py-6 md:py-8 scroll-mt-16">
@@ -27,10 +27,16 @@ export default function DashboardPage() {
           </p>
         </header>
 
+        {loadError && (
+          <p role="alert" className="mb-4 rounded-xl border-[1.5px] border-poor bg-cream-50 px-4 py-2.5 text-sm font-medium text-poor shadow-stamp-sm">
+            {loadError}
+          </p>
+        )}
+
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-32 gap-4">
-            <Loader2 className="w-10 h-10 text-alpen-dk animate-spin" />
-            <p className="text-bark font-mono animate-pulse uppercase tracking-widest text-xs">
+            <Loader2 className="w-10 h-10 text-alpen-dk motion-safe:animate-spin" />
+            <p className="text-bark font-mono motion-safe:animate-pulse uppercase tracking-widest text-xs">
               Initializing Dashboard...
             </p>
           </div>
@@ -51,7 +57,7 @@ export default function DashboardPage() {
             <div className="space-y-2">
               <h3 className="font-display font-bold text-ink">1. Save favorites</h3>
               <p className="text-sm text-bark leading-relaxed">
-                Tap the heart on a resort card or camera to add it to your dashboard.
+                Tap the heart on a resort card or the star on a camera to add it to your dashboard.
               </p>
             </div>
             <div className="space-y-2">

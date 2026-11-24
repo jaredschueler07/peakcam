@@ -9,6 +9,33 @@ import { AlertDestinations } from "@/components/alerts/AlertDestinations";
 import type { DestinationView } from "@/lib/alerts/destinations";
 import type { ManageFeeds } from "@/lib/alerts/manage";
 
+const CONFIRMED_LATCH_PREFIX = "peakcam_alert_confirmed:";
+const confirmedTokensInMemory = new Set<string>();
+
+function tokenFingerprint(token: string): string {
+  // FNV-1a digest so raw management capability tokens never enter web storage keys.
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < token.length; i++) {
+    hash ^= token.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function shouldTrackConfirmed(token: string): boolean {
+  const fp = tokenFingerprint(token);
+  if (confirmedTokensInMemory.has(fp)) return false;
+  confirmedTokensInMemory.add(fp);
+  try {
+    const key = `${CONFIRMED_LATCH_PREFIX}${fp}`;
+    if (window.sessionStorage.getItem(key) === "1") return false;
+    window.sessionStorage.setItem(key, "1");
+  } catch {
+    // Storage disabled — in-memory guard still suppresses StrictMode double-fires.
+  }
+  return true;
+}
+
 interface Resort {
   id: string;
   name: string;
@@ -53,12 +80,14 @@ export function AlertManagePage({ token, email, preferences, resorts, destinatio
   const [unsubscribed, setUnsubscribed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fire ALERT_CONFIRMED once on mount — by the time this component renders,
-  // the token has already been validated server-side and preferences loaded.
+  // Fire ALERT_CONFIRMED once per session & token — by the time this component
+  // renders, the token has already been validated server-side.
   useEffect(() => {
     // No token fragment in the properties: the sanitizer exists to keep the
     // manage_token out of analytics, and a prefix is pointless anyway.
-    track(EVENTS.ALERT_CONFIRMED);
+    if (shouldTrackConfirmed(token)) {
+      track(EVENTS.ALERT_CONFIRMED);
+    }
 
     // The manage_token is a non-expiring bearer capability (read this
     // subscriber's email, rewrite their alerts, delete the subscription). It
@@ -78,7 +107,7 @@ export function AlertManagePage({ token, email, preferences, resorts, destinatio
         window.location.pathname
       );
     }
-  }, []);
+  }, [token]);
 
   const filteredResorts = resorts.filter(
     (r) =>
@@ -154,14 +183,14 @@ export function AlertManagePage({ token, email, preferences, resorts, destinatio
 
   if (unsubscribed) {
     return (
-      <div className="min-h-screen bg-bg flex items-center justify-center p-8">
-        <div className="max-w-md text-center">
-          <BellOff size={48} className="text-text-muted mx-auto mb-6" />
-          <h1 className="text-2xl font-bold text-text-base mb-3">Unsubscribed</h1>
-          <p className="text-text-subtle mb-6">
+      <div className="min-h-screen bg-cream flex items-center justify-center p-8">
+        <div className="max-w-md rounded-[18px] border-[1.5px] border-ink bg-cream-50 p-8 text-center shadow-stamp">
+          <BellOff size={48} className="text-bark mx-auto mb-6" />
+          <h1 className="font-display text-2xl font-bold text-ink mb-3">Unsubscribed</h1>
+          <p className="text-bark-dk mb-6">
             You've been removed from all powder alerts. No more emails.
           </p>
-          <Link href="/" className="text-cyan hover:underline text-sm">
+          <Link href="/" className="text-forest font-bold hover:underline text-sm">
             Back to PeakCam
           </Link>
         </div>
@@ -170,24 +199,26 @@ export function AlertManagePage({ token, email, preferences, resorts, destinatio
   }
 
   return (
-    <div className="min-h-screen bg-bg">
+    <div className="min-h-screen bg-cream">
       {/* Header */}
-      <div className="border-b border-border bg-surface/80 backdrop-blur-md sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-cyan font-bold text-lg tracking-wider">PEAKCAM</Link>
-          <span className="text-text-muted text-sm">{email}</span>
+      <div className="border-b-[1.5px] border-ink bg-cream-50/90 backdrop-blur-md sticky top-0 z-10">
+        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
+          <Link href="/" className="font-display italic font-black text-lg tracking-tight text-ink">
+            Peak<span className="text-alpen">Cam</span>
+          </Link>
+          <span className="text-bark text-sm truncate">{email}</span>
         </div>
       </div>
 
       <main id="main-content" className="max-w-2xl mx-auto px-4 py-10">
         {/* Title */}
         <div className="flex items-center gap-3 mb-2">
-          <Bell size={24} className="text-cyan" />
-          <h1 className="text-2xl font-bold text-text-base">Powder Alert Settings</h1>
+          <Bell size={24} className="text-forest" />
+          <h1 className="font-display text-2xl font-black text-ink">Powder Alert Settings</h1>
         </div>
-        <p className="text-text-subtle text-sm mb-8">
+        <p className="text-bark-dk text-sm mb-8">
           You'll get an email when a resort you follow hits your snow threshold,
-          including when the forecast reaches it up to a week ahead. Currently tracking <strong className="text-text-base">{selected.size}</strong> resort{selected.size !== 1 ? "s" : ""}.
+          including when the forecast reaches it up to a week ahead. Currently tracking <strong className="text-ink">{selected.size}</strong> resort{selected.size !== 1 ? "s" : ""}.
         </p>
 
         {/* Resort search */}
@@ -196,8 +227,8 @@ export function AlertManagePage({ token, email, preferences, resorts, destinatio
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Filter resorts..."
-          className="w-full px-4 py-2.5 bg-surface border border-border rounded-lg text-text-base
-                     placeholder:text-text-muted outline-none focus:border-cyan/50 mb-4 text-[16px] md:text-sm"
+          className="w-full px-4 py-2.5 bg-cream-50 border-[1.5px] border-ink rounded-full text-ink
+                     placeholder:text-bark outline-none focus:border-alpen-dk mb-4 text-[16px] md:text-sm"
         />
 
         {/* Resort list */}
@@ -208,36 +239,36 @@ export function AlertManagePage({ token, email, preferences, resorts, destinatio
             return (
               <div
                 key={resort.id}
-                className={`rounded-lg border transition-colors duration-150 ${
+                className={`rounded-[14px] border-[1.5px] transition-colors duration-150 ${
                   isOn
-                    ? "bg-cyan/5 border-cyan/30"
-                    : "bg-surface border-border hover:border-border-hi"
+                    ? "bg-forest/10 border-forest"
+                    : "bg-cream-50 border-ink/25 hover:border-ink"
                 }`}
               >
                 <div className="flex items-center gap-3 px-4 py-3">
                   <button
                     onClick={() => toggleResort(resort.id)}
-                    className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
+                    className={`w-5 h-5 rounded border-[1.5px] flex-shrink-0 flex items-center justify-center transition-colors ${
                       isOn
-                        ? "bg-cyan border-cyan"
-                        : "border-border hover:border-text-muted"
+                        ? "bg-forest border-ink"
+                        : "border-ink/40 hover:border-ink"
                     }`}
                     aria-label={isOn ? `Remove ${resort.name}` : `Add ${resort.name}`}
                   >
-                    {isOn && <Check size={12} className="text-bg" strokeWidth={3} />}
+                    {isOn && <Check size={12} className="text-cream-50" strokeWidth={3} />}
                   </button>
 
                   <div className="flex-1 min-w-0">
-                    <p className={`font-medium text-sm truncate ${isOn ? "text-text-base" : "text-text-subtle"}`}>
+                    <p className={`font-medium text-sm truncate ${isOn ? "text-ink" : "text-bark-dk"}`}>
                       {resort.name}
                     </p>
-                    <p className="text-text-muted text-xs">{resort.region}, {resort.state}</p>
+                    <p className="text-bark text-xs">{resort.region}, {resort.state}</p>
                   </div>
 
                   {/* Threshold selector — only visible when selected */}
                   {isOn && (
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-text-muted text-xs">Alert at</span>
+                      <span className="text-bark text-xs">Alert at</span>
                       <select
                         value={threshold}
                         onChange={(e) => {
@@ -247,8 +278,8 @@ export function AlertManagePage({ token, email, preferences, resorts, destinatio
                           }));
                           setSaved(false);
                         }}
-                        className="bg-surface2 border border-border rounded px-2 py-1
-                                   text-text-base text-xs outline-none focus:border-cyan/50"
+                        className="bg-cream-dk border border-ink/40 rounded px-2 py-1
+                                   text-ink text-xs outline-none focus:border-ink"
                       >
                         {/* The shared picker list, plus this subscriber's own value
                             when it came from outside it (the API clamps to 1–48) —
@@ -267,14 +298,14 @@ export function AlertManagePage({ token, email, preferences, resorts, destinatio
           })}
 
           {filteredResorts.length === 0 && (
-            <p className="text-text-muted text-sm text-center py-8">No resorts match your search.</p>
+            <p className="text-bark text-sm text-center py-8">No resorts match your search.</p>
           )}
         </div>
 
         {/* Opening-day mail — one switch for every followed resort */}
         <label
           htmlFor="manage-opening-alerts"
-          className="flex items-start gap-3 rounded-lg border border-border bg-surface px-4 py-3 mb-8 cursor-pointer"
+          className="flex items-start gap-3 rounded-[14px] border-[1.5px] border-ink bg-cream-50 px-4 py-3 mb-8 cursor-pointer shadow-stamp-sm"
         >
           <input
             id="manage-opening-alerts"
@@ -283,11 +314,11 @@ export function AlertManagePage({ token, email, preferences, resorts, destinatio
             onChange={(e) => toggleOpeningAlerts(e.target.checked)}
             className="mt-0.5 w-4 h-4 shrink-0 accent-forest"
           />
-          <span className="text-sm text-text-base">
+          <span className="text-sm text-ink">
             <span className="font-medium">Also email me the morning a selected resort opens</span>
-            <span className="block text-xs text-text-muted mt-0.5">
+            <span className="block text-xs text-bark mt-0.5">
               One note on opening day, once the resort confirms its date. Applies to every resort you follow.{" "}
-              <Link href="/opening-dates" className="text-cyan hover:underline">See opening dates</Link>
+              <Link href="/opening-dates" className="text-forest font-semibold hover:underline">See opening dates</Link>
             </span>
           </span>
         </label>
@@ -297,7 +328,7 @@ export function AlertManagePage({ token, email, preferences, resorts, destinatio
         <AlertDestinations token={token} initialDestinations={destinations} feeds={feeds} />
 
         {error && (
-          <p className="text-red-400 text-sm mb-4">{error}</p>
+          <p className="text-alpen-dk font-medium text-sm mb-4">{error}</p>
         )}
 
         {/* Actions */}
@@ -305,7 +336,7 @@ export function AlertManagePage({ token, email, preferences, resorts, destinatio
           <button
             onClick={handleUnsubscribe}
             disabled={unsubscribing}
-            className="flex items-center gap-2 text-text-muted hover:text-red-400 text-sm
+            className="flex items-center gap-2 text-bark hover:text-alpen-dk text-sm
                        px-2 py-2 pointer-coarse:min-h-11 transition-colors disabled:opacity-50"
           >
             <Trash2 size={14} />
@@ -315,15 +346,15 @@ export function AlertManagePage({ token, email, preferences, resorts, destinatio
           <button
             onClick={handleSave}
             disabled={saving || saved}
-            className={`flex items-center gap-2 px-5 py-2.5 pointer-coarse:min-h-11 rounded-lg text-sm font-semibold
+            className={`flex items-center gap-2 px-5 py-2.5 min-h-11 rounded-full border-[1.5px] border-ink text-sm font-bold shadow-stamp-sm
                         transition-colors disabled:opacity-60 ${
                           saved
-                            ? "bg-green-500/20 border border-green-500/40 text-green-400"
-                            : "bg-cyan text-bg hover:bg-cyan/90"
+                            ? "bg-forest/15 text-forest"
+                            : "bg-forest text-cream-50 hover:bg-forest-dk"
                         }`}
           >
             {saving ? (
-              <><Loader2 size={14} className="animate-spin" /> Saving...</>
+              <><Loader2 size={14} className="motion-safe:animate-spin" /> Saving...</>
             ) : saved ? (
               <><Check size={14} /> Saved</>
             ) : (

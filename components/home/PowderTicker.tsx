@@ -20,7 +20,7 @@ export function PowderTicker({ alerts }: PowderTickerProps) {
         <div className="flex items-center gap-3 px-6 shrink-0">
           <div className="flex items-center gap-2">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-alpen opacity-75" />
+              <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-alpen opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-alpen" />
             </span>
             <span className="font-display font-black italic text-[18px] text-alpen tracking-[-0.01em]">
@@ -34,7 +34,7 @@ export function PowderTicker({ alerts }: PowderTickerProps) {
 
         {/* Scrolling ticker — duplicated for seamless loop */}
         <div className="flex-1 overflow-hidden">
-          <div className="flex gap-6 whitespace-nowrap animate-ticker">
+          <div className="flex gap-6 whitespace-nowrap motion-safe:animate-ticker motion-reduce:flex-wrap motion-reduce:whitespace-normal">
             {[...alerts, ...alerts].map((alert, index) => (
               <div key={index} className="flex items-center gap-2 shrink-0">
                 <span className="text-alpen text-lg leading-none">&#10052;</span>

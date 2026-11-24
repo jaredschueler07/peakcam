@@ -23,8 +23,9 @@ import { AuthModal } from "@/components/auth/AuthModal";
 import { stageGuestLineup } from "@/components/auth/lineup-gate";
 import { trackResortView, trackCamClick } from "@/lib/posthog";
 import { trackViewContent } from "@/lib/meta-pixel-events";
-import { isDropInResort } from "@/lib/drop-in";
-import DropInLink from "@/components/drop-in/DropInLink";
+import { isDropInEnabled, isDropInResort } from "@/lib/drop-in-flag";
+const DropInLink = dynamic(() => import("@/components/drop-in/DropInLink"));
+import { isOffSeason, OFF_SEASON_COLOR, parseConditionsString } from "@/lib/map-utils";
 import { useHydrated } from "@/lib/use-hydrated";
 import { formatLocalDateTime, formatUtcDate } from "@/lib/format-date";
 import { ResortAlertCapture } from "@/components/alerts/ResortAlertCapture";
@@ -115,12 +116,12 @@ const readIsLgOnServer = () => false;
 
 // ─── Conditions strip ────────────────────────────────────────────────────────
 
-function ConditionsStrip({ resort }: { resort: ResortWithData }) {
+function ConditionsStrip({ resort, offSeason }: { resort: ResortWithData; offSeason: boolean }) {
   const snow = resort.snow_report;
   if (!snow) return null;
 
   const trendIcons: Record<string, string> = { rising: "↑", stable: "→", falling: "↓" };
-  const trendColors: Record<string, string> = { rising: "text-[#2ECC8F]", stable: "text-text-subtle", falling: "text-red-400" };
+  const trendColors: Record<string, string> = { rising: "text-forest", stable: "text-bark-dk", falling: "text-alpen-dk" };
   const outlookLabels: Record<string, string> = {
     more_snow: "More snow expected",
     stable: "Conditions stable",
@@ -128,73 +129,69 @@ function ConditionsStrip({ resort }: { resort: ResortWithData }) {
     melt_risk: "Melt risk",
   };
   const outlookColors: Record<string, string> = {
-    more_snow: "text-cyan",
-    stable: "text-text-subtle",
-    warming: "text-yellow-400",
-    melt_risk: "text-red-400",
+    more_snow: "text-forest",
+    stable: "text-bark-dk",
+    warming: "text-mustard-dk",
+    melt_risk: "text-alpen-dk",
   };
 
   const stats = [
-    { label: "Base Depth", value: snow.base_depth != null ? `${snow.base_depth}″` : "—", color: "text-powder" },
-    { label: "24h New Snow", value: snow.new_snow_24h != null ? `${snow.new_snow_24h}″` : "—", color: "text-cyan" },
-    { label: "48h New Snow", value: snow.new_snow_48h != null ? `${snow.new_snow_48h}″` : "—", color: "text-text-subtle" },
-    ...(snow.swe_in != null ? [{ label: "SWE", value: `${snow.swe_in}″`, color: "text-text-base" }] : []),
-    ...(snow.pct_of_normal != null ? [{
+    { label: "Base Depth", value: snow.base_depth != null ? `${snow.base_depth}″` : "—", color: "text-ink" },
+    { label: "24h New Snow", value: snow.new_snow_24h != null ? `${snow.new_snow_24h}″` : "—", color: (snow.new_snow_24h ?? 0) >= 8 ? "text-alpen-dk" : "text-ink" },
+    { label: "48h New Snow", value: snow.new_snow_48h != null ? `${snow.new_snow_48h}″` : "—", color: "text-bark-dk" },
+    ...(snow.swe_in != null ? [{ label: "SWE", value: `${snow.swe_in}″`, color: "text-ink" }] : []),
+    ...(!offSeason && snow.pct_of_normal != null ? [{
       label: "% of Normal",
       value: `${snow.pct_of_normal}%`,
-      color: snow.pct_of_normal >= 110 ? "text-[#2ECC8F]" : snow.pct_of_normal >= 90 ? "text-text-base" : snow.pct_of_normal >= 70 ? "text-yellow-400" : "text-red-400",
+      color: snow.pct_of_normal >= 110 ? "text-forest" : snow.pct_of_normal >= 90 ? "text-ink" : snow.pct_of_normal >= 70 ? "text-mustard-dk" : "text-alpen-dk",
     }] : []),
-    ...(snow.trend_7d ? [{
+    ...(!offSeason && snow.trend_7d ? [{
       label: "7-Day Trend",
       value: `${trendIcons[snow.trend_7d] ?? ""} ${snow.trend_7d.charAt(0).toUpperCase() + snow.trend_7d.slice(1)}`,
-      color: trendColors[snow.trend_7d] ?? "text-text-base",
+      color: trendColors[snow.trend_7d] ?? "text-ink",
     }] : []),
     {
       label: "Trails Open",
       value: snow.trails_open != null ? `${snow.trails_open}${snow.trails_total ? `/${snow.trails_total}` : ""}` : "—",
-      color: "text-text-base",
+      color: "text-ink",
     },
     {
       label: "Lifts Open",
       value: snow.lifts_open != null ? `${snow.lifts_open}${snow.lifts_total ? `/${snow.lifts_total}` : ""}` : "—",
-      color: "text-text-base",
+      color: "text-ink",
     },
   ];
+
+  const { tags, narrative } = parseConditionsString(snow.conditions);
 
   return (
     <div className="flex flex-wrap gap-3">
       {stats.map((s) => (
-        <div key={s.label} className="bg-surface border border-border rounded-xl px-4 py-3 min-w-[100px]">
+        <div key={s.label} className="bg-cream-50 border border-ink/20 rounded-xl px-4 py-3 min-w-[100px]">
           <div className={`text-2xl font-bold ${s.color} leading-none`}>{s.value}</div>
-          <div className="text-text-muted text-xs mt-1">{s.label}</div>
+          <div className="text-bark text-xs mt-1">{s.label}</div>
         </div>
       ))}
-      {(() => {
-        if (!snow.conditions) return null;
-        const conditionsRaw = snow.conditions;
-        const [tagsStr, narrativeStr] = conditionsRaw.includes("||") ? conditionsRaw.split("||") : ["", conditionsRaw];
-        const tags = tagsStr ? tagsStr.split(",") : [];
-        const narrative = narrativeStr || conditionsRaw;
-
-        return (
-          <div className="bg-surface border border-border rounded-xl px-4 py-3 flex-1 min-w-[200px]">
-            {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-2">
-                {tags.map((tag) => (
-                  <span key={tag} className="px-2 py-0.5 rounded bg-surface2 border border-border text-text-subtle text-[10px] uppercase tracking-wider font-bold">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-            <div className="text-text-base text-sm font-medium leading-snug">{narrative}</div>
-          </div>
-        );
-      })()}
-      {snow.outlook && (
-        <div className={`bg-surface border border-border rounded-xl px-4 py-3 ${outlookColors[snow.outlook] ?? "text-text-base"}`}>
+      {(tags.length > 0 || narrative.length > 0) && (
+        <div className="bg-cream-50 border border-ink/20 rounded-xl px-4 py-3 flex-1 min-w-[200px]">
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {tags.map((tag) => (
+                <span key={tag} className="px-2 py-0.5 rounded bg-cream border border-ink/15 text-bark-dk text-[10px] uppercase tracking-wider font-bold">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+          {narrative && (
+            <div className="text-ink text-sm font-medium leading-snug">{narrative}</div>
+          )}
+        </div>
+      )}
+      {!offSeason && snow.outlook && (
+        <div className={`bg-cream-50 border border-ink/20 rounded-xl px-4 py-3 ${outlookColors[snow.outlook] ?? "text-ink"}`}>
           <div className="text-sm font-semibold">{outlookLabels[snow.outlook] ?? snow.outlook}</div>
-          <div className="text-text-muted text-xs mt-1">Outlook</div>
+          <div className="text-bark text-xs mt-1">Outlook</div>
         </div>
       )}
     </div>
@@ -208,6 +205,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
   const embeddableCams = activeCams.filter((c) => c.embed_type !== "link");
   const snow = resort.snow_report;
   const forecastTime = useForecastTime();
+  const [offSeason] = useState(() => isOffSeason(resort.lat, new Date()));
   const isUS = resort.country === "US";
   const { user, isFavorite, toggle: toggleFav } = useFavorites();
   // Which surface raised the auth gate (resort_save, resort_nudge) — the
@@ -273,7 +271,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
   }, []);
 
   return (
-    <div className="min-h-screen bg-bg">
+    <div className="min-h-screen pc-paper">
       {authSource && (
         <AuthModal
           onClose={closeSaveGate}
@@ -287,7 +285,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
       <Header showSearch={false} />
 
       {/* ── Hero ──────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-b from-surface2 to-bg border-b border-border px-4 py-6 md:px-8 md:py-8">
+      <div className="bg-gradient-to-b from-cream-dk/70 to-cream border-b border-ink/20 px-4 py-6 md:px-8 md:py-8">
         <div className="max-w-5xl mx-auto">
           {breadcrumb && breadcrumb.length > 0 ? (
             <div className="mb-4 py-2">
@@ -296,7 +294,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
           ) : (
             <Link
               href="/"
-              className="inline-flex items-center gap-1.5 text-text-muted hover:text-cyan text-sm py-2 px-1 pointer-coarse:min-h-11 transition-colors mb-4"
+              className="inline-flex items-center gap-1.5 text-bark hover:text-ink text-sm py-2 px-1 pointer-coarse:min-h-11 transition-colors mb-4"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -305,20 +303,20 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
             </Link>
           )}
 
-          {hasCurrentSnowForecast(hourlyData, forecastTime ?? NaN) && (
-            <div className="flex items-center gap-2 px-3 py-1.5 mb-4 bg-cyan/10 border border-cyan/30 rounded-lg w-fit">
-              <svg className="w-4 h-4 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {!offSeason && hasCurrentSnowForecast(hourlyData, forecastTime ?? NaN) && (
+            <div className="flex items-center gap-2 px-3 py-1.5 mb-4 bg-sky/70 border border-ink/30 rounded-lg w-fit">
+              <svg className="w-4 h-4 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M12 2v4m0 12v4m-6.93-2.93l2.83-2.83m8.2-8.2l2.83-2.83M2 12h4m12 0h4m-2.93 6.93l-2.83-2.83m-8.2-8.2L4.07 5.07" />
               </svg>
-              <span className="text-cyan text-sm font-semibold">Snow forecast</span>
+              <span className="text-ink text-sm font-semibold">Snow forecast</span>
             </div>
           )}
 
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
               <div className="min-w-0">
-                <h1 className="break-words text-3xl md:text-4xl font-heading font-bold text-text-base uppercase tracking-wider leading-tight">
+                <h1 className="break-words text-3xl md:text-4xl font-heading font-bold text-ink uppercase tracking-wider leading-tight">
                   {resort.name}
                 </h1>
               </div>
@@ -340,7 +338,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
                   )}
                 </p>
               )}
-              <p className="text-text-muted text-sm mt-1.5">
+              <p className="text-bark text-sm mt-1.5">
                 {resort.region} · {resort.state}
               </p>
             </div>
@@ -348,7 +346,14 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
               {conditions && conditions.contract.status.value && (
                 <StatusChip status={conditions.contract.status.value} sentence={conditions.sentence} source={conditions.contract.status.source} liftDayState={conditions.contract.liftDay?.state} />
               )}
-              {resort.cond_rating && (
+              {offSeason ? (
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full border border-ink px-2.5 py-1 text-[11.5px] font-bold uppercase tracking-[0.08em] text-ink"
+                  style={{ backgroundColor: OFF_SEASON_COLOR }}
+                >
+                  Off-season
+                </span>
+              ) : resort.cond_rating && (
                 <ConditionBadge
                   rating={resort.cond_rating}
                   label={resort.cond_rating.charAt(0).toUpperCase() + resort.cond_rating.slice(1)}
@@ -362,8 +367,8 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
                 }}
                 className={`inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 text-sm font-bold transition-all duration-[220ms] ${
                   favorited
-                    ? "bg-alpenglow/15 border-alpenglow/40 text-alpenglow hover:bg-alpenglow/25"
-                    : "bg-surface2/50 border-border text-text-muted hover:text-alpenglow hover:border-alpenglow/30 hover:bg-alpenglow/10"
+                    ? "bg-alpen/15 border-alpen/40 text-alpen-dk hover:bg-alpen/25"
+                    : "bg-cream-50 border-ink/20 text-bark hover:text-alpen-dk hover:border-alpen/40 hover:bg-alpen/10"
                 }`}
                 aria-label={favorited ? `Remove ${resort.name} from your saved mountains` : `Save ${resort.name} to your mountains`}
                 aria-pressed={favorited}
@@ -375,7 +380,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 {resort.instagram_url && (
                   <a href={resort.instagram_url} target="_blank" rel="noopener noreferrer"
-                    className="text-text-muted hover:text-cyan transition-colors p-2 pointer-coarse:p-3 -m-1" aria-label="Instagram" title="Instagram">
+                    className="text-bark hover:text-alpen-dk transition-colors p-2 pointer-coarse:p-3 -m-1" aria-label="Instagram" title="Instagram">
                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
                     </svg>
@@ -383,7 +388,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
                 )}
                 {resort.facebook_url && (
                   <a href={resort.facebook_url} target="_blank" rel="noopener noreferrer"
-                    className="text-text-muted hover:text-cyan transition-colors p-2 pointer-coarse:p-3 -m-1" aria-label="Facebook" title="Facebook">
+                    className="text-bark hover:text-alpen-dk transition-colors p-2 pointer-coarse:p-3 -m-1" aria-label="Facebook" title="Facebook">
                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                     </svg>
@@ -391,7 +396,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
                 )}
                 {resort.x_url && (
                   <a href={resort.x_url} target="_blank" rel="noopener noreferrer"
-                    className="text-text-muted hover:text-cyan transition-colors p-2 pointer-coarse:p-3 -m-1" aria-label="X (Twitter)" title="X (Twitter)">
+                    className="text-bark hover:text-alpen-dk transition-colors p-2 pointer-coarse:p-3 -m-1" aria-label="X (Twitter)" title="X (Twitter)">
                     <svg className="w-[18px] h-[18px]" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                     </svg>
@@ -402,7 +407,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
                     href={resort.website_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-text-muted hover:text-cyan text-sm border border-border hover:border-border-hi
+                    className="text-bark hover:text-ink text-sm border border-ink/20 hover:border-ink/40 bg-cream-50
                                inline-flex min-h-11 items-center rounded-lg px-3 py-1.5 transition-all duration-150"
                   >
                     Resort site ↗
@@ -445,7 +450,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
         {/* Drop In — pilot resorts only. The map cards were the only way in, so
             the game's own "Back to conditions" landed you on a page with no way
             to return to it. */}
-        {isDropInResort(resort.slug) && (
+        {isDropInEnabled() && isDropInResort(resort.slug) && (
           <section>
             <DropInLink slug={resort.slug} variant="block" />
           </section>
@@ -466,7 +471,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
           </section>
         ) : (
           <section>
-            <div className="bg-surface border border-border rounded-xl p-6 text-center text-text-muted text-sm">
+            <div className="bg-cream-50 border border-ink/20 rounded-xl p-6 text-center text-bark text-sm">
               Forecast unavailable — weather data temporarily unreachable.
             </div>
           </section>
@@ -485,28 +490,35 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
         {snow ? (
           <section id="conditions-report" className="scroll-mt-20">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">Snow Report</h2>
+              <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-ink">Snow Report</h2>
               {resort.snotel_station_id && (
                 <a
                   href={`https://www.nrcs.usda.gov/wps/portal/wcc/home/snowpackProfile?station=${resort.snotel_station_id}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-text-muted hover:text-cyan text-xs py-2 px-1 pointer-coarse:min-h-11 inline-flex items-center transition-colors"
+                  className="text-bark hover:text-alpen-dk text-xs py-2 px-1 pointer-coarse:min-h-11 inline-flex items-center transition-colors"
                 >
                   SNOTEL Source ↗
                 </a>
               )}
             </div>
-            <ConditionsStrip resort={resort} />
-            <p className="text-text-muted text-xs mt-2">
-              Updated <UpdatedStamp iso={snow.updated_at} /> · Source: {snow.source}
+            <ConditionsStrip resort={resort} offSeason={offSeason} />
+            <p className="text-bark text-xs mt-2">
+              Updated <UpdatedStamp iso={snow.updated_at} /> · Source:{" "}
+              {snow.source === "open_meteo"
+                ? "Open-Meteo model estimate"
+                : snow.source === "snotel"
+                  ? "NRCS SNOTEL station"
+                  : snow.source === "pipeline"
+                    ? "Multi-source station blend"
+                    : snow.source}
             </p>
             {conditions && <FreshnessLabels contract={conditions.contract} />}
           </section>
         ) : (
           <section id="conditions-report" className="scroll-mt-20">
-            <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base mb-3">Snow Report</h2>
-            <div className="bg-surface border border-border rounded-xl p-6 text-center text-text-muted text-sm">
+            <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-ink mb-3">Snow Report</h2>
+            <div className="bg-cream-50 border border-ink/20 rounded-xl p-6 text-center text-bark text-sm">
               No snow data available yet. Check back after the first SNOTEL sync.
             </div>
           </section>
@@ -524,13 +536,13 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
         {forecastPeriods && forecastPeriods.length > 0 ? (
           <section id="forecast" className="scroll-mt-20">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">5-Day Forecast</h2>
+              <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-ink">5-Day Forecast</h2>
               {isUS && (
                 <a
                   href={`https://forecast.weather.gov/MapClick.php?lat=${resort.lat}&lon=${resort.lng}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-text-muted hover:text-cyan text-xs py-2 px-1 pointer-coarse:min-h-11 inline-flex items-center transition-colors"
+                  className="text-bark hover:text-alpen-dk text-xs py-2 px-1 pointer-coarse:min-h-11 inline-flex items-center transition-colors"
                 >
                   NWS Forecast ↗
                 </a>
@@ -544,7 +556,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
               </div>
             )}
             <ForecastTable periods={forecastPeriods} />
-            <p className="text-text-muted text-xs mt-2">
+            <p className="text-bark text-xs mt-2">
               {forecastStrip
                 ? `Snow amounts: PeakCam blend of ${forecastStrip.summary.models.length} models (Open-Meteo, CC BY 4.0) · Narrative, temperature and wind: ${isUS ? "National Weather Service" : "Open-Meteo"} · Updated hourly`
                 : isUS
@@ -555,13 +567,13 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
         ) : (
           <section id="forecast" className="scroll-mt-20">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">{forecastStrip ? "14-Day Forecast" : "5-Day Forecast"}</h2>
+              <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-ink">{forecastStrip ? "14-Day Forecast" : "5-Day Forecast"}</h2>
               {isUS && (
                 <a
                   href={`https://forecast.weather.gov/MapClick.php?lat=${resort.lat}&lon=${resort.lng}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-text-muted hover:text-cyan text-xs py-2 px-1 pointer-coarse:min-h-11 inline-flex items-center transition-colors"
+                  className="text-bark hover:text-alpen-dk text-xs py-2 px-1 pointer-coarse:min-h-11 inline-flex items-center transition-colors"
                 >
                   NWS Forecast ↗
                 </a>
@@ -570,7 +582,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
             {forecastStrip ? (
               <ForecastStrip data={forecastStrip} />
             ) : (
-              <div className="bg-surface border border-border rounded-xl p-6 text-center text-text-muted text-sm">
+              <div className="bg-cream-50 border border-ink/20 rounded-xl p-6 text-center text-bark text-sm">
                 Weather data temporarily unavailable.
               </div>
             )}
@@ -592,7 +604,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
         {/* Live cams */}
         <section id="cameras" className="scroll-mt-20">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base">
+            <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-ink">
               Live Cams
               {/* Real separator text — a CSS margin alone glued the count onto
                   "Cams" in the accessibility tree ("Live Cams3 available"). */}
@@ -608,7 +620,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
                 href={resort.cam_page_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-text-muted hover:text-cyan text-xs transition-colors"
+                className="text-bark hover:text-alpen-dk text-xs transition-colors"
               >
                 View all on resort site ↗
               </a>
@@ -616,11 +628,11 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
           </div>
 
           {activeCams.length === 0 ? (
-            <div className="bg-surface border border-border rounded-xl p-6 text-center text-text-muted text-sm">
+            <div className="bg-cream-50 border border-ink/20 rounded-xl p-6 text-center text-bark text-sm">
               No cams indexed yet for this resort.{" "}
               {resort.cam_page_url && (
                 <a href={resort.cam_page_url} target="_blank" rel="noopener noreferrer"
-                  className="text-cyan hover:underline">
+                  className="text-alpen-dk hover:underline">
                   View on resort website ↗
                 </a>
               )}
@@ -660,9 +672,9 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
               />
               {/* A single-cam resort has nothing left for the grid on phones. */}
               {activeCams.length === 1 && (
-                <p className="text-text-muted text-sm lg:hidden">
+                <p className="text-bark text-sm lg:hidden">
                   The only cam we have for {resort.name} is at the top of this page.{" "}
-                  <a href="#lead-cam" className="text-cyan hover:underline">
+                  <a href="#lead-cam" className="text-alpen-dk hover:underline">
                     Jump to it ↑
                   </a>
                 </p>
@@ -678,7 +690,7 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
 
         {/* Community conditions — vote + detailed report */}
         <section>
-          <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-text-base mb-4">
+          <h2 className="font-heading text-xl font-semibold uppercase tracking-wider text-ink mb-4">
             Community Conditions
           </h2>
           <div className="space-y-4">
@@ -687,11 +699,11 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
                 to … get powder alerts" nudge; the account is the secondary ask. */}
             <ResortAlertCapture resort={resort} subscribed={alertSubscribed} onSubscribed={() => setAlertSubscribed(true)} />
             {!user && (
-              <p className="text-text-muted text-xs text-center">
+              <p className="text-bark text-xs text-center">
                 <button
                   type="button"
                   onClick={() => openSaveGate("resort_nudge")}
-                  className="inline-flex min-h-11 items-center px-1 text-cyan hover:underline"
+                  className="inline-flex min-h-11 items-center px-1 text-alpen-dk hover:underline"
                 >
                   Save {resort.name} with a free account
                 </button>
@@ -704,10 +716,10 @@ export function ResortDetailPage({ resort, weather, forecastPeriods, forecastStr
 
         {/* Footer nav. The "More in {State} →" hub link lives in NearbyResorts
             above, next to the compare and region links — not repeated here. */}
-        <div className="border-t border-border pt-6">
+        <div className="border-t border-ink/20 pt-6">
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 text-text-muted hover:text-cyan text-sm transition-colors"
+            className="inline-flex items-center gap-1.5 text-bark hover:text-ink text-sm transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />

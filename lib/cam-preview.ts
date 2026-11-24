@@ -63,7 +63,9 @@ export function providerStill(cam: Cam): CameraPreview | null {
 function providerStillSource(cam: Cam): CameraPreview | null {
   const p = (src: string, label: string): CameraPreview => ({ cam, src, label, capturedAt: null });
   if (cam.embed_type === "image" && cam.embed_url?.startsWith("https://")) return p(cam.embed_url, "Camera still");
-  if (cam.embed_type === "youtube") return p(`https://i.ytimg.com/vi/${cam.youtube_id}/hqdefault.jpg`, "Stream preview");
+  if (cam.embed_type === "youtube") {
+    return /^[\w-]{11}$/.test(cam.youtube_id ?? "") ? p(`https://i.ytimg.com/vi/${cam.youtube_id}/hqdefault.jpg`, "Stream preview") : null;
+  }
   if (cam.embed_type !== "iframe" || !cam.embed_url) return null;
   const url = new URL(cam.embed_url);
   if (url.protocol !== "https:") return null;

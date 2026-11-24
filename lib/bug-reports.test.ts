@@ -9,13 +9,33 @@ const payload = () => ({ id: randomUUID(), sessionId: randomUUID(), description:
 const request = (body: unknown, headers: Record<string, string> = {}) => new Request("https://peakcam.io/api/bug-reports", { method: "POST", headers: { origin: "https://peakcam.io", "content-type": "application/json", "x-forwarded-for": "192.0.2.123", ...headers }, body: JSON.stringify(body) });
 const deps = (overrides: Partial<ReportDependencies> = {}): ReportDependencies => ({ secret: "unit-test-secret", release: "local", now: () => new Date("2026-09-07T23:59:00Z"), store: async input => ({ id: input.report.id }), ...overrides });
 
-test("report context excludes query tokens, fragments and unknown private routes", () => {
+test("report context excludes query tokens, fragments and unknown private routes", async () => {
   assert.equal(reportPath("/auth/callback?code=private#token"), "/auth/callback");
   assert.equal(reportPath("/resorts/breckenridge/drop-in?seed=secret"), "/resorts/breckenridge/drop-in");
+  for (const allowed of [
+    "/resorts/breckenridge/snow-report?foo=bar",
+    "/resorts/breckenridge/snow-forecast",
+    "/resorts/breckenridge/webcams",
+    "/resorts/breckenridge/history",
+    "/opening-dates",
+    "/passes/ikon-pass",
+    "/ski-cams/colorado",
+    "/snow-report/percent-of-normal",
+    "/snow-report/best-powder-this-week",
+    "/privacy",
+    "/terms",
+  ]) {
+    assert.equal(reportPath(allowed), allowed.split("?")[0]);
+  }
   for (const path of ["https://evil.test/map", "/people/person@example.org", "/account/private-id"]) assert.equal(reportPath(path), "/other");
   assert.equal(errorLocation("https://peakcam.io/_next/static/chunks/app-abc.js?secret=123", "https://peakcam.io"), "/_next/static/chunks/app-abc.js");
   assert.equal(errorLocation("https://other.test/_next/static/a.js", "https://peakcam.io"), undefined);
   assert.equal(errorLocation("https://peakcam.io/uploads/private.js", "https://peakcam.io"), undefined);
+
+  const diagSource = await import("node:fs/promises").then((fs) =>
+    fs.readFile(new URL("./bug-reports/diagnostics.ts", import.meta.url), "utf8"),
+  );
+  assert.equal(/\bzod\b/.test(diagSource), false, "diagnostics.ts must remain Zod-free");
 });
 
 test("diagnostics allowlist strips unknown data at every nested boundary", () => {

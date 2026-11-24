@@ -30,11 +30,11 @@ import { formatUtcDate, timeAgo } from "@/lib/format-date";
 // icy/slush keys never matched a submitted value, so reports rendered
 // without a snow-quality label.
 const snowLabels: Record<UserSnowQuality, { label: string; icon: any; color: string }> = {
-  powder:  { label: "Powder",  icon: CloudSnow,    color: "text-powder" },
-  packed:  { label: "Packed",  icon: CheckCircle2, color: "text-cyan" },
-  crud:    { label: "Crud",    icon: Layers,       color: "text-fair" },
+  powder:  { label: "Powder",  icon: CloudSnow,    color: "text-forest" },
+  packed:  { label: "Packed",  icon: CheckCircle2, color: "text-forest" },
+  crud:    { label: "Crud",    icon: Layers,       color: "text-mustard-dk" },
   ice:     { label: "Ice",     icon: IceCream,     color: "text-good" },
-  spring:  { label: "Spring",  icon: Droplets,     color: "text-fair" },
+  spring:  { label: "Spring",  icon: Droplets,     color: "text-mustard-dk" },
 };
 
 const visibilityLabels: Record<string, { label: string; icon: any }> = {
@@ -73,7 +73,7 @@ export function UserConditionsList({ conditions }: Props) {
 
   if (conditions.length === 0) {
     return (
-      <div className="bg-surface border border-border rounded-xl p-6 text-center text-text-muted text-sm">
+      <div className="bg-cream-50 border border-ink/20 rounded-xl p-6 text-center text-bark text-sm">
         No recent reports. Be the first to submit conditions for today!
       </div>
     );
@@ -95,35 +95,35 @@ export function UserConditionsList({ conditions }: Props) {
         return (
           <div
             key={c.id}
-            className="bg-surface border border-border rounded-xl p-4"
+            className="bg-cream-50 border border-ink/20 rounded-xl p-4"
           >
             {/* Top row: snow quality + time */}
             <div className="flex items-start justify-between gap-3 mb-3">
               <div className="flex items-center gap-2">
                 {SnowIcon && <SnowIcon size={18} className={snow?.color} />}
-                <span className={`text-sm font-semibold ${snow?.color ?? "text-text-base"}`}>
+                <span className={`text-sm font-semibold ${snow?.color ?? "text-ink"}`}>
                   {snow?.label}
                 </span>
               </div>
-              <time dateTime={c.created_at} className="text-text-muted text-[11px] shrink-0">
+              <time dateTime={c.created_at} className="text-bark text-[11px] shrink-0">
                 {nowMs === null ? formatUtcDate(c.created_at) : timeAgo(c.created_at, nowMs)}
               </time>
             </div>
 
             {/* Condition pills */}
             <div className="flex flex-wrap gap-1.5 mb-3">
-              <span className="inline-flex items-center gap-1.5 text-xs bg-surface2 border border-border
-                rounded-full px-2.5 py-1 text-text-subtle">
+              <span className="inline-flex items-center gap-1.5 text-xs bg-cream border border-ink/15
+                rounded-full px-2.5 py-1 text-bark-dk">
                 {VisIcon && <VisIcon size={13} />}
                 {vis?.label}
               </span>
-              <span className="inline-flex items-center gap-1.5 text-xs bg-surface2 border border-border
-                rounded-full px-2.5 py-1 text-text-subtle">
+              <span className="inline-flex items-center gap-1.5 text-xs bg-cream border border-ink/15
+                rounded-full px-2.5 py-1 text-bark-dk">
                 {WindIcon && <WindIcon size={13} />}
                 {wind?.label} wind
               </span>
-              <span className="inline-flex items-center gap-1.5 text-xs bg-surface2 border border-border
-                rounded-full px-2.5 py-1 text-text-subtle">
+              <span className="inline-flex items-center gap-1.5 text-xs bg-cream border border-ink/15
+                rounded-full px-2.5 py-1 text-bark-dk">
                 {TrailIcon && <TrailIcon size={13} />}
                 {trail?.label}
               </span>
@@ -131,7 +131,7 @@ export function UserConditionsList({ conditions }: Props) {
 
             {/* Notes */}
             {c.notes && (
-              <p className="text-text-subtle text-xs leading-relaxed italic border-t border-border pt-2 mt-2">
+              <p className="text-bark-dk text-xs leading-relaxed italic border-t border-ink/15 pt-2 mt-2">
                 &ldquo;{c.notes}&rdquo;
               </p>
             )}

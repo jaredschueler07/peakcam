@@ -1,5 +1,5 @@
 import { BugHistory } from "./history";
-import { errorLocation, errorNameSchema, gameReportSchema, type Breadcrumb, type BugAction, type GameReport } from "./schema";
+import { errorLocation, parseErrorName, parseGameReport, type Breadcrumb, type BugAction, type GameReport } from "./diagnostics";
 
 const history = new BugHistory();
 let gameProvider: (() => GameReport) | undefined;
@@ -15,7 +15,7 @@ export function registerGameReport(provider: () => GameReport): () => void {
   return () => { if (gameProvider === provider) gameProvider = undefined; };
 }
 export function gameReport(): GameReport | undefined {
-  try { const parsed = gameReportSchema.safeParse(gameProvider?.()); return parsed.success ? parsed.data : undefined; }
+  try { return parseGameReport(gameProvider?.()); }
   catch { return undefined; }
 }
 
@@ -35,13 +35,13 @@ export function installBugHistory(): () => void {
   };
   const error = (event: Event) => {
     if (!(event instanceof ErrorEvent)) { recordBugAction("resource-error"); return; }
-    const name = errorNameSchema.safeParse(event.error instanceof Error ? event.error.name : "Error");
-    recordBugAction("javascript-error", { errorName: name.success ? name.data : "UnknownError",
+    const errorName = parseErrorName(event.error instanceof Error ? event.error.name : "Error");
+    recordBugAction("javascript-error", { errorName,
       source: errorLocation(event.filename, window.location.origin), line: event.lineno, column: event.colno });
   };
   const rejection = (event: PromiseRejectionEvent) => {
-    const name = errorNameSchema.safeParse(event.reason instanceof Error ? event.reason.name : "UnknownError");
-    recordBugAction("unhandled-rejection", { errorName: name.success ? name.data : "UnknownError" });
+    const errorName = parseErrorName(event.reason instanceof Error ? event.reason.name : "UnknownError");
+    recordBugAction("unhandled-rejection", { errorName });
   };
   const offline = () => recordBugAction("offline");
   const online = () => recordBugAction("online");

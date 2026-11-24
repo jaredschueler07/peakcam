@@ -126,7 +126,7 @@ export function PeakFooter() {
         <div className="pt-6 border-t-[1.5px] border-dashed border-bark">
           <div className="flex flex-col md:flex-row justify-between items-center gap-3">
             <p className="font-mono text-[11px] text-bark uppercase tracking-[0.12em]">
-              &copy; {new Date().getFullYear()} PeakCam · Sensor data synced every 6 h · pages refresh hourly
+              &copy; <span suppressHydrationWarning>{new Date().getUTCFullYear()}</span> PeakCam · Sensor data synced every 6 h · pages refresh hourly
             </p>
             <Link
               href="/alerts"
