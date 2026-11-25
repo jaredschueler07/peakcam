@@ -49,6 +49,7 @@ import {
 } from "../lib/forecast/open-meteo-models.js";
 import { blendRuns } from "../lib/forecast/blend.js";
 import { countFailure, emptyTally, formatFailureLine, formatRunWindow, formatTally, type OpenMeteoFailure } from "../lib/open-meteo-failure.js";
+import { retryDelayMs, withOpenMeteoRetry } from "../lib/open-meteo-retry.js";
 import { issueHour, type ForecastRunRow } from "../lib/forecast/store.js";
 import { pageParams, readAllPages } from "../lib/paged-read.js";
 import { DELETE_AFTER_DAYS, PRUNE_BEFORE_UTC_HOUR, THIN_AFTER_DAYS, isPruneRun, selectRunsToDelete } from "../lib/forecast/retention.js";
@@ -108,6 +109,12 @@ const writeHeaders = { apikey: SERVICE_KEY ?? "", Authorization: `Bearer ${SERVI
 
 /** Pause between Open-Meteo calls (their limit is 600/min; this keeps a full run near 1/s). */
 const CALL_GAP_MS = 150;
+/**
+ * Wait before the end-of-run pass over points that still failed after their
+ * in-place retries: long enough for a minutely limit or a short outage to
+ * clear (lib/open-meteo-retry.ts).
+ */
+const END_PASS_WAIT_MS = 90_000;
 const DELETE_CHUNK = 100;
 
 function sleep(ms: number): Promise<void> {
@@ -242,8 +249,43 @@ async function main(): Promise<void> {
   let runsWritten = 0;
   let runsSkipped = 0;
   let pointsFailed = 0;
+  let pointsRecovered = 0;
   let resortsFailed = 0;
   const failures = emptyTally();
+  // Points that still failed after their in-place retries get one more pass at the end of the run.
+  const retryLater: { resort: SyncResort; pt: ResortPoint; wanted: ModelRun["model"][] }[] = [];
+
+  /** One point's request, retried in place on 429 / 5xx / timeout / network (lib/open-meteo-retry.ts). */
+  const fetchPoint = async (resort: SyncResort, pt: ResortPoint, wanted: ModelRun["model"][]) => {
+    const label = `${resort.name} ${pt.point}`;
+    const result = await withOpenMeteoRetry<ModelRun[]>((onFailure) => fetchModelRuns({ lat: resort.lat, lng: resort.lng, elevationFt: pt.elevationFt, models: wanted }, {}, onFailure), {
+      sleep,
+      onRetry: (f, retry, waitMs) => console.error(`  ${formatFailureLine(f, label)} retry=${retry} wait=${Math.round(waitMs / 1000)}s`),
+    });
+    calls += result.attempts;
+    await sleep(CALL_GAP_MS);
+    return { runs: result.value, last: result.failures.at(-1) ?? null, label };
+  };
+
+  const writeRuns = async (resort: SyncResort, pt: ResortPoint, runs: ModelRun[]) => {
+    if (!dryRun) {
+      for (const run of runs) {
+        await insertRun(resort.id, pt.point, run, issuedAt);
+        runsWritten++;
+      }
+    } else {
+      runsWritten += runs.length;
+    }
+  };
+
+  const logFinalFailure = (seen: OpenMeteoFailure | null, label: string) => {
+    pointsFailed++;
+    // One line per failed point, with the status, any Retry-After and
+    // rate-limit headers and Open-Meteo's reason (lib/open-meteo-failure.ts).
+    // A 200 whose body held no usable run has no failure object: "other".
+    countFailure(failures, seen);
+    console.error(`  ${seen ? formatFailureLine(seen, label) : `${new Date().toISOString()} Open-Meteo FAIL ${label} class=other status=200 reason="response held no usable model run"`}`);
+  };
 
   for (const resort of resorts) {
     try {
@@ -258,32 +300,19 @@ async function main(): Promise<void> {
           perPoint.push(`${pt.point}: already written`);
           continue;
         }
-        calls++;
-        let failure: OpenMeteoFailure | null = null;
-        const runs = await fetchModelRuns({ lat: resort.lat, lng: resort.lng, elevationFt: pt.elevationFt, models: wanted }, {}, (f) => {
-          failure = f;
-        });
-        await sleep(CALL_GAP_MS);
+        const { runs, last, label } = await fetchPoint(resort, pt, wanted);
         if (!runs) {
-          pointsFailed++;
-          // One line per failed request, with the status, any Retry-After and
-          // rate-limit headers and Open-Meteo's reason (lib/open-meteo-failure.ts).
-          // A 200 whose body held no usable run has no failure object: "other".
-          const seen = failure as OpenMeteoFailure | null;
-          countFailure(failures, seen);
-          const label = `${resort.name} ${pt.point}`;
-          console.error(`  ${seen ? formatFailureLine(seen, label) : `${new Date().toISOString()} Open-Meteo FAIL ${label} class=other status=200 reason="response held no usable model run"`}`);
-          perPoint.push(`${pt.point}: Open-Meteo failed (${seen ? `${seen.kind}${seen.status != null ? ` ${seen.status}` : ""}` : "empty response"})`);
+          // A daily or hourly limit, an empty 200 or another 4xx will not clear in 90 s: no second pass.
+          if (retryDelayMs(last, 1, new Date()) != null) {
+            retryLater.push({ resort, pt, wanted });
+            perPoint.push(`${pt.point}: Open-Meteo failed (${last?.kind}${last?.status != null ? ` ${last.status}` : ""}), tried again at the end of the run`);
+          } else {
+            logFinalFailure(last, label);
+            perPoint.push(`${pt.point}: Open-Meteo failed (${last ? `${last.kind}${last.status != null ? ` ${last.status}` : ""}` : "empty response"})`);
+          }
           continue;
         }
-        if (!dryRun) {
-          for (const run of runs) {
-            await insertRun(resort.id, pt.point, run, issuedAt);
-            runsWritten++;
-          }
-        } else {
-          runsWritten += runs.length;
-        }
+        await writeRuns(resort, pt, runs);
         const blend = blendRuns(runs);
         perPoint.push(
           `${pt.point}${pt.elevationFt != null ? ` ${pt.elevationFt} ft` : ""}: ${runs.length} models (${runs.map((r) => `${modelLabel(r.model)} ${r.horizonDays}d`).join(", ")}) → 48h ${blend.next48hCm} cm, 7d ${blend.total7dCm} cm, 14d ${blend.total14dCm} cm${blend.peak ? `, peak ${blend.peak.cm} cm on ${blend.peak.date} (${blend.peak.windowDays} d)` : ""}`,
@@ -299,6 +328,30 @@ async function main(): Promise<void> {
       resortsFailed++;
       console.error(`  FAIL ${resort.name} — ${err instanceof Error ? err.message : String(err)}`);
     }
+  }
+
+  // End-of-run pass: the failed points get one more set of tries after a pause.
+  if (retryLater.length) {
+    console.log(`\n[forecast-sync] ${retryLater.length} point(s) failed; trying them again in ${END_PASS_WAIT_MS / 1000} s`);
+    await sleep(END_PASS_WAIT_MS);
+    const failedResorts = new Set<string>();
+    for (const { resort, pt, wanted } of retryLater) {
+      try {
+        const { runs, last, label } = await fetchPoint(resort, pt, wanted);
+        if (!runs) {
+          logFinalFailure(last, label);
+          failedResorts.add(resort.id);
+          continue;
+        }
+        await writeRuns(resort, pt, runs);
+        pointsRecovered++;
+        console.log(`  RECOVERED ${label}: ${runs.length} models`);
+      } catch (err) {
+        failedResorts.add(resort.id);
+        console.error(`  FAIL ${resort.name} ${pt.point} (end-of-run pass) — ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    resortsFailed += failedResorts.size;
   }
 
   // Retention: once a day, in the 01:05 Central run (isPruneRun,
@@ -318,7 +371,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `\n[forecast-sync] Done. ${resorts.length} resorts, ${calls} Open-Meteo calls, ${runsWritten} runs ${dryRun ? "would be " : ""}written, ${runsSkipped} already present, ${pointsFailed} points failed, ${resortsFailed} resorts failed. Retention: ${shouldPrune ? `${pruned} old runs pruned${pruneFailed ? `, ${pruneFailed} resorts failed to prune` : ""}` : `not this run (${dryRun ? "dry run" : noPrune ? "--no-prune" : `only the run that starts before ${PRUNE_BEFORE_UTC_HOUR}:00 UTC prunes`})`}. Open-Meteo failures by class: ${formatTally(failures)}. Run ${formatRunWindow(startedAt, new Date())}. Weather data by Open-Meteo.com (CC BY 4.0).`,
+    `\n[forecast-sync] Done. ${resorts.length} resorts, ${calls} Open-Meteo calls, ${runsWritten} runs ${dryRun ? "would be " : ""}written, ${runsSkipped} already present, ${pointsFailed} points failed (${pointsRecovered} recovered on the end-of-run pass), ${resortsFailed} resorts failed. Retention: ${shouldPrune ? `${pruned} old runs pruned${pruneFailed ? `, ${pruneFailed} resorts failed to prune` : ""}` : `not this run (${dryRun ? "dry run" : noPrune ? "--no-prune" : `only the run that starts before ${PRUNE_BEFORE_UTC_HOUR}:00 UTC prunes`})`}. Open-Meteo failures by class: ${formatTally(failures)}. Run ${formatRunWindow(startedAt, new Date())}. Weather data by Open-Meteo.com (CC BY 4.0).`,
   );
   if (resortsFailed > 0 && resortsFailed === resorts.length) process.exit(1);
 }

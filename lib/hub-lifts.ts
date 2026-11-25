@@ -123,7 +123,7 @@ export function liftsCellLabel(lifts: HubLifts, name: string): string {
   if (lifts.state === "scheduled") {
     return `${name}: ${lifts.scheduled} ${lifts.scheduled === 1 ? "lift" : "lifts"} set to run today per the operator's feed, none confirmed turning yet, read at ${formatMountainTime(lifts.observedAt)}`;
   }
-  return `${name}: ${lifts.open} of ${lifts.total} lifts open per the operator's feed, read at ${formatMountainTime(lifts.observedAt)}${lifts.carried ? ", the last open reading before today's first" : lifts.current ? "" : "; the feed has shown none open since"}`;
+  return `${name}: ${lifts.open} of ${lifts.total} lifts open per the operator's feed, read at ${formatMountainTime(lifts.observedAt)}${lifts.carried ? ", the last open reading before today's first chair" : lifts.current ? "" : "; the feed has shown none open since"}`;
 }
 
 /**

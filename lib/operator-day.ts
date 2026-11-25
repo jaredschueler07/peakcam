@@ -28,8 +28,9 @@
 //   4. Else null: the feed does not decide, the season dates do.
 // Once today has any reading, today's readings alone decide.
 //
-// Carry-over: between local midnight and the day's first reading (the first
-// sync is about 06:05 Mountain) today has no readings at all. If the previous
+// Carry-over: between local midnight and first chair, today's readings (the
+// first sync is about 06:05 Mountain) say nothing yet unless they list lifts
+// as scheduled. If the previous
 // local day had a reading with a lift open, that day's latest open count is
 // carried, flagged `carried` and dated by its own reading, so callers label
 // it with yesterday's date and never call it "today". Only one day back, and
@@ -156,6 +157,15 @@ export function summarizeOperatorDay(readings: readonly OperatorReading[] | null
     if (hour >= CORE_HOURS_START && hour < CORE_HOURS_END && n(r.liftsTotal) > 0 && n(r.liftsScheduled) === 0 && n(r.liftsOpen) === 0) {
       return { state: "closed", localDate: today, liftsOpen: 0, liftsTotal: totalOf(r), liftsScheduled: null, observedAt: at.toISOString(), newestAt, current: false, carried: false };
     }
+  }
+  // Every reading so far predates first chair and none decided the day: they
+  // say nothing about today yet, exactly like having no reading at all, so
+  // yesterday's lift day still carries. Without this, the first 06:05 sync
+  // ended the carry-over and a resort with no opening date on file (Whistler
+  // Blackcomb and Heavenly on 2026-11-24, both running lifts the day before)
+  // read UNKNOWN every morning until its first chair turned.
+  if (todays.every(({ at }) => localHour(at, timeZone) < FIRST_CHAIR_HOUR)) {
+    return carriedFromYesterday(readings ?? [], timeZone, now, today);
   }
   return null;
 }

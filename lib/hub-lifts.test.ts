@@ -110,11 +110,14 @@ test("between local midnight and the first reading the previous day's count is c
   assert.equal(lifts.carried, true);
   assert.equal(lifts.open, 2);
   assert.equal(hasOpenLifts(lifts), true);
-  assert.match(liftsCellLabel(lifts, "Vail"), /read at 3:05 p\.m\. MT Nov 20, the last open reading before today's first/);
+  assert.match(liftsCellLabel(lifts, "Vail"), /read at 3:05 p\.m\. MT Nov 20, the last open reading before today's first chair/);
   assert.match(liftsFootnote([lifts])!, /the newest of them at 3:05 p\.m\. MT Nov 20/);
-  // Once today has a reading, yesterday no longer counts.
+  // A 0/0 reading before first chair says nothing about today, so yesterday still carries…
   const withToday = row({ observed_at: "2026-11-21T13:05:00Z", lifts_open: 0, lifts_scheduled: 0, lifts_total: 34, recent: [reading("2026-11-21T13:05:00Z", 0, 0, 34), ...VAIL_RECENT] });
-  assert.equal(hubLiftsFromRow(withToday, new Date("2026-11-21T13:30:00Z"), "America/Denver"), null);
+  assert.equal(hubLiftsFromRow(withToday, new Date("2026-11-21T13:30:00Z"), "America/Denver")?.carried, true);
+  // …until a reading after first chair decides the day.
+  const afterChair = row({ observed_at: "2026-11-21T16:05:00Z", lifts_open: 0, lifts_scheduled: 0, lifts_total: 34, recent: [reading("2026-11-21T16:05:00Z", 0, 0, 34), reading("2026-11-21T13:05:00Z", 0, 0, 34), ...VAIL_RECENT] });
+  assert.equal(hubLiftsFromRow(afterChair, new Date("2026-11-21T16:30:00Z"), "America/Denver"), null);
 });
 
 test("the index uses each resort's own zone", () => {
