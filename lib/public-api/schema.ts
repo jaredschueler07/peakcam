@@ -1153,7 +1153,7 @@ export const ConditionsContractSchema = z
         observedAt: z.string().describe("The reading the count comes from (ISO)."),
         newestAt: z.string().describe("The day's newest reading (ISO)."),
         current: z.boolean().describe("True when the newest reading itself still shows lifts open."),
-        carried: z.boolean().describe("True between resort-local midnight and the day's first reading: the count is the previous day's last open reading and `localDate` is that previous day. Do not call it today's."),
+        carried: z.boolean().describe("True between resort-local midnight and first chair while no reading of the day has decided it: the count is the previous day's last open reading and `localDate` is that previous day. Do not call it today's."),
       })
       .nullable()
       .optional()

@@ -19,7 +19,7 @@ import type { CamTimeline } from "@/lib/cam-timeline";
 import { clipDurationSeconds, type CamTimelapseClip, type CamTimelapses } from "@/lib/cam-timelapse";
 import type { SnowHistoryRow } from "@/lib/mcp/types";
 import { DESCRIPTION_SOURCE_LABELS, type ResortDescription } from "@/lib/resort-profile";
-import { CONDITION_FIELD_NAMES, type ConditionsContract, type Field } from "@/lib/conditions-contract";
+import { CONDITION_FIELD_NAMES, baseDepthLabel, type ConditionsContract, type Field, type FieldSource } from "@/lib/conditions-contract";
 import type { ResortConditionsView } from "./conditions";
 import { schemaUrl } from "./json-schemas";
 import { RESORT_SUBPAGES, resortTabMarkdownPath, resortTabPath } from "@/lib/resort-pages";
@@ -238,7 +238,12 @@ export function conditionsSection(view: ResortConditionsView, apiUrl: string, ba
     if (f.value == null) continue;
     const { label: baseLabel, unit } = FIELD_LABELS[name];
     // Before first chair a feed's "open" count is the day's plan, not lifts turning (lib/operator-day.ts).
-    const label = name === "liftsOpen" && c.liftDay?.state === "scheduled" ? "Lifts marked open by the feed (before first chair; see status)" : baseLabel;
+    const label =
+      name === "liftsOpen" && c.liftDay?.state === "scheduled"
+        ? "Lifts marked open by the feed (before first chair; see status)"
+        : name === "baseDepthIn"
+          ? baseDepthLabel(f.source as FieldSource)
+          : baseLabel;
     lines.push(`| ${mdCell(label)} | ${mdCell(`${String(f.value)}${unit}`)} | ${mdCell(f.source)} | ${mdCell(f.observedAt ?? "static")} | ${mdCell(tierCell(f))} |`);
   }
   lines.push("", `Recommendable today: ${c.recommendableToday ? "yes" : "no"}. ${c.reasons.join("; ")}.`);
