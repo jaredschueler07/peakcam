@@ -10,6 +10,7 @@ import {
   isOpeningToday,
   openingStatus,
   openingSummary,
+  seasonStartDay,
   sortForTable,
   toIsoDay,
   toPacificDay,
@@ -387,4 +388,33 @@ test("groupOpeningsByState normalises state codes and lists TBA resorts alphabet
   assert.equal(states[0].label, "Vermont");
   assert.deepEqual(states[0].rows.map((r) => r.resort.id), ["a", "b"]);
   assert.equal(states[0].summary.tba, 2);
+});
+
+// ── Feed-detected openings (migration 037) ──────────────────
+
+test("openingStatus: a feed opening starts the season like a passed confirmed date", () => {
+  const row = opening({ resort_id: "big-sky", projected_open: "2026-11-25", feed_open: "2026-11-25" });
+  assert.equal(openingStatus(row, "2026-11-26"), "open");
+  assert.equal(openingStatus(row, "2026-11-25"), "open");
+  // Without it the passed projection says nothing.
+  assert.equal(openingStatus(opening({ resort_id: "big-sky", projected_open: "2026-11-25" }), "2026-11-26"), "projected");
+});
+
+test("openingStatus: an early feed opening wins over a confirmed date still ahead", () => {
+  const row = opening({ resort_id: "r", confirmed_open: "2026-12-05", feed_open: "2026-11-28" });
+  assert.equal(openingStatus(row, "2026-11-30"), "open");
+  assert.equal(openingStatus(opening({ resort_id: "r", confirmed_open: "2026-12-05" }), "2026-11-30"), "confirmed");
+  assert.equal(seasonStartDay(row), "2026-11-28");
+});
+
+test("isOpeningToday: a feed opening never mails anyone", () => {
+  const row = opening({ resort_id: "r", projected_open: "2026-11-25", feed_open: "2026-11-25" });
+  assert.equal(isOpeningToday(row, "2026-11-25"), false);
+  assert.equal(isOpeningToday({ ...row, confirmed_open: "2026-11-25" }, "2026-11-25"), true);
+});
+
+test("the opening-day cron reads confirmed_open only, never feed_open", () => {
+  const route = readFileSync(new URL("../app/api/alerts/trigger/route.ts", import.meta.url), "utf-8");
+  assert.match(route, /resort_openings\?confirmed_open=eq\./);
+  assert.doesNotMatch(route, /feed_open/);
 });

@@ -29,6 +29,15 @@ export interface ResortOpening {
   confirmed_open: string | null;
   /** End of the current season — Southern-hemisphere rows carry this instead of an opening. */
   closing_date: string | null;
+  /**
+   * The local day the operator lift feed showed lifts running, written by
+   * scripts/operator-sync.ts (lib/feed-opening.ts, migration 037). Starts the
+   * season for the status like a passed `confirmed_open`, but never triggers
+   * an opening-day email. Absent until migration 037 is applied.
+   */
+  feed_open?: string | null;
+  /** What the feed showed on that day, for a person to check (migration 037). */
+  feed_open_evidence?: string | null;
   source_url: string | null;
   notes: string | null;
   updated_at: string;
@@ -183,13 +192,29 @@ export function formatOpeningDate(iso: string | null | undefined, style: Opening
  * alongside this season's announcement). A projection never becomes "open"
  * on its own — we do not know the lifts turned until the resort says so.
  */
+/**
+ * The day the season started or starts: the earlier of the resort's
+ * confirmed date and the day its lift feed showed lifts running
+ * (`feed_open`, an early opening when it is the earlier one); null when
+ * neither is on file.
+ */
+export function seasonStartDay(row: Pick<ResortOpening, "confirmed_open"> & { feed_open?: string | null }): string | null {
+  const days = [row.confirmed_open, row.feed_open ?? null].filter((d): d is string => !!d);
+  return days.length ? days.sort()[0] : null;
+}
+
 export function openingStatus(row: ResortOpening | null | undefined, today: Date | string): OpeningStatus {
   if (!row) return "tba";
   const day = toIsoDay(today);
 
-  if (row.confirmed_open) {
-    if (day < row.confirmed_open) return "confirmed";
-    if (row.closing_date && day > row.closing_date && row.closing_date >= row.confirmed_open) return "closed";
+  const start = seasonStartDay(row);
+  if (start) {
+    // A feed opening only ever moves the start earlier: a confirmed date
+    // still ahead with no feed opening reads "confirmed". A feed day is
+    // always in the past when written; a clock behind it falls back to
+    // what the row says without it.
+    if (day < start) return row.confirmed_open ? "confirmed" : row.projected_open ? "projected" : "tba";
+    if (row.closing_date && day > row.closing_date && row.closing_date >= start) return "closed";
     return "open";
   }
   if (row.closing_date) {
@@ -199,7 +224,11 @@ export function openingStatus(row: ResortOpening | null | undefined, today: Date
   return "tba";
 }
 
-/** True on the one day the trigger cron should mail this resort's opening-day subscribers. */
+/**
+ * True on the one day the trigger cron should mail this resort's opening-day
+ * subscribers. Reads `confirmed_open` only: a feed-detected opening
+ * (`feed_open`) never mails anyone.
+ */
 export function isOpeningToday(row: Pick<ResortOpening, "confirmed_open">, today: Date | string): boolean {
   return row.confirmed_open !== null && row.confirmed_open === toIsoDay(today);
 }
@@ -262,7 +291,7 @@ export function sortForTable<R extends OpeningResort>(
     }
   }
 
-  groups.open.sort(byDate((r) => r.opening?.confirmed_open ?? null));
+  groups.open.sort(byDate((r) => (r.opening ? seasonStartDay(r.opening) : null)));
   groups.confirmed.sort(byDate((r) => r.opening?.confirmed_open ?? null));
   groups.projected.sort(byDate((r) => r.opening?.projected_open ?? null));
   groups.tba.sort(byName);
