@@ -25,15 +25,17 @@ export interface ResortOpening {
   season: string;
   /** Third-party projection (OnTheSnow) or the resort's stated target. YYYY-MM-DD. */
   projected_open: string | null;
-  /** The resort announced this date. The only field that triggers an opening-day email. */
+  /** The resort announced this date. The trigger cron mails opening-day subscribers on it. */
   confirmed_open: string | null;
   /** End of the current season — Southern-hemisphere rows carry this instead of an opening. */
   closing_date: string | null;
   /**
    * The local day the operator lift feed showed lifts running, written by
    * scripts/operator-sync.ts (lib/feed-opening.ts, migration 037). Starts the
-   * season for the status like a passed `confirmed_open`, but never triggers
-   * an opening-day email. Absent until migration 037 is applied.
+   * season for the status like a passed `confirmed_open`. When stored on
+   * that same local day, app/api/alerts/feed-openings mails the opening-day
+   * subscribers (lib/alerts/feed-opening-email.ts); a day found afterwards
+   * mails nobody. Absent until migration 037 is applied.
    */
   feed_open?: string | null;
   /** What the feed showed on that day, for a person to check (migration 037). */
@@ -225,9 +227,10 @@ export function openingStatus(row: ResortOpening | null | undefined, today: Date
 }
 
 /**
- * True on the one day the trigger cron should mail this resort's opening-day
- * subscribers. Reads `confirmed_open` only: a feed-detected opening
- * (`feed_open`) never mails anyone.
+ * True on the day the trigger cron's confirmed-date branch would mail this
+ * resort's opening-day subscribers. Reads `confirmed_open` only: a
+ * feed-detected opening (`feed_open`) is mailed by its own same-day path,
+ * app/api/alerts/feed-openings (lib/alerts/feed-opening-email.ts).
  */
 export function isOpeningToday(row: Pick<ResortOpening, "confirmed_open">, today: Date | string): boolean {
   return row.confirmed_open !== null && row.confirmed_open === toIsoDay(today);

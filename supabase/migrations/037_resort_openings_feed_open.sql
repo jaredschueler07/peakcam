@@ -20,10 +20,14 @@
 -- Written by scripts/operator-sync.ts (service role) only while feed_open is
 -- null, so a stored day is never moved.
 --
--- EMAIL. The opening-day cron (app/api/alerts/trigger) reads confirmed_open
--- only. feed_open sends nothing, ever. Promoting a feed day to a mailed
--- opening stays a person's decision (copy it into data/resort-openings.csv
--- as confirmed_open before 13:00 UTC on that day, or not at all).
+-- EMAIL. When operator-sync stores a feed_open that is the resort's local
+-- today, it calls app/api/alerts/feed-openings, which sends the opening-day
+-- email to that resort's subscribers that same day, before 16:00 local, and
+-- once per resort per season (lib/alerts/feed-opening-email.ts). A feed day
+-- found after the fact mails nobody. The trigger cron still mails
+-- confirmed_open days, now skipping a resort whose season feed_open started
+-- earlier and deduping over the whole season. No schema change is needed for
+-- the email: it logs to powder_alert_log with kind = 'opening' as before.
 --
 -- SEED. scripts/seed-resort-openings.mjs upserts with merge-duplicates and
 -- sends only the CSV's columns, so a re-seed leaves feed_open alone. It does
@@ -39,6 +43,6 @@ alter table public.resort_openings
   add column if not exists feed_open_evidence text;
 
 comment on column public.resort_openings.feed_open is
-  'Resort-local day the operator lift feed showed a sustained lift day (lib/feed-opening.ts). Starts the season for the status rules; never triggers an opening-day email.';
+  'Resort-local day the operator lift feed showed a sustained lift day (lib/feed-opening.ts). Starts the season for the status rules; mailed same-day only, via app/api/alerts/feed-openings.';
 comment on column public.resort_openings.feed_open_evidence is
   'What the operator feed showed on feed_open, written by scripts/operator-sync.ts.';

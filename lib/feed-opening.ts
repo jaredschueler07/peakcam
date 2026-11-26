@@ -18,9 +18,11 @@
 // `confirmed_open`, so the morning "scheduled" readings open the resort and a
 // 0-open core-hours reading reads CLOSED_TODAY instead of UNKNOWN.
 //
-// EMAIL. `feed_open` is never read by the opening-day email cron
-// (app/api/alerts/trigger reads `confirmed_open` only), so a feed-detected
-// opening sends nothing, glitch or not. See isOpeningToday in lib/openings.ts.
+// EMAIL. While the stored day is still the resort's local today, operator-sync
+// asks app/api/alerts/feed-openings to send the usual opening-day email.
+// lib/alerts/feed-opening-email.ts holds that path's guards (same local day
+// only, before the lifts close, once per resort per season); everything
+// below decides whether a day is stored at all, so a glitch never reaches it.
 //
 // GUARDS (the Beaver Creek glitch of 2026-11-23, which PR #168 already keeps
 // out of the status, must not become a stored opening either):
@@ -185,7 +187,7 @@ export function feedOpeningEvidence(found: FeedOpening, timeZone: string, source
   const lifts = found.liftsTotal != null ? `${found.maxOpen} of ${found.liftsTotal}` : `${found.maxOpen}`;
   return (
     `Operator lift feed showed lifts open on ${found.day}: up to ${lifts} in ${found.readings} readings from ${clock(found.firstAt)} to ${clock(found.lastAt)} resort time` +
-    `${found.early ? " (before the opening date on file)" : ""}. Detected by operator-sync; no opening-day email is sent for this.` +
+    `${found.early ? " (before the opening date on file)" : ""}. Detected by operator-sync.` +
     `${sourceUrl ? ` Source: ${sourceUrl}` : ""}`
   );
 }

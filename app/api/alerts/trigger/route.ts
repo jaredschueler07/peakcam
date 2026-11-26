@@ -10,6 +10,7 @@ import {
   type OpeningPreference,
   type OpeningTodayResort,
 } from "@/lib/alerts/opening-day";
+import { cronOpeningsToMail, seasonLogStart } from "@/lib/alerts/feed-opening-email";
 import { formatOpeningDate } from "@/lib/openings";
 import type { WeatherPeriod } from "@/lib/types";
 import { SITE_URL } from "@/lib/site";
@@ -245,13 +246,17 @@ async function runFreshnessCheck(): Promise<FreshnessSummary> {
 // ── Opening-day alerts ──────────────────────────────────────────────────────
 // Resorts whose confirmed opening date is today (UTC) → one email per
 // subscriber who opted in (alert_preferences.opening_day) for any of them,
-// deduped through powder_alert_log rows with kind = 'opening'. Isolated from
+// deduped through powder_alert_log rows with kind = 'opening' over the whole
+// season, so a resort mails each subscriber once per season. A resort whose
+// season the lift feed already started on an earlier day (feed_open, mailed
+// same-day by app/api/alerts/feed-openings) is skipped here. Isolated from
 // the powder branch the same way the freshness check is: nothing here can
 // stop a powder alert, and a powder failure never skips this. Four batched
 // reads at most; on the ~350 days a year with no opening it is one.
 
 interface OpeningRow {
   resort_id: string;
+  feed_open?: string | null;
   resorts: { name: string; slug: string } | null;
 }
 
@@ -270,12 +275,18 @@ async function runOpeningDayAlerts(today: string): Promise<OpeningsSummary> {
     // 1. Who opens today? A missing table (migration 020 not applied) or any
     //    other non-2xx is a failed run, not "nobody" — silence here would hide
     //    a broken cron on the one morning it matters.
-    const openingsResp = await sbFetch(
-      `/resort_openings?confirmed_open=eq.${today}&select=resort_id,resorts(name,slug)`
+    //    feed_open (migration 037) is read so a season the lift feed already
+    //    started is not announced again; before 037 is applied the select
+    //    falls back to the old columns.
+    let openingsResp = await sbFetch(
+      `/resort_openings?confirmed_open=eq.${today}&select=resort_id,feed_open,resorts(name,slug)`
     );
+    if (openingsResp.status === 400) {
+      openingsResp = await sbFetch(`/resort_openings?confirmed_open=eq.${today}&select=resort_id,resorts(name,slug)`);
+    }
     if (!openingsResp.ok) return fail("openings_query_failed");
     const openingRows: OpeningRow[] = await openingsResp.json();
-    const opening = openingRows.filter((row) => row.resorts !== null);
+    const opening = cronOpeningsToMail(openingRows, today).filter((row) => row.resorts !== null);
     summary.resortsOpening = opening.length;
     if (opening.length === 0) return finish();
 
@@ -287,7 +298,8 @@ async function runOpeningDayAlerts(today: string): Promise<OpeningsSummary> {
       sbFetch(
         `/alert_preferences?resort_id=in.(${idList})&opening_day=is.true&select=subscriber_id,resort_id,alert_subscribers(id,email,manage_token)`
       ),
-      sbFetch(`/powder_alert_log?kind=eq.opening&alert_date=eq.${today}&resort_id=in.(${idList})&select=subscriber_id,resort_id`),
+      // Season-wide: an opening email already sent this season (by either path) is never repeated.
+      sbFetch(`/powder_alert_log?kind=eq.opening&alert_date=gte.${seasonLogStart()}&resort_id=in.(${idList})&select=subscriber_id,resort_id`),
       sbFetch(`/cams?resort_id=in.(${idList})&is_active=eq.true&select=resort_id`),
     ]);
     if (!prefsResp.ok) return fail("openings_prefs_query_failed");

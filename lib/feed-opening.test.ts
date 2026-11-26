@@ -129,10 +129,10 @@ test("the early-opening share matches the status rule from PR #168", () => {
   assert.equal(EARLY_OPEN_MAX_SHARE, PRE_SEASON_IMPLAUSIBLE_OPEN_SHARE);
 });
 
-test("evidence text names the day, the counts and the resort-time window, and says no email is sent", () => {
+test("evidence text names the day, the counts and the resort-time window", () => {
   const v = detect(BIG_SKY, mt("16:00", NOV25), row({ projected_open: NOV25 }));
   assert.ok(v.ok);
   const text = feedOpeningEvidence(v.opening, ZONE, "https://example.test/lifts");
   assert.match(text, /lifts open on 2026-11-25: up to 8 of 40 in 4 readings from 09:05 to 15:35 resort time/);
-  assert.match(text, /no opening-day email is sent/);
+  assert.match(text, /Detected by operator-sync\. Source: https:\/\/example\.test\/lifts$/);
 });

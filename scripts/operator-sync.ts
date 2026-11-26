@@ -39,10 +39,17 @@
  *         anon key when present, else from data/resorts.csv.
  * Writes: operator_status (service role); resort_openings.feed_open and
  *         feed_open_evidence (migration 037) when the feed shows a resort's
- *         first sustained lift day of the season (lib/feed-opening.ts). That
- *         column is never read by the opening-day email cron, so a detected
- *         opening mails nobody. `--no-feed-openings` skips the pass; a dry
- *         run prints what it would store.
+ *         first sustained lift day of the season (lib/feed-opening.ts).
+ *         `--no-feed-openings` skips the pass; a dry run prints what it
+ *         would store.
+ * Calls:  POST {SITE_URL}/api/alerts/feed-openings (Bearer CRON_SECRET from
+ *         .env.local) on a run where some synced resort's feed_open is its
+ *         local today, so its opening-alert subscribers get the same-day
+ *         opening email. The route decides who is mailed from the database
+ *         (lib/alerts/feed-opening-email.ts: same local day only, before the
+ *         lifts close, once per resort per season) and the call carries no
+ *         resort list. A dry run, `--no-feed-openings` or
+ *         `--no-opening-emails` never calls it.
  *
  * Exit codes: 0 when at least one resort produced lift status (failures are
  * counted by class in the last lines); 1 when every resort failed, when the
@@ -58,7 +65,8 @@ import { fetchLiftieResort, liftiePairs, operatorStatusRow, type LiftieReport, t
 import { OPERATOR_USER_AGENT, WORKER_NOT_INSTALLED, localResultToReport, runLiftieWorker, type LocalResult } from "../lib/operators/liftie-local.js";
 import { detectFeedOpening, feedOpeningEvidence, type FeedOpeningOpening } from "../lib/feed-opening.js";
 import type { OperatorReading } from "../lib/operator-day.js";
-import { resortTimeZone } from "../lib/resort-timezone.js";
+import { localDay, resortTimeZone } from "../lib/resort-timezone.js";
+import { SITE_URL } from "../lib/site.js";
 
 // ─── Env ──────────────────────────────────────────────────────────────────
 
@@ -94,6 +102,8 @@ const USE_LIFTIE_API = args.includes("--liftie-api");
 const USER_AGENT = process.env.OPERATOR_SYNC_USER_AGENT?.trim() || OPERATOR_USER_AGENT;
 /** Skip the feed-opening pass (lib/feed-opening.ts) after the lift writes. */
 const NO_FEED_OPENINGS = args.includes("--no-feed-openings");
+const NO_OPENING_EMAILS = args.includes("--no-opening-emails");
+const CRON_SECRET = process.env.CRON_SECRET;
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -251,27 +261,33 @@ async function storeFeedOpening(resortId: string, day: string, evidence: string,
  * (lib/feed-opening.ts). Fails soft: any error here is logged and the run's
  * exit code is unchanged, because the lift rows are already stored.
  */
-async function recordFeedOpenings(resorts: ResortRow[], now: Date): Promise<void> {
-  if (NO_FEED_OPENINGS) return;
+async function recordFeedOpenings(resorts: ResortRow[], now: Date): Promise<string[]> {
+  const openingToday: string[] = [];
+  if (NO_FEED_OPENINGS) return openingToday;
   if (!SUPABASE_URL || !(SERVICE_KEY ?? ANON_KEY)) {
     console.log("[operator-sync] Feed openings: no Supabase key, skipped.");
-    return;
+    return openingToday;
   }
   const real = resorts.filter((r) => !r.id.startsWith("csv:"));
-  if (!real.length) return;
+  if (!real.length) return openingToday;
   try {
     const openings = await fetchOpeningsForFeed();
     if (!openings) {
       console.log("[operator-sync] Feed openings: resort_openings.feed_open is missing (apply migration 037); skipped.");
-      return;
+      return openingToday;
     }
     const byResort = new Map(openings.map((o) => [o.resort_id, o]));
     const readings = await fetchRecentReadings(real.map((r) => r.id), now);
     let stored = 0;
     for (const resort of real) {
+      const timeZone = resortTimeZone({ state: resort.state ?? "", country: resort.country ?? "", lng: resort.lng ?? -105, lat: resort.lat });
+      // Stored on an earlier run today: still today's opening (the route dedupes, so a retry is safe).
+      if (byResort.get(resort.id)?.feed_open === localDay(now, timeZone)) {
+        openingToday.push(resort.name);
+        continue;
+      }
       const rows = readings.get(resort.id) ?? [];
       if (!rows.length) continue;
-      const timeZone = resortTimeZone({ state: resort.state ?? "", country: resort.country ?? "", lng: resort.lng ?? -105, lat: resort.lat });
       const verdict = detectFeedOpening({
         readings: rows.map((r): OperatorReading => ({ observedAt: r.observed_at, liftsOpen: r.lifts_open, liftsScheduled: r.lifts_scheduled, liftsTotal: r.lifts_total })),
         opening: byResort.get(resort.id) ?? null,
@@ -289,11 +305,37 @@ async function recordFeedOpenings(resorts: ResortRow[], now: Date): Promise<void
       if (await storeFeedOpening(resort.id, verdict.opening.day, evidence, now)) {
         stored++;
         console.log(`  FEED ${resort.name}: feed_open ${verdict.opening.day} — ${evidence}`);
+        if (verdict.opening.day === localDay(now, timeZone)) openingToday.push(resort.name);
       }
     }
     console.log(`[operator-sync] Feed openings: ${DRY_RUN ? "dry run, nothing stored" : `${stored} stored`}.`);
   } catch (err) {
     console.error(`[operator-sync] Feed openings failed (lift rows are stored): ${err instanceof Error ? err.message : err}`);
+  }
+  return openingToday;
+}
+
+/**
+ * Asks the site to send today's feed-opening emails. The route re-reads every
+ * fact it acts on, so this call names no resorts and a repeat is harmless.
+ * Fails soft, like the feed pass.
+ */
+async function requestOpeningEmails(openingToday: string[]): Promise<void> {
+  if (!openingToday.length || DRY_RUN || NO_OPENING_EMAILS) return;
+  if (!CRON_SECRET) {
+    console.log("[operator-sync] Opening emails: CRON_SECRET not set, not requested.");
+    return;
+  }
+  try {
+    const res = await fetch(`${SITE_URL}/api/alerts/feed-openings`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${CRON_SECRET}` },
+      signal: AbortSignal.timeout(70_000),
+    });
+    const body = await res.text();
+    console.log(`[operator-sync] Opening emails for ${openingToday.join(", ")}: ${res.status} ${body.slice(0, 500)}`);
+  } catch (err) {
+    console.error(`[operator-sync] Opening emails request failed: ${err instanceof Error ? err.message : err}`);
   }
 }
 
@@ -390,7 +432,8 @@ async function main(): Promise<void> {
   }
 
   // A fresh clock: the rows just written carry the operators' own times, up to the run's length after `now`.
-  await recordFeedOpenings(targets.map((t) => bySlug.get(t.slug)!), new Date());
+  const openingToday = await recordFeedOpenings(targets.map((t) => bySlug.get(t.slug)!), new Date());
+  await requestOpeningEmails(openingToday);
 
   const failed = [...tally.failures.entries()].map(([k, n]) => `${k} ${n}`).join(", ");
   const failedCount = [...tally.failures.values()].reduce((a, b) => a + b, 0);
