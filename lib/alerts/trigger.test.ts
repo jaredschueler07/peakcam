@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
 import { setEmailClientForTests, type EmailClient } from "../email";
+import { seasonLogStart } from "./feed-opening-email";
 
 test("trigger evaluates subscribers separately and preserves live alerts during forecast failures", async (t) => {
   const savedEnv = { ...process.env };
@@ -262,7 +263,7 @@ test("rounds fractional forecast totals and reports a failed log insert", async 
 // ── Opening-day branch ────────────────────────────────────────
 // Resorts whose confirmed_open is today → one email per opted-in subscriber,
 // logged as kind='opening'. Isolated from the powder branch in both
-// directions, and never a second email for the same resort/day.
+// directions, and never a second email for the same resort in a season.
 
 const TRIGGER_ENV = ["CRON_SECRET", "NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "RESEND_API_KEY"] as const;
 
@@ -334,7 +335,7 @@ test("opening day: one email per opted-in subscriber, logged as kind=opening, ne
           logRows.push(...body);
           return json([]);
         }
-        assert.ok(url.includes("kind=eq.opening") && url.includes(`alert_date=eq.${today}`), "dedupe read is scoped to today's opening rows");
+        assert.ok(url.includes("kind=eq.opening") && url.includes(`alert_date=gte.${seasonLogStart()}`), "dedupe read covers the whole season's opening rows");
         return json(logRows.map(({ subscriber_id, resort_id }) => ({ subscriber_id, resort_id })));
       }
       throw new Error(`Unexpected fetch: ${url}`);
@@ -375,6 +376,58 @@ test("opening day: one email per opted-in subscriber, logged as kind=opening, ne
     assert.deepEqual((await second.json()).openings, { resortsOpening: 2, attempted: 0, sent: 0, failed: 0, logFailures: 0 });
     assert.equal(sent.length, 2);
     assert.equal(posts.length, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+    setEmailClientForTests(null);
+    restoreEnv();
+  }
+});
+
+test("opening day: a season the lift feed already started, or an opening email earlier this season, sends nothing on the confirmed date", async () => {
+  const restoreEnv = withTriggerEnv();
+  const originalFetch = globalThis.fetch;
+  const { GET } = await import("../../app/api/alerts/trigger/route");
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  let posts = 0;
+  try {
+    const sent = captureMail();
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      if (url.includes("/powder_alert_runs")) return new Response(JSON.stringify([{ id: "run-1" }]));
+      if (url.includes("/alert_destinations")) return new Response("[]");
+      const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
+      if (url.includes("/snow_reports?")) return json([{ updated_at: new Date().toISOString() }]);
+      if (url.includes("/resort_openings?")) {
+        assert.ok(url.includes("feed_open"), "reads feed_open with the confirmed date");
+        return json([
+          // The feed started Big Sky's season yesterday: today's confirmed date is not news.
+          { resort_id: "r-big-sky", feed_open: yesterday, resorts: { name: "Big Sky", slug: "big-sky" } },
+          // Alta: no feed day, but Ann already had an Alta opening email earlier this season.
+          { resort_id: "r-alta", feed_open: null, resorts: { name: "Alta", slug: "alta" } },
+        ]);
+      }
+      if (url.includes("/alert_preferences?") && url.includes("opening_day=is.true")) {
+        const ann = { id: "s-ann", email: "ann@example.com", manage_token: "tok-ann" };
+        assert.ok(!url.includes("r-big-sky"), "the feed-started resort is not even looked up");
+        return json([{ subscriber_id: "s-ann", resort_id: "r-alta", alert_subscribers: ann }]);
+      }
+      if (url.includes("/alert_preferences?")) return json([]);
+      if (url.includes("/cams?")) return json([]);
+      if (url.includes("/powder_alert_log")) {
+        if (init?.method === "POST") {
+          posts++;
+          return json([]);
+        }
+        return json([{ subscriber_id: "s-ann", resort_id: "r-alta" }]);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    };
+    const response = await GET(authed());
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json()).openings, { resortsOpening: 1, attempted: 0, sent: 0, failed: 0, logFailures: 0 });
+    assert.deepEqual(sent, []);
+    assert.equal(posts, 0);
   } finally {
     globalThis.fetch = originalFetch;
     setEmailClientForTests(null);

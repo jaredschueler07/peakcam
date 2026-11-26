@@ -10,6 +10,7 @@ import {
   isOpeningToday,
   openingStatus,
   openingSummary,
+  seasonStartDay,
   sortForTable,
   toIsoDay,
   toPacificDay,
@@ -387,4 +388,37 @@ test("groupOpeningsByState normalises state codes and lists TBA resorts alphabet
   assert.equal(states[0].label, "Vermont");
   assert.deepEqual(states[0].rows.map((r) => r.resort.id), ["a", "b"]);
   assert.equal(states[0].summary.tba, 2);
+});
+
+// ── Feed-detected openings (migration 037) ──────────────────
+
+test("openingStatus: a feed opening starts the season like a passed confirmed date", () => {
+  const row = opening({ resort_id: "big-sky", projected_open: "2026-11-25", feed_open: "2026-11-25" });
+  assert.equal(openingStatus(row, "2026-11-26"), "open");
+  assert.equal(openingStatus(row, "2026-11-25"), "open");
+  // Without it the passed projection says nothing.
+  assert.equal(openingStatus(opening({ resort_id: "big-sky", projected_open: "2026-11-25" }), "2026-11-26"), "projected");
+});
+
+test("openingStatus: an early feed opening wins over a confirmed date still ahead", () => {
+  const row = opening({ resort_id: "r", confirmed_open: "2026-12-05", feed_open: "2026-11-28" });
+  assert.equal(openingStatus(row, "2026-11-30"), "open");
+  assert.equal(openingStatus(opening({ resort_id: "r", confirmed_open: "2026-12-05" }), "2026-11-30"), "confirmed");
+  assert.equal(seasonStartDay(row), "2026-11-28");
+});
+
+test("isOpeningToday is the confirmed-date path only (feed openings mail through app/api/alerts/feed-openings)", () => {
+  const row = opening({ resort_id: "r", projected_open: "2026-11-25", feed_open: "2026-11-25" });
+  assert.equal(isOpeningToday(row, "2026-11-25"), false);
+  assert.equal(isOpeningToday({ ...row, confirmed_open: "2026-11-25" }, "2026-11-25"), true);
+});
+
+test("the opening-day cron mails confirmed dates; only the feed-openings route mails feed days, and only behind the cron secret", () => {
+  const cron = readFileSync(new URL("../app/api/alerts/trigger/route.ts", import.meta.url), "utf-8");
+  assert.match(cron, /resort_openings\?confirmed_open=eq\./);
+  assert.match(cron, /cronOpeningsToMail\(/, "a season the feed started earlier is skipped");
+  const feed = readFileSync(new URL("../app/api/alerts/feed-openings/route.ts", import.meta.url), "utf-8");
+  assert.match(feed, /Bearer \$\{CRON_SECRET\}/);
+  assert.match(feed, /feedOpeningMailVerdict\(/, "every feed day passes the same-day guard");
+  assert.doesNotMatch(feed, /export async function GET/, "no Vercel cron or browser can trigger it");
 });

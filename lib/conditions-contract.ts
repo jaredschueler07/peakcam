@@ -236,14 +236,17 @@ function count(n: number | null | undefined): number {
  * 1. A fresh operator feed decides first, read over the resort's local day
  *    (lib/operator-day.ts): any reading today with a lift open → OPEN for
  *    the rest of that day; else lifts scheduled in the newest reading (before
- *    the lift day ends) → OPEN, but only once a confirmed opening date has
- *    passed (a standing "scheduled" flag never opens a resort by itself);
+ *    the lift day ends) → OPEN, but only once the season has started — a
+ *    confirmed opening date has passed, or the feed itself showed a
+ *    sustained lift day earlier this season (`feed_open`, stored by
+ *    scripts/operator-sync.ts through lib/feed-opening.ts) — a standing
+ *    "scheduled" flag never opens a resort by itself;
  *    else a core-hours reading (10:00–15:00 local)
  *    with nothing open or scheduled while the season is on → CLOSED_TODAY.
  *    A 0/0 reading outside core hours, yesterday's readings and a feed with
  *    no lift data say nothing and fall through.
- * 2. Else the opening row: a confirmed date that has passed (and no closing
- *    date behind it) → OPEN; a confirmed or projected date still ahead →
+ * 2. Else the opening row: a confirmed date or a stored feed opening that
+ *    has passed (and no closing date behind it) → OPEN; a confirmed or projected date still ahead →
  *    PRE_SEASON; a closing date that has passed → OFF_SEASON; a projection
  *    that has come and gone without confirmation → UNKNOWN.
  * 3. Nothing on file → UNKNOWN. The calendar alone never opens a resort.
@@ -311,11 +314,15 @@ export function deriveStatus(input: StatusInput): StatusResult {
         // A "scheduled" flag alone is not an opening: Sun Valley's page listed
         // all 17 lifts as scheduled every day before its 2026-11-26 opening,
         // and Bogus Basin lists two non-lift rows that way on closed days.
-        reasons.push(`operator feed${age}: ${day.liftsScheduled} ${day.liftsScheduled === 1 ? "lift" : "lifts"} listed as scheduled and none open; without a confirmed opening date that has passed, a scheduled flag does not open the resort, so the dates decide`);
+        reasons.push(`operator feed${age}: ${day.liftsScheduled} ${day.liftsScheduled === 1 ? "lift" : "lifts"} listed as scheduled and none open; until a confirmed opening date has passed or the feed has shown a sustained lift day this season, a scheduled flag does not open the resort, so the dates decide`);
       } else if (day?.state === "closed") {
         reasons.push(`operator feed: 0 of ${day.liftsTotal ?? "?"} lifts open and none scheduled at ${localClock(new Date(day.observedAt), timeZone)} resort time, and no reading today showed a lift open`);
         if (seasonOn) {
-          reasons.push(`inside the ${seasonWord} per the confirmed opening date${opening?.confirmed_open ? ` ${opening.confirmed_open}` : ""}`);
+          reasons.push(
+            opening?.feed_open && (!opening.confirmed_open || opening.feed_open < opening.confirmed_open)
+              ? `inside the ${seasonWord}: the operator lift feed showed lifts running on ${opening.feed_open}`
+              : `inside the ${seasonWord} per the confirmed opening date${opening?.confirmed_open ? ` ${opening.confirmed_open}` : ""}`,
+          );
           return { status: "CLOSED_TODAY", source: "operator", basis: "feed", observedAt: day.newestAt, reasons, liftDay: day };
         }
         // Not known to be in season: the feed agrees with the calendar below.
@@ -336,7 +343,9 @@ export function deriveStatus(input: StatusInput): StatusResult {
   switch (openingState) {
     case "open":
       reasons.push(
-        opening.confirmed_open
+        opening.feed_open && (!opening.confirmed_open || opening.feed_open < opening.confirmed_open)
+          ? `the operator lift feed showed lifts running on ${opening.feed_open}, so the ${seasonWord} has started${opening.closing_date ? `; closing ${opening.closing_date}` : ""}`
+          : opening.confirmed_open
           ? `confirmed opening date ${opening.confirmed_open} has passed${opening.closing_date ? `, closing ${opening.closing_date}` : ""}`
           : `inside the ${seasonWord} per the published closing date ${opening.closing_date}`,
       );

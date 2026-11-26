@@ -557,3 +557,34 @@ test("base depth: a model 0 in at an open resort is not shown (Killington, Whist
   assert.equal(baseDepthLabel(est.baseDepthIn.source), "Base depth (model estimate)");
   assert.equal(baseDepthLabel("snotel"), "Base depth (measured)");
 });
+
+// ── Feed-detected openings (lib/feed-opening.ts, migration 037) ──
+
+test("day status: the morning after a feed-detected opening reads OPEN, not UNKNOWN (Big Sky, 8 lifts scheduled at 07:05 MT on 2026-11-26)", () => {
+  const D = "2026-11-26";
+  const morning = [rd("06:05", 0, 8, 40, D), rd("06:35", 0, 8, 40, D), rd("07:05", 0, 8, 40, D)];
+  const projectedOnly = opening({ projected_open: "2026-11-25" });
+  // Before: the projection has passed, the feed only lists lifts as scheduled → UNKNOWN.
+  assert.equal(dayStatus(morning, mt("07:10", D), projectedOnly).status, "UNKNOWN");
+  // After: the feed's own Nov 25 lift day is on file → the scheduled lifts open the day.
+  const s = dayStatus(morning, mt("07:10", D), opening({ projected_open: "2026-11-25", feed_open: "2026-11-25" }));
+  assert.equal(s.status, "OPEN");
+  assert.equal(s.basis, "feed");
+});
+
+test("day status: a 0/0 gap after first chair falls to the feed opening (Alta, 0 of 5 at 08:35 MT on 2026-11-26)", () => {
+  const D = "2026-11-26";
+  const gap = [rd("06:05", 0, 0, 5, D), rd("08:05", 0, 0, 5, D), rd("08:35", 0, 0, 5, D)];
+  assert.equal(dayStatus(gap, mt("08:40", D), opening({ projected_open: "2026-11-25" })).status, "UNKNOWN");
+  const s = dayStatus(gap, mt("08:40", D), opening({ projected_open: "2026-11-25", feed_open: "2026-11-25" }));
+  assert.equal(s.status, "OPEN");
+  assert.equal(s.basis, "date");
+  assert.match(s.reasons.join(" "), /operator lift feed showed lifts running on 2026-11-25/);
+});
+
+test("day status: a closed core-hours reading after a feed opening is CLOSED_TODAY, not UNKNOWN", () => {
+  const D = "2026-12-02";
+  const closed = [rd("10:35", 0, 0, 15, D)];
+  const s = dayStatus(closed, mt("10:40", D), opening({ projected_open: "2026-11-25", feed_open: "2026-11-25" }));
+  assert.equal(s.status, "CLOSED_TODAY");
+});
